@@ -1,0 +1,419 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Session Handoff — 2026-02-17 | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>session handoff 2026 02 17</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/session-handoff-2026-02-17.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Session Handoff — 2026-02-17</h1>
+<blockquote>
+<p>Operational restart point for the next agent session.
+Every claim cites a file path. Uncitable claims labeled [SPECULATION].</p>
+</blockquote>
+<hr>
+<h2>1. REPO STATE (GROUND TRUTH)</h2>
+<p><strong>Current branch</strong>: <code>docs/repo-reality-map</code> (docs PR only — no code changes)</p>
+<p><strong>main HEAD</strong>: <code>31ab0692</code> — <code>Merge pull request #1203 from InterCooperative-Network/feat/executor-observability</code></p>
+<h3>Open PRs (pilot-relevant)</h3>
+<table>
+<thead>
+<tr>
+<th>PR</th>
+<th>Title</th>
+<th>Branch</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>#1205</td>
+<td>docs(architecture): ICN repo reality map</td>
+<td><code>docs/repo-reality-map</code></td>
+<td>Open, docs-only</td>
+</tr>
+<tr>
+<td>#1188</td>
+<td>deps(ts-sdk): bump dev-dependencies</td>
+<td>dependabot</td>
+<td>Open, unrelated</td>
+</tr>
+<tr>
+<td>#1187</td>
+<td>deps(rn-sdk): bump react-native</td>
+<td>dependabot</td>
+<td>Open, unrelated</td>
+</tr>
+</tbody></table>
+<h3>Open Issues (pilot-path)</h3>
+<table>
+<thead>
+<tr>
+<th>Issue</th>
+<th>Title</th>
+<th>Impact</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>#1204</td>
+<td>audit(ledger): verify idempotency at ledger mutation boundary</td>
+<td><strong>Tier-1 blocker</strong> — PR-4 target</td>
+</tr>
+<tr>
+<td>#1201</td>
+<td>feat(core): operator query for execution records by status</td>
+<td>Nice-to-have, not blocking</td>
+</tr>
+<tr>
+<td>#1200</td>
+<td>feat(core): execution record retention + startup cleanup</td>
+<td>Nice-to-have, not blocking</td>
+</tr>
+<tr>
+<td>#1195</td>
+<td>feat(core): releasing timeout for stuck escrows</td>
+<td>Nice-to-have, not blocking</td>
+</tr>
+<tr>
+<td>#1147</td>
+<td>[EPIC] Vertical Slice: Identity→Governance→Compute→Receipts→Audit</td>
+<td>Epic tracker</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>2. CANONICAL INVARIANTS (PROVEN BY TESTS)</h2>
+<h3>2a. Decision Execution Idempotency</h3>
+<p><strong>Invariant</strong>: Once <code>status = Confirmed</code>, executor NEVER re-executes for the same <code>decision_hash</code>.</p>
+<ul>
+<li><strong>Test</strong>: <code>icn-core/src/supervisor/decision_executor.rs:719</code> — <code>test_idempotency_skips_confirmed</code></li>
+<li><strong>Test</strong>: <code>icn-core/src/supervisor/decision_executor.rs:751</code> — <code>test_idempotency_skips_permanently_failed</code></li>
+<li><strong>Implementation</strong>: <code>icn-core/src/supervisor/decision_executor.rs:170-195</code> — <code>execute_decision()</code> checks store before proceeding</li>
+<li><strong>Store trait</strong>: <code>icn-kernel-api/src/execution.rs:172-184</code> — <code>ExecutionStore::get()</code> keyed by <code>decision_hash</code></li>
+</ul>
+<h3>2b. Crash Recovery</h3>
+<p><strong>Invariant</strong>: On startup, all <code>Pending</code> and <code>Executing</code> records are re-processed; <code>Confirmed</code> and <code>PermanentlyFailed</code> are skipped.</p>
+<ul>
+<li><strong>Test</strong>: <code>icn-core/src/supervisor/decision_executor.rs:696</code> — <code>test_execute_records_status</code> (verifies status transitions)</li>
+<li><strong>Implementation</strong>: <code>icn-core/src/supervisor/decision_executor.rs:80</code> — <code>recover_in_flight()</code> scans <code>Pending</code> + <code>Executing</code></li>
+<li><strong>Observability</strong>: Recovery logs status distribution at startup (added in PR #1203, commit <code>155c3c0b</code>)</li>
+</ul>
+<h3>2c. Retry Accumulation + Cap</h3>
+<p><strong>Invariant</strong>: <code>retries</code> counter increments on each failure; exceeding max → <code>PermanentlyFailed</code>.</p>
+<ul>
+<li><strong>Test</strong>: <code>icn-kernel-api/src/execution.rs:209-223</code> — <code>test_execution_record_failure_path</code> (verifies retries=1 after first failure)</li>
+<li><strong>Implementation</strong>: <code>icn-kernel-api/src/execution.rs:135-145</code> — <code>mark_failed()</code> increments <code>retries</code></li>
+<li><strong>Cap check</strong>: <code>icn-core/src/supervisor/decision_executor.rs:230-250</code> — compares <code>retries &gt;= max_retries</code></li>
+</ul>
+<h3>2d. Canonical Decision Hash Derivation</h3>
+<p><strong>Invariant</strong>: Decision hash is blake3 of <code>(domain_tag, proposal_id, domain_id, outcome, vote_tally, vote_hash)</code>. Vote hash sorts by <code>(voter_did, choice_ordinal)</code> — deterministic across nodes.</p>
+<ul>
+<li><strong>Test</strong>: <code>icn-governance/src/proof.rs</code> — <code>test_decision_hash_deterministic</code> (verifies hash stability)</li>
+<li><strong>Implementation</strong>: <code>icn-governance/src/proof.rs:330-345</code> — <code>compute_decision_hash()</code></li>
+<li><strong>Vote hash</strong>: <code>icn-governance/src/proof.rs:308-328</code> — <code>compute_decision_hash_bytes_fields()</code> sorts voters</li>
+</ul>
+<h3>2e. Backpressure</h3>
+<p><strong>Invariant</strong>: Max 16 concurrent executions via semaphore. Saturation logged at &gt;100ms wait.</p>
+<ul>
+<li><strong>Implementation</strong>: <code>icn-core/src/supervisor/decision_executor.rs:38-45</code> — <code>MAX_CONCURRENT_EXECUTIONS = 16</code></li>
+<li><strong>Saturation warning</strong>: <code>icn-core/src/supervisor/decision_executor.rs:155-168</code> (added PR #1203)</li>
+</ul>
+<h3>2f. Journal Entry Provenance</h3>
+<p><strong>Invariant</strong>: Ledger entries carry <code>decision_receipt_id</code> and <code>decision_hash</code> when built via treasury path.</p>
+<ul>
+<li><strong>Test</strong>: <code>icn-ledger/src/entry.rs:287</code> — <code>test_entry_with_decision_provenance</code></li>
+<li><strong>Implementation</strong>: <code>icn-ledger/src/entry.rs:83-90</code> — <code>with_decision_provenance()</code></li>
+<li><strong>JournalEntry fields</strong>: <code>icn-ledger/src/types.rs:90,99</code> — <code>decision_receipt_id: Option&lt;String&gt;</code>, <code>decision_hash: Option&lt;String&gt;</code></li>
+</ul>
+<hr>
+<h2>3. CURRENT SAGAS — REAL vs STUBBED</h2>
+<h3>Flow: Governance Decision → Effects → Ledger Mutation</h3>
+<pre><code>GovernanceDecisionReceipt
+  → DecisionExecutor.execute_decision()
+    → KernelGovernanceExecutor.route_effects()
+      → KernelTreasuryExecutor.execute_treasury_operation()
+        → LedgerService.submit_treasury_entry()
+          → Ledger.append_entry()
+            → sled persistence
+</code></pre>
+<h3>Stage-by-stage assessment:</h3>
+<table>
+<thead>
+<tr>
+<th>Stage</th>
+<th>Status</th>
+<th>File Path</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Decision receipt creation</td>
+<td><strong>REAL</strong></td>
+<td><code>icn-governance/src/proof.rs:230-280</code></td>
+<td>Canonical hash, deterministic</td>
+</tr>
+<tr>
+<td>Decision executor loop</td>
+<td><strong>REAL</strong></td>
+<td><code>icn-core/src/supervisor/decision_executor.rs:50-280</code></td>
+<td>Polling, idempotent, crash-safe</td>
+</tr>
+<tr>
+<td>ExecutionStore (sled)</td>
+<td><strong>REAL</strong></td>
+<td><code>icn-core/src/supervisor/decision_executor.rs:300-400</code> — <code>SledExecutionStore</code></td>
+<td>Persistent, keyed by decision_hash</td>
+</tr>
+<tr>
+<td>Effect routing</td>
+<td><strong>REAL</strong></td>
+<td><code>icn-core/src/supervisor/governance_executor.rs:318-571</code></td>
+<td>Routes to specialized executors</td>
+</tr>
+<tr>
+<td>Treasury executor</td>
+<td><strong>REAL</strong> (wiring)</td>
+<td><code>icn-core/src/supervisor/governance_executor.rs:604-680</code></td>
+<td>Calls LedgerService if configured</td>
+</tr>
+<tr>
+<td>LedgerService impl</td>
+<td><strong>REAL</strong></td>
+<td><code>icn-core/src/services/ledger_service.rs:194-250</code></td>
+<td>Double-entry, provenance tagged</td>
+</tr>
+<tr>
+<td>Ledger append_entry</td>
+<td><strong>REAL</strong></td>
+<td><code>icn-ledger/src/ledger.rs:1202-1475</code></td>
+<td>Sled persistence, validation, gossip broadcast</td>
+</tr>
+<tr>
+<td><strong>Payload → KernelEffect[]</strong></td>
+<td><strong>STUB</strong></td>
+<td><code>icn-core/src/supervisor/governance_executor.rs:1370-1570</code> — test helpers only</td>
+<td>No production mapper exists</td>
+</tr>
+<tr>
+<td><strong>Treasury nonce check</strong></td>
+<td><strong>DEFINED, NOT WIRED</strong></td>
+<td><code>icn-coop/src/store.rs:161</code> — <code>check_and_increment_treasury_nonce()</code></td>
+<td>Exists in coop store, never called from executor path</td>
+</tr>
+<tr>
+<td><strong>Ledger dedup</strong></td>
+<td><strong>DOES NOT EXIST</strong></td>
+<td><code>icn-ledger/src/ledger.rs:1336-1475</code> — <code>append_entry_internal()</code></td>
+<td>No check for duplicate <code>(decision_receipt_id, decision_hash)</code></td>
+</tr>
+<tr>
+<td><strong>Entry hash → ExecutionRecord</strong></td>
+<td><strong>NOT ROUTED</strong></td>
+<td><code>icn-core/src/supervisor/governance_executor.rs:643-660</code></td>
+<td><code>entry_hash</code> returned but not stored in <code>ExecutionRecord.ledger_entry_ids</code></td>
+</tr>
+</tbody></table>
+<h3>Where persistence actually happens today</h3>
+<ul>
+<li><strong>ExecutionStore</strong>: sled at <code>icn-core/src/supervisor/decision_executor.rs</code> — persists <code>ExecutionRecord</code> keyed by <code>decision_hash</code></li>
+<li><strong>Ledger journal</strong>: sled at <code>icn-ledger/src/ledger.rs:1453-1455</code> — <code>store.put(key, value)</code></li>
+<li><strong>Both are real sled persistence</strong>, but they are not linked — the ledger entry hash is not written back to the execution record</li>
+</ul>
+<h3>Where mutations stop being real</h3>
+<p>The chain is real all the way from <code>DecisionExecutor</code> → <code>LedgerService</code> → <code>Ledger.append_entry()</code> <strong>if</strong> a ledger is configured. The gap is:</p>
+<ol>
+<li>No production code generates <code>KernelEffect[]</code> from <code>ProposalPayload</code> — effects are hardcoded in tests</li>
+<li>Treasury nonce is not checked before mutation — double-spend possible on crash+replay</li>
+<li>Ledger has no dedup — replayed <code>append_entry()</code> with same provenance key creates duplicate entries</li>
+</ol>
+<hr>
+<h2>4. TIER-1 BLOCKERS (EXECUTION ORDER — LOCKED)</h2>
+<h3>PR-1: Real LedgerService append with governance provenance</h3>
+<p><strong>Goal</strong>: Wire the real <code>LedgerService</code> append path with <code>decision_receipt_id</code>, <code>decision_hash</code>, scope/coop/treasury context. No dedup, no nonce yet.</p>
+<p><strong>Files to modify</strong>:</p>
+<ul>
+<li><code>icn-core/src/services/ledger_service.rs</code> — verify <code>submit_treasury_entry()</code> builds correct double-entry deltas</li>
+<li><code>icn-core/src/supervisor/governance_executor.rs:604-680</code> — ensure <code>entry_hash</code> routes back to <code>ExecutionRecord.ledger_entry_ids</code></li>
+<li><code>icn-ledger/src/entry.rs</code> — verify <code>with_decision_provenance()</code> fields survive sled round-trip</li>
+</ul>
+<p><strong>Test that proves completion</strong>:</p>
+<ul>
+<li>Integration test: submit treasury operation → verify journal entry in sled → verify <code>decision_receipt_id</code> and <code>decision_hash</code> on persisted entry → verify <code>ExecutionRecord.ledger_entry_ids</code> contains entry hash</li>
+</ul>
+<p><strong>What becomes unblocked</strong>: PR-2 (effect translation has a real ledger to write to)</p>
+<h3>PR-2: Payload → Effect translation (treasury spend vertical slice)</h3>
+<p><strong>Goal</strong>: Production path from <code>ProposalPayload::TreasurySpend</code> → <code>KernelEffect::Treasury(...)</code>. One proposal type only.</p>
+<p><strong>Files to modify</strong>:</p>
+<ul>
+<li><code>icn-core/src/supervisor/governance_executor.rs</code> — add <code>translate_payload_to_effects()</code> function</li>
+<li><code>icn-governance/src/types.rs</code> or <code>icn-governance/src/state_machine.rs</code> — verify <code>ProposalPayload::TreasurySpend</code> exists</li>
+</ul>
+<p><strong>Test that proves completion</strong>:</p>
+<ul>
+<li>Unit test: <code>ProposalPayload::TreasurySpend { amount, currency, recipient, treasury_id }</code> → produces <code>vec![KernelEffect::Treasury(TreasuryOperation { ... })]</code></li>
+<li>Integration test: finalized proposal with TreasurySpend payload → executor picks up → ledger entry created</li>
+</ul>
+<p><strong>What becomes unblocked</strong>: PR-3 (nonce enforcement requires real effect flow)</p>
+<h3>PR-3: Treasury nonce enforcement in mutation path</h3>
+<p><strong>Goal</strong>: Wire <code>coop_store.check_and_increment_treasury_nonce()</code> into the treasury execution path. Reject replay.</p>
+<p><strong>Files to modify</strong>:</p>
+<ul>
+<li><code>icn-core/src/supervisor/governance_executor.rs:604-680</code> — call nonce check before <code>ledger.submit_treasury_entry()</code></li>
+<li><code>icn-coop/src/store.rs:161</code> — already implemented, just needs wiring</li>
+</ul>
+<p><strong>Test that proves completion</strong>:</p>
+<ul>
+<li>Integration test: execute treasury operation → attempt same operation again → second attempt fails with nonce rejection</li>
+<li>Verify: nonce stored in sled survives restart</li>
+</ul>
+<p><strong>What becomes unblocked</strong>: PR-4 (ledger-level dedup is the final layer)</p>
+<h3>PR-4: Ledger-level idempotency (#1204)</h3>
+<p><strong>Goal</strong>: <code>Ledger.append_entry_internal()</code> rejects duplicate entries with matching <code>(decision_receipt_id, decision_hash)</code>.</p>
+<p><strong>Files to modify</strong>:</p>
+<ul>
+<li><code>icn-ledger/src/ledger.rs:1336-1455</code> — add dedup check in <code>append_entry_internal()</code> before sled write</li>
+<li><code>icn-ledger/src/types.rs</code> — add provenance index prefix constant</li>
+</ul>
+<p><strong>Test that proves completion</strong>:</p>
+<ul>
+<li>Unit test: append entry with provenance → append same provenance again → second returns existing hash (not error) but does not create duplicate</li>
+<li>Integration test: full saga from decision → ledger → crash → recovery → no duplicate entries</li>
+</ul>
+<p><strong>What becomes unblocked</strong>: Definition of &quot;pilot-ready&quot; can be proven</p>
+<hr>
+<h2>5. DEFINITION OF &quot;PILOT-READY&quot;</h2>
+<h3>The Test</h3>
+<p><strong>Name</strong>: <code>test_pilot_submit_restart_resume_single_mutation</code></p>
+<p><strong>Location</strong>: <code>icn/crates/icn-core/tests/decision_executor_runtime_test.rs</code> (new file or added to existing)</p>
+<h3>Steps</h3>
+<ol>
+<li><strong>Submit decision</strong>: Create <code>GovernanceDecisionReceipt</code> with <code>ProposalPayload::TreasurySpend</code></li>
+<li><strong>Verify effect translation</strong>: Decision executor picks up receipt, translates payload → <code>KernelEffect::Treasury</code></li>
+<li><strong>Execute</strong>: Treasury operation creates journal entry in real ledger</li>
+<li><strong>Verify provenance</strong>: Journal entry carries <code>decision_receipt_id</code> + <code>decision_hash</code></li>
+<li><strong>Crash/restart</strong>: Kill executor, reinitialize from sled</li>
+<li><strong>Recovery</strong>: <code>recover_in_flight()</code> finds the confirmed record, skips it</li>
+<li><strong>Replay protection</strong>: Attempt same decision hash → idempotent skip (ExecutionStore)</li>
+<li><strong>Nonce protection</strong>: Attempt same treasury nonce → rejected (CoopStore)</li>
+<li><strong>Ledger dedup</strong>: Attempt same provenance key → returns existing hash, no duplicate entry</li>
+<li><strong>Audit</strong>: <code>ExecutionRecord.ledger_entry_ids</code> contains the correct entry hash</li>
+</ol>
+<h3>Services Involved</h3>
+<ul>
+<li><code>DecisionExecutor</code> (<code>icn-core/src/supervisor/decision_executor.rs</code>)</li>
+<li><code>KernelGovernanceExecutor</code> (<code>icn-core/src/supervisor/governance_executor.rs</code>)</li>
+<li><code>LedgerService</code> (<code>icn-core/src/services/ledger_service.rs</code>)</li>
+<li><code>Ledger</code> (<code>icn-ledger/src/ledger.rs</code>)</li>
+<li><code>SledExecutionStore</code> (<code>icn-core/src/supervisor/decision_executor.rs</code>)</li>
+<li><code>CoopStore</code> (<code>icn-coop/src/store.rs</code>)</li>
+</ul>
+<hr>
+<h2>6. FIRST PR IN NEXT SESSION</h2>
+<p><strong>Title</strong>: <code>feat(ledger): persistent journal append with governance provenance</code></p>
+<p><strong>Branch</strong>: <code>feat/ledger-persistent-append</code></p>
+<h3>Scope</h3>
+<p><strong>Replace/verify</strong>:</p>
+<ul>
+<li><code>icn-core/src/services/ledger_service.rs:194-250</code> — <code>submit_treasury_entry()</code> already builds double-entry deltas and appends. Verify the returned <code>entry_hash</code> is routed back.</li>
+<li><code>icn-core/src/supervisor/governance_executor.rs:643-660</code> — After <code>execute_treasury_operation()</code> returns <code>ExecutionOutcome::Success</code>, extract entry hash from effects string and store in <code>ExecutionRecord.ledger_entry_ids</code>.</li>
+<li><code>icn-core/src/supervisor/decision_executor.rs:200-230</code> — After effect execution, call <code>store.put(&amp;record)</code> with populated <code>ledger_entry_ids</code>.</li>
+</ul>
+<p><strong>Data written</strong>:</p>
+<ul>
+<li>Journal entry in sled with <code>decision_receipt_id</code> and <code>decision_hash</code> metadata fields populated</li>
+<li><code>ExecutionRecord.ledger_entry_ids</code> populated with actual entry hash(es)</li>
+</ul>
+<p><strong>Explicitly NOT in scope</strong>:</p>
+<ul>
+<li>No idempotency/dedup in ledger (PR-4)</li>
+<li>No treasury nonce check (PR-3)</li>
+<li>No payload→effect translation (PR-2)</li>
+</ul>
+<h3>Acceptance Test</h3>
+<p><strong>Name</strong>: <code>test_treasury_entry_persisted_with_provenance</code></p>
+<p><strong>Behavior</strong>:</p>
+<ol>
+<li>Create <code>SledExecutionStore</code> + real <code>Ledger</code> + <code>LedgerService</code></li>
+<li>Submit <code>TreasuryEntryRequest</code> with known <code>decision_receipt_id</code> + <code>decision_hash</code></li>
+<li>Verify: journal entry exists in sled</li>
+<li>Verify: entry&#39;s <code>decision_receipt_id</code> matches</li>
+<li>Verify: entry&#39;s <code>decision_hash</code> matches</li>
+<li>Verify: <code>ExecutionRecord.ledger_entry_ids</code> is non-empty and contains correct hash</li>
+</ol>
+<hr>
+<h2>7. STRICT STARTUP INSTRUCTIONS FOR NEXT AGENT</h2>
+<pre><code>STARTUP PROTOCOL — READ THIS FIRST
+
+1. Read this file: docs/design/session-handoff-2026-02-17.md
+2. Verify repo state:
+   - git checkout main &amp;&amp; git pull
+   - Confirm HEAD is 31ab0692 or later
+   - Confirm PR #1205 (reality map) is open or merged
+3. DO NOT re-explore planes or re-derive architecture.
+   The reality map is at docs/design/repo-reality-map.md — read it if needed.
+4. DO NOT re-plan. The Tier-1 execution order is locked (Section 4 above).
+5. Start with PR-1: feat(ledger): persistent journal append with governance provenance
+   - Branch: feat/ledger-persistent-append
+   - Scope: Section 6 above
+   - Acceptance test: Section 6 above
+6. After PR-1 merges, proceed to PR-2, PR-3, PR-4 in strict order.
+7. &quot;Pilot-ready&quot; is defined in Section 5. That integration test is the exit criterion.
+</code></pre>
+<hr>
+<p><em>Generated 2026-02-17. Every file path verified against main@31ab0692.</em></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

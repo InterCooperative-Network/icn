@@ -1,0 +1,793 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Federation Actions Specification | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>FEDERATION ACTIONS</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/FEDERATION_ACTIONS.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Federation Actions Specification</h1>
+<p><strong>Version:</strong> 1.0<br><strong>Status:</strong> NORMATIVE<br><strong>Last Updated:</strong> 2026-02-02</p>
+<h2>Abstract</h2>
+<p>This document specifies the FederationAction enum and its canonical encoding rules. Federation actions represent state transitions in the ICN federation protocol, and their deterministic serialization enables cross-implementation verification.</p>
+<h2>Keywords</h2>
+<p>The key words &quot;MUST&quot;, &quot;MUST NOT&quot;, &quot;REQUIRED&quot;, &quot;SHALL&quot;, &quot;SHALL NOT&quot;, &quot;SHOULD&quot;, &quot;SHOULD NOT&quot;, &quot;RECOMMENDED&quot;, &quot;MAY&quot;, and &quot;OPTIONAL&quot; in this document are to be interpreted as described in <a href="https://www.rfc-editor.org/rfc/rfc2119" target="_blank" rel="noopener">RFC 2119</a>.</p>
+<hr>
+<h2>1. Overview</h2>
+<p>A <strong>FederationAction</strong> represents an atomic state transition in a federation. Actions are:</p>
+<ul>
+<li><strong>Deterministic</strong>: Same inputs produce same outputs</li>
+<li><strong>Verifiable</strong>: Governance proofs attest to action validity</li>
+<li><strong>Typed</strong>: Each action has a unique <code>ActionType</code></li>
+<li><strong>Canonical</strong>: Byte-identical encoding for identical logical actions</li>
+</ul>
+<hr>
+<h2>2. FederationAction Enum</h2>
+<h3>2.1 Structure</h3>
+<pre><code class="language-rust">use serde::{Serialize, Deserialize};
+use std::collections::BTreeMap;
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(tag = &quot;type&quot;, rename_all = &quot;snake_case&quot;)]
+pub enum FederationAction {
+    /// Cross-cooperative credit settlement
+    SettleCrossCoop {
+        settlements: Vec&lt;Settlement&gt;,
+    },
+    
+    /// Admit a new member cooperative
+    AdmitMember {
+        coop_did: String,
+        coop_name: String,
+        constitution_hash: [u8; 32],
+        initial_credit_limit: i64,
+        currency: String,
+        governance_weight: u64,
+        confirmations: Vec&lt;String&gt;,  // Sorted sponsor DIDs
+    },
+    
+    /// Expel a member cooperative
+    ExpelMember {
+        coop_did: String,
+        reason: String,
+        final_settlement: Option&lt;Settlement&gt;,
+        confirmations: Vec&lt;String&gt;,  // Sorted approver DIDs
+    },
+    
+    /// Update federation constitution
+    UpdateConstitution {
+        new_constitution_hash: [u8; 32],
+        rationale: String,
+        effective_timestamp: u64,
+        confirmations: Vec&lt;String&gt;,  // Sorted ratifier DIDs
+    },
+    
+    /// Allocate shared resources
+    AllocateResources {
+        allocations: Vec&lt;ResourceAllocation&gt;,
+        rationale: String,
+    },
+    
+    /// Record external trade
+    RecordExternalTrade {
+        counterparty: String,
+        trade_hash: [u8; 32],
+        settlements: Vec&lt;Settlement&gt;,
+        metadata: BTreeMap&lt;String, String&gt;,
+    },
+    
+    /// Update member credit limits
+    UpdateCreditLimits {
+        updates: Vec&lt;CreditLimitUpdate&gt;,
+        rationale: String,
+        confirmations: Vec&lt;String&gt;,  // Sorted approver DIDs
+    },
+    
+    /// Pause member operations (emergency)
+    PauseMember {
+        coop_did: String,
+        reason: String,
+        duration_seconds: Option&lt;u64&gt;,
+        confirmations: Vec&lt;String&gt;,  // Sorted emergency signatories
+    },
+    
+    /// Resume member operations
+    ResumeMember {
+        coop_did: String,
+        confirmations: Vec&lt;String&gt;,  // Sorted approver DIDs
+    },
+    
+    /// Record governance decision
+    RecordDecision {
+        proposal_id: String,
+        outcome: DecisionOutcome,
+        vote_tally: VoteTally,
+        decision_hash: [u8; 32],
+    },
+}
+</code></pre>
+<h3>2.2 Supporting Types</h3>
+<pre><code class="language-rust">/// Single credit settlement between two parties
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Settlement {
+    pub from_coop: String,       // DID (normalized)
+    pub to_coop: String,         // DID (normalized)
+    pub amount: i64,             // Positive value (from pays to)
+    pub currency: String,        // Normalized CurrencyId
+}
+
+/// Resource allocation to a cooperative
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ResourceAllocation {
+    pub recipient: String,       // DID (normalized)
+    pub resource_type: String,
+    pub quantity: u64,
+    pub duration_seconds: Option&lt;u64&gt;,
+}
+
+/// Credit limit update for a cooperative
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct CreditLimitUpdate {
+    pub coop_did: String,        // DID (normalized)
+    pub currency: String,        // Normalized CurrencyId
+    pub new_limit: i64,
+    pub effective_timestamp: u64,
+}
+
+/// Governance decision outcome
+/// 
+/// NOTE: This enum MUST match `DecisionOutcome` from GOVERNANCE_STATE_MACHINE.md
+/// exactly (same variants, same encoding). This document repeats it for federation
+/// action context. Implementations MUST support all four variants.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
+#[serde(rename_all = &quot;snake_case&quot;)]
+pub enum DecisionOutcome {
+    Approved,
+    Rejected,
+    NoQuorum,
+    Vetoed,  // Federation-specific: veto by privileged actor
+}
+
+/// Vote tally for a decision
+///
+/// NOTE: This struct MUST match `VoteTally` from GOVERNANCE_STATE_MACHINE.md
+/// exactly. The `signatories` field MUST be sorted lexicographically for canonical encoding.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct VoteTally {
+    pub votes_for: u64,
+    pub votes_against: u64,
+    pub votes_abstain: u64,
+    pub eligible_voters: u64,
+    pub signatories: Vec&lt;String&gt;,  // Sorted DIDs of voters
+}
+</code></pre>
+<hr>
+<h2>3. ActionType Enumeration</h2>
+<h3>3.1 Definition</h3>
+<pre><code class="language-rust">#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = &quot;snake_case&quot;)]
+pub enum ActionType {
+    SettleCrossCoop,
+    AdmitMember,
+    ExpelMember,
+    UpdateConstitution,
+    AllocateResources,
+    RecordExternalTrade,
+    UpdateCreditLimits,
+    PauseMember,
+    ResumeMember,
+    RecordDecision,
+}
+</code></pre>
+<h3>3.2 Derivation</h3>
+<p>The <code>ActionType</code> MUST be derived from the action structure, NOT trusted from external input:</p>
+<pre><code class="language-rust">impl FederationAction {
+    pub fn action_type(&amp;self) -&gt; ActionType {
+        match self {
+            FederationAction::SettleCrossCoop { .. } =&gt; ActionType::SettleCrossCoop,
+            FederationAction::AdmitMember { .. } =&gt; ActionType::AdmitMember,
+            FederationAction::ExpelMember { .. } =&gt; ActionType::ExpelMember,
+            FederationAction::UpdateConstitution { .. } =&gt; ActionType::UpdateConstitution,
+            FederationAction::AllocateResources { .. } =&gt; ActionType::AllocateResources,
+            FederationAction::RecordExternalTrade { .. } =&gt; ActionType::RecordExternalTrade,
+            FederationAction::UpdateCreditLimits { .. } =&gt; ActionType::UpdateCreditLimits,
+            FederationAction::PauseMember { .. } =&gt; ActionType::PauseMember,
+            FederationAction::ResumeMember { .. } =&gt; ActionType::ResumeMember,
+            FederationAction::RecordDecision { .. } =&gt; ActionType::RecordDecision,
+        }
+    }
+}
+</code></pre>
+<p><strong>Rationale:</strong> Preventing action type spoofing attacks.</p>
+<hr>
+<h2>4. Canonicalization Rules</h2>
+<h3>4.1 Canonicalize Trait Implementation</h3>
+<pre><code class="language-rust">impl Canonicalize for FederationAction {
+    fn canonicalize(&amp;mut self) {
+        match self {
+            FederationAction::SettleCrossCoop { settlements } =&gt; {
+                // Sort settlements by (from_coop, to_coop, currency)
+                settlements.sort_by(|a, b| {
+                    (&amp;a.from_coop, &amp;a.to_coop, &amp;a.currency)
+                        .cmp(&amp;(&amp;b.from_coop, &amp;b.to_coop, &amp;b.currency))
+                });
+                
+                // Normalize identifiers
+                for s in settlements.iter_mut() {
+                    s.from_coop = normalize_did(&amp;s.from_coop);
+                    s.to_coop = normalize_did(&amp;s.to_coop);
+                    s.currency = normalize_currency(&amp;s.currency);
+                }
+            }
+            
+            FederationAction::AdmitMember {
+                coop_did,
+                currency,
+                confirmations,
+                ..
+            } =&gt; {
+                *coop_did = normalize_did(coop_did);
+                *currency = normalize_currency(currency);
+                confirmations.sort();
+                confirmations.dedup();
+            }
+            
+            FederationAction::ExpelMember {
+                coop_did,
+                final_settlement,
+                confirmations,
+                ..
+            } =&gt; {
+                *coop_did = normalize_did(coop_did);
+                if let Some(settlement) = final_settlement {
+                    settlement.from_coop = normalize_did(&amp;settlement.from_coop);
+                    settlement.to_coop = normalize_did(&amp;settlement.to_coop);
+                    settlement.currency = normalize_currency(&amp;settlement.currency);
+                }
+                confirmations.sort();
+                confirmations.dedup();
+            }
+            
+            FederationAction::UpdateConstitution {
+                confirmations,
+                ..
+            } =&gt; {
+                confirmations.sort();
+                confirmations.dedup();
+            }
+            
+            FederationAction::AllocateResources { allocations, .. } =&gt; {
+                // Sort allocations by (recipient, resource_type)
+                allocations.sort_by(|a, b| {
+                    (&amp;a.recipient, &amp;a.resource_type)
+                        .cmp(&amp;(&amp;b.recipient, &amp;b.resource_type))
+                });
+                
+                for alloc in allocations.iter_mut() {
+                    alloc.recipient = normalize_did(&amp;alloc.recipient);
+                }
+            }
+            
+            FederationAction::RecordExternalTrade {
+                settlements,
+                metadata,
+                ..
+            } =&gt; {
+                settlements.sort_by(|a, b| {
+                    (&amp;a.from_coop, &amp;a.to_coop, &amp;a.currency)
+                        .cmp(&amp;(&amp;b.from_coop, &amp;b.to_coop, &amp;b.currency))
+                });
+                
+                for s in settlements.iter_mut() {
+                    s.from_coop = normalize_did(&amp;s.from_coop);
+                    s.to_coop = normalize_did(&amp;s.to_coop);
+                    s.currency = normalize_currency(&amp;s.currency);
+                }
+                
+                // BTreeMap is already ordered
+            }
+            
+            FederationAction::UpdateCreditLimits {
+                updates,
+                confirmations,
+                ..
+            } =&gt; {
+                // Sort updates by (coop_did, currency)
+                updates.sort_by(|a, b| {
+                    (&amp;a.coop_did, &amp;a.currency).cmp(&amp;(&amp;b.coop_did, &amp;b.currency))
+                });
+                
+                for update in updates.iter_mut() {
+                    update.coop_did = normalize_did(&amp;update.coop_did);
+                    update.currency = normalize_currency(&amp;update.currency);
+                }
+                
+                confirmations.sort();
+                confirmations.dedup();
+            }
+            
+            FederationAction::PauseMember {
+                coop_did,
+                confirmations,
+                ..
+            } | FederationAction::ResumeMember {
+                coop_did,
+                confirmations,
+            } =&gt; {
+                *coop_did = normalize_did(coop_did);
+                confirmations.sort();
+                confirmations.dedup();
+            }
+            
+            FederationAction::RecordDecision { vote_tally, .. } =&gt; {
+                vote_tally.signatories.sort();
+                vote_tally.signatories.dedup();
+            }
+        }
+    }
+    
+    fn is_canonical(&amp;self) -&gt; bool {
+        // NOTE: This is pseudocode for the specification.
+        //
+        // Production implementations MUST verify:
+        // - All DID fields are normalized (lowercase prefix, valid base58btc)
+        // - All currency codes are normalized (scope lowercase, symbol uppercase)
+        // - All Vec fields representing sets are sorted and deduplicated
+        // - All BTreeMap fields have keys in ascending order
+        //
+        // Returns true only if the action is already in canonical form.
+        // Normalization rules are defined in CANONICAL_ENCODING.md §5 (Identifier Normalization)
+        // and §3.2 (Set-Like Vectors). These helper methods verify compliance:
+        self.verify_dids_normalized() 
+            &amp;&amp; self.verify_currencies_normalized()
+            &amp;&amp; self.verify_collections_sorted()
+    }
+}
+
+impl CanonicalEncode for FederationAction {}
+</code></pre>
+<h3>4.2 Normalization Functions</h3>
+<pre><code class="language-rust">fn normalize_did(did: &amp;str) -&gt; String {
+    // Lowercase prefix, preserve Base58btc case
+    if let Some(pos) = did.rfind(&#39;:&#39;) {
+        let prefix = did[..pos].to_lowercase();
+        let identifier = &amp;did[pos + 1..];
+        format!(&quot;{}:{}&quot;, prefix, identifier)
+    } else {
+        did.to_string()
+    }
+}
+
+fn normalize_currency(currency: &amp;str) -&gt; String {
+    // Format: &lt;scope&gt;:&lt;symbol&gt;
+    if let Some(pos) = currency.find(&#39;:&#39;) {
+        let scope = currency[..pos].to_lowercase();
+        let symbol = currency[pos + 1..].to_uppercase();
+        format!(&quot;{}:{}&quot;, scope, symbol)
+    } else {
+        currency.to_uppercase()
+    }
+}
+</code></pre>
+<h3>4.3 Validation Helper Functions</h3>
+<p>The following helper functions verify that data is already in canonical form.
+These are used by the <code>is_canonical()</code> method in §4.1.</p>
+<pre><code class="language-rust">// Note: These are conceptual helpers. Actual implementations should validate
+// according to the rules in CANONICAL_ENCODING.md §5 and §3.2.
+
+fn verify_dids_normalized(action: &amp;FederationAction) -&gt; bool {
+    // Check that all DID fields use lowercase &quot;did:icn:&quot; prefix
+    // while preserving Base58btc identifier case.
+    // See CANONICAL_ENCODING.md §5.1 for complete DID normalization rules.
+    //
+    // Implementation: iterate through all DID fields in the action and verify:
+    // 1. Prefix is lowercase: &quot;did:icn:&quot;
+    // 2. Optional coop-name component is lowercase: &quot;[a-z0-9-]+&quot;
+    // 3. Identifier is valid Base58btc (case-preserved)
+    true  // Placeholder
+}
+
+fn verify_currencies_normalized(action: &amp;FederationAction) -&gt; bool {
+    // Check that all currency identifiers follow normalized format:
+    // - Scope is lowercase (e.g., &quot;fed&quot;, &quot;global&quot;)
+    // - Symbol is uppercase (e.g., &quot;USD&quot;, &quot;EUR&quot;)
+    // Format: &quot;scope:SYMBOL&quot; or just &quot;SYMBOL&quot; for scopeless currencies
+    // See CANONICAL_ENCODING.md §5.2 for currency normalization rules.
+    true  // Placeholder
+}
+
+fn verify_collections_sorted(action: &amp;FederationAction) -&gt; bool {
+    // Check that all Vec&lt;String&gt; fields representing sets are:
+    // 1. Sorted lexicographically
+    // 2. Deduplicated (no duplicate entries)
+    // See CANONICAL_ENCODING.md §3.2 for set-like vector rules.
+    //
+    // Also verify that all BTreeMap fields maintain sorted key order
+    // (BTreeMap guarantees this by construction, so this is always true).
+    true  // Placeholder
+}
+</code></pre>
+<hr>
+<h2>5. ActionHash Computation</h2>
+<h3>5.1 Typed Hashing</h3>
+<pre><code class="language-rust">impl FederationAction {
+    pub fn compute_hash(&amp;mut self) -&gt; [u8; 32] {
+        self.hash_canonical(&quot;icn-federation:action:v1&quot;)
+            .expect(&quot;Canonical encoding failed&quot;)
+    }
+}
+</code></pre>
+<h3>5.2 Hash Domain</h3>
+<p><strong>Domain:</strong> <code>icn-federation:action:v1</code></p>
+<p><strong>Format:</strong> <code>BLAKE3(domain || 0x00 || canonical_cbor)</code></p>
+<hr>
+<h2>6. Action-Specific Constraints</h2>
+<h3>6.1 SettleCrossCoop</h3>
+<p><strong>Constraints:</strong></p>
+<ul>
+<li>Sum of settlements MUST be zero per currency (conservation law)</li>
+<li>All DIDs MUST be federation members</li>
+<li>All amounts MUST be positive</li>
+<li>No self-settlements (from_coop ≠ to_coop)</li>
+</ul>
+<pre><code class="language-rust">impl FederationAction {
+    pub fn validate_settle_cross_coop(&amp;self, members: &amp;HashSet&lt;String&gt;) -&gt; Result&lt;()&gt; {
+        if let FederationAction::SettleCrossCoop { settlements } = self {
+            // Check conservation per currency
+            let mut balances: BTreeMap&lt;String, i64&gt; = BTreeMap::new();
+            
+            for s in settlements {
+                // Verify membership
+                if !members.contains(&amp;s.from_coop) || !members.contains(&amp;s.to_coop) {
+                    return Err(Error::NonMemberParticipant);
+                }
+                
+                // Verify no self-settlement
+                if s.from_coop == s.to_coop {
+                    return Err(Error::SelfSettlement);
+                }
+                
+                // Verify positive amount
+                if s.amount &lt;= 0 {
+                    return Err(Error::NonPositiveAmount);
+                }
+                
+                // Accumulate balance changes (checked arithmetic)
+                let from_balance = balances.entry(s.currency.clone()).or_insert(0);
+                *from_balance = from_balance.checked_sub(s.amount)
+                    .ok_or(Error::IntegerOverflow)?;
+                
+                let to_balance = balances.entry(s.currency.clone()).or_insert(0);
+                *to_balance = to_balance.checked_add(s.amount)
+                    .ok_or(Error::IntegerOverflow)?;
+            }
+            
+            // Verify conservation (sum to zero per currency)
+            for (currency, balance) in balances {
+                if balance != 0 {
+                    return Err(Error::ConservationViolation { currency, imbalance: balance });
+                }
+            }
+            
+            Ok(())
+        } else {
+            Err(Error::WrongActionType)
+        }
+    }
+}
+</code></pre>
+<h3>6.2 AdmitMember</h3>
+<p><strong>Constraints:</strong></p>
+<ul>
+<li>Cooperative DID MUST NOT already be a member</li>
+<li>Constitution hash MUST be valid (32 bytes)</li>
+<li>Initial credit limit MUST be non-negative</li>
+<li>Governance weight MUST be positive</li>
+<li>Confirmations MUST include ≥2/3 of existing members</li>
+</ul>
+<pre><code class="language-rust">impl FederationAction {
+    pub fn validate_admit_member(
+        &amp;self,
+        members: &amp;HashSet&lt;String&gt;,
+        total_governance_weight: u64,
+    ) -&gt; Result&lt;()&gt; {
+        if let FederationAction::AdmitMember {
+            coop_did,
+            initial_credit_limit,
+            governance_weight,
+            confirmations,
+            ..
+        } = self {
+            // Verify not already a member
+            if members.contains(coop_did) {
+                return Err(Error::AlreadyMember);
+            }
+            
+            // Verify non-negative credit limit
+            if *initial_credit_limit &lt; 0 {
+                return Err(Error::NegativeCreditLimit);
+            }
+            
+            // Verify positive governance weight
+            if *governance_weight == 0 {
+                return Err(Error::ZeroGovernanceWeight);
+            }
+            
+            // Verify confirmations (2/3 supermajority)
+            let confirmed_weight: u64 = confirmations.iter()
+                .filter_map(|did| /* lookup weight */ Some(1))
+                .sum();
+            
+            if confirmed_weight * 3 &lt; total_governance_weight * 2 {
+                return Err(Error::InsufficientConfirmations);
+            }
+            
+            Ok(())
+        } else {
+            Err(Error::WrongActionType)
+        }
+    }
+}
+</code></pre>
+<h3>6.3 UpdateConstitution</h3>
+<p><strong>Constraints:</strong></p>
+<ul>
+<li>New constitution hash MUST differ from current constitution</li>
+<li>Effective timestamp MUST be in the future</li>
+<li>Confirmations MUST include ≥3/4 of members (supermajority)</li>
+</ul>
+<h3>6.4 PauseMember</h3>
+<p><strong>Constraints:</strong></p>
+<ul>
+<li>Member MUST be active (not already paused)</li>
+<li>Confirmations MUST include emergency signatories (per constitution)</li>
+<li>Duration MUST be reasonable (≤90 days) or None for indefinite</li>
+</ul>
+<hr>
+<h2>7. Canonical Encoding Examples</h2>
+<h3>7.1 SettleCrossCoop</h3>
+<p><strong>Logical Action:</strong></p>
+<pre><code class="language-rust">FederationAction::SettleCrossCoop {
+    settlements: vec![
+        Settlement {
+            from_coop: &quot;did:icn:food-coop:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK&quot;.to_string(),
+            to_coop: &quot;did:icn:tool-coop:z6MkfNzT9bU9Ua5fHKwBpWJVN8XEfBD6e7o4kEwV9RxYnRpd&quot;.to_string(),
+            amount: 1000,
+            currency: &quot;food-coop:HOURS&quot;.to_string(),
+        },
+        Settlement {
+            from_coop: &quot;did:icn:tool-coop:z6MkfNzT9bU9Ua5fHKwBpWJVN8XEfBD6e7o4kEwV9RxYnRpd&quot;.to_string(),
+            to_coop: &quot;did:icn:food-coop:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK&quot;.to_string(),
+            amount: 1000,
+            currency: &quot;tool-coop:CREDITS&quot;.to_string(),
+        },
+    ],
+}
+</code></pre>
+<p><strong>After Canonicalization (sorted by from_coop, to_coop, currency):</strong></p>
+<pre><code class="language-rust">FederationAction::SettleCrossCoop {
+    settlements: vec![
+        Settlement {
+            from_coop: &quot;did:icn:food-coop:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK&quot;.to_string(),
+            to_coop: &quot;did:icn:tool-coop:z6MkfNzT9bU9Ua5fHKwBpWJVN8XEfBD6e7o4kEwV9RxYnRpd&quot;.to_string(),
+            amount: 1000,
+            currency: &quot;food-coop:HOURS&quot;.to_string(),
+        },
+        Settlement {
+            from_coop: &quot;did:icn:tool-coop:z6MkfNzT9bU9Ua5fHKwBpWJVN8XEfBD6e7o4kEwV9RxYnRpd&quot;.to_string(),
+            to_coop: &quot;did:icn:food-coop:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK&quot;.to_string(),
+            amount: 1000,
+            currency: &quot;tool-coop:CREDITS&quot;.to_string(),
+        },
+    ],
+}
+</code></pre>
+<p><strong>Canonical JSON (for human readability):</strong></p>
+<pre><code class="language-json">{
+  &quot;type&quot;: &quot;settle_cross_coop&quot;,
+  &quot;settlements&quot;: [
+    {
+      &quot;from_coop&quot;: &quot;did:icn:food-coop:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK&quot;,
+      &quot;to_coop&quot;: &quot;did:icn:tool-coop:z6MkfNzT9bU9Ua5fHKwBpWJVN8XEfBD6e7o4kEwV9RxYnRpd&quot;,
+      &quot;amount&quot;: 1000,
+      &quot;currency&quot;: &quot;food-coop:HOURS&quot;
+    },
+    {
+      &quot;from_coop&quot;: &quot;did:icn:tool-coop:z6MkfNzT9bU9Ua5fHKwBpWJVN8XEfBD6e7o4kEwV9RxYnRpd&quot;,
+      &quot;to_coop&quot;: &quot;did:icn:food-coop:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK&quot;,
+      &quot;amount&quot;: 1000,
+      &quot;currency&quot;: &quot;tool-coop:CREDITS&quot;
+    }
+  ]
+}
+</code></pre>
+<p><strong>ActionHash (BLAKE3 of canonical CBOR):</strong></p>
+<pre><code>0x7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b
+</code></pre>
+<h3>7.2 AdmitMember</h3>
+<p><strong>Logical Action:</strong></p>
+<pre><code class="language-rust">FederationAction::AdmitMember {
+    coop_did: &quot;did:icn:bike-coop:z6Mkp8uK3J7N5cMqD8fG9hL2jR4tV6wX8yA0bC1dE2fG3hI&quot;.to_string(),
+    coop_name: &quot;Bike Repair Cooperative&quot;.to_string(),
+    constitution_hash: [0x12; 32],
+    initial_credit_limit: 5000,
+    currency: &quot;bike-coop:SPOKES&quot;.to_string(),
+    governance_weight: 100,
+    confirmations: vec![
+        &quot;did:icn:tool-coop:z6MkfNzT9bU9Ua5fHKwBpWJVN8XEfBD6e7o4kEwV9RxYnRpd&quot;.to_string(),
+        &quot;did:icn:food-coop:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK&quot;.to_string(),
+    ],
+}
+</code></pre>
+<p><strong>After Canonicalization (confirmations sorted):</strong></p>
+<pre><code class="language-rust">FederationAction::AdmitMember {
+    coop_did: &quot;did:icn:bike-coop:z6Mkp8uK3J7N5cMqD8fG9hL2jR4tV6wX8yA0bC1dE2fG3hI&quot;.to_string(),
+    coop_name: &quot;Bike Repair Cooperative&quot;.to_string(),
+    constitution_hash: [0x12; 32],
+    initial_credit_limit: 5000,
+    currency: &quot;bike-coop:SPOKES&quot;.to_string(),
+    governance_weight: 100,
+    confirmations: vec![
+        &quot;did:icn:food-coop:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK&quot;.to_string(),
+        &quot;did:icn:tool-coop:z6MkfNzT9bU9Ua5fHKwBpWJVN8XEfBD6e7o4kEwV9RxYnRpd&quot;.to_string(),
+    ],
+}
+</code></pre>
+<p><strong>Canonical JSON:</strong></p>
+<pre><code class="language-json">{
+  &quot;type&quot;: &quot;admit_member&quot;,
+  &quot;coop_did&quot;: &quot;did:icn:bike-coop:z6Mkp8uK3J7N5cMqD8fG9hL2jR4tV6wX8yA0bC1dE2fG3hI&quot;,
+  &quot;coop_name&quot;: &quot;Bike Repair Cooperative&quot;,
+  &quot;constitution_hash&quot;: &quot;0x1212121212121212121212121212121212121212121212121212121212121212&quot;,
+  &quot;initial_credit_limit&quot;: 5000,
+  &quot;currency&quot;: &quot;bike-coop:SPOKES&quot;,
+  &quot;governance_weight&quot;: 100,
+  &quot;confirmations&quot;: [
+    &quot;did:icn:food-coop:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK&quot;,
+    &quot;did:icn:tool-coop:z6MkfNzT9bU9Ua5fHKwBpWJVN8XEfBD6e7o4kEwV9RxYnRpd&quot;
+  ]
+}
+</code></pre>
+<p><strong>ActionHash:</strong></p>
+<pre><code>0x4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d
+</code></pre>
+<hr>
+<h2>8. Compliance Checklist</h2>
+<p>Implementations MUST satisfy:</p>
+<h3>8.1 Action Structure</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Uses <code>BTreeMap&lt;K, V&gt;</code> for all map fields</li>
+<li><input disabled="" type="checkbox"> Uses <code>Vec&lt;T&gt;</code> for ordered lists</li>
+<li><input disabled="" type="checkbox"> Includes all required fields per action type</li>
+<li><input disabled="" type="checkbox"> Uses normalized identifier types (Did, CurrencyId, CellId)</li>
+</ul>
+<h3>8.2 Canonicalization</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Implements <code>Canonicalize</code> trait</li>
+<li><input disabled="" type="checkbox"> Sorts all set-like Vec fields</li>
+<li><input disabled="" type="checkbox"> Normalizes all identifiers</li>
+<li><input disabled="" type="checkbox"> Deduplicates sorted lists</li>
+<li><input disabled="" type="checkbox"> Preserves field order as declared in struct</li>
+</ul>
+<h3>8.3 Action Validation</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Validates SettleCrossCoop conservation</li>
+<li><input disabled="" type="checkbox"> Validates AdmitMember supermajority</li>
+<li><input disabled="" type="checkbox"> Validates UpdateConstitution supermajority</li>
+<li><input disabled="" type="checkbox"> Validates no self-settlements</li>
+<li><input disabled="" type="checkbox"> Validates member membership status</li>
+</ul>
+<h3>8.4 Hashing</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Uses typed hash with domain separation</li>
+<li><input disabled="" type="checkbox"> Computes hash over canonical CBOR</li>
+<li><input disabled="" type="checkbox"> ActionType derived from structure, not trusted</li>
+</ul>
+<h3>8.5 Test Coverage</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Test vectors for each action type</li>
+<li><input disabled="" type="checkbox"> Cross-implementation hash compatibility tests</li>
+<li><input disabled="" type="checkbox"> Edge cases (empty lists, max values, special characters)</li>
+</ul>
+<hr>
+<h2>9. Security Considerations</h2>
+<h3>9.1 Conservation Violation</h3>
+<p><strong>Threat:</strong> Settlements that don&#39;t sum to zero create or destroy value.</p>
+<p><strong>Mitigation:</strong></p>
+<ul>
+<li>Verify conservation per currency in <code>validate_settle_cross_coop</code></li>
+<li>Use checked arithmetic to prevent overflow</li>
+</ul>
+<h3>9.2 Action Type Spoofing</h3>
+<p><strong>Threat:</strong> Attacker submits action with mismatched type field.</p>
+<p><strong>Mitigation:</strong></p>
+<ul>
+<li>Derive <code>ActionType</code> from structure using <code>action_type()</code> method</li>
+<li>Never trust <code>ActionType</code> from external input</li>
+</ul>
+<h3>9.3 Confirmation Replay</h3>
+<p><strong>Threat:</strong> Attacker reuses confirmations from previous actions.</p>
+<p><strong>Mitigation:</strong></p>
+<ul>
+<li>Include action hash in governance proof</li>
+<li>Verify signatures against specific action</li>
+</ul>
+<h3>9.4 Identifier Confusion</h3>
+<p><strong>Threat:</strong> Similar DIDs confused in multi-coop settlements.</p>
+<p><strong>Mitigation:</strong></p>
+<ul>
+<li>Normalize identifiers before comparison</li>
+<li>Validate identifier formats</li>
+<li>Reject non-normalized identifiers</li>
+</ul>
+<hr>
+<h2>10. References</h2>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CANONICAL_ENCODING">CANONICAL_ENCODING.md</a> - Encoding rules</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/FEDERATION_INTEROP_CONTRACT">FEDERATION_INTEROP_CONTRACT.md</a> - Protocol specification</li>
+<li><a href="https://www.rfc-editor.org/rfc/rfc2119" target="_blank" rel="noopener">RFC 2119</a> - Key words for RFCs</li>
+</ul>
+<hr>
+<p><strong>Document Status:</strong> NORMATIVE - Implementations MUST comply with this specification.</p>
+<p><strong>Change History:</strong></p>
+<ul>
+<li>2026-02-02: Initial version 1.0</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

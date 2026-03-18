@@ -1,0 +1,263 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>SDIS &amp; Steward System - Deployment Status | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>sdis</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>SDIS DEPLOYMENT STATUS</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/sdis/SDIS_DEPLOYMENT_STATUS.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>SDIS &amp; Steward System - Deployment Status</h1>
+<p><strong>Date:</strong> December 12, 2025<br><strong>Status:</strong> ✅ Infrastructure Deployed, ⚠️  Steward System Needs Implementation</p>
+<hr>
+<h2>🎯 What&#39;s Working Now</h2>
+<h3>1. ICN Gateway Deployed ✅</h3>
+<ul>
+<li><strong>URL:</strong> <code>http://10.8.10.40:30080</code></li>
+<li><strong>Health Check:</strong> <code>http://10.8.10.40:30080/v1/health</code> → Working</li>
+<li><strong>SDIS Health:</strong> <code>http://10.8.10.40:30080/v1/sdis/health</code> → Working</li>
+</ul>
+<h3>2. SDIS API Endpoints ✅</h3>
+<p>All SDIS endpoints are deployed and accessible:</p>
+<h4>Enrollment Endpoints</h4>
+<ul>
+<li><code>POST /v1/sdis/enrollment/start</code> - Start enrollment ceremony</li>
+<li><code>GET /v1/sdis/enrollment/{id}</code> - Get ceremony status</li>
+<li><code>POST /v1/sdis/enrollment/{id}/finalize</code> - Finalize enrollment</li>
+</ul>
+<h4>Recovery Endpoints</h4>
+<ul>
+<li><code>POST /v1/sdis/recovery/start</code> - Start recovery ceremony</li>
+<li><code>GET /v1/sdis/recovery/{id}</code> - Get recovery status</li>
+<li><code>POST /v1/sdis/recovery/{id}/complete</code> - Complete recovery</li>
+</ul>
+<h4>Anchor Management</h4>
+<ul>
+<li><code>GET /v1/sdis/anchor/{id}</code> - Get anchor details</li>
+<li><code>POST /v1/sdis/anchor/rotate-keys</code> - Rotate keys</li>
+<li><code>GET /v1/sdis/anchor/{id}/history</code> - Get rotation history</li>
+<li><code>POST /v1/sdis/anchor/devices/add</code> - Add device</li>
+<li><code>GET /v1/sdis/anchor/{id}/devices</code> - List devices</li>
+</ul>
+<h4>Verification Endpoints</h4>
+<ul>
+<li><code>POST /v1/sdis/verify/level1</code> - QR scan verification (offline)</li>
+<li><code>POST /v1/sdis/verify/level2</code> - Binding verification (hybrid)</li>
+<li><code>POST /v1/sdis/verify/level3</code> - Full STARK verification (network)</li>
+</ul>
+<h3>3. Code Structure ✅</h3>
+<p>All SDIS code is implemented in:</p>
+<pre><code>icn/crates/icn-gateway/src/api/sdis/
+├── anchor.rs           # Anchor management endpoints
+├── enrollment.rs       # Full enrollment ceremony
+├── ephemeral.rs        # Ephemeral proof generation
+├── mod.rs              # Module configuration
+├── qr.rs               # QR code encoding/decoding
+├── recovery.rs         # Recovery ceremony
+├── simple_enrollment.rs # Simplified enrollment flow
+└── verify.rs           # Multi-level verification
+</code></pre>
+<h3>4. Pilot UI Deployed ✅</h3>
+<ul>
+<li><strong>URL:</strong> <code>http://10.8.10.40:30030</code></li>
+<li>Static files served via nginx</li>
+<li>Ready for SDIS UI integration</li>
+</ul>
+<hr>
+<h2>⚠️ What&#39;s Missing: Steward System</h2>
+<p>The SDIS system is fully deployed but <strong>cannot process enrollments yet</strong> because the <strong>Steward system is not implemented</strong>.</p>
+<h3>What Are Stewards?</h3>
+<p>Stewards are trusted members who:</p>
+<ol>
+<li><strong>Vouch for new members</strong> during enrollment</li>
+<li><strong>Verify identity proofs</strong> (government ID, biometrics, organizational sponsorship)</li>
+<li><strong>Sign vouches</strong> that upgrade enrollment trust levels</li>
+<li><strong>Form a trust threshold</strong> (e.g., 3 stewards required for Level 2 enrollment)</li>
+</ol>
+<h3>Steward System Components Needed</h3>
+<h4>1. Steward Role &amp; Permissions</h4>
+<ul>
+<li><input disabled="" type="checkbox"> Define <code>Steward</code> role in cooperative governance</li>
+<li><input disabled="" type="checkbox"> Add steward permissions to trust graph</li>
+<li><input disabled="" type="checkbox"> Steward appointment/removal via governance proposals</li>
+<li><input disabled="" type="checkbox"> Minimum trust threshold for stewards (e.g., 0.7)</li>
+</ul>
+<h4>2. Steward Credential System</h4>
+<ul>
+<li><input disabled="" type="checkbox"> Issue steward credentials (signed by cooperative)</li>
+<li><input disabled="" type="checkbox"> Steward DID → Coop mapping in ledger</li>
+<li><input disabled="" type="checkbox"> Revocation mechanism for removed stewards</li>
+<li><input disabled="" type="checkbox"> Credential expiry and renewal</li>
+</ul>
+<h4>3. Vouch Data Structure</h4>
+<pre><code class="language-rust">struct StewardVouch {
+    enrollment_id: String,
+    steward_did: String,
+    pathway_verified: EnrollmentPathway,
+    verification_notes: String,
+    signature: Signature,
+    timestamp: u64,
+}
+</code></pre>
+<h4>4. Enrollment State Machine</h4>
+<pre><code>Level 0: Started           → QR code issued
+Level 1: Device Verified   → Device scanned QR, proved possession
+Level 2: Steward Vouched   → N stewards approved (threshold)
+Level 3: Anchor Created    → Permanent DID issued
+</code></pre>
+<h4>5. Steward API Endpoints</h4>
+<ul>
+<li><input disabled="" type="checkbox"> <code>GET /v1/steward/pending</code> - List pending enrollments</li>
+<li><input disabled="" type="checkbox"> <code>GET /v1/steward/enrollment/{id}</code> - Get enrollment details</li>
+<li><input disabled="" type="checkbox"> <code>POST /v1/steward/vouch</code> - Submit vouch for enrollment</li>
+<li><input disabled="" type="checkbox"> <code>GET /v1/steward/my-vouches</code> - List steward&#39;s vouches</li>
+<li><input disabled="" type="checkbox"> <code>GET /v1/steward/stats</code> - Steward dashboard stats</li>
+</ul>
+<h4>6. Steward UI (Pilot UI)</h4>
+<ul>
+<li><input disabled="" type="checkbox"> Login as steward (DID authentication)</li>
+<li><input disabled="" type="checkbox"> Pending enrollments list</li>
+<li><input disabled="" type="checkbox"> Enrollment detail view (show pathway proof)</li>
+<li><input disabled="" type="checkbox"> Vouch button with confirmation</li>
+<li><input disabled="" type="checkbox"> Vouch history and statistics</li>
+<li><input disabled="" type="checkbox"> Mobile-responsive design</li>
+</ul>
+<h4>7. EnrollmentManager Actor</h4>
+<ul>
+<li><input disabled="" type="checkbox"> Track enrollment state (Level 0 → 3)</li>
+<li><input disabled="" type="checkbox"> Collect steward vouches</li>
+<li><input disabled="" type="checkbox"> Check threshold (e.g., 3 vouches required)</li>
+<li><input disabled="" type="checkbox"> Create Anchor when threshold met</li>
+<li><input disabled="" type="checkbox"> Gossip enrollment updates to peers</li>
+<li><input disabled="" type="checkbox"> Persist enrollments to store</li>
+</ul>
+<h4>8. Integration Points</h4>
+<ul>
+<li><input disabled="" type="checkbox"> Gateway → EnrollmentManager handle</li>
+<li><input disabled="" type="checkbox"> EnrollmentManager → Identity actor (create Anchor)</li>
+<li><input disabled="" type="checkbox"> EnrollmentManager → Ledger (record enrollment)</li>
+<li><input disabled="" type="checkbox"> EnrollmentManager → Trust graph (initial trust edges)</li>
+<li><input disabled="" type="checkbox"> Gateway → Governance (steward assignments)</li>
+</ul>
+<hr>
+<h2>📋 Next Steps</h2>
+<h3>Phase 1: Steward Infrastructure (1-2 days)</h3>
+<ol>
+<li>Create <code>EnrollmentManager</code> actor in <code>icn-core</code></li>
+<li>Define steward role in governance system</li>
+<li>Implement vouch data structure and validation</li>
+<li>Add enrollment state transitions</li>
+</ol>
+<h3>Phase 2: Steward API (1 day)</h3>
+<ol>
+<li>Create <code>/v1/steward/*</code> endpoints in gateway</li>
+<li>Wire up EnrollmentManager to gateway</li>
+<li>Add authentication middleware for stewards</li>
+<li>Test with curl/Postman</li>
+</ol>
+<h3>Phase 3: Steward UI (2-3 days)</h3>
+<ol>
+<li>Add steward dashboard to Pilot UI</li>
+<li>Pending enrollments list component</li>
+<li>Enrollment review and vouch flow</li>
+<li>Real-time updates via WebSocket</li>
+</ol>
+<h3>Phase 4: Testing &amp; Documentation (1 day)</h3>
+<ol>
+<li>End-to-end enrollment test (3 stewards)</li>
+<li>Recovery ceremony test</li>
+<li>Write steward onboarding guide</li>
+<li>Video walkthrough</li>
+</ol>
+<hr>
+<h2>🚀 Testing the Current System</h2>
+<h3>Test SDIS Health</h3>
+<pre><code class="language-bash">curl http://10.8.10.40:30080/v1/sdis/health
+</code></pre>
+<h3>Test Gateway Health</h3>
+<pre><code class="language-bash">curl http://10.8.10.40:30080/v1/health
+</code></pre>
+<h3>Check Pod Status</h3>
+<pre><code class="language-bash">ssh ubuntu@10.8.10.40 &#39;sudo kubectl get pods -n icn&#39;
+</code></pre>
+<h3>View Gateway Logs</h3>
+<pre><code class="language-bash">ssh ubuntu@10.8.10.40 &#39;sudo kubectl logs -n icn -l component=daemon --tail=50&#39;
+</code></pre>
+<hr>
+<h2>📚 Architecture References</h2>
+<ul>
+<li><strong>SDIS Design:</strong> <code>docs/SDIS_STEWARD_ROADMAP.md</code></li>
+<li><strong>Enrollment Flow:</strong> <code>icn/crates/icn-gateway/src/api/sdis/enrollment.rs</code> (lines 1-12)</li>
+<li><strong>Trust Graph:</strong> <code>icn/crates/icn-trust/</code></li>
+<li><strong>Governance:</strong> <code>icn/crates/icn-governance/</code></li>
+</ul>
+<hr>
+<h2>🎯 Current Priority</h2>
+<p><strong>Implement the Steward System</strong> to make SDIS enrollments functional. Without stewards, the enrollment endpoints return errors because there&#39;s no one to vouch for new members.</p>
+<p>Once stewards are implemented, the full flow will be:</p>
+<ol>
+<li>User starts enrollment → receives QR code</li>
+<li>User scans QR on mobile → proves device possession (Level 1)</li>
+<li>Stewards review enrollment → submit vouches</li>
+<li>Threshold reached (e.g., 3 vouches) → Anchor created (Level 2)</li>
+<li>User receives permanent DID + recovery codes</li>
+</ol>
+<hr>
+<p><strong>Status Summary:</strong><br>✅ <strong>Infrastructure:</strong> Deployed and working<br>⚠️ <strong>Stewards:</strong> Not yet implemented<br>🎯 <strong>Next:</strong> Build EnrollmentManager + Steward UI  </p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

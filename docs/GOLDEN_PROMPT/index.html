@@ -1,0 +1,988 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Golden Development Prompt | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>  <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>GOLDEN PROMPT</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/GOLDEN_PROMPT.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Golden Development Prompt</h1>
+<h2>Master Context for AI-Assisted Development</h2>
+<p><strong>Version:</strong> 1.0 — March 18, 2026
+<strong>Maintainer:</strong> Matt Faherty
+<strong>Repo:</strong> <code>InterCooperative-Network/icn</code> (<code>main</code> branch)</p>
+<blockquote>
+<p>This document provides complete context for any AI coding agent working on ICN.
+It supplements (does not replace) the repo&#39;s <code>CLAUDE.md</code>, which covers operational
+rules, branch hygiene, and CI workflow. This document covers <strong>what</strong>, <strong>why</strong>,
+<strong>where we are</strong>, and <strong>where we&#39;re going</strong>.</p>
+</blockquote>
+<hr>
+<h1>§1 — PROJECT IDENTITY</h1>
+<h2>What ICN Is</h2>
+<p>ICN (InterCooperative Network) is a substrate daemon for the cooperative internet. It is a P2P coordination layer that enables cooperatives, communities, and federations to govern themselves, exchange value, share resources, and federate — without intermediaries that capture their value.</p>
+<p><strong>It is not a blockchain.</strong> It is not a federation server. It is a constraint enforcement engine where apps translate cooperative governance semantics into generic constraints, and the kernel enforces constraints without understanding their meaning.</p>
+<p><strong>One-line version:</strong> Anyone can record anything of value within their cell, governed by rules they democratically choose, bridged to other cells via federated trust.</p>
+<h2>The Vision (Four Stages)</h2>
+<pre><code>Stage A: Institutions     → Institution-in-a-Box (charters, treasury, governance)
+Stage B: Federation       → Cross-group trust, agreements, clearing
+Stage C: Commons          → Resource contribution, shared services
+Stage D: Civilization     → Municipal governance, public infrastructure
+</code></pre>
+<p>The substrate is at Stage B depth in infrastructure but still finishing Stage A at the product layer.</p>
+<h2>Core Principle: The Meaning Firewall</h2>
+<blockquote>
+<p><strong>Apps translate meaning into constraints. The kernel enforces constraints without understanding meaning.</strong></p>
+</blockquote>
+<p>This is the architectural invariant. The kernel provides mechanisms (identity, transport, storage, enforcement). Apps provide semantics (what a &quot;vote&quot; means, what a &quot;credit limit&quot; is, how &quot;trust&quot; is computed). The boundary is enforced by CI ratchet tests in <code>meaning_firewall.rs</code>.</p>
+<p><strong>Litmus test for any change:</strong> &quot;Could a developer build a DIFFERENT economic model / governance system / trust algorithm using these primitives?&quot; If no, the primitives are too specific — the change belongs in an app, not the kernel.</p>
+<hr>
+<h1>§2 — CURRENT STATE (Honest Assessment)</h1>
+<h2>By the Numbers (as of March 2026)</h2>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Rust lines (crates + bins)</td>
+<td>~420,000</td>
+</tr>
+<tr>
+<td>Rust lines (app layer)</td>
+<td>~7,000</td>
+</tr>
+<tr>
+<td>Crates</td>
+<td>34</td>
+</tr>
+<tr>
+<td>App crates</td>
+<td>4 (trust, governance, ledger, echo) + membership stub</td>
+</tr>
+<tr>
+<td>Binaries</td>
+<td>3 (icnd, icnctl, icn-console)</td>
+</tr>
+<tr>
+<td>Tests</td>
+<td>4,287</td>
+</tr>
+<tr>
+<td>Gateway API endpoints</td>
+<td>~60+</td>
+</tr>
+<tr>
+<td>Workspace version</td>
+<td>0.1.0</td>
+</tr>
+<tr>
+<td>Rust toolchain</td>
+<td>1.88.0 (pinned, do not change)</td>
+</tr>
+<tr>
+<td>License</td>
+<td>MIT OR Apache-2.0 (AGPL-3.0 on repo root)</td>
+</tr>
+</tbody></table>
+<h2>What Works</h2>
+<ul>
+<li><strong>Identity:</strong> Ed25519 DIDs, Age-encrypted keystore, multi-device, key rotation, post-quantum hybrid (ML-DSA). 14,522 lines, 221 tests.</li>
+<li><strong>Trust:</strong> Trust graph with transitive computation, scoped per-org trust. PolicyOracle implementation is the reference pattern. 11,818 lines, 227 tests.</li>
+<li><strong>Networking:</strong> QUIC/TLS sessions, mDNS discovery, DID-TLS binding, E2E encryption, NAT traversal stubs. 19,856 lines, 205 tests.</li>
+<li><strong>Gossip:</strong> Topic-based with vector clocks, Bloom filters, anti-entropy, trust-gated access control. 14,949 lines, 221 tests.</li>
+<li><strong>Ledger:</strong> Double-entry mutual credit, Merkle-DAG anchoring, commons credits, patronage, treasury, settlement, disputes, dynamic limits. 28,741 lines, 325 tests.</li>
+<li><strong>Governance:</strong> Proposals, amendments, appeals, charter, delegation (liquid democracy), domains, effect manifests, invariant gates, protocol parameters, vote tallying. 25,427 lines, 434 tests.</li>
+<li><strong>Compute:</strong> Actor model, WASM executor, task scheduling, commons pool, federation compute, receipts. 24,419 lines, 278 tests.</li>
+<li><strong>Federation:</strong> Attestations, clearing, netting, receipt clearing, registry, router. 11,867 lines, 173 tests.</li>
+<li><strong>Gateway:</strong> REST API with ~60+ endpoints, JWT auth, WebSocket, actix-web. 59,685 lines, 314 tests.</li>
+<li><strong>Demo:</strong> 4-node K3s deployment, 4 demo flows (governance, patronage, federation, reporting), presenter mode, canonical personas.</li>
+</ul>
+<h2>What&#39;s Incomplete</h2>
+<ul>
+<li><strong>CCL Charter Engine:</strong> The YAML schema system (Entity, Governance, Economics, Agreement) parses and validates. The expression evaluator works (<code>parse_expr(&quot;0.67 * members&quot;)</code>). But the bridge from CclDocument → ConstraintSet → kernel enforcement does not exist. Contracts are JSON ASTs interpreted with fuel metering. No text parser. No WASM compiler in this repo.</li>
+<li><strong>Kernel infection:</strong> 11 of ~29 kernel crates still import domain types. <code>icn-core</code> has 43 governance refs, 31 ledger refs, 32 CCL refs. Being ratcheted down via CI enforcement.</li>
+<li><strong>Gateway:</strong> 59K lines in one crate. Adapter/view-model boundary refactor is in progress.</li>
+<li><strong>Federation end-to-end:</strong> Clearing and netting exist but aren&#39;t wired through the full AgreementSchema lifecycle.</li>
+<li><strong>Security audit:</strong> Internal only. No external professional review.</li>
+<li><strong>Scale testing:</strong> Works at 2-4 nodes. 10+ node testing not yet done.</li>
+</ul>
+<h2>What&#39;s Deprecated — DO NOT Reference</h2>
+<ul>
+<li><strong>Mana:</strong> The regenerating compute capacity token system is deprecated. Use &quot;fuel&quot; for compute metering. Kill any remaining Mana references encountered.</li>
+<li><strong>icn-core repo:</strong> Archived January 15, 2026. All development is in <code>InterCooperative-Network/icn</code>.</li>
+<li><strong>AgileMind Innovations Cooperative:</strong> Never operational. Do not reference.</li>
+</ul>
+<hr>
+<h1>§3 — ARCHITECTURE</h1>
+<h2>Repo Topology</h2>
+<pre><code>/                           ← Monorepo root (docs, deploy, web, sdk, scripts)
+├── icn/                    ← Rust workspace root (ALL cargo commands run here)
+│   ├── Cargo.toml          ← Workspace definition
+│   ├── crates/             ← 34 library crates
+│   ├── bins/               ← 3 binary crates (icnd, icnctl, icn-console)
+│   └── apps/               ← App-layer crates (trust, governance, ledger, echo)
+├── apps/                   ← Same as icn/apps/ (symlink or co-located)
+├── web/                    ← Web UIs (pilot-ui, dashboard)
+├── sdk/                    ← SDKs (typescript, react-native)
+├── deploy/                 ← Deployment configs (k8s, compose, devnet)
+├── demo/                   ← Demo scripts and configs
+├── contracts/              ← CCL contract examples (JSON)
+├── docs/                   ← Documentation (235+ files)
+├── monitoring/             ← Prometheus/Grafana configs
+├── CLAUDE.md               ← Operational agent rules (branch hygiene, CI, etc.)
+└── kernel_surface.toml     ← Kernel infection tracking
+</code></pre>
+<p><strong>Rule:</strong> Rust commands (<code>cargo *</code>) run from <code>icn/</code>. Everything else from monorepo root.</p>
+<h2>Crate Architecture</h2>
+<h3>Kernel Layer (domain-agnostic, enforces mechanisms)</h3>
+<table>
+<thead>
+<tr>
+<th>Crate</th>
+<th>Purpose</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icn-kernel-api</code></td>
+<td>Trait definitions: PolicyOracle, ConstraintSet, State, Compute, Comms, Events, Identity, Naming (44 traits)</td>
+<td>Clean</td>
+</tr>
+<tr>
+<td><code>icn-core</code></td>
+<td>Tokio actor runtime, supervisor, meaning firewall enforcement</td>
+<td>Infected (extraction in progress)</td>
+</tr>
+<tr>
+<td><code>icn-net</code></td>
+<td>QUIC/TLS sessions, mDNS discovery, NAT traversal</td>
+<td>Infected (medium)</td>
+</tr>
+<tr>
+<td><code>icn-gossip</code></td>
+<td>Topic-based gossip, vector clocks, Bloom filters</td>
+<td>Infected (medium)</td>
+</tr>
+<tr>
+<td><code>icn-store</code></td>
+<td>Sled-backed persistent KV storage</td>
+<td>Clean</td>
+</tr>
+<tr>
+<td><code>icn-time</code></td>
+<td>Rough Time Protocol clock sync</td>
+<td>Clean</td>
+</tr>
+<tr>
+<td><code>icn-obs</code></td>
+<td>Prometheus metrics, tracing, logging</td>
+<td>Clean</td>
+</tr>
+<tr>
+<td><code>icn-snapshot</code></td>
+<td>State snapshots for graceful restarts</td>
+<td>Clean</td>
+</tr>
+<tr>
+<td><code>icn-encoding</code></td>
+<td>Serialization utilities</td>
+<td>Clean</td>
+</tr>
+<tr>
+<td><code>icn-protocol</code></td>
+<td>Facade re-exporting icn-gossip + icn-net</td>
+<td>Clean</td>
+</tr>
+<tr>
+<td><code>icn-services</code></td>
+<td>Facade re-exporting icn-api + icn-rpc + icn-gateway</td>
+<td>Clean</td>
+</tr>
+<tr>
+<td><code>icn-crypto</code></td>
+<td>Facade re-exporting icn-crypto-pq</td>
+<td>Clean</td>
+</tr>
+</tbody></table>
+<h3>Domain Layer (semantic, interprets meaning)</h3>
+<table>
+<thead>
+<tr>
+<th>Crate</th>
+<th>Purpose</th>
+<th>Lines</th>
+<th>Tests</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icn-identity</code></td>
+<td>DIDs, Ed25519, keystore, multi-device, recovery, revocation</td>
+<td>14,522</td>
+<td>221</td>
+</tr>
+<tr>
+<td><code>icn-trust</code></td>
+<td>Trust graph, transitive computation, scoped trust</td>
+<td>11,818</td>
+<td>227</td>
+</tr>
+<tr>
+<td><code>icn-ledger</code></td>
+<td>Mutual credit, Merkle-DAG, treasury, patronage, settlement</td>
+<td>28,741</td>
+<td>325</td>
+</tr>
+<tr>
+<td><code>icn-governance</code></td>
+<td>Proposals, voting, delegation, charter, protocol params</td>
+<td>25,427</td>
+<td>434</td>
+</tr>
+<tr>
+<td><code>icn-ccl</code></td>
+<td>Contract AST, interpreter, schemas, disputes, registry</td>
+<td>14,607</td>
+<td>148</td>
+</tr>
+<tr>
+<td><code>icn-compute</code></td>
+<td>WASM executor, scheduling, commons pool, receipts</td>
+<td>24,419</td>
+<td>278</td>
+</tr>
+<tr>
+<td><code>icn-federation</code></td>
+<td>Clearing, netting, attestations, registry, routing</td>
+<td>11,867</td>
+<td>173</td>
+</tr>
+<tr>
+<td><code>icn-entity</code></td>
+<td>Unified entity model, lifecycle, membership, registry</td>
+<td>7,138</td>
+<td>113</td>
+</tr>
+<tr>
+<td><code>icn-coop</code></td>
+<td>Cooperative-specific actor, lifecycle, membership</td>
+<td>5,506</td>
+<td>69</td>
+</tr>
+<tr>
+<td><code>icn-community</code></td>
+<td>Community-specific actor, lifecycle, resources</td>
+<td>3,719</td>
+<td>134</td>
+</tr>
+<tr>
+<td><code>icn-gateway</code></td>
+<td>REST API, WebSocket, JWT auth, all HTTP endpoints</td>
+<td>59,685</td>
+<td>314</td>
+</tr>
+<tr>
+<td><code>icn-naming</code></td>
+<td>Hierarchical naming service (cell/org/fed/commons)</td>
+<td>849</td>
+<td>8</td>
+</tr>
+<tr>
+<td><code>icn-authz</code></td>
+<td>Capability graph model (new, Sprint 11+)</td>
+<td>1,232</td>
+<td>54</td>
+</tr>
+<tr>
+<td><code>icn-privacy</code></td>
+<td>Onion routing, topic encryption, traffic obfuscation</td>
+<td>1,430</td>
+<td>49</td>
+</tr>
+<tr>
+<td><code>icn-security</code></td>
+<td>Byzantine detection, misbehavior</td>
+<td>1,782</td>
+<td>26</td>
+</tr>
+<tr>
+<td><code>icn-steward</code></td>
+<td>SDIS steward network, VUI registry</td>
+<td>6,218</td>
+<td>93</td>
+</tr>
+<tr>
+<td><code>icn-zkp</code></td>
+<td>Zero-knowledge proofs, accumulators</td>
+<td>5,843</td>
+<td>74</td>
+</tr>
+<tr>
+<td><code>icn-crypto-pq</code></td>
+<td>Post-quantum ML-DSA hybrid signatures</td>
+<td>3,707</td>
+<td>106</td>
+</tr>
+</tbody></table>
+<h3>App Layer (PolicyOracle implementations)</h3>
+<table>
+<thead>
+<tr>
+<th>App</th>
+<th>Purpose</th>
+<th>Lines</th>
+<th>Pattern</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>apps/trust</code> (icn-trust-app)</td>
+<td>TrustPolicyOracle — trust scores → kernel constraints</td>
+<td>3,733</td>
+<td><strong>Reference implementation</strong></td>
+</tr>
+<tr>
+<td><code>apps/governance</code> (icn-governance-app)</td>
+<td>GovernancePolicyOracle — protocol params → constraints</td>
+<td>524</td>
+<td>Working</td>
+</tr>
+<tr>
+<td><code>apps/ledger</code> (icn-ledger-app)</td>
+<td>LedgerPolicyOracle — credit policy → constraints</td>
+<td>1,855</td>
+<td>Working</td>
+</tr>
+<tr>
+<td><code>apps/echo</code> (icn-app-echo)</td>
+<td>Test/example app</td>
+<td>262</td>
+<td>Example</td>
+</tr>
+</tbody></table>
+<h3>Key Kernel Types</h3>
+<pre><code class="language-rust">// The kernel asks apps: &quot;Should this action be allowed?&quot;
+pub struct PolicyRequest {
+    pub core: PolicyRequestCore,  // actor DID, action, domain
+    pub context: PolicyContext,    // metadata HashMap
+}
+
+// Apps answer with constraints the kernel enforces blindly
+pub struct ConstraintSet {
+    pub rate_limit: Option&lt;RateLimit&gt;,
+    pub max_topics: Option&lt;u32&gt;,
+    pub max_message_size: Option&lt;u64&gt;,
+    pub max_connections: Option&lt;u32&gt;,
+    pub max_subscriptions: Option&lt;u32&gt;,
+    pub max_outstanding_requests: Option&lt;u32&gt;,
+    pub custom: HashMap&lt;String, ConstraintValue&gt;,  // ← extensibility point
+}
+
+pub enum ConstraintValue {
+    Bool(bool), Int(i64), Float(OrderedFloat&lt;f64&gt;), String(String), List(Vec&lt;ConstraintValue&gt;)
+}
+
+// Apps implement this trait
+pub trait PolicyOracle: Send + Sync {
+    fn evaluate(&amp;self, request: &amp;PolicyRequest) -&gt; PolicyDecision;
+}
+
+pub enum PolicyDecision {
+    Allow { constraints: ConstraintSet },
+    Deny { reason: String },
+}
+</code></pre>
+<h3>CCL Schema Types (the charter system)</h3>
+<pre><code class="language-rust">// A complete CCL document (YAML-serializable)
+pub struct CclDocument {
+    pub schema_version: SchemaVersion,  // Currently V0 only
+    pub entity: Option&lt;EntitySchema&gt;,
+    pub governance: Option&lt;GovernanceSchema&gt;,
+    pub economics: Option&lt;EconomicsSchema&gt;,
+    pub agreement: Option&lt;AgreementSchema&gt;,
+    pub extensions: HashMap&lt;String, serde_yaml::Value&gt;,
+}
+
+// Expression mini-language (string-parseable)
+// parse_expr(&quot;0.67 * members&quot;) → SchemaExpr::BinaryOp { ... }
+// parse_expr(&quot;min(1000, patronage * 0.5)&quot;) → SchemaExpr::FunctionCall { ... }
+// EvalContext binds runtime values and evaluates deterministically
+</code></pre>
+<h3>The Meaning Firewall Boundary (reference: apps/trust/src/oracle.rs)</h3>
+<pre><code class="language-rust">// ABOVE this line: trust semantics (scores, classes, graph)
+// BELOW this line: generic kernel constraints (rate limits, multipliers)
+fn score_to_constraints(&amp;self, score: f64, _action: &amp;ActionKind) -&gt; ConstraintSet {
+    let rate_limit = match score {
+        s if s &gt;= 0.7 =&gt; RateLimit::unlimited(),
+        s if s &gt;= 0.4 =&gt; RateLimit::standard(),
+        s if s &gt;= 0.1 =&gt; RateLimit::throttled(),
+        _ =&gt; RateLimit::restricted(),
+    };
+    // Kernel never knows what &quot;trust score&quot; means
+    ConstraintSet::default().with_rate_limit(rate_limit)
+}
+</code></pre>
+<hr>
+<h1>§4 — DEVELOPMENT PHASES</h1>
+<h2>Phase 0: Close the Demo 🚧</h2>
+<p><strong>Status:</strong> Active
+<strong>Target:</strong> 2 weeks
+<strong>Proves:</strong> &quot;This is real. It runs. Multiple cooperatives coordinate without a central authority.&quot;</p>
+<h3>Remaining Work</h3>
+<table>
+<thead>
+<tr>
+<th>Task</th>
+<th>Type</th>
+<th>Effort</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Complete ExecutionReceiptGate (#1310)</td>
+<td>Feature</td>
+<td>Done</td>
+<td>Links governance vote → execution proof → treasury action — PR #1327 merged</td>
+</tr>
+<tr>
+<td>Add treasury/ledger scopes to demo auth calls</td>
+<td>Fix</td>
+<td>Hours</td>
+<td>Scopes exist in ALLOWED_SCOPES but demo scripts don&#39;t request them</td>
+</tr>
+<tr>
+<td>Deploy proof signing key to K3s pods</td>
+<td>Ops</td>
+<td>Hours</td>
+<td><code>/gov/proposals/{id}/proof</code> returns 404 without it</td>
+</tr>
+<tr>
+<td>Verify K3s cluster operational</td>
+<td>Ops</td>
+<td>Hours</td>
+<td>Runner was down Jan 2026</td>
+</tr>
+<tr>
+<td>Run all 4 flows, fix friction</td>
+<td>Polish</td>
+<td>Days</td>
+<td>Use <code>demo/scripts/verify-demo.sh</code></td>
+</tr>
+<tr>
+<td>Record demo</td>
+<td>Content</td>
+<td>Day</td>
+<td><code>--presenter</code> mode exists</td>
+</tr>
+</tbody></table>
+<h3>Demo Flows</h3>
+<ol>
+<li><strong>Governance Legitimacy</strong> — Harbor Homes roof repair: proposal → vote → authorization → proof</li>
+<li><strong>Patronage &amp; Contribution</strong> — BrightWorks Q1: allocation formula → settlement → provenance</li>
+<li><strong>Federation Coordination</strong> — Tool Library ↔ BrightWorks equipment agreement via Finger Lakes CDN</li>
+<li><strong>Institutional Reporting</strong> — Finger Lakes CDN: read-only audit across member coops</li>
+</ol>
+<h3>Definition of Done</h3>
+<ul>
+<li><code>demo/scripts/verify-demo.sh</code> passes</li>
+<li>All 4 flows run in <code>--presenter</code> mode without errors</li>
+<li>Recorded demo exists as shareable asset</li>
+</ul>
+<hr>
+<h2>Phase 1: The Charter Engine ⏳</h2>
+<p><strong>Status:</strong> Planned
+<strong>Target:</strong> 4–6 weeks
+<strong>Proves:</strong> &quot;Cooperatives define their own governance rules. The system enforces them.&quot;</p>
+<h3>The Core Task: <code>charter_to_constraints()</code></h3>
+<p>Build the bridge from YAML charter documents to kernel-enforced constraints.</p>
+<pre><code>CclDocument::from_yaml()          ← EXISTS
+CclDocument::validate()            ← EXISTS
+compute_hash(&amp;doc)                 ← EXISTS
+charter_to_constraints()           ← BUILD THIS
+  ├── EvalContext binds runtime data
+  ├── Schema expressions evaluate to numbers
+  └── Numbers map to ConstraintSet
+ConstraintSet via PolicyOracle     ← WIRE THIS (new apps/charter crate)
+Kernel enforcement                 ← EXISTS
+</code></pre>
+<h3>Mapping: Schema → Constraints</h3>
+<p><strong>GovernanceSchema:</strong></p>
+<ul>
+<li><code>VoteThreshold</code> expressions → <code>custom[&quot;min_votes&quot;]</code> ConstraintValue</li>
+<li><code>DecisionType.quorum</code> → <code>custom[&quot;min_quorum&quot;]</code></li>
+<li><code>DelegationConfig.max_depth</code> → <code>custom[&quot;max_delegation_depth&quot;]</code></li>
+</ul>
+<p><strong>EconomicsSchema:</strong></p>
+<ul>
+<li><code>CreditConfig.limit</code> expression → <code>custom[&quot;credit_limit&quot;]</code></li>
+<li><code>SurplusConfig.allocation_rules</code> → <code>custom[&quot;allocation_*&quot;]</code></li>
+<li><code>MemberEquity.minimum/maximum</code> → <code>custom[&quot;equity_min/max&quot;]</code></li>
+</ul>
+<p><strong>AgreementSchema:</strong></p>
+<ul>
+<li><code>SettlementConfig.cycle</code> → <code>custom[&quot;settlement_cycle&quot;]</code></li>
+<li><code>DisputeResolution.stages</code> → <code>custom[&quot;dispute_stages&quot;]</code></li>
+</ul>
+<p>Start with governance thresholds + credit limits (the demo exercises these). Expand incrementally.</p>
+<h3>Deliverables</h3>
+<ul>
+<li><code>charter_to_constraints()</code> in <code>icn-ccl</code></li>
+<li><code>CharterPolicyOracle</code> in new <code>apps/charter</code> crate</li>
+<li>5 charter templates: worker coop, consumer coop, housing coop, community org, federation</li>
+<li><code>icnctl charter validate/deploy/inspect</code> subcommands</li>
+<li>Demo Flow 1 uses a real charter document</li>
+<li>Integration test: YAML → ConstraintSet → kernel enforcement</li>
+</ul>
+<hr>
+<h2>Phase 2: Pilot Launch ⏳</h2>
+<p><strong>Status:</strong> Planned
+<strong>Target:</strong> 4–6 weeks
+<strong>Proves:</strong> &quot;Real cooperatives use this for real decisions and real accounting.&quot;</p>
+<h3>Deliverables</h3>
+<ul>
+<li>Pilot runbook (#1222)</li>
+<li>One-command deployment per cooperator</li>
+<li>Charter customization workflow</li>
+<li>Deploy nodes for 3–5 pilot cooperatives</li>
+<li>Weekly check-ins, feedback collection</li>
+<li>Pilot case study for funders</li>
+</ul>
+<h3>Selection Criteria for Pilot Coops</h3>
+<ul>
+<li>Already governing themselves (bylaws, votes, money)</li>
+<li>Willing to parallel-run ICN alongside existing tools</li>
+<li>Can articulate current coordination pain</li>
+<li>In Matt&#39;s network reach</li>
+</ul>
+<hr>
+<h2>Phase 3: Federation Depth ⏳</h2>
+<p><strong>Status:</strong> Planned
+<strong>Target:</strong> 2–3 months
+<strong>Proves:</strong> &quot;Autonomous cooperatives coordinate at scale without new bureaucracies.&quot;</p>
+<h3>Deliverables</h3>
+<ul>
+<li>Federation Agreement lifecycle (AgreementSchema → live agreement)</li>
+<li>Cross-org credential recognition</li>
+<li>Federation clearing end-to-end (credit settlement between coops)</li>
+<li>Dispute resolution flow</li>
+<li>NAT traversal for WAN federation</li>
+<li>10+ node scale test</li>
+<li>Federation dashboard in pilot UI</li>
+</ul>
+<hr>
+<h2>Phase 4: Institution-in-a-Box ⏳</h2>
+<p><strong>Status:</strong> Planned
+<strong>Target:</strong> 2–3 months
+<strong>Proves:</strong> &quot;Any group can form a cooperative and be operational in hours.&quot;</p>
+<h3>Deliverables</h3>
+<ul>
+<li><code>icnctl init-coop</code> interactive wizard</li>
+<li>Web-based charter builder</li>
+<li>One-click node deployment (Docker)</li>
+<li>Member invitation flow (QR/link)</li>
+<li>Mobile app (React Native from existing SDK)</li>
+<li>Offline-first capability</li>
+</ul>
+<hr>
+<h2>Phase 5: The Commons Layer ⏳</h2>
+<p><strong>Status:</strong> Planned
+<strong>Target:</strong> 3–6 months
+<strong>Proves:</strong> &quot;Cooperatives pool resources. The network sustains itself.&quot;</p>
+<h3>Deliverables</h3>
+<ul>
+<li>Commons resource contribution accounting (#925)</li>
+<li>Resource metering (CPU, storage, bandwidth)</li>
+<li>Commons credit formula via CCL (#1308)</li>
+<li>Shared service registry and marketplace</li>
+<li>WASM app deployment</li>
+<li>Resource allocation governance</li>
+</ul>
+<hr>
+<h2>Phase 6: Civilization Tools ⏳</h2>
+<p><strong>Status:</strong> Horizon
+<strong>Proves:</strong> &quot;This infrastructure replaces the coordination functions of state and corporation.&quot;</p>
+<p>Emerges from Phases 1–5 working. Municipal governance, cooperative health networks, climate coordination, education cooperatives, mutual aid at scale.</p>
+<hr>
+<h1>§5 — PROGRESS TRACKING</h1>
+<h2>Phase Tracking Format</h2>
+<p>Every phase follows this structure in <code>docs/PHASE_PROGRESS.md</code>:</p>
+<pre><code class="language-markdown">### Phase N: &lt;Name&gt;
+**Status:** ✅ Complete | 🚧 In Progress | ⏳ Planned
+**Started:** YYYY-MM-DD
+**Completed:** YYYY-MM-DD (if done)
+**Sprint(s):** S16, S17, etc.
+
+**Objective:** One sentence.
+
+**Deliverables:**
+- [ ] Deliverable 1 — PR #NNNN
+- [x] Deliverable 2 — PR #NNNN (merged YYYY-MM-DD)
+- [ ] Deliverable 3 — unstarted
+
+**Blockers:**
+- Description of blocker (if any)
+
+**Decisions Made:**
+- Decision and rationale (dated)
+
+**Metrics:**
+- Tests added: N
+- Lines changed: +N / -N
+- Kernel infection delta: -N refs
+</code></pre>
+<h2>Kernel Infection Ratchet</h2>
+<p>Tracked in <code>kernel_surface.toml</code> and enforced by <code>meaning_firewall.rs</code> CI tests.</p>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Current</th>
+<th>Target</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icn-core</code> governance refs</td>
+<td>43</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>icn-core</code> ledger refs</td>
+<td>31</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>icn-core</code> CCL refs</td>
+<td>32</td>
+<td>0</td>
+</tr>
+<tr>
+<td>Infected crates</td>
+<td>11</td>
+<td>0</td>
+</tr>
+<tr>
+<td>Clean crates</td>
+<td>9</td>
+<td>all</td>
+</tr>
+</tbody></table>
+<p><strong>Rule:</strong> Every sprint, infection count must not increase. Decrease when touching infected code.</p>
+<h2>Charter Engine Progress</h2>
+<p>Track in <code>docs/charter-engine/PROGRESS.md</code>:</p>
+<pre><code class="language-markdown">### Schema → Constraint Mappings
+
+| Schema Type | Field | Constraint Key | Status |
+|-------------|-------|----------------|--------|
+| GovernanceSchema | VoteThreshold | custom[&quot;min_votes&quot;] | ⏳ |
+| GovernanceSchema | quorum | custom[&quot;min_quorum&quot;] | ⏳ |
+| EconomicsSchema | CreditConfig.limit | custom[&quot;credit_limit&quot;] | ⏳ |
+| ... | ... | ... | ... |
+</code></pre>
+<h2>Sprint Close Checklist</h2>
+<p>Every sprint close updates:</p>
+<ol>
+<li><code>docs/PHASE_PROGRESS.md</code> — deliverable checkboxes</li>
+<li><code>kernel_surface.toml</code> — infection counts (if changed)</li>
+<li><code>docs/STATE.md</code> — current status snapshot (dated)</li>
+<li><code>docs/TODO.md</code> — reorder/update active items</li>
+<li>Run <code>doc_reality_scan.sh</code> — fix broken links</li>
+</ol>
+<hr>
+<h1>§6 — SESSION PROTOCOL</h1>
+<h2>Starting a Session</h2>
+<pre><code class="language-bash"># 1. Preflight
+cd /path/to/icn/icn
+git pull --rebase
+cargo check 2&gt;&amp;1 | tail -5  # Fast type-check
+git status --short            # Must be clean
+
+# 2. Orient
+cat ../docs/PHASE_PROGRESS.md | head -40   # Where are we?
+cat ../docs/TODO.md | head -20             # What&#39;s next?
+git log --oneline -10                       # Recent commits
+
+# 3. Identify scope
+# What phase are we in? What deliverable is next?
+# State scope explicitly before writing any code.
+</code></pre>
+<h2>During a Session</h2>
+<ul>
+<li><strong>One deliverable at a time.</strong> Complete it, test it, commit it.</li>
+<li><strong>Test before commit.</strong> <code>cargo fmt --check &amp;&amp; cargo clippy --all-targets -- -D warnings &amp;&amp; cargo test -p &lt;crate&gt;</code></li>
+<li><strong>Scope is law.</strong> The user&#39;s request defines scope. Note adjacent concerns but do not act on them.</li>
+<li><strong>No parallel changes</strong> unless explicitly instructed.</li>
+<li><strong>Meaning Firewall check:</strong> If adding code to a kernel crate, verify it doesn&#39;t import domain types.</li>
+</ul>
+<h2>Ending a Session</h2>
+<pre><code class="language-bash"># 1. Verify
+cargo test -p &lt;touched-crates&gt;
+cargo clippy --all-targets -- -D warnings
+
+# 2. Update tracking
+# Update docs/PHASE_PROGRESS.md deliverable checkboxes
+# Update docs/STATE.md if meaningful state changed
+
+# 3. Summary
+# State: what was done, what&#39;s next, any blockers
+</code></pre>
+<hr>
+<h1>§7 — TECHNICAL SPECIFICATIONS</h1>
+<h2>Charter Bridge Spec (Phase 1 — Primary Engineering Task)</h2>
+<h3>Function Signature</h3>
+<pre><code class="language-rust">// In icn-ccl/src/schema/bridge.rs (new file)
+
+use icn_kernel_api::authz::{ConstraintSet, ConstraintValue};
+
+/// Runtime context for evaluating charter expressions.
+/// Binds live data (member count, balances, trust scores) to field names
+/// used in schema expressions.
+pub struct CharterContext {
+    eval_ctx: EvalContext,  // from schema/expr.rs
+}
+
+impl CharterContext {
+    pub fn new() -&gt; Self { ... }
+    pub fn with_member_count(self, count: u64) -&gt; Self { ... }
+    pub fn with_trust_score(self, score: f64) -&gt; Self { ... }
+    // etc.
+}
+
+/// Convert a validated CclDocument into kernel-enforceable constraints.
+///
+/// This is THE Meaning Firewall boundary for charters.
+/// Above: cooperative governance semantics (quorum, delegation, credit policy)
+/// Below: generic kernel constraints (numbers, limits, flags)
+pub fn charter_to_constraints(
+    doc: &amp;CclDocument,
+    context: &amp;CharterContext,
+) -&gt; Result&lt;ConstraintSet, SchemaError&gt; { ... }
+</code></pre>
+<h3>Expression Evaluation Flow</h3>
+<pre><code>YAML: threshold: &quot;0.67 * members&quot;
+         │
+         v
+parse_expr(&quot;0.67 * members&quot;)                    ← EXISTS in schema/expr.rs
+         │
+         v
+SchemaExpr::BinaryOp { Literal(0.67), Mul, Field(&quot;members&quot;) }
+         │
+         v
+EvalContext { fields: { &quot;members&quot;: Int(100) } }  ← Bind from CharterContext
+         │
+         v
+evaluate() → SchemaValue::Float(67.0)           ← EXISTS in schema/expr.rs
+         │
+         v
+ConstraintSet { custom: { &quot;min_votes&quot;: Int(67) } }  ← Map to constraint
+</code></pre>
+<h3>CharterPolicyOracle</h3>
+<pre><code class="language-rust">// In apps/charter/src/oracle.rs (new crate)
+
+pub struct CharterPolicyOracle {
+    // Stores active charters per entity, keyed by content hash
+    charters: Arc&lt;RwLock&lt;HashMap&lt;ContentHash, (CclDocument, ConstraintSet)&gt;&gt;&gt;,
+}
+
+impl PolicyOracle for CharterPolicyOracle {
+    fn evaluate(&amp;self, request: &amp;PolicyRequest) -&gt; PolicyDecision {
+        // Look up charter for the requesting entity&#39;s scope
+        // Return the pre-computed ConstraintSet
+        // Kernel enforces without knowing it came from a charter
+    }
+}
+</code></pre>
+<hr>
+<h1>§8 — ANTI-PATTERNS</h1>
+<p><strong>Do not:</strong></p>
+<ul>
+<li>Build a CCL text parser. The YAML schema system with expression strings is the v1 interface.</li>
+<li>Chase WASM compilation. The interpreter with fuel metering is sufficient.</li>
+<li>Expand the kernel trait surface. 44 traits is enough. Implement existing ones.</li>
+<li>Build new web frontends. Polish <code>web/pilot-ui</code>.</li>
+<li>Rewrite the gateway. Decompose incrementally.</li>
+<li>Fix unrelated lints/warnings when working on a specific task.</li>
+<li>Upgrade the Rust toolchain (pinned at 1.88.0).</li>
+<li>Use &quot;Mana&quot; anywhere. The term is deprecated. Use &quot;fuel&quot; for compute metering.</li>
+<li>Invent new tracking systems. Use the phase format defined in §5.</li>
+<li>Make parallel changes without explicit instruction.</li>
+<li>Add domain-specific logic to kernel crates.</li>
+</ul>
+<p><strong>Do:</strong></p>
+<ul>
+<li>Follow the trust app (<code>apps/trust/src/oracle.rs</code>) as the reference PolicyOracle pattern.</li>
+<li>Run the meaning firewall check when touching kernel crates.</li>
+<li>Update <code>docs/PHASE_PROGRESS.md</code> when completing deliverables.</li>
+<li>Start sessions with the preflight in §6.</li>
+<li>Keep commits scoped to one deliverable.</li>
+<li>Be honest in documentation about what works and what doesn&#39;t.</li>
+</ul>
+<hr>
+<h1>§9 — KEY FILE LOCATIONS</h1>
+<table>
+<thead>
+<tr>
+<th>What</th>
+<th>Where</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Operational agent rules</td>
+<td><code>CLAUDE.md</code> (repo root)</td>
+</tr>
+<tr>
+<td>This development context</td>
+<td><code>docs/GOLDEN_PROMPT.md</code></td>
+</tr>
+<tr>
+<td>Phase progress tracking</td>
+<td><code>docs/PHASE_PROGRESS.md</code></td>
+</tr>
+<tr>
+<td>Current state snapshot</td>
+<td><code>docs/STATE.md</code></td>
+</tr>
+<tr>
+<td>Active TODO</td>
+<td><code>docs/TODO.md</code></td>
+</tr>
+<tr>
+<td>Kernel infection tracking</td>
+<td><code>kernel_surface.toml</code></td>
+</tr>
+<tr>
+<td>Meaning Firewall enforcement</td>
+<td><code>icn/crates/icn-core/src/meaning_firewall.rs</code></td>
+</tr>
+<tr>
+<td>Vision document</td>
+<td><code>VISION.md</code></td>
+</tr>
+<tr>
+<td>CCL schemas</td>
+<td><code>icn/crates/icn-ccl/src/schema/</code></td>
+</tr>
+<tr>
+<td>CCL expression parser</td>
+<td><code>icn/crates/icn-ccl/src/schema/expr.rs</code></td>
+</tr>
+<tr>
+<td>CCL contract AST</td>
+<td><code>icn/crates/icn-ccl/src/ast.rs</code></td>
+</tr>
+<tr>
+<td>Trust PolicyOracle (reference)</td>
+<td><code>apps/trust/src/oracle.rs</code></td>
+</tr>
+<tr>
+<td>Governance PolicyOracle</td>
+<td><code>apps/governance/src/oracle.rs</code></td>
+</tr>
+<tr>
+<td>Ledger PolicyOracle</td>
+<td><code>apps/ledger/src/oracle.rs</code></td>
+</tr>
+<tr>
+<td>Kernel API traits</td>
+<td><code>icn/crates/icn-kernel-api/src/</code></td>
+</tr>
+<tr>
+<td>Demo scripts</td>
+<td><code>demo/scripts/</code></td>
+</tr>
+<tr>
+<td>Demo design doc</td>
+<td><code>docs/plans/2026-03-07-demo-system-design.md</code></td>
+</tr>
+<tr>
+<td>Sprint planning</td>
+<td><code>docs/plans/2026-03-05-sprint-14-closeout-sprint-15-scope-design.md</code></td>
+</tr>
+<tr>
+<td>Charter templates (to be created)</td>
+<td><code>contracts/templates/</code></td>
+</tr>
+<tr>
+<td>Pilot UI</td>
+<td><code>web/pilot-ui/</code></td>
+</tr>
+<tr>
+<td>Gateway scopes</td>
+<td><code>icn/crates/icn-gateway/src/validation.rs</code> (ALLOWED_SCOPES)</td>
+</tr>
+<tr>
+<td>K3s deployment</td>
+<td><code>deploy/k8s/</code></td>
+</tr>
+<tr>
+<td>Monitoring</td>
+<td><code>monitoring/</code></td>
+</tr>
+</tbody></table>
+<hr>
+<h1>§10 — CONTEXT FOR THE HUMAN</h1>
+<p>Matt Faherty is the sole developer. He&#39;s a systems-oriented thinker and cooperative infrastructure builder based in Rochester/Palmyra, NY. He works from SSI disability income. His partner Katie is also his caregiver post-shoulder surgery. He organizes with the NY Cooperative Network.</p>
+<p>His development style: mechanism-first, sharp, no-bullshit. He prefers concise output over verbose narration. He builds because he must, not because he&#39;s confident it will work. The fatalism and the building run parallel.</p>
+<p>Two voice modes: <strong>polemical</strong> (sharp, cutting, directed at systems/hypocrisy) and <strong>teacher</strong> (structured, practical, growth-oriented). When writing docs or communications for him, match the context.</p>
+<p>Key failure modes to watch for: overcompression of opposition, isolation through clarity, certainty as armor, burnout from permanent urgency. When you see scope creeping toward &quot;rebuild civilization this session,&quot; gently redirect to the next concrete deliverable.</p>
+<p><strong>The question that drives everything:</strong> &quot;How should the world actually work?&quot; — running continuously since 2009.</p>
+<p><strong>The answer being built:</strong> Programmable, federated, democratic infrastructure — owned by the people who use it.</p>
+<hr>
+<p><em>This document should be reviewed and updated at every phase transition.</em></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

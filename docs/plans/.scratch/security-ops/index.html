@@ -1,0 +1,1172 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Security / Ops / Resilience — Repo State &amp; Gap Analysis | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>plans</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>.scratch</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>security ops</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/plans/.scratch/security-ops.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Security / Ops / Resilience — Repo State &amp; Gap Analysis</h1>
+<blockquote>
+<p>Compiled 2026-02-14 by Security/Ops/Resilience Analyst
+Branch: <code>main</code> @ <code>86677ac6</code></p>
+</blockquote>
+<h2>1. Current Security Posture</h2>
+<h3>1.1 Transport Security</h3>
+<p><strong>QUIC/TLS implementation</strong> — <code>icn-net/src/session.rs</code>, <code>icn-net/src/tls.rs</code></p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Status</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>QUIC transport</td>
+<td>✅ Implemented</td>
+<td>Quinn 0.11 + Rustls 0.23 (memory-safe, no OpenSSL)</td>
+</tr>
+<tr>
+<td>Mutual TLS</td>
+<td>✅ Implemented</td>
+<td><code>DidCertificateVerifier</code> validates client certs (<code>tls.rs:81-195</code>)</td>
+</tr>
+<tr>
+<td>Self-signed certs</td>
+<td>✅ Bound to DID</td>
+<td><code>IdentityBundle</code> generates self-signed X.509 with DID in SAN (<code>icn-identity/src/bundle.rs:93-139</code>)</td>
+</tr>
+<tr>
+<td>DID-TLS binding</td>
+<td>✅ Verified</td>
+<td><code>Signature = Sign_did_key(SHA256(tls_cert))</code> verified in Hello handler (<code>handlers/hello.rs:47-53</code>)</td>
+</tr>
+<tr>
+<td>Certificate expiry</td>
+<td>✅ Checked</td>
+<td><code>check_expiration()</code> in <code>DidCertificateVerifier</code></td>
+</tr>
+<tr>
+<td>TOFU model</td>
+<td>✅ Deployed</td>
+<td>Default <code>min_trust_threshold = 0.0</code> for bootstrap; configurable per deployment</td>
+</tr>
+<tr>
+<td>Length-prefixed framing</td>
+<td>✅ With limits</td>
+<td><code>MAX_MESSAGE_SIZE</code> (10MB) validated before allocation (<code>protocol.rs:143-167</code>)</td>
+</tr>
+<tr>
+<td>Version negotiation</td>
+<td>✅ In Hello</td>
+<td><code>VersionInfo</code> + <code>CapabilityFlags</code> exchanged during handshake (<code>handlers/hello.rs:78-120</code>)</td>
+</tr>
+</tbody></table>
+<p><strong>Key observations</strong>:</p>
+<ul>
+<li>Three critical vulnerabilities (unauthenticated QUIC, unverified DID-TLS binding, gateway scope escalation) were identified and fixed in Dec 2025 security hardening session (<code>docs/archive/2025/security-hardening-2025-12-18.md</code>)</li>
+<li>Rate limiting currently checks <code>message.from</code> <strong>before</strong> signature verification — attacker can forge <code>from</code> to exhaust another peer&#39;s rate limit budget (noted in hardening doc as &quot;Low Priority Enhancement&quot;)</li>
+</ul>
+<h3>1.2 Message Security</h3>
+<p><strong>SignedEnvelope</strong> — <code>icn-net/src/envelope.rs:61</code></p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Status</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Ed25519 signatures</td>
+<td>✅</td>
+<td>64-byte signature over <code>(from, sequence, timestamp, payload_type, payload)</code></td>
+</tr>
+<tr>
+<td>Hybrid Ed25519 + ML-DSA</td>
+<td>✅ Feature-gated</td>
+<td><code>SignatureType::Hybrid</code> with ~3.4KB combined signature (<code>envelope.rs:31-42</code>)</td>
+</tr>
+<tr>
+<td>Timestamp freshness</td>
+<td>✅</td>
+<td>Millisecond-precision Unix timestamp in envelope</td>
+</tr>
+<tr>
+<td>Sequence ordering</td>
+<td>✅</td>
+<td>Monotonic per-sender sequence number</td>
+</tr>
+<tr>
+<td>Payload type discriminator</td>
+<td>✅</td>
+<td><code>PayloadType</code> enum for message classification</td>
+</tr>
+</tbody></table>
+<p><strong>ReplayGuard</strong> — <code>icn-net/src/replay_guard.rs</code></p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Status</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Per-sender sequence windows</td>
+<td>✅</td>
+<td><code>HashMap&lt;Did, SequenceWindow&gt;</code> with Bloom filters</td>
+</tr>
+<tr>
+<td>Persistent state</td>
+<td>✅</td>
+<td>Sled-backed <code>max_seq</code> and <code>finalized</code> sequences survive restarts</td>
+</tr>
+<tr>
+<td>Restart safety gap</td>
+<td>✅</td>
+<td>+1000 gap on startup prevents edge-case replays (<code>RESTART_SAFETY_GAP = 1_000</code>)</td>
+</tr>
+<tr>
+<td>Bloom filter rotation</td>
+<td>✅</td>
+<td>Rotation at 80% capacity (8000 entries), capacity 10000</td>
+</tr>
+<tr>
+<td>Nonce uniqueness (outgoing)</td>
+<td>✅</td>
+<td><code>OutgoingSequenceTracker</code> with +10000 restart gap, Sled persistence, 50K max pairs</td>
+</tr>
+</tbody></table>
+<p><strong>Remaining concern</strong>: Bloom filter saturation over very long-running sessions (noted in hardening doc).</p>
+<h3>1.3 Identity Security</h3>
+<p><strong>Keystore</strong> — <code>icn-identity/src/keystore.rs</code></p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Status</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>At-rest encryption</td>
+<td>✅</td>
+<td>Age encryption with scrypt-based passphrase derivation</td>
+</tr>
+<tr>
+<td>Key zeroization</td>
+<td>✅</td>
+<td><code>Zeroizing&lt;[u8; 32]&gt;</code> for Ed25519 secrets; <code>#[derive(Zeroize, ZeroizeOnDrop)]</code> on ML-DSA keys</td>
+</tr>
+<tr>
+<td>Passphrase handling</td>
+<td>✅</td>
+<td><code>SecretString</code> wrapping, never logged, env var priority</td>
+</tr>
+<tr>
+<td>DID format</td>
+<td>✅</td>
+<td><code>did:icn:&lt;multibase-base58btc-ed25519-pubkey&gt;</code>, validated on deserialization</td>
+</tr>
+<tr>
+<td>Key rotation</td>
+<td>✅</td>
+<td><code>RotationRequest</code> with version chain, old-key signs new-key (<code>keybundle.rs:211-253</code>)</td>
+</tr>
+<tr>
+<td>Migration chain</td>
+<td>✅</td>
+<td>v1→v2→v2.1→v3→v4→v5, backward-compatible loading</td>
+</tr>
+<tr>
+<td>Hardware key support</td>
+<td>⏳ Scaffolding</td>
+<td><code>DidSigner</code> trait + PKCS#11/TPM backends stubbed (<code>backend_factory.rs:68-84</code>) — NOT functional</td>
+</tr>
+</tbody></table>
+<p><strong>Social Recovery</strong> — <code>icn-identity/src/recovery.rs:1-831</code></p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Status</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>M-of-N threshold</td>
+<td>✅</td>
+<td>Configurable trustees + threshold</td>
+</tr>
+<tr>
+<td>Delay period</td>
+<td>✅</td>
+<td>Time-locked finalization (fraud detection window)</td>
+</tr>
+<tr>
+<td>Attestation signatures</td>
+<td>✅</td>
+<td><code>&quot;ICN_RECOVERY_ATTESTATION:&lt;old_did&gt;:&lt;new_did&gt;:&lt;timestamp&gt;&quot;</code> signed by trustees</td>
+</tr>
+<tr>
+<td>Gossip integration</td>
+<td>✅</td>
+<td><code>&quot;identity:recovery&quot;</code> topic for ceremony coordination</td>
+</tr>
+<tr>
+<td>Status machine</td>
+<td>✅</td>
+<td><code>Pending → Delayed → ReadyToFinalize → Finalized</code> with cancellation</td>
+</tr>
+</tbody></table>
+<h3>1.4 Trust-Gated Access Control</h3>
+<p><strong>Trust graph</strong> — <code>icn-trust/src/</code></p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Status</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Trust classes</td>
+<td>✅</td>
+<td>Isolated (&lt;0.1), Known (0.1-0.4), Partner (0.4-0.7), Federated (0.7+)</td>
+</tr>
+<tr>
+<td>Transitive computation</td>
+<td>✅</td>
+<td>Multi-hop trust score derivation</td>
+</tr>
+<tr>
+<td>Rate limiting per class</td>
+<td>✅</td>
+<td>10/20/100/200 msg/sec per trust tier</td>
+</tr>
+<tr>
+<td>PolicyOracle pattern</td>
+<td>✅</td>
+<td><code>TrustPolicyOracle</code> translates scores to <code>ConstraintSet</code> across meaning firewall</td>
+</tr>
+<tr>
+<td>Topic subscription gates</td>
+<td>✅</td>
+<td><code>subscribe()</code> checks oracle + ACL + per-peer limits (<code>subscriptions.rs:34-218</code>)</td>
+</tr>
+<tr>
+<td>Misbehavior recording</td>
+<td>✅</td>
+<td>Policy denials, ACL violations, limit breaches all recorded as <code>Violation</code></td>
+</tr>
+</tbody></table>
+<h3>1.5 Gateway Security</h3>
+<p><strong>Auth flow</strong> — <code>icn-gateway/src/auth.rs</code>, <code>icn-gateway/src/api/auth.rs</code></p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Status</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>DID challenge-response</td>
+<td>✅</td>
+<td>32-byte random nonce, 5-min TTL, Ed25519 verification</td>
+</tr>
+<tr>
+<td>Constant-time auth</td>
+<td>✅</td>
+<td>Timing-attack resistant: dummy verification on parse failures, bitwise OR for decision (<code>auth.rs:162-236</code>)</td>
+</tr>
+<tr>
+<td>JWT tokens</td>
+<td>✅</td>
+<td>HS256, 1-hour expiry, scopes + coop_id claims</td>
+</tr>
+<tr>
+<td>JWT secret enforcement</td>
+<td>✅</td>
+<td>Minimum 32 bytes required (<code>server.rs:384-401</code>)</td>
+</tr>
+<tr>
+<td>Scope whitelist</td>
+<td>✅</td>
+<td>16 allowed scopes, rejects unknown (<code>validation.rs:44-76</code>)</td>
+</tr>
+<tr>
+<td>Cross-coop isolation</td>
+<td>✅</td>
+<td><code>require_coop_access()</code> on every protected route (<code>middleware.rs:88-100</code>)</td>
+</tr>
+<tr>
+<td>Sender verification</td>
+<td>✅</td>
+<td>Payment endpoints verify <code>claims.sub == req.from</code> (<code>api/ledger.rs:67-78</code>)</td>
+</tr>
+<tr>
+<td>Input validation</td>
+<td>✅</td>
+<td>Length limits on all fields (coop_id: 64, memo: 1024, proposal desc: 10000)</td>
+</tr>
+</tbody></table>
+<p><strong>Security headers</strong> — <code>icn-gateway/src/security.rs</code></p>
+<table>
+<thead>
+<tr>
+<th>Header</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>CSP</td>
+<td><code>default-src &#39;self&#39;; script-src &#39;self&#39;; style-src &#39;self&#39; &#39;unsafe-inline&#39;; ...</code></td>
+</tr>
+<tr>
+<td>X-Frame-Options</td>
+<td><code>DENY</code></td>
+</tr>
+<tr>
+<td>X-Content-Type-Options</td>
+<td><code>nosniff</code></td>
+</tr>
+<tr>
+<td>HSTS</td>
+<td><code>max-age=31536000; includeSubDomains</code></td>
+</tr>
+<tr>
+<td>Referrer-Policy</td>
+<td><code>strict-origin-when-cross-origin</code></td>
+</tr>
+<tr>
+<td>Permissions-Policy</td>
+<td>Disables geolocation, microphone, camera, payment</td>
+</tr>
+</tbody></table>
+<p><strong>Rate limiting layers</strong> — <code>icn-gateway/src/rate_limit.rs</code></p>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Target</th>
+<th>Defaults</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>IP-based (<code>IpRateLimiter</code>)</td>
+<td>Auth endpoints</td>
+<td>20 burst / 2/sec</td>
+</tr>
+<tr>
+<td>DID-based (<code>RateLimiter</code>)</td>
+<td>Authenticated</td>
+<td>100 burst / 10/sec</td>
+</tr>
+<tr>
+<td>Category-based</td>
+<td>By endpoint type</td>
+<td>Read 200/20, Write 60/6, Governance 30/3, Compute 10/1</td>
+</tr>
+<tr>
+<td>Trust-gated</td>
+<td>By trust score</td>
+<td>PolicyOracle-driven, fallback: Isolated limits</td>
+</tr>
+<tr>
+<td>Velocity</td>
+<td>Transactions/hour</td>
+<td>Isolated 10, Known 50, Partner 100, Federated 200</td>
+</tr>
+</tbody></table>
+<p><strong>QR Login</strong> — <code>icn-gateway/src/api/sessions.rs</code></p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Status</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>IP rate limiting</td>
+<td>✅</td>
+<td>On session creation and polling</td>
+</tr>
+<tr>
+<td>One-time token delivery</td>
+<td>✅</td>
+<td>Session consumed after first token retrieval</td>
+</tr>
+<tr>
+<td>Session expiry</td>
+<td>✅</td>
+<td>TTL-based, cleaned up periodically</td>
+</tr>
+<tr>
+<td>Gateway URL detection</td>
+<td>⚠️</td>
+<td>Trusts <code>X-Forwarded-*</code> headers — vulnerable to spoofing if not behind trusted proxy</td>
+</tr>
+</tbody></table>
+<h3>1.6 Gossip Security</h3>
+<p><strong>Protocol</strong> — <code>icn-gossip/src/</code></p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Status</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Bloom filter dedup</td>
+<td>✅</td>
+<td>SHA256 hash, capacity 10000, rotation at 80%</td>
+</tr>
+<tr>
+<td>Vector clocks</td>
+<td>✅</td>
+<td>Causal ordering prevents duplicate processing</td>
+</tr>
+<tr>
+<td>Bounded decompression</td>
+<td>✅</td>
+<td><code>MAX_DECOMPRESSED_SIZE = 10MB</code>, bounded reader (<code>types.rs:15-232</code>)</td>
+</tr>
+<tr>
+<td>Per-topic subscriber limits</td>
+<td>✅</td>
+<td><code>MAX_SUBSCRIBERS_PER_TOPIC</code> prevents unbounded growth</td>
+</tr>
+<tr>
+<td>Per-peer subscription limits</td>
+<td>✅</td>
+<td>Trust-weighted via <code>ResourceLimits.max_subscriptions</code></td>
+</tr>
+<tr>
+<td>Topic access control</td>
+<td>✅</td>
+<td><code>AccessControl</code> enum: <code>Open</code>, <code>AllowList</code>, <code>MinTrustScore</code></td>
+</tr>
+<tr>
+<td>BlobNonceGuard</td>
+<td>✅</td>
+<td>Separate nonce tracking for blob transfers (<code>handlers/blob_nonce_guard.rs</code>)</td>
+</tr>
+</tbody></table>
+<p><strong>Weakness</strong>: Push handler (<code>handlers/push.rs</code>) processes announces without per-sender validation — relies entirely on upstream SignedEnvelope verification in NetworkActor. If a message reaches gossip without signature verification (bug), announces could be forged.</p>
+<h3>1.7 Sybil Resistance</h3>
+<p><strong>VUI Registry</strong> — <code>icn-steward/src/vui_registry.rs</code></p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Status</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Bloom filter uniqueness</td>
+<td>✅</td>
+<td>Fast probabilistic membership check</td>
+</tr>
+<tr>
+<td>Exact hash verification</td>
+<td>✅</td>
+<td><code>HashMap&lt;[u8; 32], VuiRegistration&gt;</code> for stewards</td>
+</tr>
+<tr>
+<td>Witnessing steward</td>
+<td>✅</td>
+<td>Registration records include <code>witnessing_steward: Did</code></td>
+</tr>
+<tr>
+<td>Enrollment ceremonies</td>
+<td>✅ Scaffolding</td>
+<td><code>StewardActor</code> manages enrollment/recovery ceremonies (<code>actor.rs:4-6</code>)</td>
+</tr>
+</tbody></table>
+<p><strong>Gap</strong>: VUI is implemented at the data structure level but the <strong>enrollment ceremony protocol</strong> (in-person verification, M-of-N steward attestation, bond mechanics) is not yet wired into the runtime for production use. Personhood levels are defined conceptually but not enforced in rate limiting or governance.</p>
+<h3>1.8 Post-Quantum Readiness</h3>
+<p><strong>icn-crypto-pq</strong> — <code>icn-crypto-pq/src/</code></p>
+<table>
+<thead>
+<tr>
+<th>Algorithm</th>
+<th>Purpose</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ML-DSA-65 (FIPS 204)</td>
+<td>Signatures</td>
+<td>✅ Implemented — 1952B pubkey, 3309B signature, NIST Level 3</td>
+</tr>
+<tr>
+<td>ML-KEM-768 (FIPS 203)</td>
+<td>Key Encapsulation</td>
+<td>✅ Implemented — 1184B pubkey, 1088B ciphertext</td>
+</tr>
+<tr>
+<td>Hybrid signatures</td>
+<td>Ed25519 + ML-DSA</td>
+<td>✅ Both must verify (<code>hybrid.rs:74-83</code>)</td>
+</tr>
+<tr>
+<td>Hybrid encryption</td>
+<td>X25519 + ML-KEM</td>
+<td>⏳ Defined but NOT integrated with <code>EncryptedEnvelope</code></td>
+</tr>
+<tr>
+<td>PQ binding proof</td>
+<td>DID-PQ-BINDING-V1</td>
+<td>✅ Prevents key substitution, 5-min replay window (<code>handlers/hello.rs:60-76</code>)</td>
+</tr>
+<tr>
+<td>Capability negotiation</td>
+<td>HYBRID_SIGNATURES + HYBRID_KEM</td>
+<td>✅ Feature flags in Hello exchange</td>
+</tr>
+<tr>
+<td>Keystore PQ keys</td>
+<td>v5 format</td>
+<td>✅ Feature-gated in <code>StoredKeyV4</code></td>
+</tr>
+</tbody></table>
+<p><strong>Gap</strong>: Post-quantum encryption (ML-KEM) is not wired into the network layer. Current E2E encryption remains X25519-only even with PQ signatures enabled.</p>
+<h3>1.9 Byzantine Fault Detection</h3>
+<p><strong>icn-security</strong> — <code>icn-security/src/misbehavior.rs</code></p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Status</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Violation types</td>
+<td>✅</td>
+<td>7 types: InvalidSignature, ConflictingLedgerEntries, FailedComputeVerification, ExcessiveResourceUse, TrustGraphSpam, ConflictingSignedStatements, ReplayAttack, FailedStorageChallenge</td>
+</tr>
+<tr>
+<td>Reputation scoring</td>
+<td>✅</td>
+<td><code>ReputationScore</code> computed from violation history</td>
+</tr>
+<tr>
+<td>Quarantine/ban</td>
+<td>✅</td>
+<td>Automatic quarantine → ban escalation</td>
+</tr>
+<tr>
+<td>Evidence limits</td>
+<td>✅</td>
+<td><code>MAX_EVIDENCE_SIZE = 64KB</code>, <code>MAX_VIOLATIONS_PER_PEER = 100</code> (bounded memory)</td>
+</tr>
+<tr>
+<td>Trust penalty callback</td>
+<td>✅</td>
+<td><code>TrustPenaltyCallback</code> propagates to trust graph</td>
+</tr>
+<tr>
+<td>Gossip integration</td>
+<td>✅</td>
+<td>Violations recorded from gossip subscription/push handlers</td>
+</tr>
+<tr>
+<td>Monitoring alerts</td>
+<td>✅</td>
+<td>Prometheus alerts for quarantine and auto-ban events</td>
+</tr>
+</tbody></table>
+<h2>2. Threat Model Assessment</h2>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Current Mitigation</th>
+<th>Residual Risk</th>
+<th>Priority</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>T1: State Capture</strong></td>
+<td>No single admin key; governance-based proposals; M-of-N recovery; cooperative democratic structure</td>
+<td>Governance primitives incomplete (proposal execution not fully wired); no threshold signing for critical operations</td>
+<td><strong>Medium</strong> — Phase 5</td>
+</tr>
+<tr>
+<td><strong>T2: Capital Capture</strong></td>
+<td>Trust scores gate access (not purchasable); cooperative membership required; no token speculation</td>
+<td>Trust graph manipulation via sustained attestation flooding (rate-limited but not proof-of-stake bonded)</td>
+<td><strong>Medium</strong> — Phase 5</td>
+</tr>
+<tr>
+<td><strong>T3: Sybil</strong></td>
+<td>VUI registry (Bloom + exact), steward witnessing, enrollment ceremonies scaffolded</td>
+<td>Enrollment ceremonies not production-wired; no in-person verification enforcement; no cost to create DIDs</td>
+<td><strong>High</strong> — Critical for pilot</td>
+</tr>
+<tr>
+<td><strong>T4: Coercion</strong></td>
+<td>Age-encrypted keystore (passphrase), social recovery (M-of-N trustees + delay), key rotation chain</td>
+<td>No duress key / canary mechanism; no threshold signing to distribute key power; HSM/TPM not functional</td>
+<td><strong>Medium</strong> — Phase 5</td>
+</tr>
+<tr>
+<td><strong>T5: Censorship</strong></td>
+<td>mDNS discovery (LAN), STUN/TURN scaffolded, P2P architecture (no central server)</td>
+<td>DNS dependency for STUN servers (Google defaults); no bootstrap node diversity; no relay infrastructure deployed; single K3s cluster</td>
+<td><strong>High</strong> — Blocks non-LAN use</td>
+</tr>
+<tr>
+<td><strong>T6: Dependency</strong></td>
+<td><code>cargo-deny</code> (license + source), <code>cargo-audit</code> (weekly CI), pinned versions, crates.io-only sources</td>
+<td>4 unmaintained transitive deps (sled ecosystem); no reproducible builds; no SBOM generation</td>
+<td><strong>Medium</strong> — Ongoing</td>
+</tr>
+<tr>
+<td><strong>T7: Insider</strong></td>
+<td>Signed envelopes, Byzantine fault detection, quarantine/ban, double-entry ledger consistency checks</td>
+<td>No secret rotation for JWT key; single operator can restart nodes; snapshot files unencrypted at rest</td>
+<td><strong>Medium</strong> — Phase 0/5</td>
+</tr>
+</tbody></table>
+<h2>3. Operational Readiness</h2>
+<h3>3.1 Deployment Model</h3>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Status</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>K3s single-node cluster</td>
+<td>✅ Running</td>
+<td>Deployed since 2025-12-03, non-root pod, read-only rootfs, dropped capabilities</td>
+</tr>
+<tr>
+<td>Docker multi-stage build</td>
+<td>✅</td>
+<td><code>Dockerfile.icnd</code> — slim runtime image (debian:bookworm-slim), minimal packages</td>
+</tr>
+<tr>
+<td>Devnet (3-node)</td>
+<td>✅</td>
+<td>Docker Compose with <code>docker-compose.yml</code>, automated init via <code>entrypoint.sh</code></td>
+</tr>
+<tr>
+<td>Network policies</td>
+<td>✅</td>
+<td>Default-deny ingress, namespace-scoped allow, monitoring-only metrics access</td>
+</tr>
+<tr>
+<td>Health probes</td>
+<td>✅</td>
+<td>Liveness + readiness on <code>/v1/health</code></td>
+</tr>
+<tr>
+<td>Config validation</td>
+<td>✅</td>
+<td>Startup validation with warnings/errors before accepting connections</td>
+</tr>
+</tbody></table>
+<p><strong>Concerns</strong>:</p>
+<ul>
+<li>Gateway binds to <code>0.0.0.0:8080</code> in K8s/devnet (intentional but requires proxy/firewall)</li>
+<li>Devnet uses hardcoded passphrase <code>devnet-insecure</code> and JWT secret (acceptable for dev, dangerous if pattern leaks to prod)</li>
+<li>Metrics endpoint binds to <code>0.0.0.0:9100</code> (mitigated by NetworkPolicy)</li>
+</ul>
+<h3>3.2 Monitoring &amp; Observability</h3>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Status</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Prometheus metrics</td>
+<td>✅</td>
+<td>All subsystems instrumented: trust, gossip, network, gateway, misbehavior, compute</td>
+</tr>
+<tr>
+<td>Security events</td>
+<td>✅</td>
+<td>Signature failures, rate limiting, Byzantine violations tracked as counters</td>
+</tr>
+<tr>
+<td>Tracing (OpenTelemetry)</td>
+<td>✅</td>
+<td>Configurable sampling; security spans always sampled; OTLP export</td>
+</tr>
+<tr>
+<td>Alerting rules</td>
+<td>✅</td>
+<td>ServiceMonitor with alerts for: Byzantine quarantine/ban, signature failures, network partition, ledger inconsistency</td>
+</tr>
+<tr>
+<td>Audit logging</td>
+<td>✅</td>
+<td>Auth attempts (success/failure), scope validation failures, QR session lifecycle</td>
+</tr>
+<tr>
+<td>Cardinality protection</td>
+<td>✅</td>
+<td>Path normalization prevents label explosion; bounded dimensions</td>
+</tr>
+</tbody></table>
+<h3>3.3 Key Management Operations</h3>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>Status</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Key generation</td>
+<td>✅</td>
+<td><code>icnctl id init</code> — Ed25519 + optional PQ via <code>--features post-quantum</code></td>
+</tr>
+<tr>
+<td>Key backup</td>
+<td>✅</td>
+<td><code>icnctl backup</code> — TAR archive of encrypted keystore + metadata</td>
+</tr>
+<tr>
+<td>Key restore</td>
+<td>✅</td>
+<td><code>icnctl restore</code> — restores from TAR, safety backup of existing data</td>
+</tr>
+<tr>
+<td>Key rotation</td>
+<td>✅</td>
+<td>Rotation chain with old→new signing authorization</td>
+</tr>
+<tr>
+<td>Key export</td>
+<td>⚠️</td>
+<td>Treasury keys CLI-only with explicit flag (not via gateway)</td>
+</tr>
+<tr>
+<td>Social recovery</td>
+<td>✅</td>
+<td>M-of-N attestation + delay period + gossip coordination</td>
+</tr>
+<tr>
+<td>PQ upgrade</td>
+<td>✅</td>
+<td><code>icnctl id upgrade-pq</code> adds ML-DSA keys without changing DID</td>
+</tr>
+</tbody></table>
+<p><strong>Gap</strong>: No automated key rotation schedule; no alerts for aging keys; no operational runbook.</p>
+<h3>3.4 NAT Traversal</h3>
+<p><strong>Status</strong>: <strong>Implemented but not production-tested</strong></p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>File</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>STUN client</td>
+<td><code>icn-net/src/stun.rs</code></td>
+<td>✅ Implemented — DNS resolution, timeout/retry, public IP discovery</td>
+</tr>
+<tr>
+<td>NAT type detection</td>
+<td><code>icn-net/src/nat.rs</code></td>
+<td>✅ Implemented — Full cone, restricted, port-restricted, symmetric detection</td>
+</tr>
+<tr>
+<td>TURN relay client</td>
+<td><code>icn-net/src/turn.rs</code></td>
+<td>✅ Implemented — RFC 5766, allocation lifecycle, permission management</td>
+</tr>
+<tr>
+<td>Unified NAT config</td>
+<td><code>icn-net/src/nat.rs:36-52</code></td>
+<td>✅ — <code>NatConfig</code> with STUN/TURN server lists, timeouts</td>
+</tr>
+<tr>
+<td>Default STUN servers</td>
+<td><code>nat.rs:57-59</code></td>
+<td>⚠️ Google STUN servers (<code>stun.l.google.com:19302</code>) — DNS dependency</td>
+</tr>
+<tr>
+<td>Integration with session establishment</td>
+<td>—</td>
+<td>⏳ Not wired into QUIC connection setup</td>
+</tr>
+</tbody></table>
+<p><strong>Critical gap</strong>: NAT traversal modules exist but are <strong>not integrated into the actual QUIC session establishment flow</strong>. Nodes behind NAT cannot currently connect to each other without manual port forwarding. This blocks any deployment beyond LAN or single-server scenarios.</p>
+<h3>3.5 Naming / Discovery</h3>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Status</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>mDNS discovery</td>
+<td>✅ LAN only</td>
+<td><code>icn-net/src/discovery.rs</code> — automatic peer discovery on local network</td>
+</tr>
+<tr>
+<td>DNS-based discovery</td>
+<td>❌</td>
+<td>No DNS-SD or DNS bootstrap implementation</td>
+</tr>
+<tr>
+<td>Bootstrap nodes</td>
+<td>❌</td>
+<td>No configurable bootstrap node list for WAN peer discovery</td>
+</tr>
+<tr>
+<td>Naming service</td>
+<td>⏳</td>
+<td><code>NamingService</code> / <code>ScopedDiscovery</code> traits exist but not implemented</td>
+</tr>
+</tbody></table>
+<p><strong>Critical gap</strong>: Discovery is <strong>LAN-only via mDNS</strong>. No mechanism for WAN peer discovery without manual IP configuration. Combined with NAT traversal gap, this means the system is effectively LAN-only.</p>
+<h3>3.6 Packaging &amp; Distribution</h3>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Status</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Docker image</td>
+<td>✅</td>
+<td><code>Dockerfile.icnd</code> — multi-stage, slim runtime</td>
+</tr>
+<tr>
+<td>Binary build</td>
+<td>✅</td>
+<td><code>cargo build --release</code> produces <code>icnd</code>, <code>icnctl</code>, <code>icn-console</code></td>
+</tr>
+<tr>
+<td>.deb/.rpm packages</td>
+<td>❌</td>
+<td>No system packages</td>
+</tr>
+<tr>
+<td>Install script</td>
+<td>❌</td>
+<td>No one-liner install</td>
+</tr>
+<tr>
+<td>Systemd unit</td>
+<td>❌</td>
+<td>No service file for node management</td>
+</tr>
+<tr>
+<td>Auto-update</td>
+<td>❌</td>
+<td>No update mechanism</td>
+</tr>
+</tbody></table>
+<p><strong>Gap</strong>: Currently requires either Docker or manual Rust compilation. No OS-level packaging.</p>
+<h2>4. Gap Analysis</h2>
+<h3>Critical Gaps (Security Impact)</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Gap</th>
+<th>Threat Mitigated</th>
+<th>Missing</th>
+<th>Where it Belongs</th>
+<th>Phase</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>G1</td>
+<td><strong>NAT traversal not wired</strong></td>
+<td>T5 Censorship</td>
+<td>Integration of STUN/TURN into QUIC session establishment</td>
+<td><code>icn-net/src/session.rs</code></td>
+<td><strong>Phase 1-5</strong></td>
+</tr>
+<tr>
+<td>G2</td>
+<td><strong>Sybil resistance incomplete</strong></td>
+<td>T3 Sybil</td>
+<td>Enrollment ceremony protocol not production-wired; no cost to create DIDs</td>
+<td><code>icn-steward/src/actor.rs</code></td>
+<td><strong>Phase 5</strong></td>
+</tr>
+<tr>
+<td>G3</td>
+<td><strong>Snapshot encryption at rest</strong></td>
+<td>T7 Insider</td>
+<td>Snapshots contain TLS keys + encryption secrets in plaintext</td>
+<td><code>icn-snapshot/src/lib.rs:452</code></td>
+<td><strong>Phase 0</strong></td>
+</tr>
+<tr>
+<td>G4</td>
+<td><strong>Rate limit before sig verification</strong></td>
+<td>T7 Insider, T3 Sybil</td>
+<td>Attacker can exhaust other peer&#39;s rate budget by forging <code>from</code></td>
+<td><code>icn-net/src/</code></td>
+<td><strong>Phase 1</strong></td>
+</tr>
+<tr>
+<td>G5</td>
+<td><strong>QR session gateway URL spoofing</strong></td>
+<td>T5 Censorship, T7 Insider</td>
+<td><code>X-Forwarded-*</code> headers trusted without validation</td>
+<td><code>icn-gateway/src/api/sessions.rs:42-84</code></td>
+<td><strong>Phase 0</strong></td>
+</tr>
+<tr>
+<td>G6</td>
+<td><strong>LAN-only discovery</strong></td>
+<td>T5 Censorship</td>
+<td>No WAN bootstrap or DNS-independent discovery</td>
+<td><code>icn-net/src/discovery.rs</code></td>
+<td><strong>Phase 5</strong></td>
+</tr>
+</tbody></table>
+<h3>Important Gaps (Operational Impact)</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Gap</th>
+<th>Threat</th>
+<th>Missing</th>
+<th>Phase</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>G7</td>
+<td>No JWT secret rotation</td>
+<td>T7 Insider</td>
+<td>Mechanism to rotate gateway JWT secret without downtime</td>
+<td>Phase 1</td>
+</tr>
+<tr>
+<td>G8</td>
+<td>HSM/TPM not functional</td>
+<td>T4 Coercion</td>
+<td>PKCS#11/TPM backends are scaffolding only</td>
+<td>Phase 5</td>
+</tr>
+<tr>
+<td>G9</td>
+<td>ML-KEM not integrated</td>
+<td>T4 Coercion (quantum)</td>
+<td>PQ encryption defined but not used in EncryptedEnvelope</td>
+<td>Phase 5</td>
+</tr>
+<tr>
+<td>G10</td>
+<td>No reproducible builds</td>
+<td>T6 Dependency</td>
+<td>Build output not deterministic, no SBOM</td>
+<td>Phase 5</td>
+</tr>
+<tr>
+<td>G11</td>
+<td>No system packaging</td>
+<td>T5 Censorship</td>
+<td>No .deb/.rpm, no systemd unit</td>
+<td>Phase 5</td>
+</tr>
+<tr>
+<td>G12</td>
+<td>Unmaintained deps (sled)</td>
+<td>T6 Dependency</td>
+<td>4 transitive RUSTSEC advisories from sled ecosystem</td>
+<td>Phase 5</td>
+</tr>
+</tbody></table>
+<h2>5. Phase 0 Tasks (2-3 tasks)</h2>
+<p>These are security contributions needed for the immediate demo:</p>
+<h3>P0-S1: LAN Bind Address Safety</h3>
+<p><strong>Threat</strong>: T5, T7
+<strong>What</strong>: Ensure demo deployment gateway does NOT accidentally bind to WAN.</p>
+<ul>
+<li>Verify <code>bind_addr</code> in demo configs defaults to <code>127.0.0.1:8080</code> or LAN-only address</li>
+<li>Add startup warning when gateway binds to <code>0.0.0.0</code> (already exists: <code>icnd/src/main.rs:466-483</code>)</li>
+<li>Document firewall requirements for demo</li>
+</ul>
+<h3>P0-S2: QR Session Hardening</h3>
+<p><strong>Threat</strong>: T7 (session hijacking)
+<strong>What</strong>: Prevent QR login session hijacking in demo environment.</p>
+<ul>
+<li>Validate <code>X-Forwarded-*</code> headers come from trusted proxy (or pin <code>GATEWAY_BASE_URL</code> env var)</li>
+<li>Consider HMAC-signing QR data to prevent tampering</li>
+<li>Ensure one-time token consumption is atomic (already implemented: <code>consume_session</code>)</li>
+</ul>
+<h3>P0-S3: Operational Monitoring for Demo</h3>
+<p><strong>Threat</strong>: T7
+<strong>What</strong>: Basic security monitoring during demo.</p>
+<ul>
+<li>Verify ServiceMonitor alerts are active for: failed signatures, Byzantine quarantine, auth failures</li>
+<li>Ensure metrics endpoint is reachable by monitoring stack</li>
+<li>Test alert firing for a simulated violation</li>
+</ul>
+<h2>6. Phase 5 Tasks (5-8 tasks)</h2>
+<p>Full resilience for production-grade deployment:</p>
+<h3>P5-S1: NAT Traversal End-to-End</h3>
+<p><strong>Threat</strong>: T5 Censorship
+<strong>What</strong>: Wire STUN/TURN into QUIC session establishment.</p>
+<ul>
+<li>Integrate <code>NatTraversal::discover_public_address()</code> into <code>SessionManager</code></li>
+<li>Add TURN fallback path when direct QUIC fails</li>
+<li>Test behind symmetric NAT (most restrictive)</li>
+<li>Replace Google STUN defaults with self-hosted or diverse set</li>
+<li>Add NAT type to peer discovery announcements</li>
+</ul>
+<h3>P5-S2: DNS-Independent Naming &amp; Discovery</h3>
+<p><strong>Threat</strong>: T5 Censorship
+<strong>What</strong>: Bootstrap peers without DNS dependency.</p>
+<ul>
+<li>Implement configurable bootstrap node list (hardcoded fallback)</li>
+<li>DHT-based peer discovery or gossip-over-rendezvous</li>
+<li><code>.onion</code> / Tor hidden service support for censorship resistance</li>
+<li>Remove Google dependency in default STUN config</li>
+</ul>
+<h3>P5-S3: Anti-Censorship Relay Infrastructure</h3>
+<p><strong>Threat</strong>: T5 Censorship
+<strong>What</strong>: Deploy relay nodes for peers behind restrictive NAT/firewalls.</p>
+<ul>
+<li>Deploy TURN relay with ICN DID authentication</li>
+<li>Implement onion routing (scaffolding exists in <code>icn-privacy/src/onion_routing.rs</code>)</li>
+<li>Pluggable transport interface for domain fronting</li>
+</ul>
+<h3>P5-S4: Key Recovery End-to-End Test</h3>
+<p><strong>Threat</strong>: T4 Coercion
+<strong>What</strong>: Verify social recovery works under realistic conditions.</p>
+<ul>
+<li>Multi-node test: key loss → attestation gathering → delay period → finalization</li>
+<li>Test cancellation during delay (fraud detection)</li>
+<li>Test with gossip network partitions</li>
+<li>Document recovery operational runbook</li>
+</ul>
+<h3>P5-S5: System Packaging</h3>
+<p><strong>Threat</strong>: T5 Censorship, T6 Dependency
+<strong>What</strong>: Make node installation trivial.</p>
+<ul>
+<li><code>.deb</code> package for Ubuntu/Debian (systemd service unit included)</li>
+<li><code>.rpm</code> package for RHEL/Fedora</li>
+<li><code>install.sh</code> one-liner (curl | sh)</li>
+<li>Auto-update mechanism (version announcements via gossip)</li>
+</ul>
+<h3>P5-S6: Supply Chain Security</h3>
+<p><strong>Threat</strong>: T6 Dependency
+<strong>What</strong>: Protect against compromised dependencies.</p>
+<ul>
+<li>Reproducible builds (deterministic output from same source)</li>
+<li>SBOM generation (SPDX/CycloneDX format)</li>
+<li>Pin exact dependency hashes in <code>Cargo.lock</code> verification</li>
+<li>Migrate away from sled (resolve 4 RUSTSEC advisories)</li>
+<li>Binary signing for releases</li>
+</ul>
+<h3>P5-S7: Threat Model Documentation</h3>
+<p><strong>Threat</strong>: All
+<strong>What</strong>: Formal threat model document for security review.</p>
+<ul>
+<li>STRIDE analysis of all subsystems</li>
+<li>Attack trees for T1-T7</li>
+<li>Security boundary diagram</li>
+<li>Penetration test scope document</li>
+<li>Incident response playbook</li>
+</ul>
+<h3>P5-S8: Sybil Resistance Production Wiring</h3>
+<p><strong>Threat</strong>: T3 Sybil
+<strong>What</strong>: Make enrollment ceremonies enforceable.</p>
+<ul>
+<li>Wire steward ceremonies into identity creation flow</li>
+<li>Implement bond mechanics (economic cost to Sybil)</li>
+<li>Personhood levels gate governance participation</li>
+<li>Rate limit DID creation per ceremony window</li>
+</ul>
+<h2>7. Relevant Open Issues</h2>
+<p>Based on code TODOs and documented follow-ups:</p>
+<ol>
+<li><strong>Rate limit ordering</strong>: Move rate limit check after signature verification (noted in <code>docs/archive/2025/security-hardening-2025-12-18.md:161</code>)</li>
+<li><strong>Bloom filter cleanup</strong>: Periodic rotation task for long-running ReplayGuard sessions (noted in hardening doc:157)</li>
+<li><strong>Trust graph TLS integration</strong>: Connect trust scores to TLS certificate validation decisions (noted in hardening doc:145-149)</li>
+<li><strong>Phase 2.3 TODO</strong>: Trust score from PolicyOracle for topology decisions (<code>handlers/hello.rs:231</code> — currently hardcoded <code>trust_score = 0.5f32</code>)</li>
+<li><strong>Snapshot encryption</strong>: Caller must encrypt snapshots at rest (not enforced by code — <code>icn-snapshot/src/lib.rs</code>)</li>
+<li><strong>PQ encryption integration</strong>: ML-KEM not wired into EncryptedEnvelope (noted in <code>docs/design/post-quantum-crypto.md:234</code>)</li>
+</ol>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

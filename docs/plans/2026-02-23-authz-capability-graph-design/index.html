@@ -1,0 +1,499 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Authz Capability Graph Design (Phase B) | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>plans</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>2026 02 23 authz capability graph design</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/plans/2026-02-23-authz-capability-graph-design.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Authz Capability Graph Design (Phase B)</h1>
+<blockquote>
+<p><strong>For Claude:</strong> REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.</p>
+</blockquote>
+<p><strong>Goal:</strong> Unify ICN&#39;s four disconnected authorization systems into a single canonical capability graph model with deterministic hashing, computed-on-demand evaluation, and adapter traits.</p>
+<p><strong>Architecture:</strong> App-layer crate (<code>icn-authz</code>) with a domain-agnostic model subset (<code>icn-authz::model</code>) designed to be liftable to <code>icn-kernel-api</code> in a future phase. No persistence — graph is computed on demand from adapter sources. Deterministic hashing uses BLAKE3 with length-prefixed fields and explicit tag bytes.</p>
+<p><strong>Tech Stack:</strong> Rust, BLAKE3, <code>icn-kernel-api</code> (types only), <code>icn-identity</code> (DID types)</p>
+<hr>
+<h2>1. Motivation</h2>
+<p>ICN currently has four independent authorization systems that don&#39;t talk to each other:</p>
+<ol>
+<li><p><strong>CCL Capabilities</strong> (<code>icn-ccl/src/types.rs</code>): 12-variant <code>Capability</code> enum. The governance-related variants (<code>ProposeAmendment</code>, <code>VoteOnProposal</code>, etc.) are dead code — governance doesn&#39;t actually check them.</p>
+</li>
+<li><p><strong>Trust Classes</strong> (<code>icn-trust/src/types.rs</code>): <code>TrustGraphType</code> enum maps to hardcoded rate limits. Trust score → rate limit conversion is buried in <code>TrustPolicyOracle</code> with no way for governance or CCL to query it.</p>
+</li>
+<li><p><strong>Kernel ConstraintSet</strong> (<code>icn-kernel-api/src/authz.rs</code>): <code>HashMap&lt;String, ConstraintValue&gt;</code> custom bag. Powerful but untyped — anyone can stuff anything in, no schema, no auditing.</p>
+</li>
+<li><p><strong>JWT Scopes</strong> (<code>icn-gateway/src/auth.rs</code>): <code>scopes: Vec&lt;String&gt;</code> in <code>TokenClaims</code>. Static strings like <code>&quot;governance:read&quot;</code>, completely disconnected from CCL capabilities.</p>
+</li>
+</ol>
+<p><strong>Problems this causes:</strong></p>
+<ul>
+<li>An amendment can grant <code>ProposeAmendment</code> capability in CCL but governance never checks it</li>
+<li>Trust-gated rate limits are invisible to the governance safety pipeline (Phase A)</li>
+<li>No way to compute &quot;what changed&quot; across a governance action that touches multiple systems</li>
+<li>PowerDiff (Phase A) can detect <em>that</em> power changed but not <em>what capabilities</em> changed</li>
+</ul>
+<h2>2. Goals and Non-Goals</h2>
+<h3>Goals (B0 scope)</h3>
+<ul>
+<li>Canonical types for subjects, actions, resources, constraints, and edges</li>
+<li>Deterministic BLAKE3 hashing of capability edges and edge sets</li>
+<li><code>GraphBuilder</code> trait for constructing graphs from heterogeneous sources</li>
+<li><code>CapabilityQuery</code> trait for evaluating &quot;can subject X do action Y on resource Z?&quot;</li>
+<li>Test suite proving ordering invariants and hash determinism</li>
+</ul>
+<h3>Non-Goals (deferred)</h3>
+<ul>
+<li>Persistence (no sled, no storage)</li>
+<li>Live adapters for CCL/Trust/JWT (Phase B1)</li>
+<li>PowerDiff integration (Phase B2)</li>
+<li>Full pipeline wiring (Phase B3)</li>
+<li>Kernel promotion (future phase, post-pilot)</li>
+</ul>
+<h2>3. Boundary and Meaning Firewall Stance</h2>
+<p><code>icn-authz</code> is an <strong>app-layer crate</strong>. It lives alongside <code>icn-governance</code>, <code>icn-trust</code>, etc.</p>
+<p><strong>Why not kernel?</strong> The capability graph interprets domain semantics — it knows what &quot;governance:propose&quot; means, what trust classes map to. This is meaning. The kernel must not understand meaning.</p>
+<p><strong>Promotion path:</strong> The <code>icn-authz::model</code> module contains only domain-agnostic types (<code>SubjectId</code>, <code>Action</code>, <code>ResourceId</code>, <code>Constraint</code>, <code>CapabilityEdge</code>). These types are designed to be copy-pasted into <code>icn-kernel-api</code> when the time comes. The <code>icn-authz::adapters</code> module imports domain crates and will never move to kernel.</p>
+<p><strong>Dependency direction:</strong></p>
+<pre><code>icn-authz::model     → icn-kernel-api (types only: BlockHeight, InvariantId)
+icn-authz::adapters  → icn-ccl, icn-trust, icn-gateway (future, B1)
+icn-authz::graph     → icn-authz::model (only)
+</code></pre>
+<h2>4. Canonical Model</h2>
+<h3>4.1 SubjectId</h3>
+<pre><code class="language-rust">/// An actor in the capability graph. Always a DID.
+///
+/// Validated on construction: must start with &quot;did:&quot; prefix.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct SubjectId(String);
+
+impl SubjectId {
+    pub fn new(did: impl Into&lt;String&gt;) -&gt; Result&lt;Self, AuthzError&gt; {
+        let s = did.into();
+        if !s.starts_with(&quot;did:&quot;) {
+            return Err(AuthzError::InvalidSubjectId(s));
+        }
+        Ok(Self(s))
+    }
+    pub fn as_str(&amp;self) -&gt; &amp;str { &amp;self.0 }
+}
+</code></pre>
+<p><strong>Hashing:</strong> <code>hash_subject(s)</code> = BLAKE3(TAG_SUBJECT ++ len_u32_le(s.as_bytes()) ++ s.as_bytes())</p>
+<h3>4.2 Action</h3>
+<p>Validated canonical string newtype. Format: <code>domain:verb[:subverb]</code>.</p>
+<pre><code class="language-rust">/// A capability action. Lowercased, trimmed, colon-separated segments.
+///
+/// Examples: &quot;governance:propose&quot;, &quot;ledger:transfer:credit&quot;, &quot;compute:submit&quot;
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct Action(String);
+
+impl Action {
+    pub fn new(raw: impl Into&lt;String&gt;) -&gt; Result&lt;Self, AuthzError&gt; {
+        let s = raw.into().trim().to_ascii_lowercase();
+        // Must have at least domain:verb
+        let segments: Vec&lt;&amp;str&gt; = s.split(&#39;:&#39;).collect();
+        if segments.len() &lt; 2 || segments.iter().any(|seg| seg.is_empty()) {
+            return Err(AuthzError::InvalidAction(s));
+        }
+        // Only ASCII alphanumeric + colon + hyphen
+        if !s.chars().all(|c| c.is_ascii_alphanumeric() || c == &#39;:&#39; || c == &#39;-&#39;) {
+            return Err(AuthzError::InvalidAction(s));
+        }
+        Ok(Self(s))
+    }
+    pub fn as_str(&amp;self) -&gt; &amp;str { &amp;self.0 }
+    pub fn domain(&amp;self) -&gt; &amp;str { self.0.split(&#39;:&#39;).next().unwrap() }
+    pub fn verb(&amp;self) -&gt; &amp;str { self.0.splitn(3, &#39;:&#39;).nth(1).unwrap() }
+}
+</code></pre>
+<p><strong>Normalization:</strong> Soft — <code>Action::new()</code> lowercases and trims, then validates. No rejection on case mismatch, just normalization.</p>
+<p><strong>Hashing:</strong> <code>hash_action(a)</code> = BLAKE3(TAG_ACTION ++ len_u32_le(a.as_bytes()) ++ a.as_bytes())</p>
+<h3>4.3 ResourceId</h3>
+<pre><code class="language-rust">/// Variant order is FROZEN. Do not reorder. Append only.
+/// Tag bytes: Entity=0x01, Scope=0x02, Asset=0x03, Contract=0x04, System=0x05
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub enum ResourceKind {
+    Entity,    // tag 0x01 — cooperatives, communities, federations, individuals
+    Scope,     // tag 0x02 — cells, namespaces, governance scopes
+    Asset,     // tag 0x03 — ledger accounts, credit lines, treasury
+    Contract,  // tag 0x04 — CCL contracts, amendments
+    System,    // tag 0x05 — protocol parameters, invariant config
+}
+
+/// A typed resource identifier.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct ResourceId {
+    pub kind: ResourceKind,
+    pub id: String,
+}
+</code></pre>
+<p><strong>Hashing:</strong> <code>hash_resource(r)</code> = BLAKE3(TAG_RESOURCE ++ resource_kind_tag_byte(r.kind) ++ len_u32_le(r.id.as_bytes()) ++ r.id.as_bytes())</p>
+<p>Where <code>resource_kind_tag_byte</code> uses the explicit tag byte constants (0x01..0x05), NOT enum-as-integer casting.</p>
+<h3>4.4 Constraint</h3>
+<pre><code class="language-rust">/// Variant order is FROZEN. Do not reorder. Append only.
+/// Tag bytes: RateLimit=0x01, CreditMultiplier=0x02, MaxTopics=0x03,
+///            TimeLock=0x04, RequiresQuorum=0x05, Tag=0x06
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub enum Constraint {
+    RateLimit(u32),          // tag 0x01 — messages per second
+    CreditMultiplier(u32),   // tag 0x02 — basis points (10000 = 1.0x)
+    MaxTopics(u32),          // tag 0x03 — topic subscription limit
+    TimeLock(u64),           // tag 0x04 — block height before which action is locked
+    RequiresQuorum(u32),     // tag 0x05 — minimum votes (absolute count)
+    Tag(String),             // tag 0x06 — escape hatch for domain-specific labels
+}
+</code></pre>
+<p><strong>Design note:</strong> <code>CreditMultiplier</code> uses basis points (u32) instead of f64 for determinism. 10000 = 1.0x, 15000 = 1.5x.</p>
+<p><strong>Hashing:</strong> <code>hash_constraint(c)</code> = BLAKE3(TAG_CONSTRAINT ++ constraint_tag_byte ++ value_bytes)</p>
+<ul>
+<li>For <code>u32</code> values: 4 bytes LE</li>
+<li>For <code>u64</code> values: 8 bytes LE</li>
+<li>For <code>Tag(s)</code>: len_u32_le(s.as_bytes()) ++ s.as_bytes()</li>
+</ul>
+<h3>4.5 EdgeSource</h3>
+<pre><code class="language-rust">/// Variant order is FROZEN. Do not reorder. Append only.
+/// Tag bytes: CclContract=0x01, TrustScore=0x02, GovernanceVote=0x03, Static=0x04
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub enum EdgeSource {
+    CclContract(String),     // tag 0x01 — contract hash or ID
+    TrustScore(String),      // tag 0x02 — trust graph identifier
+    GovernanceVote(String),  // tag 0x03 — proposal ID
+    Static(String),          // tag 0x04 — hardcoded/bootstrap grants
+}
+</code></pre>
+<p><strong>Hashing:</strong> <code>hash_edge_source(es)</code> = BLAKE3(TAG_EDGE_SOURCE ++ source_tag_byte ++ len_u32_le(inner.as_bytes()) ++ inner.as_bytes())</p>
+<h3>4.6 CapabilityEdge</h3>
+<p>The fundamental unit of the graph: &quot;subject S can do action A on resource R, with constraints C, granted by source E, valid at height H.&quot;</p>
+<pre><code class="language-rust">#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct CapabilityEdge {
+    pub subject: SubjectId,
+    pub action: Action,
+    pub resource: ResourceId,
+    pub constraints: Vec&lt;Constraint&gt;,  // sorted, deduped
+    pub source: EdgeSource,
+    pub valid_at: Option&lt;BlockHeight&gt;,
+}
+</code></pre>
+<p><strong>Invariant:</strong> <code>constraints</code> is always sorted and deduped. The constructor enforces this.</p>
+<p><strong>Hashing:</strong> <code>hash_edge(e)</code> = BLAKE3 of field-by-field update:</p>
+<pre><code>hasher.update(TAG_EDGE)
+hasher.update(hash_subject(e.subject))
+hasher.update(hash_action(e.action))
+hasher.update(hash_resource(e.resource))
+hasher.update(len_u32_le(e.constraints.len()))
+for c in &amp;e.constraints { hasher.update(hash_constraint(c)) }
+hasher.update(hash_edge_source(e.source))
+hasher.update(hash_option_height(e.valid_at))
+</code></pre>
+<h2>5. Canonicalization Rules</h2>
+<p>All types implement <code>Ord</code>. Canonical ordering is the foundation of deterministic hashing.</p>
+<h3>5.1 Edge Set Canonicalization</h3>
+<p>Given a <code>Vec&lt;CapabilityEdge&gt;</code>:</p>
+<ol>
+<li>Sort by <code>Ord</code> (subject → action → resource → constraints → source → valid_at)</li>
+<li>Dedup consecutive equal edges</li>
+<li>Hash: BLAKE3(TAG_EDGE_SET ++ len_u32_le(edges.len()) ++ hash(edge_0) ++ hash(edge_1) ++ ...)</li>
+</ol>
+<h3>5.2 Constraint Canonicalization</h3>
+<p>Within a single edge, constraints are:</p>
+<ol>
+<li>Sorted by <code>Ord</code> (variant discriminant first, then inner value)</li>
+<li>Deduped — exact duplicates removed</li>
+</ol>
+<p>This is enforced at construction time by <code>CapabilityEdge::new()</code>.</p>
+<h3>5.3 No HashMap Anywhere</h3>
+<p>The canonical model uses only <code>Vec</code>, <code>String</code>, and fixed-size types. No <code>HashMap</code>, no <code>BTreeMap</code>, no <code>HashSet</code>. All collections are sorted <code>Vec</code>s. This eliminates iteration-order nondeterminism.</p>
+<h2>6. Deterministic Hashing Specification</h2>
+<h3>6.1 Core Principles</h3>
+<ol>
+<li><p><strong>Length-prefix all variable-length fields.</strong> Every <code>String</code>, <code>&amp;[u8]</code>, or <code>Vec&lt;T&gt;</code> is preceded by its length as <code>u32</code> little-endian. This prevents ambiguous concatenations (e.g., <code>&quot;ab&quot; ++ &quot;cd&quot;</code> vs <code>&quot;a&quot; ++ &quot;bcd&quot;</code>).</p>
+</li>
+<li><p><strong>Explicit tag bytes for all enums.</strong> Every enum variant has a hardcoded tag byte constant. We NEVER cast <code>variant as u8</code> or rely on discriminant values. Tag byte constants are defined as named constants with comments noting they are frozen.</p>
+</li>
+<li><p><strong>Variant order is frozen.</strong> Every enum has a comment: &quot;Variant order is FROZEN. Do not reorder. Append only.&quot; New variants get the next sequential tag byte.</p>
+</li>
+<li><p><strong>Option encoding.</strong> <code>None</code> = single byte 0x00. <code>Some(v)</code> = byte 0x01 ++ encoded(v). For <code>Option&lt;BlockHeight&gt;</code>, <code>encoded(v)</code> = <code>v.0 as u64</code> as 8 bytes LE.</p>
+</li>
+<li><p><strong>BLAKE3 only.</strong> All hashing uses BLAKE3. Output is 32 bytes.</p>
+</li>
+</ol>
+<h3>6.2 Tag Byte Constants</h3>
+<pre><code class="language-rust">// Top-level type tags
+const TAG_SUBJECT: u8       = 0x10;
+const TAG_ACTION: u8        = 0x11;
+const TAG_RESOURCE: u8      = 0x12;
+const TAG_CONSTRAINT: u8    = 0x13;
+const TAG_EDGE_SOURCE: u8   = 0x14;
+const TAG_EDGE: u8          = 0x15;
+const TAG_EDGE_SET: u8      = 0x16;
+
+// ResourceKind tags — FROZEN, append only
+const RESOURCE_ENTITY: u8   = 0x01;
+const RESOURCE_SCOPE: u8    = 0x02;
+const RESOURCE_ASSET: u8    = 0x03;
+const RESOURCE_CONTRACT: u8 = 0x04;
+const RESOURCE_SYSTEM: u8   = 0x05;
+
+// Constraint tags — FROZEN, append only
+const CONSTRAINT_RATE_LIMIT: u8         = 0x01;
+const CONSTRAINT_CREDIT_MULTIPLIER: u8  = 0x02;
+const CONSTRAINT_MAX_TOPICS: u8         = 0x03;
+const CONSTRAINT_TIME_LOCK: u8          = 0x04;
+const CONSTRAINT_REQUIRES_QUORUM: u8    = 0x05;
+const CONSTRAINT_TAG: u8               = 0x06;
+
+// EdgeSource tags — FROZEN, append only
+const SOURCE_CCL_CONTRACT: u8     = 0x01;
+const SOURCE_TRUST_SCORE: u8      = 0x02;
+const SOURCE_GOVERNANCE_VOTE: u8  = 0x03;
+const SOURCE_STATIC: u8           = 0x04;
+</code></pre>
+<h3>6.3 Length-Prefix Helper</h3>
+<pre><code class="language-rust">fn hash_bytes(hasher: &amp;mut blake3::Hasher, data: &amp;[u8]) {
+    hasher.update(&amp;(data.len() as u32).to_le_bytes());
+    hasher.update(data);
+}
+
+fn hash_option_height(hasher: &amp;mut blake3::Hasher, h: Option&lt;BlockHeight&gt;) {
+    match h {
+        None =&gt; hasher.update(&amp;[0x00]),
+        Some(height) =&gt; {
+            hasher.update(&amp;[0x01]);
+            hasher.update(&amp;(height.0 as u64).to_le_bytes());
+        }
+    }
+}
+</code></pre>
+<h2>7. Builder and Query Interfaces</h2>
+<h3>7.1 CapabilitySource Trait</h3>
+<pre><code class="language-rust">/// An adapter that can produce capability edges from a domain-specific source.
+///
+/// Implementations live in `icn-authz::adapters` (Phase B1).
+/// The trait is defined here so B0 can write tests with mock sources.
+pub trait CapabilitySource: Send + Sync {
+    /// Return all capability edges this source knows about for the given subject.
+    fn edges_for_subject(&amp;self, subject: &amp;SubjectId) -&gt; Vec&lt;CapabilityEdge&gt;;
+
+    /// Return all capability edges this source can produce.
+    fn all_edges(&amp;self) -&gt; Vec&lt;CapabilityEdge&gt;;
+}
+</code></pre>
+<h3>7.2 GraphBuilder</h3>
+<pre><code class="language-rust">/// Constructs a CapabilityGraph from one or more CapabilitySource adapters.
+pub struct GraphBuilder {
+    sources: Vec&lt;Box&lt;dyn CapabilitySource&gt;&gt;,
+}
+
+impl GraphBuilder {
+    pub fn new() -&gt; Self { Self { sources: vec![] } }
+
+    pub fn add_source(mut self, source: Box&lt;dyn CapabilitySource&gt;) -&gt; Self {
+        self.sources.push(source);
+        self
+    }
+
+    /// Build the graph by polling all sources and canonicalizing.
+    pub fn build(&amp;self) -&gt; CapabilityGraph {
+        let mut edges: Vec&lt;CapabilityEdge&gt; = self.sources
+            .iter()
+            .flat_map(|s| s.all_edges())
+            .collect();
+        edges.sort();
+        edges.dedup();
+        CapabilityGraph { edges }
+    }
+
+    /// Build a subject-scoped graph (cheaper than full build).
+    pub fn build_for_subject(&amp;self, subject: &amp;SubjectId) -&gt; CapabilityGraph {
+        let mut edges: Vec&lt;CapabilityEdge&gt; = self.sources
+            .iter()
+            .flat_map(|s| s.edges_for_subject(subject))
+            .collect();
+        edges.sort();
+        edges.dedup();
+        CapabilityGraph { edges }
+    }
+}
+</code></pre>
+<h3>7.3 CapabilityGraph and Query</h3>
+<pre><code class="language-rust">pub struct CapabilityGraph {
+    edges: Vec&lt;CapabilityEdge&gt;,  // sorted, deduped
+}
+
+impl CapabilityGraph {
+    pub fn edges(&amp;self) -&gt; &amp;[CapabilityEdge] { &amp;self.edges }
+
+    /// Deterministic hash of the entire edge set.
+    pub fn hash(&amp;self) -&gt; [u8; 32] { hash_edge_set(&amp;self.edges) }
+
+    /// Query: can subject do action on resource?
+    pub fn query(&amp;self, subject: &amp;SubjectId, action: &amp;Action, resource: &amp;ResourceId) -&gt; Decision {
+        let matching: Vec&lt;usize&gt; = self.edges.iter()
+            .enumerate()
+            .filter(|(_, e)| e.subject == *subject &amp;&amp; e.action == *action &amp;&amp; e.resource == *resource)
+            .map(|(i, _)| i)
+            .collect();
+
+        Decision {
+            allowed: !matching.is_empty(),
+            matching_edges: matching,
+        }
+    }
+}
+
+/// B0 decision: just allowed + matching edge indices. No string reasons.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Decision {
+    pub allowed: bool,
+    pub matching_edges: Vec&lt;usize&gt;,
+}
+</code></pre>
+<h2>8. Error Type</h2>
+<pre><code class="language-rust">#[derive(Debug, thiserror::Error)]
+pub enum AuthzError {
+    #[error(&quot;invalid subject ID (must start with &#39;did:&#39;): {0}&quot;)]
+    InvalidSubjectId(String),
+
+    #[error(&quot;invalid action format (expected &#39;domain:verb[:subverb]&#39;): {0}&quot;)]
+    InvalidAction(String),
+}
+</code></pre>
+<p>Minimal for B0. No <code>anyhow</code>, no error chains. Grows as adapters land in B1.</p>
+<h2>9. Crate Structure (B0)</h2>
+<pre><code>icn/crates/icn-authz/
+  Cargo.toml
+  src/
+    lib.rs              # pub mod model; pub mod graph; pub mod error;
+    error.rs            # AuthzError
+    model/
+      mod.rs            # pub mod ids; pub mod edge; pub mod hash;
+      ids.rs            # SubjectId, Action, ResourceKind, ResourceId, Constraint, EdgeSource
+      edge.rs           # CapabilityEdge, CapabilityGraph, Decision
+      hash.rs           # All hashing: tag constants, hash_*, hash_edge_set
+    graph/
+      mod.rs            # pub mod builder; pub mod query;
+      builder.rs        # CapabilitySource trait, GraphBuilder
+      query.rs          # Query logic (may be inlined into CapabilityGraph for B0)
+</code></pre>
+<p><strong>Cargo.toml dependencies (B0):</strong></p>
+<pre><code class="language-toml">[dependencies]
+blake3 = &quot;1.8&quot;
+serde = { workspace = true, features = [&quot;derive&quot;] }
+thiserror.workspace = true
+icn-kernel-api = { path = &quot;../icn-kernel-api&quot; }  # BlockHeight only
+
+[dev-dependencies]
+serde_json = &quot;1.0&quot;
+</code></pre>
+<h2>10. Testing Requirements</h2>
+<h3>10.1 Ordering Invariant Tests</h3>
+<ul>
+<li>Create 100 random edges, sort, verify sorted</li>
+<li>Serialize to JSON, deserialize, verify still sorted</li>
+<li>Two graphs built from same edges in different insertion order → same <code>Ord</code> result</li>
+</ul>
+<h3>10.2 Hash Determinism Tests</h3>
+<ul>
+<li>Same edge set → same hash (trivial)</li>
+<li>Same edges, different insertion order → same hash after canonicalization</li>
+<li>Add one edge → hash changes</li>
+<li>Remove one edge → hash changes</li>
+<li>Change one constraint → hash changes</li>
+</ul>
+<h3>10.3 Action Normalization Tests</h3>
+<ul>
+<li><code>&quot;GOVERNANCE:PROPOSE&quot;</code> normalizes to <code>&quot;governance:propose&quot;</code></li>
+<li><code>&quot;  ledger:transfer  &quot;</code> normalizes to <code>&quot;ledger:transfer&quot;</code></li>
+<li><code>&quot;&quot;</code> → error</li>
+<li><code>&quot;single&quot;</code> → error (no colon)</li>
+<li><code>&quot;a::b&quot;</code> → error (empty segment)</li>
+<li><code>&quot;a:b:c&quot;</code> → ok (3 segments)</li>
+</ul>
+<h3>10.4 SubjectId Validation Tests</h3>
+<ul>
+<li><code>&quot;did:icn:abc123&quot;</code> → ok</li>
+<li><code>&quot;not-a-did&quot;</code> → error</li>
+<li><code>&quot;&quot;</code> → error</li>
+</ul>
+<h3>10.5 GraphBuilder Tests</h3>
+<ul>
+<li>Empty graph → empty edges, query returns <code>allowed: false</code></li>
+<li>Two sources with overlapping edges → deduped</li>
+<li><code>build_for_subject</code> returns subset</li>
+</ul>
+<h2>11. Follow-On Phases</h2>
+<h3>B1: Adapters (after B0 merges)</h3>
+<ul>
+<li><code>CclCapabilitySource</code>: reads CCL contracts, emits edges</li>
+<li><code>TrustCapabilitySource</code>: reads trust scores, emits rate-limit edges</li>
+<li><code>JwtCapabilitySource</code>: reads token claims, emits edges</li>
+</ul>
+<h3>B2: PowerDiff Integration</h3>
+<ul>
+<li><code>PowerDiff::from_graphs(before: &amp;CapabilityGraph, after: &amp;CapabilityGraph)</code></li>
+<li>Replaces the current <code>PowerDiff</code> stub with real edge-level diff</li>
+</ul>
+<h3>B3: Pipeline Wiring</h3>
+<ul>
+<li>Amendment lifecycle calls <code>GraphBuilder</code> before/after</li>
+<li><code>InvariantGate</code> receives <code>PowerDiff</code> from graph comparison</li>
+<li>Full safety pipeline: CCL change → graph diff → invariant check → receipt</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

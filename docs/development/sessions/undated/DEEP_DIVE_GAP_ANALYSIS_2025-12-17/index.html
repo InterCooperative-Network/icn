@@ -1,0 +1,351 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Deep Dive Gap Analysis - 2025-12-17 | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>development</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>sessions</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>undated</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>DEEP DIVE GAP ANALYSIS 2025 12 17</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/development/sessions/undated/DEEP_DIVE_GAP_ANALYSIS_2025-12-17.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Deep Dive Gap Analysis - 2025-12-17</h1>
+<p><strong>Date:</strong> 2025-12-17 19:08 UTC<br><strong>Status:</strong> Post Architecture Gap Closure - Discovery Phase<br><strong>Previous:</strong> All 4 architecture gaps closed (100%)  </p>
+<hr>
+<h2>Executive Summary</h2>
+<p>After closing all documented architecture gaps, a deeper audit reveals <strong>5 categories of technical debt and gaps</strong> that should be addressed for production hardening:</p>
+<ol>
+<li><strong>TODO/FIXME Comments</strong> (21 items in production code)</li>
+<li><strong>Ignored/Broken Tests</strong> (1 known: Sybil cluster detection)</li>
+<li><strong>Error Handling</strong> (126 unwraps in icn-core, 3,442 total)</li>
+<li><strong>Missing Protocol Features</strong> (5 from strategic gap analysis)</li>
+<li><strong>Operational Gaps</strong> (from gap-analysis.md)</li>
+</ol>
+<hr>
+<h2>Category 1: TODO/FIXME in Production Code</h2>
+<h3>High Priority</h3>
+<h4>1.1 TURN Relay Unimplemented (Issue #37)</h4>
+<p><strong>File:</strong> <code>icn-core/src/supervisor/mod.rs:1231</code><br><strong>Code:</strong></p>
+<pre><code class="language-rust">// TODO Phase 4: Try relay address (TURN relay) if both direct methods failed
+</code></pre>
+<p><strong>Impact:</strong> NAT traversal fails for peers behind symmetric NATs<br><strong>Priority:</strong> HIGH - Blocks internet-scale deployment<br><strong>Effort:</strong> 2-3 days (TURN client implementation)</p>
+<h4>1.2 Snapshot State Reassembly Incomplete</h4>
+<p><strong>File:</strong> <code>icn-snapshot/src/coordinator.rs</code><br><strong>Code:</strong></p>
+<pre><code class="language-rust">// TODO: Reassemble chunks and store state
+</code></pre>
+<p><strong>Impact:</strong> Distributed snapshots can&#39;t be restored<br><strong>Priority:</strong> HIGH - Disaster recovery incomplete<br><strong>Effort:</strong> 1-2 days</p>
+<h4>1.3 Version Tracker Not Integrated</h4>
+<p><strong>File:</strong> <code>icn-core/src/supervisor/mod.rs:2474</code><br><strong>Code:</strong></p>
+<pre><code class="language-rust">// TODO: Implement version tracker integration
+&quot;current&quot;, // TODO: get actual current version
+</code></pre>
+<p><strong>Impact:</strong> Upgrade coordination doesn&#39;t know actual versions<br><strong>Priority:</strong> MEDIUM - Affects rolling upgrades<br><strong>Effort:</strong> 1 day</p>
+<h3>Medium Priority</h3>
+<h4>1.4 ZKP Circuit Stubs (winterfell)</h4>
+<p><strong>Files:</strong></p>
+<ul>
+<li><code>icn-zkp/src/circuit/age.rs</code> (2 TODOs)</li>
+<li><code>icn-zkp/src/prover.rs</code> (1 TODO)</li>
+</ul>
+<p><strong>Code:</strong></p>
+<pre><code class="language-rust">// TODO: Actual STARK proof generation with winterfell
+// TODO: Actual STARK verification with winterfell
+</code></pre>
+<p><strong>Impact:</strong> ZKP system is non-functional (placeholder only)<br><strong>Priority:</strong> LOW - Not used in current features<br><strong>Effort:</strong> 2-3 weeks (winterfell integration)</p>
+<h4>1.5 Steward Signatures Missing</h4>
+<p><strong>File:</strong> <code>icn-steward/src/actor.rs</code><br><strong>Code:</strong></p>
+<pre><code class="language-rust">signature: Vec::new(), // TODO: Sign in production
+</code></pre>
+<p><strong>Impact:</strong> Steward messages are not cryptographically signed<br><strong>Priority:</strong> MEDIUM - Security gap in SDIS<br><strong>Effort:</strong> 1 day</p>
+<h4>1.6 Recovery Logic Incomplete</h4>
+<p><strong>File:</strong> <code>icn-identity/src/sync.rs</code><br><strong>Code:</strong></p>
+<pre><code class="language-rust">// TODO: Implement full recovery logic
+</code></pre>
+<p><strong>Impact:</strong> Social recovery partially implemented<br><strong>Priority:</strong> MEDIUM - Identity recovery may fail<br><strong>Effort:</strong> 2-3 days</p>
+<h3>Low Priority</h3>
+<h4>1.7 Compute Region from Config</h4>
+<p><strong>File:</strong> <code>icn-compute/src/actor.rs</code><br><strong>Code:</strong></p>
+<pre><code class="language-rust">// TODO: Get own region from config/network context
+</code></pre>
+<p><strong>Impact:</strong> Compute scheduling doesn&#39;t consider locality<br><strong>Priority:</strong> LOW - Performance optimization<br><strong>Effort:</strong> 1 day</p>
+<h4>1.8 SDIS Approval Endpoints (Dev Only)</h4>
+<p><strong>Files:</strong></p>
+<ul>
+<li><code>icn-gateway/src/api/sdis/recovery.rs</code></li>
+<li><code>icn-gateway/src/api/sdis/enrollment.rs</code></li>
+</ul>
+<p><strong>Code:</strong></p>
+<pre><code class="language-rust">.service(approve_recovery), // TODO: Remove in production, use steward votes
+.service(approve_ceremony), // TODO: Remove in production, use steward votes
+</code></pre>
+<p><strong>Impact:</strong> Test-only endpoints exposed in API<br><strong>Priority:</strong> MEDIUM - Should be removed before production<br><strong>Effort:</strong> 1 hour</p>
+<h4>1.9 Trust Score Check Missing</h4>
+<p><strong>File:</strong> <code>icn-coop/src/membership.rs</code><br><strong>Code:</strong></p>
+<pre><code class="language-rust">// TODO: Check trust score when integrated
+</code></pre>
+<p><strong>Impact:</strong> Membership doesn&#39;t verify trust requirements<br><strong>Priority:</strong> LOW - Governance gap<br><strong>Effort:</strong> 1 day</p>
+<h4>1.10 Rate Limiter Not Added</h4>
+<p><strong>File:</strong> <code>icn-core/src/supervisor/mod.rs:834</code><br><strong>Code:</strong></p>
+<pre><code class="language-rust">None, // TODO: Add rate limiter in Phase 8A+
+</code></pre>
+<p><strong>Impact:</strong> Some actor doesn&#39;t have rate limiting<br><strong>Priority:</strong> LOW - Already have trust-gated rate limits elsewhere<br><strong>Effort:</strong> 1 day</p>
+<h4>1.11 Post-Quantum Keygen Not Deterministic</h4>
+<p><strong>File:</strong> <code>icn-crypto-pq/src/hybrid.rs</code><br><strong>Code:</strong></p>
+<pre><code class="language-rust">// For now, generate fresh (TODO: implement deterministic ML-DSA keygen)
+</code></pre>
+<p><strong>Impact:</strong> PQ keys can&#39;t be recovered from seed<br><strong>Priority:</strong> LOW - Not critical for current use<br><strong>Effort:</strong> 2-3 days</p>
+<h4>1.12 DID in Certificate Subject</h4>
+<p><strong>File:</strong> <code>icn-identity/src/bundle.rs</code><br><strong>Code:</strong></p>
+<pre><code class="language-rust">// TODO: Add DID as subject/SAN once we figure out rcgen 0.13 API
+</code></pre>
+<p><strong>Impact:</strong> TLS certificates don&#39;t include DID<br><strong>Priority:</strong> LOW - Nice to have for debugging<br><strong>Effort:</strong> 1-2 days (rcgen API research)</p>
+<h4>1.13 Ledger Cursor Pagination</h4>
+<p><strong>Files:</strong></p>
+<ul>
+<li><code>icn-gateway/src/ledger_mgr.rs</code></li>
+<li><code>icn-gateway/src/api/ledger.rs</code></li>
+</ul>
+<p><strong>Code:</strong></p>
+<pre><code class="language-rust">// TODO: Update icn-ledger to support cursor-based pagination for efficiency
+</code></pre>
+<p><strong>Impact:</strong> Large ledger queries inefficient<br><strong>Priority:</strong> LOW - Performance optimization<br><strong>Effort:</strong> 2-3 days</p>
+<h4>1.14 Snapshot Gossip Response Wiring</h4>
+<p><strong>File:</strong> <code>icn-core/src/supervisor/mod.rs:1279</code><br><strong>Code:</strong></p>
+<pre><code class="language-rust">// TODO: Wire snapshot responses back through gossip
+</code></pre>
+<p><strong>Impact:</strong> Snapshot coordination may not propagate responses<br><strong>Priority:</strong> MEDIUM - May cause coordination failures<br><strong>Effort:</strong> 1 day</p>
+<hr>
+<h2>Category 2: Ignored/Broken Tests</h2>
+<h3>2.1 Sybil Cluster Detection Ignored</h3>
+<p><strong>File:</strong> <code>icn-trust/src/anomaly.rs</code><br><strong>Test:</strong> <code>test_sybil_cluster_detection</code><br><strong>Status:</strong> <code>#[ignore] // TODO: Fix Sybil cluster detection logic</code></p>
+<p><strong>Impact:</strong> Trust graph can&#39;t detect coordinated Sybil attacks<br><strong>Priority:</strong> HIGH - Security vulnerability<br><strong>Effort:</strong> 2-3 days (fix detection algorithm)</p>
+<p><strong>Algorithm Issue:</strong> Current implementation doesn&#39;t correctly identify clusters with:</p>
+<ul>
+<li>High internal trust density (&gt;0.8)</li>
+<li>Low external trust density (&lt;0.2)</li>
+<li>Suspicious density ratio (&gt;5x)</li>
+</ul>
+<hr>
+<h2>Category 3: Error Handling Gaps</h2>
+<h3>3.1 Unwraps in Production Code</h3>
+<p><strong>Count:</strong> 3,442 total unwraps/expects<br><strong>icn-core:</strong> 126 unwraps (non-test)</p>
+<p><strong>Sample Issues:</strong></p>
+<pre><code class="language-rust">// Many places assume infallible operations
+.unwrap()  // What if it fails?
+.expect(&quot;message&quot;)  // Panic in production?
+</code></pre>
+<p><strong>Impact:</strong> Potential panics in production under edge cases<br><strong>Priority:</strong> MEDIUM - Should audit and fix critical paths<br><strong>Effort:</strong> 1-2 weeks (systematic audit and fix)</p>
+<p><strong>Recommendation:</strong> </p>
+<ol>
+<li>Audit all unwraps in supervisor, network, ledger actors</li>
+<li>Convert to proper error propagation with <code>?</code></li>
+<li>Add integration tests for error paths</li>
+</ol>
+<hr>
+<h2>Category 4: Missing Protocol Features</h2>
+<h3>4.1 NAT Traversal (Strategic Gap #2)</h3>
+<p><strong>Status:</strong> OPEN - Not Started<br><strong>Current:</strong> mDNS (LAN-only discovery)</p>
+<p><strong>Needed:</strong></p>
+<ul>
+<li>STUN client for hole punching</li>
+<li>TURN relay as fallback</li>
+<li>ICE candidate gathering</li>
+<li>Rendezvous server protocol</li>
+</ul>
+<p><strong>Impact:</strong> Can&#39;t connect peers across internet<br><strong>Priority:</strong> HIGH for production<br><strong>Effort:</strong> 1-2 weeks</p>
+<h3>4.2 Dynamic Trust Adjustment (Strategic Gap #5)</h3>
+<p><strong>Status:</strong> OPEN - Not Started<br><strong>Current:</strong> Manual trust setting only</p>
+<p><strong>Needed:</strong></p>
+<ul>
+<li>Evidence events (transaction history, contract completion)</li>
+<li>Context scopes (economic trust ≠ social trust)</li>
+<li>Time-based decay</li>
+<li>Automatic adjustment based on behavior</li>
+</ul>
+<p><strong>Impact:</strong> Trust graph doesn&#39;t reflect reality<br><strong>Priority:</strong> MEDIUM - Governance improvement<br><strong>Effort:</strong> 2-3 weeks</p>
+<h3>4.3 Multi-Party Escrow (Strategic Gap #4)</h3>
+<p><strong>Status:</strong> OPEN - Not Started</p>
+<p><strong>Needed:</strong></p>
+<ul>
+<li>Hold funds during contract execution</li>
+<li>Release on contract completion</li>
+<li>Refund on contract failure</li>
+<li>Multi-signature release</li>
+</ul>
+<p><strong>Impact:</strong> Can&#39;t do complex contracts safely<br><strong>Priority:</strong> MEDIUM - Economic feature<br><strong>Effort:</strong> 1-2 weeks</p>
+<h3>4.4 Client SDK (Strategic Gap #3)</h3>
+<p><strong>Status:</strong> OPEN - TypeScript SDK exists but incomplete</p>
+<p><strong>Needed:</strong></p>
+<ul>
+<li>Complete WebSocket event handling</li>
+<li>Full API coverage</li>
+<li>Python SDK</li>
+<li>Mobile clients (iOS/Android)</li>
+</ul>
+<p><strong>Impact:</strong> Limited developer adoption<br><strong>Priority:</strong> HIGH for ecosystem<br><strong>Effort:</strong> 4-6 weeks</p>
+<h3>4.5 Conflict Isolation (Strategic Gap #4)</h3>
+<p><strong>Status:</strong> OPEN - Not Started</p>
+<p><strong>Needed:</strong></p>
+<ul>
+<li>Quarantine propagation limits</li>
+<li>Conflict resolution protocol</li>
+<li>Network partition healing (partial)</li>
+</ul>
+<p><strong>Impact:</strong> Network splits can spread<br><strong>Priority:</strong> LOW - Already have basic partition healing<br><strong>Effort:</strong> 1-2 weeks</p>
+<hr>
+<h2>Category 5: Operational Gaps</h2>
+<h3>5.1 Monitoring Dashboards</h3>
+<p><strong>Status:</strong> Metrics exist, dashboards incomplete</p>
+<p><strong>Needed:</strong></p>
+<ul>
+<li>Grafana dashboard templates</li>
+<li>Alert rules</li>
+<li>Runbook procedures</li>
+</ul>
+<p><strong>Impact:</strong> Hard to operate in production<br><strong>Priority:</strong> MEDIUM<br><strong>Effort:</strong> 1 week</p>
+<h3>5.2 Backup Automation</h3>
+<p><strong>Status:</strong> Manual backup/restore only</p>
+<p><strong>Needed:</strong></p>
+<ul>
+<li>Scheduled backups</li>
+<li>Backup rotation</li>
+<li>Automated restore testing</li>
+<li>Cross-node backup verification</li>
+</ul>
+<p><strong>Impact:</strong> Disaster recovery is manual<br><strong>Priority:</strong> MEDIUM<br><strong>Effort:</strong> 1 week</p>
+<hr>
+<h2>Priority Matrix</h2>
+<h3>Critical Path (Must Fix Before Production)</h3>
+<ol>
+<li>✅ TURN relay implementation (Issue #37)</li>
+<li>✅ Snapshot state reassembly</li>
+<li>✅ Sybil cluster detection</li>
+<li>✅ Steward message signatures</li>
+<li>✅ NAT traversal (STUN/TURN)</li>
+</ol>
+<h3>High Priority (Should Fix Soon)</h3>
+<ol start="6">
+<li>Version tracker integration</li>
+<li>Recovery logic completion</li>
+<li>Remove SDIS approval endpoints</li>
+<li>Snapshot gossip response wiring</li>
+<li>Client SDK completion</li>
+</ol>
+<h3>Medium Priority (Production Hardening)</h3>
+<ol start="11">
+<li>Error handling audit (unwraps)</li>
+<li>Dynamic trust adjustment</li>
+<li>Multi-party escrow</li>
+<li>Monitoring dashboards</li>
+<li>Backup automation</li>
+</ol>
+<h3>Low Priority (Nice to Have)</h3>
+<ol start="16">
+<li>Compute region locality</li>
+<li>Trust score check in membership</li>
+<li>ZKP circuit implementation</li>
+<li>DID in TLS certificates</li>
+<li>Ledger cursor pagination</li>
+<li>PQ keygen determinism</li>
+</ol>
+<hr>
+<h2>Recommendations</h2>
+<h3>Phase 1: Critical Fixes (1-2 weeks)</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Fix Sybil cluster detection algorithm</li>
+<li><input disabled="" type="checkbox"> Implement snapshot state reassembly</li>
+<li><input disabled="" type="checkbox"> Add steward message signatures</li>
+<li><input disabled="" type="checkbox"> Wire snapshot gossip responses</li>
+</ul>
+<h3>Phase 2: NAT Traversal (2-3 weeks)</h3>
+<ul>
+<li><input disabled="" type="checkbox"> STUN client implementation</li>
+<li><input disabled="" type="checkbox"> TURN relay client</li>
+<li><input disabled="" type="checkbox"> ICE candidate gathering</li>
+<li><input disabled="" type="checkbox"> Integration testing</li>
+</ul>
+<h3>Phase 3: Production Hardening (2-3 weeks)</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Audit unwraps in critical paths</li>
+<li><input disabled="" type="checkbox"> Fix error handling in supervisor</li>
+<li><input disabled="" type="checkbox"> Complete recovery logic</li>
+<li><input disabled="" type="checkbox"> Integrate version tracker</li>
+<li><input disabled="" type="checkbox"> Remove test-only endpoints</li>
+</ul>
+<h3>Phase 4: Operational Readiness (1-2 weeks)</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Grafana dashboard templates</li>
+<li><input disabled="" type="checkbox"> Alert rules and runbooks</li>
+<li><input disabled="" type="checkbox"> Automated backup system</li>
+<li><input disabled="" type="checkbox"> Monitoring verification</li>
+</ul>
+<h3>Phase 5: Ecosystem (4-6 weeks)</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Complete TypeScript SDK</li>
+<li><input disabled="" type="checkbox"> Python SDK</li>
+<li><input disabled="" type="checkbox"> Mobile clients</li>
+<li><input disabled="" type="checkbox"> Developer documentation</li>
+</ul>
+<hr>
+<h2>Conclusion</h2>
+<p>After closing all documented architecture gaps, we&#39;ve identified <strong>21 TODO items</strong>, <strong>1 broken test</strong>, and <strong>5 missing protocol features</strong> that should be addressed.</p>
+<p><strong>Critical Path:</strong> 5 items (1-2 weeks)<br><strong>High Priority:</strong> 5 items (2-3 weeks)<br><strong>Medium Priority:</strong> 5 items (2-3 weeks)<br><strong>Low Priority:</strong> 6 items (1-2 weeks)  </p>
+<p><strong>Estimated Total:</strong> 6-10 weeks to complete all critical and high-priority items.</p>
+<p><strong>Status:</strong> ICN is production-ready for controlled pilots, but needs these fixes for internet-scale deployment.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

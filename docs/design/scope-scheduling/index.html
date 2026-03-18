@@ -1,0 +1,444 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Scope Scheduling: Capacity Slices and Preemption | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>scope scheduling</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/scope-scheduling.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Scope Scheduling: Capacity Slices and Preemption</h1>
+<p><strong>Status</strong>: Specification<br><strong>Version</strong>: 1.0<br><strong>Date</strong>: 2026-02-11</p>
+<hr>
+<h2>Overview</h2>
+<p>ICN uses a <strong>scope hierarchy</strong> to manage resource allocation and priority. Scopes represent jurisdictional boundaries where capacity can be pledged and priority can be claimed.</p>
+<pre><code>Commons &lt; Local &lt; Cell &lt; Org &lt; Federation
+</code></pre>
+<p>This document specifies how scopes interact with scheduling, preemption, and resource allocation.</p>
+<hr>
+<h2>The Scope Hierarchy</h2>
+<h3>Scope Definitions</h3>
+<table>
+<thead>
+<tr>
+<th>Scope</th>
+<th>Description</th>
+<th>Trust Model</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Commons</strong></td>
+<td>Open participation, no membership required</td>
+<td>Adversarial</td>
+</tr>
+<tr>
+<td><strong>Local</strong></td>
+<td>Your own node&#39;s resources</td>
+<td>Strongest (self)</td>
+</tr>
+<tr>
+<td><strong>Cell</strong></td>
+<td>Small coordinated group</td>
+<td>Coordinated</td>
+</tr>
+<tr>
+<td><strong>Org</strong></td>
+<td>Formal cooperative membership</td>
+<td>Formal membership</td>
+</tr>
+<tr>
+<td><strong>Federation</strong></td>
+<td>Cross-cooperative treaties</td>
+<td>Treaty-based</td>
+</tr>
+</tbody></table>
+<h3>Priority Order</h3>
+<p>Higher scopes have higher priority <strong>only when capacity is pledged</strong>:</p>
+<pre><code>Commons (lowest) &lt; Local &lt; Cell &lt; Org &lt; Federation (highest)
+</code></pre>
+<h3>Key Invariants</h3>
+<ol>
+<li><strong>Commons is never authoritative</strong> - Commons can propose, never decide</li>
+<li><strong>Commons is always preemptible</strong> - Any higher scope can evict commons work</li>
+<li><strong>Priority requires pledged capacity</strong> - No pledge = no priority claim</li>
+<li><strong>Node remains sovereign</strong> - Without pledges, only local matters</li>
+</ol>
+<hr>
+<h2>Capacity Slices</h2>
+<h3>Definition</h3>
+<p>A <strong>capacity slice</strong> is a resource allocation pledged by a node to a higher scope:</p>
+<pre><code class="language-rust">pub struct CapacitySlice {
+    pub scope: Scope,
+    pub cpu_cores: f32,        // e.g., 2.0 cores
+    pub memory_mb: u32,        // e.g., 4096 MB
+    pub storage_gb: u32,       // e.g., 100 GB
+    pub bandwidth_mbps: u32,   // e.g., 100 Mbps
+    pub expires_at: Option&lt;u64&gt;,
+}
+</code></pre>
+<h3>Pledge Semantics</h3>
+<p>When a node pledges capacity to a scope:</p>
+<ol>
+<li>That capacity is <strong>reserved</strong> for the scope&#39;s work</li>
+<li>The scope&#39;s scheduler can <strong>claim</strong> the capacity</li>
+<li>Work at that scope level gets <strong>priority</strong> within the slice</li>
+<li>Lower scopes cannot use the pledged capacity</li>
+</ol>
+<h3>Example: Org Pledge</h3>
+<pre><code>Node A pledges to Org &quot;MyCoop&quot;:
+  - 2 CPU cores
+  - 4 GB RAM
+  - 50 GB storage
+
+MyCoop&#39;s scheduler can now:
+  - Submit tasks that use up to 2 cores
+  - Expect 4 GB RAM available
+  - Store up to 50 GB of org data
+
+Commons tasks CANNOT use this pledged capacity.
+</code></pre>
+<hr>
+<h2>Preemption Rules</h2>
+<h3>Preemption Within Pledged Capacity</h3>
+<p>Higher scopes can preempt lower scopes <strong>within their pledged slice</strong>:</p>
+<pre><code>Federation pledged work &gt; Org pledged work &gt; Cell pledged work &gt; Local &gt; Commons
+</code></pre>
+<h3>Preemption Logic</h3>
+<pre><code class="language-rust">fn should_preempt(running: &amp;Task, incoming: &amp;Task) -&gt; bool {
+    // Higher scope always preempts within pledged capacity
+    if incoming.scope &gt; running.scope {
+        if capacity_available_for(incoming.scope, incoming.resources) {
+            return true;
+        }
+    }
+    
+    // Same scope: priority within scope
+    if incoming.scope == running.scope {
+        return incoming.priority &gt; running.priority;
+    }
+    
+    false
+}
+</code></pre>
+<h3>Preemption Examples</h3>
+<table>
+<thead>
+<tr>
+<th>Running Task</th>
+<th>Incoming Task</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Commons indexing</td>
+<td>Local backup</td>
+<td>Preempt (local &gt; commons)</td>
+</tr>
+<tr>
+<td>Org service</td>
+<td>Org service (higher prio)</td>
+<td>Preempt (same scope, higher prio)</td>
+</tr>
+<tr>
+<td>Cell compute</td>
+<td>Org governance</td>
+<td>Preempt if org has pledge</td>
+</tr>
+<tr>
+<td>Federation settlement</td>
+<td>Org service</td>
+<td>No preempt (fed &gt; org)</td>
+</tr>
+<tr>
+<td>Local backup</td>
+<td>Commons analytics</td>
+<td>No preempt (local &gt; commons)</td>
+</tr>
+</tbody></table>
+<h3>Graceful Preemption</h3>
+<p>Preempted tasks receive:</p>
+<ol>
+<li><strong>Signal</strong> to checkpoint/pause</li>
+<li><strong>Grace period</strong> (configurable, default 30s)</li>
+<li><strong>State preservation</strong> if checkpointable</li>
+<li><strong>Re-queue</strong> at original scope level</li>
+</ol>
+<hr>
+<h2>Scheduler Architecture</h2>
+<h3>Per-Scope Queues</h3>
+<pre><code>┌─────────────────────────────────────────┐
+│            Federation Queue              │  ← Highest priority
+├─────────────────────────────────────────┤
+│               Org Queue                  │
+├─────────────────────────────────────────┤
+│              Cell Queue                  │
+├─────────────────────────────────────────┤
+│              Local Queue                 │
+├─────────────────────────────────────────┤
+│             Commons Queue                │  ← Lowest priority
+└─────────────────────────────────────────┘
+</code></pre>
+<h3>Scheduling Algorithm</h3>
+<pre><code class="language-rust">fn schedule_next() -&gt; Option&lt;Task&gt; {
+    // Try federation first (if pledged)
+    if let Some(task) = federation_queue.pop_if_capacity_available() {
+        return Some(task);
+    }
+    
+    // Then org (if pledged)
+    if let Some(task) = org_queue.pop_if_capacity_available() {
+        return Some(task);
+    }
+    
+    // Then cell (if pledged)
+    if let Some(task) = cell_queue.pop_if_capacity_available() {
+        return Some(task);
+    }
+    
+    // Then local (always available)
+    if let Some(task) = local_queue.pop_if_capacity_available() {
+        return Some(task);
+    }
+    
+    // Finally commons (uses remaining capacity)
+    commons_queue.pop_if_capacity_available()
+}
+</code></pre>
+<h3>Capacity Accounting</h3>
+<pre><code class="language-rust">struct CapacityManager {
+    total: ResourceSet,
+    pledges: HashMap&lt;Scope, CapacitySlice&gt;,
+    in_use: HashMap&lt;Scope, ResourceSet&gt;,
+}
+
+impl CapacityManager {
+    fn available_for(&amp;self, scope: Scope) -&gt; ResourceSet {
+        match scope {
+            Scope::Commons =&gt; {
+                // Commons gets unpledged capacity only
+                self.total - self.pledged_total()
+            }
+            _ =&gt; {
+                // Higher scopes get their pledged slice
+                self.pledges.get(&amp;scope).map(|s| s.resources).unwrap_or_default()
+            }
+        }
+    }
+}
+</code></pre>
+<hr>
+<h2>Pledge Management</h2>
+<h3>Creating Pledges</h3>
+<pre><code class="language-rust">pub struct PledgeRequest {
+    pub node_id: Did,
+    pub scope: Scope,
+    pub scope_id: String,  // e.g., coop DID
+    pub capacity: CapacitySlice,
+    pub duration: Duration,
+}
+</code></pre>
+<h3>Pledge Lifecycle</h3>
+<ol>
+<li><strong>Propose</strong>: Node proposes pledge to scope</li>
+<li><strong>Accept</strong>: Scope governance accepts pledge</li>
+<li><strong>Activate</strong>: Capacity reserved, scheduler updated</li>
+<li><strong>Renew</strong>: Pledge extended before expiry</li>
+<li><strong>Expire/Revoke</strong>: Capacity returned to local</li>
+</ol>
+<h3>Pledge Verification</h3>
+<p>Scope schedulers verify pledges before claiming:</p>
+<pre><code class="language-rust">fn verify_pledge(node: &amp;Did, scope: &amp;Scope) -&gt; Option&lt;CapacitySlice&gt; {
+    // Check pledge registry
+    let pledge = pledge_registry.get(node, scope)?;
+    
+    // Verify not expired
+    if pledge.is_expired() {
+        return None;
+    }
+    
+    // Verify scope membership
+    if !scope.is_member(node) {
+        return None;
+    }
+    
+    Some(pledge.capacity)
+}
+</code></pre>
+<hr>
+<h2>Service Level Agreements</h2>
+<h3>SLA Types</h3>
+<table>
+<thead>
+<tr>
+<th>Scope</th>
+<th>SLA Model</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Commons</td>
+<td>Best-effort, no guarantees</td>
+</tr>
+<tr>
+<td>Local</td>
+<td>Node operator&#39;s choice</td>
+</tr>
+<tr>
+<td>Cell</td>
+<td>Informal agreement</td>
+</tr>
+<tr>
+<td>Org</td>
+<td>Formal SLA with penalties</td>
+</tr>
+<tr>
+<td>Federation</td>
+<td>Treaty-defined SLA</td>
+</tr>
+</tbody></table>
+<h3>SLA Metrics</h3>
+<pre><code class="language-rust">pub struct ServiceLevelAgreement {
+    pub availability: f64,      // e.g., 0.99 = 99%
+    pub latency_p99_ms: u32,    // e.g., 100ms
+    pub throughput_rps: u32,    // e.g., 1000 req/s
+    pub penalty_credits: u64,   // Credits for SLA breach
+}
+</code></pre>
+<h3>SLA Enforcement</h3>
+<p>For Org and Federation scopes:</p>
+<ol>
+<li><strong>Monitor</strong>: Track availability, latency, throughput</li>
+<li><strong>Report</strong>: Periodic SLA compliance reports</li>
+<li><strong>Compensate</strong>: Automatic credit transfer on breach</li>
+<li><strong>Escalate</strong>: Governance proposal for chronic breach</li>
+</ol>
+<hr>
+<h2>Implementation Notes</h2>
+<h3>Data Structures</h3>
+<pre><code class="language-rust">// Scope enum
+pub enum Scope {
+    Commons,
+    Local,
+    Cell { cell_id: String },
+    Org { org_did: Did },
+    Federation { fed_id: String },
+}
+
+impl Ord for Scope {
+    fn cmp(&amp;self, other: &amp;Self) -&gt; Ordering {
+        self.priority_level().cmp(&amp;other.priority_level())
+    }
+}
+
+impl Scope {
+    fn priority_level(&amp;self) -&gt; u8 {
+        match self {
+            Scope::Commons =&gt; 0,
+            Scope::Local =&gt; 1,
+            Scope::Cell { .. } =&gt; 2,
+            Scope::Org { .. } =&gt; 3,
+            Scope::Federation { .. } =&gt; 4,
+        }
+    }
+}
+</code></pre>
+<h3>Scheduler Hooks</h3>
+<p>The scheduler must integrate with:</p>
+<ol>
+<li><strong>Gossip</strong> - Receive task submissions, broadcast results</li>
+<li><strong>Trust graph</strong> - Verify scope membership</li>
+<li><strong>Ledger</strong> - Record usage, settle capacity payments</li>
+<li><strong>Governance</strong> - Process pledge proposals</li>
+</ol>
+<hr>
+<h2>Rationale</h2>
+<h3>Why Scopes?</h3>
+<p>Without scopes:</p>
+<ul>
+<li>All work competes equally for resources</li>
+<li>No way to guarantee capacity for cooperatives</li>
+<li>Commons abuse could starve legitimate work</li>
+</ul>
+<p>With scopes:</p>
+<ul>
+<li>Cooperatives can guarantee resources for members</li>
+<li>Commons remains open but preemptible</li>
+<li>Fair sharing without centralized rationing</li>
+</ul>
+<h3>Why Pledges?</h3>
+<p>Pledges create:</p>
+<ul>
+<li><strong>Accountability</strong>: Node commits resources</li>
+<li><strong>Predictability</strong>: Scope can plan capacity</li>
+<li><strong>Incentive alignment</strong>: Pledge = stake in scope success</li>
+</ul>
+<h3>Why Preemption?</h3>
+<p>Preemption enables:</p>
+<ul>
+<li><strong>Elastic commons</strong>: Use spare capacity</li>
+<li><strong>Priority enforcement</strong>: Critical work first</li>
+<li><strong>Graceful degradation</strong>: Shed load under pressure</li>
+</ul>
+<hr>
+<h2>References</h2>
+<ul>
+<li><code>docs/design/compute-classes.md</code> - LC/UC specification</li>
+<li><code>docs/design/deterministic-core.md</code> - ICN-DC specification</li>
+<li><code>docs/design/DETERMINISTIC_COMPUTE_SPRINT.md</code> - Implementation plan</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

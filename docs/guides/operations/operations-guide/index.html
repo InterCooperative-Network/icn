@@ -1,0 +1,1009 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Operations Guide | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>guides</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>operations</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>operations guide</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/guides/operations/operations-guide.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Operations Guide</h1>
+<p>Comprehensive operational procedures and workflows for running ICN nodes in production.</p>
+<h2>Table of Contents</h2>
+<ol>
+<li><a href="#overview">Overview</a></li>
+<li><a href="#daily-operations">Daily Operations</a></li>
+<li><a href="#monitoring--health-checks">Monitoring & Health Checks</a></li>
+<li><a href="#backup-procedures">Backup Procedures</a></li>
+<li><a href="#upgrade-procedures">Upgrade Procedures</a></li>
+<li><a href="#incident-response">Incident Response</a></li>
+<li><a href="#capacity-planning">Capacity Planning</a></li>
+<li><a href="#performance-tuning">Performance Tuning</a></li>
+<li><a href="#operational-command-reference">Operational Command Reference</a></li>
+<li><a href="#troubleshooting-workflows">Troubleshooting Workflows</a></li>
+</ol>
+<hr>
+<h2>Overview</h2>
+<p>This guide provides operational procedures for ICN node operators. It assumes you have already:</p>
+<ul>
+<li>Deployed ICN following <a href="/docs/operations/deployment/deployment-guide">deployment-guide.md</a></li>
+<li>Configured systemd service (or equivalent)</li>
+<li>Set up monitoring dashboard and Prometheus</li>
+</ul>
+<p><strong>Document Relationships:</strong></p>
+<ul>
+<li><strong>Deployment Guide</strong>: Initial setup and installation</li>
+<li><strong>Operations Guide</strong> (this document): Day-to-day operations and workflows</li>
+<li><strong>Incident Response</strong>: Emergency procedures and troubleshooting</li>
+<li><strong>Architecture</strong>: Technical design and system internals</li>
+</ul>
+<hr>
+<h2>Daily Operations</h2>
+<h3>Morning Health Check (5 minutes)</h3>
+<p><strong>1. Check node status:</strong></p>
+<pre><code class="language-bash"># Verify daemon is running
+systemctl status icnd
+
+# Check current identity
+icnctl id show
+
+# View peer connections
+icnctl status
+</code></pre>
+<p><strong>2. Review health + metrics:</strong></p>
+<ul>
+<li>Check <code>http://localhost:8080/v1/health</code></li>
+<li>Verify status is healthy/ok</li>
+<li>Check active peer count (should be &gt; 0 for connected nodes)</li>
+<li>Review gossip metrics and entries</li>
+</ul>
+<p><strong>3. Check metrics endpoint:</strong></p>
+<pre><code class="language-bash"># Verify Prometheus metrics are being exported
+curl -s http://localhost:9100/metrics | grep icn_network_connections_active
+</code></pre>
+<p><strong>Expected output:</strong></p>
+<pre><code>icn_network_connections_active 3
+</code></pre>
+<p><strong>4. Review logs:</strong></p>
+<pre><code class="language-bash"># Check recent logs for errors
+journalctl -u icnd --since &quot;1 hour ago&quot; | grep -i error
+
+# Check for warnings
+journalctl -u icnd --since &quot;1 hour ago&quot; | grep -i warn
+</code></pre>
+<p><strong>Action if issues found:</strong></p>
+<ul>
+<li>See <a href="#troubleshooting-workflows">Troubleshooting Workflows</a></li>
+<li>For critical issues, see <a href="/docs/operations/deployment/incident-response">Incident Response</a></li>
+</ul>
+<hr>
+<h3>Weekly Maintenance (15-30 minutes)</h3>
+<p><strong>1. Create backup:</strong></p>
+<pre><code class="language-bash"># Create backup (tarball contains encrypted keystore)
+sudo -u icn icnctl backup ~/backups/icn-backup-$(date +%Y%m%d).tar
+
+# Verify backup was created
+ls -lh ~/backups/
+
+# Copy to off-site storage
+rsync -av ~/backups/ remote-server:/backup/icn/
+</code></pre>
+<p><strong>2. Review metrics trends:</strong></p>
+<ul>
+<li>Check dashboard for growth patterns</li>
+<li>Monitor ledger quarantine size (should be &lt; 100)</li>
+<li>Review rate-limited messages (should be low)</li>
+<li>Check trust cache hit rate (should be &gt; 80%)</li>
+</ul>
+<p><strong>3. Check disk usage:</strong></p>
+<pre><code class="language-bash"># ICN data directory size
+du -sh ~/.icn/
+
+# Log file sizes
+du -sh /var/log/icnd/
+</code></pre>
+<p><strong>Action if disk usage is high:</strong></p>
+<ul>
+<li>See <a href="#capacity-planning">Capacity Planning</a></li>
+<li>Consider log rotation or archival</li>
+</ul>
+<p><strong>4. Update system packages:</strong></p>
+<pre><code class="language-bash"># Update OS packages (includes security updates)
+sudo apt update &amp;&amp; sudo apt upgrade -y
+
+# Reboot if kernel updated (plan maintenance window)
+</code></pre>
+<hr>
+<h3>Monthly Tasks</h3>
+<p><strong>1. Review and archive old backups:</strong></p>
+<pre><code class="language-bash"># Keep last 4 weekly backups, delete older
+find ~/backups/ -name &quot;icn-backup-*.tar&quot; -mtime +30 -delete
+</code></pre>
+<p><strong>2. Audit device list:</strong></p>
+<pre><code class="language-bash"># List all devices associated with identity
+icnctl device list
+
+# Revoke any compromised or unused devices
+icnctl device revoke &lt;device-id&gt;
+</code></pre>
+<p><strong>3. Review operational metrics:</strong></p>
+<ul>
+<li>Average uptime</li>
+<li>Peer connection stability</li>
+<li>Ledger transaction volume</li>
+<li>Gossip entry growth rate</li>
+<li>Quarantine entry rate (should be near zero)</li>
+</ul>
+<p><strong>4. Check for ICN updates:</strong></p>
+<pre><code class="language-bash"># Check current version
+icnd --version
+
+# Check repository for new releases
+git fetch origin
+git log --oneline HEAD..origin/main
+</code></pre>
+<hr>
+<h2>Monitoring &amp; Health Checks</h2>
+<h3>Health Overview</h3>
+<p>Use gateway health (<code>http://localhost:8080/v1/health</code>) and metrics (<code>http://localhost:9100/metrics</code>) for real-time visibility into:</p>
+<p><strong>Status Banner:</strong></p>
+<ul>
+<li><strong>Healthy</strong> (green): All systems operational</li>
+<li><strong>Degraded</strong> (yellow): Non-critical issues detected (e.g., 100+ quarantine entries)</li>
+<li><strong>Unhealthy</strong> (red): Critical issues (e.g., 1000+ quarantine entries)</li>
+</ul>
+<p><strong>Key Metrics:</strong></p>
+<ul>
+<li><strong>Network Peers</strong>: Active connections (should match expected community size)</li>
+<li><strong>Gossip Topics</strong>: Number of active topics</li>
+<li><strong>Gossip Entries</strong>: Total entries in gossip store</li>
+<li><strong>Ledger Quarantine</strong>: Conflicting entries awaiting resolution</li>
+</ul>
+<h3>Health Check Endpoint</h3>
+<p>The <code>/v1/health</code> endpoint returns JSON status for external monitoring:</p>
+<pre><code class="language-bash"># Check health status
+curl http://localhost:8080/v1/health | jq
+
+# Example healthy response:
+{
+  &quot;status&quot;: &quot;healthy&quot;,
+  &quot;uptime_seconds&quot;: 86400,
+  &quot;active_connections&quot;: 5,
+  &quot;gossip_topics&quot;: 3,
+  &quot;ledger_quarantine_size&quot;: 0,
+  &quot;timestamp&quot;: 1705234567
+}
+</code></pre>
+<p><strong>HTTP Status Codes:</strong></p>
+<ul>
+<li><code>200 OK</code>: Healthy or degraded (still operational)</li>
+<li><code>503 Service Unavailable</code>: Unhealthy (critical issues)</li>
+</ul>
+<p><strong>Integration with external monitoring:</strong></p>
+<pre><code class="language-yaml"># Example: Prometheus alerting rule
+groups:
+  - name: icn_health
+    rules:
+      - alert: ICNNodeUnhealthy
+        expr: icn_health_status{status=&quot;unhealthy&quot;} &gt; 0
+        for: 5m
+        annotations:
+          summary: &quot;ICN node {{ $labels.instance }} is unhealthy&quot;
+</code></pre>
+<h3>Key Metrics to Monitor</h3>
+<p><strong>Network Health:</strong></p>
+<ul>
+<li><code>icn_network_connections_active</code>: Should be &gt; 0 for connected nodes</li>
+<li><code>icn_network_messages_rate_limited_total</code>: Should be low (&lt; 1% of sent)</li>
+<li><code>icn_network_bytes_sent_total</code> / <code>icn_network_bytes_received_total</code>: Balanced I/O</li>
+</ul>
+<p><strong>Gossip Health:</strong></p>
+<ul>
+<li><code>icn_gossip_topics_total</code>: Should match expected subscriptions</li>
+<li><code>icn_gossip_entries_total</code>: Steadily growing</li>
+<li><code>icn_gossip_subscriptions_total</code>: Should match community size</li>
+</ul>
+<p><strong>Ledger Health:</strong></p>
+<ul>
+<li><code>icn_ledger_quarantine_size</code>: Should be &lt; 100 (warning), &lt; 1000 (critical)</li>
+<li><code>icn_ledger_merge_conflicts_total</code>: Should be low (occasional conflicts are normal)</li>
+<li><code>icn_ledger_transactions_total</code>: Steadily growing with economic activity</li>
+</ul>
+<p><strong>Trust Graph Health:</strong></p>
+<ul>
+<li><code>icn_trust_cache_hits_total</code> / (<code>icn_trust_cache_hits_total</code> + <code>icn_trust_cache_misses_total</code>): Should be &gt; 80%</li>
+<li><code>icn_trust_edges_total</code>: Growing with community relationships</li>
+</ul>
+<p><strong>System Health:</strong></p>
+<ul>
+<li>Disk usage: <code>~/.icn/</code> should not exceed available space</li>
+<li>Memory usage: ICNd should stay within configured limits</li>
+<li>CPU usage: Should be low except during signature verification bursts</li>
+</ul>
+<hr>
+<h2>Backup Procedures</h2>
+<h3>Creating Backups</h3>
+<p><strong>Standard backup (weekly):</strong></p>
+<pre><code class="language-bash"># Create backup (tarball contains encrypted keystore) with timestamp
+icnctl backup ~/backups/icn-backup-$(date +%Y%m%d).tar
+
+# Backup includes:
+# - Identity keystore ({data_dir}/identity.age)
+# - Persistent store ({data_dir}/store/)
+# - Configuration ({data_dir}/config.toml or related runtime config)
+# - Device documents ({data_dir}/devices/)
+</code></pre>
+<p><strong>Emergency backup (before risky operations):</strong></p>
+<pre><code class="language-bash"># Before upgrades, migrations, or major changes
+icnctl backup ~/backups/icn-pre-upgrade-$(date +%Y%m%d-%H%M%S).tar
+</code></pre>
+<h3>Backup Storage Strategy</h3>
+<p><strong>Local retention:</strong></p>
+<ul>
+<li>Daily backups: Keep last 7 days</li>
+<li>Weekly backups: Keep last 4 weeks</li>
+<li>Monthly backups: Keep last 12 months</li>
+</ul>
+<p><strong>Off-site storage:</strong></p>
+<pre><code class="language-bash"># Copy to remote server via rsync
+rsync -av --delete ~/backups/ backup-server:/mnt/backup/icn/
+
+# Or use cloud storage
+rclone copy ~/backups/ remote:icn-backups/
+</code></pre>
+<p><strong>Backup verification:</strong></p>
+<pre><code class="language-bash"># Test restore in isolated environment
+mkdir /tmp/icn-restore-test
+cd /tmp/icn-restore-test
+icnctl restore ~/backups/icn-backup-latest.tar --data-dir /tmp/icn-restore-test
+# Verify keystore can be unlocked
+icnctl --data-dir /tmp/icn-restore-test id show
+</code></pre>
+<h3>Restoring from Backup</h3>
+<p><strong>Full restoration:</strong></p>
+<pre><code class="language-bash"># Stop ICNd
+sudo systemctl stop icnd
+
+# Backup current state (if any)
+mv ~/.icn ~/.icn.old-$(date +%Y%m%d-%H%M%S)
+
+# Restore from backup
+icnctl restore ~/backups/icn-backup-20250114.tar
+# Enter passphrase when prompted
+
+# Verify identity
+icnctl id show
+
+# Start ICNd
+sudo systemctl start icnd
+
+# Verify node is healthy
+icnctl status
+</code></pre>
+<p><strong>Partial restoration (keystore only):</strong></p>
+<pre><code class="language-bash"># Extract keystore from backup
+icnctl restore ~/backups/icn-backup-20250114.tar --keystore-only
+</code></pre>
+<p><strong>See also:</strong></p>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/operations/deployment/incident-response#ledger-corruption-detected-p1#ledger-corruption-detected-p1">Incident Response: Ledger Corruption</a></li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/operations/deployment/deployment-guide#backup--recovery#backup--recovery">Deployment Guide: Backup & Recovery</a></li>
+</ul>
+<hr>
+<h2>Upgrade Procedures</h2>
+<h3>Current Version: v0.1.x (Manual Process)</h3>
+<p>ICN is pre-v1.0 and does not yet have automated upgrade mechanisms. Upgrades require manual steps.</p>
+<p><strong>Before upgrading:</strong></p>
+<ol>
+<li><strong>Create backup</strong> (see <a href="#backup-procedures">Backup Procedures</a>)</li>
+<li><strong>Review release notes</strong> for breaking changes</li>
+<li><strong>Plan maintenance window</strong> (5-15 minutes downtime)</li>
+<li><strong>Notify community members</strong> if running a shared node</li>
+</ol>
+<p><strong>Upgrade steps:</strong></p>
+<pre><code class="language-bash"># 1. Stop ICNd
+sudo systemctl stop icnd
+
+# 2. Create pre-upgrade backup
+icnctl backup ~/backups/icn-pre-upgrade-$(date +%Y%m%d-%H%M%S).tar
+
+# 3. Pull latest code
+cd ~/projects/icn/icn/
+git fetch origin
+git checkout &lt;new-version-tag&gt;  # e.g., v0.1.3
+
+# 4. Build new binaries
+cargo build --release
+
+# 5. Install new binaries
+sudo cp target/release/{icnd,icnctl} /usr/local/bin/
+
+# 6. Run migrations (if required by release notes)
+# Example: icnctl migrate --from v0.1.2 --to v0.1.3
+# (Not yet implemented - manual migration steps in release notes)
+
+# 7. Start ICNd
+sudo systemctl start icnd
+
+# 8. Verify node health
+icnctl status
+journalctl -u icnd -f  # Watch logs for errors
+
+# 9. Check health endpoint
+curl http://localhost:8080/v1/health | jq
+</code></pre>
+<p><strong>Rollback if issues occur:</strong></p>
+<pre><code class="language-bash"># Stop ICNd
+sudo systemctl stop icnd
+
+# Restore from pre-upgrade backup
+icnctl restore ~/backups/icn-pre-upgrade-&lt;timestamp&gt;.tar
+
+# Reinstall old binaries
+cd ~/projects/icn/icn/
+git checkout &lt;old-version-tag&gt;
+cargo build --release
+sudo cp target/release/{icnd,icnctl} /usr/local/bin/
+
+# Start ICNd
+sudo systemctl start icnd
+</code></pre>
+<h3>Future: Automated Upgrade Mechanism (v0.2+)</h3>
+<p><strong>Planned features (Track B1: Upgrade Mechanism):</strong></p>
+<ul>
+<li>Versioned network protocol (automatic version negotiation)</li>
+<li>✅ <strong>Graceful restart semantics</strong> (IMPLEMENTED - preserves vector clocks, subscriptions, X25519 keys)</li>
+<li><code>icnctl migrate</code> command for schema changes</li>
+<li>Rolling upgrade strategy for multi-node communities</li>
+</ul>
+<p><strong>Target upgrade workflow:</strong></p>
+<pre><code class="language-bash"># Download new version
+icnctl upgrade --check
+# &quot;New version v0.2.0 available&quot;
+
+# Perform automated upgrade
+icnctl upgrade --to v0.2.0
+# - Downloads new binaries
+# - Verifies signatures
+# - Creates automatic backup
+# - Runs migrations
+# - Restarts daemon with graceful handoff
+# - Verifies health
+# - Rolls back automatically if health check fails
+</code></pre>
+<p><strong>Rolling upgrades for communities:</strong></p>
+<ul>
+<li>Upgrade nodes one at a time</li>
+<li>Protocol version compatibility window (e.g., v0.2.x can talk to v0.1.x)</li>
+<li>Coordinated upgrade scheduling</li>
+</ul>
+<hr>
+<h2>Incident Response</h2>
+<p>For emergency situations, see the comprehensive <a href="/docs/operations/deployment/incident-response">Incident Response Playbook</a>.</p>
+<p><strong>Quick reference:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Incident</th>
+<th>Severity</th>
+<th>First Action</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Node Compromise</td>
+<td>P0</td>
+<td>Isolate node immediately (<code>systemctl stop icnd</code>)</td>
+</tr>
+<tr>
+<td>Ledger Corruption</td>
+<td>P1</td>
+<td>Assess quarantine size, restore from backup if needed</td>
+</tr>
+<tr>
+<td>Key Suspected Stolen</td>
+<td>P0</td>
+<td>Revoke device immediately (<code>icnctl device revoke</code>)</td>
+</tr>
+<tr>
+<td>Network Partition</td>
+<td>P1</td>
+<td>Check connectivity, restart ICNd</td>
+</tr>
+<tr>
+<td>Gossip Storm</td>
+<td>P2</td>
+<td>Verify rate limiting, check peer health</td>
+</tr>
+<tr>
+<td>Quarantine Growth</td>
+<td>P2</td>
+<td>Inspect entries, identify patterns</td>
+</tr>
+</tbody></table>
+<p><strong>Emergency contacts:</strong></p>
+<ul>
+<li>ICN maintainers: (To be established)</li>
+<li>Community coordinator: (Community-specific)</li>
+<li>Incident response on-call: (Community-specific)</li>
+</ul>
+<hr>
+<h2>Capacity Planning</h2>
+<h3>Storage Growth Estimates</h3>
+<p><strong>Gossip store:</strong></p>
+<ul>
+<li>Small community (10-50 nodes): ~10 MB/month</li>
+<li>Medium community (50-200 nodes): ~100 MB/month</li>
+<li>Large community (200+ nodes): ~500+ MB/month</li>
+</ul>
+<p><strong>Ledger:</strong></p>
+<ul>
+<li>Low activity (10 transactions/day): ~1 MB/month</li>
+<li>Medium activity (100 transactions/day): ~10 MB/month</li>
+<li>High activity (1000 transactions/day): ~100 MB/month</li>
+</ul>
+<p><strong>Logs:</strong></p>
+<ul>
+<li>Default INFO level: ~10 MB/day</li>
+<li>DEBUG level (not recommended for production): ~100+ MB/day</li>
+</ul>
+<p><strong>Recommendations:</strong></p>
+<ul>
+<li>Minimum 10 GB disk for production nodes</li>
+<li>Monitor disk usage weekly</li>
+<li>Set up log rotation:<pre><code class="language-bash"># /etc/logrotate.d/icnd
+/var/log/icnd/*.log {
+    daily
+    rotate 7
+    compress
+    missingok
+    notifempty
+}
+</code></pre>
+</li>
+</ul>
+<h3>Memory Requirements</h3>
+<p><strong>Base usage:</strong> ~100 MB (idle node)</p>
+<p><strong>Growth factors:</strong></p>
+<ul>
+<li>Peer connections: ~5 MB per active peer</li>
+<li>Gossip topics: ~10 MB per topic (with typical entry volume)</li>
+<li>Ledger cache: ~50 MB (configurable)</li>
+<li>Trust graph cache: ~20 MB (configurable)</li>
+</ul>
+<p><strong>Recommendations:</strong></p>
+<ul>
+<li>Small community: 512 MB RAM minimum</li>
+<li>Medium community: 1-2 GB RAM</li>
+<li>Large community: 2-4 GB RAM</li>
+</ul>
+<h3>Network Bandwidth</h3>
+<p><strong>Typical usage:</strong></p>
+<ul>
+<li>Small community: 1-5 Mbps peak</li>
+<li>Medium community: 5-20 Mbps peak</li>
+<li>Large community: 20-50+ Mbps peak</li>
+</ul>
+<p><strong>Bandwidth spikes:</strong></p>
+<ul>
+<li>New node sync: Can use 50+ Mbps temporarily</li>
+<li>Anti-entropy: Periodic bursts (every 5-10 minutes)</li>
+<li>Gossip storms: Can spike to 100+ Mbps (should be rare with rate limiting)</li>
+</ul>
+<h3>When to Scale</h3>
+<p><strong>Indicators:</strong></p>
+<ul>
+<li>Disk usage &gt; 80%</li>
+<li>Memory usage consistently &gt; 80%</li>
+<li>CPU usage consistently &gt; 70%</li>
+<li>Network bandwidth consistently &gt; 70% of available</li>
+<li>Peer connection count approaching configured limit</li>
+</ul>
+<p><strong>Scaling options:</strong></p>
+<ol>
+<li><strong>Vertical scaling</strong>: Add more resources to existing node</li>
+<li><strong>Horizontal scaling</strong>: Split community into multiple federated nodes (requires Phase 16+)</li>
+<li><strong>Optimize</strong>: Tune configuration parameters (see <a href="#performance-tuning">Performance Tuning</a>)</li>
+</ol>
+<hr>
+<h2>Performance Tuning</h2>
+<h3>Configuration Options</h3>
+<p><strong>Network tuning (<code>~/.icn/config.toml</code>):</strong></p>
+<pre><code class="language-toml">[network]
+max_peers = 100              # Limit concurrent connections
+dial_timeout_secs = 30       # Timeout for new connections
+send_timeout_secs = 10       # Timeout for sending messages
+max_concurrent_streams = 10  # QUIC streams per connection
+stream_window_bytes = 1048576 # 1MB per stream
+</code></pre>
+<p><strong>Gossip tuning:</strong></p>
+<pre><code class="language-toml">[gossip]
+announce_interval_secs = 60    # How often to announce new entries
+anti_entropy_interval_secs = 300  # How often to sync with peers
+max_entries_per_topic = 1000   # Entry limit per topic (bounded growth)
+bloom_filter_capacity = 10000  # Bloom filter size (affects false positive rate)
+</code></pre>
+<p><strong>Ledger tuning:</strong></p>
+<pre><code class="language-toml">[ledger]
+quarantine_warning_threshold = 100   # Warn at this size
+quarantine_critical_threshold = 1000 # Critical at this size
+cache_size_mb = 50  # In-memory ledger cache
+</code></pre>
+<p><strong>Trust graph tuning:</strong></p>
+<pre><code class="language-toml">[trust]
+cache_size = 1000  # Number of cached trust computations
+cache_ttl_secs = 300  # Cache entry lifetime
+</code></pre>
+<h3>Rate Limiting</h3>
+<p><strong>Trust-based rate limits are automatic:</strong></p>
+<ul>
+<li><strong>Isolated peers</strong> (trust &lt; 0.1): 10 msg/sec, burst 2</li>
+<li><strong>Known peers</strong> (trust 0.1-0.4): 50 msg/sec, burst 10</li>
+<li><strong>Partner peers</strong> (trust 0.4-0.7): 100 msg/sec, burst 20</li>
+<li><strong>Federated peers</strong> (trust 0.7+): 200 msg/sec, burst 50</li>
+</ul>
+<p><strong>Override default limits (if needed):</strong></p>
+<pre><code class="language-toml">[network.rate_limiting]
+default_limit_per_sec = 100
+default_burst_size = 20
+</code></pre>
+<h3>Optimizing for Different Use Cases</h3>
+<p><strong>Low-resource environments (Raspberry Pi, old hardware):</strong></p>
+<pre><code class="language-toml">[network]
+max_peers = 20
+[gossip]
+max_entries_per_topic = 500
+[ledger]
+cache_size_mb = 20
+</code></pre>
+<p><strong>High-throughput environments (large communities):</strong></p>
+<pre><code class="language-toml">[network]
+max_peers = 200
+max_concurrent_streams = 20
+[gossip]
+max_entries_per_topic = 5000
+bloom_filter_capacity = 50000
+[ledger]
+cache_size_mb = 200
+</code></pre>
+<p><strong>Bandwidth-constrained environments:</strong></p>
+<pre><code class="language-toml">[gossip]
+announce_interval_secs = 120  # Reduce announcement frequency
+compression_threshold_bytes = 512  # Compress smaller entries
+</code></pre>
+<hr>
+<h2>Operational Command Reference</h2>
+<h3>Identity Management</h3>
+<pre><code class="language-bash"># Show current identity
+icnctl id show
+
+# Initialize new identity
+icnctl id init
+
+# Rotate key (scheduled rotation)
+icnctl id rotate
+
+# Export identity (encrypted backup)
+icnctl id export ~/identity-backup.age
+
+# Import identity
+icnctl id import ~/identity-backup.age
+</code></pre>
+<h3>Device Management</h3>
+<pre><code class="language-bash"># List all devices
+icnctl device list
+
+# Add new device (from new device)
+icnctl device add --name &quot;laptop&quot;
+
+# Revoke device (from authorized device)
+icnctl device revoke &lt;device-id&gt;
+
+# Show device details
+icnctl device show &lt;device-id&gt;
+</code></pre>
+<h3>Node Operations</h3>
+<pre><code class="language-bash"># Show node status
+icnctl status
+
+# Restart node gracefully
+sudo systemctl restart icnd
+
+# Stop node
+sudo systemctl stop icnd
+
+# Start node
+sudo systemctl start icnd
+
+# View logs
+journalctl -u icnd -f
+
+# View logs from last hour
+journalctl -u icnd --since &quot;1 hour ago&quot;
+</code></pre>
+<h3>Graceful Restart &amp; State Persistence</h3>
+<p>ICN nodes automatically preserve critical runtime state across restarts, enabling zero-downtime maintenance and upgrades.</p>
+<p><strong>What&#39;s Preserved:</strong></p>
+<ul>
+<li><strong>Vector Clocks</strong>: Causal ordering state prevents duplicate message processing</li>
+<li><strong>Topic Subscriptions</strong>: No need to re-subscribe after restart</li>
+<li><strong>Topic Metadata</strong>: Topic names, access control policies (Public/Private/TrustGated/Participants)</li>
+<li><strong>Peer X25519 Keys</strong>: Immediate end-to-end encrypted communication after restart</li>
+</ul>
+<p><strong>What&#39;s NOT Preserved (by design):</strong></p>
+<ul>
+<li>Gossip entries (fetched from peers via anti-entropy within seconds)</li>
+<li>Active network connections (re-established via mDNS within ~5s)</li>
+<li>Connection statistics (acceptable reset)</li>
+</ul>
+<p><strong>Snapshot Location:</strong></p>
+<pre><code class="language-bash"># Default location
+~/.icn/state.snapshot
+
+# Custom location (via config)
+&lt;data-dir&gt;/state.snapshot
+</code></pre>
+<p><strong>Restart Best Practices:</strong></p>
+<pre><code class="language-bash"># 1. Check node health before restart
+icnctl status
+curl http://localhost:8080/v1/health | jq
+
+# 2. Check recent metrics (optional)
+curl -s http://localhost:9100/metrics | grep icn_snapshot
+
+# 3. Perform graceful restart
+sudo systemctl restart icnd
+
+# 4. Verify state restoration in logs
+journalctl -u icnd --since &quot;1 minute ago&quot; | grep -E &quot;(snapshot|restored)&quot;
+# Look for: &quot;State snapshot saved&quot; and &quot;Gossip/Network state restored&quot;
+
+# 5. Verify health after restart
+icnctl status
+curl http://localhost:8080/v1/health | jq
+
+# 6. Check that subscriptions were restored
+icnctl gossip topics
+</code></pre>
+<p><strong>Monitoring State Snapshots:</strong></p>
+<p>Prometheus metrics for operational visibility:</p>
+<pre><code class="language-bash"># Snapshot operation timing
+curl -s http://localhost:9100/metrics | grep icn_snapshot_save_duration
+curl -s http://localhost:9100/metrics | grep icn_snapshot_load_duration
+
+# Snapshot contents
+curl -s http://localhost:9100/metrics | grep icn_snapshot_gossip_vector_clock_entries
+curl -s http://localhost:9100/metrics | grep icn_snapshot_gossip_subscriptions
+curl -s http://localhost:9100/metrics | grep icn_snapshot_network_x25519_keys
+
+# Snapshot file size
+curl -s http://localhost:9100/metrics | grep icn_snapshot_size_bytes
+
+# Operation counters
+curl -s http://localhost:9100/metrics | grep icn_snapshot_save_total
+curl -s http://localhost:9100/metrics | grep icn_snapshot_load_total
+curl -s http://localhost:9100/metrics | grep icn_snapshot_errors_total
+</code></pre>
+<p><strong>Snapshot Alerts (Recommended):</strong></p>
+<p>Add these Prometheus alerts to detect snapshot issues:</p>
+<pre><code class="language-yaml"># Alert if snapshot save fails
+- alert: SnapshotSaveFailed
+  expr: rate(icn_snapshot_save_errors_total[5m]) &gt; 0
+  annotations:
+    summary: &quot;Snapshot save operations failing&quot;
+    description: &quot;Node {{ $labels.instance }} failed to save state snapshot&quot;
+
+# Alert if snapshot is very large (possible issue)
+- alert: SnapshotTooLarge
+  expr: icn_snapshot_size_bytes &gt; 10485760  # 10MB
+  annotations:
+    summary: &quot;State snapshot unusually large&quot;
+    description: &quot;Snapshot size {{ $value }} bytes on {{ $labels.instance }}&quot;
+
+# Alert if snapshot save is slow
+- alert: SnapshotSaveSlow
+  expr: histogram_quantile(0.99, rate(icn_snapshot_save_duration_seconds_bucket[5m])) &gt; 1.0
+  annotations:
+    summary: &quot;Snapshot saves taking over 1 second&quot;
+    description: &quot;P99 snapshot save time: {{ $value }}s&quot;
+</code></pre>
+<p><strong>Troubleshooting:</strong></p>
+<pre><code class="language-bash"># Snapshot not being created
+# 1. Check disk space
+df -h ~/.icn
+# 2. Check permissions
+ls -la ~/.icn/state.snapshot
+# 3. Check logs for errors
+journalctl -u icnd | grep -i &quot;snapshot.*error&quot;
+
+# Snapshot not being restored
+# 1. Check if snapshot exists
+ls -lh ~/.icn/state.snapshot
+# 2. Verify JSON format
+jq . ~/.icn/state.snapshot
+# 3. Check for corruption
+cat ~/.icn/state.snapshot | jq &#39;.version&#39;
+
+# State not preserved after restart
+# 1. Verify snapshot was created before shutdown
+journalctl -u icnd | grep &quot;State snapshot saved&quot;
+# 2. Verify snapshot was loaded on startup
+journalctl -u icnd | grep &quot;State snapshot restored&quot;
+# 3. Check snapshot contents
+jq &#39;.gossip_state.vector_clock&#39; ~/.icn/state.snapshot
+</code></pre>
+<p><strong>Security Considerations:</strong></p>
+<p>The state snapshot contains <strong>public information only</strong>:</p>
+<ul>
+<li>DIDs (public identifiers)</li>
+<li>Vector clock counters</li>
+<li>Topic names and access control policies</li>
+<li>X25519 public keys (not private keys)</li>
+</ul>
+<p><strong>No sensitive data</strong> is persisted:</p>
+<ul>
+<li>Private keys remain in encrypted keystore</li>
+<li>Passphrases never written to disk</li>
+<li>Message content not persisted</li>
+</ul>
+<p><strong>File permissions</strong> use OS defaults (typically 644). For defense-in-depth:</p>
+<pre><code class="language-bash"># Tighten permissions (optional)
+chmod 600 ~/.icn/state.snapshot
+</code></pre>
+<h3>Backup &amp; Restore</h3>
+<pre><code class="language-bash"># Create backup (includes state.snapshot automatically)
+icnctl backup &lt;output-path&gt;
+
+# Restore from backup (includes state.snapshot)
+icnctl restore &lt;backup-path&gt;
+
+# Verify backup integrity
+icnctl backup verify &lt;backup-path&gt;
+
+# Verify state.snapshot is included
+tar -tf backup.tar | grep state.snapshot
+</code></pre>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>Backups automatically include <code>state.snapshot</code> for full state restoration</li>
+<li>When you restore from backup, both your identity and runtime state (vector clocks, subscriptions, X25519 keys) are restored together</li>
+<li><strong>Security</strong>: Backup tarballs are <strong>not encrypted</strong>, but the keystore inside (<code>identity.age</code>) is Age-encrypted with your passphrase</li>
+<li><strong>Storage</strong>: Store backups securely with appropriate file permissions (recommended: <code>chmod 600 backup.tar</code>)</li>
+</ul>
+<h3>Network Diagnostics</h3>
+<pre><code class="language-bash"># Show peer connections
+icnctl peers list
+
+# Connect to specific peer
+icnctl peers connect &lt;did&gt; &lt;address&gt;
+
+# Disconnect from peer
+icnctl peers disconnect &lt;did&gt;
+
+# Show network stats
+icnctl network stats
+</code></pre>
+<h3>Gossip Operations</h3>
+<pre><code class="language-bash"># List subscribed topics
+icnctl gossip topics
+
+# Subscribe to topic
+icnctl gossip subscribe &lt;topic-name&gt;
+
+# Unsubscribe from topic
+icnctl gossip unsubscribe &lt;topic-name&gt;
+
+# Show entries in topic
+icnctl gossip entries &lt;topic-name&gt;
+</code></pre>
+<h3>Ledger Operations</h3>
+<pre><code class="language-bash"># Show account balance
+icnctl ledger balance &lt;did&gt;
+
+# Show account history
+icnctl ledger history &lt;did&gt;
+
+# Create transaction
+icnctl ledger transfer --from &lt;did&gt; --to &lt;did&gt; --amount &lt;amount&gt; --memo &quot;&lt;description&gt;&quot;
+
+# Show quarantine entries
+icnctl ledger quarantine list
+
+# Resolve quarantine entry (manual review)
+icnctl ledger quarantine resolve &lt;entry-id&gt; --action &lt;keep|discard&gt;
+</code></pre>
+<h3>Metrics &amp; Monitoring</h3>
+<pre><code class="language-bash"># Query Prometheus metrics
+curl http://localhost:9100/metrics
+
+# Query specific metric
+curl -s http://localhost:9100/metrics | grep icn_network_connections_active
+
+# Check health status
+curl http://localhost:8080/v1/health | jq
+
+# Open metrics in browser if needed
+xdg-open http://localhost:9100/metrics
+</code></pre>
+<hr>
+<h2>Troubleshooting Workflows</h2>
+<h3>Node Won&#39;t Start</h3>
+<p><strong>Symptoms:</strong></p>
+<ul>
+<li><code>systemctl status icnd</code> shows failed state</li>
+<li>Logs show errors during startup</li>
+</ul>
+<p><strong>Diagnosis:</strong></p>
+<pre><code class="language-bash"># Check detailed error
+journalctl -u icnd -n 50
+
+# Common issues:
+# 1. Port already in use
+sudo netstat -ulnp | grep 7777
+
+# 2. Keystore file missing or corrupted
+ls -la ~/.icn/identity.age
+
+# 3. Permissions issue
+ls -la ~/.icn/
+</code></pre>
+<p><strong>Solutions:</strong></p>
+<ol>
+<li><strong>Port conflict</strong>: Change <code>network.listen_addr</code> in your daemon config (or kill conflicting process)</li>
+<li><strong>Missing keystore</strong>: Restore from backup or run <code>icnctl id init</code></li>
+<li><strong>Permissions</strong>: Fix with <code>chown -R icn:icn ~/.icn/</code></li>
+</ol>
+<h3>No Peer Connections</h3>
+<p><strong>Symptoms:</strong></p>
+<ul>
+<li><code>icn_network_connections_active</code> metric is 0</li>
+<li>Dashboard shows &quot;Network Peers: 0&quot;</li>
+</ul>
+<p><strong>Diagnosis:</strong></p>
+<pre><code class="language-bash"># Check network configuration
+icnctl status
+
+# Check firewall
+sudo iptables -L -n | grep 7777
+
+# Check if port is accessible
+sudo netstat -tulpn | grep icnd
+</code></pre>
+<p><strong>Solutions:</strong></p>
+<ol>
+<li><strong>mDNS not working</strong>: Manually dial peers with <code>icnctl peers connect &lt;did&gt; &lt;address&gt;</code></li>
+<li><strong>Firewall blocking</strong>: Open UDP port 7777: <code>sudo ufw allow 7777/udp</code></li>
+<li><strong>Wrong network interface</strong>: Check <code>bind_addr</code> in config</li>
+<li><strong>TLS certificate issue</strong>: Check logs for certificate verification errors</li>
+</ol>
+<h3>High Quarantine Size</h3>
+<p><strong>Symptoms:</strong></p>
+<ul>
+<li><code>icn_ledger_quarantine_size</code> &gt; 100</li>
+<li>Dashboard shows &quot;Degraded&quot; status</li>
+</ul>
+<p><strong>Diagnosis:</strong></p>
+<pre><code class="language-bash"># List quarantine entries
+icnctl ledger quarantine list
+
+# Check for patterns (repeated accounts, timestamps, etc.)
+icnctl ledger quarantine list --format json | jq &#39;.[] | .account&#39; | sort | uniq -c
+</code></pre>
+<p><strong>Solutions:</strong></p>
+<ol>
+<li><strong>Concurrent transaction conflicts</strong>: Normal in high-activity periods, will resolve automatically</li>
+<li><strong>Clock skew</strong>: Check system time with <code>timedatectl</code>, sync with NTP</li>
+<li><strong>Network partition</strong>: Check connectivity to peers</li>
+<li><strong>Attack/malicious entries</strong>: Investigate and potentially block peer</li>
+</ol>
+<p><strong>See also:</strong> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/operations/deployment/incident-response#quarantine-growth-p2#quarantine-growth-p2">Incident Response: Quarantine Growth</a></p>
+<h3>High Memory Usage</h3>
+<p><strong>Symptoms:</strong></p>
+<ul>
+<li>ICNd consuming &gt; 2 GB RAM</li>
+<li>OOM killer terminating ICNd</li>
+</ul>
+<p><strong>Diagnosis:</strong></p>
+<pre><code class="language-bash"># Check process memory
+ps aux | grep icnd
+
+# Check metrics for growth indicators
+curl -s http://localhost:9100/metrics | grep -E &quot;(gossip_entries_total|ledger_accounts_total|trust_edges_total)&quot;
+</code></pre>
+<p><strong>Solutions:</strong></p>
+<ol>
+<li><strong>Gossip store growth</strong>: Reduce <code>max_entries_per_topic</code> in config</li>
+<li><strong>Ledger cache</strong>: Reduce <code>cache_size_mb</code> in config</li>
+<li><strong>Too many peers</strong>: Reduce <code>max_peers</code> in config</li>
+<li><strong>Memory leak</strong>: Check for version with known leaks, upgrade if needed</li>
+</ol>
+<h3>Slow Transaction Processing</h3>
+<p><strong>Symptoms:</strong></p>
+<ul>
+<li>Transactions taking &gt; 10 seconds to confirm</li>
+<li>High <code>icn_ledger_merge_conflicts_total</code></li>
+</ul>
+<p><strong>Diagnosis:</strong></p>
+<pre><code class="language-bash"># Check ledger metrics
+curl -s http://localhost:9100/metrics | grep icn_ledger
+
+# Check gossip sync status
+icnctl gossip stats
+</code></pre>
+<p><strong>Solutions:</strong></p>
+<ol>
+<li><strong>Network latency</strong>: Check peer connectivity and latency</li>
+<li><strong>High conflict rate</strong>: Reduce concurrent transactions from same account</li>
+<li><strong>Quarantine backlog</strong>: Resolve quarantine entries (see above)</li>
+<li><strong>Disk I/O bottleneck</strong>: Check disk performance with <code>iostat</code></li>
+</ol>
+<hr>
+<h2>Additional Resources</h2>
+<ul>
+<li><strong>Deployment Guide</strong>: <a href="/docs/operations/deployment/deployment-guide">deployment-guide.md</a></li>
+<li><strong>Incident Response</strong>: <a href="/docs/operations/deployment/incident-response">incident-response.md</a></li>
+<li><strong>Architecture</strong>: <a href="/docs/ARCHITECTURE">ARCHITECTURE.md</a></li>
+<li><strong>Changelog</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/CHANGELOG">CHANGELOG.md</a></li>
+<li><strong>Roadmap</strong>: <a href="/docs/development/sessions/undated/ROADMAP">ROADMAP.md</a></li>
+</ul>
+<hr>
+<p><strong>Document Version</strong>: 1.0
+<strong>Last Updated</strong>: 2025-01-14
+<strong>Applies To</strong>: ICN v0.1.x</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

@@ -1,0 +1,256 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Sprint 2 Progress - Dashboard Implementation | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>sprints</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>SPRINT2 PROGRESS</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/sprints/SPRINT2_PROGRESS.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Sprint 2 Progress - Dashboard Implementation</h1>
+<p><strong>Date</strong>: December 17, 2025<br><strong>Sprint Goal</strong>: Complete high-priority user-facing tools</p>
+<h2>Completed ✅</h2>
+<h3>1. Node Administration Dashboard (100%)</h3>
+<p><strong>Implementation</strong>: <code>web/dashboard/</code></p>
+<p>Created a comprehensive web-based dashboard for ICN node operators with:</p>
+<h4>Core Views (9 total)</h4>
+<ul>
+<li><strong>Overview</strong>: Real-time stats, activity feed, charts</li>
+<li><strong>Network</strong>: Connected peers, trust scores, connection info</li>
+<li><strong>Ledger</strong>: Transaction history with time filtering</li>
+<li><strong>Governance</strong>: Proposals, voting, status tracking</li>
+<li><strong>Compute</strong>: Distributed task monitoring and filtering</li>
+<li><strong>Federation</strong>: Cooperative registry and gateway info</li>
+<li><strong>Metrics</strong>: System performance (gossip, trust, storage, bandwidth)</li>
+<li><strong>Logs</strong>: Real-time log streaming with level filtering</li>
+<li><strong>Settings</strong>: Configurable API endpoints and refresh</li>
+</ul>
+<h4>Technical Features</h4>
+<ul>
+<li>✅ Modern dark theme UI with responsive design</li>
+<li>✅ Real-time WebSocket updates for live data</li>
+<li>✅ Auto-refresh with configurable interval (1-60 seconds)</li>
+<li>✅ Toast notifications for user feedback</li>
+<li>✅ LocalStorage persistence for settings</li>
+<li>✅ Filtering and export capabilities</li>
+<li>✅ Professional single-page app architecture</li>
+</ul>
+<h4>Deployment Options</h4>
+<ul>
+<li>✅ Python HTTP server (simplest, one command)</li>
+<li>✅ Node.js HTTP server</li>
+<li>✅ Docker container with nginx</li>
+<li>✅ Deployment script (<code>deploy.sh</code>)</li>
+<li>✅ Comprehensive README with docs</li>
+</ul>
+<h4>Stats</h4>
+<ul>
+<li><strong>Files</strong>: 7 (HTML, CSS, JS, Dockerfile, README, deploy script, package.json)</li>
+<li><strong>Lines of Code</strong>: ~1,740</li>
+<li><strong>Size</strong>: ~50KB</li>
+<li><strong>Dependencies</strong>: Zero (vanilla JavaScript, no build process)</li>
+</ul>
+<h3>Testing</h3>
+<ul>
+<li>✅ Renders correctly in browser</li>
+<li>✅ Navigation works between views</li>
+<li>✅ Settings persist in localStorage</li>
+<li>✅ Responsive layout for mobile/desktop</li>
+<li>⚠️ API integration pending (requires running ICN node)</li>
+</ul>
+<h3>2. API Documentation (100%)</h3>
+<p><strong>Implementation</strong>: <code>web/api-docs/</code></p>
+<p>Created interactive API documentation with Swagger UI:</p>
+<h4>Features</h4>
+<ul>
+<li>✅ Interactive Swagger UI interface</li>
+<li>✅ Complete OpenAPI 3.1 specification (1,522 lines)</li>
+<li>✅ 60+ documented endpoints across all modules</li>
+<li>✅ Try-it-out functionality for testing</li>
+<li>✅ Authentication flow guide (challenge-response)</li>
+<li>✅ Request/Response examples for all endpoints</li>
+<li>✅ Complete schema definitions</li>
+<li>✅ Search and filter capabilities</li>
+<li>✅ Persistent authorization (save JWT token)</li>
+</ul>
+<h4>API Coverage</h4>
+<ul>
+<li><strong>Authentication</strong>: Challenge-response with Ed25519</li>
+<li><strong>Identity</strong>: DID resolution and management (3 endpoints)</li>
+<li><strong>Ledger</strong>: Payments, balances, history (5 endpoints)</li>
+<li><strong>Governance</strong>: Domains, proposals, voting (10+ endpoints)</li>
+<li><strong>Cooperatives</strong>: Full CRUD operations (8+ endpoints)</li>
+<li><strong>Members</strong>: Profile and membership management (5+ endpoints)</li>
+<li><strong>Compute</strong>: Task submission and monitoring (6+ endpoints)</li>
+<li><strong>Federation</strong>: Inter-cooperative operations (4+ endpoints)</li>
+<li><strong>SDIS</strong>: Social DID issuance (10+ endpoints)</li>
+<li><strong>WebSocket</strong>: Real-time event streaming (1 endpoint)</li>
+<li><strong>Health</strong>: Liveness, readiness checks (4 endpoints)</li>
+</ul>
+<h4>Deployment Options</h4>
+<ul>
+<li>✅ Python HTTP server</li>
+<li>✅ Node.js HTTP server</li>
+<li>✅ Docker container with nginx</li>
+<li>✅ Deployment script (<code>deploy.sh</code>)</li>
+<li>✅ Comprehensive README</li>
+</ul>
+<h4>Stats</h4>
+<ul>
+<li><strong>Files</strong>: 5 (HTML, YAML, Dockerfile, README, deploy script)</li>
+<li><strong>OpenAPI Spec</strong>: 1,522 lines</li>
+<li><strong>Total Size</strong>: ~50KB</li>
+<li><strong>Endpoints Documented</strong>: 60+</li>
+</ul>
+<h2>Sprint Timeline</h2>
+<h3>Completed Tasks</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> Dashboard HTML structure (index.html)</li>
+<li><input checked="" disabled="" type="checkbox"> Professional dark theme CSS (style.css)</li>
+<li><input checked="" disabled="" type="checkbox"> Application logic and API client (app.js)</li>
+<li><input checked="" disabled="" type="checkbox"> Deployment script and Dockerfile</li>
+<li><input checked="" disabled="" type="checkbox"> Comprehensive README documentation</li>
+<li><input checked="" disabled="" type="checkbox"> Git commit and push</li>
+</ul>
+<p><strong>Time Spent</strong>: ~2 hours</p>
+<h3>Remaining Sprint 2 Tasks</h3>
+<h4>3. Mobile App Assembly (Next - 1 day)</h4>
+<ul>
+<li><input disabled="" type="checkbox"> Create main app scaffold in <code>examples/mobile-app/</code></li>
+<li><input disabled="" type="checkbox"> Integrate existing 5 UI components</li>
+<li><input disabled="" type="checkbox"> Add navigation and routing</li>
+<li><input disabled="" type="checkbox"> Connect to TypeScript SDK</li>
+<li><input disabled="" type="checkbox"> Test on iOS/Android emulators</li>
+</ul>
+<h2>Next Steps (Priority Order)</h2>
+<ol>
+<li><p><strong>Mobile App Assembly</strong> (Next)</p>
+<ul>
+<li>React Native or Expo framework</li>
+<li>Integrate existing components</li>
+<li>Add authentication flow</li>
+<li>Build and test APK/IPA</li>
+</ul>
+</li>
+<li><p><strong>Deployment Guide</strong> (Following week)</p>
+<ul>
+<li>Kubernetes manifests</li>
+<li>Helm charts</li>
+<li>Docker Compose stacks</li>
+<li>Monitoring setup (Prometheus + Grafana)</li>
+</ul>
+</li>
+</ol>
+<h2>Status After API Documentation Completion</h2>
+<p><strong>Overall Sprint 2 Progress</strong>: 67% (2/3 high-priority items done)</p>
+<h3>What&#39;s Ready for Production</h3>
+<p>✅ ICN Core Infrastructure (22 crates, 1,580 tests)<br>✅ TypeScript SDK<br>✅ Pilot UI (timebank/mutual credit)<br>✅ <strong>Node Dashboard</strong> (NEW - admin monitoring)<br>✅ <strong>API Documentation</strong> (NEW - interactive Swagger UI)<br>✅ Security model (TLS, signing, encryption)<br>✅ Economic safeguards (limits, disputes)<br>✅ Federation support  </p>
+<h3>What&#39;s In Progress</h3>
+<p>🚧 Mobile app assembly (final sprint task)  </p>
+<h3>What&#39;s Planned</h3>
+<p>📋 Deployment guide<br>📋 Integration tests (SDIS, federation)<br>📋 Performance benchmarking  </p>
+<h2>Dashboard Architecture Notes</h2>
+<h3>Design Decisions</h3>
+<ol>
+<li><strong>Vanilla JavaScript</strong>: No framework dependencies for simplicity</li>
+<li><strong>Dark Theme</strong>: Reduces eye strain for long monitoring sessions</li>
+<li><strong>WebSocket</strong>: Real-time updates without polling</li>
+<li><strong>LocalStorage</strong>: Settings persist across sessions</li>
+<li><strong>Modular Views</strong>: Easy to add new monitoring panels</li>
+</ol>
+<h3>API Endpoint Requirements</h3>
+<p>The dashboard expects these Gateway endpoints:</p>
+<pre><code>GET  /v1/node/info              - Node DID and metadata
+GET  /v1/network/peers          - Connected peers list
+GET  /v1/ledger/entries         - Ledger transactions
+GET  /v1/governance/proposals   - Governance proposals
+GET  /v1/compute/tasks          - Compute task queue
+GET  /v1/federation/cooperatives - Federated coops
+GET  /v1/metrics                - Performance metrics
+GET  /v1/logs                   - System logs
+WS   /ws                        - Real-time updates
+</code></pre>
+<p>All endpoints are currently implemented in <code>icn-gateway</code> crate.</p>
+<h3>Security Considerations</h3>
+<p>Dashboard connects directly to node&#39;s Gateway API. For production:</p>
+<ol>
+<li>✅ Documented HTTPS/TLS requirement</li>
+<li>✅ Recommended nginx reverse proxy config</li>
+<li>✅ CORS configuration guidance</li>
+<li>⚠️ Authentication not yet implemented (planned)</li>
+<li>⚠️ Rate limiting not yet implemented (planned)</li>
+</ol>
+<h2>Metrics</h2>
+<h3>Code Statistics</h3>
+<ul>
+<li><strong>Dashboard</strong>: 1,740 lines</li>
+<li><strong>API Documentation</strong>: 1,522 lines (OpenAPI) + 300 lines (HTML/docs)</li>
+<li><strong>Total Project</strong>: ~50,000+ lines Rust + TypeScript</li>
+<li><strong>Tests</strong>: 1,580 passing</li>
+</ul>
+<h3>Sprint Velocity</h3>
+<ul>
+<li><strong>Planned</strong>: 3 items (dashboard, API docs, mobile app)</li>
+<li><strong>Completed</strong>: 2 items (dashboard, API docs)</li>
+<li><strong>On Track</strong>: Yes (67% done, ahead of schedule)</li>
+</ul>
+<h2>Conclusion</h2>
+<p>Dashboard and API documentation were complete and assessed as production-capable in this sprint snapshot. Sprint 2 was 67% complete and ahead of schedule. Moving forward with mobile app assembly to finish the sprint.</p>
+<p><strong>Next Session</strong>: Assemble mobile app from existing UI components.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

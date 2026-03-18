@@ -1,0 +1,909 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Governance Primitives | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>governance</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>governance</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/governance/governance.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Governance Primitives</h1>
+<p><strong>Status</strong>: Phase 13 – Governance MVC
+<strong>Audience</strong>: Cooperative members, facilitators, and ICN developers</p>
+<h2>1. Overview</h2>
+<p>ICN governance is <strong>not</strong> &quot;one true DAO.&quot;
+It is a set of <strong>governance runtime primitives</strong> that communities can assemble into their own decision systems.</p>
+<p>Design goals:</p>
+<ul>
+<li><p><strong>Democratic by default</strong>
+Ship with a boring, cooperative baseline that &quot;just works&quot; without anyone having to hand-roll a constitution.</p>
+</li>
+<li><p><strong>Configurable by communities</strong>
+Each community (governance domain) defines its own membership rules and decision thresholds.</p>
+</li>
+<li><p><strong>Extensible over time</strong>
+New governance profiles can be added, and communities can migrate to them using proposals.</p>
+</li>
+<li><p><strong>Mechanisms, not ideology</strong>
+ICN provides the mechanics: proposals, votes, outcomes. How those are used is a political choice of the community.</p>
+</li>
+</ul>
+<p>At a high level, the system is structured as:</p>
+<ol>
+<li><strong>Membership</strong> – who is allowed to vote</li>
+<li><strong>Tally</strong> – how votes are counted</li>
+<li><strong>Outcome</strong> – how tallies are turned into decisions</li>
+<li><strong>Execution</strong> – what the system does when a proposal is accepted</li>
+</ol>
+<p>This separation keeps the core small and lets future governance models plug in without rewriting everything.</p>
+<hr>
+<h2>2. Core Types</h2>
+<h3>2.1 Governance Domains</h3>
+<p>A <strong>governance domain</strong> represents a space where decisions are made. This usually maps to a single cooperative, working group, or project.</p>
+<pre><code class="language-rust">pub struct GovernanceDomainId(pub String);
+
+pub struct GovernanceDomain {
+    pub id: GovernanceDomainId,
+    pub name: String,
+    pub config: GovernanceConfig,
+}
+</code></pre>
+<p>Examples:</p>
+<ul>
+<li><code>coop:tiny-food</code></li>
+<li><code>timebank:city-center</code></li>
+<li><code>did:icn:org123…</code> (org DID as domain id)</li>
+</ul>
+<p>Each domain has its own membership configuration and decision thresholds.</p>
+<hr>
+<h3>2.2 Membership</h3>
+<p>Membership answers the question: <strong>&quot;Who is allowed to vote in this domain?&quot;</strong></p>
+<pre><code class="language-rust">pub enum MembershipSource {
+    /// Explicit list of member DIDs
+    StaticList(Vec&lt;Did&gt;),
+
+    /// Trust-based membership: any DID whose trust score is above a threshold
+    TrustThreshold(f64),
+
+    // Future: roles, contract-defined groups, etc.
+}
+
+pub struct MembershipConfig {
+    pub source: MembershipSource,
+}
+</code></pre>
+<p>Phase 13 focuses primarily on <code>StaticList</code>, with <code>TrustThreshold</code> scaffolded for future use (e.g., &quot;everyone trusted at least X by the org DID&quot;).</p>
+<hr>
+<h3>2.3 Governance Configuration &amp; Profiles</h3>
+<p>A <strong>governance profile</strong> is a rule set that decides how tallies become outcomes.</p>
+<pre><code class="language-rust">pub struct GovernanceProfileId(pub String);
+// e.g. &quot;cooperative_default&quot;
+
+pub struct GovernanceParams {
+    /// Quorum as a percentage of eligible voters (0–100)
+    pub quorum_percentage: u8,
+    /// Required percentage of For vs Against for approval (0–100)
+    pub approval_threshold_percentage: u8,
+    /// Voting period in seconds (used by higher layers / scheduling)
+    pub voting_period_seconds: u64,
+}
+</code></pre>
+<p>These parameters are wrapped in a higher-level <code>GovernanceConfig</code>:</p>
+<pre><code class="language-rust">pub struct GovernanceConfig {
+    pub profile: GovernanceProfileId,
+    pub membership: MembershipConfig,
+    pub params: GovernanceParams,
+}
+</code></pre>
+<p>This is the object communities can change over time (via governance proposals).</p>
+<hr>
+<h3>2.4 Proposals</h3>
+<p>A <strong>proposal</strong> is a decision being made within a governance domain.</p>
+<pre><code class="language-rust">pub struct ProposalId(pub String);
+
+pub enum ProposalState {
+    Draft,
+    Open { opened_at: Timestamp, closes_at: Timestamp },
+    Accepted { closed_at: Timestamp },
+    Rejected { closed_at: Timestamp },
+    NoQuorum { closed_at: Timestamp },
+    Cancelled { cancelled_at: Timestamp },
+}
+</code></pre>
+<p>Proposal payloads describe the <em>type</em> of decision:</p>
+<pre><code class="language-rust">pub enum ProposalPayload {
+    /// Informational / advisory decisions
+    Text {
+        body: String,
+    },
+
+    /// Budget or resource allocation decisions
+    Budget {
+        amount: i64,
+        currency: String,
+        recipient: Did,
+        purpose: String,
+    },
+
+    /// Membership changes (add/remove members)
+    Membership {
+        action: MembershipAction,
+        member: Did,
+    },
+
+    /// Changes to governance config (thresholds, profile, membership rules)
+    ConfigChange {
+        /// Serialized representation of the new configuration
+        new_config: String,
+    },
+}
+</code></pre>
+<p>Combined into:</p>
+<pre><code class="language-rust">pub struct Proposal {
+    pub id: ProposalId,
+    pub domain_id: GovernanceDomainId,
+    pub proposer: Did,
+
+    pub title: String,
+    pub description: String,
+    pub payload: ProposalPayload,
+
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
+
+    pub state: ProposalState,
+}
+</code></pre>
+<p>Phase 13 provides structured payloads for common decision types and a generic <code>ConfigChange</code> for evolving governance itself.</p>
+<hr>
+<h3>2.5 Votes and Tallies</h3>
+<p>A <strong>vote</strong> is a member&#39;s position on a proposal.</p>
+<pre><code class="language-rust">pub enum VoteChoice {
+    For,
+    Against,
+    Abstain,
+}
+
+pub struct Vote {
+    pub proposal_id: ProposalId,
+    pub voter: Did,
+    /// Weight of this vote (Phase 13: typically 1 for 1-member-1-vote)
+    pub weight: u64,
+    pub choice: VoteChoice,
+    pub timestamp: Timestamp,
+    pub comment: Option&lt;String&gt;,
+}
+</code></pre>
+<p>Votes are aggregated into a <strong>tally</strong>:</p>
+<pre><code class="language-rust">pub struct VoteTally {
+    pub for_votes: usize,
+    pub against_votes: usize,
+    pub abstain_votes: usize,
+}
+
+impl VoteTally {
+    pub fn total_votes(&amp;self) -&gt; usize {
+        self.for_votes + self.against_votes + self.abstain_votes
+    }
+
+    pub fn deciding_votes(&amp;self) -&gt; usize {
+        self.for_votes + self.against_votes
+    }
+
+    pub fn approval_percentage(&amp;self) -&gt; u8 {
+        // Returns percentage of For among deciding votes (0-100)
+    }
+}
+</code></pre>
+<p><strong>Note:</strong></p>
+<ul>
+<li><strong>Eligible voter count</strong> is not stored on <code>VoteTally</code> – it is provided separately when we evaluate outcomes (see below).</li>
+<li>Phase 13 assumes 1-member-1-vote semantics, but uses <code>weight: u64</code> to keep room for future weighted models.</li>
+<li>Vote weights are summed during tally computation, allowing future extensions.</li>
+</ul>
+<hr>
+<h3>2.6 Decision Outcomes &amp; Rules</h3>
+<p>The result of a closed proposal is represented as:</p>
+<pre><code class="language-rust">pub enum DecisionOutcome {
+    Accepted,
+    Rejected,
+    NoQuorum,
+}
+</code></pre>
+<p>Decision logic is provided by <strong>governance profiles</strong> via a trait:</p>
+<pre><code class="language-rust">pub trait GovernanceRule: Send + Sync {
+    fn evaluate(
+        &amp;self,
+        tally: &amp;VoteTally,
+        params: &amp;GovernanceParams,
+        eligible_voter_count: usize,
+    ) -&gt; Result&lt;DecisionOutcome&gt;;
+
+    fn profile_id(&amp;self) -&gt; &amp;GovernanceProfileId;
+    fn description(&amp;self) -&gt; &amp;str;
+}
+</code></pre>
+<ul>
+<li><code>tally</code> holds the For/Against/Abstain counts.</li>
+<li><code>params</code> is the configured quorum and approval thresholds.</li>
+<li><code>eligible_voter_count</code> is the number of members allowed to vote in this domain.</li>
+</ul>
+<p>Different profiles implement <code>GovernanceRule</code>. The cooperative default profile is just one such implementation.</p>
+<hr>
+<h2>3. The <code>cooperative_default</code> Profile</h2>
+<p>The <strong><code>cooperative_default</code></strong> profile is the boring, democratic baseline:</p>
+<ul>
+<li>Members are defined by a <code>MembershipConfig</code> (usually a static list of DIDs).</li>
+<li>Each member&#39;s vote is counted once (1-member-1-vote).</li>
+<li>Quorum is enforced as a percentage of eligible voters.</li>
+<li>Approval is enforced as a percentage of For vs Against among participating voters.</li>
+</ul>
+<h3>3.1 Default Parameters</h3>
+<p>The built-in defaults are:</p>
+<pre><code class="language-text">quorum_percentage              = 50   # at least 50% of eligible members must vote
+approval_threshold_percentage  = 50   # simple majority of For vs Against
+voting_period_seconds          = 604800  # 7 days
+</code></pre>
+<h3>3.2 Evaluation Logic</h3>
+<p>The <code>cooperative_default</code> profile implements <code>GovernanceRule::evaluate</code> as follows:</p>
+<ol>
+<li><p><strong>Quorum check</strong></p>
+<ul>
+<li>Compute <code>quorum_required = (eligible_voter_count * quorum_percentage) / 100</code>.</li>
+<li>If <code>tally.total_votes() &lt; quorum_required</code> → <code>DecisionOutcome::NoQuorum</code>.</li>
+</ul>
+</li>
+<li><p><strong>Approval check</strong></p>
+<ul>
+<li>Compute <code>approval_required = (total_votes * approval_threshold_percentage) / 100</code>.</li>
+<li>If <code>tally.for_votes &gt; approval_required</code> → <code>DecisionOutcome::Accepted</code>.</li>
+<li>Otherwise → <code>DecisionOutcome::Rejected</code>.</li>
+</ul>
+</li>
+</ol>
+<p><strong>Key behaviors:</strong></p>
+<ul>
+<li><strong>Abstain votes</strong> count towards <strong>quorum</strong> but not towards the approval calculation.</li>
+<li>The approval threshold is computed as <code>&gt;</code> (strictly greater than), ensuring a true majority at 50%.</li>
+<li>Edge case: If all votes are abstentions, quorum is met but approval fails → <code>Rejected</code>.</li>
+</ul>
+<p>The exact implementation includes comprehensive unit tests covering boundary conditions:</p>
+<ul>
+<li>Exact threshold matches (49%, 50%, 51%)</li>
+<li>All-abstain scenarios</li>
+<li>Zero participation</li>
+<li>Multi-currency weighted votes (future)</li>
+</ul>
+<hr>
+<h2>4. Proposal Lifecycle</h2>
+<p>The governance system enforces a clear state machine:</p>
+<pre><code class="language-text">Draft → Open → {Accepted, Rejected, NoQuorum}
+          ↘ Cancelled
+</code></pre>
+<ul>
+<li><p><strong>Draft</strong>
+Proposal exists but is not yet open for voting. Can be edited by the proposer.</p>
+</li>
+<li><p><strong>Open { opened_at, closes_at }</strong>
+Voting is active. Eligible members can cast <strong>For / Against / Abstain</strong>.
+The <code>closes_at</code> timestamp indicates when voting ends.</p>
+</li>
+<li><p><strong>Accepted { closed_at }</strong>
+Proposal passed both quorum and approval thresholds.</p>
+</li>
+<li><p><strong>Rejected { closed_at }</strong>
+Proposal met quorum but failed approval threshold.</p>
+</li>
+<li><p><strong>NoQuorum { closed_at }</strong>
+Insufficient participation.</p>
+</li>
+<li><p><strong>Cancelled { cancelled_at }</strong>
+Proposal was intentionally cancelled (e.g. withdrawn by proposer, superseded, or invalid).</p>
+</li>
+</ul>
+<p><strong>State transitions:</strong></p>
+<pre><code class="language-rust">impl Proposal {
+    pub fn open(&amp;mut self, voting_period_seconds: u64) -&gt; Result&lt;()&gt;;
+    pub fn close(&amp;mut self, final_state: ProposalState) -&gt; Result&lt;()&gt;;
+    pub fn cancel(&amp;mut self) -&gt; Result&lt;()&gt;;
+}
+</code></pre>
+<p>Transitions are validated:</p>
+<ul>
+<li>Can only <code>open()</code> from <code>Draft</code></li>
+<li>Can only <code>close()</code> from <code>Open</code></li>
+<li>Can only <code>cancel()</code> from non-terminal states</li>
+</ul>
+<hr>
+<h2>5. Gossip, Storage, and Integration</h2>
+<p>Phase 13 introduces three integration layers:</p>
+<h3>5.1 Gossip Protocol</h3>
+<p>A <strong><code>GovernanceMessage</code></strong> enum is broadcast on the <code>governance:proposal</code> topic:</p>
+<pre><code class="language-rust">pub enum GovernanceMessage {
+    DomainCreated { domain: GovernanceDomain },
+    DomainUpdated { domain: GovernanceDomain },
+    ProposalCreated { proposal: Proposal },
+    ProposalOpened { id: ProposalId, opened_at: u64, closes_at: u64 },
+    VoteCast { vote: Vote, signature: Option&lt;Vec&lt;u8&gt;&gt; },
+    ProposalClosed { id: ProposalId, outcome: ProposalOutcome, closed_at: u64, tally: TallySnapshot },
+    ProposalCancelled { id: ProposalId, cancelled_by: Did, cancelled_at: u64 },
+}
+</code></pre>
+<p><strong>TallySnapshot</strong> provides an immutable record of the final vote count:</p>
+<pre><code class="language-rust">pub struct TallySnapshot {
+    pub for_votes: usize,
+    pub against_votes: usize,
+    pub abstain_votes: usize,
+    pub eligible_voters: usize,
+}
+</code></pre>
+<p>This enables independent outcome verification by any node.</p>
+<h3>5.2 Storage Layer</h3>
+<p>A <strong><code>GovernanceStore</code></strong> trait abstracts persistence:</p>
+<pre><code class="language-rust">pub trait GovernanceStore: Send + Sync {
+    fn store_domain(&amp;self, domain: &amp;GovernanceDomain) -&gt; Result&lt;()&gt;;
+    fn get_domain(&amp;self, id: &amp;GovernanceDomainId) -&gt; Result&lt;Option&lt;GovernanceDomain&gt;&gt;;
+    fn list_domains(&amp;self) -&gt; Result&lt;Vec&lt;GovernanceDomain&gt;&gt;;
+
+    fn store_proposal(&amp;self, proposal: &amp;Proposal) -&gt; Result&lt;()&gt;;
+    fn get_proposal(&amp;self, id: &amp;ProposalId) -&gt; Result&lt;Option&lt;Proposal&gt;&gt;;
+    fn list_proposals(&amp;self, domain_id: &amp;GovernanceDomainId) -&gt; Result&lt;Vec&lt;Proposal&gt;&gt;;
+
+    fn store_vote(&amp;self, vote: &amp;Vote) -&gt; Result&lt;()&gt;;
+    fn get_vote(&amp;self, proposal_id: &amp;ProposalId, voter: &amp;Did) -&gt; Result&lt;Option&lt;Vote&gt;&gt;;
+    fn list_votes(&amp;self, proposal_id: &amp;ProposalId) -&gt; Result&lt;Vec&lt;Vote&gt;&gt;;
+
+    fn compute_tally(&amp;self, proposal_id: &amp;ProposalId) -&gt; Result&lt;VoteTally&gt;;
+}
+</code></pre>
+<p>Phase 13 includes:</p>
+<ul>
+<li><code>InMemoryGovernanceStore</code> for testing</li>
+<li><code>SledGovernanceStore</code> scaffold for production (not yet complete)</li>
+</ul>
+<p><strong>Vote replacement:</strong> The store allows voters to change their votes - calling <code>store_vote()</code> with the same <code>(proposal_id, voter)</code> replaces the previous vote. This reflects the democratic principle that voters can change their minds before voting closes.</p>
+<h3>5.3 Membership Resolution</h3>
+<p>A <strong><code>MembershipResolver</code></strong> trait determines who can vote:</p>
+<pre><code class="language-rust">pub trait MembershipResolver: Send + Sync {
+    fn resolve_members(&amp;self, domain: &amp;GovernanceDomain) -&gt; Result&lt;Vec&lt;Did&gt;&gt;;
+    fn is_member(&amp;self, domain: &amp;GovernanceDomain, did: &amp;Did) -&gt; Result&lt;bool&gt;;
+    fn member_count(&amp;self, domain: &amp;GovernanceDomain) -&gt; Result&lt;usize&gt;;
+}
+</code></pre>
+<p>Phase 13 implementations:</p>
+<ul>
+<li><strong>StaticMembershipResolver</strong>: Handles <code>MembershipSource::StaticList</code></li>
+<li><strong>TrustMembershipResolver</strong>: Scaffold for trust graph integration (not yet wired)</li>
+<li><strong>CompositeMembershipResolver</strong>: Tries multiple strategies in sequence</li>
+</ul>
+<h3>5.4 Treasury Spend Proof Gate</h3>
+<p>Treasury disbursements initiated by governance (<code>TreasuryProposalOperation::Spend</code>) are
+<strong>proof-gated</strong> and <strong>fail-closed</strong> at execution time.</p>
+<p>Before any treasury spend mutates ledger state, the executor requires a valid
+<code>GovernanceProofV2</code> for the accepted proposal and verifies:</p>
+<ul>
+<li>canonical receipt binding (<code>proof.verify_receipt()</code>)</li>
+<li>proposal identity (<code>proof.receipt.proposal_id</code>)</li>
+<li>governance domain (<code>proof.receipt.domain_id</code>)</li>
+<li>accepted outcome (<code>proof.receipt.outcome == ProofOutcome::Accepted</code>)</li>
+<li>at least one attestation is present</li>
+<li>each attestation is bound to <code>receipt.decision_hash</code></li>
+<li>each signer DID resolves and each attestation signature verifies</li>
+<li>decision timestamp consistency (at least one attestation has <code>timestamp == decided_at</code>)</li>
+</ul>
+<p>If proof lookup or validation fails, spend execution is rejected, recorded in the
+dead-letter queue, and reported as a proposal execution failure event.</p>
+<hr>
+<h2>6. How Communities Evolve Their Governance</h2>
+<p>Because <strong>governance configuration is itself governed</strong>, communities can:</p>
+<ol>
+<li><p><strong>Start simple</strong>: Use <code>cooperative_default</code> with a static member list and 50/50 thresholds.</p>
+</li>
+<li><p><strong>Propose changes</strong> via <code>ProposalPayload::ConfigChange</code>:</p>
+<ul>
+<li>Increase quorum to 67%</li>
+<li>Require supermajority (when that profile exists)</li>
+<li>Switch to trust-based membership</li>
+<li>Migrate to a different profile entirely</li>
+</ul>
+</li>
+<li><p><strong>Vote using current rules</strong>: The config change proposal is evaluated under the <em>existing</em> governance rules.</p>
+</li>
+<li><p><strong>Apply if accepted</strong>: The new configuration takes effect for future proposals.</p>
+</li>
+</ol>
+<p>Every governance evolution is transparent, auditable, and requires community consent.</p>
+<hr>
+<h2>7. CLI Design (Planned)</h2>
+<p>Phase 13 will provide <code>icnctl gov</code> commands for governance workflows:</p>
+<h3>Domain Management</h3>
+<pre><code class="language-bash"># Create a new governance domain
+icnctl gov domain create \
+  --domain-id &quot;coop:tiny-food&quot; \
+  --name &quot;Tiny Food Cooperative&quot; \
+  --members did:icn:alice,did:icn:bob,did:icn:carol \
+  --profile cooperative_default \
+  --quorum 50 \
+  --approval 50
+
+# Show domain configuration
+icnctl gov domain show --domain-id &quot;coop:tiny-food&quot;
+
+# List all domains
+icnctl gov domain list
+</code></pre>
+<h3>Proposal Workflow</h3>
+<pre><code class="language-bash"># Create a text proposal
+icnctl gov proposal create \
+  --domain-id &quot;coop:tiny-food&quot; \
+  --title &quot;Approve new supplier&quot; \
+  --description &quot;Add Local Veggie Farm as approved supplier&quot; \
+  --payload text
+
+# Create a budget proposal
+icnctl gov proposal create \
+  --domain-id &quot;coop:tiny-food&quot; \
+  --title &quot;Q1 Marketing Budget&quot; \
+  --payload budget \
+  --amount 5000 \
+  --currency USD \
+  --recipient did:icn:marketing \
+  --purpose &quot;Social media campaign&quot;
+
+# Open proposal for voting (7 days from now)
+icnctl gov proposal open &lt;proposal-id&gt; --duration 7d
+
+# List proposals
+icnctl gov proposal list --domain-id &quot;coop:tiny-food&quot;
+icnctl gov proposal list --domain-id &quot;coop:tiny-food&quot; --state open
+
+# Show proposal details
+icnctl gov proposal show &lt;proposal-id&gt;
+</code></pre>
+<h3>Voting</h3>
+<pre><code class="language-bash"># Cast a vote
+icnctl gov vote cast &lt;proposal-id&gt; for
+icnctl gov vote cast &lt;proposal-id&gt; against
+icnctl gov vote cast &lt;proposal-id&gt; abstain
+
+# Add a comment to your vote
+icnctl gov vote cast &lt;proposal-id&gt; for --comment &quot;Strong support for this initiative&quot;
+
+# Show your vote on a proposal
+icnctl gov vote show &lt;proposal-id&gt;
+</code></pre>
+<h3>Closing and Outcomes</h3>
+<pre><code class="language-bash"># Close proposal and compute outcome (manual close)
+icnctl gov proposal close &lt;proposal-id&gt;
+
+# Show proposal status with tally
+icnctl gov proposal status &lt;proposal-id&gt;
+</code></pre>
+<h3>Governance Changes</h3>
+<pre><code class="language-bash"># Propose governance config change
+icnctl gov proposal create \
+  --domain-id &quot;coop:tiny-food&quot; \
+  --title &quot;Increase quorum to 67%&quot; \
+  --payload config-change \
+  --quorum 67
+
+# If accepted, new threshold applies to future proposals
+</code></pre>
+<hr>
+<h2>8. Future Extensions (Not Yet Implemented)</h2>
+<p>Phase 13 focuses on a robust but minimal base. Several extensions are explicitly left for later:</p>
+<h3>Additional GovernanceParams Fields</h3>
+<ul>
+<li><code>supermajority_percentage: Option&lt;u8&gt;</code> for built-in supermajority profiles</li>
+<li><code>allow_abstain: bool</code> to control whether abstain is offered as a choice</li>
+<li><code>veto_roles: Vec&lt;String&gt;</code> for role-based veto power</li>
+</ul>
+<h3>Additional Decision Outcomes</h3>
+<ul>
+<li><code>Inconclusive</code> for ambiguous cases (all abstentions, tied votes in even-number electorates)</li>
+</ul>
+<h3>Weighted Voting</h3>
+<ul>
+<li>True <code>f64</code> weights derived from:<ul>
+<li>Trust scores</li>
+<li>Role-based authority</li>
+<li>Stake or contribution metrics</li>
+<li>Time-weighted participation</li>
+</ul>
+</li>
+</ul>
+<h3>Additional Governance Profiles</h3>
+<ul>
+<li><strong>Consent/Sociocratic</strong>: Proposal accepted unless there&#39;s a reasoned objection</li>
+<li><strong>Supermajority</strong>: Built-in 2/3, 3/4, 4/5 profiles</li>
+<li><strong>Council/Role-Based</strong>: Different chambers or roles with different voting powers</li>
+<li><strong>Liquid Democracy</strong>: Delegation and proxy voting</li>
+</ul>
+<h3>Contract-Based Profiles</h3>
+<ul>
+<li><code>profile = &quot;contract:&lt;did&gt;&quot;</code> delegates evaluation to a CCL contract</li>
+<li>Enables arbitrarily complex governance logic without core changes</li>
+</ul>
+<h3>Automatic Side Effects</h3>
+<ul>
+<li>Direct integration with ledger for budget execution</li>
+<li>Membership changes applied automatically when proposals pass</li>
+<li>Contract invocation for ConfigChange payloads</li>
+</ul>
+<h3>Time-Based Features</h3>
+<ul>
+<li>Automatic proposal opening/closing based on timestamps</li>
+<li>Proposal scheduling and queuing</li>
+<li>Grace periods and execution delays</li>
+</ul>
+<p>The current implementation is intentionally conservative, but the architecture supports all of these extensions without breaking existing governance domains.</p>
+<hr>
+<h2>9. Test Coverage</h2>
+<p>Phase 13 includes comprehensive unit tests:</p>
+<ul>
+<li><strong>39 total tests</strong> covering all core types and logic</li>
+<li><strong>Governance profile edge cases</strong>:<ul>
+<li>Quorum boundary testing (49%, 50%, 51%)</li>
+<li>Approval threshold edge cases</li>
+<li>All-abstain scenarios</li>
+<li>Zero participation handling</li>
+</ul>
+</li>
+<li><strong>Proposal lifecycle validation</strong>:<ul>
+<li>State transition enforcement</li>
+<li>Invalid transition rejection</li>
+<li>Cancellation from various states</li>
+</ul>
+</li>
+<li><strong>Vote tallying</strong>:<ul>
+<li>Weighted vote aggregation</li>
+<li>Percentage calculations</li>
+<li>From-iterator construction</li>
+</ul>
+</li>
+<li><strong>Store operations</strong>:<ul>
+<li>CRUD for domains, proposals, votes</li>
+<li>Vote replacement (changing your vote)</li>
+<li>Tally computation</li>
+</ul>
+</li>
+<li><strong>Membership resolution</strong>:<ul>
+<li>Static list lookups</li>
+<li>Trust threshold validation</li>
+<li>Composite resolution strategies</li>
+</ul>
+</li>
+<li><strong>Message serialization</strong>:<ul>
+<li>Round-trip JSON encoding</li>
+<li>All message variants</li>
+<li>TallySnapshot calculations</li>
+</ul>
+</li>
+</ul>
+<p>Integration tests (planned):</p>
+<ul>
+<li>Multi-node governance via gossip</li>
+<li>Full proposal lifecycle across network</li>
+<li>Outcome convergence verification</li>
+<li>Byzantine voter behavior resistance</li>
+</ul>
+<hr>
+<h2>10. Architecture Philosophy</h2>
+<p>The governance primitives follow ICN&#39;s core design principles:</p>
+<p><strong>Separation of Concerns:</strong></p>
+<ul>
+<li>Membership ≠ Tallying ≠ Evaluation ≠ Execution</li>
+<li>Each layer is independently testable and replaceable</li>
+</ul>
+<p><strong>Extensibility via Composition:</strong></p>
+<ul>
+<li>New profiles implement <code>GovernanceRule</code> trait</li>
+<li>New membership sources extend <code>MembershipSource</code> enum</li>
+<li>New payload types extend <code>ProposalPayload</code> enum</li>
+</ul>
+<p><strong>Defaults, Not Dogma:</strong></p>
+<ul>
+<li><code>cooperative_default</code> is boring and democratic</li>
+<li>Communities can switch profiles via proposals</li>
+<li>No hardcoded political assumptions</li>
+</ul>
+<p><strong>Gossip-Based Coordination:</strong></p>
+<ul>
+<li>Same pattern as social recovery (Phase 11)</li>
+<li>Eventually consistent decision-making</li>
+<li>Independent outcome verification via TallySnapshot</li>
+</ul>
+<p><strong>Data Sovereignty:</strong></p>
+<ul>
+<li>Each governance domain is independent</li>
+<li>No global registry or permissions</li>
+<li>Communities control their own rules</li>
+</ul>
+<p><strong>Future-Proof:</strong></p>
+<ul>
+<li>Weight field supports future weighted voting</li>
+<li>Profile system supports arbitrary complexity</li>
+<li>Contract integration planned but not required</li>
+</ul>
+<p>This governance layer is not the &quot;ICN way to make decisions&quot; - it&#39;s a <strong>substrate for communities to build their own democratic processes</strong>.</p>
+<hr>
+<h2>11. Runtime Architecture</h2>
+<p>The governance system has multiple deployment modes depending on how ICN is run:</p>
+<h3>11.1 Component Overview</h3>
+<pre><code>┌──────────────────────────────────────────────────────────────────┐
+│                        icn-governance crate                      │
+│   Types, traits, profiles, stores (domain.rs, proposal.rs, etc.) │
+└──────────────────────────────────────────────────────────────────┘
+                                    │
+           ┌────────────────────────┼────────────────────────┐
+           │                        │                        │
+           ▼                        ▼                        ▼
+┌────────────────────┐   ┌────────────────────┐   ┌────────────────────┐
+│  GovernanceActor   │   │  GovernanceManager │   │   RPC Handlers     │
+│ (icn-core/gov/)    │   │ (icn-gateway/)     │   │ (icn-rpc/)         │
+│                    │   │                    │   │                    │
+│ • Gossip-backed    │   │ • In-memory        │   │ • JSON-RPC API     │
+│ • Persistent store │   │ • REST API support │   │ • Uses actor handle│
+│ • Auto-scheduling  │   │ • Standalone mode  │   │                    │
+└────────────────────┘   └────────────────────┘   └────────────────────┘
+         │                                                   │
+         └──────────────────────┬────────────────────────────┘
+                                ▼
+                     GovernanceOps trait
+                     (unified interface)
+</code></pre>
+<p><strong>Three consumers, one set of primitives:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Location</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>icn-governance</strong></td>
+<td><code>icn/crates/icn-governance/</code></td>
+<td>Core types, traits, profiles (the primitives layer)</td>
+</tr>
+<tr>
+<td><strong>GovernanceActor</strong></td>
+<td><code>icn-core/src/governance/actor.rs</code></td>
+<td>Production actor with gossip, store, auto-close scheduler</td>
+</tr>
+<tr>
+<td><strong>GovernanceManager</strong></td>
+<td><code>icn-gateway/src/governance_mgr.rs</code></td>
+<td>Standalone gateway mode (in-memory, no gossip)</td>
+</tr>
+<tr>
+<td><strong>RPC Handlers</strong></td>
+<td><code>icn-rpc/src/server.rs</code></td>
+<td>JSON-RPC methods delegating to GovernanceActor</td>
+</tr>
+</tbody></table>
+<h3>11.2 Deployment Modes</h3>
+<p><strong>Mode 1: Full Daemon (icnd)</strong></p>
+<p>When the ICN daemon runs, the supervisor spawns <code>GovernanceActor</code>:</p>
+<pre><code class="language-rust">// In supervisor.rs
+let governance_handle = GovernanceActor::spawn(
+    did,
+    store,       // Persistent Sled store
+    gossip,      // GossipActor for network sync
+    resolver,    // Membership resolution
+    event_bus,   // For ledger integration
+).await?;
+</code></pre>
+<p>This mode provides:</p>
+<ul>
+<li><strong>Gossip-based synchronization</strong>: <code>governance:proposal</code> topic</li>
+<li><strong>Persistent storage</strong>: Domains, proposals, votes in Sled</li>
+<li><strong>Auto-close scheduling</strong>: Background task closes proposals when voting period ends</li>
+<li><strong>Event bus integration</strong>: <code>ProposalAccepted</code> events trigger ledger transactions</li>
+</ul>
+<p>RPC clients use <code>governance.*</code> methods which delegate to <code>GovernanceHandle</code>:</p>
+<pre><code class="language-bash">icnctl gov proposal create --domain-id &quot;coop:food&quot; --title &quot;Budget&quot;
+# → JSON-RPC to icnd → GovernanceHandle → gossip broadcast
+</code></pre>
+<p><strong>Mode 2: Standalone Gateway</strong></p>
+<p>The gateway can run without the full daemon for development/testing:</p>
+<pre><code class="language-rust">// In gateway server.rs
+let governance_mgr = GovernanceManager::new();  // In-memory
+</code></pre>
+<p>This mode provides:</p>
+<ul>
+<li><strong>REST API access</strong>: <code>/v1/gov/*</code> endpoints</li>
+<li><strong>In-memory storage</strong>: No persistence, no gossip</li>
+<li><strong>Simplified testing</strong>: Quick iteration without full daemon</li>
+</ul>
+<p><strong>Mode 3: Gateway + Daemon Integration (Future)</strong></p>
+<p>The gateway can connect to a running daemon&#39;s governance actor:</p>
+<pre><code class="language-rust">// Planned: Gateway receives GovernanceHandle via configuration
+let gateway = GatewayServer::new_with_governance_handle(addr, jwt, handle);
+</code></pre>
+<p>This enables REST API clients to have full gossip-backed governance.</p>
+<h3>11.3 Data Flow</h3>
+<p><strong>Creating a proposal (daemon mode):</strong></p>
+<pre><code>User (icnctl)
+    │
+    ▼ JSON-RPC: governance.proposal.create
+┌─────────────────┐
+│   RPC Server    │ → handle_governance_proposal_create()
+└─────────────────┘
+    │
+    ▼ GovernanceCommand::CreateProposal
+┌─────────────────┐
+│GovernanceActor  │ → Persist to store
+└─────────────────┘     │
+    │                   ▼ Gossip: GovernanceMessage::ProposalCreated
+    ▼               ┌─────────────────┐
+Other nodes ←────── │  GossipActor    │
+                    └─────────────────┘
+</code></pre>
+<p><strong>Closing a proposal (daemon mode):</strong></p>
+<pre><code>Timer expires OR icnctl gov proposal close
+    │
+    ▼ GovernanceCommand::CloseProposal
+┌─────────────────┐
+│GovernanceActor  │ → Load votes
+└─────────────────┘     │
+    │                   ▼ MembershipResolver.member_count()
+    │                   ▼ GovernanceProfile.evaluate()
+    │                   ▼ Persist final state
+    │                   ▼ Gossip: ProposalClosed
+    │
+    ▼ EventBus: ProposalAccepted
+┌─────────────────┐
+│   LedgerActor   │ → Execute budget transfers (if Budget payload)
+└─────────────────┘
+</code></pre>
+<h3>11.4 Which to Use?</h3>
+<table>
+<thead>
+<tr>
+<th>Use Case</th>
+<th>Component</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Production deployment</td>
+<td>GovernanceActor</td>
+<td>Full gossip, persistence, scheduling</td>
+</tr>
+<tr>
+<td>CLI operations</td>
+<td>RPC → GovernanceActor</td>
+<td>Via <code>icnctl gov</code> commands</td>
+</tr>
+<tr>
+<td>Gateway REST API (dev)</td>
+<td>GovernanceManager</td>
+<td>Quick testing, no persistence</td>
+</tr>
+<tr>
+<td>Gateway REST API (prod)</td>
+<td>Gateway + Actor handle</td>
+<td>Future: full integration</td>
+</tr>
+<tr>
+<td>Unit tests</td>
+<td>InMemoryGovernanceStore</td>
+<td>Direct store operations</td>
+</tr>
+<tr>
+<td>Integration tests</td>
+<td>GovernanceActor</td>
+<td>Multi-node gossip validation</td>
+</tr>
+</tbody></table>
+<h3>11.5 Source of Truth</h3>
+<p><strong>In daemon mode</strong>, the <code>GovernanceActor</code> is authoritative:</p>
+<ul>
+<li>It maintains the canonical store</li>
+<li>It broadcasts changes via gossip</li>
+<li>It schedules auto-close timers</li>
+<li>It emits events for ledger integration</li>
+</ul>
+<p><strong>In standalone gateway mode</strong>, the <code>GovernanceManager</code> is local-only:</p>
+<ul>
+<li>No network synchronization</li>
+<li>State lost on restart</li>
+<li>Suitable only for development/testing</li>
+</ul>
+<p>The <code>GovernanceOps</code> trait provides a unified interface that both implement, enabling code to work with either backend:</p>
+<pre><code class="language-rust">#[async_trait]
+pub trait GovernanceOps: Send + Sync {
+    async fn create_domain(...) -&gt; Result&lt;()&gt;;
+    async fn create_proposal(...) -&gt; Result&lt;ProposalId&gt;;
+    async fn open_proposal(...) -&gt; Result&lt;()&gt;;
+    async fn cast_vote(...) -&gt; Result&lt;()&gt;;
+    async fn close_proposal(...) -&gt; Result&lt;()&gt;;
+    // Read operations...
+}
+</code></pre>
+<hr>
+<h2>12. References</h2>
+<p><strong>Primitives Crate:</strong></p>
+<ul>
+<li><code>icn/crates/icn-governance/</code> - All governance primitives</li>
+<li><code>icn-governance/src/profile.rs</code> - GovernanceRule trait and cooperative_default</li>
+<li><code>icn-governance/src/config.rs</code> - GovernanceParams and defaults</li>
+<li><code>icn-governance/src/message.rs</code> - Gossip protocol messages</li>
+<li><code>icn-governance/src/store.rs</code> - GovernanceStore trait + InMemoryGovernanceStore</li>
+</ul>
+<p><strong>Runtime Components:</strong></p>
+<ul>
+<li><code>icn-core/src/governance/actor.rs</code> - GovernanceActor (production, gossip-backed)</li>
+<li><code>icn-gateway/src/governance_mgr.rs</code> - GovernanceManager (standalone gateway)</li>
+<li><code>icn-rpc/src/server.rs</code> - RPC handlers (<code>governance.*</code> methods)</li>
+<li><code>icn-gateway/src/api/governance.rs</code> - REST API endpoints (<code>/v1/gov/*</code>)</li>
+</ul>
+<p><strong>Related Documentation:</strong></p>
+<ul>
+<li><a href="/docs/ARCHITECTURE">ARCHITECTURE.md</a> - Overall ICN architecture</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/sdis/social-recovery">social-recovery.md</a> - Similar gossip-based coordination pattern</li>
+</ul>
+<p><strong>External Context:</strong></p>
+<ul>
+<li><a href="/docs/development/sessions/undated/ROADMAP">ROADMAP.md</a> - Phase 13 objectives and next steps</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/economics/econ-modeling">../economics/econ-modeling.md</a> - Economic safety mechanisms (Phase 12)</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

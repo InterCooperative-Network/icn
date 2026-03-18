@@ -1,0 +1,713 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Strategic Alignment Audit | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>development</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>sessions</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>undated</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>STRATEGIC ALIGNMENT AUDIT 2026 01 20</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/development/sessions/undated/STRATEGIC_ALIGNMENT_AUDIT_2026-01-20.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Strategic Alignment Audit</h1>
+<p><strong>Date</strong>: 2026-01-20
+<strong>Status</strong>: CRITICAL - Action Required
+<strong>Auditor</strong>: Claude Code</p>
+<hr>
+<h2>Executive Summary</h2>
+<p>A comprehensive audit of ICN&#39;s vision documents, GitHub issues, roadmap, and implementation reveals <strong>significant misalignments</strong> that require resolution before proceeding with Phase 19+.</p>
+<h3>Key Findings</h3>
+<table>
+<thead>
+<tr>
+<th>Category</th>
+<th>Finding</th>
+<th>Severity</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Phase Numbering</strong></td>
+<td>Two conflicting Phase 19-24 definitions exist</td>
+<td>CRITICAL</td>
+</tr>
+<tr>
+<td><strong>Untracked Work</strong></td>
+<td>43-56 weeks of vision work not in ROADMAP.md</td>
+<td>HIGH</td>
+</tr>
+<tr>
+<td><strong>Implementation Gap</strong></td>
+<td>Code is 75% done but tracking is 30% accurate</td>
+<td>HIGH</td>
+</tr>
+<tr>
+<td><strong>Obsolete Foundation</strong></td>
+<td>Issue #266 (CooperativeEntity) was closed but scope is outdated</td>
+<td>CRITICAL</td>
+</tr>
+<tr>
+<td><strong>Pilot Blocking</strong></td>
+<td>#5 (Select Pilot Community) is CRITICAL but unphased</td>
+<td>CRITICAL</td>
+</tr>
+</tbody></table>
+<h3>Bottom Line</h3>
+<p><strong>The codebase is more complete than the roadmap suggests, but the strategic direction is unclear.</strong> Two roadmaps exist with incompatible phase definitions. The team must decide: infrastructure-first (current ROADMAP.md) or governance-first (Cooperative Middle Layer vision)?</p>
+<hr>
+<h2>Part 1: The Two Roadmaps</h2>
+<h3>ROADMAP.md (Official - Phases 19-35)</h3>
+<p>Focus: <strong>Infrastructure → Security → SDK → Features → Release</strong></p>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Focus</th>
+<th>Duration</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>19</td>
+<td>Release Infrastructure</td>
+<td>CI/CD, signing, health checks</td>
+</tr>
+<tr>
+<td>20</td>
+<td>Testing Foundation</td>
+<td>Chaos, fuzz, benchmarks</td>
+</tr>
+<tr>
+<td>21</td>
+<td>Network Connectivity</td>
+<td>NAT traversal, STUN/TURN</td>
+</tr>
+<tr>
+<td>22</td>
+<td>Security Hardening</td>
+<td>Rate limiting, audit</td>
+</tr>
+<tr>
+<td>23</td>
+<td>Identity &amp; Trust</td>
+<td>Multi-device, key rotation</td>
+</tr>
+<tr>
+<td>24</td>
+<td>SDK Completion</td>
+<td>TypeScript, React Native</td>
+</tr>
+<tr>
+<td>25-26</td>
+<td>Observability &amp; Docs</td>
+<td>Tracing, dashboards, guides</td>
+</tr>
+<tr>
+<td>27-28</td>
+<td>Ledger &amp; CCL</td>
+<td>Economics, contracts</td>
+</tr>
+<tr>
+<td>29-33</td>
+<td>Code Quality, Mobile, Infra, Federation, CLI</td>
+<td></td>
+</tr>
+<tr>
+<td>34-35</td>
+<td>Release Candidate &amp; Pilot</td>
+<td></td>
+</tr>
+</tbody></table>
+<h3>COOPERATIVE_MIDDLE_LAYER (Vision - Phases 19-24)</h3>
+<p>Focus: <strong>Entity Model → Self-Governance → Economics → Federation</strong></p>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Focus</th>
+<th>Duration</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>19</td>
+<td>Cooperative Entity Foundation</td>
+<td>8 weeks</td>
+</tr>
+<tr>
+<td>20</td>
+<td>Protocol Governance</td>
+<td>4 weeks</td>
+</tr>
+<tr>
+<td>21</td>
+<td>Inter-Coop Economics</td>
+<td>8 weeks</td>
+</tr>
+<tr>
+<td>22</td>
+<td>SDIS Completion</td>
+<td>8 weeks</td>
+</tr>
+<tr>
+<td>23</td>
+<td>Recursive Federation</td>
+<td>6 weeks</td>
+</tr>
+<tr>
+<td>24</td>
+<td>Subsidiarity</td>
+<td>4 weeks</td>
+</tr>
+</tbody></table>
+<h3>The Conflict</h3>
+<p><strong>Both roadmaps define Phases 19-24 completely differently.</strong></p>
+<ul>
+<li><p>ROADMAP Phase 19 = Release Infrastructure</p>
+</li>
+<li><p>Vision Phase 19 = Cooperative Entity Foundation</p>
+</li>
+<li><p>ROADMAP Phase 20 = Testing Foundation</p>
+</li>
+<li><p>Vision Phase 20 = Protocol Governance</p>
+</li>
+</ul>
+<p>This creates confusion: What exactly counts as Phase 19 work (ROADMAP Release Infrastructure vs. Vision Cooperative Entity Foundation)?</p>
+<hr>
+<h2>Part 2: Implementation Reality Check</h2>
+<p>The audit found that <strong>implementation is significantly more advanced than tracking suggests</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Crate</th>
+<th>Vision Status</th>
+<th>Implementation</th>
+<th>LOC</th>
+<th>Tests</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>icn-entity</strong></td>
+<td>&quot;Needs Phase 19&quot;</td>
+<td>✅ 100% COMPLETE</td>
+<td>4,624</td>
+<td>72</td>
+</tr>
+<tr>
+<td><strong>icn-coop</strong></td>
+<td>&quot;Needs integration&quot;</td>
+<td>✅ 95% (not spawned)</td>
+<td>4,125</td>
+<td>93</td>
+</tr>
+<tr>
+<td><strong>icn-governance</strong></td>
+<td>&quot;Foundation needed&quot;</td>
+<td>✅ 98% COMPLETE</td>
+<td>25,438</td>
+<td>347</td>
+</tr>
+<tr>
+<td><strong>icn-federation</strong></td>
+<td>&quot;Phase 32 work&quot;</td>
+<td>✅ 90% COMPLETE</td>
+<td>14,732</td>
+<td>101</td>
+</tr>
+<tr>
+<td><strong>icn-steward</strong></td>
+<td>&quot;Phase 22 SDIS&quot;</td>
+<td>✅ 95% INTEGRATED</td>
+<td>7,377</td>
+<td>63</td>
+</tr>
+<tr>
+<td><strong>icn-zkp</strong></td>
+<td>&quot;Unscheduled&quot;</td>
+<td>✅ 85% COMPLETE</td>
+<td>5,842</td>
+<td>74</td>
+</tr>
+<tr>
+<td><strong>icn-community</strong></td>
+<td>&quot;Not mentioned&quot;</td>
+<td>✅ 80% COMPLETE</td>
+<td>4,211</td>
+<td>112</td>
+</tr>
+</tbody></table>
+<p><strong>Total</strong>: 66,349 LOC across 7 strategic crates, 862 tests passing</p>
+<h3>What&#39;s Actually Missing</h3>
+<ol>
+<li><strong>CoopActor not spawned in supervisor</strong> (16 hours to fix, plan exists)</li>
+<li><strong>Entity doesn&#39;t have gossip topic</strong> (needs wiring)</li>
+<li><strong>Gateway endpoints incomplete</strong> for Entity/Community</li>
+<li><strong>STARK proofs use simulated mode</strong> (needs production decision)</li>
+</ol>
+<h3>Critical Insight</h3>
+<p>The Cooperative Middle Layer&#39;s &quot;Phase 19: Entity Foundation&quot; is <strong>already 100% implemented</strong>. The vision document is outdated - the code exists but wasn&#39;t tracked.</p>
+<hr>
+<h2>Part 3: GitHub Issue Gaps</h2>
+<h3>Epics</h3>
+<table>
+<thead>
+<tr>
+<th>Epic</th>
+<th>Status</th>
+<th>Sub-Issues</th>
+<th>In Roadmap</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>#265 ICN as Cooperative Middle Layer</td>
+<td>priority:low</td>
+<td>None created</td>
+<td>Backlog</td>
+</tr>
+<tr>
+<td>#386 Razeto Four Bodies</td>
+<td>2/5 Phase 1 done</td>
+<td>5 issues</td>
+<td>Not assigned</td>
+</tr>
+</tbody></table>
+<h3>Missing Critical Issue</h3>
+<p><strong>Issue #266 (CooperativeEntity)</strong> is cited as a dependency by:</p>
+<ul>
+<li>#267 Protocol Self-Governance</li>
+<li>#268 Inter-Cooperative Economics</li>
+<li>#269 SDIS ZK Voting</li>
+<li>#270 Recursive Federation</li>
+</ul>
+<p><strong>Issue #266 exists but is obsolete.</strong> It was created and closed on 2025-12-24, describing foundation work that is now complete. A new issue (#738) was created to track the remaining integration work.</p>
+<h3>Untracked Work Items</h3>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Vision Doc</th>
+<th>Est. Effort</th>
+<th>Assigned Phase</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Labor Shares</td>
+<td>Razeto</td>
+<td>8-10 weeks</td>
+<td>NONE</td>
+</tr>
+<tr>
+<td>Cooperative Bonds</td>
+<td>Razeto</td>
+<td>6-8 weeks</td>
+<td>NONE</td>
+</tr>
+<tr>
+<td>Protocol Governance</td>
+<td>CML</td>
+<td>4-6 weeks</td>
+<td>NONE</td>
+</tr>
+<tr>
+<td>Subsidiarity</td>
+<td>CML</td>
+<td>3-4 weeks</td>
+<td>NONE</td>
+</tr>
+<tr>
+<td>ZK Voting</td>
+<td>SDIS</td>
+<td>8-12 weeks</td>
+<td>NONE</td>
+</tr>
+<tr>
+<td>Steward Network Governance</td>
+<td>SDIS</td>
+<td>4-6 weeks</td>
+<td>NONE</td>
+</tr>
+<tr>
+<td>Group Purchasing</td>
+<td>CML</td>
+<td>4-6 weeks</td>
+<td>Phase 27 (partial)</td>
+</tr>
+</tbody></table>
+<p><strong>Total untracked: ~43-56 weeks of work</strong></p>
+<h3>Orphaned Issues</h3>
+<p>Recent labor-related issues (#718-722) appear to be Razeto Phase 1 work but aren&#39;t linked to #386.</p>
+<hr>
+<h2>Part 4: Recommended Resolution</h2>
+<h3>Option A: Keep ROADMAP.md As-Is</h3>
+<p><strong>Approach</strong>: Treat Cooperative Middle Layer as post-Phase-35 vision</p>
+<p><strong>Pros</strong>:</p>
+<ul>
+<li>No roadmap rewrite needed</li>
+<li>Infrastructure-first is safe</li>
+<li>Clear short-term priorities</li>
+</ul>
+<p><strong>Cons</strong>:</p>
+<ul>
+<li>43+ weeks of strategic work remains unscheduled</li>
+<li>Vision documents become misleading</li>
+<li>Entity/Governance work already done goes unrecognized</li>
+</ul>
+<h3>Option B: Integrate Cooperative Middle Layer (RECOMMENDED)</h3>
+<p><strong>Approach</strong>: Reconcile both roadmaps into unified plan</p>
+<p><strong>Proposed Reconciled Phases</strong>:</p>
+<pre><code>Phase 19: Entity Integration (2 weeks)
+  - Spawn CoopActor in supervisor
+  - Add entity gossip topic
+  - Wire SledEntityRegistry
+  - Update gateway endpoints
+  [Code exists - just integration work]
+
+Phase 20: Release &amp; Testing Infrastructure (4 weeks)
+  - Binary signing, SBOM
+  - Chaos/fuzz testing
+  - Benchmark suite
+  [From original ROADMAP]
+
+Phase 21: Network Connectivity (4 weeks)
+  - NAT traversal (STUN/TURN)
+  - Bloom filter sizing
+  [From original ROADMAP]
+
+Phase 22: Protocol Governance (4 weeks)
+  - ProtocolParameter types
+  - Parameter governance domain
+  - Change application mechanism
+  [From Cooperative Middle Layer]
+
+Phase 23: Security Hardening (4 weeks)
+  - Rate limiting refinement
+  - Security audit fixes
+  [From original ROADMAP]
+
+Phase 24: Identity &amp; SDIS Completion (6 weeks)
+  - Multi-device sync
+  - ZK voting circuits
+  - Steward network as cooperative
+  [Combined from both]
+
+Phase 25: Inter-Coop Economics (8 weeks)
+  - Labor shares
+  - Cooperative bonds
+  - Bilateral clearing
+  - Group purchasing
+  [From Cooperative Middle Layer + Razeto]
+
+Phase 26: SDK Completion (4 weeks)
+  [From original ROADMAP Phase 24]
+
+Phase 27: Observability &amp; Docs (4 weeks)
+  [From original ROADMAP Phases 25-26]
+
+Phase 28: Recursive Federation &amp; Subsidiarity (6 weeks)
+  - Multi-level hierarchy
+  - Subsidiarity enforcement
+  - Governance bubbling
+  [From Cooperative Middle Layer]
+
+Phase 29-32: Mobile, Infrastructure, CLI, Code Quality
+  [From original ROADMAP]
+
+Phase 34: Release Candidate
+
+Phase 35: Pilot Deployment
+</code></pre>
+<p><strong>Benefits</strong>:</p>
+<ul>
+<li>Recognizes work already done</li>
+<li>Schedules strategic vision work</li>
+<li>Maintains infrastructure priorities</li>
+<li>Clear dependency chain</li>
+</ul>
+<h3>Option C: Two-Track Development</h3>
+<p><strong>Approach</strong>: Run infrastructure and governance tracks in parallel</p>
+<p><strong>Track 1</strong> (ROADMAP.md): Release, testing, network, SDK
+<strong>Track 2</strong> (Vision): Entity, governance, economics, federation</p>
+<p><strong>Pros</strong>: Faster overall progress
+<strong>Cons</strong>: Coordination complexity, resource splitting</p>
+<hr>
+<h2>Part 5: Immediate Actions Needed</h2>
+<h3>Critical (This Week)</h3>
+<ol>
+<li><p><strong>DECISION</strong>: Which roadmap approach? (A, B, or C)</p>
+</li>
+<li><p><strong>Issue #738 Created</strong>: &quot;feat(entity): CooperativeEntity integration&quot;</p>
+<ul>
+<li>Replaces obsolete #266 (foundation work complete)</li>
+<li>#267-270 linked as dependents</li>
+</ul>
+</li>
+<li><p><strong>Spawn CoopActor</strong>: 16 hours of work, plan exists</p>
+<ul>
+<li>Located in <code>docs/dev-journal/COOP_INTEGRATION_PLAN.md</code></li>
+<li>This unblocks cooperative management in production</li>
+</ul>
+</li>
+<li><p><strong>Update ROADMAP.md</strong>: Reflect chosen approach</p>
+</li>
+</ol>
+<h3>High Priority (This Month)</h3>
+<ol start="5">
+<li><p><strong>Create sub-issues for Epic #265</strong>:</p>
+<ul>
+<li>Break down each vision phase into trackable issues</li>
+<li>Assign to reconciled roadmap phases</li>
+</ul>
+</li>
+<li><p><strong>Link Razeto issues (#718-722) to #386</strong></p>
+</li>
+<li><p><strong>Phase #5 (Pilot Selection)</strong>:</p>
+<ul>
+<li>Assign to explicit phase or mark as immediate priority</li>
+</ul>
+</li>
+<li><p><strong>Audit SDIS alignment</strong>:</p>
+<ul>
+<li>Reconcile S1-S7 internal phases with main roadmap</li>
+</ul>
+</li>
+</ol>
+<h3>Medium Priority (This Quarter)</h3>
+<ol start="9">
+<li><p><strong>Create missing issues</strong> for all ROADMAP.md phase items (~50 issues)</p>
+</li>
+<li><p><strong>Document dependencies</strong> between phases</p>
+</li>
+<li><p><strong>Update vision documents</strong> to reflect what&#39;s already built</p>
+</li>
+</ol>
+<hr>
+<h2>Part 6: Summary Table</h2>
+<h3>Document Status</h3>
+<table>
+<thead>
+<tr>
+<th>Document</th>
+<th>Current State</th>
+<th>Action Needed</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ROADMAP.md</td>
+<td>Authoritative but incomplete</td>
+<td>Update with reconciled phases</td>
+</tr>
+<tr>
+<td>COOPERATIVE_MIDDLE_LAYER</td>
+<td>Partially outdated (code exists)</td>
+<td>Update status, reconcile phases</td>
+</tr>
+<tr>
+<td>COOPERATIVE_ENTITY_SPEC</td>
+<td>Implemented but untracked</td>
+<td>Create tracking issue #266</td>
+</tr>
+<tr>
+<td>ECONOMIC_VISION</td>
+<td>Strategic framing</td>
+<td>Reference only</td>
+</tr>
+<tr>
+<td>ECONOMIC_ARCHITECTURE</td>
+<td>Technical design</td>
+<td>Reference only</td>
+</tr>
+<tr>
+<td>Razeto design</td>
+<td>Partially implemented</td>
+<td>Create remaining issues</td>
+</tr>
+<tr>
+<td>SDIS documents</td>
+<td>S1-S6 complete</td>
+<td>Align with main roadmap</td>
+</tr>
+</tbody></table>
+<h3>Crate Status</h3>
+<table>
+<thead>
+<tr>
+<th>Crate</th>
+<th>Code</th>
+<th>Integration</th>
+<th>Gateway</th>
+<th>Gossip</th>
+<th>Blocker</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>icn-entity</td>
+<td>✅</td>
+<td>❌</td>
+<td>⚠️</td>
+<td>❌</td>
+<td>Missing</td>
+</tr>
+<tr>
+<td>icn-coop</td>
+<td>✅</td>
+<td>❌</td>
+<td>⚠️</td>
+<td>✅</td>
+<td>Not spawned</td>
+</tr>
+<tr>
+<td>icn-governance</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>None</td>
+</tr>
+<tr>
+<td>icn-federation</td>
+<td>✅</td>
+<td>✅</td>
+<td>⚠️</td>
+<td>✅</td>
+<td>None</td>
+</tr>
+<tr>
+<td>icn-steward</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>None</td>
+</tr>
+<tr>
+<td>icn-zkp</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>N/A</td>
+<td>STARK decision</td>
+</tr>
+<tr>
+<td>icn-community</td>
+<td>✅</td>
+<td>⚠️</td>
+<td>⚠️</td>
+<td>✅</td>
+<td>In-memory only</td>
+</tr>
+</tbody></table>
+<h3>Issue Tracking</h3>
+<table>
+<thead>
+<tr>
+<th>Category</th>
+<th>Count</th>
+<th>Tracked</th>
+<th>Phase-Assigned</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Epics</td>
+<td>2</td>
+<td>2/2</td>
+<td>0/2</td>
+</tr>
+<tr>
+<td>Design issues</td>
+<td>4</td>
+<td>4/4</td>
+<td>0/4</td>
+</tr>
+<tr>
+<td>Phase work items</td>
+<td>~100</td>
+<td>~30</td>
+<td>Partial</td>
+</tr>
+<tr>
+<td>Orphaned issues</td>
+<td>~20</td>
+<td>-</td>
+<td>-</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Appendix: File References</h2>
+<h3>Vision Documents</h3>
+<ul>
+<li><code>docs/dev-journal/ROADMAP.md</code> - Official roadmap</li>
+<li><code>docs/dev-journal/COOPERATIVE_MIDDLE_LAYER_GAP_ANALYSIS.md</code> - Vision gap analysis</li>
+<li><code>docs/dev-journal/COOPERATIVE_ENTITY_SPEC.md</code> - Entity specification</li>
+<li><code>docs/dev-journal/ICN_SDIS_INTEGRATED_VISION.md</code> - SDIS vision</li>
+<li><code>docs/ECONOMIC_VISION.md</code> - Economic framing</li>
+<li><code>docs/ECONOMIC_ARCHITECTURE.md</code> - Economic technical design</li>
+<li><code>docs/razeto-integration-design.md</code> - Razeto four bodies</li>
+</ul>
+<h3>Implementation</h3>
+<ul>
+<li><code>icn/crates/icn-entity/</code> - Entity model (COMPLETE)</li>
+<li><code>icn/crates/icn-coop/</code> - Cooperative management (NOT SPAWNED)</li>
+<li><code>icn/crates/icn-governance/</code> - Governance substrate (COMPLETE)</li>
+<li><code>icn/crates/icn-federation/</code> - Federation layer (COMPLETE)</li>
+<li><code>icn/crates/icn-steward/</code> - SDIS steward network (INTEGRATED)</li>
+</ul>
+<h3>Integration Plans</h3>
+<ul>
+<li><code>docs/dev-journal/COOP_INTEGRATION_PLAN.md</code> - CoopActor wiring plan</li>
+</ul>
+<hr>
+<p><strong>End of Audit Report</strong></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

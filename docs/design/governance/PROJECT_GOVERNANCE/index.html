@@ -1,0 +1,485 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Project Governance | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>governance</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>PROJECT GOVERNANCE</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/governance/PROJECT_GOVERNANCE.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Project Governance</h1>
+<p>This document describes how the ICN project is governed, how decisions are made, and how the community can participate.</p>
+<h2>Mission</h2>
+<p><strong>ICN&#39;s mission</strong> is to provide robust, secure, and accessible infrastructure for cooperative coordination. We are building substrate for the cooperative economy - not a product, but a foundation.</p>
+<p><strong>Core Values:</strong></p>
+<ul>
+<li><strong>Cooperative First</strong>: Design decisions prioritize cooperative use cases</li>
+<li><strong>Security &amp; Privacy</strong>: No compromise on member data protection</li>
+<li><strong>Simplicity</strong>: Prefer simple, understandable solutions over clever complexity</li>
+<li><strong>Pilot-Driven</strong>: Real-world feedback drives roadmap priorities</li>
+<li><strong>Open Development</strong>: Transparent decision-making and open source code</li>
+</ul>
+<hr>
+<h2>Project Structure</h2>
+<h3>Roles</h3>
+<h4>Maintainers</h4>
+<p><strong>Responsibilities:</strong></p>
+<ul>
+<li>Review and merge pull requests</li>
+<li>Triage issues</li>
+<li>Make architectural decisions</li>
+<li>Release management</li>
+<li>Community stewardship</li>
+</ul>
+<p><strong>Current Maintainers:</strong></p>
+<ul>
+<li>Matt (lead developer)</li>
+</ul>
+<p><strong>Becoming a Maintainer:</strong></p>
+<ul>
+<li>Demonstrate sustained, high-quality contributions (6+ months)</li>
+<li>Deep understanding of ICN architecture</li>
+<li>Commitment to project values</li>
+<li>Nominated by existing maintainer(s)</li>
+<li>Consensus approval from maintainer team</li>
+</ul>
+<h4>Contributors</h4>
+<p><strong>Anyone who contributes</strong> to ICN (code, docs, design, testing, feedback):</p>
+<ul>
+<li>Submit pull requests</li>
+<li>Report bugs and suggest features</li>
+<li>Participate in discussions</li>
+<li>Help other users</li>
+</ul>
+<p><strong>No formal process</strong>: Just start contributing! See <a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING">CONTRIBUTING.md</a>.</p>
+<h4>Pilot Community Partners</h4>
+<p><strong>Cooperatives piloting ICN</strong>:</p>
+<ul>
+<li>Provide real-world feedback</li>
+<li>Shape roadmap priorities</li>
+<li>Test new features</li>
+<li>Document use cases</li>
+</ul>
+<p><strong>Relationship</strong>: Partnership, not hierarchy. Pilots guide development but don&#39;t control it.</p>
+<hr>
+<h2>Decision-Making Process</h2>
+<h3>Types of Decisions</h3>
+<h4>1. Routine Decisions (Fast Track)</h4>
+<p><strong>Examples:</strong></p>
+<ul>
+<li>Bug fixes</li>
+<li>Documentation updates</li>
+<li>Dependency updates (security patches)</li>
+<li>Clippy/fmt fixes</li>
+</ul>
+<p><strong>Process:</strong></p>
+<ol>
+<li>Contributor opens PR</li>
+<li>Maintainer reviews</li>
+<li>Merge if quality standards met</li>
+<li>No discussion needed for obvious fixes</li>
+</ol>
+<p><strong>Timeline</strong>: 1-3 days</p>
+<h4>2. Feature Additions (Standard Track)</h4>
+<p><strong>Examples:</strong></p>
+<ul>
+<li>New CLI commands</li>
+<li>API endpoint additions</li>
+<li>Performance optimizations</li>
+<li>New integrations</li>
+</ul>
+<p><strong>Process:</strong></p>
+<ol>
+<li>Open GitHub issue to discuss</li>
+<li>Maintainer provides feedback</li>
+<li>If approved, contributor implements</li>
+<li>PR review and merge</li>
+<li>Update CHANGELOG and docs</li>
+</ol>
+<p><strong>Timeline</strong>: 1-2 weeks</p>
+<h4>3. Architectural Changes (RFC Track)</h4>
+<p><strong>Examples:</strong></p>
+<ul>
+<li>New protocol features (e.g., federation)</li>
+<li>Breaking API changes</li>
+<li>Major refactors</li>
+<li>New subsystems</li>
+</ul>
+<p><strong>Process:</strong></p>
+<ol>
+<li><p><strong>RFC (Request for Comments)</strong>:</p>
+<ul>
+<li>Create issue with &quot;RFC:&quot; prefix</li>
+<li>Describe problem, proposed solution, alternatives</li>
+<li>Solicit community feedback</li>
+<li>Iterate on design</li>
+</ul>
+</li>
+<li><p><strong>Evaluation</strong>:</p>
+<ul>
+<li>Maintainers assess technical merit</li>
+<li>Consider alignment with mission</li>
+<li>Evaluate complexity vs. benefit</li>
+<li>Check pilot community needs</li>
+</ul>
+</li>
+<li><p><strong>Decision</strong>:</p>
+<ul>
+<li>Consensus among maintainers (aim for unanimous)</li>
+<li>If disagreement, lead maintainer decides</li>
+<li>Decision documented in RFC issue</li>
+</ul>
+</li>
+<li><p><strong>Implementation</strong>:</p>
+<ul>
+<li>Break into milestones</li>
+<li>Track in project board</li>
+<li>Regular progress updates</li>
+</ul>
+</li>
+</ol>
+<p><strong>Timeline</strong>: 2-8 weeks (discussion) + implementation time</p>
+<p><strong>Example RFCs:</strong></p>
+<ul>
+<li>Multi-device identity (Phase 11)</li>
+<li>Economic safety rails (Phase 12)</li>
+<li>Gateway API (Phase 14)</li>
+</ul>
+<h4>4. Roadmap Priorities (Community-Driven)</h4>
+<p><strong>Examples:</strong></p>
+<ul>
+<li>Which features to build next</li>
+<li>Pilot deployment timelines</li>
+<li>Resource allocation</li>
+</ul>
+<p><strong>Process:</strong></p>
+<ol>
+<li><p><strong>Input Gathering</strong>:</p>
+<ul>
+<li>Pilot community feedback</li>
+<li>GitHub issue discussions</li>
+<li>Contributor proposals</li>
+<li>User surveys</li>
+</ul>
+</li>
+<li><p><strong>Prioritization</strong>:</p>
+<ul>
+<li>Maintainers synthesize feedback</li>
+<li>Draft roadmap update</li>
+<li>Post for community comment</li>
+<li>Revise based on feedback</li>
+</ul>
+</li>
+<li><p><strong>Publish</strong>:</p>
+<ul>
+<li>Update <a href="/docs/development/sessions/undated/ROADMAP">ROADMAP.md</a></li>
+<li>Announce in CHANGELOG</li>
+<li>Communicate to pilot communities</li>
+</ul>
+</li>
+</ol>
+<p><strong>Timeline</strong>: Quarterly (or after major milestones)</p>
+<hr>
+<h2>Consensus Model</h2>
+<p><strong>We aim for consensus</strong>, not majority vote.</p>
+<h3>Consensus Guidelines</h3>
+<ol>
+<li><strong>Seek broad agreement</strong>: Consider all perspectives</li>
+<li><strong>Document dissent</strong>: Minority opinions are valuable</li>
+<li><strong>Disagree and commit</strong>: Once decided, everyone supports it</li>
+<li><strong>Revisit if needed</strong>: New information can change decisions</li>
+</ol>
+<h3>When Consensus Fails</h3>
+<p>If maintainers cannot reach consensus:</p>
+<ol>
+<li><strong>Extended discussion</strong>: Take more time, explore alternatives</li>
+<li><strong>Pilot input</strong>: Ask pilot communities for feedback</li>
+<li><strong>Lead decision</strong>: Lead maintainer makes final call</li>
+<li><strong>Document rationale</strong>: Explain why decision was made</li>
+</ol>
+<p><strong>Last resort</strong>: Benevolent dictator model (lead maintainer decides)</p>
+<hr>
+<h2>Communication Channels</h2>
+<h3>GitHub Issues</h3>
+<p><strong>Purpose</strong>: Bug reports, feature requests, RFCs</p>
+<p><strong>Guidelines:</strong></p>
+<ul>
+<li>Search before creating (avoid duplicates)</li>
+<li>Use templates when provided</li>
+<li>Be respectful and constructive</li>
+<li>Tag appropriately (bug, enhancement, question, etc.)</li>
+</ul>
+<h3>Pull Requests</h3>
+<p><strong>Purpose</strong>: Code contributions</p>
+<p><strong>Guidelines:</strong></p>
+<ul>
+<li>Reference related issue(s)</li>
+<li>Follow code style (see <a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING">CONTRIBUTING.md</a>)</li>
+<li>Include tests</li>
+<li>Update documentation</li>
+<li>Be responsive to feedback</li>
+</ul>
+<h3>CHANGELOG</h3>
+<p><strong>Purpose</strong>: User-facing change announcements</p>
+<p><strong>Guidelines:</strong></p>
+<ul>
+<li>Semantic versioning</li>
+<li>Clear, concise descriptions</li>
+<li>Credit contributors</li>
+<li>Link to relevant issues/PRs</li>
+</ul>
+<h3>Roadmap</h3>
+<p><strong>Purpose</strong>: Strategic direction</p>
+<p><strong>Guidelines:</strong></p>
+<ul>
+<li>Updated quarterly or after milestones</li>
+<li>Reflects pilot feedback</li>
+<li>Realistic timelines (or no timelines)</li>
+<li>Subject to change based on learnings</li>
+</ul>
+<hr>
+<h2>Release Process</h2>
+<h3>Versioning</h3>
+<p>ICN follows <a href="https://semver.org/" target="_blank" rel="noopener">Semantic Versioning</a>:</p>
+<ul>
+<li><strong>MAJOR</strong>: Breaking changes (e.g., protocol version bump)</li>
+<li><strong>MINOR</strong>: New features (backward-compatible)</li>
+<li><strong>PATCH</strong>: Bug fixes (backward-compatible)</li>
+</ul>
+<h3>Release Cadence</h3>
+<ul>
+<li><strong>Patch releases</strong>: As needed (security fixes, critical bugs)</li>
+<li><strong>Minor releases</strong>: Monthly (when features accumulate)</li>
+<li><strong>Major releases</strong>: Rare (only when breaking changes required)</li>
+</ul>
+<h3>Release Checklist</h3>
+<ol>
+<li><p><strong>Prepare</strong>:</p>
+<ul>
+<li><input disabled="" type="checkbox"> Update CHANGELOG.md</li>
+<li><input disabled="" type="checkbox"> Update version in Cargo.toml files</li>
+<li><input disabled="" type="checkbox"> Run full test suite</li>
+<li><input disabled="" type="checkbox"> Run clippy and fmt</li>
+<li><input disabled="" type="checkbox"> Build release binaries</li>
+</ul>
+</li>
+<li><p><strong>Tag</strong>:</p>
+<ul>
+<li><input disabled="" type="checkbox"> Create git tag: <code>git tag -a v0.2.0 -m &quot;Release 0.2.0&quot;</code></li>
+<li><input disabled="" type="checkbox"> Push tag: <code>git push origin v0.2.0</code></li>
+</ul>
+</li>
+<li><p><strong>Build</strong>:</p>
+<ul>
+<li><input disabled="" type="checkbox"> Build for multiple platforms (Linux x86_64, aarch64, macOS)</li>
+<li><input disabled="" type="checkbox"> Generate checksums</li>
+</ul>
+</li>
+<li><p><strong>Publish</strong>:</p>
+<ul>
+<li><input disabled="" type="checkbox"> Create GitHub release</li>
+<li><input disabled="" type="checkbox"> Upload binaries and checksums</li>
+<li><input disabled="" type="checkbox"> Update installer script</li>
+<li><input disabled="" type="checkbox"> Announce to pilot communities</li>
+</ul>
+</li>
+<li><p><strong>Verify</strong>:</p>
+<ul>
+<li><input disabled="" type="checkbox"> Test install script</li>
+<li><input disabled="" type="checkbox"> Test upgrade path</li>
+<li><input disabled="" type="checkbox"> Monitor for issues</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h2>Code of Conduct Enforcement</h2>
+<p>We follow the <a href="https://github.com/InterCooperative-Network/icn/blob/main/CODE_OF_CONDUCT">Contributor Covenant Code of Conduct</a>.</p>
+<h3>Reporting</h3>
+<p><strong>How to report violations:</strong></p>
+<ul>
+<li>Email: [INSERT CONTACT]</li>
+<li>Private GitHub issue (if you have access)</li>
+<li>Direct message to maintainer</li>
+</ul>
+<p><strong>What to include:</strong></p>
+<ul>
+<li>Description of violation</li>
+<li>Context (where, when, who)</li>
+<li>Any evidence (screenshots, logs)</li>
+<li>Your preferred outcome</li>
+</ul>
+<h3>Response Process</h3>
+<ol>
+<li><strong>Acknowledgment</strong>: Within 24 hours</li>
+<li><strong>Investigation</strong>: Gather facts, contact parties</li>
+<li><strong>Decision</strong>: Apply enforcement ladder (see Code of Conduct)</li>
+<li><strong>Communication</strong>: Inform reporter and subject</li>
+<li><strong>Appeal</strong>: Subject can appeal within 7 days</li>
+</ol>
+<p><strong>Confidentiality</strong>: Reporter identity protected unless they consent to disclosure.</p>
+<hr>
+<h2>Conflict Resolution</h2>
+<p>If conflicts arise (technical disagreements, interpersonal issues):</p>
+<ol>
+<li><strong>Direct communication</strong>: Talk to each other first</li>
+<li><strong>Maintainer mediation</strong>: If direct communication fails</li>
+<li><strong>Cooling-off period</strong>: Take a break if emotions high</li>
+<li><strong>Document positions</strong>: Write down each perspective</li>
+<li><strong>Find common ground</strong>: Look for win-win solutions</li>
+<li><strong>Escalate if needed</strong>: Lead maintainer makes final call</li>
+</ol>
+<p><strong>Remember</strong>: We&#39;re building infrastructure for cooperation. Model the behavior we want to see in cooperatives.</p>
+<hr>
+<h2>Pilot Community Partnership</h2>
+<h3>Relationship</h3>
+<ul>
+<li><strong>Partnership, not vendor/client</strong>: We build together</li>
+<li><strong>Feedback loops</strong>: Weekly check-ins during pilot</li>
+<li><strong>Mutual learning</strong>: We learn from them, they learn from ICN</li>
+<li><strong>Long-term alignment</strong>: Not just a test, but a relationship</li>
+</ul>
+<h3>Expectations</h3>
+<p><strong>What pilots provide:</strong></p>
+<ul>
+<li>Regular feedback (weekly during pilot)</li>
+<li>Bug reports and feature requests</li>
+<li>Documentation of use cases</li>
+<li>Patience with rough edges</li>
+</ul>
+<p><strong>What ICN provides:</strong></p>
+<ul>
+<li>Responsive support</li>
+<li>Rapid iteration on feedback</li>
+<li>Training and onboarding</li>
+<li>Commitment to long-term success</li>
+</ul>
+<h3>Decision Rights</h3>
+<p><strong>Pilots influence but don&#39;t control</strong>:</p>
+<ul>
+<li>✅ Pilots guide priorities (what to build next)</li>
+<li>✅ Pilots validate designs (will this work for us?)</li>
+<li>❌ Pilots don&#39;t dictate architecture (how to build it)</li>
+<li>❌ Pilots don&#39;t veto security requirements</li>
+</ul>
+<p><strong>Rationale</strong>: ICN serves many cooperatives, not just one. We balance all pilot needs.</p>
+<hr>
+<h2>Amendment Process</h2>
+<p>This governance document can be amended:</p>
+<ol>
+<li>Open GitHub issue proposing change</li>
+<li>Community discussion (2 weeks minimum)</li>
+<li>Maintainer consensus</li>
+<li>Update document</li>
+<li>Announce in CHANGELOG</li>
+</ol>
+<p><strong>Principle</strong>: Governance evolves as project matures.</p>
+<hr>
+<h2>Financial Sustainability (Future)</h2>
+<p><strong>Current state</strong>: Volunteer-driven, no formal funding</p>
+<p><strong>Future considerations</strong> (to be determined):</p>
+<ul>
+<li>Grant funding (e.g., NGI, cooperative development orgs)</li>
+<li>Cooperative membership dues (hosted services?)</li>
+<li>Service contracts (support, training, customization)</li>
+<li>Donations (if community grows)</li>
+</ul>
+<p><strong>Decision</strong>: Deferred until after pilot deployments. Focus on building value first.</p>
+<p><strong>Commitment</strong>: ICN will remain open source (MIT/Apache-2.0) regardless of funding model.</p>
+<hr>
+<h2>Legal Structure (Future)</h2>
+<p><strong>Current state</strong>: Informal open source project</p>
+<p><strong>Future considerations</strong>:</p>
+<ul>
+<li>Nonprofit foundation (if grant funding needed)</li>
+<li>Cooperative corporation (if selling services)</li>
+<li>Platform cooperative (if hosting services)</li>
+</ul>
+<p><strong>Decision</strong>: Deferred until project matures. No legal entity needed for development.</p>
+<hr>
+<h2>Trademark &amp; Branding</h2>
+<p><strong>Status</strong>: No registered trademarks yet</p>
+<p><strong>Guidelines</strong>:</p>
+<ul>
+<li>&quot;ICN&quot; and &quot;Intercooperative Network&quot; are project names</li>
+<li>Logo/branding TBD</li>
+<li>Anyone can use project name to describe the software</li>
+<li>Don&#39;t imply endorsement without permission</li>
+<li>Don&#39;t use name for unrelated products</li>
+</ul>
+<p><strong>Future</strong>: May register trademark if project grows to prevent misuse.</p>
+<hr>
+<h2>Questions?</h2>
+<p>If you have questions about project governance:</p>
+<ol>
+<li>Check this document</li>
+<li>Search GitHub issues</li>
+<li>Open a new issue tagged &quot;governance&quot;</li>
+<li>Ask in community channels</li>
+</ol>
+<p><strong>This is a living document.</strong> Governance evolves with the project.</p>
+<hr>
+<h2>History</h2>
+<ul>
+<li><strong>2025-11-21</strong>: Initial governance document created</li>
+<li><em>Future amendments will be listed here</em></li>
+</ul>
+<hr>
+<p><strong>Thank you for being part of ICN!</strong> Together, we&#39;re building infrastructure for a more cooperative future.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

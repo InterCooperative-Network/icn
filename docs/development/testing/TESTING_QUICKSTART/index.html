@@ -1,0 +1,464 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Internal Testing Quick Start Guide | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>development</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>testing</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>TESTING QUICKSTART</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/development/testing/TESTING_QUICKSTART.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Internal Testing Quick Start Guide</h1>
+<p>Get your multi-node ICN test network running in under 10 minutes.</p>
+<hr>
+<h2>⚠️ Security Warning</h2>
+<p><strong>This test environment uses a hardcoded passphrase for convenience:</strong></p>
+<pre><code>ICN_PASSPHRASE=test-passphrase-insecure-do-not-use-in-production
+</code></pre>
+<p><strong>DO NOT</strong> use this configuration in production or with real identities. This is <strong>ONLY</strong> for internal testing on isolated networks.</p>
+<p>For production deployments, use secure passphrases and proper secret management (e.g., Docker secrets, Kubernetes secrets, HashiCorp Vault).</p>
+<hr>
+<h2>Prerequisites</h2>
+<ul>
+<li>Docker 24+ and Docker Compose 2.20+</li>
+<li>4 GB RAM minimum (8 GB recommended)</li>
+<li>10 GB disk space</li>
+<li><strong>Isolated test network</strong> (not exposed to internet)</li>
+</ul>
+<hr>
+<h2>Quick Start (Docker Compose)</h2>
+<h3>1. Build ICN Docker Image</h3>
+<pre><code class="language-bash">cd /workspaces/icn
+docker build -t icn:latest -f Dockerfile icn/
+</code></pre>
+<p><strong>Expected time</strong>: 5-10 minutes (first build)</p>
+<h3>2. Start Test Network (3 Honest Nodes)</h3>
+<pre><code class="language-bash">docker compose -f docker-compose.test.yml up -d
+</code></pre>
+<p>This starts:</p>
+<ul>
+<li><strong>node1, node2, node3</strong>: Honest ICN nodes</li>
+<li><strong>prometheus</strong>: Metrics collection at <a href="http://localhost:9095" target="_blank" rel="noopener">http://localhost:9095</a></li>
+<li><strong>grafana</strong>: Dashboard at <a href="http://localhost:3000" target="_blank" rel="noopener">http://localhost:3000</a> (default dev creds below)</li>
+</ul>
+<p><strong>Expected time</strong>: 30 seconds</p>
+<h3>3. Verify Network Health</h3>
+<pre><code class="language-bash"># Check all containers are running
+docker compose -f docker-compose.test.yml ps
+
+# View node1 logs
+docker compose -f docker-compose.test.yml logs -f node1
+
+# Check metrics endpoint
+curl http://localhost:9091/metrics | grep icn_system_actors_active
+</code></pre>
+<p><strong>Expected output</strong>: <code>icn_system_actors_active 7</code> (7 actors running on node1)</p>
+<p><strong>Note</strong>: Without bootstrap peer configuration, nodes won&#39;t auto-discover each other (mDNS doesn&#39;t work in Docker bridge mode). See <a href="/docs/deployment/DEPLOY_TEST_NETWORK">DEPLOY_TEST_NETWORK.md</a> for peer connectivity setup.</p>
+<h3>4. Access Monitoring</h3>
+<p>Open in browser:</p>
+<ul>
+<li><p><strong>Grafana</strong>: <a href="http://localhost:3000" target="_blank" rel="noopener">http://localhost:3000</a></p>
+<ul>
+<li>Username: <code>admin</code></li>
+<li>Password: <code>admin</code> (development only - use secrets management for production)</li>
+<li>Navigate to: Dashboards → ICN Dashboard</li>
+</ul>
+</li>
+<li><p><strong>Prometheus</strong>: <a href="http://localhost:9095" target="_blank" rel="noopener">http://localhost:9095</a></p>
+<ul>
+<li>Try query: <code>icn_network_connections_active</code></li>
+</ul>
+</li>
+</ul>
+<h3>5. Run Basic Commands</h3>
+<pre><code class="language-bash"># Enter node1 container
+docker exec -it icn-node1 bash
+
+# Inside container:
+icnctl status
+icnctl network peers
+icnctl id show
+
+# Exit container
+exit
+</code></pre>
+<h3>6. Start Byzantine Node (Optional)</h3>
+<pre><code class="language-bash"># Start node4 with byzantine profile
+docker compose -f docker-compose.test.yml --profile byzantine up -d node4
+
+# Check it joined
+docker exec -it icn-node1 icnctl network peers
+</code></pre>
+<p><strong>Expected</strong>: 3 peers listed (node2, node3, node4)</p>
+<h3>7. Stop Test Network</h3>
+<pre><code class="language-bash"># Stop all containers
+docker compose -f docker-compose.test.yml down
+
+# Stop and remove volumes (DELETES ALL DATA)
+docker compose -f docker-compose.test.yml down -v
+</code></pre>
+<hr>
+<h2>Running Test Scenarios</h2>
+<h3>Baseline Functionality Tests</h3>
+<h4>Test 1.1: Network Formation</h4>
+<pre><code class="language-bash"># Start network
+docker compose -f docker-compose.test.yml up -d
+
+# Wait 30 seconds for mDNS discovery
+sleep 30
+
+# Check connections on each node
+for node in node1 node2 node3; do
+  echo &quot;=== $node ===&quot;
+  docker exec icn-$node icnctl network peers | wc -l
+done
+</code></pre>
+<p><strong>Expected</strong>: Each node reports 2 peers</p>
+<h4>Test 1.2: Trust Graph Sync</h4>
+<pre><code class="language-bash"># Set trust edges from node1
+docker exec -it icn-node1 bash
+icnctl trust set did:icn:node2 0.8
+icnctl trust set did:icn:node3 0.7
+
+# Wait for gossip sync
+sleep 30
+
+# Verify on node2
+docker exec -it icn-node2 icnctl trust list
+</code></pre>
+<p><strong>Expected</strong>: node2 sees trust edges for node3</p>
+<h4>Test 1.3: Gossip Message Propagation</h4>
+<pre><code class="language-bash"># Node1 publishes messages
+docker exec -it icn-node1 bash
+icnctl gossip publish test:messages &quot;Hello from node1&quot; --count 10
+
+# Check node2 received
+docker exec -it icn-node2 icnctl gossip list test:messages
+</code></pre>
+<p><strong>Expected</strong>: 10 messages visible on node2</p>
+<h4>Test 1.4: Ledger Transaction</h4>
+<pre><code class="language-bash"># Node1 creates transaction
+docker exec -it icn-node1 bash
+icnctl ledger transfer did:icn:node2 50
+
+# Wait for sync
+sleep 30
+
+# Check balances on all nodes
+for node in node1 node2 node3; do
+  echo &quot;=== $node ===&quot;
+  docker exec icn-$node icnctl ledger balance did:icn:node1
+  docker exec icn-$node icnctl ledger balance did:icn:node2
+done
+</code></pre>
+<p><strong>Expected</strong>: Consistent balances (node1=-50, node2=+50) across all nodes</p>
+<h4>Test 1.6-1.9: Governance Tests</h4>
+<pre><code class="language-bash"># Node1 creates governance domain
+docker exec -it icn-node1 bash
+icnctl gov domain create \
+  --domain-id &quot;test-coop&quot; \
+  --name &quot;Test Cooperative&quot; \
+  --members &quot;did:icn:node1,did:icn:node2,did:icn:node3&quot;
+
+# Create proposal
+icnctl gov proposal create \
+  --domain-id &quot;test-coop&quot; \
+  --title &quot;Upgrade to v2&quot; \
+  --kind text
+
+# Open for voting
+icnctl gov proposal open --proposal-id &lt;ID&gt;
+
+# Vote from each node
+# Node1
+icnctl gov vote cast --proposal-id &lt;ID&gt; --choice for
+
+# Node2
+docker exec -it icn-node2 icnctl gov vote cast --proposal-id &lt;ID&gt; --choice for
+
+# Node3
+docker exec -it icn-node3 icnctl gov vote cast --proposal-id &lt;ID&gt; --choice against
+
+# Close proposal
+icnctl gov proposal close --proposal-id &lt;ID&gt;
+
+# Check outcome
+icnctl gov vote show --proposal-id &lt;ID&gt;
+</code></pre>
+<p><strong>Expected</strong>:</p>
+<ul>
+<li>Tally: 2 For, 1 Against</li>
+<li>Outcome: Accepted (66% &gt; 50%)</li>
+</ul>
+<h3>Byzantine Detection Tests</h3>
+<h4>Test 2.1: Invalid Signature Attack</h4>
+<p>This requires modifying node4&#39;s code to forge signatures - covered in automated test suite.</p>
+<h4>Test 2.2: Replay Attack (Manual Simulation)</h4>
+<pre><code class="language-bash"># Start network with byzantine node
+docker compose -f docker-compose.test.yml --profile byzantine up -d
+
+# Monitor violations
+watch -n 1 &#39;curl -s http://localhost:9091/metrics | grep icn_misbehavior&#39;
+</code></pre>
+<p><strong>Expected</strong>: Violations increment when replay attack detected</p>
+<h4>Test 2.7: Governance Vote Manipulation</h4>
+<pre><code class="language-bash"># Create governance domain with nodes 1-3
+docker exec -it icn-node1 bash
+icnctl gov domain create --domain-id &quot;coop&quot; --members &quot;did:icn:node1,did:icn:node2,did:icn:node3&quot;
+
+# Create and open proposal
+PROPOSAL_ID=$(icnctl gov proposal create --domain-id &quot;coop&quot; --title &quot;Test&quot; --kind text | grep -oP &#39;ID: \K\S+&#39;)
+icnctl gov proposal open --proposal-id $PROPOSAL_ID
+
+# Node4 tries to vote (not a member)
+docker exec -it icn-node4 icnctl gov vote cast --proposal-id $PROPOSAL_ID --choice for
+</code></pre>
+<p><strong>Expected</strong>: Vote rejected with error &quot;not a member of domain&quot;</p>
+<hr>
+<h2>Monitoring Queries</h2>
+<h3>Prometheus Queries</h3>
+<p>Access <a href="http://localhost:9095/graph" target="_blank" rel="noopener">http://localhost:9095/graph</a> and try:</p>
+<pre><code class="language-promql"># Network connections per node
+icn_network_connections_active
+
+# Gossip message rate
+rate(icn_gossip_announces_sent_total[1m])
+
+# Byzantine violations
+icn_misbehavior_violations_total
+
+# Quarantined peers
+icn_misbehavior_quarantined_peers
+
+# Ledger entries
+icn_ledger_entries_total
+
+# Compute tasks
+rate(icn_compute_tasks_completed_total[5m])
+
+# Governance proposals by state
+icn_governance_proposals_total
+</code></pre>
+<h3>Grafana Dashboards</h3>
+<ol>
+<li>Open <a href="http://localhost:3000" target="_blank" rel="noopener">http://localhost:3000</a></li>
+<li>Login ( default creds - change for prod)</li>
+<li>Navigate: Dashboards → ICN Dashboard</li>
+</ol>
+<p><strong>Panels to watch</strong>:</p>
+<ul>
+<li>Network Connections (should be 2 per node)</li>
+<li>Byzantine Violations (should be 0 for honest nodes)</li>
+<li>Quarantined Peers (should be 0 initially)</li>
+<li>Gossip Message Rate</li>
+<li>Ledger Transaction Rate</li>
+<li>Governance Proposal Outcomes</li>
+</ul>
+<hr>
+<h2>Performance Testing</h2>
+<h3>Gossip Throughput Test</h3>
+<pre><code class="language-bash"># Terminal 1: Start monitoring
+docker compose -f docker-compose.test.yml logs -f node1 | grep &quot;gossip&quot;
+
+# Terminal 2: Publish 1000 messages
+docker exec -it icn-node1 bash
+for i in {1..1000}; do
+  icnctl gossip publish load:test &quot;Message $i&quot;
+done
+
+# Check latency in Grafana
+# Query: histogram_quantile(0.99, rate(icn_gossip_latency_seconds_bucket[5m]))
+</code></pre>
+<p><strong>Expected</strong>: P99 latency &lt; 500ms</p>
+<h3>Ledger Transaction Volume</h3>
+<pre><code class="language-bash"># Automated script (run inside node1)
+docker exec -it icn-node1 bash
+
+cat &gt; /tmp/ledger_load.sh &lt;&lt;&#39;EOF&#39;
+#!/bin/bash
+for i in {1..1000}; do
+  icnctl ledger transfer did:icn:node2 1 &amp;
+  if [ $((i % 50)) -eq 0 ]; then
+    wait  # Batch every 50 transactions
+  fi
+done
+wait
+EOF
+
+chmod +x /tmp/ledger_load.sh
+time /tmp/ledger_load.sh
+</code></pre>
+<p><strong>Expected</strong>: ~50 tx/sec, all successful</p>
+<hr>
+<h2>Troubleshooting</h2>
+<h3>Nodes not discovering each other</h3>
+<pre><code class="language-bash"># Check mDNS is working
+docker exec -it icn-node1 icnctl network discover
+
+# Check logs for connection errors
+docker compose -f docker-compose.test.yml logs node1 | grep -i error
+
+# Restart network
+docker compose -f docker-compose.test.yml restart
+</code></pre>
+<h3>Metrics not available</h3>
+<pre><code class="language-bash"># Check Prometheus targets
+curl http://localhost:9095/api/v1/targets | jq &#39;.data.activeTargets[] | {instance, health}&#39;
+
+# Should show all nodes as &quot;up&quot;
+</code></pre>
+<h3>Grafana dashboard not loading</h3>
+<pre><code class="language-bash"># Check Grafana logs
+docker compose -f docker-compose.test.yml logs grafana
+
+# Re-provision datasource
+docker compose -f docker-compose.test.yml restart grafana
+</code></pre>
+<h3>High memory usage</h3>
+<pre><code class="language-bash"># Check container stats
+docker stats icn-node1 icn-node2 icn-node3
+
+# If &gt;2 GB per node, check for memory leaks
+docker exec -it icn-node1 bash
+ps aux
+top
+</code></pre>
+<h3>Containers keep restarting</h3>
+<pre><code class="language-bash"># Check logs for crash reason
+docker compose -f docker-compose.test.yml logs --tail=100 node1
+
+# Common causes:
+# - Keystore unlock fails (needs --keystore-passphrase)
+# - Port conflicts (another process using 5001-5004)
+# - Insufficient resources (increase Docker RAM limit)
+</code></pre>
+<hr>
+<h2>Automated Test Execution</h2>
+<h3>Run Full Test Suite</h3>
+<pre><code class="language-bash">cd /workspaces/icn
+./scripts/run-internal-tests.sh
+</code></pre>
+<p>This script:</p>
+<ol>
+<li>Builds Docker images</li>
+<li>Starts test network</li>
+<li>Runs all 38 test scenarios</li>
+<li>Collects logs and metrics</li>
+<li>Generates test report: <code>test-results/report.md</code></li>
+</ol>
+<p><strong>Expected time</strong>: 2-3 hours</p>
+<h3>Run Specific Test Category</h3>
+<pre><code class="language-bash"># Baseline tests only
+./scripts/run-internal-tests.sh --category baseline
+
+# Byzantine tests only
+./scripts/run-internal-tests.sh --category byzantine
+
+# Governance tests only
+./scripts/run-internal-tests.sh --category governance
+
+# Performance tests only
+./scripts/run-internal-tests.sh --category performance
+</code></pre>
+<hr>
+<h2>Next Steps</h2>
+<ol>
+<li><strong>Run Baseline Tests</strong>: Verify all 10 baseline scenarios pass</li>
+<li><strong>Run Byzantine Tests</strong>: Simulate attacks and verify detection</li>
+<li><strong>Run Governance Tests</strong>: Test voting workflows end-to-end</li>
+<li><strong>Performance Baseline</strong>: Establish throughput and latency targets</li>
+<li><strong>Soak Test</strong>: 24-hour stability test with continuous load</li>
+<li><strong>Review Metrics</strong>: Analyze Grafana dashboards for anomalies</li>
+<li><strong>Document Findings</strong>: Fill out test execution log</li>
+<li><strong>Go/No-Go Decision</strong>: Ready for pilot or more hardening needed?</li>
+</ol>
+<hr>
+<h2>Useful Commands Reference</h2>
+<pre><code class="language-bash"># Docker Compose
+docker compose -f docker-compose.test.yml up -d          # Start network
+docker compose -f docker-compose.test.yml down           # Stop network
+docker compose -f docker-compose.test.yml logs -f node1  # View logs
+docker compose -f docker-compose.test.yml ps             # Status
+docker compose -f docker-compose.test.yml restart node1  # Restart node
+
+# Container access
+docker exec -it icn-node1 bash                           # Shell into container
+docker exec -it icn-node1 icnctl status                  # Run command
+
+# Monitoring
+curl http://localhost:9091/metrics                       # Node1 metrics
+curl http://localhost:9095/api/v1/query?query=up        # Prometheus query
+curl http://localhost:3000/api/health                    # Grafana health
+
+# Cleanup
+docker compose -f docker-compose.test.yml down -v        # Remove volumes
+docker system prune -a                                   # Full cleanup
+</code></pre>
+<hr>
+<h2>Support</h2>
+<ul>
+<li><strong>Documentation</strong>: See <code>/docs/INTERNAL_TESTING_PLAN.md</code> for full test plan</li>
+<li><strong>Issues</strong>: Check logs in <code>docker compose logs</code></li>
+<li><strong>Metrics</strong>: Prometheus at <code>localhost:9090</code>, Grafana at <code>localhost:3000</code></li>
+<li><strong>Community</strong>: (Add Slack/Discord link if available)</li>
+</ul>
+<hr>
+<p><strong>Testing Status</strong>: Ready to Execute
+<strong>Last Updated</strong>: 2025-12-04</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

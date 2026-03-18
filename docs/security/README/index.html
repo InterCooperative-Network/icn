@@ -1,0 +1,366 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Security Documentation | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>security</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>README</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/security/README.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Security Documentation</h1>
+<p>Comprehensive security documentation, threat models, audit reports, and hardening guides.</p>
+<p><strong>Last Updated</strong>: 2026-02-10<br><strong>Security Status</strong>: Historical assessment snapshot (as of 2025-12-18)</p>
+<h2>🚨 Quick Links</h2>
+<ul>
+<li><strong><a href="https://github.com/InterCooperative-Network/icn/blob/main/FINAL_SECURITY_STATUS">FINAL_SECURITY_STATUS.md</a></strong> - Production readiness assessment ⭐</li>
+<li><strong><a href="https://github.com/InterCooperative-Network/icn/blob/main/threat-model">threat-model.md</a></strong> - Comprehensive threat analysis</li>
+<li><strong><a href="https://github.com/InterCooperative-Network/icn/blob/main/production-hardening">production-hardening.md</a></strong> - Hardening measures</li>
+<li><strong><a href="https://github.com/InterCooperative-Network/icn/blob/main/SECURITY_TESTING_GUIDE">SECURITY_TESTING_GUIDE.md</a></strong> - Testing procedures</li>
+</ul>
+<h2>Overview</h2>
+<p>This directory contains all security-related documentation for ICN, including:</p>
+<ul>
+<li>Production security status and assessments</li>
+<li>Threat models and risk analysis</li>
+<li>Security audit reports and findings</li>
+<li>Hardening guides and best practices</li>
+<li>SDIS-specific security documentation</li>
+<li>Testing and validation procedures</li>
+</ul>
+<h2>📊 Production Security</h2>
+<h3>Status Snapshot</h3>
+<table>
+<thead>
+<tr>
+<th>Document</th>
+<th>Status</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/FINAL_SECURITY_STATUS">FINAL_SECURITY_STATUS.md</a></td>
+<td>✅ Current</td>
+<td>Production readiness assessment (2025-12-18)</td>
+</tr>
+<tr>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/COMPREHENSIVE_SECURITY_IMPROVEMENTS">COMPREHENSIVE_SECURITY_IMPROVEMENTS.md</a></td>
+<td>✅ Complete</td>
+<td>Security overview and improvements</td>
+</tr>
+<tr>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/SECURITY_FIXES_2025-12-18">SECURITY_FIXES_2025-12-18.md</a></td>
+<td>✅ Applied</td>
+<td>Detailed vulnerability fixes</td>
+</tr>
+</tbody></table>
+<h3>Deployment &amp; Operations</h3>
+<table>
+<thead>
+<tr>
+<th>Document</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/production-hardening">production-hardening.md</a></td>
+<td>Production hardening measures (67KB)</td>
+</tr>
+<tr>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/SECURITY_TESTING_GUIDE">SECURITY_TESTING_GUIDE.md</a></td>
+<td>Testing procedures and validation</td>
+</tr>
+<tr>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/SECRET_MANAGEMENT">SECRET_MANAGEMENT.md</a></td>
+<td>Secret management best practices</td>
+</tr>
+<tr>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/GATEWAY_CSP">GATEWAY_CSP.md</a></td>
+<td>Content Security Policy configuration</td>
+</tr>
+</tbody></table>
+<h2>🔍 Threat Models &amp; Audits</h2>
+<h3>Comprehensive Analyses</h3>
+<table>
+<thead>
+<tr>
+<th>Document</th>
+<th>Scope</th>
+<th>Size</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/threat-model">threat-model.md</a></td>
+<td>Complete system threat model</td>
+<td>43KB</td>
+</tr>
+<tr>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/security-roadmap">security-roadmap.md</a></td>
+<td>Security roadmap and priorities</td>
+<td>68KB</td>
+</tr>
+<tr>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/TOFU_SECURITY_MODEL">TOFU_SECURITY_MODEL.md</a></td>
+<td>Trust-On-First-Use model analysis</td>
+<td>6KB</td>
+</tr>
+</tbody></table>
+<h3>Audit Reports</h3>
+<table>
+<thead>
+<tr>
+<th>Document</th>
+<th>Date</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/SECURITY_AUDIT_REPORT">SECURITY_AUDIT_REPORT.md</a></td>
+<td>2025-12-18</td>
+<td>Primary audit report</td>
+</tr>
+<tr>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/SECURITY_AUDIT_RESULTS">SECURITY_AUDIT_RESULTS.md</a></td>
+<td>2025-12-18</td>
+<td>Detailed audit results</td>
+</tr>
+<tr>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/SECURITY_ANALYSIS_REMAINING_ISSUES">SECURITY_ANALYSIS_REMAINING_ISSUES.md</a></td>
+<td>2025-12-18</td>
+<td>Outstanding issues tracking</td>
+</tr>
+<tr>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/SECURITY_FOLLOWUP">SECURITY_FOLLOWUP.md</a></td>
+<td>Various</td>
+<td>Follow-up actions</td>
+</tr>
+<tr>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/phase-10c-security-analysis">phase-10c-security-analysis.md</a></td>
+<td>Phase 10c</td>
+<td>Phase-specific analysis</td>
+</tr>
+</tbody></table>
+<h2>🆔 SDIS Security</h2>
+<p>Sovereign Digital Identity System security documentation:</p>
+<table>
+<thead>
+<tr>
+<th>Document</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/SDIS_THREAT_MODEL">SDIS_THREAT_MODEL.md</a></td>
+<td>SDIS-specific threat model (11KB)</td>
+</tr>
+<tr>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/SDIS_CRYPTO_REVIEW">SDIS_CRYPTO_REVIEW.md</a></td>
+<td>Cryptographic review (11KB)</td>
+</tr>
+<tr>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/SDIS_AUDIT_CHECKLIST">SDIS_AUDIT_CHECKLIST.md</a></td>
+<td>SDIS audit checklist (9KB)</td>
+</tr>
+</tbody></table>
+<p><strong>See also</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/sdis/">../sdis/</a> for complete SDIS documentation</p>
+<h2>📚 Educational Resources</h2>
+<table>
+<thead>
+<tr>
+<th>Document</th>
+<th>Audience</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/EDUCATIONAL_GUIDE_SECURITY_FIXES">EDUCATIONAL_GUIDE_SECURITY_FIXES.md</a></td>
+<td>All</td>
+<td>Learning resource for security fixes (15KB)</td>
+</tr>
+<tr>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/SECURITY_TESTING_GUIDE">SECURITY_TESTING_GUIDE.md</a></td>
+<td>Developers/QA</td>
+<td>Testing procedures (10KB)</td>
+</tr>
+</tbody></table>
+<h2>🎯 Quick Access by Role</h2>
+<h3>For Security Engineers</h3>
+<ol>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/FINAL_SECURITY_STATUS">FINAL_SECURITY_STATUS.md</a> - Start here</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/threat-model">threat-model.md</a> - Understand threats</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/SECURITY_AUDIT_REPORT">SECURITY_AUDIT_REPORT.md</a> - Review findings</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/security-roadmap">security-roadmap.md</a> - Future work</li>
+</ol>
+<h3>For DevOps/Operators</h3>
+<ol>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/production-hardening">production-hardening.md</a> - Hardening checklist</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/SECRET_MANAGEMENT">SECRET_MANAGEMENT.md</a> - Secret handling</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/GATEWAY_CSP">GATEWAY_CSP.md</a> - Gateway security</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/SECURITY_TESTING_GUIDE">SECURITY_TESTING_GUIDE.md</a> - Validation</li>
+</ol>
+<h3>For Developers</h3>
+<ol>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/EDUCATIONAL_GUIDE_SECURITY_FIXES">EDUCATIONAL_GUIDE_SECURITY_FIXES.md</a> - Learn patterns</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/SECURITY_TESTING_GUIDE">SECURITY_TESTING_GUIDE.md</a> - Test your code</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/threat-model">threat-model.md</a> - Understand attack surface</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/TOFU_SECURITY_MODEL">TOFU_SECURITY_MODEL.md</a> - Trust model</li>
+</ol>
+<h3>For Auditors/Compliance</h3>
+<ol>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/SECURITY_AUDIT_REPORT">SECURITY_AUDIT_REPORT.md</a> - Audit findings</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/SECURITY_AUDIT_RESULTS">SECURITY_AUDIT_RESULTS.md</a> - Detailed results</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/COMPREHENSIVE_SECURITY_IMPROVEMENTS">COMPREHENSIVE_SECURITY_IMPROVEMENTS.md</a> - Improvements made</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/security-roadmap">security-roadmap.md</a> - Future plans</li>
+</ol>
+<h2>🔐 Security Domains</h2>
+<h3>Network Security</h3>
+<ul>
+<li>DID-TLS binding (production-hardening.md)</li>
+<li>Certificate validation</li>
+<li>QUIC transport security</li>
+<li>mDNS security considerations</li>
+</ul>
+<h3>Cryptography</h3>
+<ul>
+<li>Ed25519 signatures</li>
+<li>X25519-ChaCha20-Poly1305 encryption</li>
+<li>Post-quantum hybrid crypto (see <a href="/docs/design/post-quantum-crypto">../design/post-quantum-crypto.md</a>)</li>
+<li>SDIS cryptography (SDIS_CRYPTO_REVIEW.md)</li>
+</ul>
+<h3>Application Security</h3>
+<ul>
+<li>Input validation</li>
+<li>Injection prevention</li>
+<li>Rate limiting and DoS protection</li>
+<li>Content Security Policy (GATEWAY_CSP.md)</li>
+</ul>
+<h3>Identity &amp; Access</h3>
+<ul>
+<li>DID-based authentication</li>
+<li>Trust graph authorization</li>
+<li>Multi-device identity (see <a href="/docs/design/multi-device-identity-design">../design/multi-device-identity-design.md</a>)</li>
+<li>SDIS identity (SDIS_THREAT_MODEL.md)</li>
+</ul>
+<h3>Operational Security</h3>
+<ul>
+<li>Secret management (SECRET_MANAGEMENT.md)</li>
+<li>Backup and recovery</li>
+<li>Incident response</li>
+<li>Security monitoring</li>
+</ul>
+<h2>📈 Security Metrics</h2>
+<p>Key security metrics tracked:</p>
+<ul>
+<li>Vulnerability remediation time</li>
+<li>Test coverage for security-critical paths</li>
+<li>Cryptographic strength margins</li>
+<li>Trust verification success rates</li>
+<li>Rate limiting effectiveness</li>
+</ul>
+<p>See <a href="https://github.com/InterCooperative-Network/icn/blob/main/SECURITY_TESTING_GUIDE">SECURITY_TESTING_GUIDE.md</a> for monitoring procedures.</p>
+<h2>🚀 Security Roadmap</h2>
+<p>Current security work is documented in:</p>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/security-roadmap">security-roadmap.md</a> - Long-term roadmap</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/SECURITY_ANALYSIS_REMAINING_ISSUES">SECURITY_ANALYSIS_REMAINING_ISSUES.md</a> - Outstanding issues</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/SECURITY_FOLLOWUP">SECURITY_FOLLOWUP.md</a> - Follow-up actions</li>
+</ul>
+<h3>Recent Milestones</h3>
+<ul>
+<li>✅ 2025-12-18: Production hardening complete</li>
+<li>✅ 2025-12-18: Security audit resolution</li>
+<li>✅ 2025-12-17: Architecture security review</li>
+</ul>
+<h3>Upcoming Work</h3>
+<p>See <a href="https://github.com/InterCooperative-Network/icn/blob/main/security-roadmap">security-roadmap.md</a> for detailed future plans.</p>
+<h2>🔗 Related Documentation</h2>
+<ul>
+<li><strong>Architecture</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/">../architecture/</a> - System architecture</li>
+<li><strong>SDIS</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/sdis/">../sdis/</a> - Identity system documentation</li>
+<li><strong>Operations</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/guides/operations/">../guides/operations/</a> - Operational guides</li>
+<li><strong>Design</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/">../design/</a> - Security-related designs</li>
+</ul>
+<h2>📝 Contributing to Security</h2>
+<p>When adding security documentation:</p>
+<ol>
+<li><strong>Threat Models</strong>: Use STRIDE or similar frameworks</li>
+<li><strong>Findings</strong>: Include severity, impact, and remediation</li>
+<li><strong>Cross-references</strong>: Link to related security docs</li>
+<li><strong>Updates</strong>: Keep FINAL_SECURITY_STATUS.md current</li>
+<li><strong>Sensitive Data</strong>: Never commit secrets or keys</li>
+</ol>
+<p>See <a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING">../CONTRIBUTING.md</a> for general guidelines.</p>
+<h2>⚠️ Reporting Security Issues</h2>
+<p><strong>DO NOT</strong> file public issues for security vulnerabilities.</p>
+<p>Follow responsible disclosure:</p>
+<ol>
+<li>Email security contact (see main README)</li>
+<li>Encrypt with project PGP key if available</li>
+<li>Include detailed reproduction steps</li>
+<li>Allow reasonable time for patching</li>
+</ol>
+<h2>📞 Questions?</h2>
+<ul>
+<li>Security questions: Review <a href="https://github.com/InterCooperative-Network/icn/blob/main/EDUCATIONAL_GUIDE_SECURITY_FIXES">EDUCATIONAL_GUIDE_SECURITY_FIXES.md</a></li>
+<li>Operational security: Check <a href="https://github.com/InterCooperative-Network/icn/blob/main/production-hardening">production-hardening.md</a></li>
+<li>Testing: See <a href="https://github.com/InterCooperative-Network/icn/blob/main/SECURITY_TESTING_GUIDE">SECURITY_TESTING_GUIDE.md</a></li>
+<li>Status: Review <a href="https://github.com/InterCooperative-Network/icn/blob/main/FINAL_SECURITY_STATUS">FINAL_SECURITY_STATUS.md</a></li>
+</ul>
+<hr>
+<p><strong>Navigation</strong>: <a href="/docs/INDEX">Back to Index</a> | <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/">Architecture</a> | <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/sdis/">SDIS</a> | <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/guides/operations/">Operations</a></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

@@ -1,0 +1,521 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>SDIS Code Audit Checklist | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>security</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>SDIS AUDIT CHECKLIST</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/security/SDIS_AUDIT_CHECKLIST.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>SDIS Code Audit Checklist</h1>
+<p><strong>Version</strong>: 1.0
+<strong>Status</strong>: Pre-audit preparation
+<strong>Last Updated</strong>: 2025-12-10</p>
+<h2>Audit Overview</h2>
+<p>This checklist guides security auditors through the SDIS implementation in ICN.</p>
+<p><strong>Estimated Audit Time</strong>: 2-3 weeks
+<strong>Crates in Scope</strong>: 6
+<strong>Lines of Code</strong>: ~8,000 (core SDIS components)</p>
+<hr>
+<h2>1. Cryptographic Operations (<code>icn-crypto-pq</code>)</h2>
+<h3>1.1 Hybrid Signatures</h3>
+<ul>
+<li><p><input disabled="" type="checkbox"> <strong>Signature Generation</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Both Ed25519 and ML-DSA signatures computed</li>
+<li><input disabled="" type="checkbox"> Signatures computed over identical message</li>
+<li><input disabled="" type="checkbox"> No information leakage between algorithms</li>
+<li><input disabled="" type="checkbox"> Constant-time operations where applicable</li>
+</ul>
+</li>
+<li><p><input disabled="" type="checkbox"> <strong>Signature Verification</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Both signatures must verify (AND logic)</li>
+<li><input disabled="" type="checkbox"> Verification fails fast on invalid input</li>
+<li><input disabled="" type="checkbox"> No timing side-channels</li>
+</ul>
+</li>
+<li><p><input disabled="" type="checkbox"> <strong>Key Generation</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Proper entropy source (rand::rngs::OsRng)</li>
+<li><input disabled="" type="checkbox"> Keys properly zeroized on drop</li>
+<li><input disabled="" type="checkbox"> No key material in logs/errors</li>
+</ul>
+</li>
+</ul>
+<p><strong>Files</strong>: <code>crates/icn-crypto-pq/src/hybrid.rs</code></p>
+<h3>1.2 Threshold PRF</h3>
+<ul>
+<li><p><input disabled="" type="checkbox"> <strong>Secret Sharing</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Shamir shares correctly computed</li>
+<li><input disabled="" type="checkbox"> Threshold reconstruction works for t-of-n</li>
+<li><input disabled="" type="checkbox"> Insufficient shares reveal nothing</li>
+</ul>
+</li>
+<li><p><input disabled="" type="checkbox"> <strong>PRF Computation</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> PRF is deterministic for same input</li>
+<li><input disabled="" type="checkbox"> PRF output is pseudorandom</li>
+<li><input disabled="" type="checkbox"> Partial evaluation doesn&#39;t leak full PRF</li>
+</ul>
+</li>
+</ul>
+<p><strong>Files</strong>: <code>crates/icn-crypto-pq/src/threshold.rs</code></p>
+<h3>1.3 ML-DSA Wrapper</h3>
+<ul>
+<li><p><input disabled="" type="checkbox"> <strong>Parameter Selection</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> ML-DSA-65 (NIST Level 3) used correctly</li>
+<li><input disabled="" type="checkbox"> Proper domain separation</li>
+</ul>
+</li>
+<li><p><input disabled="" type="checkbox"> <strong>Memory Handling</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Private keys zeroized after use</li>
+<li><input disabled="" type="checkbox"> No heap allocations with sensitive data</li>
+</ul>
+</li>
+</ul>
+<p><strong>Files</strong>: <code>crates/icn-crypto-pq/src/ml_dsa.rs</code></p>
+<hr>
+<h2>2. Identity Types (<code>icn-identity</code>)</h2>
+<h3>2.1 Anchor</h3>
+<ul>
+<li><p><input disabled="" type="checkbox"> <strong>Anchor Creation</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Anchor ID computed correctly: H(VUI || genesis)</li>
+<li><input disabled="" type="checkbox"> VUI commitment is binding (no substitution)</li>
+<li><input disabled="" type="checkbox"> Timestamp is authentic (not manipulated)</li>
+</ul>
+</li>
+<li><p><input disabled="" type="checkbox"> <strong>Immutability</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Anchor fields cannot be modified after creation</li>
+<li><input disabled="" type="checkbox"> No serialization/deserialization mutations</li>
+</ul>
+</li>
+</ul>
+<p><strong>Files</strong>: <code>crates/icn-identity/src/anchor.rs</code></p>
+<h3>2.2 KeyBundle</h3>
+<ul>
+<li><p><input disabled="" type="checkbox"> <strong>Version Monotonicity</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Version only increases</li>
+<li><input disabled="" type="checkbox"> Cannot create bundle with lower version</li>
+</ul>
+</li>
+<li><p><input disabled="" type="checkbox"> <strong>Anchor Binding</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> KeyBundle strongly bound to anchor</li>
+<li><input disabled="" type="checkbox"> Cannot transfer KeyBundle to different anchor</li>
+</ul>
+</li>
+<li><p><input disabled="" type="checkbox"> <strong>Key Rotation</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Old key signs rotation to new key</li>
+<li><input disabled="" type="checkbox"> Cannot skip versions</li>
+<li><input disabled="" type="checkbox"> Rotation reason is preserved</li>
+</ul>
+</li>
+</ul>
+<p><strong>Files</strong>: <code>crates/icn-identity/src/keybundle.rs</code></p>
+<h3>2.3 VUI Types</h3>
+<ul>
+<li><p><input disabled="" type="checkbox"> <strong>Commitment Scheme</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Commitment is hiding (reveals nothing)</li>
+<li><input disabled="" type="checkbox"> Commitment is binding (cannot open to different value)</li>
+</ul>
+</li>
+<li><p><input disabled="" type="checkbox"> <strong>IdDataHash</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Personal data never leaves device</li>
+<li><input disabled="" type="checkbox"> Hash is deterministic</li>
+</ul>
+</li>
+</ul>
+<p><strong>Files</strong>: <code>crates/icn-identity/src/vui.rs</code></p>
+<h3>2.4 Keystore v4</h3>
+<ul>
+<li><p><input disabled="" type="checkbox"> <strong>Encryption</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Age encryption used correctly</li>
+<li><input disabled="" type="checkbox"> Passphrase-based key derivation secure</li>
+<li><input disabled="" type="checkbox"> No plaintext key material on disk</li>
+</ul>
+</li>
+<li><p><input disabled="" type="checkbox"> <strong>Migration</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> v1→v2→v3→v4 migration preserves data</li>
+<li><input disabled="" type="checkbox"> Downgrade attacks prevented</li>
+<li><input disabled="" type="checkbox"> Migration atomic (no partial states)</li>
+</ul>
+</li>
+</ul>
+<p><strong>Files</strong>: <code>crates/icn-identity/src/keystore.rs</code></p>
+<hr>
+<h2>3. Zero-Knowledge Proofs (<code>icn-zkp</code>)</h2>
+<h3>3.1 STARK Parameters</h3>
+<ul>
+<li><input disabled="" type="checkbox"> <strong>Security Level</strong><ul>
+<li><input disabled="" type="checkbox"> 128-bit security achieved</li>
+<li><input disabled="" type="checkbox"> Blowup factor adequate (4)</li>
+<li><input disabled="" type="checkbox"> FRI parameters conservative</li>
+</ul>
+</li>
+</ul>
+<h3>3.2 Proof Generation</h3>
+<ul>
+<li><p><input disabled="" type="checkbox"> <strong>Witness Privacy</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Witness data not in proof</li>
+<li><input disabled="" type="checkbox"> No witness leakage via timing</li>
+</ul>
+</li>
+<li><p><input disabled="" type="checkbox"> <strong>Constraint System</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Constraints are complete (valid witness → proof)</li>
+<li><input disabled="" type="checkbox"> Constraints are sound (no false proofs)</li>
+</ul>
+</li>
+</ul>
+<h3>3.3 Proof Verification</h3>
+<ul>
+<li><p><input disabled="" type="checkbox"> <strong>Soundness</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Invalid proofs rejected</li>
+<li><input disabled="" type="checkbox"> Malformed proofs don&#39;t crash</li>
+</ul>
+</li>
+<li><p><input disabled="" type="checkbox"> <strong>Performance</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Verification time bounded</li>
+<li><input disabled="" type="checkbox"> Memory usage bounded</li>
+</ul>
+</li>
+</ul>
+<p><strong>Files</strong>: <code>crates/icn-zkp/src/</code></p>
+<hr>
+<h2>4. Credential Presentation (<code>icn-gateway/api/sdis</code>)</h2>
+<h3>4.1 Ephemeral Proof</h3>
+<ul>
+<li><p><input disabled="" type="checkbox"> <strong>Proof Structure</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> All fields correctly serialized</li>
+<li><input disabled="" type="checkbox"> Signature covers all fields</li>
+<li><input disabled="" type="checkbox"> Nonce is cryptographically random</li>
+</ul>
+</li>
+<li><p><input disabled="" type="checkbox"> <strong>QR Encoding</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> 137-byte format maintained</li>
+<li><input disabled="" type="checkbox"> Magic bytes validated on decode</li>
+<li><input disabled="" type="checkbox"> Version checked before processing</li>
+</ul>
+</li>
+<li><p><input disabled="" type="checkbox"> <strong>Expiry Handling</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Expiry correctly computed (relative → absolute)</li>
+<li><input disabled="" type="checkbox"> Expired proofs rejected</li>
+<li><input disabled="" type="checkbox"> No integer overflow in time calculation</li>
+</ul>
+</li>
+</ul>
+<p><strong>Files</strong>: <code>crates/icn-gateway/src/api/sdis/proof.rs</code>, <code>crates/icn-gateway/src/api/sdis/qr.rs</code></p>
+<h3>4.2 Verification</h3>
+<ul>
+<li><p><input disabled="" type="checkbox"> <strong>L1 Verification</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Ed25519 signature verified</li>
+<li><input disabled="" type="checkbox"> Nonce checked against replay cache</li>
+<li><input disabled="" type="checkbox"> Expiry validated against current time</li>
+</ul>
+</li>
+<li><p><input disabled="" type="checkbox"> <strong>L2 Verification</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> L1 checks performed first</li>
+<li><input disabled="" type="checkbox"> Binding matches proof nonce</li>
+<li><input disabled="" type="checkbox"> Hybrid signature verified (both algorithms)</li>
+</ul>
+</li>
+<li><p><input disabled="" type="checkbox"> <strong>L3 Verification</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> L2 checks performed first</li>
+<li><input disabled="" type="checkbox"> STARK proof verified</li>
+<li><input disabled="" type="checkbox"> Non-revocation checked</li>
+</ul>
+</li>
+</ul>
+<p><strong>Files</strong>: <code>crates/icn-gateway/src/api/sdis/verify.rs</code></p>
+<h3>4.3 Replay Protection</h3>
+<ul>
+<li><p><input disabled="" type="checkbox"> <strong>Nonce Generation</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> 16 bytes of secure randomness</li>
+<li><input disabled="" type="checkbox"> No nonce reuse across proofs</li>
+</ul>
+</li>
+<li><p><input disabled="" type="checkbox"> <strong>Replay Cache</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> LRU eviction works correctly</li>
+<li><input disabled="" type="checkbox"> Cache size bounded</li>
+<li><input disabled="" type="checkbox"> Concurrent access safe</li>
+</ul>
+</li>
+</ul>
+<p><strong>Files</strong>: <code>crates/icn-gateway/src/api/sdis/verify.rs</code> (replay cache)</p>
+<hr>
+<h2>5. Steward Network (<code>icn-steward</code>)</h2>
+<h3>5.1 Steward Profile</h3>
+<ul>
+<li><p><input disabled="" type="checkbox"> <strong>Status Transitions</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Only valid transitions allowed</li>
+<li><input disabled="" type="checkbox"> Suspended → Active requires governance</li>
+</ul>
+</li>
+<li><p><input disabled="" type="checkbox"> <strong>Bond Handling</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Bond tracked correctly</li>
+<li><input disabled="" type="checkbox"> Slashing deducts properly</li>
+</ul>
+</li>
+</ul>
+<p><strong>Files</strong>: <code>crates/icn-steward/src/lib.rs</code></p>
+<h3>5.2 Enrollment Tokens</h3>
+<ul>
+<li><p><input disabled="" type="checkbox"> <strong>Blind Signatures</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Token blindness maintained</li>
+<li><input disabled="" type="checkbox"> Unblinded token verifies</li>
+<li><input disabled="" type="checkbox"> Cannot link issuance to redemption</li>
+</ul>
+</li>
+<li><p><input disabled="" type="checkbox"> <strong>Token Expiry</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> 7-day default enforced</li>
+<li><input disabled="" type="checkbox"> Expired tokens rejected</li>
+</ul>
+</li>
+</ul>
+<p><strong>Files</strong>: <code>crates/icn-steward/src/token.rs</code></p>
+<h3>5.3 VUI Registry</h3>
+<ul>
+<li><p><input disabled="" type="checkbox"> <strong>Bloom Filter</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> False positive rate acceptable (0.01%)</li>
+<li><input disabled="" type="checkbox"> No false negatives</li>
+</ul>
+</li>
+<li><p><input disabled="" type="checkbox"> <strong>Exact Set</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Fallback to exact check on Bloom hit</li>
+<li><input disabled="" type="checkbox"> Set synchronized across stewards</li>
+</ul>
+</li>
+</ul>
+<p><strong>Files</strong>: <code>crates/icn-steward/src/vui_registry.rs</code></p>
+<h3>5.4 Ceremonies</h3>
+<ul>
+<li><p><input disabled="" type="checkbox"> <strong>Enrollment Ceremony</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Requires threshold participation</li>
+<li><input disabled="" type="checkbox"> Partial results don&#39;t leak VUI</li>
+<li><input disabled="" type="checkbox"> Ceremony timeout handled</li>
+</ul>
+</li>
+<li><p><input disabled="" type="checkbox"> <strong>Recovery Ceremony</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Requires higher threshold</li>
+<li><input disabled="" type="checkbox"> Old keys properly revoked</li>
+<li><input disabled="" type="checkbox"> Evidence verified</li>
+</ul>
+</li>
+</ul>
+<p><strong>Files</strong>: <code>crates/icn-steward/src/ceremony.rs</code></p>
+<hr>
+<h2>6. Governance Integration (<code>icn-governance/sdis</code>)</h2>
+<h3>6.1 SDIS Proposals</h3>
+<ul>
+<li><p><input disabled="" type="checkbox"> <strong>Proposal Types</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> All 12 types properly defined</li>
+<li><input disabled="" type="checkbox"> Required fields enforced</li>
+</ul>
+</li>
+<li><p><input disabled="" type="checkbox"> <strong>Voting Requirements</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Quorum calculated correctly</li>
+<li><input disabled="" type="checkbox"> Approval threshold enforced</li>
+<li><input disabled="" type="checkbox"> Timeout enforced</li>
+</ul>
+</li>
+</ul>
+<p><strong>Files</strong>: <code>crates/icn-governance/src/sdis.rs</code></p>
+<h3>6.2 Proposal Execution</h3>
+<ul>
+<li><input disabled="" type="checkbox"> <strong>Execution Handler</strong><ul>
+<li><input disabled="" type="checkbox"> Only executes on approval</li>
+<li><input disabled="" type="checkbox"> Idempotent execution</li>
+<li><input disabled="" type="checkbox"> Audit trail created</li>
+</ul>
+</li>
+</ul>
+<p><strong>Files</strong>: <code>crates/icn-core/src/supervisor.rs</code> (SDIS handler)</p>
+<hr>
+<h2>7. Cross-Cutting Concerns</h2>
+<h3>7.1 Error Handling</h3>
+<ul>
+<li><input disabled="" type="checkbox"> No sensitive data in error messages</li>
+<li><input disabled="" type="checkbox"> Errors don&#39;t reveal timing information</li>
+<li><input disabled="" type="checkbox"> Panics don&#39;t occur on malformed input</li>
+</ul>
+<h3>7.2 Logging</h3>
+<ul>
+<li><input disabled="" type="checkbox"> No keys logged at any level</li>
+<li><input disabled="" type="checkbox"> No VUI/anchor logged</li>
+<li><input disabled="" type="checkbox"> Safe to enable debug logging</li>
+</ul>
+<h3>7.3 Serialization</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Deserialize validates all fields</li>
+<li><input disabled="" type="checkbox"> No arbitrary code execution</li>
+<li><input disabled="" type="checkbox"> Version fields checked</li>
+</ul>
+<h3>7.4 Dependencies</h3>
+<ul>
+<li><input disabled="" type="checkbox"> All deps at recent versions</li>
+<li><input disabled="" type="checkbox"> Known vulnerabilities addressed</li>
+<li><input disabled="" type="checkbox"> Minimal unsafe usage in deps</li>
+</ul>
+<hr>
+<h2>8. Test Coverage</h2>
+<h3>8.1 Unit Tests</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Crypto operations have comprehensive tests</li>
+<li><input disabled="" type="checkbox"> Edge cases covered (empty input, max size)</li>
+<li><input disabled="" type="checkbox"> Error paths tested</li>
+</ul>
+<h3>8.2 Integration Tests</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Multi-node scenarios tested</li>
+<li><input disabled="" type="checkbox"> Replay attacks tested</li>
+<li><input disabled="" type="checkbox"> Expiry boundary tested</li>
+</ul>
+<h3>8.3 Fuzz Testing</h3>
+<ul>
+<li><input disabled="" type="checkbox"> QR decode fuzzed</li>
+<li><input disabled="" type="checkbox"> Proof verification fuzzed</li>
+<li><input disabled="" type="checkbox"> Serialization fuzzed</li>
+</ul>
+<hr>
+<h2>9. Findings Template</h2>
+<h3>Finding: [TITLE]</h3>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Severity</td>
+<td>Critical/High/Medium/Low/Info</td>
+</tr>
+<tr>
+<td>Type</td>
+<td>Crypto/Logic/DoS/Privacy</td>
+</tr>
+<tr>
+<td>Location</td>
+<td>file:line</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Open/Fixed/Acknowledged</td>
+</tr>
+</tbody></table>
+<p><strong>Description</strong>: [What is the issue]</p>
+<p><strong>Impact</strong>: [What can an attacker do]</p>
+<p><strong>Recommendation</strong>: [How to fix]</p>
+<p><strong>Response</strong>: [Vendor response]</p>
+<hr>
+<h2>10. Sign-off</h2>
+<table>
+<thead>
+<tr>
+<th>Auditor</th>
+<th>Date</th>
+<th>Areas Covered</th>
+</tr>
+</thead>
+<tbody><tr>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody></table>
+<p><strong>Overall Assessment</strong>: [ ] Pass [ ] Pass with conditions [ ] Fail</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

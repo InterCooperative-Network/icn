@@ -1,0 +1,260 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Code Quality Improvement Tracker | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>development</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>code quality improvements</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/development/code-quality-improvements.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Code Quality Improvement Tracker</h1>
+<p>This document tracks code quality improvements for the ICN project.</p>
+<h2>Error Handling Audit</h2>
+<p><strong>Status</strong>: Planning
+<strong>Priority</strong>: High
+<strong>Effort</strong>: Large (~1326 unwrap() calls in production code as of 2025-11-21)</p>
+<h3>Current State</h3>
+<ul>
+<li>1467 total <code>.unwrap()</code> calls across codebase</li>
+<li>1326 in production code (non-test)</li>
+<li>Many could panic in unexpected conditions</li>
+</ul>
+<h3>Improvement Plan</h3>
+<ol>
+<li><p><strong>Phase 1: Critical Paths</strong> (Week 1-2)</p>
+<ul>
+<li>Actor message handlers</li>
+<li>Network protocol parsing</li>
+<li>Cryptographic operations</li>
+<li>Storage operations</li>
+</ul>
+</li>
+<li><p><strong>Phase 2: User-Facing Code</strong> (Week 3-4)</p>
+<ul>
+<li>CLI commands (icnctl)</li>
+<li>RPC handlers</li>
+<li>Gateway API endpoints</li>
+</ul>
+</li>
+<li><p><strong>Phase 3: Internal Code</strong> (Week 5-6)</p>
+<ul>
+<li>Gossip protocol</li>
+<li>Trust computation</li>
+<li>Ledger operations</li>
+</ul>
+</li>
+</ol>
+<h3>Best Practices</h3>
+<ul>
+<li>Replace <code>.unwrap()</code> with <code>.context(&quot;meaningful error message&quot;)?</code></li>
+<li>Replace <code>.expect()</code> with proper error propagation</li>
+<li>Add <code>#[allow(clippy::unwrap_used)]</code> only in tests or truly infallible cases</li>
+<li>Use <code>Result&lt;T&gt;</code> return types throughout</li>
+</ul>
+<h3>Progress Tracking</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> icn-core - clippy::unwrap_used/expect_used denied (2025-12-21)</li>
+<li><input checked="" disabled="" type="checkbox"> icn-net - clippy::unwrap_used/expect_used denied (2025-12-21)</li>
+<li><input checked="" disabled="" type="checkbox"> icn-gateway - clippy::unwrap_used/expect_used denied (2025-12-21)</li>
+<li><input checked="" disabled="" type="checkbox"> icn-gossip - clippy::unwrap_used/expect_used denied (2025-12-21)</li>
+<li><input checked="" disabled="" type="checkbox"> icn-ledger - clippy::unwrap_used/expect_used denied (2025-12-21)</li>
+<li><input checked="" disabled="" type="checkbox"> icnd (binary) - clippy::unwrap_used/expect_used denied (2025-12-21)</li>
+<li><input disabled="" type="checkbox"> icnctl commands</li>
+<li><input disabled="" type="checkbox"> icn-rpc handlers</li>
+<li><input disabled="" type="checkbox"> icn-trust computations</li>
+<li><input disabled="" type="checkbox"> icn-identity keystore</li>
+<li><input disabled="" type="checkbox"> icn-compute task execution</li>
+</ul>
+<hr>
+<h2>Property-Based Testing</h2>
+<p><strong>Status</strong>: Planning
+<strong>Priority</strong>: Medium
+<strong>Effort</strong>: Medium</p>
+<h3>Target Components</h3>
+<ol>
+<li><p><strong>Gossip Protocol</strong></p>
+<ul>
+<li>Vector clock properties (monotonicity, causality)</li>
+<li>Bloom filter false positive rates</li>
+<li>Anti-entropy convergence</li>
+</ul>
+</li>
+<li><p><strong>Trust Graph</strong></p>
+<ul>
+<li>Transitive trust computation properties</li>
+<li>Score normalization (0.0 &lt;= score &lt;= 1.0)</li>
+<li>Graph cycle handling</li>
+</ul>
+</li>
+<li><p><strong>Ledger</strong></p>
+<ul>
+<li>Double-entry invariants</li>
+<li>Balance consistency</li>
+<li>Merkle tree properties</li>
+</ul>
+</li>
+<li><p><strong>CCL Interpreter</strong></p>
+<ul>
+<li>Fuel metering correctness</li>
+<li>Determinism (same inputs = same outputs)</li>
+<li>Type safety</li>
+</ul>
+</li>
+</ol>
+<h3>Framework</h3>
+<ul>
+<li>Use <code>proptest</code> or <code>quickcheck</code></li>
+<li>Add to each crate&#39;s dev-dependencies</li>
+<li>Run as part of CI</li>
+</ul>
+<hr>
+<h2>Dependency Management</h2>
+<p><strong>Status</strong>: Planned
+<strong>Priority</strong>: Medium
+<strong>Effort</strong>: Low (ongoing)</p>
+<h3>Tools</h3>
+<ul>
+<li><code>cargo-deny</code> configuration added (<a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/deny.toml">deny.toml</a>)</li>
+<li>Run <code>cargo deny check</code> in CI</li>
+<li>Review advisories quarterly</li>
+</ul>
+<h3>Update Strategy</h3>
+<ul>
+<li>Patch updates: Applied immediately</li>
+<li>Minor updates: Reviewed monthly</li>
+<li>Major updates: Evaluated per-dependency</li>
+</ul>
+<hr>
+<h2>Performance Benchmarking</h2>
+<p><strong>Status</strong>: Not Started
+<strong>Priority</strong>: Low (optimize after pilot feedback)
+<strong>Effort</strong>: Medium</p>
+<h3>Proposed Benchmarks (using criterion)</h3>
+<ol>
+<li><p><strong>Gossip Operations</strong></p>
+<ul>
+<li>Message serialization/deserialization</li>
+<li>Bloom filter operations</li>
+<li>Vector clock updates</li>
+</ul>
+</li>
+<li><p><strong>Network Operations</strong></p>
+<ul>
+<li>QUIC connection establishment</li>
+<li>Message framing</li>
+<li>Encryption/decryption</li>
+</ul>
+</li>
+<li><p><strong>Ledger Operations</strong></p>
+<ul>
+<li>Transaction processing</li>
+<li>Balance queries</li>
+<li>Merkle proof generation</li>
+</ul>
+</li>
+<li><p><strong>Trust Computation</strong></p>
+<ul>
+<li>Single-source trust scores</li>
+<li>Full graph recomputation</li>
+</ul>
+</li>
+</ol>
+<h3>Baseline Targets</h3>
+<ul>
+<li>Gossip message processing: &lt; 1ms</li>
+<li>Ledger transaction: &lt; 10ms</li>
+<li>Trust score query: &lt; 5ms</li>
+<li>Full trust recomputation (100 nodes): &lt; 100ms</li>
+</ul>
+<hr>
+<h2>Code Coverage</h2>
+<p><strong>Status</strong>: Good (423 tests passing)
+<strong>Priority</strong>: Low
+<strong>Effort</strong>: Ongoing</p>
+<h3>Current Coverage</h3>
+<ul>
+<li>No formal coverage tracking yet</li>
+<li>Comprehensive integration tests exist</li>
+<li>Unit tests for most components</li>
+</ul>
+<h3>Improvement Plan</h3>
+<ul>
+<li>Add <code>tarpaulin</code> or <code>llvm-cov</code> to CI</li>
+<li>Target 80% coverage for production code</li>
+<li>100% coverage for critical paths (crypto, protocol)</li>
+</ul>
+<hr>
+<h2>Clippy Improvements</h2>
+<p><strong>Status</strong>: In Progress
+<strong>Completed</strong>: Workspace clippy.toml, fixed conflicts, added allows</p>
+<h3>Remaining Work</h3>
+<ul>
+<li>~115 warnings (75 in icn-rpc, 38 in icn-net, 2 in icn-compute)</li>
+<li>Most are stylistic (format strings, needless borrows)</li>
+<li>Low priority - code is functional</li>
+</ul>
+<h3>Strategy</h3>
+<ul>
+<li>Allow stylistic lints workspace-wide</li>
+<li>Fix correctness lints immediately</li>
+<li>Performance lints: profile first, optimize if needed</li>
+</ul>
+<hr>
+<p><em>Last Updated: 2025-11-21</em></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

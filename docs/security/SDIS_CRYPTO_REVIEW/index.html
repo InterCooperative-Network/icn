@@ -1,0 +1,574 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>SDIS Cryptographic Review | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>security</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>SDIS CRYPTO REVIEW</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/security/SDIS_CRYPTO_REVIEW.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>SDIS Cryptographic Review</h1>
+<p><strong>Version</strong>: 1.0
+<strong>Status</strong>: Pre-audit preparation
+<strong>Last Updated</strong>: 2025-12-10</p>
+<h2>1. Executive Summary</h2>
+<p>This document provides a cryptographic review of the SDIS implementation, covering algorithm selection, parameter choices, and implementation considerations.</p>
+<h3>Algorithms Used</h3>
+<table>
+<thead>
+<tr>
+<th>Purpose</th>
+<th>Algorithm</th>
+<th>Security Level</th>
+<th>Standard</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Classical signature</td>
+<td>Ed25519</td>
+<td>128-bit</td>
+<td>RFC 8032</td>
+</tr>
+<tr>
+<td>Post-quantum signature</td>
+<td>ML-DSA-65</td>
+<td>Level 3 (~143-bit)</td>
+<td>FIPS 204</td>
+</tr>
+<tr>
+<td>Key encapsulation</td>
+<td>ML-KEM-768</td>
+<td>Level 3</td>
+<td>FIPS 203</td>
+</tr>
+<tr>
+<td>Hash function</td>
+<td>SHA3-256</td>
+<td>128-bit</td>
+<td>FIPS 202</td>
+</tr>
+<tr>
+<td>Symmetric encryption</td>
+<td>Age (X25519+ChaCha20)</td>
+<td>128-bit</td>
+<td>age-encryption.org</td>
+</tr>
+<tr>
+<td>Zero-knowledge</td>
+<td>STARK</td>
+<td>128-bit</td>
+<td>winterfell</td>
+</tr>
+<tr>
+<td>Secret sharing</td>
+<td>Shamir</td>
+<td>Information-theoretic</td>
+<td>VSSS</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>2. Hybrid Signature Scheme</h2>
+<h3>2.1 Design Rationale</h3>
+<p>SDIS uses a hybrid signature scheme combining Ed25519 (classical) with ML-DSA-65 (post-quantum):</p>
+<pre><code>HybridSignature = Ed25519(message) || ML-DSA-65(message)
+</code></pre>
+<p><strong>Why hybrid?</strong></p>
+<ul>
+<li><strong>Defense in depth</strong>: If either algorithm is broken, the other provides security</li>
+<li><strong>Transition period</strong>: Smooth migration as PQ algorithms mature</li>
+<li><strong>Compatibility</strong>: Ed25519 alone for constrained environments (L1)</li>
+</ul>
+<h3>2.2 Verification Logic</h3>
+<pre><code class="language-rust">fn verify_hybrid(message: &amp;[u8], sig: &amp;HybridSignature, pk: &amp;HybridPublicKey) -&gt; bool {
+    let classical_valid = ed25519_verify(message, &amp;sig.classical, &amp;pk.classical);
+    let pq_valid = ml_dsa_verify(message, &amp;sig.pq, &amp;pk.pq);
+
+    classical_valid &amp;&amp; pq_valid  // Both must verify
+}
+</code></pre>
+<p><strong>Security Claim</strong>: An attacker must break BOTH Ed25519 AND ML-DSA-65 to forge a signature.</p>
+<h3>2.3 Key Generation</h3>
+<pre><code class="language-rust">fn generate_hybrid_keypair() -&gt; HybridKeypair {
+    let classical = Ed25519::generate(OsRng);
+    let pq = MlDsa65::keygen(OsRng);
+    HybridKeypair { classical, pq }
+}
+</code></pre>
+<p><strong>Notes</strong>:</p>
+<ul>
+<li>Independent key generation for each algorithm</li>
+<li>Single entropy source (OsRng) is acceptable (distinct algorithms)</li>
+<li>No seed reuse between algorithms</li>
+</ul>
+<h3>2.4 Signature Sizes</h3>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Size (bytes)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Ed25519 signature</td>
+<td>64</td>
+</tr>
+<tr>
+<td>ML-DSA-65 signature</td>
+<td>3,293</td>
+</tr>
+<tr>
+<td><strong>Total hybrid</strong></td>
+<td><strong>3,357</strong></td>
+</tr>
+<tr>
+<td>Ed25519 public key</td>
+<td>32</td>
+</tr>
+<tr>
+<td>ML-DSA-65 public key</td>
+<td>1,952</td>
+</tr>
+<tr>
+<td><strong>Total hybrid public</strong></td>
+<td><strong>1,984</strong></td>
+</tr>
+</tbody></table>
+<hr>
+<h2>3. Threshold PRF (VUI Computation)</h2>
+<h3>3.1 Protocol Overview</h3>
+<p>VUI is computed via a threshold PRF to ensure:</p>
+<ol>
+<li>Deterministic output for same identity data</li>
+<li>No single steward learns the full VUI</li>
+<li>Distributed trust across steward network</li>
+</ol>
+<pre><code>VUI = PRF(pepper, IdDataHash)
+    = Reconstruct([PRF_partial(share_i, IdDataHash) for i in threshold])
+</code></pre>
+<h3>3.2 Implementation</h3>
+<pre><code class="language-rust">// Shamir secret sharing of pepper
+let shares = shamir::split_secret(&amp;pepper, threshold, total);
+
+// Each steward computes partial PRF
+fn compute_partial(share: &amp;Share, input: &amp;[u8]) -&gt; PrfPartial {
+    let blinded_input = blind(input);
+    let partial = prf_eval(share, blinded_input);
+    PrfPartial { partial, proof }
+}
+
+// User combines partials
+fn combine_partials(partials: &amp;[PrfPartial]) -&gt; Vui {
+    let combined = lagrange_interpolate(partials);
+    Vui::from_bytes(combined)
+}
+</code></pre>
+<h3>3.3 Security Properties</h3>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Guarantee</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Threshold security</strong></td>
+<td>&lt; t shares reveal nothing about VUI</td>
+</tr>
+<tr>
+<td><strong>Determinism</strong></td>
+<td>Same input → same VUI</td>
+</tr>
+<tr>
+<td><strong>Pseudorandomness</strong></td>
+<td>VUI indistinguishable from random</td>
+</tr>
+<tr>
+<td><strong>Unlinkability</strong></td>
+<td>Different inputs → unrelated VUIs</td>
+</tr>
+</tbody></table>
+<h3>3.4 Parameter Recommendations</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Default</th>
+<th>Minimum</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Threshold (t)</td>
+<td>3</td>
+<td>2</td>
+<td>Byzantine tolerance</td>
+</tr>
+<tr>
+<td>Total shares (n)</td>
+<td>5</td>
+<td>3</td>
+<td>Availability vs security</td>
+</tr>
+<tr>
+<td>Share size</td>
+<td>32 bytes</td>
+<td>-</td>
+<td>256-bit security margin</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>4. Zero-Knowledge Proofs (STARK)</h2>
+<h3>4.1 System Parameters</h3>
+<pre><code class="language-rust">const SECURITY_BITS: usize = 128;
+const BLOWUP_FACTOR: usize = 4;
+const FRI_FOLDING_FACTOR: usize = 4;
+const FIELD: Goldilocks;  // 64-bit prime field
+</code></pre>
+<h3>4.2 Proof Types</h3>
+<h4>Age Proof</h4>
+<pre><code>Proves: current_date - birthdate &gt;= threshold
+Without revealing: birthdate
+</code></pre>
+<p>Constraint system:</p>
+<pre><code>1. age = current_date - birthdate
+2. age &gt;= threshold
+3. commitment(birthdate) = claimed_commitment
+</code></pre>
+<h4>Citizenship Proof</h4>
+<pre><code>Proves: country_code in credential == claimed_country
+Without revealing: full credential
+</code></pre>
+<h4>Membership Proof</h4>
+<pre><code>Proves: org_did in credential == claimed_org
+Without revealing: member ID or other details
+</code></pre>
+<h3>4.3 Proof Sizes and Times</h3>
+<table>
+<thead>
+<tr>
+<th>Proof Type</th>
+<th>Size</th>
+<th>Generation</th>
+<th>Verification</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Age</td>
+<td>~15 KB</td>
+<td>~200ms</td>
+<td>~50ms</td>
+</tr>
+<tr>
+<td>Citizenship</td>
+<td>~12 KB</td>
+<td>~150ms</td>
+<td>~40ms</td>
+</tr>
+<tr>
+<td>Membership</td>
+<td>~18 KB</td>
+<td>~250ms</td>
+<td>~60ms</td>
+</tr>
+</tbody></table>
+<h3>4.4 Security Analysis</h3>
+<p><strong>Soundness error</strong>: 2^(-128)</p>
+<ul>
+<li>Achieved via appropriate repetition and FRI parameters</li>
+</ul>
+<p><strong>Zero-knowledge</strong>: Computational</p>
+<ul>
+<li>Witness information protected by random masking</li>
+<li>Proof reveals nothing beyond statement validity</li>
+</ul>
+<hr>
+<h2>5. QR Code Encoding</h2>
+<h3>5.1 Compact Format (137 bytes)</h3>
+<pre><code>┌─────────────────────────────────────────────────────────────┐
+│  Magic (2) │ Ver (1) │ Type (1) │ Anchor[..16] (16)        │
+├─────────────────────────────────────────────────────────────┤
+│  Ephemeral PK (32) │ Expiry (4) │ Nonce (16)               │
+├─────────────────────────────────────────────────────────────┤
+│  Ed25519 Signature (64)                    │ Channels (1)  │
+└─────────────────────────────────────────────────────────────┘
+</code></pre>
+<h3>5.2 Security Considerations</h3>
+<p><strong>Anchor Truncation</strong>: First 16 bytes used (128-bit collision resistance)</p>
+<ul>
+<li>Acceptable for short-lived proofs</li>
+<li>L2 binding includes full 32-byte anchor</li>
+</ul>
+<p><strong>Relative Expiry</strong>: 4-byte seconds from generation</p>
+<ul>
+<li>Max ~136 years, practically limited to 24 hours</li>
+<li>Verifier must have accurate clock (±30s tolerance recommended)</li>
+</ul>
+<p><strong>Nonce</strong>: 16 bytes random</p>
+<ul>
+<li>128-bit collision resistance</li>
+<li>Sufficient for replay protection over proof lifetime</li>
+</ul>
+<h3>5.3 Signature Coverage</h3>
+<p>Signature covers (in order):</p>
+<ol>
+<li>Magic bytes</li>
+<li>Version</li>
+<li>Proof type</li>
+<li>Full anchor (32 bytes, not truncated)</li>
+<li>Ephemeral public key</li>
+<li>Expiry timestamp</li>
+<li>Nonce</li>
+<li>Channels bitmap</li>
+</ol>
+<p><strong>Note</strong>: Full anchor signed even though truncated in QR.</p>
+<hr>
+<h2>6. Key Derivation and Storage</h2>
+<h3>6.1 Keystore Encryption</h3>
+<pre><code>Keystore uses Age encryption:
+1. User provides passphrase
+2. scrypt KDF derives encryption key
+3. ChaCha20-Poly1305 encrypts keystore
+</code></pre>
+<p><strong>scrypt parameters</strong>:</p>
+<ul>
+<li>N = 2^18 (262144)</li>
+<li>r = 8</li>
+<li>p = 1</li>
+<li>Output: 32 bytes</li>
+</ul>
+<h3>6.2 KeyBundle Derivation</h3>
+<pre><code class="language-rust">// Each KeyBundle version uses independent keys
+fn derive_keybundle(anchor: &amp;Anchor, version: u32) -&gt; KeyBundle {
+    let seed = hkdf_expand(
+        anchor.id,
+        &amp;format!(&quot;icn-keybundle-v{}&quot;, version),
+        64
+    );
+    let hybrid = HybridKeypair::from_seed(&amp;seed[..32]);
+    let x25519 = X25519Secret::from(&amp;seed[32..64]);
+    KeyBundle { anchor, version, hybrid, x25519 }
+}
+</code></pre>
+<p><strong>Note</strong>: Actual implementation generates fresh randomness, not derived.</p>
+<h3>6.3 Memory Protection</h3>
+<pre><code class="language-rust">// All key types implement Zeroize
+#[derive(Zeroize, ZeroizeOnDrop)]
+pub struct HybridKeypair {
+    classical_signing: SigningKey,
+    pq_keypair: MlDsaKeypair,
+}
+</code></pre>
+<hr>
+<h2>7. Replay Protection</h2>
+<h3>7.1 Nonce-Based Protection</h3>
+<pre><code class="language-rust">struct ReplayCache {
+    seen: LruCache&lt;[u8; 16], ()&gt;,  // Nonce → timestamp
+    max_entries: usize,
+}
+
+impl ReplayCache {
+    fn check_and_insert(&amp;mut self, nonce: &amp;[u8; 16]) -&gt; bool {
+        if self.seen.contains(nonce) {
+            return false;  // Replay detected
+        }
+        self.seen.put(*nonce, ());
+        true
+    }
+}
+</code></pre>
+<h3>7.2 Cache Sizing</h3>
+<p><strong>Assumptions</strong>:</p>
+<ul>
+<li>1 million verifications per day</li>
+<li>1 hour proof validity (max)</li>
+<li>16 bytes per entry</li>
+</ul>
+<p><strong>Cache size</strong>: ~42,000 entries × 16 bytes ≈ 672 KB</p>
+<h3>7.3 Distributed Considerations</h3>
+<ul>
+<li>Each verifier maintains independent cache</li>
+<li>No cross-verifier synchronization needed</li>
+<li>Proof reuse at different verifiers is acceptable by design (L1)</li>
+</ul>
+<hr>
+<h2>8. Random Number Generation</h2>
+<h3>8.1 Entropy Sources</h3>
+<table>
+<thead>
+<tr>
+<th>Use Case</th>
+<th>Source</th>
+<th>Justification</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Key generation</td>
+<td>OsRng</td>
+<td>CSPRNG from OS</td>
+</tr>
+<tr>
+<td>Nonce generation</td>
+<td>OsRng</td>
+<td>Must be unpredictable</td>
+</tr>
+<tr>
+<td>Proof randomness</td>
+<td>OsRng</td>
+<td>ZK requires fresh randomness</td>
+</tr>
+</tbody></table>
+<h3>8.2 Implementation</h3>
+<pre><code class="language-rust">use rand::rngs::OsRng;
+
+fn generate_nonce() -&gt; [u8; 16] {
+    let mut nonce = [0u8; 16];
+    OsRng.fill_bytes(&amp;mut nonce);
+    nonce
+}
+</code></pre>
+<hr>
+<h2>9. Side-Channel Considerations</h2>
+<h3>9.1 Timing Attacks</h3>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>Constant-time?</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Ed25519 sign/verify</td>
+<td>Yes</td>
+<td>dalek library</td>
+</tr>
+<tr>
+<td>ML-DSA sign/verify</td>
+<td>Best-effort</td>
+<td>pqcrypto library</td>
+</tr>
+<tr>
+<td>Secret comparison</td>
+<td>Yes</td>
+<td>subtle crate</td>
+</tr>
+<tr>
+<td>Nonce comparison</td>
+<td>Yes</td>
+<td>constant_time_eq</td>
+</tr>
+</tbody></table>
+<h3>9.2 Memory Access</h3>
+<ul>
+<li>No secret-dependent array indexing</li>
+<li>No secret-dependent branches in crypto code</li>
+<li>Cache-timing resistant implementations preferred</li>
+</ul>
+<h3>9.3 Recommendations</h3>
+<ol>
+<li>Run crypto operations on constant-time hardware when possible</li>
+<li>Avoid logging that could reveal timing</li>
+<li>Use dedicated crypto coprocessor for high-security deployments</li>
+</ol>
+<hr>
+<h2>10. Recommendations</h2>
+<h3>10.1 Critical</h3>
+<ol>
+<li><strong>Audit pqcrypto dependencies</strong> - Third-party PQ implementations</li>
+<li><strong>Implement constant-time comparison</strong> - All secret comparisons</li>
+<li><strong>Add HSM support</strong> - For steward pepper shares</li>
+</ol>
+<h3>10.2 Important</h3>
+<ol start="4">
+<li><strong>Parameter agility</strong> - Support algorithm upgrade without protocol change</li>
+<li><strong>Key rotation schedule</strong> - Enforce regular KeyBundle rotation</li>
+<li><strong>Entropy monitoring</strong> - Alert on low entropy conditions</li>
+</ol>
+<h3>10.3 Nice to Have</h3>
+<ol start="7">
+<li><strong>Formal verification</strong> - Model and verify protocol</li>
+<li><strong>Hardware attestation</strong> - Bind keys to secure hardware</li>
+<li><strong>Post-quantum key exchange</strong> - ML-KEM for transport layer</li>
+</ol>
+<hr>
+<h2>11. Compliance Notes</h2>
+<h3>FIPS 140-3</h3>
+<ul>
+<li>ML-DSA compliant with FIPS 204</li>
+<li>ML-KEM compliant with FIPS 203</li>
+<li>SHA3 compliant with FIPS 202</li>
+<li>Ed25519 not FIPS-approved (classical fallback)</li>
+</ul>
+<h3>Common Criteria</h3>
+<ul>
+<li>EAL4+ target for production deployment</li>
+<li>Crypto module boundary defined</li>
+<li>Key management procedures documented</li>
+</ul>
+<hr>
+<h2>12. References</h2>
+<ol>
+<li>NIST FIPS 204 - Module-Lattice-Based Digital Signature Standard</li>
+<li>NIST FIPS 203 - Module-Lattice-Based Key-Encapsulation Mechanism</li>
+<li>RFC 8032 - Edwards-Curve Digital Signature Algorithm (EdDSA)</li>
+<li>age-encryption.org - age file encryption specification</li>
+<li>winterfell - STARK proof system documentation</li>
+<li>Shamir, A. (1979) - How to Share a Secret</li>
+</ol>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

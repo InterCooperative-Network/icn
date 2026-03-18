@@ -1,0 +1,1503 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Human Interface — Repo State &amp; Gap Analysis | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>plans</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>.scratch</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>human interface</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/plans/.scratch/human-interface.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Human Interface — Repo State &amp; Gap Analysis</h1>
+<h2>1. Current State</h2>
+<h3>1.1 pilot-ui Inventory</h3>
+<p>Location: <code>web/pilot-ui/</code> (source) → synced to <code>icn-gateway/static/</code> (served at gateway root)</p>
+<table>
+<thead>
+<tr>
+<th>Screen / Tab</th>
+<th>File(s)</th>
+<th>API Calls</th>
+<th>Scope-Aware?</th>
+<th>Shows Receipts?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Login</td>
+<td><code>index.html:32-100</code>, <code>app.js:520-630</code></td>
+<td><code>GET /v1/health</code>, <code>GET /v1/ledger/{coop}/balance/{did}</code> (validation)</td>
+<td><strong>No</strong> — coop ID manually entered</td>
+<td>No</td>
+</tr>
+<tr>
+<td>QR Login</td>
+<td><code>app.js:5237-5400</code></td>
+<td><code>POST /v1/sessions</code> (create), <code>GET /v1/sessions/{id}</code> (poll status)</td>
+<td>No</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Join via Invite</td>
+<td><code>index.html</code> (join-screen), <code>app.js:5100-5170</code></td>
+<td><code>POST /v1/invites/join</code></td>
+<td>No</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Dashboard</td>
+<td><code>index.html:371-476</code>, <code>app.js:632-700</code></td>
+<td><code>GET /v1/ledger/{coop}/balance/{did}</code>, <code>GET /v1/coops/{coop}</code>, members, transactions, proposals</td>
+<td><strong>No</strong> — shows coop name only</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Log Hours</td>
+<td><code>index.html:708-738</code></td>
+<td><code>POST /v1/ledger/{coop}/payment</code></td>
+<td>No</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Transaction History</td>
+<td><code>index.html:739-905</code></td>
+<td><code>GET /v1/ledger/{coop}/history</code></td>
+<td>No</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Members</td>
+<td><code>index.html:906-1308</code></td>
+<td><code>GET /v1/coops/{coop}</code> (includes members), member CRUD</td>
+<td>No</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Member Profile</td>
+<td><code>index.html:477-595</code></td>
+<td><code>GET /v1/members/{coop}/{did}</code></td>
+<td>No</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Service Board</td>
+<td><code>index.html:596-707</code> (hidden tab)</td>
+<td>Listings API</td>
+<td>No</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Governance</td>
+<td><code>index.html:1309-1453</code></td>
+<td><code>GET/POST /v1/gov/proposals</code>, votes, discussion, proof</td>
+<td>No</td>
+<td><strong>Partial</strong> — governance proof button exists</td>
+</tr>
+<tr>
+<td>Proposal Detail</td>
+<td><code>app.js:987-1500</code> (modal)</td>
+<td><code>GET /v1/gov/proposals/{id}</code>, votes, discussion, comments, reactions</td>
+<td>No</td>
+<td>Proof link only</td>
+</tr>
+<tr>
+<td>Exchange (Marketplace)</td>
+<td><code>index.html:1454-1660</code> (hidden tab)</td>
+<td><code>GET/POST /v1/listings</code>, interest, matching</td>
+<td>No</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Receipt Chain Viewer</td>
+<td><code>index.html:1661+</code>, <code>receipts.js</code></td>
+<td><code>GET /v1/receipts/chain/{hash}</code></td>
+<td>No</td>
+<td><strong>Yes</strong> — full chain view</td>
+</tr>
+<tr>
+<td>SDIS Enrollment</td>
+<td><code>sdis-enrollment.html/js/css</code></td>
+<td>SDIS endpoints</td>
+<td>No</td>
+<td>No</td>
+</tr>
+<tr>
+<td>SDIS Identity</td>
+<td><code>sdis-identity.html/js/css</code></td>
+<td>Identity endpoints</td>
+<td>No</td>
+<td>No</td>
+</tr>
+<tr>
+<td>SDIS Recovery</td>
+<td><code>sdis-recovery.html/js/css</code></td>
+<td>Recovery endpoints</td>
+<td>No</td>
+<td>No</td>
+</tr>
+<tr>
+<td>SDIS Proofs</td>
+<td><code>sdis-proofs.html/js/css</code></td>
+<td>Proof endpoints</td>
+<td>No</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Steward Dashboard</td>
+<td><code>steward-dashboard.html/js/css</code></td>
+<td>Steward endpoints</td>
+<td>No</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Anchor Manager</td>
+<td><code>components/anchor-manager.js</code></td>
+<td>Anchor endpoints</td>
+<td>No</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Offline Fallback</td>
+<td><code>offline.html</code></td>
+<td>None</td>
+<td>No</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Test API</td>
+<td><code>test-api.html</code></td>
+<td>Various (debugging)</td>
+<td>No</td>
+<td>No</td>
+</tr>
+</tbody></table>
+<p><strong>Total: 12 tabs/views in main SPA + 5 standalone SDIS pages + 2 utility pages</strong></p>
+<h3>1.2 Auth Flows</h3>
+<h4>Current Login (Manual Token Paste)</h4>
+<ol>
+<li>User runs <code>icnctl auth token -c COOP_ID -s &quot;ledger:read,gov:write&quot;</code> in terminal</li>
+<li>icnctl performs challenge-response with gateway (DID + Ed25519 signature)</li>
+<li>icnctl outputs JWT string</li>
+<li>User manually pastes JWT into pilot-ui login form</li>
+<li>pilot-ui validates by calling <code>GET /v1/health</code> + <code>GET /v1/ledger/{coop}/balance/{did}</code></li>
+<li>Token stored in <code>state.token</code> (in-memory) with expiry tracking</li>
+<li>Token expires after 24h; user must repeat</li>
+</ol>
+<p><strong>Friction</strong>: Requires CLI access and manual copy-paste. Non-technical users cannot log in.</p>
+<h4>QR Login (Implemented but incomplete)</h4>
+<ol>
+<li>pilot-ui calls <code>POST /v1/sessions</code> → creates session with unique ID</li>
+<li>QR code displayed containing session ID + gateway URL</li>
+<li>Mobile wallet (not yet built) scans QR</li>
+<li>Wallet calls <code>POST /v1/sessions/{id}/approve</code> with JWT</li>
+<li>pilot-ui polls <code>GET /v1/sessions/{id}</code> until status = &quot;approved&quot;</li>
+<li>pilot-ui receives JWT from approved session</li>
+</ol>
+<p><strong>Status</strong>: Backend endpoints exist (<code>api/sessions.rs</code>). QR code generation works. BUT no mobile wallet exists to scan/approve. The flow is <strong>dead-ended</strong> — you can display a QR but nothing can scan it.</p>
+<h4>Magic Link</h4>
+<p><strong>Does not exist</strong> anywhere in the codebase. No email integration, no link-based auth.</p>
+<h4>JWT Lifecycle</h4>
+<ul>
+<li>Created via <code>POST /v1/auth/verify</code> after challenge-response</li>
+<li>Claims: <code>sub</code> (DID), <code>coop_id</code>, <code>exp</code>, <code>iat</code>, <code>scopes</code></li>
+<li>Default expiry: 24 hours</li>
+<li>No refresh token mechanism in gateway</li>
+<li>pilot-ui tracks expiry and warns at 15/10/5 minute marks</li>
+<li>Auto-logout on 401 response</li>
+</ul>
+<h3>1.3 CoopWallet Inventory</h3>
+<p>Location: <code>sdk/react-native/examples/CoopWallet/</code> (Expo/React Native)
+React Native SDK: <code>sdk/react-native/src/</code>
+Total: ~10K LOC (app + SDK), 21 screens</p>
+<table>
+<thead>
+<tr>
+<th>Screen</th>
+<th>Connected to Backend?</th>
+<th>Offline?</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>LoginScreen</td>
+<td><strong>Yes</strong> — challenge-response auth</td>
+<td>No</td>
+<td>DID + coopId entry, QR scan for enrollment</td>
+</tr>
+<tr>
+<td>HomeScreen</td>
+<td><strong>Yes</strong> — balance, recent tx</td>
+<td>Queue</td>
+<td>Dashboard with quick actions (Send/Receive/Scan/Vote/Trust)</td>
+</tr>
+<tr>
+<td>PaymentScreen</td>
+<td><strong>Yes</strong> — <code>POST /v1/ledger/{coop}/payment</code></td>
+<td>Queue</td>
+<td>Send hours via DID or QR, contacts + recent recipients</td>
+</tr>
+<tr>
+<td>ReceiveScreen</td>
+<td><strong>Local</strong> — QR generation</td>
+<td>N/A</td>
+<td>Generates payment QR for receiving</td>
+</tr>
+<tr>
+<td>TransactionsScreen</td>
+<td><strong>Yes</strong> — <code>GET /v1/ledger/{coop}/transactions</code></td>
+<td>Cache</td>
+<td>Full history with filtering, pull-to-refresh</td>
+</tr>
+<tr>
+<td>TransactionDetailScreen</td>
+<td><strong>Yes</strong> — tx metadata</td>
+<td>Cache</td>
+<td>Detail + memo display</td>
+</tr>
+<tr>
+<td>GovernanceScreen</td>
+<td><strong>Yes</strong> — <code>GET /v1/governance/{coop}/proposals</code></td>
+<td>Cache</td>
+<td>Active proposals with voting state</td>
+</tr>
+<tr>
+<td>ProposalScreen</td>
+<td><strong>Yes</strong> — proposal details + vote</td>
+<td>Queue</td>
+<td>Voting interface, tally display</td>
+</tr>
+<tr>
+<td>IdentityScreen</td>
+<td><strong>Local</strong> — ephemeral proof generation</td>
+<td>Yes</td>
+<td>Age 18+/21+/65+, citizenship, non-revocation; 6h max validity</td>
+</tr>
+<tr>
+<td>VerifyScreen</td>
+<td><strong>Yes</strong> — <code>POST /v1/sdis/verify/level1</code></td>
+<td>No</td>
+<td>Scan QR proofs and verify</td>
+</tr>
+<tr>
+<td>VerificationHistoryScreen</td>
+<td><strong>Local</strong> — AsyncStorage</td>
+<td>Yes</td>
+<td>30-day retention, max 100 entries</td>
+</tr>
+<tr>
+<td>StewardDashboardScreen</td>
+<td><strong>Yes</strong> — pending enrollments</td>
+<td>No</td>
+<td>Steward-only: manage enrollments</td>
+</tr>
+<tr>
+<td>VouchConfirmationScreen</td>
+<td><strong>Yes</strong> — vouch API</td>
+<td>No</td>
+<td>Steward confirmation of vouches</td>
+</tr>
+<tr>
+<td>VouchHistoryScreen</td>
+<td><strong>Local</strong> — AsyncStorage</td>
+<td>Yes</td>
+<td>Steward audit trail</td>
+</tr>
+<tr>
+<td>EnrollmentDetailScreen</td>
+<td><strong>Yes</strong> — enrollment API</td>
+<td>No</td>
+<td>Steward review of enrollment details</td>
+</tr>
+<tr>
+<td>TrustAttestationScreen</td>
+<td><strong>Yes</strong> — <code>POST /v1/trust/attestations</code></td>
+<td>Queue</td>
+<td>Create trust edges for other members</td>
+</tr>
+<tr>
+<td>ContactsScreen</td>
+<td><strong>Local</strong> — AsyncStorage/SecureStore</td>
+<td>Yes</td>
+<td>Saved contacts with DID + name</td>
+</tr>
+<tr>
+<td>MemberProfileScreen</td>
+<td><strong>Yes</strong> — <code>GET /v1/members/{coop}/{did}</code></td>
+<td>Cache</td>
+<td>Role, tx count, trust score/class</td>
+</tr>
+<tr>
+<td>SettingsScreen</td>
+<td><strong>Local</strong></td>
+<td>Yes</td>
+<td>Account info, theme toggle, logout</td>
+</tr>
+</tbody></table>
+<p><strong>Navigation</strong>: Bottom tabs (Home | Transactions | Governance | Identity | Settings) + modal stacks for detail views.</p>
+<p><strong>Crypto</strong>: Ed25519 via <code>@noble/ed25519</code> for all signing. Post-quantum hybrid (Ed25519 + ML-DSA-65 Dilithium) available via <code>hybrid-crypto.ts</code>. Keys stored in SecureStore (iOS Keychain / Android Keystore).</p>
+<p><strong>Offline Queue</strong>: <code>QueueManager</code> in <code>sdk/react-native/src/queue-manager.ts</code>. Queues payments, votes, proposals, trust attestations. Persistent (AsyncStorage). 3 retries with exponential backoff (1s, 2s, 4s). <code>useQueue()</code> hook exposes pending/failed counts. <code>useNetworkState()</code> triggers processing on reconnect.</p>
+<p><strong>i18n</strong>: EN + ES via <code>i18next</code> + <code>react-i18next</code>.</p>
+<p><strong>Gateway target</strong>: <code>http://10.8.10.40:30080</code> (homelab staging), configurable in <code>src/config.ts</code>.</p>
+<h3>1.4 icnctl Command Coverage</h3>
+<p><strong>32 command groups, 100+ subcommands, 10,191 lines in single main.rs</strong></p>
+<table>
+<thead>
+<tr>
+<th>Command Group</th>
+<th>User-Facing?</th>
+<th>Description</th>
+<th>Connection</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code> (init/show/rotate/export/import/upgrade-pq)</td>
+<td><strong>Yes</strong></td>
+<td>Identity management</td>
+<td>Local keystore</td>
+</tr>
+<tr>
+<td><code>device</code> (list/add/approve/revoke)</td>
+<td><strong>Yes</strong></td>
+<td>Multi-device management</td>
+<td>Local + gateway</td>
+</tr>
+<tr>
+<td><code>recovery</code> (setup/config/initiate/attest/finalize)</td>
+<td><strong>Yes</strong></td>
+<td>Social recovery (M-of-N)</td>
+<td>Local + gateway</td>
+</tr>
+<tr>
+<td><code>trust</code> (add/list/show/remove)</td>
+<td><strong>Yes</strong></td>
+<td>Personal trust edges</td>
+<td>RPC to daemon</td>
+</tr>
+<tr>
+<td><code>gov domain</code> (create/show/list/add-member)</td>
+<td>Officer</td>
+<td>Governance domains</td>
+<td>RPC</td>
+</tr>
+<tr>
+<td><code>gov proposal</code> (create/open/list/show/close)</td>
+<td><strong>Yes</strong></td>
+<td>Democratic participation</td>
+<td>RPC</td>
+</tr>
+<tr>
+<td><code>gov vote</code> (cast/show/delegate/revoke)</td>
+<td><strong>Yes</strong></td>
+<td>Voting</td>
+<td>RPC</td>
+</tr>
+<tr>
+<td><code>ledger</code> (head/balance/history)</td>
+<td><strong>Yes</strong></td>
+<td>Account transparency</td>
+<td>RPC</td>
+</tr>
+<tr>
+<td><code>ledger quarantine</code> (list/get/release/drop/purge)</td>
+<td>Admin</td>
+<td>Quarantined entries</td>
+<td>RPC</td>
+</tr>
+<tr>
+<td><code>dispute</code> (file/list/get/add-evidence/resolve)</td>
+<td><strong>Yes</strong></td>
+<td>Dispute filing</td>
+<td>RPC</td>
+</tr>
+<tr>
+<td><code>compute</code> (submit/submit-wasm/status/cancel)</td>
+<td>Power</td>
+<td>Task execution</td>
+<td>RPC</td>
+</tr>
+<tr>
+<td><code>contract</code> (deploy/prepare/sign/call/list)</td>
+<td>Power</td>
+<td>CCL contracts</td>
+<td>RPC</td>
+</tr>
+<tr>
+<td><code>network</code> (peers/dial/stats/status)</td>
+<td>Operator</td>
+<td>P2P debugging</td>
+<td>RPC</td>
+</tr>
+<tr>
+<td><code>federation</code> (coop/vouch/attestation/clearing)</td>
+<td>Officer</td>
+<td>Cross-coop coordination</td>
+<td>RPC + gateway</td>
+</tr>
+<tr>
+<td><code>steward</code> (register/retire/check-vui/enroll)</td>
+<td>Steward</td>
+<td>Identity stewardship</td>
+<td>Gateway</td>
+</tr>
+<tr>
+<td><code>commons</code> (status/enroll/anchor/affiliations/join)</td>
+<td><strong>Yes</strong></td>
+<td>Jurisdiction membership</td>
+<td>Gateway</td>
+</tr>
+<tr>
+<td><code>charter</code> (create/show/list/sign/ratify)</td>
+<td><strong>Yes</strong></td>
+<td>Organizational founding</td>
+<td>Gateway</td>
+</tr>
+<tr>
+<td><code>amendment</code> (propose/list/show/vote/withdraw)</td>
+<td><strong>Yes</strong></td>
+<td>Constitutional governance</td>
+<td>Gateway</td>
+</tr>
+<tr>
+<td><code>appeal</code> (file/list/show/add-evidence/respond)</td>
+<td><strong>Yes</strong></td>
+<td>Due process</td>
+<td>Gateway</td>
+</tr>
+<tr>
+<td><code>auth</code> (token)</td>
+<td><strong>Yes</strong></td>
+<td>Get JWT token</td>
+<td>Gateway</td>
+</tr>
+<tr>
+<td><code>receipts</code> (chain/allocation/intent)</td>
+<td><strong>Yes</strong></td>
+<td>Economic proof queries</td>
+<td>Gateway</td>
+</tr>
+<tr>
+<td><code>policy</code> (set/show/list/remove)</td>
+<td>Admin</td>
+<td>Scheduling policies</td>
+<td>RPC</td>
+</tr>
+<tr>
+<td><code>quota</code> (show/list)</td>
+<td>Admin</td>
+<td>Resource quotas</td>
+<td>RPC</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td><strong>Yes</strong></td>
+<td>Daemon health</td>
+<td>RPC</td>
+</tr>
+<tr>
+<td><code>preflight</code></td>
+<td>Operator</td>
+<td>Pre-deployment checks</td>
+<td>Local + gateway</td>
+</tr>
+<tr>
+<td><code>backup</code>/<code>restore</code>/<code>verify-backup</code></td>
+<td>Operator</td>
+<td>Data management</td>
+<td>Local</td>
+</tr>
+<tr>
+<td><code>snapshot</code> (create/list/verify/delete/cleanup)</td>
+<td>Operator</td>
+<td>State snapshots</td>
+<td>Local</td>
+</tr>
+<tr>
+<td><code>init-coop</code></td>
+<td>Operator</td>
+<td>Guided setup wizard</td>
+<td>Local + RPC</td>
+</tr>
+<tr>
+<td><code>api</code> (export-openapi)</td>
+<td>Developer</td>
+<td>Schema export</td>
+<td>Local</td>
+</tr>
+<tr>
+<td><code>completions</code></td>
+<td><strong>Yes</strong></td>
+<td>Shell completion gen</td>
+<td>Local</td>
+</tr>
+</tbody></table>
+<p><strong>i18n</strong>: 2 locales — <code>en.yaml</code> (8KB), <code>es.yaml</code> (9KB). Uses <code>rust_i18n</code> crate.</p>
+<p><strong>Output</strong>: Human-readable by default. <code>--json</code> flag on receipt commands only. No universal JSON output mode.</p>
+<h3>1.5 TypeScript SDK Coverage</h3>
+<p>Location: <code>sdk/typescript/</code> | Package: <code>@icn/client</code> v0.1.0 | Zero runtime deps</p>
+<table>
+<thead>
+<tr>
+<th>Gateway Domain</th>
+<th>SDK Methods</th>
+<th>Coverage</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Auth (challenge/verify)</td>
+<td><code>getChallenge</code>, <code>verify</code>, <code>authenticate</code></td>
+<td>Full</td>
+</tr>
+<tr>
+<td>Token management</td>
+<td><code>setToken</code>, <code>clearToken</code>, <code>isTokenExpired</code></td>
+<td>Full</td>
+</tr>
+<tr>
+<td>Cooperatives</td>
+<td><code>listCoops</code>, <code>createCoop</code>, <code>getCoop</code>, <code>updateCoop</code>, <code>deleteCoop</code>, <code>getCoopStats</code></td>
+<td>Full</td>
+</tr>
+<tr>
+<td>Members</td>
+<td><code>listMembers</code>, <code>addMember</code>, <code>updateMember</code>, <code>removeMember</code>, <code>getMemberProfile</code>, batch ops</td>
+<td>Full</td>
+</tr>
+<tr>
+<td>Ledger/Payments</td>
+<td><code>getBalance</code>, <code>pay</code>, <code>crossPay</code>, <code>getHistory</code>, <code>batchPay</code>, query builder</td>
+<td>Full</td>
+</tr>
+<tr>
+<td>Governance</td>
+<td><code>createDomain</code>, <code>createProposal</code>, <code>vote</code>, <code>openProposal</code>, <code>closeProposal</code></td>
+<td>Full</td>
+</tr>
+<tr>
+<td>Delegation</td>
+<td><code>createDelegation</code>, <code>listDelegations</code>, <code>revokeDelegation</code></td>
+<td>Full</td>
+</tr>
+<tr>
+<td>Compute</td>
+<td><code>submitTask</code>, <code>submitWasmTask</code>, <code>getTaskStatus</code>, <code>waitForTask</code>, <code>cancelTask</code></td>
+<td>Full</td>
+</tr>
+<tr>
+<td>WASM Registry</td>
+<td><code>uploadWasm</code>, <code>listWasm</code>, <code>getWasm</code>, <code>submitWasmByHash</code></td>
+<td>Full</td>
+</tr>
+<tr>
+<td>Treasury</td>
+<td><code>getTreasuryStatus</code>, <code>getTreasuryBalance</code>, <code>proposeTreasurySpend</code></td>
+<td>Full</td>
+</tr>
+<tr>
+<td>Services</td>
+<td><code>announceService</code>, <code>withdrawService</code>, <code>discoverServices</code></td>
+<td>Full</td>
+</tr>
+<tr>
+<td>Charter</td>
+<td><code>createCharter</code>, <code>getCharter</code>, <code>signCharter</code>, <code>activateCharter</code></td>
+<td>Full</td>
+</tr>
+<tr>
+<td>Membership (Commons)</td>
+<td><code>applyForMembership</code>, <code>approveMembership</code>, capabilities, roles</td>
+<td>Full</td>
+</tr>
+<tr>
+<td>Amendments</td>
+<td><code>createAmendment</code>, <code>submitAmendment</code>, <code>castAmendmentVote</code>, <code>ratifyAmendment</code></td>
+<td>Full</td>
+</tr>
+<tr>
+<td>Appeals</td>
+<td><code>fileAppeal</code>, <code>addAppealEvidence</code>, <code>resolveAppeal</code></td>
+<td>Full</td>
+</tr>
+<tr>
+<td>Identity</td>
+<td><code>resolveDid</code>, <code>identityHealth</code></td>
+<td>Full</td>
+</tr>
+<tr>
+<td>Devices</td>
+<td><code>registerDevice</code>, <code>listDevices</code>, <code>revokeDevice</code></td>
+<td>Full</td>
+</tr>
+<tr>
+<td>Exchange Rates</td>
+<td><code>getExchangeRate</code>, <code>convertAmount</code>, <code>setManualRate</code></td>
+<td>Full</td>
+</tr>
+<tr>
+<td>WebSocket</td>
+<td><code>connectWebSocket</code> with auto-reconnect, backfill, event filtering</td>
+<td>Full</td>
+</tr>
+<tr>
+<td>Health</td>
+<td><code>health()</code></td>
+<td>Full</td>
+</tr>
+</tbody></table>
+<p><strong>Total: 90+ methods across 19 domains. Comprehensive coverage.</strong></p>
+<p><strong>Auth Model</strong>: <code>SignatureProvider</code> interface — SDK does NOT handle key generation, storage, or Ed25519 crypto. Users must implement <code>sign(challenge: string): Promise&lt;string&gt;</code>. This is intentional for security (HSM, WebAuthn support) but creates an onboarding barrier.</p>
+<p><strong>Key Gap</strong>: No key management utilities. A non-developer cannot use the SDK without importing a separate crypto library and writing signing code.</p>
+<h3>1.6 Gateway Route Module Inventory</h3>
+<p>Location: <code>icn/crates/icn-gateway/src/api/</code> — 43 route module files</p>
+<p><strong>Total: ~200+ endpoints across 34+ domain groups</strong></p>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Domain</th>
+<th>Endpoints</th>
+<th>Status</th>
+<th>Auth</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>health.rs</code></td>
+<td>Diagnostics</td>
+<td>5</td>
+<td><strong>Live</strong></td>
+<td>Public</td>
+</tr>
+<tr>
+<td><code>auth.rs</code></td>
+<td>Challenge/verify</td>
+<td>2</td>
+<td><strong>Live</strong></td>
+<td>Public</td>
+</tr>
+<tr>
+<td><code>sessions.rs</code></td>
+<td>QR Login</td>
+<td>3</td>
+<td><strong>Live</strong></td>
+<td>Mixed</td>
+</tr>
+<tr>
+<td><code>coops.rs</code></td>
+<td>Cooperative CRUD</td>
+<td>8</td>
+<td><strong>Live</strong></td>
+<td>JWT</td>
+</tr>
+<tr>
+<td><code>members.rs</code></td>
+<td>Membership</td>
+<td>2+</td>
+<td><strong>Live</strong></td>
+<td>JWT</td>
+</tr>
+<tr>
+<td><code>ledger.rs</code></td>
+<td>Payments/balance</td>
+<td>6</td>
+<td><strong>Live</strong></td>
+<td>JWT</td>
+</tr>
+<tr>
+<td><code>governance.rs</code></td>
+<td>Domains/proposals</td>
+<td>25+</td>
+<td><strong>Live</strong></td>
+<td>JWT</td>
+</tr>
+<tr>
+<td><code>trust.rs</code></td>
+<td>Trust graph</td>
+<td>5</td>
+<td><strong>Live</strong></td>
+<td>JWT</td>
+</tr>
+<tr>
+<td><code>compute.rs</code></td>
+<td>Task execution</td>
+<td>6</td>
+<td><strong>Live</strong> (if compute handle)</td>
+<td>JWT</td>
+</tr>
+<tr>
+<td><code>federation.rs</code></td>
+<td>Cross-coop</td>
+<td>16</td>
+<td><strong>Live</strong></td>
+<td>JWT</td>
+</tr>
+<tr>
+<td><code>treasury.rs</code></td>
+<td>Collective reserves</td>
+<td>5+</td>
+<td><strong>Partial</strong> (needs handle)</td>
+<td>JWT</td>
+</tr>
+<tr>
+<td><code>listings.rs</code></td>
+<td>Marketplace</td>
+<td>7</td>
+<td><strong>Live</strong></td>
+<td>JWT</td>
+</tr>
+<tr>
+<td><code>entity.rs</code></td>
+<td>Entity CRUD+audit</td>
+<td>10</td>
+<td><strong>Live</strong></td>
+<td>JWT</td>
+</tr>
+<tr>
+<td><code>escrow.rs</code></td>
+<td>Conditional tx</td>
+<td>5</td>
+<td><strong>Live</strong></td>
+<td>JWT</td>
+</tr>
+<tr>
+<td><code>recurring_payments.rs</code></td>
+<td>Subscriptions</td>
+<td>4+</td>
+<td><strong>Live</strong> (scheduler runs)</td>
+<td>JWT</td>
+</tr>
+<tr>
+<td><code>budgets.rs</code></td>
+<td>Spending limits</td>
+<td>5</td>
+<td><strong>Live</strong></td>
+<td>JWT</td>
+</tr>
+<tr>
+<td><code>services.rs</code></td>
+<td>Service discovery</td>
+<td>5+</td>
+<td><strong>Live</strong></td>
+<td>JWT</td>
+</tr>
+<tr>
+<td><code>contracts.rs</code></td>
+<td>CCL contracts</td>
+<td>7</td>
+<td><strong>Partial</strong> (needs registry)</td>
+<td>JWT</td>
+</tr>
+<tr>
+<td><code>invites.rs</code></td>
+<td>Invite flow</td>
+<td>3</td>
+<td><strong>Live</strong></td>
+<td>Mixed</td>
+</tr>
+<tr>
+<td><code>governance_dashboard.rs</code></td>
+<td>Summary stats</td>
+<td>1</td>
+<td><strong>Live</strong></td>
+<td>JWT</td>
+</tr>
+<tr>
+<td><code>registry.rs</code></td>
+<td>Decision registry</td>
+<td>6</td>
+<td><strong>Live</strong></td>
+<td>JWT</td>
+</tr>
+<tr>
+<td><code>receipts.rs</code></td>
+<td>Economic receipts</td>
+<td>2+</td>
+<td><strong>Live</strong></td>
+<td>JWT</td>
+</tr>
+<tr>
+<td><code>oracle.rs</code></td>
+<td>Exchange rates</td>
+<td>4+</td>
+<td><strong>Live</strong></td>
+<td>JWT</td>
+</tr>
+<tr>
+<td><code>steward/mod.rs</code></td>
+<td>SDIS stewards</td>
+<td>10</td>
+<td><strong>Live</strong></td>
+<td>JWT</td>
+</tr>
+<tr>
+<td><code>membership/mod.rs</code></td>
+<td>Commons membership</td>
+<td>5+</td>
+<td><strong>Live</strong></td>
+<td>JWT</td>
+</tr>
+<tr>
+<td><code>charter/mod.rs</code></td>
+<td>Org founding docs</td>
+<td>7</td>
+<td><strong>Live</strong></td>
+<td>JWT</td>
+</tr>
+<tr>
+<td><code>sdis/mod.rs</code></td>
+<td>Identity verification</td>
+<td>5</td>
+<td><strong>Stub</strong> (basic logic)</td>
+<td>Public</td>
+</tr>
+<tr>
+<td><code>constitutional/mod.rs</code></td>
+<td>Amendments/appeals</td>
+<td>5+</td>
+<td><strong>Stub</strong> (minimal logic)</td>
+<td>JWT</td>
+</tr>
+<tr>
+<td><code>commons/mod.rs</code></td>
+<td>Resource mgmt</td>
+<td>3+</td>
+<td><strong>Stub</strong></td>
+<td>JWT</td>
+</tr>
+<tr>
+<td><code>communities.rs</code></td>
+<td>Civic engine</td>
+<td>10</td>
+<td><strong>Stub</strong> (basic CRUD)</td>
+<td>JWT</td>
+</tr>
+<tr>
+<td><code>notifications.rs</code></td>
+<td>Push notifications</td>
+<td>5</td>
+<td><strong>Partial</strong> (FCM optional)</td>
+<td>JWT</td>
+</tr>
+<tr>
+<td><code>agreements.rs</code></td>
+<td>Inter-coop agreements</td>
+<td>14</td>
+<td><strong>Partial</strong> (needs handle)</td>
+<td>JWT</td>
+</tr>
+<tr>
+<td><code>identity.rs</code></td>
+<td>DID resolution</td>
+<td>3</td>
+<td><strong>Live</strong></td>
+<td>Mixed</td>
+</tr>
+<tr>
+<td><code>devices.rs</code></td>
+<td>Multi-device</td>
+<td>4</td>
+<td><strong>Live</strong></td>
+<td>JWT</td>
+</tr>
+</tbody></table>
+<h3>1.7 WebSocket Events</h3>
+<p>Endpoint: <code>/v1/websocket</code> or <code>/v1/ws/{coop_id}</code></p>
+<table>
+<thead>
+<tr>
+<th>Event Type</th>
+<th>Category</th>
+<th>Trigger</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>PaymentCreated</code></td>
+<td>Ledger</td>
+<td>New payment</td>
+</tr>
+<tr>
+<td><code>CrossPaymentCreated</code></td>
+<td>Ledger</td>
+<td>Cross-currency payment</td>
+</tr>
+<tr>
+<td><code>TransactionCompleted</code></td>
+<td>Ledger</td>
+<td>Transaction confirmed</td>
+</tr>
+<tr>
+<td><code>BalanceChanged</code></td>
+<td>Ledger</td>
+<td>Balance update</td>
+</tr>
+<tr>
+<td><code>BatchBalanceChanged</code></td>
+<td>Ledger</td>
+<td>Batch balance update</td>
+</tr>
+<tr>
+<td><code>LedgerMemberFrozen</code></td>
+<td>Ledger</td>
+<td>Account frozen</td>
+</tr>
+<tr>
+<td><code>LedgerMemberUnfrozen</code></td>
+<td>Ledger</td>
+<td>Account unfrozen</td>
+</tr>
+<tr>
+<td><code>LedgerForkDetected</code></td>
+<td>Ledger</td>
+<td>Conflict detected</td>
+</tr>
+<tr>
+<td><code>LedgerForkResolved</code></td>
+<td>Ledger</td>
+<td>Conflict resolved</td>
+</tr>
+<tr>
+<td><code>LedgerRollback</code></td>
+<td>Ledger</td>
+<td>Rollback occurred</td>
+</tr>
+<tr>
+<td><code>ResourceAccessTransferred</code></td>
+<td>Ledger</td>
+<td>Resource transferred</td>
+</tr>
+<tr>
+<td><code>MemberAdded</code></td>
+<td>Membership</td>
+<td>New member</td>
+</tr>
+<tr>
+<td><code>MemberRemoved</code></td>
+<td>Membership</td>
+<td>Member left</td>
+</tr>
+<tr>
+<td><code>RoleUpdated</code></td>
+<td>Membership</td>
+<td>Role changed</td>
+</tr>
+<tr>
+<td><code>GovernanceDomainCreated</code></td>
+<td>Governance</td>
+<td>New domain</td>
+</tr>
+<tr>
+<td><code>GovernanceProposalCreated</code></td>
+<td>Governance</td>
+<td>Proposal submitted</td>
+</tr>
+<tr>
+<td><code>GovernanceProposalOpened</code></td>
+<td>Governance</td>
+<td>Voting started</td>
+</tr>
+<tr>
+<td><code>GovernanceProposalClosed</code></td>
+<td>Governance</td>
+<td>Voting ended</td>
+</tr>
+<tr>
+<td><code>GovernanceVoteCast</code></td>
+<td>Governance</td>
+<td>Vote cast</td>
+</tr>
+<tr>
+<td><code>ComputeTaskSubmitted</code></td>
+<td>Compute</td>
+<td>Task submitted</td>
+</tr>
+<tr>
+<td><code>ComputeTaskClaimed</code></td>
+<td>Compute</td>
+<td>Task claimed</td>
+</tr>
+<tr>
+<td><code>ComputeTaskCompleted</code></td>
+<td>Compute</td>
+<td>Task finished</td>
+</tr>
+<tr>
+<td><code>ComputeTaskCancelled</code></td>
+<td>Compute</td>
+<td>Task cancelled</td>
+</tr>
+<tr>
+<td><code>TrustAttested</code></td>
+<td>Trust</td>
+<td>Trust created</td>
+</tr>
+<tr>
+<td><code>TrustRevoked</code></td>
+<td>Trust</td>
+<td>Trust revoked</td>
+</tr>
+<tr>
+<td><code>SettingsUpdated</code></td>
+<td>Config</td>
+<td>Settings changed</td>
+</tr>
+<tr>
+<td><code>Shutdown</code></td>
+<td>Control</td>
+<td>Server shutting down</td>
+</tr>
+</tbody></table>
+<p><strong>Protocol features</strong>: Sequence numbering, backfill on reconnect, 5000-event buffer, heartbeat (30s/60s timeout), 10K max global connections.</p>
+<h2>2. User Journey Analysis</h2>
+<h3>Journey A: New person joins a cooperative</h3>
+<p><strong>Current path (what they&#39;d have to do today)</strong>:</p>
+<ol>
+<li>Install Rust toolchain (to build icnctl from source — no prebuilt binary)</li>
+<li>Run <code>icnctl id init</code> to create Ed25519 keypair with passphrase</li>
+<li>Run <code>icnctl id show</code> to get their DID</li>
+<li>Give DID to a cooperative admin (out-of-band — email, chat)</li>
+<li>Admin runs <code>icnctl federation coop register</code> or uses gateway API to add member</li>
+<li>OR: admin creates invite via <code>POST /v1/invites</code>, shares invite code</li>
+<li>New member opens pilot-ui, uses &quot;Join&quot; form with invite code</li>
+<li>After join: run <code>icnctl auth token -c COOP_ID</code> to get JWT</li>
+<li>Paste JWT into pilot-ui login form</li>
+</ol>
+<p><strong>What&#39;s broken/missing</strong>:</p>
+<ul>
+<li>Requires CLI / Rust toolchain — impossible for non-developers</li>
+<li>No web-based identity creation</li>
+<li>No in-browser key generation</li>
+<li>No invite flow that works end-to-end for non-technical users</li>
+<li>Join form exists in pilot-ui but requires DID (which requires CLI)</li>
+<li>No &quot;create account&quot; button that generates identity in browser</li>
+</ul>
+<h3>Journey B: Member proposes and votes</h3>
+<p><strong>Current path</strong>:</p>
+<ol>
+<li>Log in to pilot-ui (JWT paste)</li>
+<li>Navigate to Governance tab</li>
+<li>Proposals visible with voting buttons (for/against/abstain)</li>
+<li>Can create proposals via governance form</li>
+<li>Can view vote tallies, discussion, proof</li>
+<li>Comments and reactions supported</li>
+<li>Proposal detail view with timeline</li>
+</ol>
+<p><strong>What&#39;s broken/missing</strong>:</p>
+<ul>
+<li>No scope context (which domain/jurisdiction is this proposal in?)</li>
+<li>No delegation UI (delegation is CLI-only via <code>icnctl gov vote delegate</code>)</li>
+<li>No &quot;what law applies&quot; context — proposals float without constitutional grounding</li>
+<li>Proposal outcomes don&#39;t show effect chain (decision → allocation → settlement)</li>
+<li>No receipt trail visible from proposal to ledger entry</li>
+</ul>
+<h3>Journey C: Steward verifies personhood</h3>
+<p><strong>Current path</strong>:</p>
+<ol>
+<li>Run <code>icnctl steward register</code> with bond, term, specializations</li>
+<li>Use <code>steward-dashboard.html</code> (standalone page, separate from main SPA)</li>
+<li>SDIS enrollment via <code>sdis-enrollment.html</code> (standalone)</li>
+<li>VUI check via <code>icnctl steward check-vui</code></li>
+<li>Enrollment ceremony via <code>icnctl steward start-enrollment</code></li>
+</ol>
+<p><strong>What&#39;s broken/missing</strong>:</p>
+<ul>
+<li>Steward dashboard is a separate HTML page, not integrated into main SPA</li>
+<li>SDIS pages are standalone, not linked from main navigation</li>
+<li>No unified &quot;steward workflow&quot; — scattered across CLI + 4 separate pages</li>
+<li>Spatial proof logic is basic/stub in gateway</li>
+<li>No mobile-friendly enrollment (needs camera for spatial proofs)</li>
+</ul>
+<h3>Journey D: Operator runs a node for their org</h3>
+<p><strong>Current path</strong>:</p>
+<ol>
+<li>Build from source (<code>cargo build --release</code>)</li>
+<li>Run <code>icnctl id init</code> to create node identity</li>
+<li>Run <code>icnd --init</code> to initialize data directory</li>
+<li>Run <code>icnd</code> to start daemon</li>
+<li>Access pilot-ui at <code>http://localhost:8080</code></li>
+<li>Use <code>icnctl status</code>, <code>icnctl network peers</code>, <code>icnctl network stats</code></li>
+<li>Deploy scripts in <code>deploy/k8s/</code> for K3s cluster</li>
+</ol>
+<p><strong>What&#39;s broken/missing</strong>:</p>
+<ul>
+<li>No prebuilt binaries (must compile from source)</li>
+<li>No Docker images published</li>
+<li>No guided setup wizard in the web UI</li>
+<li>Monitoring via Prometheus metrics but no bundled dashboard</li>
+<li><code>icnctl preflight</code> exists but not integrated into web UI</li>
+<li>Federation setup is complex (multiple CLI commands)</li>
+</ul>
+<h2>3. Scope Navigation Gaps</h2>
+<ul>
+<li><p><strong>Does any screen show &quot;where am I&quot;?</strong> <strong>No.</strong> The pilot-ui header shows coop name and user DID, but no jurisdiction, scope, or constitutional context. The user has no way to know which governance domain they&#39;re operating in, what laws apply, or what scope their actions affect.</p>
+</li>
+<li><p><strong>Can a user switch scope/jurisdiction?</strong> <strong>No.</strong> Login is locked to a single coop ID. To switch cooperatives, user must log out and log back in with a different coop ID. There&#39;s no multi-org view, no scope switcher, no federation-aware navigation.</p>
+</li>
+<li><p><strong>Is the scope context propagated in API calls?</strong> <strong>Partially.</strong> The JWT includes <code>coop_id</code> and <code>scopes</code> claims. The gateway has cross-coop access checks (<code>require_coop_access()</code>). But the UI never shows which scope is active or what the user&#39;s capabilities are within that scope.</p>
+</li>
+<li><p><strong>Missing scope primitives</strong>:</p>
+<ul>
+<li>No &quot;scope banner&quot; showing current jurisdiction</li>
+<li>No &quot;what law applies here&quot; indicator</li>
+<li>No &quot;my standing in this scope&quot; display</li>
+<li>No constitutional context (which charter governs this space?)</li>
+<li>No capability display (what can I do here?)</li>
+</ul>
+</li>
+</ul>
+<h2>4. Receipts Visibility Gaps</h2>
+<ul>
+<li><p><strong>Does any screen show receipt chains?</strong> <strong>Yes — one screen.</strong> The Receipt Chain Viewer (<code>receipts.js</code>, hidden tab) can query <code>GET /v1/receipts/chain/{hash}</code> and display: DecisionReceipt → AllocationReceipt → SettlementIntent → LedgerEntry. But it&#39;s a hidden tab, requires manual hash entry, and is not linked from any other view.</p>
+</li>
+<li><p><strong>Can a user trace decision → effect → settlement?</strong> <strong>Barely.</strong> The receipt viewer can show the chain if you know the decision hash. But:</p>
+<ul>
+<li>Governance proposals don&#39;t link to their receipt chain</li>
+<li>Transaction history doesn&#39;t show provenance</li>
+<li>No &quot;why was I charged/credited?&quot; view</li>
+<li>No automatic receipt display after actions</li>
+</ul>
+</li>
+<li><p><strong>Is there a &quot;what happened and why?&quot; view?</strong> <strong>No.</strong> No audit trail visible in the UI. The gateway has entity audit endpoints (<code>GET /v1/entities/{id}/audit</code>) and decision registry (<code>GET /v1/registry/decisions/{id}/trace</code>), but no UI consumes them.</p>
+</li>
+<li><p><strong>Missing receipt primitives</strong>:</p>
+<ul>
+<li>Governance proposals should link to receipt chain on close</li>
+<li>Transactions should show provenance (which decision authorized this?)</li>
+<li>Treasury spends should show full receipt chain</li>
+<li>Appeal outcomes should show effect chain</li>
+<li>Amendment ratification should show constraint propagation</li>
+</ul>
+</li>
+</ul>
+<h2>5. Gap Analysis</h2>
+<h3>Critical Gaps (User story blockers)</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Gap</th>
+<th>User Story Blocked</th>
+<th>Missing Primitive OR Surface</th>
+<th>Where It Belongs</th>
+<th>Phase</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>G1</td>
+<td>No browser-based identity creation</td>
+<td>&quot;I want to join a cooperative&quot;</td>
+<td>Identity generation in browser (Ed25519 + DID)</td>
+<td>pilot-ui + SDK</td>
+<td><strong>0</strong></td>
+</tr>
+<tr>
+<td>G2</td>
+<td>Auth requires CLI token paste</td>
+<td>&quot;I want to log in&quot;</td>
+<td>QR login needs mobile wallet OR magic link OR in-browser signing</td>
+<td>pilot-ui auth flow</td>
+<td><strong>0</strong></td>
+</tr>
+<tr>
+<td>G3</td>
+<td>No scope context banner</td>
+<td>&quot;Where am I? What law applies?&quot;</td>
+<td>Scope context component with jurisdiction, charter, capabilities</td>
+<td>pilot-ui header</td>
+<td><strong>0</strong></td>
+</tr>
+<tr>
+<td>G4</td>
+<td>Receipts not linked from actions</td>
+<td>&quot;What happened and why?&quot;</td>
+<td>Receipt chain links from proposals, transactions, treasury</td>
+<td>pilot-ui governance + ledger tabs</td>
+<td><strong>0</strong></td>
+</tr>
+<tr>
+<td>G5</td>
+<td>No multi-org navigation</td>
+<td>&quot;I&#39;m in 3 cooperatives&quot;</td>
+<td>Org switcher, affiliations home screen</td>
+<td>pilot-ui nav</td>
+<td><strong>1</strong></td>
+</tr>
+<tr>
+<td>G6</td>
+<td>No standing/capability display</td>
+<td>&quot;What can I do here?&quot;</td>
+<td>Standing panel showing trust class, roles, capabilities</td>
+<td>pilot-ui profile</td>
+<td><strong>1</strong></td>
+</tr>
+<tr>
+<td>G7</td>
+<td>No delegation UI</td>
+<td>&quot;I want to delegate my vote&quot;</td>
+<td>Delegation management (create, list, revoke)</td>
+<td>pilot-ui governance tab</td>
+<td><strong>1</strong></td>
+</tr>
+<tr>
+<td>G8</td>
+<td>No treasury visualization</td>
+<td>&quot;Where does our money go?&quot;</td>
+<td>Treasury spend flow with receipt chain</td>
+<td>pilot-ui new tab</td>
+<td><strong>1</strong></td>
+</tr>
+<tr>
+<td>G9</td>
+<td>No appeal filing in UI</td>
+<td>&quot;I want to appeal a decision&quot;</td>
+<td>Appeal form + status tracking</td>
+<td>pilot-ui governance tab</td>
+<td><strong>1</strong></td>
+</tr>
+<tr>
+<td>G10</td>
+<td>No mobile app</td>
+<td>&quot;I want to do this from my phone&quot;</td>
+<td>React Native or PWA with signing capability</td>
+<td>New project</td>
+<td><strong>4</strong></td>
+</tr>
+<tr>
+<td>G11</td>
+<td>SDIS pages not integrated</td>
+<td>&quot;I want to verify my identity&quot;</td>
+<td>Integrate SDIS flows into main SPA</td>
+<td>pilot-ui</td>
+<td><strong>2</strong></td>
+</tr>
+<tr>
+<td>G12</td>
+<td>No offline queue for writes</td>
+<td>&quot;My network is unreliable&quot;</td>
+<td>Offline write queue with sync</td>
+<td>pilot-ui service worker</td>
+<td><strong>2</strong></td>
+</tr>
+<tr>
+<td>G13</td>
+<td>No notification UI</td>
+<td>&quot;Tell me when something happens&quot;</td>
+<td>Notification bell + push notifications</td>
+<td>pilot-ui</td>
+<td><strong>2</strong></td>
+</tr>
+<tr>
+<td>G14</td>
+<td>OpenAPI paths not exported</td>
+<td>SDK type generation incomplete</td>
+<td>Fix utoipa path generation</td>
+<td>icn-gateway</td>
+<td><strong>1</strong></td>
+</tr>
+<tr>
+<td>G15</td>
+<td>SDK has no key management</td>
+<td>&quot;How do I sign things?&quot;</td>
+<td>Ed25519 key generation helper in SDK</td>
+<td>sdk/typescript</td>
+<td><strong>1</strong></td>
+</tr>
+</tbody></table>
+<h3>Gaps by Surface</h3>
+<p><strong>pilot-ui</strong>:</p>
+<ul>
+<li>G1 (identity creation), G2 (auth), G3 (scope), G4 (receipts), G5 (multi-org), G6 (standing), G7 (delegation), G8 (treasury viz), G9 (appeals), G11 (SDIS integration), G12 (offline writes), G13 (notifications)</li>
+</ul>
+<p><strong>SDK</strong>:</p>
+<ul>
+<li>G15 (key management helper)</li>
+</ul>
+<p><strong>Gateway</strong>:</p>
+<ul>
+<li>G14 (OpenAPI paths)</li>
+</ul>
+<p><strong>Mobile (CoopWallet)</strong>:</p>
+<ul>
+<li>G10 (doesn&#39;t exist yet — entirely new project)</li>
+</ul>
+<h2>6. Phase 0 Tasks (8 tasks)</h2>
+<p>These are the minimum-viable UI changes needed for the &quot;Point A&quot; baseline to be usable by non-developers.</p>
+<h3>P0-UI-1: In-Browser Identity Creation</h3>
+<p><strong>What</strong>: Add &quot;Create Identity&quot; button on login screen that generates Ed25519 keypair in browser, derives DID, and allows download of encrypted keystore.
+<strong>Files to create/modify</strong>:</p>
+<ul>
+<li><code>web/pilot-ui/index.html</code> — Add &quot;Create New Identity&quot; section to login screen</li>
+<li><code>web/pilot-ui/crypto.js</code> — New file: Ed25519 key generation using WebCrypto API or noble-ed25519</li>
+<li><code>web/pilot-ui/app.js</code> — Wire creation flow, store keypair in IndexedDB (encrypted)
+<strong>API dependencies</strong>: None (local operation). Later: <code>POST /v1/auth/challenge</code> + <code>POST /v1/auth/verify</code> for auto-login after creation.
+<strong>Validation</strong>: User can create identity, see DID, and use it to log in — all in browser, no CLI needed.</li>
+</ul>
+<h3>P0-UI-2: Challenge-Response Auth in Browser</h3>
+<p><strong>What</strong>: Replace &quot;paste JWT token&quot; with in-browser challenge-response. User enters DID, browser fetches challenge, signs with stored key, gets JWT.
+<strong>Files to create/modify</strong>:</p>
+<ul>
+<li><code>web/pilot-ui/app.js</code> — Replace manual token paste with automatic challenge-response flow</li>
+<li><code>web/pilot-ui/crypto.js</code> — <code>sign(challenge, privateKey)</code> function</li>
+<li><code>web/pilot-ui/index.html</code> — Simplify login form (remove token field, add passphrase field for keystore unlock)
+<strong>API dependencies</strong>: <code>POST /v1/auth/challenge</code>, <code>POST /v1/auth/verify</code> (both exist)
+<strong>Validation</strong>: User enters DID + passphrase → automatic JWT acquisition, no CLI needed.</li>
+</ul>
+<h3>P0-UI-3: Scope Context Banner</h3>
+<p><strong>What</strong>: Add a persistent header banner showing: current cooperative name, jurisdiction (if any), active charter name, user&#39;s role, trust class.
+<strong>Files to create/modify</strong>:</p>
+<ul>
+<li><code>web/pilot-ui/index.html</code> — Add scope banner below header</li>
+<li><code>web/pilot-ui/app.js</code> — Fetch scope context on login (<code>GET /v1/coops/{coop}</code>, <code>GET /v1/charter?coop_id={coop}</code>)</li>
+<li><code>web/pilot-ui/style.css</code> — Banner styling
+<strong>API dependencies</strong>: <code>GET /v1/coops/{coop}</code> (exists), <code>GET /v1/charter</code> (exists), <code>GET /v1/trust/score/{did}</code> (exists)
+<strong>Validation</strong>: After login, banner shows &quot;Timebank Coop | Cooperative Charter v1 | Member | Trust: Known (0.35)&quot;</li>
+</ul>
+<h3>P0-UI-4: Receipt Chain Links from Governance</h3>
+<p><strong>What</strong>: When a proposal closes, display &quot;View Receipt Chain&quot; button that opens the receipt viewer pre-populated with the decision hash.
+<strong>Files to create/modify</strong>:</p>
+<ul>
+<li><code>web/pilot-ui/app.js</code> — Add receipt link to <code>renderProposalDetailHeader()</code> and <code>renderProposalList()</code></li>
+<li><code>web/pilot-ui/receipts.js</code> — Add <code>openForDecision(hash)</code> public function</li>
+<li><code>web/pilot-ui/index.html</code> — Unhide receipts tab
+<strong>API dependencies</strong>: <code>GET /v1/receipts/chain/{hash}</code> (exists), <code>GET /v1/gov/proposals/{id}/proof</code> (exists)
+<strong>Validation</strong>: Close a proposal → &quot;View Receipt Chain&quot; button → full chain displayed.</li>
+</ul>
+<h3>P0-UI-5: &quot;Constraints with Receipts&quot; Dashboard (#1012)</h3>
+<p><strong>What</strong>: Show active constraints for current user (rate limits, credit multipliers, voting weights) with links to the governance decisions that created them.
+<strong>Files to create/modify</strong>:</p>
+<ul>
+<li><code>web/pilot-ui/index.html</code> — Add &quot;My Constraints&quot; card to dashboard tab</li>
+<li><code>web/pilot-ui/app.js</code> — Fetch and render constraints
+<strong>API dependencies</strong>: Need new endpoint <code>GET /v1/constraints/{did}</code> OR derive from <code>GET /v1/trust/score/{did}</code> + governance config. May need gateway endpoint addition.
+<strong>Validation</strong>: Dashboard shows &quot;Rate Limit: 20 msg/sec (from Trust Class: Known)&quot; with link to trust score source.</li>
+</ul>
+<h3>P0-UI-6: &quot;What Law Applies?&quot; Stub</h3>
+<p><strong>What</strong>: Add &quot;Governing Law&quot; section to scope banner that links to the active charter/constitution document.
+<strong>Files to create/modify</strong>:</p>
+<ul>
+<li><code>web/pilot-ui/index.html</code> — Extend scope banner with charter link</li>
+<li><code>web/pilot-ui/app.js</code> — Fetch charter details, render link
+<strong>API dependencies</strong>: <code>GET /v1/charter/{id}</code> (exists), <code>GET /v1/charter?coop_id={coop}</code> (exists)
+<strong>Validation</strong>: Banner shows clickable &quot;Governed by: Cooperative Charter v1 (Active since 2025-12-03)&quot; that opens charter detail.</li>
+</ul>
+<h3>P0-UI-7: LAN Accessibility Fixes</h3>
+<p><strong>What</strong>: pilot-ui currently hardcodes <code>http://localhost:8080</code>. Make gateway URL auto-detected or configurable for LAN access.
+<strong>Files to create/modify</strong>:</p>
+<ul>
+<li><code>web/pilot-ui/app.js</code> — Auto-detect gateway URL from <code>window.location.origin</code> (since UI is served from gateway)</li>
+<li><code>web/pilot-ui/index.html</code> — Pre-fill gateway URL with current host
+<strong>API dependencies</strong>: None
+<strong>Validation</strong>: Access pilot-ui at <code>http://192.168.1.X:8080</code> and login works without manual URL change.</li>
+</ul>
+<h3>P0-UI-8: Non-Developer Onboarding Flow</h3>
+<p><strong>What</strong>: Guided wizard combining P0-UI-1 + P0-UI-2: &quot;Create Identity → Join Cooperative (via invite code) → Auto-login → Dashboard&quot;
+<strong>Files to create/modify</strong>:</p>
+<ul>
+<li><code>web/pilot-ui/index.html</code> — Add onboarding wizard overlay</li>
+<li><code>web/pilot-ui/app.js</code> — Wizard state machine (3 steps)</li>
+<li><code>web/pilot-ui/style.css</code> — Wizard styling
+<strong>API dependencies</strong>: Identity creation (P0-UI-1), auth (P0-UI-2), <code>POST /v1/invites/join</code> (exists)
+<strong>Validation</strong>: Non-developer opens URL → clicks &quot;Get Started&quot; → creates identity → enters invite code → sees dashboard. No CLI needed.</li>
+</ul>
+<h2>7. Phase 1 Tasks (5 tasks)</h2>
+<h3>P1-UI-1: Standing &amp; Capability Display</h3>
+<p><strong>What</strong>: Profile tab shows user&#39;s trust score, trust class, active roles, capabilities, and rate limits.
+<strong>Files</strong>: <code>web/pilot-ui/app.js</code> (profile section), <code>web/pilot-ui/index.html</code> (profile tab)
+<strong>API deps</strong>: <code>GET /v1/trust/score/{did}</code>, <code>GET /v1/members/{coop}/{did}</code>, <code>GET /v1/membership/status/{did}</code> (all exist)</p>
+<h3>P1-UI-2: Multi-Org Affiliations Home Screen</h3>
+<p><strong>What</strong>: After login, show all cooperatives the user belongs to. Allow switching between them without full logout.
+<strong>Files</strong>: New affiliations component in <code>app.js</code>, modified login flow to query multiple coops
+<strong>API deps</strong>: Need <code>GET /v1/coops?member={did}</code> or similar. May need new endpoint.</p>
+<h3>P1-UI-3: Treasury Spend Visualization with Receipt Chain</h3>
+<p><strong>What</strong>: New &quot;Treasury&quot; tab showing collective balance, pending proposals, and completed spend flows with full receipt chains.
+<strong>Files</strong>: New tab in <code>index.html</code> + <code>app.js</code>
+<strong>API deps</strong>: <code>GET /v1/treasury/{coop}/status</code>, <code>GET /v1/treasury/{coop}/balance</code>, <code>GET /v1/receipts/chain/{hash}</code> (all exist)</p>
+<h3>P1-UI-4: Delegation Management UI</h3>
+<p><strong>What</strong>: In Governance tab, add delegation management: create delegation (blanket/domain/proposal scoped), view active delegations, revoke.
+<strong>Files</strong>: Extend governance section in <code>index.html</code> + <code>app.js</code>
+<strong>API deps</strong>: <code>POST /v1/gov/delegations</code>, <code>GET /v1/gov/delegations</code>, <code>DELETE /v1/gov/delegations/{id}</code> (all exist)</p>
+<h3>P1-UI-5: Appeal Filing Entry Point</h3>
+<p><strong>What</strong>: &quot;File Appeal&quot; button on closed proposals and governance decisions. Appeal form with grounds, evidence upload, respondent selection.
+<strong>Files</strong>: New modal in <code>index.html</code> + handler in <code>app.js</code>
+<strong>API deps</strong>: <code>POST /v1/constitutional/appeals</code> (exists but stub logic)</p>
+<h2>8. Phase 4 Tasks (5 tasks)</h2>
+<h3>P4-UI-1: CoopWallet MVP (React Native)</h3>
+<p><strong>What</strong>: Build mobile wallet that can: create identity, scan QR codes, sign challenges, view balance, vote.
+<strong>Files</strong>: New <code>apps/coop-wallet/</code> directory, React Native project
+<strong>Dependencies</strong>: P0-UI-1 (crypto), P0-UI-2 (auth), SDK for API calls</p>
+<h3>P4-UI-2: Mobile-First Identity (Signer → Lightweight Node)</h3>
+<p><strong>What</strong>: Mobile app starts as pure signer (scan QR, sign challenges), evolves to lightweight node that can receive gossip.
+<strong>Dependencies</strong>: P4-UI-1, icn-net QUIC library compiled for mobile</p>
+<h3>P4-UI-3: Offline Queue + Sync</h3>
+<p><strong>What</strong>: Queue write operations when offline, replay on reconnect with conflict detection.
+<strong>Files</strong>: Extend pilot-ui service worker, add to mobile app
+<strong>Dependencies</strong>: <code>offline-storage.js</code> exists but only caches reads</p>
+<h3>P4-UI-4: Mobile Affiliations</h3>
+<p><strong>What</strong>: Multi-org membership view on mobile with push notifications per org.
+<strong>Dependencies</strong>: P4-UI-1, P1-UI-2 (affiliations data), notification infrastructure</p>
+<h3>P4-UI-5: Steward Mobile Enrollment</h3>
+<p><strong>What</strong>: Mobile-optimized SDIS enrollment with camera access for spatial proofs.
+<strong>Dependencies</strong>: P4-UI-1, SDIS verification endpoints (exist but stub)</p>
+<h2>9. Relevant Open Issues</h2>
+<ul>
+<li><strong>#1012</strong>: &quot;Constraints with Receipts&quot; dashboard — directly maps to P0-UI-5</li>
+<li>QR login flow backend exists but no mobile client to complete it</li>
+<li>SDIS verification endpoints exist but have basic/stub logic</li>
+<li>Constitutional endpoints (amendments, appeals) exist but have minimal backend logic</li>
+<li>OpenAPI spec has schemas but empty paths (utoipa generation issue)</li>
+<li>Service Worker caches reads but doesn&#39;t queue writes</li>
+<li>i18n: English + Spanish only (pilot-ui has <code>locales/en.json</code>; icnctl has <code>en.yaml</code> + <code>es.yaml</code>)</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

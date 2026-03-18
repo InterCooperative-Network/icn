@@ -1,0 +1,466 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN System Gaps - Comprehensive Analysis | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>archive</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>2025</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>SYSTEM GAPS 2025 12 06</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/archive/2025/SYSTEM_GAPS_2025-12-06.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><p>⚠️ <strong>ARCHIVED</strong> - This document is from 2025 and has been archived.</p>
+<p>For current information, see:</p>
+<ul>
+<li><a href="/docs/STATE">STATE.md</a> - Current project state</li>
+<li><a href="/docs/TODO">TODO.md</a> - Current tasks</li>
+<li><a href="/docs/ARCHITECTURE">ARCHITECTURE.md</a> - Current architecture</li>
+</ul>
+<hr>
+<h1>ICN System Gaps - Comprehensive Analysis</h1>
+<p><strong>Date</strong>: 2025-12-06
+<strong>Updated</strong>: 2025-12-13
+<strong>Purpose</strong>: Complete inventory of incomplete functionality, architectural issues, and design oversights
+<strong>Scope</strong>: Core systems only (not pilot UX gaps)</p>
+<hr>
+<h2>Executive Summary</h2>
+<p>Deep audit of ICN core systems revealed <strong>47 significant gaps</strong> across:</p>
+<ul>
+<li>15 incomplete features (TODOs/stubs)</li>
+<li>12 architectural issues (coupling, layering, ownership)</li>
+<li>11 consistency/race conditions</li>
+<li>9 trust enforcement gaps</li>
+</ul>
+<p><strong>Critical Finding</strong>: The infrastructure is ~90% complete, but the remaining 10% includes <strong>critical consistency bugs</strong> and <strong>security model gaps</strong> that would cause production failures.</p>
+<p><strong>Update 2025-12-07</strong>: All 8 Critical issues and all 9 High priority issues have been addressed. See status below.
+<strong>Update 2025-12-13</strong>: C3 (Actor Pause/Resume) verified as implemented. M8 (Floating Point Selection) fixed with deterministic tie-breaking. M3 (Dead-Letter Queue) implemented. M6 (Fork Detection) and A7 (Panics) verified as non-issues. M2 (Profile Query Responses) implemented. M4 (Executor Capacity) implemented. A1 Phase 1 complete (supervisor modularization started). M1 (TURN Relay) implemented with RFC 5766 protocol. M7 (Balance Recomputation Race) fixed with journal versioning. A1 Phase 2 (init_rpc.rs extraction) complete. M5 (Locality/RTT) integrated via LocalityCallback. M9 (Deliberation Clock Skew) fixed with relative timing. A5 (Configuration Sprawl) fixed with SupervisorConfig struct. A6 (Error Swallowing) fixed with supervisor error metrics for observability. A2 (Circular Dependencies) verified as non-issue - dependencies form DAG. A3 (Trust Graph), A4 (Callback Patterns), A8 (Byzantine Detector) verified as appropriate patterns.</p>
+<hr>
+<h2>Priority 1: CRITICAL (Production Blockers)</h2>
+<p>These must be fixed before any real-world use.</p>
+<h3>C1. Ledger Rollback Not Implemented - FIXED</h3>
+<p><strong>Location</strong>: <code>icn-core/src/supervisor.rs:2206</code>, <code>icn-ledger/src/ledger.rs</code>
+<strong>Issue</strong>: Governance proposals for ledger rollback are accepted but never executed
+<strong>Impact</strong>: Emergency recovery impossible
+<strong>Fix</strong>: Implemented <code>Ledger::rollback_to_entry()</code> method with archive storage, balance recomputation, fork index rebuild, and gossip notification. Supervisor now executes rollback when governance proposal is accepted.</p>
+<h3>C2. Dispute Resolution Not Executed - FIXED</h3>
+<p><strong>Location</strong>: <code>icn-core/src/supervisor.rs:2276</code>
+<strong>Issue</strong>: DisputeResolution proposals accepted but not applied to ledger
+<strong>Impact</strong>: Accepted dispute decisions have no effect
+<strong>Fix</strong>: Supervisor now maps governance <code>DisputeResolutionOutcome</code> to ledger <code>DisputeOutcome</code> and calls <code>DisputeManager::resolve_escalated_dispute()</code> when proposals are accepted.</p>
+<h3>C3. Actor Pause/Resume Missing (Compute Migration) - FIXED</h3>
+<p><strong>Location</strong>: <code>icn-compute/src/migration_manager.rs</code>, <code>icn-compute/src/actor_runtime.rs</code>
+<strong>Issue</strong>: Actor migration has TODO for &quot;Week 4 integration&quot; - no pause/resume
+<strong>Impact</strong>: Live migration will corrupt actor state
+<strong>Fix</strong>: Implemented actor execution control. <code>MigrationManager</code> has <code>pause_actor()</code>, <code>resume_actor()</code>, and <code>restore_actor()</code> methods that send <code>ActorRuntimeCommand</code> variants. <code>StatefulActorRegistry</code> handles these commands via <code>create_callback()</code> integration. Full state machine: Running → Paused → Migrating → (transferred to target) with proper checkpoint coordination.</p>
+<h3>C4. Gossip Handle Race in Ledger - FIXED</h3>
+<p><strong>Location</strong>: <code>icn-ledger/src/ledger.rs</code>
+<strong>Issue</strong>: <code>gossip.take()</code> during entry append creates window where new entries silently fail to publish
+<strong>Impact</strong>: Entries stored locally but never propagated → split-brain
+<strong>Fix</strong>: Added <code>append_entry_from_sync()</code> method to avoid re-broadcasting entries received from gossip. Removed dangerous <code>.take()</code> pattern.</p>
+<h3>C5. Trust Penalty Callback Race - FIXED</h3>
+<p><strong>Location</strong>: <code>icn-core/src/supervisor.rs:161-193</code>
+<strong>Issue</strong>: <code>tokio::spawn()</code> without await means trust updates race with gossip updates
+<strong>Impact</strong>: Trust scores diverge across network
+<strong>Fix</strong>: Changed from fire-and-forget <code>tokio::spawn</code> to synchronous <code>tokio::task::block_in_place</code> for trust penalty callback, ensuring updates complete before returning.</p>
+<h3>C6. Vote Tally Not Synchronized - VERIFIED IMPLEMENTED</h3>
+<p><strong>Location</strong>: <code>icn-core/src/governance/actor.rs:512-559</code>
+<strong>Issue</strong>: Tally computed on-demand, not persisted. Different nodes see different counts.
+<strong>Impact</strong>: Governance proposals may pass on some nodes, fail on others
+<strong>Status</strong>: Already implemented. Governance actor computes tally when closing proposals and broadcasts <code>ProposalClosed</code> message with canonical <code>TallySnapshot</code> via gossip.</p>
+<h3>C7. Proposal Outcome Not Gossiped - VERIFIED IMPLEMENTED</h3>
+<p><strong>Location</strong>: <code>icn-core/src/governance/actor.rs:553-559</code>, <code>icn-governance/src/message.rs</code>
+<strong>Issue</strong>: When proposal closes, outcome is local only
+<strong>Impact</strong>: Nodes don&#39;t know final governance decisions
+<strong>Status</strong>: Already implemented. <code>GovernanceMessage::ProposalClosed</code> variant includes outcome and tally snapshot. Receiving nodes handle and store the outcome (lines 776-791).</p>
+<h3>C8. RPC/Gateway Has No Trust-Based Rate Limiting - FIXED</h3>
+<p><strong>Location</strong>: <code>icn-rpc/src/server.rs</code>, <code>icn-rpc/src/auth.rs</code>
+<strong>Issue</strong>: All authenticated users get same rate limits regardless of trust
+<strong>Impact</strong>: Low-trust peers can spam API
+<strong>Fix</strong>: Added trust-gated rate limiter to RPC server using <code>icn_net::RateLimiter</code>. Different trust levels get different limits (Isolated: 10/sec, Known: 50/sec, Partner: 100/sec, Federated: 200/sec). Enabled automatically in supervisor.</p>
+<hr>
+<h2>Priority 2: HIGH (Correctness Issues)</h2>
+<p>These cause incorrect behavior but may not immediately crash the system.</p>
+<h3>H1. Configuration Changes Not Applied - FIXED</h3>
+<p><strong>Location</strong>: <code>icn-core/src/supervisor.rs:2083</code>
+<strong>Issue</strong>: ConfigChange proposals accepted but never take effect
+<strong>Fix</strong>: Implemented config update execution. Supervisor now parses <code>new_config</code> JSON string into <code>GovernanceConfig</code>, calls <code>GovernanceCommand::UpdateDomainConfig</code> which updates the domain and broadcasts <code>DomainUpdated</code> message via gossip.</p>
+<h3>H2. Membership Updates Not Executed - FIXED</h3>
+<p><strong>Location</strong>: <code>icn-core/src/supervisor.rs:2089</code>
+<strong>Issue</strong>: Member add/remove proposals don&#39;t modify actual membership
+<strong>Fix</strong>: Implemented membership update execution. Added <code>GovernanceCommand::UpdateMembership</code> which adds/removes members from <code>MembershipSource::StaticList</code>. Supervisor calls this when Membership proposals are accepted. Gossip broadcasts <code>DomainUpdated</code>.</p>
+<h3>H3. Replica Threshold Never Checked - FIXED</h3>
+<p><strong>Location</strong>: <code>icn-gossip/src/gossip.rs:1573</code>
+<strong>Issue</strong>: Phase 17 incomplete - replica count below threshold not detected
+<strong>Fix</strong>: Added immediate replica threshold check during <code>ReplicaStatus</code> message handling. Now checks if healthy replica count &lt; 3, emits <code>content_under_replicated_detected_total</code> metric, and logs warning. ReplicationManager handles remediation via its periodic health check.</p>
+<h3>H4. Partition Healing Incomplete - FIXED</h3>
+<p><strong>Location</strong>: <code>icn-gossip/src/gossip.rs:248</code>
+<strong>Issue</strong>: TODO for PartitionHealRequest/Response - uses empty VectorClock
+<strong>Impact</strong>: Partitions detected but not actually healed
+<strong>Fix</strong>: <code>heal_partition_with_peer()</code> now sends <code>PartitionHealRequest</code> with actual vector clock. Added <code>mark_healing_started/complete</code> to PartitionHealer for tracking. Response handler merges clocks and requests diverged entries.</p>
+<h3>H5. Ledger Entry Acceptance Has No Trust Check - FIXED</h3>
+<p><strong>Location</strong>: <code>icn-ledger/src/ledger.rs</code> - append_entry()
+<strong>Issue</strong>: Credit limits use trust, but entry acceptance doesn&#39;t validate trust
+<strong>Impact</strong>: Malicious peers can spam ledger up to credit limit
+<strong>Fix</strong>: Added <code>trust_graph</code> and <code>min_trust_for_entry</code> fields to Ledger. <code>append_entry_internal()</code> now validates author&#39;s trust score against threshold (default 0.1 = Known class). Rejects entries from low-trust authors with metric tracking.</p>
+<h3>H6. Default Trust Thresholds Too Permissive - FIXED</h3>
+<p><strong>Locations</strong>: TLS (0.0), Compute (0.0)
+<strong>Issue</strong>: Default accepts everyone with valid DID
+<strong>Fix</strong>: Updated <code>TrustGatedRateLimitConfig.min_trust_threshold</code> default from 0.0 to 0.1 (Known trust class minimum). Added warning in TLS fallback path to indicate development-only mode. Compute already uses proper defaults (MIN_TRUST_SUBMIT=0.1, MIN_TRUST_EXECUTE=0.3).</p>
+<h3>H7. Gossip Messages Not Trust-Gated - FIXED</h3>
+<p><strong>Location</strong>: <code>icn-gossip/src/gossip.rs</code>
+<strong>Issue</strong>: Subscriptions check trust, but message flow doesn&#39;t
+<strong>Fix</strong>: Added trust validation at start of <code>handle_message()</code>. Messages from senders with trust &lt; 0.1 (Known class) are rejected. Unknown senders are also rejected. Metric <code>messages_rejected_low_trust_total</code> tracks rejections.</p>
+<h3>H8. Vector Clock Merge Missing Conflict Data - FIXED</h3>
+<p><strong>Location</strong>: <code>icn-gossip/src/partition.rs:145-189</code>
+<strong>Issue</strong>: Merge returns version numbers but no actual conflict entries
+<strong>Fix</strong>: Created <code>VersionGap</code> struct with <code>author_did</code>, <code>local_version</code>, <code>remote_version</code>, <code>detected_at</code> timestamp, and <code>GapDirection</code> (RemoteAhead/LocalAhead/Diverged). Merge now returns <code>Vec&lt;VersionGap&gt;</code> with full context. Added <code>merge_simple()</code> for backward compatibility.</p>
+<h3>H9. Task Completion Not Published - VERIFIED IMPLEMENTED</h3>
+<p><strong>Location</strong>: <code>icn-compute/src/actor.rs:1424-1427</code>
+<strong>Issue</strong>: Status updated locally, never gossiped
+<strong>Status</strong>: Already implemented. <code>ComputeActor</code> broadcasts <code>ComputeMessage::TaskResult</code> via <code>send_callback</code> after local execution (line 1425). It also broadcasts <code>TaskCancelled</code> for cancellations (line 1004) and <code>TaskResult</code> with timeout outcome for deadline failures (line 825). The <code>task.rs</code> file only manages local state; gossip publishing is correctly handled at the actor level.</p>
+<hr>
+<h2>Priority 3: MEDIUM (Quality/Reliability)</h2>
+<p>These affect robustness but system can function.</p>
+<h3>M1. NAT Traversal Relay Fallback Missing - FIXED</h3>
+<p><strong>Location</strong>: <code>icn-net/src/turn.rs</code>, <code>icn-net/src/session.rs</code>
+<strong>Issue</strong>: TURN relay not implemented (Phase 4 TODO)
+<strong>Impact</strong>: Nodes behind symmetric NAT can&#39;t connect
+<strong>Fix</strong>: Implemented <code>TurnClient</code> with RFC 5766 protocol (allocate, refresh, create_permission). Added <code>TurnConfig</code> with builder pattern to <code>NetworkConfig</code>. <code>SessionManager</code> creates allocation on startup if configured and includes relay address in connection candidates. Added TURN metrics.</p>
+<h3>M2. Profile Query Responses Not Implemented - FIXED</h3>
+<p><strong>Location</strong>: <code>icn-core/src/supervisor/mod.rs:1363</code>
+<strong>Issue</strong>: Profile queries received but not answered
+<strong>Fix</strong>: Implemented profile query response handler. When a Query message is received, looks up the requested DID (own profile or cached peer profile) and publishes a Response message via gossip.</p>
+<h3>M3. Dead-Letter Queue Missing - FIXED</h3>
+<p><strong>Location</strong>: <code>icn-core/src/dead_letter.rs</code>
+<strong>Issue</strong>: Failed ledger entries logged but no recovery path
+<strong>Fix</strong>: Implemented <code>DeadLetterQueue</code> with persistent storage, failure type tracking, retry support, and Prometheus metrics. Provides <code>FailedOperation</code> entries with context for manual review or automated retry.</p>
+<h3>M4. Executor Capacity Not Tracked - FIXED</h3>
+<p><strong>Location</strong>: <code>icn-compute/src/actor.rs:2206</code>
+<strong>Issue</strong>: Scheduler can&#39;t make informed placement decisions
+<strong>Fix</strong>: Added <code>capacity</code> field to <code>ExecutorInfo</code> struct. <code>on_capacity_announce()</code> now stores capacity in the executor registry. Added <code>get_executor_capacity()</code> and <code>get_all_executor_capacities()</code> methods for scheduler placement decisions.</p>
+<h3>M5. Locality/Region Constraints Incomplete - FIXED</h3>
+<p><strong>Location</strong>: <code>icn-compute/src/actor.rs:1931-1937</code>, <code>icn-core/src/supervisor/mod.rs:2613-2643</code>
+<strong>Issue</strong>: Network RTT and blob registry integration missing
+<strong>Fix</strong>: Added <code>LocalityCallback</code> type to ComputeActor that queries network topology for RTT data. Supervisor wires up callback to NeighborSets for live RTT lookup. Placement scoring now uses real network latency data when available.</p>
+<h3>M6. Fork Detection Index Not Atomic - VERIFIED NON-ISSUE</h3>
+<p><strong>Location</strong>: <code>icn-ledger/src/ledger.rs:119-176</code>
+<strong>Issue</strong>: Entry stored before fork index updated - crash window
+<strong>Status</strong>: The ForkDetector is an in-memory structure that is rebuilt from persistent entries on startup via <code>rebuild_fork_index()</code>. Any crash window is recovered on restart. Not a data consistency issue.</p>
+<h3>M7. Balance Recomputation Race - FIXED</h3>
+<p><strong>Location</strong>: <code>icn-ledger/src/ledger.rs:531-578</code>
+<strong>Issue</strong>: Full recompute during quarantine can cause lost updates
+<strong>Fix</strong>: Added <code>journal_version</code> tracking to Ledger. <code>recompute_balances()</code> validates snapshot isolation via version check before applying. Added <code>recompute_balances_with_retry()</code> convenience method that retries on version mismatch.</p>
+<h3>M8. Floating Point Offer Selection - FIXED</h3>
+<p><strong>Location</strong>: <code>icn-compute/src/actor.rs:2118-2126</code>
+<strong>Issue</strong>: f64 comparison non-deterministic across platforms
+<strong>Fix</strong>: Implemented deterministic tie-breaking with epsilon-based float comparison (1e-9 threshold) and lexicographic DID comparison as tie-breaker for equal scores.</p>
+<h3>M9. Deliberation Period Clock Skew - FIXED</h3>
+<p><strong>Location</strong>: <code>icn-compute/src/actor.rs:2052-2063</code>
+<strong>Issue</strong>: 500ms wait uses local wall-clock, not synchronized
+<strong>Fix</strong>: Implemented relative timing based on <code>requested_at</code> timestamp from PlacementRequest. Executors calculate <code>deadline = requested_at + DELIBERATION_PERIOD_MS</code> and wait only the remaining time, ensuring all executors broadcast at approximately the same wall-clock time regardless of network latency.</p>
+<hr>
+<h2>Priority 4: ARCHITECTURAL (Technical Debt)</h2>
+<p>These don&#39;t cause immediate bugs but make the system harder to maintain.</p>
+<h3>A1. Supervisor God Object - IN PROGRESS</h3>
+<p><strong>Location</strong>: <code>icn-core/src/supervisor/</code> (now modular)
+<strong>Issue</strong>: Creates, wires, and manages 12+ subsystems with 38+ lock acquisitions
+<strong>Impact</strong>: Can&#39;t test components in isolation, high-risk changes
+<strong>Status</strong>: Phase 1 complete (2025-12-13). Extracted to supervisor/ directory with modules:</p>
+<ul>
+<li><code>init_trust.rs</code> - Trust graph and misbehavior detector</li>
+<li><code>init_gossip.rs</code> - Gossip actor, partitions, replication</li>
+<li><code>init_ledger.rs</code> - Ledger, disputes, contracts</li>
+<li><code>registry.rs</code> - Service container types</li>
+<li><code>shutdown.rs</code> - Graceful shutdown and snapshot management</li>
+<li><code>mod.rs</code> - Main supervisor (reduced from 3571 to 3256 lines, -315 lines)
+<strong>Remaining</strong>: Network/message handlers, governance subscriptions, compute callbacks have deeply embedded closures requiring fuller ServiceRegistry integration</li>
+</ul>
+<h3>A2. Circular Crate Dependencies - VERIFIED NON-ISSUE</h3>
+<p><strong>Locations</strong>: icn-net ↔ icn-gossip ↔ icn-ledger
+<strong>Claimed Issue</strong>: Can&#39;t version or update crates independently
+<strong>Verification</strong>: Analyzed with <code>cargo tree</code>. Dependencies form a DAG, not a cycle:</p>
+<ul>
+<li>icn-net → icn-ledger, icn-gossip</li>
+<li>icn-ledger → icn-gossip (no reverse dependency)</li>
+<li>icn-gossip → icn-identity, icn-trust, etc. (no dependency on icn-net or icn-ledger)
+No circular dependencies exist. Crates can be versioned independently.</li>
+</ul>
+<h3>A3. Multiple Sources of Truth (Trust Graph) - VERIFIED APPROPRIATE PATTERN</h3>
+<p><strong>Issue</strong>: Trust graph shared via Arc&lt;RwLock&lt;&gt;&gt; to 6+ actors without coordination
+<strong>Analysis</strong>: Arc&lt;RwLock&lt;&gt;&gt; IS the coordination mechanism. This is the standard Rust pattern for shared mutable state across actors. The RwLock provides:</p>
+<ul>
+<li>Multiple concurrent readers</li>
+<li>Exclusive writer access</li>
+<li>Automatic coordination via lock acquisition
+Alternative patterns (message-passing, CRDT) would add complexity without benefit for in-process actors.</li>
+</ul>
+<h3>A4. Inconsistent Callback Patterns - VERIFIED APPROPRIATE PATTERN</h3>
+<p><strong>Issue</strong>: Each actor defines own callback types, no common abstraction
+<strong>Analysis</strong>: Actors have different callback needs (different input/output types, sync vs async). A common ActorCallback trait would require either:</p>
+<ul>
+<li>Excessive generics that hurt ergonomics</li>
+<li>Runtime type erasure that loses type safety
+The current approach provides type-safe, actor-specific callbacks. This is idiomatic Rust.</li>
+</ul>
+<h3>A5. Configuration Sprawl - FIXED</h3>
+<p><strong>Issue</strong>: Hardcoded values scattered across supervisor.rs
+<strong>Fix</strong>: Created <code>SupervisorConfig</code> struct in <code>config.rs</code> centralizing:</p>
+<ul>
+<li><code>candidate_cleanup_interval_secs</code> (default: 300)</li>
+<li><code>peer_exchange_delay_ms</code> (default: 500)</li>
+<li><code>peer_exchange_max_peers</code> (default: 50)</li>
+<li><code>metrics_update_interval_secs</code> (default: 10)</li>
+<li><code>shutdown_timeout_secs</code> (default: 5)</li>
+<li><code>clock_sync_interval_secs</code> (default: 600)
+Updated supervisor.rs to use config values instead of hardcoded literals.</li>
+</ul>
+<h3>A6. Error Swallowing - FIXED (OBSERVABILITY APPROACH)</h3>
+<p><strong>Locations</strong>: 8+ places in supervisor.rs
+<strong>Issue</strong>: Errors logged but not propagated
+<strong>Analysis</strong>: Most errors occur in async contexts (background tasks, notification handlers) where there&#39;s no caller to propagate to. Logging is the appropriate pattern for these cases.
+<strong>Fix</strong>: Added <code>icn_obs::metrics::supervisor</code> module with observability metrics:</p>
+<ul>
+<li><code>icn_supervisor_errors_total{operation}</code> - Error counter by operation type</li>
+<li><code>icn_supervisor_state</code> - State gauge (0=stopped, 1=starting, 2=running, 3=stopping)</li>
+<li><code>icn_supervisor_actors_spawned_total{actor}</code> - Actor spawn counter</li>
+<li><code>icn_supervisor_actor_spawn_failures_total{actor}</code> - Spawn failure counter
+Key error locations instrumented: metrics_server_start, rpc_server, gateway_server, identity_bundle_missing, gateway_jwt_secret_missing, shutdown_timeout. Errors are now alertable via Prometheus.</li>
+</ul>
+<h3>A7. Panic! in Production Code - VERIFIED NON-ISSUE</h3>
+<p><strong>Locations</strong>: icn-ledger/sync.rs:86, icn-ledger/dispute.rs:553,625, icn-net/protocol.rs (6 places)
+<strong>Issue</strong>: Panics instead of error returns
+<strong>Status</strong>: All reported panics are inside <code>#[cfg(test)]</code> modules (test code only). No panics exist in production code paths. Verified 2025-12-13.</p>
+<h3>A8. Byzantine Detector Ownership Unclear - VERIFIED APPROPRIATE PATTERN</h3>
+<p><strong>Issue</strong>: Created in supervisor, shared to Network, Gossip, Ledger
+<strong>Analysis</strong>: Ownership IS explicit:</p>
+<ul>
+<li><strong>Created</strong>: <code>init_trust.rs</code> line 56-64, part of TrustServices</li>
+<li><strong>Owned</strong>: Supervisor holds the Arc&lt;RwLock<MisbehaviorDetector>&gt;</li>
+<li><strong>Shared</strong>: Passed to NetworkActor, GossipActor, LedgerDeps, ComputeActor via clone()
+This is the correct pattern for a component that:</li>
+<li>Aggregates misbehavior reports from multiple sources</li>
+<li>Provides unified tracking across actors</li>
+<li>Applies trust penalties when thresholds are exceeded
+Well-documented in <code>init_trust.rs</code> with comments explaining the shared ownership design.</li>
+</ul>
+<hr>
+<h2>Gap Summary by System</h2>
+<table>
+<thead>
+<tr>
+<th>System</th>
+<th>Critical</th>
+<th>High</th>
+<th>Medium</th>
+<th>Arch</th>
+<th>Total</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Ledger</td>
+<td>1</td>
+<td>2</td>
+<td>2</td>
+<td>0</td>
+<td>5</td>
+</tr>
+<tr>
+<td>Governance</td>
+<td>2</td>
+<td>2</td>
+<td>0</td>
+<td>0</td>
+<td>4</td>
+</tr>
+<tr>
+<td>Trust</td>
+<td>1</td>
+<td>3</td>
+<td>0</td>
+<td>1</td>
+<td>5</td>
+</tr>
+<tr>
+<td>Gossip</td>
+<td>0</td>
+<td>2</td>
+<td>0</td>
+<td>0</td>
+<td>2</td>
+</tr>
+<tr>
+<td>Compute</td>
+<td>1</td>
+<td>1</td>
+<td>4</td>
+<td>0</td>
+<td>6</td>
+</tr>
+<tr>
+<td>Network</td>
+<td>0</td>
+<td>0</td>
+<td>1</td>
+<td>0</td>
+<td>1</td>
+</tr>
+<tr>
+<td>RPC/Gateway</td>
+<td>1</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>1</td>
+</tr>
+<tr>
+<td>Core/Supervisor</td>
+<td>2</td>
+<td>2</td>
+<td>2</td>
+<td>7</td>
+<td>13</td>
+</tr>
+<tr>
+<td><strong>Total</strong></td>
+<td><strong>8</strong></td>
+<td><strong>12</strong></td>
+<td><strong>9</strong></td>
+<td><strong>8</strong></td>
+<td><strong>47</strong></td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Recommended Fix Order</h2>
+<h3>Week 1: Critical Consistency Fixes</h3>
+<ol>
+<li>C4 - Ledger gossip handle race (prevents split-brain)</li>
+<li>C5 - Trust penalty callback race (prevents trust divergence)</li>
+<li>C6 - Vote tally synchronization (governance correctness)</li>
+<li>C7 - Proposal outcome gossip (governance visibility)</li>
+</ol>
+<h3>Week 2: Critical Feature Completion</h3>
+<ol start="5">
+<li>C1 - Ledger rollback implementation</li>
+<li>C2 - Dispute resolution execution</li>
+<li>C8 - Trust-based API rate limiting</li>
+</ol>
+<h3>Week 3: High Priority Correctness</h3>
+<ol start="8">
+<li>H4 - Partition healing protocol</li>
+<li>H5 - Ledger entry trust validation</li>
+<li>H7 - Gossip message trust gating</li>
+<li>H1/H2 - Config and membership updates</li>
+</ol>
+<h3>Week 4: Compute Layer Completion</h3>
+<ol start="12">
+<li>C3 - Actor pause/resume</li>
+<li>H9 - Task completion gossip</li>
+<li>M4/M5 - Executor capacity and locality</li>
+</ol>
+<h3>Week 5+: Architectural Cleanup</h3>
+<ol start="15">
+<li>A1 - Supervisor refactoring (incremental)</li>
+<li>A6/A7 - Error handling cleanup</li>
+<li>A2 - Crate dependency cleanup</li>
+</ol>
+<hr>
+<h2>Test Coverage Needed</h2>
+<pre><code class="language-rust">// Critical consistency tests
+test_ledger_concurrent_append_with_gossip()
+test_trust_penalty_vs_gossip_race()
+test_proposal_tally_consistency_across_nodes()
+test_partition_heal_with_conflicting_entries()
+test_task_completion_both_nodes_agree()
+
+// Trust enforcement tests
+test_ledger_entry_rejected_low_trust()
+test_api_rate_limited_by_trust_class()
+test_gossip_message_rejected_low_trust()
+
+// Governance tests
+test_proposal_outcome_gossip_propagation()
+test_vote_ordering_deterministic()
+
+// Compute tests
+test_actor_migration_pause_resume()
+test_task_status_gossip_sync()
+</code></pre>
+<hr>
+<h2>What&#39;s Actually Working Well</h2>
+<p>Despite the gaps, these systems are solid:</p>
+<ul>
+<li><strong>Identity &amp; Keystore</strong>: Multi-device, age-encrypted, migrations work</li>
+<li><strong>Network Layer</strong>: QUIC/TLS, rate limiting, signed envelopes all good</li>
+<li><strong>Gossip Core</strong>: Vector clocks, subscriptions, anti-entropy work</li>
+<li><strong>Ledger Core</strong>: Double-entry, Merkle-DAG, credit limits work</li>
+<li><strong>Contract Execution</strong>: CCL interpreter, fuel metering work</li>
+<li><strong>Security Detection</strong>: Byzantine detection, reputation, quarantine work</li>
+<li><strong>Gateway API</strong>: REST/WebSocket endpoints, JWT auth work</li>
+</ul>
+<p>The gaps are in <strong>integration</strong> (systems don&#39;t talk to each other correctly) and <strong>edge cases</strong> (concurrent operations, failure recovery).</p>
+<hr>
+<h2>Conclusion</h2>
+<p>The ICN codebase is architecturally sound but has critical integration gaps. The most dangerous issues are:</p>
+<ol>
+<li><strong>Consistency bugs</strong> that cause split-brain (ledger, trust, governance)</li>
+<li><strong>Trust enforcement gaps</strong> that undermine the security model</li>
+<li><strong>Incomplete features</strong> marked TODO that are assumed working</li>
+</ol>
+<p>Fixing the 8 Critical items is essential before any production use. The 12 High items should follow. The Medium and Architectural items can be addressed incrementally.</p>
+<p><strong>Estimated effort</strong>: 4-5 weeks for Critical + High priority fixes.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

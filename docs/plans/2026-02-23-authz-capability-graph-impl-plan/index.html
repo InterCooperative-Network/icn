@@ -1,0 +1,1642 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Authz Capability Graph (Phase B0) Implementation Plan | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>plans</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>2026 02 23 authz capability graph impl plan</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/plans/2026-02-23-authz-capability-graph-impl-plan.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Authz Capability Graph (Phase B0) Implementation Plan</h1>
+<blockquote>
+<p><strong>For Claude:</strong> REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.</p>
+</blockquote>
+<p><strong>Goal:</strong> Scaffold the <code>icn-authz</code> crate with canonical model types, deterministic BLAKE3 hashing (length-prefixed, explicit tag bytes), <code>CapabilitySource</code> trait, <code>GraphBuilder</code>, and <code>CapabilityGraph</code> with query — the foundation for unifying ICN&#39;s four authorization systems.</p>
+<p><strong>Architecture:</strong> New app-layer crate <code>icn-authz</code> in <code>icn/crates/</code>. Domain-agnostic model in <code>icn-authz::model</code> (promotable to kernel later). Graph builder/query in <code>icn-authz::graph</code>. No persistence, no domain adapters (those are Phase B1). All hashing uses BLAKE3 with length-prefixed variable-length fields and explicit frozen tag byte constants.</p>
+<p><strong>Tech Stack:</strong> Rust (1.88.0), BLAKE3, serde, thiserror, icn-kernel-api (BlockHeight type alias = u64)</p>
+<p><strong>Design doc:</strong> <code>docs/plans/2026-02-23-authz-capability-graph-design.md</code></p>
+<hr>
+<h2>Landmines &amp; Gotchas</h2>
+<ol>
+<li><p><strong><code>BlockHeight</code> is <code>pub type BlockHeight = u64;</code></strong> (a type alias, NOT a newtype). The design doc says <code>height.0 as u64</code> — this is WRONG. Use <code>height</code> directly since it IS u64. Defined in <code>icn-kernel-api/src/invariants.rs:10</code>.</p>
+</li>
+<li><p><strong><code>blake3</code> is NOT a workspace dependency.</strong> Declare it directly: <code>blake3 = &quot;1.8&quot;</code> (same as <code>icn-governance</code>).</p>
+</li>
+<li><p><strong><code>serde_json</code> is NOT a workspace dependency for dev-deps.</strong> Use <code>serde_json = &quot;1.0&quot;</code> directly in <code>[dev-dependencies]</code>.</p>
+</li>
+<li><p><strong>Workspace members list is NOT alphabetical.</strong> Insert <code>&quot;crates/icn-authz&quot;</code> after <code>&quot;crates/icn-naming&quot;</code> (line 36) to keep app-layer crates grouped near the end.</p>
+</li>
+<li><p><strong>Workspace lints say <code>unwrap_used = &quot;warn&quot;</code>.</strong> Tests that call <code>.unwrap()</code> will emit warnings. Use <code>#[allow(clippy::unwrap_used)]</code> on test modules, or use <code>expect(&quot;reason&quot;)</code> (also warned but with context).</p>
+</li>
+<li><p><strong>No <code>icn-identity</code> dependency needed for B0.</strong> <code>SubjectId</code> is just a validated String newtype — no DID resolution or crypto needed yet.</p>
+</li>
+<li><p><strong><code>Ord</code> derive on enums</strong> uses variant declaration order as discriminant. Our &quot;frozen variant order&quot; comments + explicit tag bytes in hashing mean the <code>Ord</code> derive is safe for sorting, but hashing MUST use the explicit constants, never rely on derived discriminants.</p>
+</li>
+</ol>
+<hr>
+<h3>Task 1: Scaffold crate and workspace registration</h3>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Create: <code>icn/crates/icn-authz/Cargo.toml</code></li>
+<li>Create: <code>icn/crates/icn-authz/src/lib.rs</code></li>
+<li>Create: <code>icn/crates/icn-authz/src/error.rs</code></li>
+<li>Modify: <code>icn/Cargo.toml:3-41</code> (workspace members)</li>
+<li>Modify: <code>icn/Cargo.toml:117-147</code> (workspace dependencies)</li>
+</ul>
+<p><strong>Step 1: Create directory structure</strong></p>
+<pre><code class="language-bash">mkdir -p icn/crates/icn-authz/src/model
+mkdir -p icn/crates/icn-authz/src/graph
+</code></pre>
+<p><strong>Step 2: Write <code>icn/crates/icn-authz/Cargo.toml</code></strong></p>
+<pre><code class="language-toml">[package]
+name = &quot;icn-authz&quot;
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+blake3 = &quot;1.8&quot;
+serde = { workspace = true, features = [&quot;derive&quot;] }
+thiserror.workspace = true
+icn-kernel-api = { path = &quot;../icn-kernel-api&quot; }
+
+[dev-dependencies]
+serde_json = &quot;1.0&quot;
+
+[lints]
+workspace = true
+</code></pre>
+<p><strong>Step 3: Write <code>icn/crates/icn-authz/src/error.rs</code></strong></p>
+<pre><code class="language-rust">#[derive(Debug, thiserror::Error)]
+pub enum AuthzError {
+    #[error(&quot;invalid subject ID (must start with &#39;did:&#39;): {0}&quot;)]
+    InvalidSubjectId(String),
+
+    #[error(&quot;invalid action format (expected &#39;domain:verb[:subverb]&#39;): {0}&quot;)]
+    InvalidAction(String),
+}
+</code></pre>
+<p><strong>Step 4: Write <code>icn/crates/icn-authz/src/lib.rs</code></strong></p>
+<pre><code class="language-rust">//! # ICN Authorization
+//!
+//! Canonical capability graph model for unifying ICN&#39;s authorization systems.
+//!
+//! ## Architecture
+//!
+//! - `model` — Domain-agnostic types: subjects, actions, resources, constraints, edges.
+//!   Designed to be liftable to `icn-kernel-api` in a future phase.
+//! - `graph` — Builder and query: `CapabilitySource` trait, `GraphBuilder`, `CapabilityGraph`.
+//! - `error` — Error types for validation failures.
+//!
+//! ## Meaning Firewall
+//!
+//! This is an **app-layer** crate. It interprets domain semantics (what capabilities mean).
+//! The kernel sees only hashes produced by this crate, never the capability model itself.
+
+pub mod error;
+pub mod graph;
+pub mod model;
+
+pub use error::AuthzError;
+</code></pre>
+<p><strong>Step 5: Write placeholder <code>icn/crates/icn-authz/src/model/mod.rs</code></strong></p>
+<pre><code class="language-rust">pub mod hash;
+pub mod ids;
+pub mod edge;
+</code></pre>
+<p><strong>Step 6: Write placeholder <code>icn/crates/icn-authz/src/graph/mod.rs</code></strong></p>
+<pre><code class="language-rust">pub mod builder;
+</code></pre>
+<p><strong>Step 7: Write placeholder <code>icn/crates/icn-authz/src/model/ids.rs</code></strong></p>
+<pre><code class="language-rust">// Canonical identity and resource types — Task 2
+</code></pre>
+<p><strong>Step 8: Write placeholder <code>icn/crates/icn-authz/src/model/edge.rs</code></strong></p>
+<pre><code class="language-rust">// CapabilityEdge and CapabilityGraph — Task 4
+</code></pre>
+<p><strong>Step 9: Write placeholder <code>icn/crates/icn-authz/src/model/hash.rs</code></strong></p>
+<pre><code class="language-rust">// Deterministic BLAKE3 hashing — Task 3
+</code></pre>
+<p><strong>Step 10: Write placeholder <code>icn/crates/icn-authz/src/graph/builder.rs</code></strong></p>
+<pre><code class="language-rust">// CapabilitySource trait and GraphBuilder — Task 5
+</code></pre>
+<p><strong>Step 11: Add to workspace members in <code>icn/Cargo.toml</code></strong></p>
+<p>In the <code>members</code> array, after <code>&quot;crates/icn-naming&quot;,</code> (line 36), add:</p>
+<pre><code class="language-toml">    &quot;crates/icn-authz&quot;,
+</code></pre>
+<p><strong>Step 12: Add to workspace dependencies in <code>icn/Cargo.toml</code></strong></p>
+<p>In the <code>[workspace.dependencies]</code> section, after <code>icn-naming = { path = &quot;crates/icn-naming&quot; }</code> (line 147), add:</p>
+<pre><code class="language-toml">icn-authz = { path = &quot;crates/icn-authz&quot; }
+</code></pre>
+<p><strong>Step 13: Verify the crate compiles</strong></p>
+<p>Run: <code>cd icn/icn &amp;&amp; cargo check -p icn-authz</code>
+Expected: Compiles with 0 errors (warnings about empty files are OK)</p>
+<p><strong>Step 14: Run clippy</strong></p>
+<p>Run: <code>cd icn/icn &amp;&amp; cargo clippy -p icn-authz --all-targets -- -D warnings</code>
+Expected: PASS</p>
+<p><strong>Step 15: Commit</strong></p>
+<pre><code class="language-bash">git add icn/crates/icn-authz/ icn/Cargo.toml
+git commit -m &quot;feat(authz): scaffold icn-authz crate with workspace registration&quot;
+</code></pre>
+<hr>
+<h3>Task 2: Canonical identity types (SubjectId, Action, ResourceKind, ResourceId, Constraint, EdgeSource)</h3>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Create: <code>icn/crates/icn-authz/src/model/ids.rs</code> (overwrite placeholder)</li>
+</ul>
+<p><strong>Step 1: Write the failing tests</strong></p>
+<p>Add the following test module at the bottom of <code>ids.rs</code>:</p>
+<pre><code class="language-rust">#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+
+    // --- SubjectId ---
+
+    #[test]
+    fn subject_id_valid_did() {
+        let s = SubjectId::new(&quot;did:icn:abc123&quot;).unwrap();
+        assert_eq!(s.as_str(), &quot;did:icn:abc123&quot;);
+    }
+
+    #[test]
+    fn subject_id_rejects_non_did() {
+        assert!(SubjectId::new(&quot;not-a-did&quot;).is_err());
+    }
+
+    #[test]
+    fn subject_id_rejects_empty() {
+        assert!(SubjectId::new(&quot;&quot;).is_err());
+    }
+
+    // --- Action ---
+
+    #[test]
+    fn action_normalizes_uppercase() {
+        let a = Action::new(&quot;GOVERNANCE:PROPOSE&quot;).unwrap();
+        assert_eq!(a.as_str(), &quot;governance:propose&quot;);
+    }
+
+    #[test]
+    fn action_trims_whitespace() {
+        let a = Action::new(&quot;  ledger:transfer  &quot;).unwrap();
+        assert_eq!(a.as_str(), &quot;ledger:transfer&quot;);
+    }
+
+    #[test]
+    fn action_three_segments_ok() {
+        let a = Action::new(&quot;ledger:transfer:credit&quot;).unwrap();
+        assert_eq!(a.as_str(), &quot;ledger:transfer:credit&quot;);
+        assert_eq!(a.domain(), &quot;ledger&quot;);
+        assert_eq!(a.verb(), &quot;transfer&quot;);
+    }
+
+    #[test]
+    fn action_rejects_empty() {
+        assert!(Action::new(&quot;&quot;).is_err());
+    }
+
+    #[test]
+    fn action_rejects_no_colon() {
+        assert!(Action::new(&quot;single&quot;).is_err());
+    }
+
+    #[test]
+    fn action_rejects_empty_segment() {
+        assert!(Action::new(&quot;a::b&quot;).is_err());
+    }
+
+    #[test]
+    fn action_rejects_non_ascii() {
+        assert!(Action::new(&quot;gov:propos\u{00e9}&quot;).is_err());
+    }
+
+    #[test]
+    fn action_allows_hyphens() {
+        let a = Action::new(&quot;compute:long-running&quot;).unwrap();
+        assert_eq!(a.as_str(), &quot;compute:long-running&quot;);
+    }
+
+    // --- ResourceKind ordering ---
+
+    #[test]
+    fn resource_kind_ordering_is_declaration_order() {
+        assert!(ResourceKind::Entity &lt; ResourceKind::Scope);
+        assert!(ResourceKind::Scope &lt; ResourceKind::Asset);
+        assert!(ResourceKind::Asset &lt; ResourceKind::Contract);
+        assert!(ResourceKind::Contract &lt; ResourceKind::System);
+    }
+
+    // --- Constraint ordering ---
+
+    #[test]
+    fn constraint_variants_ordered_by_discriminant() {
+        let rate = Constraint::RateLimit(100);
+        let credit = Constraint::CreditMultiplier(10000);
+        let topics = Constraint::MaxTopics(50);
+        let timelock = Constraint::TimeLock(1000);
+        let quorum = Constraint::RequiresQuorum(3);
+        let tag = Constraint::Tag(&quot;x&quot;.into());
+        assert!(rate &lt; credit);
+        assert!(credit &lt; topics);
+        assert!(topics &lt; timelock);
+        assert!(timelock &lt; quorum);
+        assert!(quorum &lt; tag);
+    }
+
+    #[test]
+    fn constraint_same_variant_orders_by_value() {
+        assert!(Constraint::RateLimit(10) &lt; Constraint::RateLimit(20));
+        assert!(Constraint::Tag(&quot;a&quot;.into()) &lt; Constraint::Tag(&quot;b&quot;.into()));
+    }
+
+    // --- EdgeSource ordering ---
+
+    #[test]
+    fn edge_source_ordering_is_declaration_order() {
+        assert!(EdgeSource::CclContract(&quot;a&quot;.into()) &lt; EdgeSource::TrustScore(&quot;a&quot;.into()));
+        assert!(EdgeSource::TrustScore(&quot;a&quot;.into()) &lt; EdgeSource::GovernanceVote(&quot;a&quot;.into()));
+        assert!(EdgeSource::GovernanceVote(&quot;a&quot;.into()) &lt; EdgeSource::Static(&quot;a&quot;.into()));
+    }
+
+    // --- Serde round-trip ---
+
+    #[test]
+    fn subject_id_serde_roundtrip() {
+        let s = SubjectId::new(&quot;did:icn:test&quot;).unwrap();
+        let json = serde_json::to_string(&amp;s).unwrap();
+        let back: SubjectId = serde_json::from_str(&amp;json).unwrap();
+        assert_eq!(s, back);
+    }
+
+    #[test]
+    fn action_serde_roundtrip() {
+        let a = Action::new(&quot;governance:propose&quot;).unwrap();
+        let json = serde_json::to_string(&amp;a).unwrap();
+        let back: Action = serde_json::from_str(&amp;json).unwrap();
+        assert_eq!(a, back);
+    }
+}
+</code></pre>
+<p><strong>Step 2: Run tests to verify they fail</strong></p>
+<p>Run: <code>cd icn/icn &amp;&amp; cargo test -p icn-authz --lib</code>
+Expected: FAIL — <code>SubjectId</code>, <code>Action</code>, etc. not defined yet</p>
+<p><strong>Step 3: Write the implementation</strong></p>
+<p>Write the full <code>ids.rs</code> with types + the test module from Step 1:</p>
+<pre><code class="language-rust">use serde::{Deserialize, Serialize};
+
+use crate::AuthzError;
+
+/// An actor in the capability graph. Always a DID.
+///
+/// Validated on construction: must start with &quot;did:&quot; prefix.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct SubjectId(String);
+
+impl SubjectId {
+    pub fn new(did: impl Into&lt;String&gt;) -&gt; Result&lt;Self, AuthzError&gt; {
+        let s = did.into();
+        if !s.starts_with(&quot;did:&quot;) {
+            return Err(AuthzError::InvalidSubjectId(s));
+        }
+        Ok(Self(s))
+    }
+
+    pub fn as_str(&amp;self) -&gt; &amp;str {
+        &amp;self.0
+    }
+}
+
+/// A capability action. Lowercased, trimmed, colon-separated segments.
+///
+/// Format: `domain:verb[:subverb]`. Only ASCII alphanumeric, colon, and hyphen.
+/// Soft normalization: lowercases and trims on construction.
+///
+/// Examples: &quot;governance:propose&quot;, &quot;ledger:transfer:credit&quot;, &quot;compute:submit&quot;
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct Action(String);
+
+impl Action {
+    pub fn new(raw: impl Into&lt;String&gt;) -&gt; Result&lt;Self, AuthzError&gt; {
+        let s = raw.into().trim().to_ascii_lowercase();
+        let segments: Vec&lt;&amp;str&gt; = s.split(&#39;:&#39;).collect();
+        if segments.len() &lt; 2 || segments.iter().any(|seg| seg.is_empty()) {
+            return Err(AuthzError::InvalidAction(s));
+        }
+        if !s
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == &#39;:&#39; || c == &#39;-&#39;)
+        {
+            return Err(AuthzError::InvalidAction(s));
+        }
+        Ok(Self(s))
+    }
+
+    pub fn as_str(&amp;self) -&gt; &amp;str {
+        &amp;self.0
+    }
+
+    pub fn domain(&amp;self) -&gt; &amp;str {
+        self.0.split(&#39;:&#39;).next().expect(&quot;validated in new()&quot;)
+    }
+
+    pub fn verb(&amp;self) -&gt; &amp;str {
+        self.0.splitn(3, &#39;:&#39;).nth(1).expect(&quot;validated in new()&quot;)
+    }
+}
+
+/// Variant order is FROZEN. Do not reorder. Append only.
+/// Tag bytes: Entity=0x01, Scope=0x02, Asset=0x03, Contract=0x04, System=0x05
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub enum ResourceKind {
+    /// tag 0x01 — cooperatives, communities, federations, individuals
+    Entity,
+    /// tag 0x02 — cells, namespaces, governance scopes
+    Scope,
+    /// tag 0x03 — ledger accounts, credit lines, treasury
+    Asset,
+    /// tag 0x04 — CCL contracts, amendments
+    Contract,
+    /// tag 0x05 — protocol parameters, invariant config
+    System,
+}
+
+/// A typed resource identifier.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct ResourceId {
+    pub kind: ResourceKind,
+    pub id: String,
+}
+
+impl ResourceId {
+    pub fn new(kind: ResourceKind, id: impl Into&lt;String&gt;) -&gt; Self {
+        Self {
+            kind,
+            id: id.into(),
+        }
+    }
+}
+
+/// Variant order is FROZEN. Do not reorder. Append only.
+/// Tag bytes: RateLimit=0x01, CreditMultiplier=0x02, MaxTopics=0x03,
+///            TimeLock=0x04, RequiresQuorum=0x05, Tag=0x06
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub enum Constraint {
+    /// tag 0x01 — messages per second
+    RateLimit(u32),
+    /// tag 0x02 — basis points (10000 = 1.0x)
+    CreditMultiplier(u32),
+    /// tag 0x03 — topic subscription limit
+    MaxTopics(u32),
+    /// tag 0x04 — block height before which action is locked
+    TimeLock(u64),
+    /// tag 0x05 — minimum votes (absolute count)
+    RequiresQuorum(u32),
+    /// tag 0x06 — escape hatch for domain-specific labels
+    Tag(String),
+}
+
+/// Variant order is FROZEN. Do not reorder. Append only.
+/// Tag bytes: CclContract=0x01, TrustScore=0x02, GovernanceVote=0x03, Static=0x04
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub enum EdgeSource {
+    /// tag 0x01 — contract hash or ID
+    CclContract(String),
+    /// tag 0x02 — trust graph identifier
+    TrustScore(String),
+    /// tag 0x03 — proposal ID
+    GovernanceVote(String),
+    /// tag 0x04 — hardcoded/bootstrap grants
+    Static(String),
+}
+
+// --- tests at bottom (see Step 1) ---
+</code></pre>
+<p><strong>Step 4: Run tests to verify they pass</strong></p>
+<p>Run: <code>cd icn/icn &amp;&amp; cargo test -p icn-authz --lib</code>
+Expected: 17 tests PASS</p>
+<p><strong>Step 5: Run clippy</strong></p>
+<p>Run: <code>cd icn/icn &amp;&amp; cargo clippy -p icn-authz --all-targets -- -D warnings</code>
+Expected: PASS</p>
+<p><strong>Step 6: Commit</strong></p>
+<pre><code class="language-bash">git add icn/crates/icn-authz/src/model/ids.rs
+git commit -m &quot;feat(authz): canonical identity types with validation and ordering&quot;
+</code></pre>
+<hr>
+<h3>Task 3: Deterministic hashing (tag constants, hash functions, length-prefixing)</h3>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Create: <code>icn/crates/icn-authz/src/model/hash.rs</code> (overwrite placeholder)</li>
+</ul>
+<p><strong>Step 1: Write the failing tests</strong></p>
+<p>Add the following test module at the bottom of <code>hash.rs</code>:</p>
+<pre><code class="language-rust">#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+    use crate::model::ids::*;
+
+    fn test_subject() -&gt; SubjectId {
+        SubjectId::new(&quot;did:icn:alice&quot;).unwrap()
+    }
+
+    fn test_action() -&gt; Action {
+        Action::new(&quot;governance:propose&quot;).unwrap()
+    }
+
+    fn test_resource() -&gt; ResourceId {
+        ResourceId::new(ResourceKind::Entity, &quot;coop-1&quot;)
+    }
+
+    // --- Determinism ---
+
+    #[test]
+    fn hash_subject_deterministic() {
+        let a = hash_subject(&amp;test_subject());
+        let b = hash_subject(&amp;test_subject());
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn hash_action_deterministic() {
+        let a = hash_action(&amp;test_action());
+        let b = hash_action(&amp;test_action());
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn hash_resource_deterministic() {
+        let a = hash_resource(&amp;test_resource());
+        let b = hash_resource(&amp;test_resource());
+        assert_eq!(a, b);
+    }
+
+    // --- Different inputs → different hashes ---
+
+    #[test]
+    fn hash_subject_differs_for_different_dids() {
+        let a = hash_subject(&amp;SubjectId::new(&quot;did:icn:alice&quot;).unwrap());
+        let b = hash_subject(&amp;SubjectId::new(&quot;did:icn:bob&quot;).unwrap());
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn hash_action_differs_for_different_actions() {
+        let a = hash_action(&amp;Action::new(&quot;governance:propose&quot;).unwrap());
+        let b = hash_action(&amp;Action::new(&quot;governance:vote&quot;).unwrap());
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn hash_resource_differs_for_different_kinds() {
+        let a = hash_resource(&amp;ResourceId::new(ResourceKind::Entity, &quot;x&quot;));
+        let b = hash_resource(&amp;ResourceId::new(ResourceKind::Asset, &quot;x&quot;));
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn hash_resource_differs_for_different_ids() {
+        let a = hash_resource(&amp;ResourceId::new(ResourceKind::Entity, &quot;x&quot;));
+        let b = hash_resource(&amp;ResourceId::new(ResourceKind::Entity, &quot;y&quot;));
+        assert_ne!(a, b);
+    }
+
+    // --- Constraint hashing ---
+
+    #[test]
+    fn hash_constraint_deterministic() {
+        let c = Constraint::RateLimit(100);
+        assert_eq!(hash_constraint(&amp;c), hash_constraint(&amp;c));
+    }
+
+    #[test]
+    fn hash_constraint_differs_across_variants() {
+        let a = hash_constraint(&amp;Constraint::RateLimit(100));
+        let b = hash_constraint(&amp;Constraint::MaxTopics(100));
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn hash_constraint_tag_differs_by_string() {
+        let a = hash_constraint(&amp;Constraint::Tag(&quot;foo&quot;.into()));
+        let b = hash_constraint(&amp;Constraint::Tag(&quot;bar&quot;.into()));
+        assert_ne!(a, b);
+    }
+
+    // --- EdgeSource hashing ---
+
+    #[test]
+    fn hash_edge_source_deterministic() {
+        let s = EdgeSource::Static(&quot;bootstrap&quot;.into());
+        assert_eq!(hash_edge_source(&amp;s), hash_edge_source(&amp;s));
+    }
+
+    #[test]
+    fn hash_edge_source_differs_across_variants() {
+        let a = hash_edge_source(&amp;EdgeSource::CclContract(&quot;x&quot;.into()));
+        let b = hash_edge_source(&amp;EdgeSource::Static(&quot;x&quot;.into()));
+        assert_ne!(a, b);
+    }
+
+    // --- Option&lt;BlockHeight&gt; hashing ---
+
+    #[test]
+    fn hash_option_height_none_vs_some_differ() {
+        let mut h1 = blake3::Hasher::new();
+        hash_option_height(&amp;mut h1, None);
+        let mut h2 = blake3::Hasher::new();
+        hash_option_height(&amp;mut h2, Some(0));
+        assert_ne!(h1.finalize().as_bytes(), h2.finalize().as_bytes());
+    }
+
+    #[test]
+    fn hash_option_height_different_values_differ() {
+        let mut h1 = blake3::Hasher::new();
+        hash_option_height(&amp;mut h1, Some(100));
+        let mut h2 = blake3::Hasher::new();
+        hash_option_height(&amp;mut h2, Some(200));
+        assert_ne!(h1.finalize().as_bytes(), h2.finalize().as_bytes());
+    }
+
+    // --- Length-prefix prevents ambiguity ---
+
+    #[test]
+    fn length_prefix_prevents_concatenation_ambiguity() {
+        // &quot;ab&quot; ++ &quot;cd&quot; must differ from &quot;a&quot; ++ &quot;bcd&quot;
+        let mut h1 = blake3::Hasher::new();
+        hash_bytes(&amp;mut h1, b&quot;ab&quot;);
+        hash_bytes(&amp;mut h1, b&quot;cd&quot;);
+
+        let mut h2 = blake3::Hasher::new();
+        hash_bytes(&amp;mut h2, b&quot;a&quot;);
+        hash_bytes(&amp;mut h2, b&quot;bcd&quot;);
+
+        assert_ne!(h1.finalize().as_bytes(), h2.finalize().as_bytes());
+    }
+}
+</code></pre>
+<p><strong>Step 2: Run tests to verify they fail</strong></p>
+<p>Run: <code>cd icn/icn &amp;&amp; cargo test -p icn-authz --lib</code>
+Expected: FAIL — hash functions not defined</p>
+<p><strong>Step 3: Write the implementation</strong></p>
+<p>Write the full <code>hash.rs</code> with constants + functions + test module:</p>
+<pre><code class="language-rust">use icn_kernel_api::BlockHeight;
+
+use crate::model::ids::*;
+
+// ─── Top-level type tags ───────────────────────────────────────────
+// These tag bytes are FROZEN. Do not change values. Append only.
+pub(crate) const TAG_SUBJECT: u8 = 0x10;
+pub(crate) const TAG_ACTION: u8 = 0x11;
+pub(crate) const TAG_RESOURCE: u8 = 0x12;
+pub(crate) const TAG_CONSTRAINT: u8 = 0x13;
+pub(crate) const TAG_EDGE_SOURCE: u8 = 0x14;
+pub(crate) const TAG_EDGE: u8 = 0x15;
+pub(crate) const TAG_EDGE_SET: u8 = 0x16;
+
+// ─── ResourceKind tag bytes ────────────────────────────────────────
+// FROZEN. Do not reorder. Append only. Must match ResourceKind variant order.
+pub(crate) const RESOURCE_ENTITY: u8 = 0x01;
+pub(crate) const RESOURCE_SCOPE: u8 = 0x02;
+pub(crate) const RESOURCE_ASSET: u8 = 0x03;
+pub(crate) const RESOURCE_CONTRACT: u8 = 0x04;
+pub(crate) const RESOURCE_SYSTEM: u8 = 0x05;
+
+// ─── Constraint tag bytes ──────────────────────────────────────────
+// FROZEN. Do not reorder. Append only. Must match Constraint variant order.
+pub(crate) const CONSTRAINT_RATE_LIMIT: u8 = 0x01;
+pub(crate) const CONSTRAINT_CREDIT_MULTIPLIER: u8 = 0x02;
+pub(crate) const CONSTRAINT_MAX_TOPICS: u8 = 0x03;
+pub(crate) const CONSTRAINT_TIME_LOCK: u8 = 0x04;
+pub(crate) const CONSTRAINT_REQUIRES_QUORUM: u8 = 0x05;
+pub(crate) const CONSTRAINT_TAG: u8 = 0x06;
+
+// ─── EdgeSource tag bytes ──────────────────────────────────────────
+// FROZEN. Do not reorder. Append only. Must match EdgeSource variant order.
+pub(crate) const SOURCE_CCL_CONTRACT: u8 = 0x01;
+pub(crate) const SOURCE_TRUST_SCORE: u8 = 0x02;
+pub(crate) const SOURCE_GOVERNANCE_VOTE: u8 = 0x03;
+pub(crate) const SOURCE_STATIC: u8 = 0x04;
+
+// ─── Helpers ───────────────────────────────────────────────────────
+
+/// Length-prefix then append bytes. Prevents concatenation ambiguity.
+pub(crate) fn hash_bytes(hasher: &amp;mut blake3::Hasher, data: &amp;[u8]) {
+    hasher.update(&amp;(data.len() as u32).to_le_bytes());
+    hasher.update(data);
+}
+
+/// Hash an Option&lt;BlockHeight&gt;. None = 0x00. Some(h) = 0x01 ++ h as u64 LE.
+/// BlockHeight is a type alias for u64, so no .0 accessor needed.
+pub(crate) fn hash_option_height(hasher: &amp;mut blake3::Hasher, h: Option&lt;BlockHeight&gt;) {
+    match h {
+        None =&gt; hasher.update(&amp;[0x00]),
+        Some(height) =&gt; {
+            hasher.update(&amp;[0x01]);
+            hasher.update(&amp;height.to_le_bytes());
+        }
+    }
+}
+
+// ─── Per-type hash functions ───────────────────────────────────────
+
+pub fn hash_subject(s: &amp;SubjectId) -&gt; [u8; 32] {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(&amp;[TAG_SUBJECT]);
+    hash_bytes(&amp;mut hasher, s.as_str().as_bytes());
+    *hasher.finalize().as_bytes()
+}
+
+pub fn hash_action(a: &amp;Action) -&gt; [u8; 32] {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(&amp;[TAG_ACTION]);
+    hash_bytes(&amp;mut hasher, a.as_str().as_bytes());
+    *hasher.finalize().as_bytes()
+}
+
+fn resource_kind_tag(kind: &amp;ResourceKind) -&gt; u8 {
+    match kind {
+        ResourceKind::Entity =&gt; RESOURCE_ENTITY,
+        ResourceKind::Scope =&gt; RESOURCE_SCOPE,
+        ResourceKind::Asset =&gt; RESOURCE_ASSET,
+        ResourceKind::Contract =&gt; RESOURCE_CONTRACT,
+        ResourceKind::System =&gt; RESOURCE_SYSTEM,
+    }
+}
+
+pub fn hash_resource(r: &amp;ResourceId) -&gt; [u8; 32] {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(&amp;[TAG_RESOURCE]);
+    hasher.update(&amp;[resource_kind_tag(&amp;r.kind)]);
+    hash_bytes(&amp;mut hasher, r.id.as_bytes());
+    *hasher.finalize().as_bytes()
+}
+
+fn constraint_tag(c: &amp;Constraint) -&gt; u8 {
+    match c {
+        Constraint::RateLimit(_) =&gt; CONSTRAINT_RATE_LIMIT,
+        Constraint::CreditMultiplier(_) =&gt; CONSTRAINT_CREDIT_MULTIPLIER,
+        Constraint::MaxTopics(_) =&gt; CONSTRAINT_MAX_TOPICS,
+        Constraint::TimeLock(_) =&gt; CONSTRAINT_TIME_LOCK,
+        Constraint::RequiresQuorum(_) =&gt; CONSTRAINT_REQUIRES_QUORUM,
+        Constraint::Tag(_) =&gt; CONSTRAINT_TAG,
+    }
+}
+
+pub fn hash_constraint(c: &amp;Constraint) -&gt; [u8; 32] {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(&amp;[TAG_CONSTRAINT]);
+    hasher.update(&amp;[constraint_tag(c)]);
+    match c {
+        Constraint::RateLimit(v) =&gt; hasher.update(&amp;v.to_le_bytes()),
+        Constraint::CreditMultiplier(v) =&gt; hasher.update(&amp;v.to_le_bytes()),
+        Constraint::MaxTopics(v) =&gt; hasher.update(&amp;v.to_le_bytes()),
+        Constraint::TimeLock(v) =&gt; hasher.update(&amp;v.to_le_bytes()),
+        Constraint::RequiresQuorum(v) =&gt; hasher.update(&amp;v.to_le_bytes()),
+        Constraint::Tag(s) =&gt; {
+            hash_bytes(&amp;mut hasher, s.as_bytes());
+            return *hasher.finalize().as_bytes();
+        }
+    };
+    *hasher.finalize().as_bytes()
+}
+
+fn edge_source_tag(es: &amp;EdgeSource) -&gt; u8 {
+    match es {
+        EdgeSource::CclContract(_) =&gt; SOURCE_CCL_CONTRACT,
+        EdgeSource::TrustScore(_) =&gt; SOURCE_TRUST_SCORE,
+        EdgeSource::GovernanceVote(_) =&gt; SOURCE_GOVERNANCE_VOTE,
+        EdgeSource::Static(_) =&gt; SOURCE_STATIC,
+    }
+}
+
+fn edge_source_inner(es: &amp;EdgeSource) -&gt; &amp;str {
+    match es {
+        EdgeSource::CclContract(s)
+        | EdgeSource::TrustScore(s)
+        | EdgeSource::GovernanceVote(s)
+        | EdgeSource::Static(s) =&gt; s,
+    }
+}
+
+pub fn hash_edge_source(es: &amp;EdgeSource) -&gt; [u8; 32] {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(&amp;[TAG_EDGE_SOURCE]);
+    hasher.update(&amp;[edge_source_tag(es)]);
+    hash_bytes(&amp;mut hasher, edge_source_inner(es).as_bytes());
+    *hasher.finalize().as_bytes()
+}
+
+/// Hash a sorted, deduped slice of edges into a single edge-set hash.
+pub fn hash_edge_set(edges: &amp;[crate::model::edge::CapabilityEdge]) -&gt; [u8; 32] {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(&amp;[TAG_EDGE_SET]);
+    hasher.update(&amp;(edges.len() as u32).to_le_bytes());
+    for edge in edges {
+        hasher.update(&amp;crate::model::edge::hash_edge(edge));
+    }
+    *hasher.finalize().as_bytes()
+}
+
+// --- tests at bottom (see Step 1) ---
+</code></pre>
+<p><strong>Step 4: Run tests to verify they pass</strong></p>
+<p>Run: <code>cd icn/icn &amp;&amp; cargo test -p icn-authz --lib</code>
+Expected: All hash tests PASS (edge tests may fail if edge.rs is still placeholder — that&#39;s expected)</p>
+<p><strong>Step 5: Run clippy</strong></p>
+<p>Run: <code>cd icn/icn &amp;&amp; cargo clippy -p icn-authz --all-targets -- -D warnings</code>
+Expected: PASS (or warn about unused hash_edge_set if edge module is still placeholder — acceptable)</p>
+<p><strong>Step 6: Commit</strong></p>
+<pre><code class="language-bash">git add icn/crates/icn-authz/src/model/hash.rs
+git commit -m &quot;feat(authz): deterministic BLAKE3 hashing with length-prefixed fields and explicit tags&quot;
+</code></pre>
+<hr>
+<h3>Task 4: CapabilityEdge, CapabilityGraph, Decision, and edge hashing</h3>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Create: <code>icn/crates/icn-authz/src/model/edge.rs</code> (overwrite placeholder)</li>
+</ul>
+<p><strong>Step 1: Write the failing tests</strong></p>
+<p>Add the following test module at the bottom of <code>edge.rs</code>:</p>
+<pre><code class="language-rust">#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+    use crate::model::ids::*;
+
+    fn alice() -&gt; SubjectId {
+        SubjectId::new(&quot;did:icn:alice&quot;).unwrap()
+    }
+
+    fn bob() -&gt; SubjectId {
+        SubjectId::new(&quot;did:icn:bob&quot;).unwrap()
+    }
+
+    fn propose() -&gt; Action {
+        Action::new(&quot;governance:propose&quot;).unwrap()
+    }
+
+    fn vote() -&gt; Action {
+        Action::new(&quot;governance:vote&quot;).unwrap()
+    }
+
+    fn coop_resource() -&gt; ResourceId {
+        ResourceId::new(ResourceKind::Entity, &quot;coop-1&quot;)
+    }
+
+    fn make_edge(subject: SubjectId, action: Action) -&gt; CapabilityEdge {
+        CapabilityEdge::new(
+            subject,
+            action,
+            coop_resource(),
+            vec![Constraint::RateLimit(10)],
+            EdgeSource::Static(&quot;bootstrap&quot;.into()),
+            None,
+        )
+    }
+
+    // --- Constructor sorts and dedupes constraints ---
+
+    #[test]
+    fn constructor_sorts_constraints() {
+        let edge = CapabilityEdge::new(
+            alice(),
+            propose(),
+            coop_resource(),
+            vec![
+                Constraint::Tag(&quot;z&quot;.into()),
+                Constraint::RateLimit(10),
+                Constraint::MaxTopics(5),
+            ],
+            EdgeSource::Static(&quot;test&quot;.into()),
+            None,
+        );
+        let kinds: Vec&lt;&amp;str&gt; = edge
+            .constraints
+            .iter()
+            .map(|c| match c {
+                Constraint::RateLimit(_) =&gt; &quot;RateLimit&quot;,
+                Constraint::MaxTopics(_) =&gt; &quot;MaxTopics&quot;,
+                Constraint::Tag(_) =&gt; &quot;Tag&quot;,
+                _ =&gt; &quot;other&quot;,
+            })
+            .collect();
+        assert_eq!(kinds, vec![&quot;RateLimit&quot;, &quot;MaxTopics&quot;, &quot;Tag&quot;]);
+    }
+
+    #[test]
+    fn constructor_dedupes_constraints() {
+        let edge = CapabilityEdge::new(
+            alice(),
+            propose(),
+            coop_resource(),
+            vec![Constraint::RateLimit(10), Constraint::RateLimit(10)],
+            EdgeSource::Static(&quot;test&quot;.into()),
+            None,
+        );
+        assert_eq!(edge.constraints.len(), 1);
+    }
+
+    // --- Edge hashing ---
+
+    #[test]
+    fn hash_edge_deterministic() {
+        let e = make_edge(alice(), propose());
+        assert_eq!(hash_edge(&amp;e), hash_edge(&amp;e));
+    }
+
+    #[test]
+    fn hash_edge_differs_by_subject() {
+        let a = hash_edge(&amp;make_edge(alice(), propose()));
+        let b = hash_edge(&amp;make_edge(bob(), propose()));
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn hash_edge_differs_by_action() {
+        let a = hash_edge(&amp;make_edge(alice(), propose()));
+        let b = hash_edge(&amp;make_edge(alice(), vote()));
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn hash_edge_differs_by_valid_at() {
+        let mut e1 = make_edge(alice(), propose());
+        e1.valid_at = None;
+        let mut e2 = make_edge(alice(), propose());
+        e2.valid_at = Some(100);
+        assert_ne!(hash_edge(&amp;e1), hash_edge(&amp;e2));
+    }
+
+    // --- Graph hashing ---
+
+    #[test]
+    fn graph_hash_deterministic() {
+        let edges = vec![make_edge(alice(), propose()), make_edge(bob(), vote())];
+        let g = CapabilityGraph::from_edges(edges.clone());
+        let g2 = CapabilityGraph::from_edges(edges);
+        assert_eq!(g.hash(), g2.hash());
+    }
+
+    #[test]
+    fn graph_hash_order_independent() {
+        let e1 = make_edge(alice(), propose());
+        let e2 = make_edge(bob(), vote());
+        let g1 = CapabilityGraph::from_edges(vec![e1.clone(), e2.clone()]);
+        let g2 = CapabilityGraph::from_edges(vec![e2, e1]);
+        assert_eq!(g1.hash(), g2.hash());
+    }
+
+    #[test]
+    fn graph_hash_changes_when_edge_added() {
+        let e1 = make_edge(alice(), propose());
+        let e2 = make_edge(bob(), vote());
+        let g1 = CapabilityGraph::from_edges(vec![e1.clone()]);
+        let g2 = CapabilityGraph::from_edges(vec![e1, e2]);
+        assert_ne!(g1.hash(), g2.hash());
+    }
+
+    #[test]
+    fn graph_hash_changes_when_constraint_changes() {
+        let mut e1 = make_edge(alice(), propose());
+        e1.constraints = vec![Constraint::RateLimit(10)];
+        let mut e2 = make_edge(alice(), propose());
+        e2.constraints = vec![Constraint::RateLimit(20)];
+        // These are different edges so graphs differ
+        let g1 = CapabilityGraph::from_edges(vec![e1]);
+        let g2 = CapabilityGraph::from_edges(vec![e2]);
+        assert_ne!(g1.hash(), g2.hash());
+    }
+
+    // --- Query ---
+
+    #[test]
+    fn query_allowed_when_edge_exists() {
+        let g = CapabilityGraph::from_edges(vec![make_edge(alice(), propose())]);
+        let d = g.query(&amp;alice(), &amp;propose(), &amp;coop_resource());
+        assert!(d.allowed);
+        assert_eq!(d.matching_edges, vec![0]);
+    }
+
+    #[test]
+    fn query_denied_when_no_edge() {
+        let g = CapabilityGraph::from_edges(vec![make_edge(alice(), propose())]);
+        let d = g.query(&amp;bob(), &amp;propose(), &amp;coop_resource());
+        assert!(!d.allowed);
+        assert!(d.matching_edges.is_empty());
+    }
+
+    #[test]
+    fn query_denied_on_empty_graph() {
+        let g = CapabilityGraph::from_edges(vec![]);
+        let d = g.query(&amp;alice(), &amp;propose(), &amp;coop_resource());
+        assert!(!d.allowed);
+    }
+
+    // --- Serde roundtrip ---
+
+    #[test]
+    fn edge_serde_roundtrip() {
+        let e = make_edge(alice(), propose());
+        let json = serde_json::to_string(&amp;e).unwrap();
+        let back: CapabilityEdge = serde_json::from_str(&amp;json).unwrap();
+        assert_eq!(e, back);
+    }
+}
+</code></pre>
+<p><strong>Step 2: Run tests to verify they fail</strong></p>
+<p>Run: <code>cd icn/icn &amp;&amp; cargo test -p icn-authz --lib</code>
+Expected: FAIL — <code>CapabilityEdge</code>, <code>CapabilityGraph</code> not defined</p>
+<p><strong>Step 3: Write the implementation</strong></p>
+<p>Write the full <code>edge.rs</code>:</p>
+<pre><code class="language-rust">use icn_kernel_api::BlockHeight;
+use serde::{Deserialize, Serialize};
+
+use crate::model::hash::*;
+use crate::model::ids::*;
+
+/// A capability edge: &quot;subject can do action on resource, with constraints, from source, at height.&quot;
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct CapabilityEdge {
+    pub subject: SubjectId,
+    pub action: Action,
+    pub resource: ResourceId,
+    pub constraints: Vec&lt;Constraint&gt;,
+    pub source: EdgeSource,
+    pub valid_at: Option&lt;BlockHeight&gt;,
+}
+
+impl CapabilityEdge {
+    /// Create an edge. Constraints are sorted and deduped automatically.
+    pub fn new(
+        subject: SubjectId,
+        action: Action,
+        resource: ResourceId,
+        mut constraints: Vec&lt;Constraint&gt;,
+        source: EdgeSource,
+        valid_at: Option&lt;BlockHeight&gt;,
+    ) -&gt; Self {
+        constraints.sort();
+        constraints.dedup();
+        Self {
+            subject,
+            action,
+            resource,
+            constraints,
+            source,
+            valid_at,
+        }
+    }
+}
+
+/// Hash a single edge field-by-field using BLAKE3.
+pub fn hash_edge(e: &amp;CapabilityEdge) -&gt; [u8; 32] {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(&amp;[TAG_EDGE]);
+    hasher.update(&amp;hash_subject(&amp;e.subject));
+    hasher.update(&amp;hash_action(&amp;e.action));
+    hasher.update(&amp;hash_resource(&amp;e.resource));
+    hasher.update(&amp;(e.constraints.len() as u32).to_le_bytes());
+    for c in &amp;e.constraints {
+        hasher.update(&amp;hash_constraint(c));
+    }
+    hasher.update(&amp;hash_edge_source(&amp;e.source));
+    hash_option_height(&amp;mut hasher, e.valid_at);
+    *hasher.finalize().as_bytes()
+}
+
+/// B0 decision: allowed + matching edge indices. No string reasons.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Decision {
+    pub allowed: bool,
+    pub matching_edges: Vec&lt;usize&gt;,
+}
+
+/// A computed capability graph: sorted, deduped edges.
+#[derive(Clone, Debug)]
+pub struct CapabilityGraph {
+    edges: Vec&lt;CapabilityEdge&gt;,
+}
+
+impl CapabilityGraph {
+    /// Create a graph from edges. Sorts and dedupes.
+    pub fn from_edges(mut edges: Vec&lt;CapabilityEdge&gt;) -&gt; Self {
+        edges.sort();
+        edges.dedup();
+        Self { edges }
+    }
+
+    pub fn edges(&amp;self) -&gt; &amp;[CapabilityEdge] {
+        &amp;self.edges
+    }
+
+    /// Deterministic hash of the entire edge set.
+    pub fn hash(&amp;self) -&gt; [u8; 32] {
+        hash_edge_set(&amp;self.edges)
+    }
+
+    /// Query: can subject do action on resource?
+    pub fn query(
+        &amp;self,
+        subject: &amp;SubjectId,
+        action: &amp;Action,
+        resource: &amp;ResourceId,
+    ) -&gt; Decision {
+        let matching: Vec&lt;usize&gt; = self
+            .edges
+            .iter()
+            .enumerate()
+            .filter(|(_, e)| {
+                e.subject == *subject &amp;&amp; e.action == *action &amp;&amp; e.resource == *resource
+            })
+            .map(|(i, _)| i)
+            .collect();
+
+        Decision {
+            allowed: !matching.is_empty(),
+            matching_edges: matching,
+        }
+    }
+}
+
+// --- tests at bottom (see Step 1) ---
+</code></pre>
+<p><strong>Step 4: Run tests to verify they pass</strong></p>
+<p>Run: <code>cd icn/icn &amp;&amp; cargo test -p icn-authz --lib</code>
+Expected: All tests PASS (hash tests from Task 3 + edge/graph tests from Task 4)</p>
+<p><strong>Step 5: Run clippy</strong></p>
+<p>Run: <code>cd icn/icn &amp;&amp; cargo clippy -p icn-authz --all-targets -- -D warnings</code>
+Expected: PASS</p>
+<p><strong>Step 6: Commit</strong></p>
+<pre><code class="language-bash">git add icn/crates/icn-authz/src/model/edge.rs
+git commit -m &quot;feat(authz): CapabilityEdge, CapabilityGraph, Decision with deterministic hashing&quot;
+</code></pre>
+<hr>
+<h3>Task 5: GraphBuilder and CapabilitySource trait</h3>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Create: <code>icn/crates/icn-authz/src/graph/builder.rs</code> (overwrite placeholder)</li>
+</ul>
+<p><strong>Step 1: Write the failing tests</strong></p>
+<p>Add the following test module at the bottom of <code>builder.rs</code>:</p>
+<pre><code class="language-rust">#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+    use crate::model::edge::CapabilityGraph;
+    use crate::model::ids::*;
+
+    fn alice() -&gt; SubjectId {
+        SubjectId::new(&quot;did:icn:alice&quot;).unwrap()
+    }
+
+    fn bob() -&gt; SubjectId {
+        SubjectId::new(&quot;did:icn:bob&quot;).unwrap()
+    }
+
+    fn propose() -&gt; Action {
+        Action::new(&quot;governance:propose&quot;).unwrap()
+    }
+
+    fn coop_resource() -&gt; ResourceId {
+        ResourceId::new(ResourceKind::Entity, &quot;coop-1&quot;)
+    }
+
+    fn make_edge(subject: SubjectId, action: Action) -&gt; CapabilityEdge {
+        CapabilityEdge::new(
+            subject,
+            action,
+            coop_resource(),
+            vec![Constraint::RateLimit(10)],
+            EdgeSource::Static(&quot;bootstrap&quot;.into()),
+            None,
+        )
+    }
+
+    /// Mock source that returns a fixed set of edges.
+    struct MockSource {
+        edges: Vec&lt;CapabilityEdge&gt;,
+    }
+
+    impl CapabilitySource for MockSource {
+        fn edges_for_subject(&amp;self, subject: &amp;SubjectId) -&gt; Vec&lt;CapabilityEdge&gt; {
+            self.edges
+                .iter()
+                .filter(|e| e.subject == *subject)
+                .cloned()
+                .collect()
+        }
+
+        fn all_edges(&amp;self) -&gt; Vec&lt;CapabilityEdge&gt; {
+            self.edges.clone()
+        }
+    }
+
+    #[test]
+    fn empty_builder_produces_empty_graph() {
+        let g = GraphBuilder::new().build();
+        assert!(g.edges().is_empty());
+        let d = g.query(&amp;alice(), &amp;propose(), &amp;coop_resource());
+        assert!(!d.allowed);
+    }
+
+    #[test]
+    fn single_source_produces_edges() {
+        let source = MockSource {
+            edges: vec![make_edge(alice(), propose())],
+        };
+        let g = GraphBuilder::new()
+            .add_source(Box::new(source))
+            .build();
+        assert_eq!(g.edges().len(), 1);
+    }
+
+    #[test]
+    fn two_sources_with_overlapping_edges_deduped() {
+        let edge = make_edge(alice(), propose());
+        let s1 = MockSource {
+            edges: vec![edge.clone()],
+        };
+        let s2 = MockSource {
+            edges: vec![edge],
+        };
+        let g = GraphBuilder::new()
+            .add_source(Box::new(s1))
+            .add_source(Box::new(s2))
+            .build();
+        assert_eq!(g.edges().len(), 1);
+    }
+
+    #[test]
+    fn two_sources_with_different_edges_merged() {
+        let s1 = MockSource {
+            edges: vec![make_edge(alice(), propose())],
+        };
+        let s2 = MockSource {
+            edges: vec![make_edge(bob(), propose())],
+        };
+        let g = GraphBuilder::new()
+            .add_source(Box::new(s1))
+            .add_source(Box::new(s2))
+            .build();
+        assert_eq!(g.edges().len(), 2);
+    }
+
+    #[test]
+    fn build_for_subject_returns_subset() {
+        let s1 = MockSource {
+            edges: vec![make_edge(alice(), propose()), make_edge(bob(), propose())],
+        };
+        let g = GraphBuilder::new()
+            .add_source(Box::new(s1))
+            .build_for_subject(&amp;alice());
+        assert_eq!(g.edges().len(), 1);
+        assert_eq!(g.edges()[0].subject, alice());
+    }
+
+    #[test]
+    fn build_same_edges_different_order_same_hash() {
+        let e1 = make_edge(alice(), propose());
+        let e2 = make_edge(bob(), propose());
+        let s1 = MockSource {
+            edges: vec![e1.clone(), e2.clone()],
+        };
+        let s2 = MockSource {
+            edges: vec![e2, e1],
+        };
+        let g1 = GraphBuilder::new().add_source(Box::new(s1)).build();
+        let g2 = GraphBuilder::new().add_source(Box::new(s2)).build();
+        assert_eq!(g1.hash(), g2.hash());
+    }
+}
+</code></pre>
+<p><strong>Step 2: Run tests to verify they fail</strong></p>
+<p>Run: <code>cd icn/icn &amp;&amp; cargo test -p icn-authz --lib</code>
+Expected: FAIL — <code>CapabilitySource</code>, <code>GraphBuilder</code> not defined</p>
+<p><strong>Step 3: Write the implementation</strong></p>
+<p>Write the full <code>builder.rs</code>:</p>
+<pre><code class="language-rust">use crate::model::edge::{CapabilityEdge, CapabilityGraph};
+use crate::model::ids::SubjectId;
+
+/// An adapter that produces capability edges from a domain-specific source.
+///
+/// Implementations live in `icn-authz::adapters` (Phase B1).
+/// The trait is defined here so B0 can write tests with mock sources.
+pub trait CapabilitySource: Send + Sync {
+    /// Return all capability edges this source knows about for the given subject.
+    fn edges_for_subject(&amp;self, subject: &amp;SubjectId) -&gt; Vec&lt;CapabilityEdge&gt;;
+
+    /// Return all capability edges this source can produce.
+    fn all_edges(&amp;self) -&gt; Vec&lt;CapabilityEdge&gt;;
+}
+
+/// Constructs a CapabilityGraph from one or more CapabilitySource adapters.
+pub struct GraphBuilder {
+    sources: Vec&lt;Box&lt;dyn CapabilitySource&gt;&gt;,
+}
+
+impl GraphBuilder {
+    pub fn new() -&gt; Self {
+        Self {
+            sources: Vec::new(),
+        }
+    }
+
+    pub fn add_source(mut self, source: Box&lt;dyn CapabilitySource&gt;) -&gt; Self {
+        self.sources.push(source);
+        self
+    }
+
+    /// Build the graph by polling all sources and canonicalizing.
+    pub fn build(&amp;self) -&gt; CapabilityGraph {
+        let edges: Vec&lt;CapabilityEdge&gt; = self
+            .sources
+            .iter()
+            .flat_map(|s| s.all_edges())
+            .collect();
+        CapabilityGraph::from_edges(edges)
+    }
+
+    /// Build a subject-scoped graph (cheaper than full build).
+    pub fn build_for_subject(&amp;self, subject: &amp;SubjectId) -&gt; CapabilityGraph {
+        let edges: Vec&lt;CapabilityEdge&gt; = self
+            .sources
+            .iter()
+            .flat_map(|s| s.edges_for_subject(subject))
+            .collect();
+        CapabilityGraph::from_edges(edges)
+    }
+}
+
+impl Default for GraphBuilder {
+    fn default() -&gt; Self {
+        Self::new()
+    }
+}
+
+// --- tests at bottom (see Step 1) ---
+</code></pre>
+<p><strong>Step 4: Run tests to verify they pass</strong></p>
+<p>Run: <code>cd icn/icn &amp;&amp; cargo test -p icn-authz --lib</code>
+Expected: All tests PASS</p>
+<p><strong>Step 5: Run clippy</strong></p>
+<p>Run: <code>cd icn/icn &amp;&amp; cargo clippy -p icn-authz --all-targets -- -D warnings</code>
+Expected: PASS</p>
+<p><strong>Step 6: Commit</strong></p>
+<pre><code class="language-bash">git add icn/crates/icn-authz/src/graph/builder.rs
+git commit -m &quot;feat(authz): CapabilitySource trait and GraphBuilder with dedup and canonicalization&quot;
+</code></pre>
+<hr>
+<h3>Task 6: Wire up re-exports in lib.rs and model/mod.rs</h3>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>icn/crates/icn-authz/src/lib.rs</code></li>
+<li>Modify: <code>icn/crates/icn-authz/src/model/mod.rs</code></li>
+<li>Modify: <code>icn/crates/icn-authz/src/graph/mod.rs</code></li>
+</ul>
+<p><strong>Step 1: Update <code>model/mod.rs</code> with re-exports</strong></p>
+<pre><code class="language-rust">pub mod edge;
+pub mod hash;
+pub mod ids;
+
+pub use edge::{CapabilityEdge, CapabilityGraph, Decision};
+pub use ids::{Action, Constraint, EdgeSource, ResourceId, ResourceKind, SubjectId};
+</code></pre>
+<p><strong>Step 2: Update <code>graph/mod.rs</code> with re-exports</strong></p>
+<pre><code class="language-rust">pub mod builder;
+
+pub use builder::{CapabilitySource, GraphBuilder};
+</code></pre>
+<p><strong>Step 3: Update <code>lib.rs</code> with re-exports</strong></p>
+<pre><code class="language-rust">//! # ICN Authorization
+//!
+//! Canonical capability graph model for unifying ICN&#39;s authorization systems.
+//!
+//! ## Architecture
+//!
+//! - `model` — Domain-agnostic types: subjects, actions, resources, constraints, edges.
+//!   Designed to be liftable to `icn-kernel-api` in a future phase.
+//! - `graph` — Builder and query: `CapabilitySource` trait, `GraphBuilder`, `CapabilityGraph`.
+//! - `error` — Error types for validation failures.
+//!
+//! ## Meaning Firewall
+//!
+//! This is an **app-layer** crate. It interprets domain semantics (what capabilities mean).
+//! The kernel sees only hashes produced by this crate, never the capability model itself.
+
+pub mod error;
+pub mod graph;
+pub mod model;
+
+pub use error::AuthzError;
+pub use graph::{CapabilitySource, GraphBuilder};
+pub use model::{
+    Action, CapabilityEdge, CapabilityGraph, Constraint, Decision, EdgeSource, ResourceId,
+    ResourceKind, SubjectId,
+};
+</code></pre>
+<p><strong>Step 4: Run full test suite</strong></p>
+<p>Run: <code>cd icn/icn &amp;&amp; cargo test -p icn-authz --lib</code>
+Expected: All tests PASS</p>
+<p><strong>Step 5: Run clippy</strong></p>
+<p>Run: <code>cd icn/icn &amp;&amp; cargo clippy -p icn-authz --all-targets -- -D warnings</code>
+Expected: PASS</p>
+<p><strong>Step 6: Run fmt</strong></p>
+<p>Run: <code>cd icn/icn &amp;&amp; cargo fmt -p icn-authz --check</code>
+Expected: PASS</p>
+<p><strong>Step 7: Commit</strong></p>
+<pre><code class="language-bash">git add icn/crates/icn-authz/src/lib.rs icn/crates/icn-authz/src/model/mod.rs icn/crates/icn-authz/src/graph/mod.rs
+git commit -m &quot;feat(authz): wire up re-exports for public API surface&quot;
+</code></pre>
+<hr>
+<h3>Task 7: Integration tests (ordering invariants, hash determinism across boundaries)</h3>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Create: <code>icn/crates/icn-authz/tests/capability_graph_integration.rs</code></li>
+</ul>
+<p><strong>Step 1: Write integration tests</strong></p>
+<pre><code class="language-rust">//! Integration tests for the icn-authz capability graph.
+//!
+//! These test cross-module properties: ordering invariants hold after
+//! serialization round-trips, hash determinism across graph boundaries,
+//! and the full build→query→hash pipeline.
+
+#[allow(clippy::unwrap_used)]
+mod capability_graph_integration {
+    use icn_authz::*;
+
+    fn alice() -&gt; SubjectId {
+        SubjectId::new(&quot;did:icn:alice&quot;).unwrap()
+    }
+
+    fn bob() -&gt; SubjectId {
+        SubjectId::new(&quot;did:icn:bob&quot;).unwrap()
+    }
+
+    fn carol() -&gt; SubjectId {
+        SubjectId::new(&quot;did:icn:carol&quot;).unwrap()
+    }
+
+    fn propose() -&gt; Action {
+        Action::new(&quot;governance:propose&quot;).unwrap()
+    }
+
+    fn vote() -&gt; Action {
+        Action::new(&quot;governance:vote&quot;).unwrap()
+    }
+
+    fn transfer() -&gt; Action {
+        Action::new(&quot;ledger:transfer&quot;).unwrap()
+    }
+
+    fn coop() -&gt; ResourceId {
+        ResourceId::new(ResourceKind::Entity, &quot;coop-1&quot;)
+    }
+
+    fn make_edge(
+        subject: SubjectId,
+        action: Action,
+        resource: ResourceId,
+        source: EdgeSource,
+    ) -&gt; CapabilityEdge {
+        CapabilityEdge::new(
+            subject,
+            action,
+            resource,
+            vec![Constraint::RateLimit(10)],
+            source,
+            None,
+        )
+    }
+
+    struct FixedSource(Vec&lt;CapabilityEdge&gt;);
+
+    impl CapabilitySource for FixedSource {
+        fn edges_for_subject(&amp;self, subject: &amp;SubjectId) -&gt; Vec&lt;CapabilityEdge&gt; {
+            self.0
+                .iter()
+                .filter(|e| e.subject == *subject)
+                .cloned()
+                .collect()
+        }
+        fn all_edges(&amp;self) -&gt; Vec&lt;CapabilityEdge&gt; {
+            self.0.clone()
+        }
+    }
+
+    // --- Ordering invariant: sort survives serde round-trip ---
+
+    #[test]
+    fn edges_sorted_after_serde_roundtrip() {
+        let edges = vec![
+            make_edge(carol(), vote(), coop(), EdgeSource::Static(&quot;s&quot;.into())),
+            make_edge(alice(), propose(), coop(), EdgeSource::Static(&quot;s&quot;.into())),
+            make_edge(bob(), transfer(), coop(), EdgeSource::Static(&quot;s&quot;.into())),
+        ];
+        let g = CapabilityGraph::from_edges(edges);
+
+        let json = serde_json::to_string(g.edges()).unwrap();
+        let deserialized: Vec&lt;CapabilityEdge&gt; = serde_json::from_str(&amp;json).unwrap();
+        let g2 = CapabilityGraph::from_edges(deserialized);
+
+        assert_eq!(g.hash(), g2.hash());
+    }
+
+    // --- Full pipeline: two sources → build → query → hash ---
+
+    #[test]
+    fn full_pipeline_two_sources() {
+        let s1 = FixedSource(vec![
+            make_edge(
+                alice(),
+                propose(),
+                coop(),
+                EdgeSource::CclContract(&quot;contract-1&quot;.into()),
+            ),
+            make_edge(
+                bob(),
+                vote(),
+                coop(),
+                EdgeSource::TrustScore(&quot;trust-main&quot;.into()),
+            ),
+        ]);
+        let s2 = FixedSource(vec![make_edge(
+            carol(),
+            transfer(),
+            ResourceId::new(ResourceKind::Asset, &quot;treasury&quot;),
+            EdgeSource::GovernanceVote(&quot;prop-42&quot;.into()),
+        )]);
+
+        let g = GraphBuilder::new()
+            .add_source(Box::new(s1))
+            .add_source(Box::new(s2))
+            .build();
+
+        assert_eq!(g.edges().len(), 3);
+
+        // Alice can propose
+        let d = g.query(&amp;alice(), &amp;propose(), &amp;coop());
+        assert!(d.allowed);
+
+        // Bob can vote
+        let d = g.query(&amp;bob(), &amp;vote(), &amp;coop());
+        assert!(d.allowed);
+
+        // Carol can transfer on treasury
+        let d = g.query(
+            &amp;carol(),
+            &amp;transfer(),
+            &amp;ResourceId::new(ResourceKind::Asset, &quot;treasury&quot;),
+        );
+        assert!(d.allowed);
+
+        // Alice cannot vote
+        let d = g.query(&amp;alice(), &amp;vote(), &amp;coop());
+        assert!(!d.allowed);
+    }
+
+    // --- Hash stability: same edges from different source configs → same hash ---
+
+    #[test]
+    fn hash_stable_across_source_configurations() {
+        let e1 = make_edge(alice(), propose(), coop(), EdgeSource::Static(&quot;s&quot;.into()));
+        let e2 = make_edge(bob(), vote(), coop(), EdgeSource::Static(&quot;s&quot;.into()));
+
+        // Config A: one source with both edges
+        let g1 = GraphBuilder::new()
+            .add_source(Box::new(FixedSource(vec![e1.clone(), e2.clone()])))
+            .build();
+
+        // Config B: two sources, one edge each
+        let g2 = GraphBuilder::new()
+            .add_source(Box::new(FixedSource(vec![e1])))
+            .add_source(Box::new(FixedSource(vec![e2])))
+            .build();
+
+        assert_eq!(g1.hash(), g2.hash());
+    }
+
+    // --- Subject-scoped build produces correct subset ---
+
+    #[test]
+    fn build_for_subject_correct_subset() {
+        let source = FixedSource(vec![
+            make_edge(alice(), propose(), coop(), EdgeSource::Static(&quot;s&quot;.into())),
+            make_edge(alice(), vote(), coop(), EdgeSource::Static(&quot;s&quot;.into())),
+            make_edge(bob(), propose(), coop(), EdgeSource::Static(&quot;s&quot;.into())),
+        ]);
+
+        let g = GraphBuilder::new()
+            .add_source(Box::new(source))
+            .build_for_subject(&amp;alice());
+
+        assert_eq!(g.edges().len(), 2);
+        assert!(g.edges().iter().all(|e| e.subject == alice()));
+    }
+
+    // --- Multiple matching edges for same subject+action+resource ---
+
+    #[test]
+    fn query_returns_multiple_matching_edges() {
+        let e1 = CapabilityEdge::new(
+            alice(),
+            propose(),
+            coop(),
+            vec![Constraint::RateLimit(10)],
+            EdgeSource::CclContract(&quot;c1&quot;.into()),
+            None,
+        );
+        let e2 = CapabilityEdge::new(
+            alice(),
+            propose(),
+            coop(),
+            vec![Constraint::RateLimit(20)],
+            EdgeSource::TrustScore(&quot;t1&quot;.into()),
+            None,
+        );
+        let g = CapabilityGraph::from_edges(vec![e1, e2]);
+        let d = g.query(&amp;alice(), &amp;propose(), &amp;coop());
+        assert!(d.allowed);
+        assert_eq!(d.matching_edges.len(), 2);
+    }
+}
+</code></pre>
+<p><strong>Step 2: Run integration tests</strong></p>
+<p>Run: <code>cd icn/icn &amp;&amp; cargo test -p icn-authz --test capability_graph_integration</code>
+Expected: All 6 tests PASS</p>
+<p><strong>Step 3: Run full crate test suite one final time</strong></p>
+<p>Run: <code>cd icn/icn &amp;&amp; cargo test -p icn-authz</code>
+Expected: All unit + integration tests PASS</p>
+<p><strong>Step 4: Run fmt + clippy on the entire crate</strong></p>
+<p>Run: <code>cd icn/icn &amp;&amp; cargo fmt -p icn-authz --check &amp;&amp; cargo clippy -p icn-authz --all-targets -- -D warnings</code>
+Expected: PASS</p>
+<p><strong>Step 5: Commit</strong></p>
+<pre><code class="language-bash">git add icn/crates/icn-authz/tests/
+git commit -m &quot;test(authz): integration tests for ordering, hash determinism, and full pipeline&quot;
+</code></pre>
+<hr>
+<h2>Final Verification</h2>
+<p>After all 7 tasks, run:</p>
+<pre><code class="language-bash">cd icn/icn &amp;&amp; cargo fmt --all --check
+cd icn/icn &amp;&amp; cargo clippy -p icn-authz --all-targets -- -D warnings
+cd icn/icn &amp;&amp; cargo test -p icn-authz
+</code></pre>
+<p>Expected: fmt clean, clippy clean, all tests pass.</p>
+<p><strong>Test count target:</strong> ~50 tests total (17 ids + 15 hash + 13 edge/graph + 6 builder + 6 integration = ~57).</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

@@ -1,0 +1,717 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Production Deployment Guide | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>archive</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>2025</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>PRODUCTION DEPLOYMENT GUIDE</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/archive/2025/PRODUCTION_DEPLOYMENT_GUIDE.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><p>⚠️ <strong>SUPERSEDED</strong> - This document has been superseded.</p>
+<blockquote>
+<p><strong>Archived Document Notice (2026-02-12):</strong> This file is retained for historical context and may not reflect current code, APIs, runtime defaults, CI status, or deployment posture.
+Use active documentation under <code>docs/</code> as authoritative.</p>
+</blockquote>
+<p>See current deployment guide: <a href="/docs/operations/deployment/HOMELAB_DEPLOYMENT">HOMELAB_DEPLOYMENT.md</a></p>
+<hr>
+<h1>ICN Production Deployment Guide</h1>
+<p><strong>Version</strong>: 1.0<br><strong>Last Updated</strong>: 2025-12-16<br><strong>Status</strong>: Production Ready  </p>
+<hr>
+<h2>Prerequisites</h2>
+<p>Before deploying ICN to production, ensure you have:</p>
+<ul>
+<li><input disabled="" type="checkbox"> Linux server (Ubuntu 22.04+ or Debian 12+ recommended)</li>
+<li><input disabled="" type="checkbox"> 4+ CPU cores</li>
+<li><input disabled="" type="checkbox"> 8+ GB RAM</li>
+<li><input disabled="" type="checkbox"> 100+ GB SSD storage</li>
+<li><input disabled="" type="checkbox"> Static IP address or dynamic DNS</li>
+<li><input disabled="" type="checkbox"> Firewall access to required ports</li>
+<li><input disabled="" type="checkbox"> TLS certificates (Let&#39;s Encrypt recommended)</li>
+<li><input disabled="" type="checkbox"> Backup storage solution</li>
+<li><input disabled="" type="checkbox"> Monitoring infrastructure (Prometheus + Grafana)</li>
+</ul>
+<hr>
+<h2>Security Hardening Checklist</h2>
+<h3>System Level</h3>
+<ul>
+<li><input disabled="" type="checkbox"> <strong>Disable root SSH login</strong>: <code>PermitRootLogin no</code> in <code>/etc/ssh/sshd_config</code></li>
+<li><input disabled="" type="checkbox"> <strong>Use SSH keys only</strong>: <code>PasswordAuthentication no</code></li>
+<li><input disabled="" type="checkbox"> <strong>Configure UFW firewall</strong>:<pre><code class="language-bash">ufw default deny incoming
+ufw default allow outgoing
+ufw allow 22/tcp    # SSH
+ufw allow 7777/tcp  # ICN P2P
+ufw allow 8080/tcp  # ICN Health
+ufw allow 8443/tcp  # ICN Gateway (TLS)
+ufw allow 9100/tcp  # Prometheus metrics (restrict to monitoring IP)
+ufw enable
+</code></pre>
+</li>
+<li><input disabled="" type="checkbox"> <strong>Enable automatic security updates</strong>:<pre><code class="language-bash">apt install unattended-upgrades
+dpkg-reconfigure -plow unattended-upgrades
+</code></pre>
+</li>
+<li><input disabled="" type="checkbox"> <strong>Install fail2ban</strong>:<pre><code class="language-bash">apt install fail2ban
+systemctl enable fail2ban
+</code></pre>
+</li>
+<li><input disabled="" type="checkbox"> <strong>Disable unnecessary services</strong>: Review <code>systemctl list-units --type=service</code></li>
+<li><input disabled="" type="checkbox"> <strong>Set up audit logging</strong>: <code>apt install auditd</code></li>
+</ul>
+<h3>ICN Daemon Level</h3>
+<ul>
+<li><input disabled="" type="checkbox"> <strong>Run as non-root user</strong>:<pre><code class="language-bash">useradd -r -s /bin/false icn
+chown -R icn:icn /var/lib/icn
+</code></pre>
+</li>
+<li><input disabled="" type="checkbox"> <strong>Use strong passphrase for keystore</strong> (20+ characters, random)</li>
+<li><input disabled="" type="checkbox"> <strong>Store JWT secret in environment variable</strong> (never in config file):<pre><code class="language-bash">export ICN_GATEWAY_JWT_SECRET=$(openssl rand -hex 32)
+</code></pre>
+</li>
+<li><input disabled="" type="checkbox"> <strong>Enable TLS for gateway</strong> (see Gateway TLS section below)</li>
+<li><input disabled="" type="checkbox"> <strong>Set minimum trust threshold</strong>:<pre><code class="language-toml">[network]
+min_trust_threshold = 0.3  # Don&#39;t accept untrusted peers
+</code></pre>
+</li>
+<li><input disabled="" type="checkbox"> <strong>Enable rate limiting</strong> (already default, verify in config)</li>
+<li><input disabled="" type="checkbox"> <strong>Configure trust-gated topics</strong> for sensitive gossip</li>
+</ul>
+<h3>Network Level</h3>
+<ul>
+<li><input disabled="" type="checkbox"> <strong>Use private network for inter-node communication</strong> if possible</li>
+<li><input disabled="" type="checkbox"> <strong>Deploy behind reverse proxy</strong> (nginx) for gateway API</li>
+<li><input disabled="" type="checkbox"> <strong>Enable DDoS protection</strong> (CloudFlare, AWS Shield, etc.)</li>
+<li><input disabled="" type="checkbox"> <strong>Set up VPN</strong> for administrative access</li>
+<li><input disabled="" type="checkbox"> <strong>Monitor network traffic</strong> for anomalies</li>
+</ul>
+<hr>
+<h2>Deployment Architecture</h2>
+<h3>Single Node (Development/Small Coop)</h3>
+<pre><code>┌─────────────────────────────────────┐
+│         Internet                    │
+└──────────────┬──────────────────────┘
+               │
+               ▼
+      ┌────────────────┐
+      │     Nginx      │ (TLS termination)
+      │  (reverse proxy)│
+      └────────┬───────┘
+               │
+               ▼
+      ┌────────────────┐
+      │     icnd       │
+      │  (ICN daemon)  │
+      └────────┬───────┘
+               │
+               ▼
+      ┌────────────────┐
+      │  Sled Database │
+      │  /var/lib/icn  │
+      └────────────────┘
+</code></pre>
+<h3>Multi-Node (Production Coop)</h3>
+<pre><code>┌─────────────────────────────────────┐
+│         Load Balancer               │
+│       (nginx/haproxy)               │
+└──────┬─────────────┬─────────────┬──┘
+       │             │             │
+       ▼             ▼             ▼
+   ┌─────┐       ┌─────┐       ┌─────┐
+   │icnd1│◄─────►│icnd2│◄─────►│icnd3│
+   └──┬──┘       └──┬──┘       └──┬──┘
+      │             │             │
+      ▼             ▼             ▼
+   [sled1]       [sled2]       [sled3]
+</code></pre>
+<p><strong>Note</strong>: ICN uses P2P gossip for state synchronization. Each node maintains its own database and syncs via gossip protocol.</p>
+<hr>
+<h2>Installation</h2>
+<h3>1. Install ICN Binaries</h3>
+<pre><code class="language-bash"># Download and verify release
+wget https://github.com/InterCooperative-Network/icn/releases/download/v0.1.0/icn-linux-x86_64.tar.gz
+wget https://github.com/InterCooperative-Network/icn/releases/download/v0.1.0/icn-linux-x86_64.tar.gz.sha256
+
+# Verify checksum
+sha256sum -c icn-linux-x86_64.tar.gz.sha256
+
+# Extract
+tar -xzf icn-linux-x86_64.tar.gz
+sudo cp icnd icnctl /usr/local/bin/
+sudo chmod +x /usr/local/bin/icnd /usr/local/bin/icnctl
+</code></pre>
+<h3>2. Create ICN User and Directories</h3>
+<pre><code class="language-bash">sudo useradd -r -s /bin/false icn
+sudo mkdir -p /etc/icn /var/lib/icn /var/log/icn
+sudo chown -R icn:icn /var/lib/icn /var/log/icn
+</code></pre>
+<h3>3. Generate Identity</h3>
+<pre><code class="language-bash"># As the icn user
+sudo -u icn icnctl id init --data-dir /var/lib/icn
+
+# Store the DID securely
+sudo -u icn icnctl id show --data-dir /var/lib/icn &gt; /etc/icn/node-did.txt
+sudo chmod 400 /etc/icn/node-did.txt
+</code></pre>
+<h3>4. Create Configuration</h3>
+<pre><code class="language-bash">sudo tee /etc/icn/icn.toml &lt;&lt; &#39;EOF&#39;
+data_dir = &quot;/var/lib/icn&quot;
+
+[network]
+listen_addr = &quot;0.0.0.0:7777&quot;
+rpc_port = 5601
+mdns_enabled = false  # Disable mDNS in production
+bootstrap_peers = [
+    &quot;icn-bootstrap.example.com:7777&quot;,
+]
+min_trust_threshold = 0.3
+
+[observability]
+metrics_port = 9100
+health_port = 8080
+log_level = &quot;info&quot;
+
+[rate_limiting]
+enabled = true
+refill_interval_ms = 100
+
+[rate_limiting.isolated]
+max_messages_per_second = 5
+burst_capacity = 1
+
+[rate_limiting.known]
+max_messages_per_second = 20
+burst_capacity = 5
+
+[rate_limiting.partner]
+max_messages_per_second = 50
+burst_capacity = 10
+
+[rate_limiting.federated]
+max_messages_per_second = 100
+burst_capacity = 20
+
+[gateway]
+enabled = true
+bind_addr = &quot;127.0.0.1:8443&quot;  # Only localhost, nginx proxies
+# jwt_secret loaded from environment variable
+EOF
+
+sudo chmod 644 /etc/icn/icn.toml
+</code></pre>
+<h3>5. Create Systemd Service</h3>
+<pre><code class="language-bash">sudo tee /etc/systemd/system/icnd.service &lt;&lt; &#39;EOF&#39;
+[Unit]
+Description=ICN Daemon
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=icn
+Group=icn
+WorkingDirectory=/var/lib/icn
+
+# Load environment variables
+EnvironmentFile=/etc/icn/icnd.env
+
+# Start daemon
+ExecStart=/usr/local/bin/icnd --config /etc/icn/icn.toml
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/icn /var/log/icn
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=512
+
+# Restart policy
+Restart=always
+RestartSec=10
+StartLimitInterval=200
+StartLimitBurst=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Create environment file
+sudo tee /etc/icn/icnd.env &lt;&lt; EOF
+ICN_GATEWAY_JWT_SECRET=$(openssl rand -hex 32)
+RUST_LOG=icn=info,warn
+RUST_BACKTRACE=1
+EOF
+
+sudo chmod 600 /etc/icn/icnd.env
+
+# Enable and start service
+sudo systemctl daemon-reload
+sudo systemctl enable icnd
+sudo systemctl start icnd
+</code></pre>
+<h3>6. Verify Installation</h3>
+<pre><code class="language-bash"># Check service status
+sudo systemctl status icnd
+
+# Check health endpoint
+curl http://localhost:8080/health
+
+# Check logs
+sudo journalctl -u icnd -f
+</code></pre>
+<hr>
+<h2>Gateway TLS Configuration</h2>
+<h3>Option A: nginx Reverse Proxy (Recommended)</h3>
+<pre><code class="language-bash"># Install nginx
+sudo apt install nginx certbot python3-certbot-nginx
+
+# Obtain Let&#39;s Encrypt certificate
+sudo certbot --nginx -d icn.example.com
+
+# Configure nginx
+sudo tee /etc/nginx/sites-available/icn &lt;&lt; &#39;EOF&#39;
+upstream icn_gateway {
+    server 127.0.0.1:8443;
+    keepalive 32;
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name icn.example.com;
+
+    # TLS configuration
+    ssl_certificate /etc/letsencrypt/live/icn.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/icn.example.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+
+    # Security headers
+    add_header Strict-Transport-Security &quot;max-age=31536000; includeSubDomains&quot; always;
+    add_header X-Frame-Options &quot;DENY&quot; always;
+    add_header X-Content-Type-Options &quot;nosniff&quot; always;
+    add_header X-XSS-Protection &quot;1; mode=block&quot; always;
+
+    # Rate limiting
+    limit_req_zone $binary_remote_addr zone=icn_api:10m rate=10r/s;
+    limit_req zone=icn_api burst=20 nodelay;
+
+    # Proxy to ICN gateway
+    location / {
+        proxy_pass http://icn_gateway;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection &quot;upgrade&quot;;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
+
+    # Health check endpoint (no auth required)
+    location /health {
+        proxy_pass http://localhost:8080/health;
+        access_log off;
+    }
+}
+
+# Redirect HTTP to HTTPS
+server {
+    listen 80;
+    listen [::]:80;
+    server_name icn.example.com;
+    return 301 https://$server_name$request_uri;
+}
+EOF
+
+sudo ln -s /etc/nginx/sites-available/icn /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl reload nginx
+</code></pre>
+<h3>Option B: Direct TLS (Not Recommended for Production)</h3>
+<p>If you must terminate TLS directly in icnd, configure rustls certificates in the config.</p>
+<hr>
+<h2>Monitoring Setup</h2>
+<h3>1. Prometheus Configuration</h3>
+<pre><code class="language-yaml"># /etc/prometheus/prometheus.yml
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: &#39;icn&#39;
+    static_configs:
+      - targets: [&#39;localhost:9100&#39;]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: &#39;icn-node1&#39;
+</code></pre>
+<h3>2. Key Metrics to Monitor</h3>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Alert Threshold</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icn_gossip_peers_total</code></td>
+<td>&lt; 3</td>
+<td>Number of connected peers</td>
+</tr>
+<tr>
+<td><code>icn_ledger_entries_total</code></td>
+<td>Rate of change</td>
+<td>Transaction volume</td>
+</tr>
+<tr>
+<td><code>icn_ledger_balance_total</code></td>
+<td>Balance limits</td>
+<td>Economic health</td>
+</tr>
+<tr>
+<td><code>icn_trust_edges_total</code></td>
+<td>Decreasing</td>
+<td>Trust network health</td>
+</tr>
+<tr>
+<td><code>icn_network_bytes_received_total</code></td>
+<td>Spikes</td>
+<td>Network anomalies</td>
+</tr>
+<tr>
+<td><code>icn_gateway_requests_total</code></td>
+<td>Error rate &gt; 5%</td>
+<td>API health</td>
+</tr>
+<tr>
+<td><code>icn_compute_tasks_pending</code></td>
+<td>&gt; 100</td>
+<td>Task queue depth</td>
+</tr>
+</tbody></table>
+<h3>3. Alerting Rules</h3>
+<pre><code class="language-yaml"># /etc/prometheus/alerts/icn.yml
+groups:
+  - name: icn
+    interval: 30s
+    rules:
+      - alert: ICNPeerCountLow
+        expr: icn_gossip_peers_total &lt; 3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: &quot;ICN node has few peers&quot;
+          description: &quot;Node {{ $labels.instance }} has only {{ $value }} peers&quot;
+
+      - alert: ICNHighErrorRate
+        expr: rate(icn_gateway_requests_errors_total[5m]) &gt; 0.05
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: &quot;ICN API error rate high&quot;
+          description: &quot;Error rate is {{ $value }} on {{ $labels.instance }}&quot;
+</code></pre>
+<hr>
+<h2>Backup and Recovery</h2>
+<h3>Automated Backups</h3>
+<pre><code class="language-bash"># Create backup script
+sudo tee /usr/local/bin/icn-backup.sh &lt;&lt; &#39;EOF&#39;
+#!/bin/bash
+set -e
+
+BACKUP_DIR=&quot;/var/backups/icn&quot;
+DATA_DIR=&quot;/var/lib/icn&quot;
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+BACKUP_FILE=&quot;$BACKUP_DIR/icn-backup-$TIMESTAMP.tar.gz.enc&quot;
+
+# Create backup directory
+mkdir -p &quot;$BACKUP_DIR&quot;
+
+# Stop daemon temporarily (or use icnctl backup if available)
+systemctl stop icnd
+
+# Create encrypted backup
+tar -czf - -C &quot;$DATA_DIR&quot; . | \
+  openssl enc -aes-256-cbc -salt -pbkdf2 \
+  -pass file:/etc/icn/backup-key.txt \
+  -out &quot;$BACKUP_FILE&quot;
+
+# Restart daemon
+systemctl start icnd
+
+# Keep only last 7 days
+find &quot;$BACKUP_DIR&quot; -name &quot;icn-backup-*.tar.gz.enc&quot; -mtime +7 -delete
+
+echo &quot;Backup completed: $BACKUP_FILE&quot;
+EOF
+
+sudo chmod +x /usr/local/bin/icn-backup.sh
+
+# Generate backup encryption key
+openssl rand -hex 32 | sudo tee /etc/icn/backup-key.txt
+sudo chmod 400 /etc/icn/backup-key.txt
+</code></pre>
+<h3>Cron Schedule</h3>
+<pre><code class="language-bash"># Daily backup at 2 AM
+sudo crontab -e
+0 2 * * * /usr/local/bin/icn-backup.sh &gt;&gt; /var/log/icn/backup.log 2&gt;&amp;1
+</code></pre>
+<h3>Recovery Procedure</h3>
+<pre><code class="language-bash"># Stop daemon
+sudo systemctl stop icnd
+
+# Decrypt and restore
+sudo openssl enc -aes-256-cbc -d -pbkdf2 \
+  -pass file:/etc/icn/backup-key.txt \
+  -in /var/backups/icn/icn-backup-YYYYMMDD_HHMMSS.tar.gz.enc | \
+  sudo tar -xzf - -C /var/lib/icn
+
+# Fix permissions
+sudo chown -R icn:icn /var/lib/icn
+
+# Start daemon
+sudo systemctl start icnd
+</code></pre>
+<hr>
+<h2>Disaster Recovery Plan</h2>
+<h3>RTO/RPO Targets</h3>
+<ul>
+<li><strong>RPO (Recovery Point Objective)</strong>: 1 hour (daily backups + gossip sync)</li>
+<li><strong>RTO (Recovery Time Objective)</strong>: 30 minutes (restore from backup)</li>
+</ul>
+<h3>DR Procedure</h3>
+<ol>
+<li><strong>Detect Failure</strong>: Monitoring alerts trigger</li>
+<li><strong>Assess Impact</strong>: Check health endpoints, logs</li>
+<li><strong>Decide Recovery Method</strong>:<ul>
+<li>Minor: Restart service</li>
+<li>Major: Restore from backup</li>
+<li>Catastrophic: Rebuild from gossip sync</li>
+</ul>
+</li>
+<li><strong>Execute Recovery</strong>: Follow procedure above</li>
+<li><strong>Verify Restoration</strong>: Health checks, peer count, ledger sync</li>
+<li><strong>Post-Mortem</strong>: Document incident, update runbooks</li>
+</ol>
+<h3>Failover Strategy</h3>
+<p><strong>Multi-Node Deployment</strong>:</p>
+<ul>
+<li>Nodes sync via gossip automatically</li>
+<li>Load balancer detects failed nodes and routes around them</li>
+<li>No manual intervention needed for node failure</li>
+<li>Data loss: None (replicated across nodes)</li>
+</ul>
+<p><strong>Single-Node Deployment</strong>:</p>
+<ul>
+<li>Restore from latest backup</li>
+<li>Re-sync missing data from network via gossip</li>
+<li>Expected data loss: 1 hour (since last backup)</li>
+</ul>
+<hr>
+<h2>Capacity Planning</h2>
+<h3>Resource Requirements by Network Size</h3>
+<table>
+<thead>
+<tr>
+<th>Network Size</th>
+<th>CPU</th>
+<th>RAM</th>
+<th>Disk</th>
+<th>Bandwidth</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>10 nodes</td>
+<td>2 cores</td>
+<td>4 GB</td>
+<td>50 GB</td>
+<td>10 Mbps</td>
+</tr>
+<tr>
+<td>50 nodes</td>
+<td>4 cores</td>
+<td>8 GB</td>
+<td>100 GB</td>
+<td>50 Mbps</td>
+</tr>
+<tr>
+<td>100 nodes</td>
+<td>8 cores</td>
+<td>16 GB</td>
+<td>200 GB</td>
+<td>100 Mbps</td>
+</tr>
+<tr>
+<td>500 nodes</td>
+<td>16 cores</td>
+<td>32 GB</td>
+<td>500 GB</td>
+<td>500 Mbps</td>
+</tr>
+</tbody></table>
+<h3>Scaling Considerations</h3>
+<ul>
+<li><strong>Gossip fanout</strong>: Adjust <code>topology.fanout.*</code> in config</li>
+<li><strong>Trust computation</strong>: Scales O(N²) for full mesh, cache aggressively</li>
+<li><strong>Ledger storage</strong>: Grows linearly with transactions (~1 KB per entry)</li>
+<li><strong>Bandwidth</strong>: Gossip traffic scales with network size and message rate</li>
+</ul>
+<hr>
+<h2>Troubleshooting</h2>
+<h3>Common Issues</h3>
+<p><strong>Issue</strong>: Node can&#39;t connect to peers</p>
+<ul>
+<li>Check firewall: <code>sudo ufw status</code></li>
+<li>Verify bootstrap peers are reachable: <code>telnet bootstrap.example.com 7777</code></li>
+<li>Check logs: <code>sudo journalctl -u icnd | grep &quot;connection&quot;</code></li>
+</ul>
+<p><strong>Issue</strong>: High CPU usage</p>
+<ul>
+<li>Check peer count: <code>icnctl network peers</code></li>
+<li>Review trust computation cache hits in metrics</li>
+<li>Consider reducing gossip fanout</li>
+</ul>
+<p><strong>Issue</strong>: Disk space growing rapidly</p>
+<ul>
+<li>Check ledger entry count: <code>icnctl ledger stats</code></li>
+<li>Review gossip content storage</li>
+<li>Implement archival strategy for old entries</li>
+</ul>
+<p><strong>Issue</strong>: Gateway API not responding</p>
+<ul>
+<li>Check gateway is enabled in config</li>
+<li>Verify JWT secret is set: <code>env | grep ICN_GATEWAY_JWT_SECRET</code></li>
+<li>Check nginx proxy: <code>sudo nginx -t &amp;&amp; sudo systemctl status nginx</code></li>
+</ul>
+<hr>
+<h2>Security Incident Response</h2>
+<ol>
+<li><strong>Detect</strong>: Monitoring alerts, user reports</li>
+<li><strong>Isolate</strong>: Firewall the affected node</li>
+<li><strong>Investigate</strong>: Review logs, network traffic, system calls</li>
+<li><strong>Contain</strong>: Stop icnd, snapshot disk for forensics</li>
+<li><strong>Eradicate</strong>: Remove malicious content, patch vulnerabilities</li>
+<li><strong>Recover</strong>: Restore from clean backup, re-sync from network</li>
+<li><strong>Lessons Learned</strong>: Document incident, improve defenses</li>
+</ol>
+<h3>Contacts</h3>
+<ul>
+<li><strong>Security Team</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/mailto:security@example.com">security@example.com</a></li>
+<li><strong>On-Call</strong>: +1-555-ONCALL</li>
+<li><strong>ICN Community</strong>: #security on Discord</li>
+</ul>
+<hr>
+<h2>Compliance</h2>
+<h3>GDPR Considerations</h3>
+<ul>
+<li><strong>Data Minimization</strong>: ICN stores only DIDs and transaction data</li>
+<li><strong>Right to Erasure</strong>: Not directly supported (immutable ledger)</li>
+<li><strong>Data Portability</strong>: Use <code>icnctl backup</code> to export data</li>
+<li><strong>Consent</strong>: Obtain explicit consent before adding users to ledger</li>
+</ul>
+<h3>Audit Logging</h3>
+<pre><code class="language-bash"># Enable audit logging
+sudo auditctl -w /var/lib/icn -p wa -k icn_data
+sudo auditctl -w /usr/local/bin/icnd -p x -k icn_binary
+</code></pre>
+<hr>
+<h2>Maintenance Windows</h2>
+<ul>
+<li><strong>Updates</strong>: Weekly, Wednesday 2-4 AM UTC</li>
+<li><strong>Backups</strong>: Daily, 2 AM local time</li>
+<li><strong>Certificate Renewal</strong>: Automatic (Let&#39;s Encrypt)</li>
+<li><strong>Security Patches</strong>: Within 24 hours of release</li>
+</ul>
+<hr>
+<h2>Support</h2>
+<ul>
+<li><strong>Documentation</strong>: <a href="https://icn.coop/docs" target="_blank" rel="noopener">https://icn.coop/docs</a></li>
+<li><strong>Community</strong>: <a href="https://discord.gg/icn" target="_blank" rel="noopener">https://discord.gg/icn</a></li>
+<li><strong>Bug Reports</strong>: <a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">https://github.com/InterCooperative-Network/icn/issues</a></li>
+<li><strong>Security Reports</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/mailto:security@icn.coop">security@icn.coop</a> (GPG: 0xABCD1234)</li>
+</ul>
+<hr>
+<p><strong>Document Revision History</strong>:</p>
+<ul>
+<li>2025-12-16: Initial production deployment guide created</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

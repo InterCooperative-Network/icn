@@ -1,0 +1,579 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Configuration Management Guide | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>reference</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>config</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>CONFIGURATION</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/reference/config/CONFIGURATION.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Configuration Management Guide</h1>
+<p><strong>Version</strong>: 1.0<br><strong>Last Updated</strong>: 2025-12-16<br><strong>Status</strong>: Complete  </p>
+<hr>
+<h2>Overview</h2>
+<p>ICN uses TOML configuration files for all node settings. This guide covers configuration management, validation, and best practices.</p>
+<hr>
+<h2>Configuration Files</h2>
+<h3>Default Locations</h3>
+<p><code>icnd</code> uses one of two modes:</p>
+<ol>
+<li><strong>Command-line specified config</strong>: <code>icnd --config /path/to/config.toml</code></li>
+<li><strong>Built-in defaults</strong>: if <code>--config</code> is not provided, <code>icnd</code> starts from <code>Config::default()</code> and applies CLI/env overrides.</li>
+</ol>
+<p>Note: there is no automatic multi-path config file search order in current <code>icnd</code>.</p>
+<h3>Example Configuration</h3>
+<p>See <code>icn/config/icn.toml.example</code> for a fully documented example with available options.</p>
+<hr>
+<h2>Configuration Validation</h2>
+<h3>Runtime Validation (Primary)</h3>
+<p>Use <code>icnd --validate-config</code> (same validation logic used at startup):</p>
+<pre><code class="language-bash"># Validate a specific config file
+icnd --config /path/to/config.toml --validate-config
+</code></pre>
+<h3>Validation Tool (Optional/Legacy)</h3>
+<p><code>scripts/validate-config.py</code> can be used if you provide a compatible JSON schema:</p>
+<pre><code class="language-bash"># Install dependencies
+pip install jsonschema toml
+
+# Validate configuration (requires --schema path)
+python3 scripts/validate-config.py --schema /path/to/icn-config.schema.json /path/to/config.toml
+
+# Validate with verbose output
+python3 scripts/validate-config.py --verbose --schema /path/to/icn-config.schema.json /path/to/config.toml
+
+# Validate JSON configuration
+python3 scripts/validate-config.py --format json --schema /path/to/icn-config.schema.json /path/to/config.json
+</code></pre>
+<h3>IDE Integration</h3>
+<p>If you maintain a local JSON schema, configure your IDE to validate TOML files:</p>
+<p><strong>VS Code</strong> (<code>settings.json</code>):</p>
+<pre><code class="language-json">{
+  &quot;evenBetterToml.schema.associations&quot;: {
+    &quot;icn.toml&quot;: &quot;file:///path/to/icn/config/icn-config.schema.json&quot;
+  }
+}
+</code></pre>
+<p><strong>IntelliJ/PyCharm</strong>:</p>
+<ol>
+<li>Settings → Languages &amp; Frameworks → Schemas and DTDs</li>
+<li>Add JSON Schema → File</li>
+<li>Select your local schema file (for example <code>icn-config.schema.json</code>)</li>
+<li>Add file pattern: <code>**/icn*.toml</code></li>
+</ol>
+<hr>
+<h2>Configuration Sections</h2>
+<h3>1. Node Configuration</h3>
+<pre><code class="language-toml"># Data directory for all node data
+data_dir = &quot;/var/lib/icn&quot;
+</code></pre>
+<p><strong>Best Practices</strong>:</p>
+<ul>
+<li>Use absolute paths</li>
+<li>Ensure write permissions</li>
+<li>Consider disk space (ledger growth)</li>
+</ul>
+<h3>2. Network Configuration</h3>
+<pre><code class="language-toml">[network]
+listen_addr = &quot;0.0.0.0:7777&quot;
+rpc_port = 5601
+mdns_enabled = true
+bootstrap_peers = []
+min_trust_threshold = 0.1
+</code></pre>
+<p><strong>Security Considerations</strong>:</p>
+<ul>
+<li>Set <code>min_trust_threshold &gt;= 0.1</code> for public networks</li>
+<li>Disable mDNS (<code>mdns_enabled = false</code>) in production</li>
+<li>Use firewall rules to restrict <code>listen_addr</code></li>
+</ul>
+<p><strong>Bootstrap Peers</strong>:</p>
+<pre><code class="language-toml">bootstrap_peers = [
+    &quot;icn://did:icn:z6Mk...@203.0.113.50:7777&quot;,
+    &quot;icn://did:icn:z6Mk...@203.0.113.51:7777&quot;
+]
+</code></pre>
+<h3>3. Observability</h3>
+<pre><code class="language-toml">[observability]
+metrics_port = 9100
+health_port = 8080
+log_level = &quot;info&quot;
+</code></pre>
+<p><strong>Log Levels</strong>:</p>
+<ul>
+<li><code>trace</code>: Very verbose (development only)</li>
+<li><code>debug</code>: Detailed debugging information</li>
+<li><code>info</code>: Normal operations (recommended)</li>
+<li><code>warn</code>: Warning messages only</li>
+<li><code>error</code>: Errors only (not recommended)</li>
+</ul>
+<h3>4. Rate Limiting</h3>
+<pre><code class="language-toml">[rate_limiting]
+enabled = true
+refill_interval_ms = 100
+
+[rate_limiting.isolated]
+max_messages_per_second = 10
+burst_capacity = 2
+
+[rate_limiting.known]
+max_messages_per_second = 50
+burst_capacity = 10
+
+[rate_limiting.partner]
+max_messages_per_second = 100
+burst_capacity = 20
+
+[rate_limiting.federated]
+max_messages_per_second = 200
+burst_capacity = 50
+</code></pre>
+<p><strong>Tuning Guidelines</strong>:</p>
+<ul>
+<li><strong>Isolated</strong>: Strict limits for untrusted peers</li>
+<li><strong>Known</strong>: Moderate limits for basic trust</li>
+<li><strong>Partner</strong>: Generous limits for collaborators</li>
+<li><strong>Federated</strong>: High limits for trusted members</li>
+</ul>
+<h3>5. Topology (Optional)</h3>
+<pre><code class="language-toml">[topology]
+region = &quot;us-west&quot;
+cluster_id = &quot;sfo-1&quot;
+role = &quot;edge&quot;
+
+[topology.neighbor_limits]
+max_local_cluster = 50
+max_regional = 30
+max_backbone = 20
+max_trusted = 100
+
+[topology.fanout]
+local_cluster = 8
+regional = 6
+global = 4
+</code></pre>
+<p><strong>When to Use</strong>:</p>
+<ul>
+<li>Large networks (100+ nodes)</li>
+<li>Geographic distribution</li>
+<li>Bandwidth optimization</li>
+</ul>
+<p><strong>When to Skip</strong>:</p>
+<ul>
+<li>Small cooperatives (&lt;50 nodes)</li>
+<li>Single geographic location</li>
+<li>Simple deployments</li>
+</ul>
+<h3>6. Federation</h3>
+<pre><code class="language-toml">[federation]
+enabled = true
+network_name = &quot;icn-mainnet&quot;
+bootstrap_peer_trust = 0.3
+auto_accept_invites = false
+min_invite_trust = 0.5
+max_federations = 10
+announce_public_addr = true
+
+[federation.retry]
+max_retries = 5
+initial_delay_secs = 1
+max_delay_secs = 60
+reconnect_interval_secs = 30
+</code></pre>
+<p><strong>Security</strong>:</p>
+<ul>
+<li>Set <code>auto_accept_invites = false</code> initially</li>
+<li>Use <code>min_invite_trust &gt;= 0.5</code> if enabling auto-accept</li>
+<li>Monitor <code>max_federations</code> to prevent exhaustion</li>
+</ul>
+<h3>7. Gateway API</h3>
+<pre><code class="language-toml">[gateway]
+enabled = true
+bind_addr = &quot;127.0.0.1:8080&quot;
+token_expiry_hours = 24
+challenge_ttl_minutes = 5
+jwt_secret = &quot;&quot;  # Use environment variable!
+
+[gateway.rate_limiting]
+capacity = 100
+refill_rate = 10
+cost_per_request = 1
+</code></pre>
+<p><strong>Security Critical</strong>:</p>
+<ul>
+<li>⚠️ <strong>NEVER</strong> commit <code>jwt_secret</code> to version control</li>
+<li>Use environment variable: <code>ICN_GATEWAY_JWT_SECRET</code></li>
+<li>Bind to <code>127.0.0.1</code> and use reverse proxy</li>
+<li>Enable TLS in reverse proxy (nginx/Apache)</li>
+</ul>
+<p><strong>Generate JWT Secret</strong>:</p>
+<pre><code class="language-bash">openssl rand -base64 32
+</code></pre>
+<h3>8. Privacy (Optional)</h3>
+<pre><code class="language-toml">[privacy]
+enabled = true
+onion_routing_enabled = true
+onion_hops = 2
+min_relay_trust = 0.3
+topic_encryption_enabled = false
+traffic_obfuscation_enabled = false
+padding_target = 0
+max_delay_ms = 0
+cover_traffic_rate = 0
+</code></pre>
+<p><strong>Performance Impact</strong>:</p>
+<ul>
+<li>Onion routing: +100-500ms latency per hop</li>
+<li>Traffic obfuscation: +10-50ms latency</li>
+<li>Cover traffic: Bandwidth cost</li>
+</ul>
+<h3>9. Cooperative</h3>
+<pre><code class="language-toml">[cooperative]
+treasury_did = &quot;did:icn:z6Mk...&quot;
+name = &quot;My Cooperative&quot;
+description = &quot;A community cooperative&quot;
+</code></pre>
+<hr>
+<h2>Environment Variables</h2>
+<p>Only selected runtime values are read from environment variables in current <code>icnd</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Configuration</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ICN_GATEWAY_JWT_SECRET</code></td>
+<td><code>gateway.jwt_secret</code></td>
+<td><code>&lt;secret&gt;</code></td>
+</tr>
+<tr>
+<td><code>OTEL_EXPORTER_OTLP_ENDPOINT</code></td>
+<td><code>observability.tracing.otlp_endpoint</code></td>
+<td><code>http://tempo:4317</code></td>
+</tr>
+<tr>
+<td><code>OTEL_SERVICE_NAME</code></td>
+<td><code>observability.tracing.service_name</code></td>
+<td><code>icn-node</code></td>
+</tr>
+<tr>
+<td><code>ICN_KEYSTORE_PASSPHRASE</code></td>
+<td>keystore unlock passphrase (preferred)</td>
+<td><code>&lt;secret&gt;</code></td>
+</tr>
+<tr>
+<td><code>ICN_PASSPHRASE</code></td>
+<td>keystore unlock passphrase (legacy fallback)</td>
+<td><code>&lt;secret&gt;</code></td>
+</tr>
+</tbody></table>
+<p><strong>Precedence</strong> (highest to lowest):</p>
+<ol>
+<li>Command-line arguments</li>
+<li>Configuration file</li>
+<li>Default values</li>
+</ol>
+<p>Environment variables apply only where explicitly supported (for example gateway JWT and OpenTelemetry settings), not as a blanket override for all config fields.</p>
+<hr>
+<h2>Configuration Templates</h2>
+<h3>Development</h3>
+<pre><code class="language-toml">data_dir = &quot;./.icn-dev&quot;
+
+[network]
+listen_addr = &quot;127.0.0.1:7777&quot;
+mdns_enabled = true
+min_trust_threshold = 0.0
+
+[observability]
+log_level = &quot;debug&quot;
+
+[gateway]
+enabled = true
+bind_addr = &quot;127.0.0.1:8080&quot;
+jwt_secret = &quot;dev-secret-change-in-production&quot;
+</code></pre>
+<h3>Production (Small Cooperative)</h3>
+<pre><code class="language-toml">data_dir = &quot;/var/lib/icn&quot;
+
+[network]
+listen_addr = &quot;0.0.0.0:7777&quot;
+mdns_enabled = false
+bootstrap_peers = [&quot;icn://...&quot;]
+min_trust_threshold = 0.1
+
+[observability]
+metrics_port = 9100
+health_port = 8080
+log_level = &quot;info&quot;
+
+[rate_limiting]
+enabled = true
+
+[gateway]
+enabled = true
+bind_addr = &quot;127.0.0.1:8080&quot;
+# jwt_secret loaded from environment
+
+[cooperative]
+name = &quot;My Coop&quot;
+</code></pre>
+<h3>Production (Federated Network)</h3>
+<pre><code class="language-toml">data_dir = &quot;/var/lib/icn&quot;
+
+[network]
+listen_addr = &quot;0.0.0.0:7777&quot;
+mdns_enabled = false
+bootstrap_peers = [&quot;icn://...&quot;]
+min_trust_threshold = 0.3
+
+[observability]
+metrics_port = 9100
+log_level = &quot;info&quot;
+
+[topology]
+region = &quot;us-west&quot;
+cluster_id = &quot;sfo-1&quot;
+role = &quot;edge&quot;
+
+[federation]
+enabled = true
+network_name = &quot;icn-mainnet&quot;
+auto_accept_invites = false
+min_invite_trust = 0.6
+
+[gateway]
+enabled = true
+bind_addr = &quot;127.0.0.1:8080&quot;
+token_expiry_hours = 12
+</code></pre>
+<hr>
+<h2>Secrets Management</h2>
+<h3>DO NOT Store Secrets in Config Files</h3>
+<p>❌ <strong>Never do this</strong>:</p>
+<pre><code class="language-toml">[gateway]
+jwt_secret = &quot;my-secret-key&quot;  # INSECURE!
+</code></pre>
+<p>✅ <strong>Always do this</strong>:</p>
+<pre><code class="language-bash"># Set environment variable
+export ICN_GATEWAY_JWT_SECRET=$(openssl rand -base64 32)
+
+# Or use systemd EnvironmentFile
+# /etc/icn/icnd.env:
+ICN_GATEWAY_JWT_SECRET=&lt;generated-secret&gt;
+</code></pre>
+<h3>Secrets Management Tools</h3>
+<p><strong>Kubernetes</strong>:</p>
+<pre><code class="language-yaml">apiVersion: v1
+kind: Secret
+metadata:
+  name: icn-secrets
+stringData:
+  jwt-secret: &lt;base64-encoded-secret&gt;
+---
+apiVersion: v1
+kind: Pod
+spec:
+  containers:
+  - name: icnd
+    env:
+    - name: ICN_GATEWAY_JWT_SECRET
+      valueFrom:
+        secretKeyRef:
+          name: icn-secrets
+          key: jwt-secret
+</code></pre>
+<p><strong>HashiCorp Vault</strong>:</p>
+<pre><code class="language-bash"># Store secret
+vault kv put secret/icn/jwt-secret value=&quot;$(openssl rand -base64 32)&quot;
+
+# Retrieve and use
+export ICN_GATEWAY_JWT_SECRET=$(vault kv get -field=value secret/icn/jwt-secret)
+</code></pre>
+<p><strong>AWS Secrets Manager</strong>:</p>
+<pre><code class="language-bash"># Store secret
+aws secretsmanager create-secret \
+  --name icn/jwt-secret \
+  --secret-string &quot;$(openssl rand -base64 32)&quot;
+
+# Retrieve in application
+aws secretsmanager get-secret-value \
+  --secret-id icn/jwt-secret \
+  --query SecretString \
+  --output text
+</code></pre>
+<hr>
+<h2>Configuration Migration</h2>
+<h3>Version Compatibility</h3>
+<p>ICN follows semantic versioning. Configuration changes:</p>
+<table>
+<thead>
+<tr>
+<th>Version Change</th>
+<th>Compatibility</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Patch (0.1.0 → 0.1.1)</td>
+<td>Fully compatible</td>
+</tr>
+<tr>
+<td>Minor (0.1.x → 0.2.0)</td>
+<td>Backward compatible</td>
+</tr>
+<tr>
+<td>Major (0.x.y → 1.0.0)</td>
+<td>May require migration</td>
+</tr>
+</tbody></table>
+<h3>Migration Checklist</h3>
+<p>When upgrading ICN:</p>
+<ol>
+<li><strong>Backup configuration</strong>: <code>cp config.toml config.toml.backup</code></li>
+<li><strong>Review CHANGELOG</strong>: Check for config changes</li>
+<li><strong>Validate</strong>: <code>icnd --config /path/to/config.toml --validate-config</code></li>
+<li><strong>Test startup</strong>: Start with your target flags in a non-production environment</li>
+<li><strong>Monitor</strong>: Watch logs after upgrade</li>
+</ol>
+<hr>
+<h2>Troubleshooting</h2>
+<h3>Configuration Not Loading</h3>
+<p><strong>Symptom</strong>: ICN uses default values instead of config</p>
+<p><strong>Solutions</strong>:</p>
+<ol>
+<li>Check file path: <code>icnd --config /path/to/config.toml</code></li>
+<li>Verify file permissions: <code>ls -l /path/to/config.toml</code></li>
+<li>Enable debug logging: <code>icnd --log-level debug</code></li>
+</ol>
+<h3>Validation Fails</h3>
+<p><strong>Symptom</strong>: <code>icnd --validate-config</code> reports errors</p>
+<p><strong>Solutions</strong>:</p>
+<ol>
+<li>Check for typos in section names</li>
+<li>Verify data types (string vs. integer)</li>
+<li>Check required fields are present</li>
+<li>Review error message carefully</li>
+</ol>
+<h3>Gateway Won&#39;t Start</h3>
+<p><strong>Symptom</strong>: Gateway enabled but not responding</p>
+<p><strong>Common Causes</strong>:</p>
+<ol>
+<li>Missing <code>jwt_secret</code>: Set via environment variable</li>
+<li>Port already in use: Check with <code>netstat -tlnp | grep 8080</code></li>
+<li>Firewall blocking: <code>sudo ufw allow 8080/tcp</code></li>
+</ol>
+<h3>Network Connectivity Issues</h3>
+<p><strong>Symptom</strong>: No peers connecting</p>
+<p><strong>Solutions</strong>:</p>
+<ol>
+<li>Check firewall: <code>sudo ufw status</code></li>
+<li>Verify <code>listen_addr</code> is correct</li>
+<li>Test bootstrap peers: <code>telnet peer.example.com 7777</code></li>
+<li>Lower <code>min_trust_threshold</code> temporarily</li>
+</ol>
+<hr>
+<h2>Best Practices</h2>
+<h3>1. Configuration as Code</h3>
+<ul>
+<li>Store configurations in version control</li>
+<li>Use separate configs for dev/staging/prod</li>
+<li>Remove secrets before committing</li>
+<li>Document custom settings</li>
+</ul>
+<h3>2. Regular Validation</h3>
+<pre><code class="language-bash"># Add to CI pipeline
+icnd --config /path/to/config.toml --validate-config
+</code></pre>
+<h3>3. Monitoring</h3>
+<p>Monitor configuration drift:</p>
+<ul>
+<li>Alert on unexpected changes</li>
+<li>Track configuration versions</li>
+<li>Audit configuration access</li>
+</ul>
+<h3>4. Documentation</h3>
+<p>Document custom settings:</p>
+<pre><code class="language-toml"># Custom rate limit for our high-traffic network
+# Increased after load testing on 2025-12-01
+[rate_limiting.partner]
+max_messages_per_second = 150  # Was: 100
+</code></pre>
+<h3>5. Testing</h3>
+<p>Test configuration changes:</p>
+<ol>
+<li>Validate with schema</li>
+<li>Test in staging environment</li>
+<li>Monitor metrics after deployment</li>
+<li>Have rollback plan ready</li>
+</ol>
+<hr>
+<h2>Appendix: Full Configuration Reference</h2>
+<p>See <code>icn/config/icn.toml.example</code> for complete reference with all options documented.</p>
+<hr>
+<h2>Support</h2>
+<ul>
+<li><strong>Configuration Issues</strong>: <a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">https://github.com/InterCooperative-Network/icn/issues</a></li>
+<li><strong>Security</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/mailto:security@icn.coop">security@icn.coop</a></li>
+<li><strong>Documentation</strong>: <a href="https://icn.coop/docs" target="_blank" rel="noopener">https://icn.coop/docs</a></li>
+</ul>
+<hr>
+<p><strong>Document Version</strong>: 1.0<br><strong>Last Updated</strong>: 2025-12-16</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

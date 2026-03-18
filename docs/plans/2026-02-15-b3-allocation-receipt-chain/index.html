@@ -1,0 +1,363 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>B3: Allocation Receipt Chain — Implementation Plan | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>plans</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>2026 02 15 b3 allocation receipt chain</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/plans/2026-02-15-b3-allocation-receipt-chain.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>B3: Allocation Receipt Chain — Implementation Plan</h1>
+<blockquote>
+<p><strong>For Claude:</strong> REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.</p>
+</blockquote>
+<p><strong>Goal:</strong> Wire governance budget decisions to structured AllocationReceipts with verifiable provenance chain, replacing ad-hoc audit JSON in the vertical slice test.</p>
+<p><strong>Architecture:</strong> Pure conversion function <code>create_budget_allocation()</code> in <code>icn-ledger</code> bridges governance decisions to <code>AllocationReceipt</code> + <code>SettlementIntent</code> types from <code>icn-kernel-api</code>. The vertical slice integration test is updated to produce and verify these receipts end-to-end. No new actors or traits.</p>
+<p><strong>Tech Stack:</strong> Rust, <code>icn-kernel-api</code> (AllocationReceipt, SettlementIntent, CanonicalReceipt), <code>icn-governance</code> (GovernanceDecisionReceipt), <code>icn-ledger</code> (new allocations module), <code>icn-time</code> (timestamps).</p>
+<p><strong>Design Doc:</strong> <code>docs/plans/2026-02-15-b3-allocation-receipt-chain-design.md</code></p>
+<hr>
+<h2>Pre-flight</h2>
+<p>Before starting, create the feature branch:</p>
+<pre><code class="language-bash">git checkout main &amp;&amp; git pull origin main
+git checkout -b feat/allocation-receipt-chain
+</code></pre>
+<hr>
+<h3>Task 1: Create allocations module with unit tests</h3>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Create: <code>icn/crates/icn-ledger/src/allocations.rs</code></li>
+<li>Modify: <code>icn/crates/icn-ledger/src/lib.rs</code> (add module + re-exports)</li>
+</ul>
+<p><strong>Step 1: Write the allocations module with tests</strong></p>
+<p>Create <code>icn/crates/icn-ledger/src/allocations.rs</code>:</p>
+<pre><code class="language-rust">//! Allocation receipt creation for governance → economics bridge.
+//!
+//! Converts governance budget decision parameters into structured
+//! `AllocationReceipt` objects with `SettlementIntent` entries.
+//! These receipts form the provenance chain:
+//!
+//! ```text
+//! GovernanceDecisionReceipt.decision_hash
+//!     → AllocationReceipt.decision_hash
+//!         → SettlementIntent.decision_hash
+//!             → JournalEntry (ledger mutation)
+//! ```
+
+use icn_kernel_api::economics::SettlementIntent;
+use icn_kernel_api::receipts::{AllocationReceipt, CanonicalReceipt, Hash};
+use icn_kernel_api::ScopeLevel;
+
+/// Create an `AllocationReceipt` from a governance budget decision.
+///
+/// This is the bridge between governance decisions and economic settlement.
+/// The receipt links `decision_hash` to a `SettlementIntent` describing
+/// the treasury → recipient transfer.
+///
+/// # Arguments
+///
+/// * `decision_hash` — Canonical hash of the `GovernanceDecisionReceipt`
+/// * `proposal_id` — Governance proposal ID (used as `decision_receipt_id` on the intent)
+/// * `treasury_did` — Source account DID (treasury paying out)
+/// * `recipient_did` — Destination account DID (receiving the allocation)
+/// * `amount` — Transfer amount in smallest unit
+/// * `currency` — Currency/unit symbol (e.g. &quot;HOURS&quot;)
+/// * `purpose` — Human-readable memo (excluded from canonical hash)
+pub fn create_budget_allocation(
+    decision_hash: Hash,
+    proposal_id: &amp;str,
+    treasury_did: &amp;str,
+    recipient_did: &amp;str,
+    amount: u64,
+    currency: &amp;str,
+    purpose: &amp;str,
+) -&gt; AllocationReceipt {
+    let now = icn_time::current_timestamp_secs();
+
+    let intent = SettlementIntent::new(
+        proposal_id,
+        decision_hash,
+        treasury_did,
+        recipient_did,
+        amount,
+        currency,
+    )
+    .with_memo(purpose)
+    .with_timestamp(now);
+
+    AllocationReceipt::new(decision_hash, ScopeLevel::Org)
+        .with_timestamp(now)
+        .add_intent(intent)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const TEST_DECISION_HASH: Hash = [42u8; 32];
+
+    fn make_test_allocation() -&gt; AllocationReceipt {
+        create_budget_allocation(
+            TEST_DECISION_HASH,
+            &quot;prop-budget-001&quot;,
+            &quot;did:icn:treasury&quot;,
+            &quot;did:icn:supplier&quot;,
+            30,
+            &quot;HOURS&quot;,
+            &quot;Purchase drill press&quot;,
+        )
+    }
+
+    #[test]
+    fn test_creates_valid_receipt_with_one_intent() {
+        let receipt = make_test_allocation();
+        assert_eq!(receipt.intents.len(), 1);
+        assert_eq!(receipt.decision_hash, TEST_DECISION_HASH);
+        assert_eq!(receipt.scope, ScopeLevel::Org);
+        assert!(receipt.created_at &gt; 0);
+    }
+
+    #[test]
+    fn test_decision_hash_propagates_to_intent() {
+        let receipt = make_test_allocation();
+        let intent = &amp;receipt.intents[0];
+        assert_eq!(intent.decision_hash, TEST_DECISION_HASH);
+        assert_eq!(receipt.decision_hash, intent.decision_hash);
+    }
+
+    #[test]
+    fn test_intent_fields_match_inputs() {
+        let receipt = make_test_allocation();
+        let intent = &amp;receipt.intents[0];
+
+        assert_eq!(intent.from, &quot;did:icn:treasury&quot;);
+        assert_eq!(intent.to, &quot;did:icn:supplier&quot;);
+        assert_eq!(intent.amount, 30);
+        assert_eq!(intent.unit, &quot;HOURS&quot;);
+        assert_eq!(intent.decision_receipt_id, &quot;prop-budget-001&quot;);
+        assert_eq!(intent.memo.as_deref(), Some(&quot;Purchase drill press&quot;));
+    }
+
+    #[test]
+    fn test_provenance_chain_includes_decision_hash() {
+        let receipt = make_test_allocation();
+        assert!(
+            receipt.provenance.upstream_hashes.contains(&amp;TEST_DECISION_HASH),
+            &quot;provenance must link to decision_hash&quot;
+        );
+    }
+
+    #[test]
+    fn test_canonical_hash_is_stable() {
+        let r1 = create_budget_allocation(
+            TEST_DECISION_HASH,
+            &quot;prop-001&quot;,
+            &quot;did:icn:a&quot;,
+            &quot;did:icn:b&quot;,
+            100,
+            &quot;HOURS&quot;,
+            &quot;test&quot;,
+        );
+        let r2 = create_budget_allocation(
+            TEST_DECISION_HASH,
+            &quot;prop-001&quot;,
+            &quot;did:icn:a&quot;,
+            &quot;did:icn:b&quot;,
+            100,
+            &quot;HOURS&quot;,
+            &quot;test&quot;,
+        );
+
+        // Same inputs within same second → same canonical hash
+        // (canonical hash excludes memo, so purpose doesn&#39;t matter)
+        assert_eq!(r1.canonical_hash(), r2.canonical_hash());
+    }
+
+    #[test]
+    fn test_different_amounts_produce_different_hashes() {
+        let r1 = create_budget_allocation(
+            TEST_DECISION_HASH,
+            &quot;prop-001&quot;,
+            &quot;did:icn:a&quot;,
+            &quot;did:icn:b&quot;,
+            100,
+            &quot;HOURS&quot;,
+            &quot;test&quot;,
+        );
+        let r2 = create_budget_allocation(
+            TEST_DECISION_HASH,
+            &quot;prop-001&quot;,
+            &quot;did:icn:a&quot;,
+            &quot;did:icn:b&quot;,
+            200,
+            &quot;HOURS&quot;,
+            &quot;test&quot;,
+        );
+
+        assert_ne!(r1.canonical_hash(), r2.canonical_hash());
+    }
+}
+</code></pre>
+<p><strong>Step 2: Register module in lib.rs</strong></p>
+<p>In <code>icn/crates/icn-ledger/src/lib.rs</code>, add after <code>pub mod asset_types;</code>:</p>
+<pre><code class="language-rust">pub mod allocations;
+</code></pre>
+<p>And add to re-exports:</p>
+<pre><code class="language-rust">pub use allocations::create_budget_allocation;
+</code></pre>
+<p><strong>Step 3: Run tests to verify</strong></p>
+<pre><code class="language-bash">cargo test -p icn-ledger --lib allocations -- --quiet
+</code></pre>
+<p>Expected: 6 tests pass.</p>
+<p><strong>Step 4: Run fmt + clippy</strong></p>
+<pre><code class="language-bash">cargo fmt -p icn-ledger -- --check
+cargo clippy -p icn-ledger -- -D warnings
+</code></pre>
+<p>Expected: Clean.</p>
+<p><strong>Step 5: Commit</strong></p>
+<pre><code class="language-bash">git add icn/crates/icn-ledger/src/allocations.rs icn/crates/icn-ledger/src/lib.rs
+git commit -m &quot;feat(ledger): add allocation receipt creation for budget decisions (#1141)&quot;
+</code></pre>
+<hr>
+<h3>Task 2: Update vertical slice test — receipt production in Step 6</h3>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>icn/crates/icn-core/tests/vertical_slice_integration.rs</code></li>
+</ul>
+<p>The <code>ProposalAccepted</code> event handler (lines ~204-252) currently creates an ad-hoc JSON audit record. Replace it with structured receipt production.</p>
+<p><strong>Step 1: Add imports at top of test file</strong></p>
+<p>Add these imports (some may already be present):</p>
+<pre><code class="language-rust">use icn_governance::{GovernanceDecisionReceipt, ProofOutcome, VoteTally};
+use icn_kernel_api::receipts::CanonicalReceipt;
+use icn_ledger::create_budget_allocation;
+</code></pre>
+<p><strong>Step 2: Update the ProposalAccepted event handler</strong></p>
+<p>Replace the event handler closure (the <code>event_bus.subscribe(...)</code> block around lines 203-252) so that after creating the <code>JournalEntry</code> it also:</p>
+<ol>
+<li>Creates a <code>GovernanceDecisionReceipt</code> from the proposal outcome</li>
+<li>Calls <code>create_budget_allocation()</code> to produce an <code>AllocationReceipt</code></li>
+<li>Stores both the receipt canonical hash and the serialized receipt in the KV store</li>
+</ol>
+<p>The handler should store:</p>
+<ul>
+<li>Key <code>&quot;receipt:allocation:&lt;hex_hash&gt;&quot;</code> → serialized <code>AllocationReceipt</code></li>
+<li>Key <code>&quot;receipt:decision:&lt;proposal_id&gt;&quot;</code> → serialized <code>GovernanceDecisionReceipt</code></li>
+</ul>
+<p><strong>Step 3: Run the test</strong></p>
+<pre><code class="language-bash">cargo test -p icn-core --test vertical_slice_integration -- --quiet
+</code></pre>
+<p>Expected: Pass (receipt production is additive, doesn&#39;t change existing behavior).</p>
+<p><strong>Step 4: Commit</strong></p>
+<pre><code class="language-bash">git add icn/crates/icn-core/tests/vertical_slice_integration.rs
+git commit -m &quot;feat(test): produce allocation receipts in vertical slice event handler (#1141)&quot;
+</code></pre>
+<hr>
+<h3>Task 3: Update vertical slice test — receipt verification in Step 9</h3>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>icn/crates/icn-core/tests/vertical_slice_integration.rs</code></li>
+</ul>
+<p><strong>Step 1: Replace the ad-hoc audit verification in Step 9</strong></p>
+<p>The current Step 9 loads <code>gov:audit:&lt;proposal_id&gt;</code> and checks JSON fields. Replace with:</p>
+<ol>
+<li>Load the <code>AllocationReceipt</code> from KV by scanning <code>&quot;receipt:allocation:&quot;</code> prefix</li>
+<li>Verify <code>receipt.decision_hash</code> is non-zero</li>
+<li>Verify the <code>SettlementIntent</code> inside has correct from/to/amount/unit</li>
+<li>Verify provenance chain: <code>receipt.provenance.upstream_hashes</code> contains the decision hash</li>
+<li>Load the <code>GovernanceDecisionReceipt</code> and verify its <code>decision_hash</code> matches</li>
+</ol>
+<p>Keep the existing cooperative state and member count assertions — those are still valid.</p>
+<p><strong>Step 2: Run the full test</strong></p>
+<pre><code class="language-bash">cargo test -p icn-core --test vertical_slice_integration -- --nocapture
+</code></pre>
+<p>Expected: All 9 steps pass with receipt chain verification logged.</p>
+<p><strong>Step 3: Commit</strong></p>
+<pre><code class="language-bash">git add icn/crates/icn-core/tests/vertical_slice_integration.rs
+git commit -m &quot;feat(test): verify allocation receipt chain end-to-end in vertical slice (#1141)&quot;
+</code></pre>
+<hr>
+<h3>Task 4: Final verification and cleanup</h3>
+<p><strong>Step 1: Run full workspace lib tests</strong></p>
+<pre><code class="language-bash">cargo test --workspace --lib -- --quiet 2&gt;&amp;1 | tail -5
+</code></pre>
+<p>Expected: All pass (4400+ tests).</p>
+<p><strong>Step 2: Run the specific integration test</strong></p>
+<pre><code class="language-bash">cargo test -p icn-core --test vertical_slice_integration -- --nocapture
+</code></pre>
+<p>Expected: 9-step vertical slice passes with receipt chain output.</p>
+<p><strong>Step 3: Run fmt + clippy on workspace</strong></p>
+<pre><code class="language-bash">cargo fmt --all -- --check
+cargo clippy --all-targets -- -D warnings
+</code></pre>
+<p>Expected: Clean.</p>
+<p><strong>Step 4: Commit any remaining changes and push</strong></p>
+<p>Use <code>/push</code> skill to push the branch.</p>
+<p><strong>Step 5: Create PR</strong></p>
+<p>Use <code>/pr-create</code> skill targeting <code>main</code>. PR title: <code>feat(ledger): allocation receipt chain (#1141)</code></p>
+<hr>
+<h2>Verification Checklist</h2>
+<ul>
+<li><input disabled="" type="checkbox"> <code>cargo test -p icn-ledger --lib allocations</code> — 6+ unit tests pass</li>
+<li><input disabled="" type="checkbox"> <code>cargo test -p icn-core --test vertical_slice_integration</code> — full chain verified</li>
+<li><input disabled="" type="checkbox"> <code>cargo fmt --all -- --check</code> — clean</li>
+<li><input disabled="" type="checkbox"> <code>cargo clippy --all-targets -- -D warnings</code> — clean</li>
+<li><input disabled="" type="checkbox"> Provenance chain: decision_hash propagates through AllocationReceipt → SettlementIntent</li>
+<li><input disabled="" type="checkbox"> No new dependencies added (uses existing icn-kernel-api types)</li>
+<li><input disabled="" type="checkbox"> No panics in non-test code (all Result returns)</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

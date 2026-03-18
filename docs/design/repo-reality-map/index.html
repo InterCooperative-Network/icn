@@ -1,0 +1,1179 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Repo Reality Map | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>repo reality map</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/repo-reality-map.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Repo Reality Map</h1>
+<blockquote>
+<p><strong>Generated</strong>: 2026-02-17 | <strong>Branch</strong>: <code>main</code> @ <code>6943792e</code>
+<strong>Purpose</strong>: Evidence-driven inventory of every ICN plane. Every claim cites a file path.
+If a claim cannot cite a file path, it is labeled <strong>[SPECULATION]</strong>.</p>
+</blockquote>
+<hr>
+<h2>Table of Contents</h2>
+<ol>
+<li><a href="#1-red-flag-questions">Red-Flag Questions (Answered First)</a></li>
+<li><a href="#2-governance--effects--ledger-saga">Governance → Effects → Ledger Saga</a></li>
+<li><a href="#3-identity-plane">Identity Plane</a></li>
+<li><a href="#4-network-plane">Network Plane</a></li>
+<li><a href="#5-gossip-plane">Gossip Plane</a></li>
+<li><a href="#6-ledgereconomics-plane">Ledger/Economics Plane</a></li>
+<li><a href="#7-compute-plane">Compute Plane</a></li>
+<li><a href="#8-gatewayui-surface">Gateway/UI Surface</a></li>
+<li><a href="#9-privacycrypto-plane">Privacy/Crypto Plane</a></li>
+<li><a href="#10-idempotency-layer-map">Idempotency Layer Map</a></li>
+<li><a href="#11-critical-gap-summary">Critical Gap Summary</a></li>
+</ol>
+<hr>
+<h2>1. Red-Flag Questions</h2>
+<h3>Q1: Where is the canonical decision hash derived?</h3>
+<p><strong>Answer</strong>: <code>icn-governance/src/proof.rs:330-345</code></p>
+<pre><code class="language-rust">pub fn compute_decision_hash(
+    proposal_id: &amp;str,
+    domain_id: &amp;str,
+    outcome: ProofOutcome,
+    vote_tally: &amp;VoteTally,
+    vote_hash: &amp;Hash,
+) -&gt; Hash
+</code></pre>
+<p><strong>What it hashes</strong> (domain tag <code>b&quot;icn:gov:decision:v1&quot;</code>):</p>
+<ul>
+<li>proposal_id (length-prefixed)</li>
+<li>domain_id (length-prefixed)</li>
+<li>outcome ordinal (0=Accepted, 1=Rejected, 2=NoQuorum)</li>
+<li>vote_tally: for_votes, against_votes, abstain_votes (each u64 LE)</li>
+<li>vote_hash: 32-byte Merkle root of sorted votes</li>
+</ul>
+<p><strong>Vote hash</strong> (<code>proof.rs:116-139</code>): Sorts votes by <code>(voter_did, choice_ordinal)</code> deterministically, creates Merkle root from <code>[voter_did, choice_ordinal, weight]</code> tuples. Domain tag: <code>b&quot;icn:vote-hash:v1&quot;</code>.</p>
+<p><strong>Property</strong>: Canonical — same decision produces same hash across all nodes. This is the idempotency key for the entire execution pipeline.</p>
+<h3>Q2: Where is the treasury nonce checked on the actual mutation path?</h3>
+<p><strong>Answer</strong>: <strong>IT IS NOT.</strong> The nonce mechanism exists but is not wired into the execution path.</p>
+<ul>
+<li><strong>Nonce mechanism defined</strong>: <code>icn-coop/src/store.rs:112-206</code> — <code>check_and_increment_treasury_nonce()</code> does atomic sled CAS (compare-and-swap)</li>
+<li><strong>Not called from</strong>: <code>KernelGovernanceExecutor::execute_treasury_operation()</code> in <code>icn-core/src/supervisor/governance_executor.rs:318-571</code></li>
+<li><strong>Result</strong>: A single governance decision could replay at the ledger level if the executor store write crashes after the ledger write but before the execution record is marked Confirmed</li>
+</ul>
+<h3>Q3: What ledger-level idempotency mechanism exists?</h3>
+<p><strong>Answer</strong>: <strong>None today.</strong> Idempotency is enforced only at:</p>
+<ul>
+<li>Level 1: <code>ExecutionStore</code> (decision_hash → terminal check) — <code>icn-core/src/supervisor/decision_executor.rs:225</code></li>
+<li>Level 2: Domain stores (BudgetRecord tracks decision_hash per spend; EscrowRecord tracks release_decision_hash)</li>
+<li>Level 3: <strong>[MISSING]</strong> — No ledger-level deduplication. No <code>(decision_hash, entry_hash)</code> mapping in the ledger.</li>
+</ul>
+<h3>Q4: What is the minimal gateway API contract for a pilot UI + wallet?</h3>
+<p><strong>Answer</strong>: The gateway has 40+ route modules but no unified service layer boundary.</p>
+<ul>
+<li><code>icn-api/src/lib.rs</code> exists (45 lines) with partial <code>ComputeService</code> — no LedgerService, GovernanceService, EntityService</li>
+<li>Gateway routes in <code>icn-gateway/src/api/*.rs</code> call managers directly (not through icn-api)</li>
+<li>RPC handlers in <code>icn-rpc/src/handler/compute.rs:50-95</code> DO use <code>icn_api::SubmitTaskParams</code></li>
+<li><strong>Result</strong>: Two code paths to the same operation (REST vs RPC), likely with divergent behavior</li>
+</ul>
+<hr>
+<h2>2. Governance → Effects → Ledger Saga</h2>
+<p>This is the <strong>critical vertical path</strong> for the pilot. End-to-end:</p>
+<h3>Step 1: Proposal Closes → Decision Receipt</h3>
+<p><strong>Source</strong>: <code>icn-governance/src/proof.rs:250-271</code></p>
+<p>When a proposal closes with Accepted/Rejected/NoQuorum, a <code>GovernanceDecisionReceipt</code> is created containing the canonical <code>decision_hash</code>.</p>
+<p><strong>Proposal state machine</strong>: <code>icn-governance/src/proposal.rs:1-217</code></p>
+<ul>
+<li>States: Draft → Deliberation → Open → {Accepted | Rejected | NoQuorum | Cancelled | Vetoed | ForceClosed}</li>
+<li>Transitions enforced by methods: <code>start_deliberation()</code>, <code>open()</code>, <code>close()</code>, etc.</li>
+</ul>
+<h3>Step 2: Event Emission</h3>
+<p><strong>Source</strong>: <code>apps/governance/src/actor.rs</code> (event bus integration)</p>
+<p>Emits <code>SystemEvent::ProposalAccepted { proposal_id, domain_id, payload, decided_at }</code> via <code>EventBus::emit()</code>.</p>
+<h3>Step 3: Effect Translation (Payload → KernelEffect)</h3>
+<p><strong>Status</strong>: <strong>[GAP]</strong> — No explicit code translates <code>ProposalPayload</code> → <code>KernelEffect[]</code>.</p>
+<ul>
+<li>Tests manually construct effects</li>
+<li>Payload variants defined in <code>icn-governance/src/proposal.rs:220+</code>: Budget, FreezeMember, ResourceAccess, ConfigChange, ProtocolChange, TextResolution</li>
+<li>Effect variants defined in <code>icn-kernel-api/src/effects.rs</code>: TreasuryEffect::Spend, CreateBudget, ReleaseEscrow, etc.</li>
+<li><strong>Risk</strong>: Payload variants and effect variants could drift silently</li>
+</ul>
+<h3>Step 4: Decision Executor</h3>
+<p><strong>Source</strong>: <code>icn-core/src/supervisor/decision_executor.rs:217-379</code></p>
+<pre><code>execute(effects, decision_receipt_id, decision_hash, proposal_id) → Vec&lt;EffectResult&gt;
+</code></pre>
+<p><strong>Idempotency check</strong> (line 225): If <code>store.get(decision_hash)?.is_terminal()</code> → skip.</p>
+<p><strong>Status machine</strong>: <code>icn-kernel-api/src/execution.rs:14-166</code></p>
+<pre><code>Pending → Executing → Confirmed
+                   ↘ Failed → (retry) → Executing
+                            ↘ PermanentlyFailed (MAX_RETRIES=3)
+</code></pre>
+<p><strong>Persistence</strong>: Sled-backed <code>ExecutionStore</code>. Effects stored in record for crash recovery.</p>
+<p><strong>Backpressure</strong>: <code>tokio::sync::Semaphore</code> with <code>MAX_CONCURRENT_EXECUTIONS=16</code>.</p>
+<p><strong>Observability</strong> (PR #1203):</p>
+<ul>
+<li>Recovery scan log with status distribution counts</li>
+<li>Per-decision <code>status_before → status_after</code> transition logs</li>
+<li>Semaphore saturation warning (&gt;100ms wait)</li>
+</ul>
+<h3>Step 5: Effect Dispatch</h3>
+<p><strong>Source</strong>: <code>icn-core/src/supervisor/governance_executor.rs:318-571</code></p>
+<p><code>KernelGovernanceExecutor</code> implements <code>EffectExecutor</code> trait. Routes to specialized executors:</p>
+<ul>
+<li>TreasuryExecutor (Spend, Allocate, Release)</li>
+<li>ProtocolExecutor (SetParameter, Config)</li>
+<li>ControlExecutor (Veto, ForceClose)</li>
+<li>MembershipExecutor (Add, Remove, Freeze)</li>
+<li>FederationExecutor (Join, Vouch)</li>
+</ul>
+<h3>Step 6: Treasury Sagas</h3>
+<p><strong>Budget Spend</strong> (governance_executor.rs, Path 2):</p>
+<ol>
+<li><code>budget.begin_spend(decision_hash, amount)</code> → validates capacity, stores pending</li>
+<li>Ledger mutation via <code>submit_treasury_entry()</code></li>
+<li><code>budget.confirm_spend()</code> → transitions Pending → Spent</li>
+</ol>
+<p><strong>Escrow Release</strong> (governance_executor.rs, Path 3):</p>
+<ol>
+<li><code>escrow.begin_release(decision_hash)</code> → transitions Locked → Releasing, stores <code>release_decision_hash</code></li>
+<li>Ledger mutation via <code>submit_treasury_entry()</code></li>
+<li><code>escrow.confirm_release()</code> → transitions Releasing → Released</li>
+</ol>
+<h3>Step 7: Ledger Mutation</h3>
+<p><strong>Source</strong>: <code>icn-ledger/src/ledger.rs</code> (5,447 LOC)</p>
+<ul>
+<li>Double-entry accounting: each journal entry has debit[] and credit[] sides</li>
+<li><code>append_entry()</code> returns <code>entry_hash</code></li>
+<li>Merkle-DAG for immutable history</li>
+</ul>
+<p><strong>Gap</strong>: <code>submit_treasury_entry()</code> exists and returns entry_hash, but:</p>
+<ul>
+<li>Entry hash is NOT routed back to <code>ExecutionRecord.ledger_entry_ids</code> (audit trail incomplete)</li>
+<li>No <code>state_change_hash</code> computed for treasury operations (protocol/federation effects DO compute them)</li>
+<li>Ledger service integration is stubbed in tests — <code>if let Some(ledger) = &amp;self.ledger</code> falls back to placeholder</li>
+</ul>
+<h3>What Tests Prove</h3>
+<table>
+<thead>
+<tr>
+<th>Test File</th>
+<th>What It Proves</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icn-core/tests/decision_executor_runtime_test.rs::test_callback_auto_executes_decision</code></td>
+<td>Finalized decision auto-executes via callback</td>
+</tr>
+<tr>
+<td><code>...::test_callback_idempotent_no_double_execute</code></td>
+<td>Replay doesn&#39;t double-execute</td>
+</tr>
+<tr>
+<td><code>...::test_startup_recovery_completes_executing_decision</code></td>
+<td>Crash recovery picks up Executing state</td>
+</tr>
+<tr>
+<td><code>...::test_backpressure_no_deadlock</code></td>
+<td>Semaphore backpressure under load</td>
+</tr>
+<tr>
+<td><code>...::test_budget_spend_with_enforcement</code></td>
+<td>Budget saga begin→execute→confirm</td>
+</tr>
+<tr>
+<td><code>icn-core/tests/governance_ledger_integration.rs::test_budget_proposal_executes_ledger_transaction</code></td>
+<td>Governance approves → ledger transaction created</td>
+</tr>
+<tr>
+<td><code>icn-core/tests/escrow_release_integration.rs::test_replay_idempotent_no_double_spend</code></td>
+<td>Same decision twice → no double release</td>
+</tr>
+<tr>
+<td><code>...::test_crash_recovery_completes_releasing_escrow</code></td>
+<td>Escrow stays in Releasing across restart</td>
+</tr>
+<tr>
+<td><code>...::test_conflicting_decisions_rejected</code></td>
+<td>Two decisions can&#39;t both release same escrow</td>
+</tr>
+<tr>
+<td><code>icn-core/tests/budget_enforcement_integration.rs::test_budget_created_and_enforced</code></td>
+<td>CreateBudget → Spend validates capacity</td>
+</tr>
+<tr>
+<td><code>...::test_budget_overspend_rejected</code></td>
+<td>Over-limit spend fails before ledger mutation</td>
+</tr>
+<tr>
+<td><code>...::test_budget_crash_recovery</code></td>
+<td>Budget pending_spend survives restart</td>
+</tr>
+<tr>
+<td><code>icn-core/src/supervisor/decision_executor.rs</code> (unit tests)</td>
+<td>6 unit tests: extract_decision_hash, idempotency_skips, execute_records_status, treasury_effect_with_decision_hash</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>3. Identity Plane</h2>
+<h3>What Exists</h3>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Location</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Did newtype</td>
+<td><code>icn-identity/src/lib.rs</code></td>
+<td><code>did:icn:&lt;multibase-base58-ed25519-pubkey&gt;</code></td>
+</tr>
+<tr>
+<td>KeyPair</td>
+<td><code>icn-identity/src/lib.rs</code></td>
+<td>Ed25519, optional PQ hybrid (<code>#[cfg(feature = &quot;post-quantum&quot;)]</code>)</td>
+</tr>
+<tr>
+<td>Anchor (SDIS root)</td>
+<td><code>icn-identity/src/anchor.rs</code></td>
+<td><code>H(VUI || genesis_random)</code>, immutable across rotations</td>
+</tr>
+<tr>
+<td>KeyBundle (rotatable)</td>
+<td><code>icn-identity/src/keybundle.rs</code></td>
+<td>Bound to Anchor, version monotonic, rotation protocol</td>
+</tr>
+<tr>
+<td>PersonhoodAnchor</td>
+<td><code>icn-identity/src/personhood.rs</code></td>
+<td>Commons Layer 0, status: Active/Suspended/Revoked</td>
+</tr>
+<tr>
+<td>DidDocument v2</td>
+<td><code>icn-identity/src/multi_device.rs</code></td>
+<td>Multi-device, verification methods per device</td>
+</tr>
+<tr>
+<td>Social Recovery</td>
+<td><code>icn-identity/src/recovery.rs</code></td>
+<td>M-of-N trustees, delay period, cancellation</td>
+</tr>
+<tr>
+<td>Revocation Registry</td>
+<td><code>icn-identity/src/revocation.rs</code></td>
+<td>Appeal deadline, scope: Global/Federation/Jurisdiction</td>
+</tr>
+<tr>
+<td>AgeKeyStore</td>
+<td><code>icn-identity/src/keystore.rs</code></td>
+<td>Age-encrypted at <code>~/.icn/keystore.age</code></td>
+</tr>
+<tr>
+<td>DidSigner trait</td>
+<td><code>icn-identity/src/did_signer.rs</code></td>
+<td>Software + Hardware backend abstraction</td>
+</tr>
+<tr>
+<td>Batch verify</td>
+<td><code>icn-identity/src/batch_verify.rs</code></td>
+<td>Batch Ed25519 signature verification</td>
+</tr>
+<tr>
+<td>CLI commands</td>
+<td><code>icn/bins/icnctl/src/main.rs:422-451</code></td>
+<td>init, show, rotate, upgrade-pq, export, import</td>
+</tr>
+</tbody></table>
+<h3>What Tests Prove</h3>
+<table>
+<thead>
+<tr>
+<th>Test</th>
+<th>Location</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>KeyPair gen + sign/verify roundtrip</td>
+<td><code>icn-identity/src/lib.rs::test_generate_keypair</code>, <code>test_sign_verify</code></td>
+</tr>
+<tr>
+<td>DID parsing (valid/invalid/edge cases)</td>
+<td><code>lib.rs::test_did_from_str_*</code> (8 tests)</td>
+</tr>
+<tr>
+<td>DID deserialization validates</td>
+<td><code>lib.rs::test_did_deserialization_*</code> (4 tests)</td>
+</tr>
+<tr>
+<td>Multi-device workflow</td>
+<td><code>icn-identity/tests/multi_device_integration.rs</code></td>
+</tr>
+<tr>
+<td>Backend abstraction</td>
+<td><code>icn-identity/tests/backend_abstraction_test.rs</code></td>
+</tr>
+<tr>
+<td>Identity sync via gossip</td>
+<td><code>icn-identity/tests/identity_sync_test.rs</code></td>
+</tr>
+</tbody></table>
+<h3>Missing/Risky</h3>
+<ul>
+<li>HSM/TPM backends feature-gated and experimental (<code>keystore_pkcs11.rs</code>, <code>keystore_tpm.rs</code>)</li>
+<li>Recovery → KeyBundle rotation integration unclear (RecoveryReason::Recovery exists but wiring not visible)</li>
+<li>Revocation appeal deadline enforcement: no periodic task auto-finalizes</li>
+<li>DID resolution over network: DidDocument exists but no resolution endpoint in identity crate <strong>[SPECULATION: likely in gateway]</strong></li>
+<li>PQ upgrade path (<code>icnctl id upgrade-pq</code>) not exercised in tests</li>
+</ul>
+<hr>
+<h2>4. Network Plane</h2>
+<h3>What Exists</h3>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Location</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>NetworkActor</td>
+<td><code>icn-net/src/actor/mod.rs</code> (1,999 LOC)</td>
+<td>QUIC event loop, session/relay management</td>
+</tr>
+<tr>
+<td>NetworkHandle</td>
+<td><code>icn-net/src/actor/mod.rs:165</code></td>
+<td>20+ public async methods</td>
+</tr>
+<tr>
+<td>Wire protocol</td>
+<td><code>icn-net/src/protocol.rs</code></td>
+<td>NetworkMessage, 10+ MessagePayload variants</td>
+</tr>
+<tr>
+<td>Encoding</td>
+<td><code>icn-net/src/protocol.rs:24-25</code></td>
+<td>Postcard (current) + Bincode (legacy, rejected). 1-byte header: <code>(encoding&lt;&lt;4)|compression</code></td>
+</tr>
+<tr>
+<td>SignedEnvelope</td>
+<td><code>icn-net/src/envelope.rs:60</code></td>
+<td>Ed25519 signature, optional PQ hybrid</td>
+</tr>
+<tr>
+<td>ReplayGuard</td>
+<td><code>icn-net/src/replay_guard.rs</code></td>
+<td>Per-sender sequence tracking, 300s clock skew, persistent mode</td>
+</tr>
+<tr>
+<td>Discovery</td>
+<td><code>icn-net/src/discovery.rs</code></td>
+<td>mDNS <code>_icn._udp.local</code>, 30s scan interval</td>
+</tr>
+<tr>
+<td>TLS binding</td>
+<td><code>icn-net/src/tls.rs</code></td>
+<td>DID in X.509 SAN, verified against Hello message</td>
+</tr>
+<tr>
+<td>NAT traversal</td>
+<td><code>icn-net/src/nat.rs</code>, <code>stun.rs</code>, <code>turn.rs</code></td>
+<td>STUN discovery, TURN relay fallback (PR #1183)</td>
+</tr>
+<tr>
+<td>Rate limiting</td>
+<td><code>icn-net/src/rate_limit.rs</code></td>
+<td>Trust-gated: 10/20/100/200 msg/sec by trust class</td>
+</tr>
+<tr>
+<td>Topology</td>
+<td><code>icn-net/src/topology.rs</code></td>
+<td>NeighborSets, RTT refresh 60s</td>
+</tr>
+<tr>
+<td>Blob registry</td>
+<td><code>icn-net/src/blob_registry.rs</code></td>
+<td>Hash → peers, 24h TTL</td>
+</tr>
+<tr>
+<td>E2E encryption</td>
+<td><code>icn-net/src/encryption.rs</code></td>
+<td>X25519 session keys</td>
+</tr>
+</tbody></table>
+<h3>What Tests Prove</h3>
+<table>
+<thead>
+<tr>
+<th>Test File</th>
+<th>What It Tests</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icn-net/tests/nat_traversal_integration.rs</code></td>
+<td>Candidate cache flow, stale rejection, priority, multi-peer</td>
+</tr>
+<tr>
+<td><code>icn-net/tests/relay_fallback.rs</code></td>
+<td>TURN relay when direct dial times out</td>
+</tr>
+<tr>
+<td><code>icn-net/tests/encrypted_message_integration.rs</code></td>
+<td>E2E encryption roundtrip</td>
+</tr>
+<tr>
+<td><code>icn-net/tests/did_tls_binding_integration.rs</code></td>
+<td>DID-TLS SAN verification</td>
+</tr>
+<tr>
+<td><code>icn-net/tests/encoding_negotiation_integration.rs</code></td>
+<td>Postcard vs Bincode negotiation</td>
+</tr>
+<tr>
+<td><code>icn-net/tests/signed_envelope_roundtrip.rs</code></td>
+<td>SignedEnvelope serialization</td>
+</tr>
+<tr>
+<td><code>icn-net/tests/trust_gated_rate_limiting_integration.rs</code></td>
+<td>PolicyOracle rate limits</td>
+</tr>
+<tr>
+<td><code>icn-net/src/actor/mod.rs</code> (unit tests)</td>
+<td>13 tests: actor start, peer capabilities, blob registry, NAT status</td>
+</tr>
+</tbody></table>
+<h3>Missing/Risky</h3>
+<ul>
+<li>No Hello handshake timeout — peer can delay indefinitely before identity proof</li>
+<li>Broadcast dedup only at gossip layer (no network-level nonce guard)</li>
+<li>Blob registry no refresh protocol — announced blob from failed peer still returned to callers</li>
+<li>E2E encryption fail-closed (<code>init_send_callback.rs:197-206</code>) — messages dropped if peer can&#39;t decrypt</li>
+<li>Misbehavior detector created but not wired (<code>actor/mod.rs:1122-1129</code>)</li>
+</ul>
+<hr>
+<h2>5. Gossip Plane</h2>
+<h3>What Exists</h3>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Location</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GossipActor</td>
+<td><code>icn-gossip/src/gossip.rs</code></td>
+<td>State machine: topics, entries, subscriptions, sync state</td>
+</tr>
+<tr>
+<td>GossipMessage</td>
+<td><code>icn-gossip/src/types.rs</code></td>
+<td>20 variants (push, pull, bloom, blob, replica, partition, storage)</td>
+</tr>
+<tr>
+<td>VectorClock</td>
+<td><code>icn-gossip/src/vector_clock.rs</code></td>
+<td>Lamport clocks, LRU eviction at 10K entries</td>
+</tr>
+<tr>
+<td>BloomFilter</td>
+<td><code>icn-gossip/src/bloom.rs</code></td>
+<td>Configurable k/m, anti-entropy</td>
+</tr>
+<tr>
+<td>Dispatch</td>
+<td><code>icn-gossip/src/handlers/dispatch.rs</code></td>
+<td>Single routing table: GossipMessage → handler</td>
+</tr>
+<tr>
+<td>Blob transfer</td>
+<td><code>icn-gossip/src/handlers/blob_transfer.rs</code></td>
+<td>Session manager, chunk reassembly, hash verification</td>
+</tr>
+<tr>
+<td>BlobNonceGuard</td>
+<td><code>icn-gossip/src/handlers/blob_nonce_guard.rs</code></td>
+<td>Per-request nonce tracking, 5min expiry</td>
+</tr>
+<tr>
+<td>Pull protocol</td>
+<td><code>icn-gossip/src/handlers/pull.rs</code></td>
+<td>Digest→PullRequest→PullResponse with SyncCursor pagination</td>
+</tr>
+<tr>
+<td>Partition healing</td>
+<td><code>icn-gossip/src/handlers/partition.rs</code></td>
+<td>Phase 18 Week 3</td>
+</tr>
+<tr>
+<td>Storage challenges</td>
+<td><code>icn-gossip/src/handlers/storage_challenge.rs</code></td>
+<td>Proof-of-Storage</td>
+</tr>
+<tr>
+<td>Topic ACL</td>
+<td><code>icn-gossip/src/types.rs:540</code></td>
+<td>Public, MinTrustScore(f64), Participants(Vec<Did>)</td>
+</tr>
+<tr>
+<td>Key rotation cache</td>
+<td><code>icn-gossip/src/key_rotation.rs</code></td>
+<td>Issue #469 grace period</td>
+</tr>
+</tbody></table>
+<h3>What Tests Prove</h3>
+<table>
+<thead>
+<tr>
+<th>Test File</th>
+<th>What It Tests</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icn-gossip/tests/gossip_integration.rs</code></td>
+<td>Vector clocks (5 tests), Bloom filters (4 tests), Topics (4 tests), Entry compression (4 tests), Message serialization (4 tests)</td>
+</tr>
+<tr>
+<td><code>icn-gossip/tests/service_discovery_auth_boundary.rs</code></td>
+<td>Topic ACL enforcement, MinTrustScore, Participant allow-list</td>
+</tr>
+<tr>
+<td><code>icn-gossip/tests/service_discovery_integration.rs</code></td>
+<td>Topic subscription flow</td>
+</tr>
+<tr>
+<td><code>icn-core/tests/gossip_pull_protocol_integration.rs</code></td>
+<td>Pull protocol convergence between TestNodes</td>
+</tr>
+<tr>
+<td><code>icn-core/tests/multi_node_gossip_convergence.rs</code></td>
+<td>Multi-node entry propagation</td>
+</tr>
+</tbody></table>
+<h3>Missing/Risky</h3>
+<ul>
+<li>Storage quota manager created but never called (<code>gossip.rs:131</code>)</li>
+<li>Blob transfer no expiry reaper (expires_at set but not enforced)</li>
+<li>Partition healing no retry logic (PartitionHeal messages may be lost)</li>
+<li>Pull request no priority (critical topics starved under load)</li>
+<li>Bloom filter auto-resize not triggered (<code>scalability.rs</code> exists but not wired)</li>
+<li>Key rotation grace period incomplete (cache created but not used in publish handler)</li>
+</ul>
+<hr>
+<h2>6. Ledger/Economics Plane</h2>
+<h3>What Exists</h3>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Location</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Ledger (double-entry)</td>
+<td><code>icn-ledger/src/ledger.rs</code> (5,447 LOC)</td>
+<td>JournalEntry with debit[]/credit[], Merkle-DAG</td>
+</tr>
+<tr>
+<td>Treasury ops</td>
+<td><code>icn-ledger/src/treasury.rs</code></td>
+<td>Treasury spend, allocate</td>
+</tr>
+<tr>
+<td>Budget allocation</td>
+<td><code>icn-ledger/src/treasury/budgets.rs</code></td>
+<td>Budget records</td>
+</tr>
+<tr>
+<td>Audit trail</td>
+<td><code>icn-ledger/src/treasury/audit.rs</code></td>
+<td>Audit log</td>
+</tr>
+<tr>
+<td>BudgetStore trait</td>
+<td><code>icn-kernel-api/src/budget.rs</code></td>
+<td>BudgetRecord, begin_spend/confirm_spend saga</td>
+</tr>
+<tr>
+<td>EscrowStore trait</td>
+<td><code>icn-kernel-api/src/escrow.rs</code></td>
+<td>EscrowRecord, begin_release/confirm_release saga</td>
+</tr>
+<tr>
+<td>TreasuryEffect</td>
+<td><code>icn-kernel-api/src/effects.rs</code></td>
+<td>Spend, CreateBudget, ReleaseEscrow variants</td>
+</tr>
+<tr>
+<td>ExecutionStore</td>
+<td><code>icn-kernel-api/src/execution.rs</code></td>
+<td>ExecutionRecord, status machine, persistence trait</td>
+</tr>
+<tr>
+<td>Treasury nonce</td>
+<td><code>icn-coop/src/store.rs:112-206</code></td>
+<td>Atomic sled CAS — <code>check_and_increment_treasury_nonce()</code></td>
+</tr>
+<tr>
+<td>Cooperative types</td>
+<td><code>icn-coop/src/types.rs</code></td>
+<td>Cooperative, Member, Treasury structures</td>
+</tr>
+<tr>
+<td>Recurring payments</td>
+<td><code>icn-gateway/src/api/recurring_payments.rs</code></td>
+<td>Gateway-level only</td>
+</tr>
+</tbody></table>
+<h3>What Tests Prove</h3>
+<table>
+<thead>
+<tr>
+<th>Test</th>
+<th>What It Proves</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icn-core/tests/governance_ledger_integration.rs</code></td>
+<td>Budget proposal → ledger transaction → audit trail</td>
+</tr>
+<tr>
+<td><code>icn-core/tests/escrow_release_integration.rs</code></td>
+<td>Escrow saga idempotency + crash recovery (3 tests)</td>
+</tr>
+<tr>
+<td><code>icn-core/tests/budget_enforcement_integration.rs</code></td>
+<td>Budget creation + enforcement + crash recovery (3 tests)</td>
+</tr>
+<tr>
+<td><code>icn-core/tests/treasury_integration.rs</code></td>
+<td>Treasury operations (14 filtered)</td>
+</tr>
+<tr>
+<td><code>icn-core/tests/treasury_governance_integration.rs</code></td>
+<td>Treasury-governance binding (9 filtered)</td>
+</tr>
+<tr>
+<td><code>icn-coop/src/store.rs</code> (unit tests)</td>
+<td>Treasury nonce mechanism works in isolation</td>
+</tr>
+</tbody></table>
+<h3>Missing/Risky</h3>
+<ul>
+<li><strong>Treasury nonce NOT in execution path</strong> — defined but not called from treasury executor</li>
+<li><strong>Ledger service integration stubbed</strong> — tests use mock/placeholder</li>
+<li><strong>No ledger-level dedup</strong> — no <code>(decision_hash → entry_hash)</code> mapping</li>
+<li><strong>Recurring payment scheduler not wired</strong> — <code>execute_due_payments()</code> exists, never called from daemon loop</li>
+<li><strong>Budget enforcement in Gateway only</strong> — BudgetStore in-memory, not in ledger consensus</li>
+<li><strong>No GL account types</strong> — DID→currency→balance only (no financial statement classification)</li>
+<li><strong>Cross-coop settlement unproven</strong> — netting engine designed, never exercised</li>
+<li><strong>Dispute workflow missing</strong> — types exist, no submission API</li>
+</ul>
+<hr>
+<h2>7. Compute Plane</h2>
+<h3>What Exists</h3>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Location</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ComputeActor</td>
+<td><code>icn-compute/src/actor/mod.rs</code></td>
+<td>Trust-gated task execution, 5+ gossip topics</td>
+</tr>
+<tr>
+<td>ComputeTask</td>
+<td><code>icn-compute/src/types.rs</code></td>
+<td>TaskCode: CCL, CclRef, Wasm. DeterminismClass: Canonical, Advisory</td>
+</tr>
+<tr>
+<td>ComputeHandle</td>
+<td><code>icn-compute/src/actor/mod.rs</code></td>
+<td>submit, status, cancel, handle_gossip, policy, disputes</td>
+</tr>
+<tr>
+<td>WasmRegistry</td>
+<td><code>icn-compute/src/wasm_registry.rs</code></td>
+<td>Deploy/retrieve WASM blobs by hash</td>
+</tr>
+<tr>
+<td>LocalExecutor</td>
+<td><code>icn-compute/src/executor.rs</code></td>
+<td>CCL execution, WASM feature-gated</td>
+</tr>
+<tr>
+<td>Placement</td>
+<td><code>icn-compute/src/types.rs</code></td>
+<td>PlacementRequest/Offer, 500ms deliberation</td>
+</tr>
+<tr>
+<td>Verification</td>
+<td><code>icn-compute/src/result_quorum.rs</code></td>
+<td>Multi-executor quorum (Issue #511)</td>
+</tr>
+<tr>
+<td>Trust gates</td>
+<td><code>icn-compute/src/actor/mod.rs</code></td>
+<td>MIN_TRUST_SUBMIT=0.1, MIN_TRUST_EXECUTE=0.3</td>
+</tr>
+<tr>
+<td>Coop scheduling</td>
+<td><code>icn-compute/src/policy.rs</code></td>
+<td>Per-coop quotas, time windows, whitelist/blacklist</td>
+</tr>
+</tbody></table>
+<h3>What Tests Prove</h3>
+<table>
+<thead>
+<tr>
+<th>Test File</th>
+<th>What It Tests</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icn-compute/tests/compute_integration.rs</code></td>
+<td>LocalExecutor CCL execution, capability checks, Ed25519 result signatures</td>
+</tr>
+<tr>
+<td><code>icn-compute/tests/commons_integration.rs</code></td>
+<td>Commons pool operations</td>
+</tr>
+<tr>
+<td><code>icn-compute/tests/federation_integration.rs</code></td>
+<td>Cross-coop federation</td>
+</tr>
+<tr>
+<td><code>icn-compute/src/types.rs</code> (30+ unit tests)</td>
+<td>Task hash determinism, fuel defaults, message serialization, result signing/verification, 30+ validation tests</td>
+</tr>
+<tr>
+<td><code>icn-gateway/tests/compute_events_integration.rs</code></td>
+<td>Compute events → WebSocket delivery</td>
+</tr>
+</tbody></table>
+<h3>Missing/Risky</h3>
+<ul>
+<li>CCL interpreter bridge to <code>icn_ccl::Interpreter</code> not visible in read code paths <strong>[SPECULATION]</strong></li>
+<li>WASM executor feature-gated (<code>#[cfg(feature = &quot;wasm&quot;)]</code>) — default builds may not support WASM</li>
+<li>Multi-executor consensus algorithm incomplete (how to break ties if 2/3 disagree)</li>
+<li>Actor migration rollback strategy unclear (Phase 16D migration_manager)</li>
+<li>Federated executor attestation verification not read</li>
+</ul>
+<hr>
+<h2>8. Gateway/UI Surface</h2>
+<h3>What Exists</h3>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Location</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GatewayServer</td>
+<td><code>icn-gateway/src/server.rs</code></td>
+<td>Actix-web, Prometheus, CORS, JWT, rate limiting</td>
+</tr>
+<tr>
+<td>API routes</td>
+<td><code>icn-gateway/src/api/*.rs</code></td>
+<td>38+ sub-modules, 40+ endpoints</td>
+</tr>
+<tr>
+<td>GatewayError</td>
+<td><code>icn-gateway/src/error.rs</code></td>
+<td>20+ variants, HTTP status mapping, i18n</td>
+</tr>
+<tr>
+<td>JWT auth</td>
+<td><code>icn-gateway/src/auth.rs</code> + <code>middleware.rs</code></td>
+<td>TokenClaims with scopes, per-scope validation</td>
+</tr>
+<tr>
+<td>OpenAPI</td>
+<td><code>icn-gateway/src/openapi.rs</code></td>
+<td>utoipa v0.1.0, 80+ schemas</td>
+</tr>
+<tr>
+<td>EventBroadcaster</td>
+<td><code>icn-gateway/src/events.rs</code></td>
+<td>Pub-sub channels → WebSocket</td>
+</tr>
+<tr>
+<td>WsSession</td>
+<td><code>icn-gateway/src/websocket.rs</code></td>
+<td>Real-time event delivery</td>
+</tr>
+<tr>
+<td>Notification system</td>
+<td><code>icn-gateway/src/notification_*.rs</code></td>
+<td>Queue, processor, store, triggers</td>
+</tr>
+<tr>
+<td>18 Managers</td>
+<td><code>icn-gateway/src/*.rs</code></td>
+<td>Compute, Ledger, Trust, Entity, Governance, Commons, Coop, Community, Federation, Treasury, Identity, Session, Steward, Listings, ServiceDiscovery, EntityAudit</td>
+</tr>
+<tr>
+<td>Rate limiting</td>
+<td><code>icn-gateway/src/rate_limit.rs</code></td>
+<td>Trust-gated per-DID limits</td>
+</tr>
+</tbody></table>
+<h3>What Tests Prove</h3>
+<p>20 integration test files in <code>icn-gateway/tests/</code>:</p>
+<ul>
+<li><code>compute_events_integration.rs</code> — events flow compute→WebSocket</li>
+<li><code>websocket_integration.rs</code> — WebSocket connection</li>
+<li><code>governance_flows_integration.rs</code> — governance proposal workflow</li>
+<li><code>budget_integration.rs</code> — member budget enforcement</li>
+<li><code>escrow_integration.rs</code> — escrow hold/release</li>
+<li><code>recurring_payments_integration.rs</code> — subscription payments</li>
+<li><code>entity_integration.rs</code> — entity lifecycle</li>
+<li><code>treasury_custody_test.rs</code> — treasury multi-sig</li>
+<li><code>pilot_features_integration.rs</code> — pilot-specific features</li>
+<li>Plus 10+ more (SDIS, service discovery, commons, steward, dissolution, constitutional, metrics, i18n, services, queries)</li>
+</ul>
+<h3>Missing/Risky</h3>
+<ul>
+<li><strong>No unified service layer</strong> — <code>icn-api</code> exists with partial ComputeService only. Gateway routes bypass it entirely.</li>
+<li><strong>Two code paths</strong> — RPC uses <code>icn_api::SubmitTaskParams</code>; Gateway uses managers directly → divergent behavior</li>
+<li><strong>Error inconsistency</strong> — Gateway uses GatewayError + i18n; RPC uses RpcErrorCode (JSON-RPC). Not bridged.</li>
+<li><strong>WebSocket event filtering</strong> — EventBroadcaster broadcasts to channels but no visible coop_id scope filtering</li>
+<li><strong>Coop isolation audit needed</strong> — managers likely scoped to coop_id but enforcement not visible in route handlers</li>
+<li><strong>OpenAPI schema vs reality</strong> — 80+ schemas registered but endpoint-path mapping not verified complete</li>
+</ul>
+<hr>
+<h2>9. Privacy/Crypto Plane</h2>
+<h3>What Exists</h3>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Location</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Topic encryption</td>
+<td><code>icn-privacy/src/topic_encryption.rs</code></td>
+<td>ChaCha20-Poly1305 AEAD, Bloom hints</td>
+</tr>
+<tr>
+<td>Onion routing</td>
+<td><code>icn-privacy/src/onion_routing.rs</code></td>
+<td>Multi-hop via X25519. Types exist.</td>
+</tr>
+<tr>
+<td>Traffic obfuscation</td>
+<td><code>icn-privacy/src/traffic_obfuscation.rs</code></td>
+<td>Random delays, size padding, cover traffic (disabled default)</td>
+</tr>
+<tr>
+<td>Hybrid Ed25519+ML-DSA</td>
+<td><code>icn-crypto-pq/src/hybrid.rs</code></td>
+<td>HybridKeypair, HybridSignature (~3.4KB)</td>
+</tr>
+<tr>
+<td>ML-DSA-65</td>
+<td><code>icn-crypto-pq/src/ml_dsa.rs</code></td>
+<td>NIST FIPS 204, Level 3</td>
+</tr>
+<tr>
+<td>ML-KEM-768</td>
+<td><code>icn-crypto-pq/src/ml_kem.rs</code></td>
+<td>NIST FIPS 203, key encapsulation</td>
+</tr>
+<tr>
+<td>Shamir sharing</td>
+<td><code>icn-crypto-pq/src/shamir.rs</code></td>
+<td>Secret distribution</td>
+</tr>
+<tr>
+<td>Blind signatures</td>
+<td><code>icn-crypto-pq/src/blind.rs</code></td>
+<td>Privacy-preserving enrollment</td>
+</tr>
+<tr>
+<td>ZKP (STARK)</td>
+<td><code>icn-zkp/src/types.rs</code>, <code>prover.rs</code></td>
+<td>StarkProof, ProofType: Age, Citizenship, Membership, NonRevocation</td>
+</tr>
+</tbody></table>
+<h3>What Tests Prove</h3>
+<table>
+<thead>
+<tr>
+<th>Test</th>
+<th>What It Proves</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icn-privacy/tests/privacy_integration.rs::test_multi_party_topic_encryption</code></td>
+<td>Shared key encrypt/decrypt</td>
+</tr>
+<tr>
+<td><code>...::test_bloom_filter_topic_discovery_multiple_subscribers</code></td>
+<td>Bloom filters match correctly</td>
+</tr>
+<tr>
+<td><code>...::test_topic_encryption_prevents_linkability</code></td>
+<td>Same topic → different nonces</td>
+</tr>
+<tr>
+<td><code>icn-crypto-pq/src/lib.rs::test_hybrid_roundtrip</code></td>
+<td>Generate, sign, verify both sigs</td>
+</tr>
+<tr>
+<td><code>...::test_hybrid_tampered_message</code></td>
+<td>Tampered → fail</td>
+</tr>
+<tr>
+<td><code>...::test_hybrid_wrong_key</code></td>
+<td>Wrong key → fail</td>
+</tr>
+</tbody></table>
+<h3>Missing/Risky</h3>
+<ul>
+<li>Onion routing not end-to-end tested (types exist, no circuit creation test)</li>
+<li>ZKP proofs simulated only (<code>simulated: true</code> → no cryptographic security)</li>
+<li>ZKP circuits marked <code>#[allow(dead_code)]</code> — STARK proving/verification likely stubbed</li>
+<li>PQ key distribution not implemented — hybrid verification deferred in SignedEnvelope</li>
+<li>Cover traffic disabled by default (bandwidth intensive)</li>
+</ul>
+<hr>
+<h2>10. Idempotency Layer Map</h2>
+<pre><code>Layer 1: Decision Hash (canonical, deterministic)
+├── Source: icn-governance/src/proof.rs:330-345
+├── Key: blake3(domain_tag || proposal_id || domain_id || outcome || vote_tally || vote_hash)
+└── Property: Same decision → same hash across all nodes
+
+Layer 2: ExecutionStore (sled, persistent)
+├── Source: icn-core/src/supervisor/decision_executor.rs:225
+├── Check: If decision_hash already terminal → skip
+├── Record: Pending → Executing → Confirmed | Failed | PermanentlyFailed
+└── Test: test_callback_idempotent_no_double_execute
+
+Layer 3: Domain Stores (per-effect-type)
+├── BudgetRecord: stores decision_hash per spend (begin_spend/confirm_spend)
+│   └── Source: icn-kernel-api/src/budget.rs
+├── EscrowRecord: stores release_decision_hash (one decision per escrow)
+│   └── Source: icn-kernel-api/src/escrow.rs
+│   └── Test: test_conflicting_decisions_rejected
+└── Property: Domain-specific dedup before ledger mutation
+
+Layer 4: Treasury Nonce (DEFINED BUT NOT WIRED)
+├── Source: icn-coop/src/store.rs:112-206
+├── Mechanism: Atomic sled CAS — check_and_increment_treasury_nonce()
+├── NOT called from: governance_executor.rs::execute_treasury_operation()
+└── Issue: #1204 (created for this gap)
+
+Layer 5: Ledger Deduplication (DOES NOT EXIST)
+├── No (decision_hash → entry_hash) mapping in ledger
+├── No append_entry() idempotency check
+└── Risk: Crash between ledger write and executor store write → double-apply
+</code></pre>
+<hr>
+<h2>11. Critical Gap Summary</h2>
+<h3>Tier 1: Blocking for Pilot</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Gap</th>
+<th>Location</th>
+<th>Risk</th>
+<th>Issue</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>Treasury nonce not in execution path</td>
+<td><code>icn-coop/src/store.rs</code> defined, <code>governance_executor.rs</code> doesn&#39;t call it</td>
+<td>Double-spend on replay at ledger level</td>
+<td>#1204</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Ledger service integration stubbed</td>
+<td><code>governance_executor.rs:622-659</code> falls back to placeholder</td>
+<td>No actual persistent ledger mutations in pilot</td>
+<td>—</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Payload→Effect translation missing</td>
+<td>No explicit code maps ProposalPayload→KernelEffect[]</td>
+<td>Effect construction is manual in tests only</td>
+<td>—</td>
+</tr>
+<tr>
+<td>4</td>
+<td>No unified service layer</td>
+<td><code>icn-api</code> has partial ComputeService only</td>
+<td>REST and RPC diverge, SDK consumers confused</td>
+<td>—</td>
+</tr>
+</tbody></table>
+<h3>Tier 2: Hardening for Pilot v1+1</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Gap</th>
+<th>Location</th>
+<th>Risk</th>
+<th>Issue</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>5</td>
+<td>Ledger entry IDs not returned to execution record</td>
+<td><code>ExecutionRecord.ledger_entry_ids</code> always empty</td>
+<td>Audit trail incomplete</td>
+<td>—</td>
+</tr>
+<tr>
+<td>6</td>
+<td>No state_change_hash for treasury effects</td>
+<td>Protocol effects compute it, treasury doesn&#39;t</td>
+<td>Verification gap</td>
+<td>—</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Recurring payment scheduler not wired</td>
+<td><code>execute_due_payments()</code> never called from daemon</td>
+<td>No payroll</td>
+<td>—</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Budget enforcement in Gateway only</td>
+<td>BudgetStore in-memory</td>
+<td>Bypassable</td>
+<td>—</td>
+</tr>
+<tr>
+<td>9</td>
+<td>Error code inconsistency (Gateway vs RPC)</td>
+<td><code>GatewayError</code> vs <code>RpcErrorCode</code></td>
+<td>SDK sees different errors for same operation</td>
+<td>—</td>
+</tr>
+</tbody></table>
+<h3>Tier 3: Post-Pilot Robustness</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Gap</th>
+<th>Location</th>
+<th>Risk</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>10</td>
+<td>Storage quota manager never called</td>
+<td><code>gossip.rs:131</code></td>
+<td>Per-DID storage limits not enforced</td>
+</tr>
+<tr>
+<td>11</td>
+<td>Blob transfer no expiry reaper</td>
+<td><code>handlers/blob_transfer.rs</code></td>
+<td>Stale transfers consume resources</td>
+</tr>
+<tr>
+<td>12</td>
+<td>Partition healing no retry</td>
+<td><code>handlers/partition.rs</code></td>
+<td>Partitions may not self-heal</td>
+</tr>
+<tr>
+<td>13</td>
+<td>ZKP proofs simulated only</td>
+<td><code>icn-zkp/src/types.rs</code></td>
+<td>No cryptographic security</td>
+</tr>
+<tr>
+<td>14</td>
+<td>PQ key distribution not implemented</td>
+<td><code>icn-net/src/envelope.rs</code> hybrid deferred</td>
+<td>Only classical verification works</td>
+</tr>
+<tr>
+<td>15</td>
+<td>Onion routing incomplete</td>
+<td><code>icn-privacy/src/onion_routing.rs</code></td>
+<td>No end-to-end test</td>
+</tr>
+<tr>
+<td>16</td>
+<td>Misbehavior detector not wired</td>
+<td><code>icn-net/src/actor/mod.rs:1122-1129</code></td>
+<td>Can&#39;t distinguish malicious from slow peers</td>
+</tr>
+</tbody></table>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

@@ -1,0 +1,768 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Governance Model Validation | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>governance</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>model validation</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/governance/model-validation.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Governance Model Validation</h1>
+<p><strong>Status</strong>: Authoritative Truth Document
+<strong>Last Updated</strong>: 2026-02-17
+<strong>Purpose</strong>: Maps every governance operation a cooperative needs against ICN&#39;s actual implementation state.</p>
+<blockquote>
+<p>This is the single source of truth for what ICN&#39;s governance system <strong>actually does</strong> vs. what it <strong>claims to do</strong>. Every entry has been verified against the codebase. Generated from codebase audit against 5 cooperative governance scenarios.</p>
+</blockquote>
+<h2>How to Read This Document</h2>
+<p>Each scenario includes a <strong>gap matrix</strong> table. The columns are:</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Operation</td>
+<td>A discrete step required by the scenario</td>
+</tr>
+<tr>
+<td>ICN API/Type</td>
+<td>The Rust struct, function, or endpoint that handles this. &quot;None&quot; if absent</td>
+</tr>
+<tr>
+<td>State Location</td>
+<td>Where data lives: governance store, sled, in-memory, nowhere</td>
+</tr>
+<tr>
+<td>Test Evidence</td>
+<td>Specific test functions. &quot;None&quot; if untested</td>
+</tr>
+<tr>
+<td>Status</td>
+<td><code>WORKS</code> / <code>TYPES_ONLY</code> / <code>MISSING</code></td>
+</tr>
+<tr>
+<td>Gap</td>
+<td>Why it does not work end-to-end (if applicable)</td>
+</tr>
+</tbody></table>
+<p><strong>Status key</strong>:</p>
+<ul>
+<li><code>WORKS</code> -- Exercised end-to-end with tests proving the path.</li>
+<li><code>TYPES_ONLY</code> -- Rust types exist but no execution bridge, no persistence, or no API endpoint.</li>
+<li><code>MISSING</code> -- No types, no code, no tests.</li>
+</ul>
+<hr>
+<h2>Scenario 1: Annual Board Election</h2>
+<p>A cooperative elects 3 board members from 5 candidates using ranked-choice voting.</p>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>ICN API/Type</th>
+<th>State Location</th>
+<th>Test Evidence</th>
+<th>Status</th>
+<th>Gap</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Nomination submission</td>
+<td>None</td>
+<td>Nowhere</td>
+<td>None</td>
+<td>MISSING</td>
+<td>No <code>ElectionProposal</code>, <code>Nomination</code>, or <code>Candidate</code> types. <code>ProposalPayload</code> has no <code>Election</code> variant.</td>
+</tr>
+<tr>
+<td>Candidate eligibility check</td>
+<td>None</td>
+<td>Nowhere</td>
+<td>None</td>
+<td>MISSING</td>
+<td><code>MembershipConfig</code> has trust thresholds but no candidacy qualifications (min term, role-specific).</td>
+</tr>
+<tr>
+<td>Ballot creation (ranked-choice / plurality)</td>
+<td>None</td>
+<td>N/A</td>
+<td>None</td>
+<td>MISSING</td>
+<td><code>VoteChoice</code> is <code>{For, Against, Abstain}</code> only (<code>vote.rs:9-18</code>). Cannot express ranked preferences.</td>
+</tr>
+<tr>
+<td>Vote casting</td>
+<td><code>Vote::new()</code>, <code>GovernanceStore::store_vote()</code></td>
+<td>GovernanceStore</td>
+<td><code>test_vote_creation</code> (<code>vote.rs:77</code>)</td>
+<td>TYPES_ONLY</td>
+<td>Works for binary For/Against/Abstain. Cannot rank candidates.</td>
+</tr>
+<tr>
+<td>Vote tallying</td>
+<td><code>VoteTally</code> (<code>tally.rs:13-21</code>), <code>compute_tally_with_delegations()</code></td>
+<td>Computed</td>
+<td><code>test_add_votes</code> (<code>tally.rs:211</code>)</td>
+<td>TYPES_ONLY</td>
+<td>Counts for/against/abstain only. No ranked-choice elimination rounds.</td>
+</tr>
+<tr>
+<td>Winner determination</td>
+<td>None</td>
+<td>Nowhere</td>
+<td>None</td>
+<td>MISSING</td>
+<td><code>DecisionOutcome</code> is <code>{Accepted, Rejected, NoQuorum}</code> (<code>profile.rs:37-47</code>). No &quot;winner&quot; concept.</td>
+</tr>
+<tr>
+<td>Term start/end</td>
+<td><code>StewardRecord::term_start/term_end</code> (<code>steward.rs:74-78</code>)</td>
+<td>StewardStore</td>
+<td>Steward tests only</td>
+<td>TYPES_ONLY</td>
+<td>Term tracking exists for SDIS stewards only, not general board roles.</td>
+</tr>
+<tr>
+<td>Role assignment</td>
+<td>None</td>
+<td>Nowhere</td>
+<td>None</td>
+<td>MISSING</td>
+<td>No role registry. No concept of &quot;board member&quot; distinct from &quot;member&quot;.</td>
+</tr>
+</tbody></table>
+<p><strong>Summary</strong>: Elections are completely absent. ICN has a binary yes/no proposal system. Zero election primitives exist: no nominations, no multi-candidate ballots, no ranked-choice tallying, no winner determination, no role assignment.</p>
+<hr>
+<h2>Scenario 2: Budget Approval Cycle</h2>
+<p>A cooperative submits an annual budget, deliberates, votes, and activates spending limits.</p>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>ICN API/Type</th>
+<th>State Location</th>
+<th>Test Evidence</th>
+<th>Status</th>
+<th>Gap</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Budget proposal submission</td>
+<td><code>ProposalPayload::Budget { amount, currency, recipient, purpose }</code> (<code>proposal.rs:403-413</code>)</td>
+<td>GovernanceStore</td>
+<td>None (Membership variant tested, not Budget)</td>
+<td>TYPES_ONLY</td>
+<td>Type exists. Submittable via <code>POST /gov/proposals</code>. No budget-specific validation.</td>
+</tr>
+<tr>
+<td>Deliberation period</td>
+<td><code>Proposal::start_deliberation()</code>, <code>ProposalState::Deliberation</code></td>
+<td>GovernanceStore</td>
+<td><code>test_proposal_deliberation_lifecycle</code> (integration)</td>
+<td>WORKS</td>
+<td>Transitions Draft -&gt; Deliberation with configurable period.</td>
+</tr>
+<tr>
+<td>In-flight amendment</td>
+<td>None</td>
+<td>N/A</td>
+<td>None</td>
+<td>MISSING</td>
+<td>Doc states: &quot;Amendments handled by cancelling and resubmitting&quot; (<code>proposal.rs:203-206</code>). Design decision.</td>
+</tr>
+<tr>
+<td>Final budget vote</td>
+<td><code>GovernanceOps::cast_vote()</code> + <code>close_proposal()</code> (<code>handle.rs:99-107</code>)</td>
+<td>GovernanceStore</td>
+<td><code>test_complete_governance_flow_accepted</code></td>
+<td>WORKS</td>
+<td>Binary yes/no on budget proposals works.</td>
+</tr>
+<tr>
+<td>Budget enforcement activation</td>
+<td>None (executor does not handle <code>Budget</code> payload)</td>
+<td>Nowhere</td>
+<td>None</td>
+<td>TYPES_ONLY</td>
+<td>Accepted Budget proposal produces no kernel effect. <code>KernelGovernanceExecutor::execute_effect()</code> has no branch for Budget.</td>
+</tr>
+<tr>
+<td>Spending limit enforcement</td>
+<td><code>TreasuryProposalOperation::ModifySpendingRule</code> (<code>proposal.rs:728-743</code>)</td>
+<td>GovernanceConfig</td>
+<td><code>test_thresholds_for_treasury_withdrawal</code></td>
+<td>TYPES_ONLY</td>
+<td>Spending rules can be proposed. No enforcement at ledger transaction time.</td>
+</tr>
+</tbody></table>
+<p><strong>Summary</strong>: Budget proposals flow through the proposal lifecycle (create, deliberate, vote, accept). But acceptance is a dead end -- there is no execution bridge to allocate funds or activate spending limits. The <code>KernelTreasuryExecutor</code> can execute treasury operations, but <code>ProposalPayload::Budget</code> is not mapped to a <code>TreasuryOperation</code>.</p>
+<hr>
+<h2>Scenario 3: Bylaw Amendment</h2>
+<p>A cooperative amends its charter to change the quorum from 50% to 60%, requiring 2/3 supermajority.</p>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>ICN API/Type</th>
+<th>State Location</th>
+<th>Test Evidence</th>
+<th>Status</th>
+<th>Gap</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Amendment drafting</td>
+<td><code>Amendment::new()</code>, <code>AmendmentChange</code> (<code>amendment.rs:366-407</code>)</td>
+<td>In-memory only</td>
+<td><code>test_amendment_creation</code> (<code>amendment.rs:714</code>)</td>
+<td>TYPES_ONLY</td>
+<td>Well-designed types. No <code>AmendmentStore</code> trait or persistence.</td>
+</tr>
+<tr>
+<td>Sponsor collection</td>
+<td><code>Amendment::add_sponsor()</code> (<code>amendment.rs:446-451</code>)</td>
+<td>In <code>Amendment</code> struct</td>
+<td><code>test_add_sponsor</code> (<code>amendment.rs:783</code>)</td>
+<td>TYPES_ONLY</td>
+<td>Method works (prevents duplicates, self-sponsorship). No API endpoint.</td>
+</tr>
+<tr>
+<td>Supermajority threshold</td>
+<td><code>RatificationRequirements { approval_percent }</code> (<code>amendment.rs:176-246</code>)</td>
+<td>In <code>Amendment::requirements</code></td>
+<td><code>test_ratification_rejection</code> (<code>amendment.rs:924</code>)</td>
+<td>WORKS</td>
+<td>Jurisdiction=67%, Federation=67%, Network=80%, Critical=90%. Tested.</td>
+</tr>
+<tr>
+<td>Voting period management</td>
+<td><code>AmendmentStatus::Voting { voting_started_at, voting_ends_at }</code> (<code>amendment.rs:126-129</code>)</td>
+<td>In <code>Amendment::status</code></td>
+<td><code>test_amendment_lifecycle</code> (<code>amendment.rs:839</code>)</td>
+<td>TYPES_ONLY</td>
+<td>State transitions work. No timer/scheduler for auto-close at period end.</td>
+</tr>
+<tr>
+<td>Ratification</td>
+<td><code>Amendment::add_ratification()</code> + <code>check_ratification()</code> + <code>ratify()</code> (<code>amendment.rs:513-618</code>)</td>
+<td>In <code>Amendment::ratifications</code></td>
+<td><code>test_ratification</code>, <code>test_duplicate_ratification_prevented</code></td>
+<td>TYPES_ONLY</td>
+<td>Multi-level ratification logic works. No persistence, no API.</td>
+</tr>
+<tr>
+<td>Effective date scheduling</td>
+<td><code>AmendmentStatus::Ratified { effective_at }</code> (<code>amendment.rs:137-139</code>)</td>
+<td>In <code>Amendment::status</code></td>
+<td>Indirect in <code>test_ratification</code></td>
+<td>TYPES_ONLY</td>
+<td>Date computed (ratified_at + effective_delay_secs). Nothing enforces it.</td>
+</tr>
+<tr>
+<td>Charter config update</td>
+<td><code>Charter::add_amendment(AmendmentRef)</code> (<code>charter.rs:348-350</code>)</td>
+<td>Charter in CharterStore</td>
+<td>None end-to-end</td>
+<td>TYPES_ONLY</td>
+<td>Appends a reference only. Does not actually update <code>charter.governance</code> config.</td>
+</tr>
+</tbody></table>
+<p><strong>Summary</strong>: The amendment system has excellent type design (multi-level ratification, structured changes, configurable thresholds per scope). It is entirely disconnected from execution: no persistence store, no gateway API, no timer-based period management, and no mechanism to apply ratified amendments to the charter config.</p>
+<hr>
+<h2>Scenario 4: Emergency Action</h2>
+<p>A compromised account must be frozen immediately, with a 24-hour emergency vote.</p>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>ICN API/Type</th>
+<th>State Location</th>
+<th>Test Evidence</th>
+<th>Status</th>
+<th>Gap</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Emergency declaration</td>
+<td>Implicit via payload type (<code>FreezeMember</code>, <code>VetoProposal</code>, etc.)</td>
+<td>N/A</td>
+<td>N/A</td>
+<td>WORKS</td>
+<td>Design decision: emergency = proposal with elevated thresholds, no separate state.</td>
+</tr>
+<tr>
+<td>Account freeze</td>
+<td><code>ProposalPayload::FreezeMember { member, reason, duration_seconds }</code> (<code>proposal.rs:442-449</code>)</td>
+<td>GovernanceStore</td>
+<td><code>test_emergency_freeze_proposal_requires_higher_quorum</code></td>
+<td>TYPES_ONLY</td>
+<td>Proposal created and voted with 67%/75% thresholds. Executor has no handler. Ledger has no freeze API.</td>
+</tr>
+<tr>
+<td>Emergency spending</td>
+<td><code>TreasuryProposalOperation::Spend</code>, <code>EmergencyThresholds::emergency_voting_period_seconds</code> (24h)</td>
+<td>GovernanceConfig</td>
+<td><code>test_thresholds_for_treasury_withdrawal</code></td>
+<td>TYPES_ONLY</td>
+<td>Shorter voting period + higher thresholds configured. Treasury executor can execute if wired.</td>
+</tr>
+<tr>
+<td>Post-emergency review</td>
+<td>None</td>
+<td>Nowhere</td>
+<td>None</td>
+<td>MISSING</td>
+<td>No automatic review trigger after emergency action completes.</td>
+</tr>
+<tr>
+<td>Account unfreeze</td>
+<td><code>ProposalPayload::UnfreezeMember { member, reason }</code> (<code>proposal.rs:452-457</code>)</td>
+<td>GovernanceStore</td>
+<td>None</td>
+<td>TYPES_ONLY</td>
+<td>Same gap as freeze: type exists, no execution bridge.</td>
+</tr>
+<tr>
+<td>Veto proposal</td>
+<td><code>ProposalPayload::VetoProposal</code> + <code>Proposal::veto()</code></td>
+<td>GovernanceStore</td>
+<td><code>test_proposal_veto_from_draft</code>, <code>test_proposal_veto_from_open</code></td>
+<td>WORKS</td>
+<td><code>KernelControlExecutor</code> handles veto via <code>ControlService</code>.</td>
+</tr>
+<tr>
+<td>Force close</td>
+<td><code>ProposalPayload::ForceCloseProposal</code> + <code>Proposal::force_close()</code></td>
+<td>GovernanceStore</td>
+<td><code>test_proposal_force_close</code></td>
+<td>WORKS</td>
+<td><code>KernelControlExecutor</code> handles this via <code>ControlService</code>.</td>
+</tr>
+<tr>
+<td>Audit trail</td>
+<td><code>GovernanceProofV2</code>, <code>GovernanceDecisionReceipt</code> (<code>proof.rs</code>)</td>
+<td>Generated on proposal close</td>
+<td><code>test_governance_proof_roundtrip</code>, <code>test_governance_proof_tamper_detection</code></td>
+<td>WORKS</td>
+<td>Cryptographic receipt with decision hash, signatures, tamper detection.</td>
+</tr>
+</tbody></table>
+<p><strong>Summary</strong>: Emergency governance is half-built. Veto, force-close, and audit trails work end-to-end. Account freeze/unfreeze and ledger rollback have types and elevated thresholds but no execution path to the ledger. Emergency voting periods (24h) are configured but not enforced by a scheduler.</p>
+<hr>
+<h2>Scenario 5: Dispute Resolution</h2>
+<p>A member files a grievance, mediation fails, the dispute escalates to governance, and the outcome is appealed.</p>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>ICN API/Type</th>
+<th>State Location</th>
+<th>Test Evidence</th>
+<th>Status</th>
+<th>Gap</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Grievance filing</td>
+<td><code>ProposalPayload::DisputeResolution</code> (<code>proposal.rs:494-510</code>)</td>
+<td>GovernanceStore</td>
+<td>None</td>
+<td>TYPES_ONLY</td>
+<td>Type exists for <strong>escalated</strong> disputes only. No member-to-member grievance filing. CCL <code>DisputeEngine</code> is compute-only.</td>
+</tr>
+<tr>
+<td>Mediator assignment</td>
+<td><code>DisputePolicy::ArbitratorSelection</code> enum (<code>charter.rs:625-670</code>)</td>
+<td>Charter</td>
+<td><code>test_dispute_policy</code> (<code>charter.rs:900</code>)</td>
+<td>TYPES_ONLY</td>
+<td>Policy defines selection method (random, elected, party, fixed). No runtime selection code.</td>
+</tr>
+<tr>
+<td>Evidence submission</td>
+<td><code>AppealEvidence { evidence_id, evidence_type, content_hash }</code> (<code>appeal.rs:350-366</code>)</td>
+<td>In <code>Appeal::evidence</code></td>
+<td><code>test_add_evidence</code> (<code>appeal.rs:907</code>)</td>
+<td>TYPES_ONLY</td>
+<td>Well-modeled for appeals. No dispute-level evidence store.</td>
+</tr>
+<tr>
+<td>Mediation outcome</td>
+<td><code>DisputeResolutionOutcome</code> enum (in <code>proposal.rs</code>)</td>
+<td>N/A</td>
+<td>None</td>
+<td>TYPES_ONLY</td>
+<td>Type exists as proposal field. No mediation session workflow.</td>
+</tr>
+<tr>
+<td>Appeal filing</td>
+<td><code>Appeal::new()</code> (<code>appeal.rs:457-491</code>)</td>
+<td>In-memory only</td>
+<td><code>test_appeal_creation</code> (<code>appeal.rs:732</code>)</td>
+<td>TYPES_ONLY</td>
+<td>Rich type system. No <code>AppealStore</code> trait. No persistence.</td>
+</tr>
+<tr>
+<td>Appeal review</td>
+<td><code>Appeal::begin_review()</code>, <code>begin_hearing()</code> (<code>appeal.rs:582-612</code>)</td>
+<td>In <code>Appeal::status</code></td>
+<td><code>test_appeal_lifecycle</code> (<code>appeal.rs:791</code>)</td>
+<td>TYPES_ONLY</td>
+<td>State machine works. No API to trigger transitions.</td>
+</tr>
+<tr>
+<td>Binding outcome</td>
+<td><code>Appeal::resolve(AppealOutcome)</code> with <code>Upheld/Denied/PartiallyUpheld/Remanded</code></td>
+<td>In <code>Appeal::status</code></td>
+<td><code>test_appeal_denied</code>, <code>test_partial_uphold</code></td>
+<td>TYPES_ONLY</td>
+<td>Outcome recorded. Never executed (no effect on ledger/membership).</td>
+</tr>
+<tr>
+<td>Ledger reversal</td>
+<td><code>ProposalPayload::RollbackLedger { target_hash, reason }</code> (<code>proposal.rs:481-492</code>)</td>
+<td>GovernanceStore</td>
+<td>None</td>
+<td>TYPES_ONLY</td>
+<td>Highest thresholds (75%/80%). No <code>LedgerService::rollback_to()</code>. No executor handler.</td>
+</tr>
+</tbody></table>
+<p><strong>Summary</strong>: Dispute resolution is the least complete scenario. Two disconnected dispute systems exist: (1) CCL <code>DisputeEngine</code> for compute task disputes (automated, with trust penalties), (2) governance <code>DisputeResolution</code> proposals for escalated ledger disputes. Neither provides member-to-member grievances. The appeal system has excellent type modeling but zero persistence or execution.</p>
+<hr>
+<h2>Cross-Cutting Analysis</h2>
+<h3>What Works End-to-End (with tests)</h3>
+<table>
+<thead>
+<tr>
+<th>Capability</th>
+<th>Key Files</th>
+<th>Key Tests</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Proposal lifecycle (create/deliberate/vote/tally/close)</td>
+<td><code>proposal.rs</code>, <code>store.rs</code>, <code>handle.rs</code></td>
+<td><code>test_complete_governance_flow_accepted/rejected</code></td>
+</tr>
+<tr>
+<td>Vote delegation (liquid democracy)</td>
+<td><code>delegation.rs</code>, <code>tally.rs</code></td>
+<td><code>test_tally_with_single_delegation</code>, <code>test_tally_transitive_delegation</code></td>
+</tr>
+<tr>
+<td>Governance proofs (cryptographic receipts)</td>
+<td><code>proof.rs</code></td>
+<td><code>test_governance_proof_roundtrip</code>, <code>test_governance_proof_tamper_detection</code></td>
+</tr>
+<tr>
+<td>Per-type thresholds (emergency = higher)</td>
+<td><code>config.rs</code></td>
+<td><code>test_thresholds_for_freeze_member_proposal</code>, <code>test_thresholds_for_rollback_proposal</code></td>
+</tr>
+<tr>
+<td>Protocol parameter changes</td>
+<td><code>governance_executor.rs</code> (KernelProtocolExecutor)</td>
+<td>Executor tests</td>
+</tr>
+<tr>
+<td>Veto / force-close execution</td>
+<td><code>governance_executor.rs</code> (KernelControlExecutor)</td>
+<td>Integration tests</td>
+</tr>
+<tr>
+<td>Treasury execution (spend/allocate)</td>
+<td><code>governance_executor.rs</code> (KernelTreasuryExecutor)</td>
+<td>Executor tests</td>
+</tr>
+</tbody></table>
+<h3>Types Exist, Execution Absent</h3>
+<table>
+<thead>
+<tr>
+<th>Capability</th>
+<th>Types In</th>
+<th>Missing Piece</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Budget activation</td>
+<td><code>ProposalPayload::Budget</code></td>
+<td>Executor branch + <code>LedgerService</code> call</td>
+</tr>
+<tr>
+<td>Account freeze/unfreeze</td>
+<td><code>ProposalPayload::FreezeMember/UnfreezeMember</code></td>
+<td><code>LedgerService::freeze_account()</code> + executor</td>
+</tr>
+<tr>
+<td>Ledger rollback</td>
+<td><code>ProposalPayload::RollbackLedger</code></td>
+<td><code>LedgerService::rollback_to()</code> + executor</td>
+</tr>
+<tr>
+<td>Amendment lifecycle</td>
+<td><code>Amendment</code>, <code>AmendmentChange</code>, <code>RatificationRequirements</code></td>
+<td><code>AmendmentStore</code> + gateway API + charter update</td>
+</tr>
+<tr>
+<td>Appeal lifecycle</td>
+<td><code>Appeal</code>, <code>AppealOutcome</code>, <code>AppealRemedy</code></td>
+<td><code>AppealStore</code> + gateway API + remedy execution</td>
+</tr>
+<tr>
+<td>Dispute mediation</td>
+<td><code>DisputePolicy</code>, <code>ArbitratorSelection</code></td>
+<td>Mediator selection runtime + session workflow</td>
+</tr>
+<tr>
+<td>Scheduling policy</td>
+<td><code>ProposalPayload::SchedulingPolicy</code></td>
+<td>Executor returns explicit failure in pilot v1</td>
+</tr>
+</tbody></table>
+<h3>Completely Missing</h3>
+<table>
+<thead>
+<tr>
+<th>Capability</th>
+<th>Why It Matters</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Elections (multi-candidate, ranked-choice)</td>
+<td>Cooperatives elect boards. Binary yes/no cannot elect from candidates.</td>
+</tr>
+<tr>
+<td>Role registry</td>
+<td>Board members, officers, committee chairs need term-tracked roles.</td>
+</tr>
+<tr>
+<td>Member-to-member grievances</td>
+<td>Only compute disputes and escalated ledger disputes exist.</td>
+</tr>
+<tr>
+<td>Automatic period expiry</td>
+<td>No scheduler closes deliberation/voting/amendment periods when time runs out.</td>
+</tr>
+<tr>
+<td>Budget spending limit enforcement</td>
+<td>Spending rules can be proposed but the ledger does not enforce them at transaction time.</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>File Reference</h2>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Path</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Proposal types + state machine</td>
+<td><code>icn/crates/icn-governance/src/proposal.rs</code></td>
+</tr>
+<tr>
+<td>Vote + VoteChoice</td>
+<td><code>icn/crates/icn-governance/src/vote.rs</code></td>
+</tr>
+<tr>
+<td>VoteTally + delegation-aware tally</td>
+<td><code>icn/crates/icn-governance/src/tally.rs</code></td>
+</tr>
+<tr>
+<td>GovernanceConfig + thresholds</td>
+<td><code>icn/crates/icn-governance/src/config.rs</code></td>
+</tr>
+<tr>
+<td>Amendment system</td>
+<td><code>icn/crates/icn-governance/src/amendment.rs</code></td>
+</tr>
+<tr>
+<td>Appeal system</td>
+<td><code>icn/crates/icn-governance/src/appeal.rs</code></td>
+</tr>
+<tr>
+<td>Charter (founding document)</td>
+<td><code>icn/crates/icn-governance/src/charter.rs</code></td>
+</tr>
+<tr>
+<td>GovernanceStore trait + impls</td>
+<td><code>icn/crates/icn-governance/src/store.rs</code></td>
+</tr>
+<tr>
+<td>GovernanceOps trait (RPC API)</td>
+<td><code>icn/crates/icn-governance/src/handle.rs</code></td>
+</tr>
+<tr>
+<td>Delegation (liquid democracy)</td>
+<td><code>icn/crates/icn-governance/src/delegation.rs</code></td>
+</tr>
+<tr>
+<td>Governance executor (bridge)</td>
+<td><code>icn/crates/icn-core/src/supervisor/governance_executor.rs</code></td>
+</tr>
+<tr>
+<td>Gateway governance routes</td>
+<td><code>icn/crates/icn-gateway/src/api/governance.rs</code></td>
+</tr>
+<tr>
+<td>Gateway governance manager</td>
+<td><code>icn/crates/icn-gateway/src/governance_mgr.rs</code></td>
+</tr>
+<tr>
+<td>Integration tests</td>
+<td><code>icn/crates/icn-governance/tests/governance_integration.rs</code></td>
+</tr>
+<tr>
+<td>CCL compute disputes</td>
+<td><code>icn/crates/icn-ccl/src/disputes.rs</code></td>
+</tr>
+<tr>
+<td>Decision proofs</td>
+<td><code>icn/crates/icn-governance/src/proof.rs</code></td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Prioritized Fix List</h2>
+<table>
+<thead>
+<tr>
+<th>Priority</th>
+<th>Fix</th>
+<th>Unblocks</th>
+<th>Effort</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>P0</strong></td>
+<td>Election/ballot system (multi-candidate, ranked choice)</td>
+<td>Scenario 1</td>
+<td>Large</td>
+</tr>
+<tr>
+<td><strong>P0</strong></td>
+<td>Background governance scheduler (auto-close, auto-expire)</td>
+<td>Scenarios 1, 3, 4</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td><strong>P1</strong></td>
+<td>Persist governance store to sled</td>
+<td>All scenarios</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td><strong>P1</strong></td>
+<td>Wire remaining ProposalPayload variants to executor effects</td>
+<td>Scenarios 2, 3, 4, 5</td>
+<td>Large</td>
+</tr>
+<tr>
+<td><strong>P1</strong></td>
+<td>Dispute filing + mediation API</td>
+<td>Scenario 5</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td><strong>P2</strong></td>
+<td>Amendment persistence + gateway API</td>
+<td>Scenario 3</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td><strong>P2</strong></td>
+<td>Generalize term management from Steward to Officer</td>
+<td>Scenario 1</td>
+<td>Small</td>
+</tr>
+<tr>
+<td><strong>P2</strong></td>
+<td>Wire charter ConfigChange acceptance to config update</td>
+<td>Scenario 3</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td><strong>P3</strong></td>
+<td>Appeal persistence + gateway API + remedy execution</td>
+<td>Scenario 5</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td><strong>P3</strong></td>
+<td>CCL-governance integration</td>
+<td>All (long-term)</td>
+<td>Large</td>
+</tr>
+<tr>
+<td><strong>P4</strong></td>
+<td>Secret ballot (sealed votes)</td>
+<td>Scenario 1</td>
+<td>Large</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Document History</h2>
+<ul>
+<li>2026-02-17: Initial creation from comprehensive codebase audit</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

@@ -1,0 +1,454 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>CoopActor Integration Plan | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>development</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>sessions</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>undated</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>COOP INTEGRATION PLAN</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/development/sessions/undated/COOP_INTEGRATION_PLAN.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>CoopActor Integration Plan</h1>
+<p><strong>Date:</strong> 2025-12-17
+<strong>Priority:</strong> HIGH
+<strong>Estimated Effort:</strong> 1-2 days</p>
+<h2>Current State</h2>
+<h3>✅ What Exists</h3>
+<ol>
+<li><p><strong>icn-coop crate</strong> - Full actor implementation</p>
+<ul>
+<li><code>CoopActor</code> with message-based API</li>
+<li><code>CoopHandle</code> for async operations</li>
+<li><code>CoopStore</code> with persistent storage (Sled)</li>
+<li><code>LifecycleManager</code> for state transitions</li>
+<li><code>MembershipManager</code> for member operations</li>
+</ul>
+</li>
+<li><p><strong>Gateway CoopManager</strong> - In-memory workaround</p>
+<ul>
+<li>HashMap-based storage (lost on restart)</li>
+<li>REST API endpoints working</li>
+<li>No gossip synchronization</li>
+</ul>
+</li>
+</ol>
+<h3>❌ What&#39;s Missing</h3>
+<ol>
+<li>CoopActor NOT spawned in supervisor</li>
+<li>No integration with gossip for distributed state</li>
+<li>No persistent storage connection</li>
+<li>Gateway still using in-memory CoopManager</li>
+</ol>
+<hr>
+<h2>Integration Steps</h2>
+<h3>Step 1: Create Supervisor Init Module (2 hours)</h3>
+<p><strong>File:</strong> <code>icn/crates/icn-core/src/supervisor/init_coop.rs</code></p>
+<pre><code class="language-rust">//! Cooperative actor initialization
+
+use anyhow::Result;
+use icn_coop::{CoopActor, CoopHandle, CoopStore};
+use icn_gossip::GossipHandle;
+use icn_store::Store;
+use std::sync::Arc;
+use tracing::info;
+
+pub struct CoopServices {
+    pub coop_handle: CoopHandle,
+    pub coop_store: Arc&lt;CoopStore&gt;,
+}
+
+pub async fn init_coop_services(
+    store: Arc&lt;dyn Store&gt;,
+    gossip_handle: GossipHandle,
+) -&gt; Result&lt;CoopServices&gt; {
+    info!(&quot;Initializing cooperative services&quot;);
+
+    // Create cooperative store
+    let coop_store = Arc::new(CoopStore::new(store)?);
+
+    // Subscribe to gossip topic for distributed coop updates
+    gossip_handle
+        .subscribe(
+            &quot;coop:updates&quot;.to_string(),
+            icn_gossip::AccessControl::Public,
+        )
+        .await?;
+
+    // Spawn CoopActor
+    let tx = CoopActor::spawn(coop_store.clone(), Some(gossip_handle));
+    let coop_handle = CoopHandle::new(tx);
+
+    info!(&quot;✓ Cooperative actor spawned&quot;);
+
+    Ok(CoopServices {
+        coop_handle,
+        coop_store,
+    })
+}
+</code></pre>
+<p><strong>Add to supervisor mod.rs:</strong></p>
+<pre><code class="language-rust">pub mod init_coop;
+</code></pre>
+<hr>
+<h3>Step 2: Spawn CoopActor in Supervisor (1 hour)</h3>
+<p><strong>File:</strong> <code>icn/crates/icn-core/src/supervisor/mod.rs</code></p>
+<p><strong>Add after ledger initialization (around line 188):</strong></p>
+<pre><code class="language-rust">// Initialize cooperative services
+let coop_services = init_coop::init_coop_services(
+    sled_store.clone(),
+    gossip_handle.clone(),
+)
+.await?;
+icn_obs::metrics::supervisor::actor_spawned_inc(&quot;coop&quot;);
+let coop_handle = coop_services.coop_handle.clone();
+</code></pre>
+<p><strong>Wire to gateway:</strong></p>
+<pre><code class="language-rust">// Later in the code where gateway is initialized
+// Pass coop_handle to gateway app_data
+</code></pre>
+<hr>
+<h3>Step 3: Update Gateway to Use CoopHandle (3 hours)</h3>
+<p><strong>File:</strong> <code>icn/crates/icn-gateway/src/coop.rs</code></p>
+<p>Option A: <strong>Replace CoopManager</strong> (breaking change)</p>
+<pre><code class="language-rust">// Remove: pub struct CoopManager with HashMap
+// Add: Wrapper around CoopHandle
+
+use icn_coop::CoopHandle;
+
+#[derive(Clone)]
+pub struct CoopManager {
+    handle: CoopHandle,
+}
+
+impl CoopManager {
+    pub fn new(handle: CoopHandle) -&gt; Self {
+        Self { handle }
+    }
+
+    pub async fn create_coop(
+        &amp;self,
+        id: String,
+        name: String,
+        steward: Did,
+        _timestamp: u64,
+    ) -&gt; Result&lt;()&gt; {
+        self.handle
+            .create_cooperative(name, icn_coop::CoopType::Worker, steward)
+            .await
+            .map_err(|e| GatewayError::InternalError(e.to_string()))?;
+        Ok(())
+    }
+
+    pub async fn get_coop(&amp;self, id: &amp;str) -&gt; Result&lt;Coop&gt; {
+        let coop = self.handle
+            .get_cooperative(id.to_string())
+            .await
+            .map_err(|e| GatewayError::NotFound(e.to_string()))?;
+        
+        // Convert icn_coop::Cooperative to gateway::Coop
+        Ok(convert_coop(coop))
+    }
+
+    // ... implement other methods
+}
+</code></pre>
+<p>Option B: <strong>Dual Mode</strong> (migration path)</p>
+<pre><code class="language-rust">pub struct CoopManager {
+    handle: Option&lt;CoopHandle&gt;,
+    fallback: Arc&lt;RwLock&lt;HashMap&lt;CoopId, Coop&gt;&gt;&gt;,
+}
+
+impl CoopManager {
+    pub fn with_handle(handle: CoopHandle) -&gt; Self {
+        Self {
+            handle: Some(handle),
+            fallback: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    pub async fn create_coop(...) -&gt; Result&lt;()&gt; {
+        if let Some(handle) = &amp;self.handle {
+            // Use actor
+            handle.create_cooperative(...).await?;
+        } else {
+            // Use fallback
+            let mut coops = self.fallback.write().unwrap();
+            coops.insert(...);
+        }
+        Ok(())
+    }
+}
+</code></pre>
+<p><strong>Recommended:</strong> Option A (clean break, simpler)</p>
+<hr>
+<h3>Step 4: Update Gateway Initialization (1 hour)</h3>
+<p><strong>File:</strong> <code>icn/crates/icn-gateway/src/lib.rs</code> or <code>bins/icnd/src/main.rs</code></p>
+<pre><code class="language-rust">// When starting gateway, pass CoopHandle from supervisor
+
+use icn_coop::CoopHandle;
+
+pub struct GatewayDeps {
+    pub ledger_handle: LedgerHandle,
+    pub governance_handle: GovernanceHandle,
+    pub coop_handle: CoopHandle,  // NEW
+    pub compute_handle: Option&lt;ComputeHandle&gt;,
+    pub event_broadcaster: Option&lt;Arc&lt;EventBroadcaster&gt;&gt;,
+}
+
+// In app_data setup:
+let coop_mgr = CoopManager::new(deps.coop_handle);
+app_data = app_data.app_data(web::Data::new(Arc::new(coop_mgr)));
+</code></pre>
+<hr>
+<h3>Step 5: Add Gossip Notification Handler (2 hours)</h3>
+<p><strong>File:</strong> <code>icn/crates/icn-coop/src/actor.rs</code></p>
+<pre><code class="language-rust">// Add to CoopActor
+pub fn set_gossip_callback(&amp;mut self, callback: GossipCallback) {
+    self.gossip_callback = Some(callback);
+}
+
+// In supervisor, after spawning:
+gossip_handle
+    .on_entry(&quot;coop:updates&quot;, move |entry| {
+        let coop_handle = coop_handle.clone();
+        tokio::spawn(async move {
+            // Deserialize coop update from entry.data
+            // Apply to local store via coop_handle
+        });
+    })
+    .await?;
+</code></pre>
+<p>This enables distributed coop state synchronization.</p>
+<hr>
+<h3>Step 6: Update icnctl CLI (2 hours)</h3>
+<p><strong>File:</strong> <code>bins/icnctl/src/main.rs</code></p>
+<pre><code class="language-rust">// Add subcommand enum
+enum CoopCommand {
+    Create { name: String, type: String },
+    List,
+    Get { id: String },
+    Activate { id: String, charter_hash: String },
+    AddMember { coop_id: String, did: String, role: String },
+    ListMembers { coop_id: String },
+}
+
+// Add to main match
+Commands::Coop(cmd) =&gt; {
+    match cmd {
+        CoopCommand::Create { name, type } =&gt; {
+            // Call RPC or HTTP API to create coop
+        }
+        CoopCommand::List =&gt; {
+            // List all coops
+        }
+        // ... implement other commands
+    }
+}
+</code></pre>
+<hr>
+<h2>Testing Plan</h2>
+<h3>Unit Tests</h3>
+<ol>
+<li>✅ CoopActor message handling (already exists in icn-coop)</li>
+<li>✅ CoopStore persistence (already exists)</li>
+</ol>
+<h3>Integration Tests</h3>
+<p>Create: <code>icn/crates/icn-core/tests/coop_integration.rs</code></p>
+<pre><code class="language-rust">#[tokio::test]
+async fn test_coop_actor_in_supervisor() {
+    // 1. Spawn supervisor with CoopActor
+    // 2. Create cooperative via handle
+    // 3. Verify persistence across restart
+    // 4. Test gossip synchronization between two nodes
+}
+
+#[tokio::test]
+async fn test_gateway_coop_api_with_actor() {
+    // 1. Start gateway with CoopHandle
+    // 2. POST /coops - create cooperative
+    // 3. GET /coops/:id - retrieve cooperative
+    // 4. POST /coops/:id/members - add member
+    // 5. Verify state persisted in CoopStore
+}
+</code></pre>
+<h3>Manual E2E Testing</h3>
+<ol>
+<li>Start icnd with CoopActor</li>
+<li>Start gateway</li>
+<li>Use pilot-ui to create cooperative</li>
+<li>Verify in icnctl: <code>icnctl coop list</code></li>
+<li>Restart icnd</li>
+<li>Verify cooperative still exists (persistence)</li>
+</ol>
+<hr>
+<h2>Migration Strategy</h2>
+<h3>Phase 1: Dual Mode (Week 1)</h3>
+<ul>
+<li>Implement Option B (dual mode CoopManager)</li>
+<li>CoopActor spawned but optional</li>
+<li>Gateway can work with or without actor</li>
+<li>Gradual rollout, low risk</li>
+</ul>
+<h3>Phase 2: Actor-Only (Week 2)</h3>
+<ul>
+<li>Switch to Option A (handle-only)</li>
+<li>Remove in-memory HashMap fallback</li>
+<li>All operations go through CoopActor</li>
+<li>Full persistence and gossip sync</li>
+</ul>
+<h3>Phase 3: CLI Integration (Week 2)</h3>
+<ul>
+<li>Add icnctl coop commands</li>
+<li>Update documentation</li>
+<li>User testing</li>
+</ul>
+<hr>
+<h2>Risks &amp; Mitigation</h2>
+<h3>Risk 1: API Compatibility</h3>
+<p><strong>Problem:</strong> icn-coop types may not match gateway types exactly</p>
+<p><strong>Mitigation:</strong></p>
+<ul>
+<li>Create conversion functions between types</li>
+<li>Update gateway types to match icn-coop if needed</li>
+<li>Version API responses properly</li>
+</ul>
+<h3>Risk 2: Performance</h3>
+<p><strong>Problem:</strong> Message passing adds latency vs direct HashMap access</p>
+<p><strong>Mitigation:</strong></p>
+<ul>
+<li>CoopActor operations are async (non-blocking)</li>
+<li>Channel buffer size = 100 (configurable)</li>
+<li>Profile in testing, optimize if needed</li>
+</ul>
+<h3>Risk 3: State Sync Complexity</h3>
+<p><strong>Problem:</strong> Gossip-based state sync may have conflicts</p>
+<p><strong>Mitigation:</strong></p>
+<ul>
+<li>Use timestamp-based last-write-wins for simple fields</li>
+<li>Use CRDT for complex state (future enhancement)</li>
+<li>Quarantine conflicting updates for manual resolution</li>
+</ul>
+<hr>
+<h2>Success Criteria</h2>
+<ul>
+<li><input disabled="" type="checkbox"> CoopActor spawned in supervisor</li>
+<li><input disabled="" type="checkbox"> Gateway uses CoopHandle instead of HashMap</li>
+<li><input disabled="" type="checkbox"> Coops persist across icnd restarts</li>
+<li><input disabled="" type="checkbox"> Multi-node coop creation syncs via gossip</li>
+<li><input disabled="" type="checkbox"> icnctl coop commands work</li>
+<li><input disabled="" type="checkbox"> All gateway coop tests pass</li>
+<li><input disabled="" type="checkbox"> No regressions in existing functionality</li>
+<li><input disabled="" type="checkbox"> Documentation updated</li>
+</ul>
+<hr>
+<h2>Timeline</h2>
+<p><strong>Total Estimate:</strong> 10-12 hours (1.5 days focused work)</p>
+<table>
+<thead>
+<tr>
+<th>Task</th>
+<th>Hours</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Step 1: Init module</td>
+<td>2</td>
+</tr>
+<tr>
+<td>Step 2: Supervisor integration</td>
+<td>1</td>
+</tr>
+<tr>
+<td>Step 3: Gateway refactor</td>
+<td>3</td>
+</tr>
+<tr>
+<td>Step 4: Gateway init</td>
+<td>1</td>
+</tr>
+<tr>
+<td>Step 5: Gossip handler</td>
+<td>2</td>
+</tr>
+<tr>
+<td>Step 6: CLI commands</td>
+<td>2</td>
+</tr>
+<tr>
+<td>Testing</td>
+<td>2</td>
+</tr>
+<tr>
+<td><strong>Total</strong></td>
+<td><strong>13</strong></td>
+</tr>
+</tbody></table>
+<p><strong>Buffer:</strong> +3 hours for debugging and edge cases
+<strong>Final Estimate:</strong> 16 hours (~2 days)</p>
+<hr>
+<h2>Next Steps</h2>
+<ol>
+<li><strong>Immediate:</strong> Create init_coop.rs module</li>
+<li><strong>Day 1 Morning:</strong> Integrate into supervisor, spawn actor</li>
+<li><strong>Day 1 Afternoon:</strong> Refactor gateway CoopManager</li>
+<li><strong>Day 2 Morning:</strong> Add gossip sync, test multi-node</li>
+<li><strong>Day 2 Afternoon:</strong> Add CLI commands, E2E testing</li>
+</ol>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

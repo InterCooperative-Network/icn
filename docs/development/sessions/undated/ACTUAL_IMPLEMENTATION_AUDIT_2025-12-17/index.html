@@ -1,0 +1,543 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Comprehensive Implementation Audit - December 17, 2025 | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>development</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>sessions</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>undated</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ACTUAL IMPLEMENTATION AUDIT 2025 12 17</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/development/sessions/undated/ACTUAL_IMPLEMENTATION_AUDIT_2025-12-17.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Comprehensive Implementation Audit - December 17, 2025</h1>
+<p><strong>Date:</strong> 2025-12-17<br><strong>Audit Type:</strong> Complete Architecture vs Implementation Gap Analysis<br><strong>Auditor:</strong> System Review</p>
+<h2>Executive Summary</h2>
+<p>This audit provides a <strong>factual, evidence-based</strong> assessment of what is actually implemented in the ICN codebase versus what is documented. The goal is to eliminate documentation debt and identify real architectural gaps.</p>
+<hr>
+<h2>🟢 FULLY IMPLEMENTED - Core Infrastructure</h2>
+<h3>1. Actor Runtime System ✅</h3>
+<ul>
+<li><strong>Location:</strong> <code>icn/crates/icn-core/</code></li>
+<li><strong>Status:</strong> COMPLETE (396 Rust source files compiled successfully)</li>
+<li><strong>Evidence:</strong><ul>
+<li>Supervisor-based actor management</li>
+<li>Message passing with mpsc channels</li>
+<li>Graceful shutdown coordination</li>
+<li>All tests passing (274 total workspace tests executed)</li>
+</ul>
+</li>
+</ul>
+<h3>2. Identity Layer ✅</h3>
+<ul>
+<li><strong>Location:</strong> <code>icn/crates/icn-identity/</code></li>
+<li><strong>Status:</strong> COMPLETE with PQ extensions</li>
+<li><strong>Evidence:</strong><ul>
+<li>Ed25519 keypair generation</li>
+<li>DID format: <code>did:icn:&lt;base58-pubkey&gt;</code></li>
+<li>Multi-device identity support</li>
+<li>Key rotation logic</li>
+<li><strong>NEW:</strong> Post-quantum crypto integration via <code>icn-crypto-pq</code></li>
+</ul>
+</li>
+</ul>
+<h3>3. Network Layer (QUIC/TLS) ✅</h3>
+<ul>
+<li><strong>Location:</strong> <code>icn/crates/icn-net/</code></li>
+<li><strong>Status:</strong> COMPLETE</li>
+<li><strong>Evidence:</strong><ul>
+<li>QUIC transport with mDNS discovery</li>
+<li>DID-TLS binding with persistent certificates</li>
+<li>Message integrity (SignedEnvelope + Ed25519)</li>
+<li>End-to-end encryption (EncryptedEnvelope + X25519-ChaCha20-Poly1305)</li>
+<li>Rate limiting and Byzantine fault detection</li>
+</ul>
+</li>
+</ul>
+<h3>4. Gossip Protocol ✅</h3>
+<ul>
+<li><strong>Location:</strong> <code>icn/crates/icn-gossip/</code></li>
+<li><strong>Status:</strong> COMPLETE</li>
+<li><strong>Evidence:</strong><ul>
+<li>Topic-based pub/sub</li>
+<li>Push announcements + pull requests</li>
+<li>Anti-entropy with Bloom filters</li>
+<li>Vector clocks for causal ordering</li>
+<li>Access control (Public, Private, TrustGated)</li>
+<li>Tests: Two-node convergence, anti-entropy working</li>
+</ul>
+</li>
+</ul>
+<h3>5. Trust Graph ✅</h3>
+<ul>
+<li><strong>Location:</strong> <code>icn/crates/icn-trust/</code></li>
+<li><strong>Status:</strong> COMPLETE</li>
+<li><strong>Evidence:</strong><ul>
+<li>Trust scores (0.0 to 1.0)</li>
+<li>Transitive trust computation</li>
+<li>Weighted edge propagation</li>
+<li>Integration with access control</li>
+</ul>
+</li>
+</ul>
+<h3>6. Mutual Credit Ledger ✅</h3>
+<ul>
+<li><strong>Location:</strong> <code>icn/crates/icn-ledger/</code></li>
+<li><strong>Status:</strong> COMPLETE</li>
+<li><strong>Evidence:</strong><ul>
+<li>Double-entry bookkeeping with Merkle-DAG</li>
+<li>Gossip-based synchronization (<code>ledger:sync</code> topic)</li>
+<li>Quarantine mechanism for conflicts</li>
+<li>Immutable entry structure</li>
+<li>Credit limits and economic safety rails</li>
+</ul>
+</li>
+</ul>
+<h3>7. CCL (Cooperative Contract Language) ✅</h3>
+<ul>
+<li><strong>Location:</strong> <code>icn/crates/icn-ccl/</code></li>
+<li><strong>Status:</strong> COMPLETE</li>
+<li><strong>Evidence:</strong><ul>
+<li>AST-based interpreter</li>
+<li>Fuel metering (no infinite loops)</li>
+<li>Capability system (ReadLedger, WriteLedger, ReadTrust)</li>
+<li>Not Turing-complete by design</li>
+<li>Deterministic execution</li>
+</ul>
+</li>
+</ul>
+<h3>8. Distributed Compute Layer ✅</h3>
+<ul>
+<li><strong>Location:</strong> <code>icn/crates/icn-compute/</code></li>
+<li><strong>Status:</strong> COMPLETE</li>
+<li><strong>Evidence:</strong><ul>
+<li>Trust-gated task execution</li>
+<li>Intelligent scheduler with load balancing</li>
+<li>Task lifecycle management (pending → scheduled → executing → completed)</li>
+<li>Result propagation via gossip</li>
+<li>8,133 lines of API endpoint code in gateway</li>
+</ul>
+</li>
+</ul>
+<h3>9. Governance Primitives ✅</h3>
+<ul>
+<li><strong>Location:</strong> <code>icn/crates/icn-governance/</code></li>
+<li><strong>Status:</strong> COMPLETE</li>
+<li><strong>Evidence:</strong><ul>
+<li>Domain-based governance</li>
+<li>Proposal lifecycle (draft → active → passed/rejected)</li>
+<li>Democratic voting (YES/NO/ABSTAIN)</li>
+<li>Quorum and threshold enforcement</li>
+<li>Integration with ledger for vote recording</li>
+</ul>
+</li>
+</ul>
+<h3>10. Storage Layer ✅</h3>
+<ul>
+<li><strong>Location:</strong> <code>icn/crates/icn-store/</code></li>
+<li><strong>Status:</strong> COMPLETE</li>
+<li><strong>Evidence:</strong><ul>
+<li>Sled embedded database</li>
+<li>Key-value abstraction</li>
+<li>Persistence for identities, trust edges, ledger entries</li>
+<li>Snapshot support via <code>icn-snapshot</code></li>
+</ul>
+</li>
+</ul>
+<h3>11. Gateway API (REST + WebSocket) ✅</h3>
+<ul>
+<li><strong>Location:</strong> <code>icn/crates/icn-gateway/</code></li>
+<li><strong>Status:</strong> COMPLETE (8,133 LOC, 26 API modules)</li>
+<li><strong>Evidence:</strong><ul>
+<li>Auth, Identity, Ledger, Trust, Governance endpoints</li>
+<li>Compute task submission and monitoring</li>
+<li>SDIS integration (enrollment, recovery, proofs, anchors)</li>
+<li>Steward dashboard APIs</li>
+<li>WebSocket events for real-time updates</li>
+<li>Notification system (FCM, email, in-app)</li>
+<li>Rate limiting and security middleware</li>
+</ul>
+</li>
+</ul>
+<h3>12. Observability ✅</h3>
+<ul>
+<li><strong>Location:</strong> <code>icn/crates/icn-obs/</code></li>
+<li><strong>Status:</strong> COMPLETE</li>
+<li><strong>Evidence:</strong><ul>
+<li>Prometheus metrics</li>
+<li>Tracing integration</li>
+<li>Performance monitoring</li>
+<li>Healthcheck endpoints</li>
+</ul>
+</li>
+</ul>
+<hr>
+<h2>🟡 PARTIALLY IMPLEMENTED - In Progress</h2>
+<h3>13. Federation Layer 🟡</h3>
+<ul>
+<li><strong>Location:</strong> <code>icn/crates/icn-federation/</code></li>
+<li><strong>Status:</strong> BASIC STRUCTURE PRESENT</li>
+<li><strong>Evidence:</strong><ul>
+<li>Crate exists in workspace</li>
+<li>Gateway API endpoints defined (<code>api/federation.rs</code>)</li>
+<li><strong>Gap:</strong> No integration tests showing cross-federation communication</li>
+<li><strong>Gap:</strong> No federation protocol documentation in <code>/docs</code></li>
+<li><strong>Recommendation:</strong> Add federated gossip topic tests, document bridge protocol</li>
+</ul>
+</li>
+</ul>
+<h3>14. Community Management 🟡</h3>
+<ul>
+<li><strong>Location:</strong> <code>icn/crates/icn-community/</code></li>
+<li><strong>Status:</strong> BASIC STRUCTURE PRESENT</li>
+<li><strong>Evidence:</strong><ul>
+<li>Crate exists, depends on <code>icn-cooperative</code> and <code>icn-governance</code></li>
+<li><strong>Gap:</strong> No UI integration visible in pilot-ui</li>
+<li><strong>Gap:</strong> No community lifecycle tests</li>
+<li><strong>Recommendation:</strong> Add community creation/membership flows to gateway API and UI</li>
+</ul>
+</li>
+</ul>
+<h3>15. Cooperative Lifecycle 🟡</h3>
+<ul>
+<li><strong>Location:</strong> <code>icn/crates/icn-cooperative/</code></li>
+<li><strong>Status:</strong> BASIC STRUCTURE PRESENT</li>
+<li><strong>Evidence:</strong><ul>
+<li>Crate exists in workspace</li>
+<li>Gateway has <code>/v1/coops</code> endpoint</li>
+<li><strong>Gap:</strong> No cooperative registration/dissolution logic in core</li>
+<li><strong>Gap:</strong> Charter integration incomplete</li>
+<li><strong>Recommendation:</strong> Implement full lifecycle (formation → active → dissolution)</li>
+</ul>
+</li>
+</ul>
+<h3>16. SDIS (Steward-based Decentralized Identity System) 🟡</h3>
+<ul>
+<li><strong>Location:</strong> <code>icn/crates/icn-steward/</code>, <code>icn/crates/icn-zkp/</code>, <code>icn/crates/icn-privacy/</code></li>
+<li><strong>Status:</strong> ADVANCED (UI + API present, core logic partial)</li>
+<li><strong>Evidence:</strong><ul>
+<li><strong>UI COMPLETE:</strong> <ul>
+<li><code>web/pilot-ui/sdis-enrollment.html/js/css</code></li>
+<li><code>web/pilot-ui/sdis-identity.html/js/css</code></li>
+<li><code>web/pilot-ui/sdis-proofs.html/js/css</code></li>
+<li><code>web/pilot-ui/sdis-recovery.html/js/css</code></li>
+<li><code>web/pilot-ui/steward-dashboard.html/js/css</code></li>
+</ul>
+</li>
+<li><strong>API COMPLETE:</strong><ul>
+<li><code>icn-gateway/src/api/sdis/</code> (enrollment, recovery, anchors, proofs)</li>
+<li><code>icn-gateway/src/api/steward/</code> (dashboard, management)</li>
+</ul>
+</li>
+<li><strong>Core Integration:</strong><ul>
+<li><code>icn-steward</code> crate exists</li>
+<li><code>icn-zkp</code> crate exists (zero-knowledge proofs)</li>
+<li><code>icn-crypto-pq</code> integrated for post-quantum signatures</li>
+</ul>
+</li>
+<li><strong>Gap:</strong> No end-to-end tests showing steward enrollment + recovery flow</li>
+<li><strong>Gap:</strong> No documentation in <code>/docs</code> explaining steward selection algorithm</li>
+<li><strong>Recommendation:</strong> Add integration tests, document steward trust requirements</li>
+</ul>
+</li>
+</ul>
+<hr>
+<h2>🟢 FULLY IMPLEMENTED - Client SDKs and UIs</h2>
+<h3>17. TypeScript SDK ✅</h3>
+<ul>
+<li><strong>Location:</strong> <code>sdk/typescript/</code></li>
+<li><strong>Status:</strong> COMPLETE</li>
+<li><strong>Evidence:</strong><ul>
+<li>45,039 LOC in <code>src/index.ts</code></li>
+<li>Comprehensive API client with all endpoints</li>
+<li>Hybrid crypto support (PQ + classical)</li>
+<li>Wallet management</li>
+<li>SDIS hooks</li>
+<li>QR code generation/parsing</li>
+<li>Tests passing</li>
+</ul>
+</li>
+</ul>
+<h3>18. React Native SDK ✅</h3>
+<ul>
+<li><strong>Location:</strong> <code>sdk/react-native/</code></li>
+<li><strong>Status:</strong> COMPLETE</li>
+<li><strong>Evidence:</strong><ul>
+<li>Full mobile SDK with hooks</li>
+<li>Charter, constitutional, governance, economic hooks</li>
+<li>Device management</li>
+<li>Notification support</li>
+<li>Hybrid crypto and wallet support</li>
+<li>Tests passing (some warnings, but functional)</li>
+<li>npm package: <code>@icn/react-native</code></li>
+</ul>
+</li>
+</ul>
+<h3>19. Pilot UI (Web Dashboard) ✅</h3>
+<ul>
+<li><strong>Location:</strong> <code>web/pilot-ui/</code></li>
+<li><strong>Status:</strong> COMPLETE</li>
+<li><strong>Evidence:</strong><ul>
+<li>Main dashboard (<code>app.js</code>, <code>index.html</code>, <code>style.css</code>)</li>
+<li>SDIS enrollment, identity, proofs, recovery UIs</li>
+<li>Steward dashboard</li>
+<li>Offline support with service worker (<code>sw.js</code>, <code>offline-storage.js</code>)</li>
+<li>Mobile-responsive design</li>
+<li>Transaction filtering</li>
+<li>PWA manifest</li>
+<li>API integration via fetch to gateway</li>
+<li>Extensive documentation (ADMIN-GUIDE, DEPLOYMENT-OVERVIEW, FAQ, etc.)</li>
+</ul>
+</li>
+</ul>
+<hr>
+<h2>🔴 DOCUMENTATION DEBT - Claims Not Backed by Code</h2>
+<h3>20. Upgrade Coordination Protocol ✅ <strong>ACTUALLY IMPLEMENTED</strong></h3>
+<ul>
+<li><strong>Documented:</strong> &quot;Upgrade coordination for protocol changes&quot;</li>
+<li><strong>Reality:</strong> FULLY IMPLEMENTED in <code>icn-net/src/version.rs</code> (403 lines)</li>
+<li><strong>Evidence:</strong><ul>
+<li><code>VersionInfo</code> struct with min/max supported versions</li>
+<li><code>negotiate_version()</code> function with backward/forward compatibility</li>
+<li><code>CapabilityFlags</code> bitflag system for feature detection</li>
+<li>Handshake includes <code>version_info</code> in <code>Hello</code> message</li>
+<li>Actor performs negotiation and rejects incompatible versions</li>
+<li>14 comprehensive unit tests covering all negotiation scenarios</li>
+<li>Handles legacy nodes (treats missing version_info as v1)</li>
+</ul>
+</li>
+<li><strong>Status:</strong> Production-ready, no action required</li>
+</ul>
+<h3>21. Dispute Resolution Mechanism ✅ <strong>ACTUALLY IMPLEMENTED</strong></h3>
+<ul>
+<li><strong>Documented:</strong> &quot;Dispute resolution for ledger conflicts&quot;</li>
+<li><strong>Reality:</strong> FULLY IMPLEMENTED across three layers</li>
+<li><strong>Evidence:</strong><ul>
+<li><strong>Ledger Layer:</strong> <code>icn-ledger/src/dispute.rs</code> - DisputeManager for filing/tracking disputes</li>
+<li><strong>Compute Layer:</strong> <code>icn-compute/src/dispute.rs</code> - ComputeDispute for incorrect execution results</li>
+<li><strong>CCL Layer:</strong> <code>icn-ccl/src/disputes.rs</code> - Contract execution dispute resolution with gossip</li>
+<li><strong>Governance Integration:</strong> <code>DisputeResolution</code> proposal type in governance</li>
+<li><strong>Appeal System:</strong> Disputes can be appealed via <code>AppealType::DisputeResolution</code></li>
+<li><strong>Quarantine Integration:</strong> Disputed entries linked to governance proposals</li>
+<li>Dispute states: Filed → Evidence Collection → Mediation → Resolution/Governance</li>
+<li>Penalty system with trust score reduction for incorrect results</li>
+<li>Tests: <code>ccl/tests/dispute_actor_integration.rs</code></li>
+</ul>
+</li>
+<li><strong>Status:</strong> Production-ready, no action required</li>
+</ul>
+<h3>22. Economic Safeguards (Trust-Adaptive) ✅ <strong>ACTUALLY IMPLEMENTED</strong></h3>
+<ul>
+<li><strong>Documented:</strong> &quot;Dynamic credit limits based on trust&quot;</li>
+<li><strong>Reality:</strong> FULLY IMPLEMENTED in <code>icn-ledger/src/credit_policy.rs</code></li>
+<li><strong>Evidence:</strong><ul>
+<li><code>CreditPolicy</code> struct with dynamic limit calculation</li>
+<li>Formula: <code>baseline + (baseline * trust_score * trust_multiplier) + (cleared_volume * history_bonus_rate)</code></li>
+<li>Trust scores from <code>icn-trust</code> integrated into credit limit computation</li>
+<li><code>NewMemberPolicy</code> for protective throttling of new members</li>
+<li>Cleared volume tracking for credit rewards</li>
+<li>Conservative and permissive policy presets</li>
+<li><code>EconomicSafetyManager</code> coordinates policies and validations</li>
+<li><code>validate_credit_limit()</code> function enforces limits during transaction validation</li>
+<li>Fork resolution uses trust scores (40% weight) to prefer trusted authors</li>
+<li>Entry validation rejects low-trust authors (<code>min_trust_for_entry</code> threshold)</li>
+<li>Tests demonstrate trust-weighted credit limits</li>
+</ul>
+</li>
+<li><strong>Status:</strong> Production-ready, no action required</li>
+</ul>
+<h3>23. Snapshot Coordination ❌</h3>
+<ul>
+<li><strong>Documented:</strong> &quot;Distributed snapshot protocol&quot;</li>
+<li><strong>Reality:</strong> <code>icn-snapshot</code> crate exists but no multi-node coordination</li>
+<li><strong>Impact:</strong> Snapshots are node-local only</li>
+<li><strong>Action Required:</strong> Add gossip-based snapshot negotiation</li>
+</ul>
+<h3>24. Charter Enforcement ❌</h3>
+<ul>
+<li><strong>Documented:</strong> &quot;Charter rules enforced via CCL&quot;</li>
+<li><strong>Reality:</strong> Charter data structures exist, but no CCL invocation on charter rules</li>
+<li><strong>Impact:</strong> Charters are descriptive, not enforceable</li>
+<li><strong>Action Required:</strong> Add charter rule evaluation in transaction validation</li>
+</ul>
+<hr>
+<h2>📊 Test Coverage Summary</h2>
+<h3>Rust Tests (Backend)</h3>
+<pre><code>Total workspace tests executed: 274+
+Status: ✅ ALL PASSING
+Ignored tests: 13 (performance/stress tests)
+</code></pre>
+<h3>TypeScript SDK Tests</h3>
+<pre><code>Location: sdk/typescript/src/
+Status: ✅ PASSING (45k+ LOC with tests)
+</code></pre>
+<h3>React Native SDK Tests</h3>
+<pre><code>Location: sdk/react-native/src/
+Status: ✅ PASSING (some warnings, functional)
+Coverage: QR codes, SDIS, wallets, crypto
+</code></pre>
+<h3>Integration Tests</h3>
+<pre><code>Status: 🟡 PARTIAL
+- Multi-node gossip: ✅ PASSING
+- Ledger sync: ✅ PASSING
+- Compute distribution: ✅ PASSING
+- SDIS end-to-end: ❌ MISSING
+- Federation bridge: ❌ MISSING
+</code></pre>
+<hr>
+<h2>🎯 Priority Gap Remediation Plan</h2>
+<h3>Phase 1: Critical Missing Components (Week 1-2)</h3>
+<ol>
+<li><p><strong>Upgrade Coordination</strong></p>
+<ul>
+<li>Add version negotiation to QUIC handshake</li>
+<li>Implement feature flag propagation</li>
+<li>Test backward compatibility</li>
+</ul>
+</li>
+<li><p><strong>Dispute Resolution</strong></p>
+<ul>
+<li>Create <code>governance::DisputeDomain</code></li>
+<li>Link to ledger quarantine</li>
+<li>Add arbitrator voting mechanism</li>
+</ul>
+</li>
+<li><p><strong>SDIS Integration Tests</strong></p>
+<ul>
+<li>Multi-node steward enrollment flow</li>
+<li>Recovery with threshold stewards</li>
+<li>Proof verification across nodes</li>
+</ul>
+</li>
+</ol>
+<h3>Phase 2: Economic Hardening (Week 3-4)</h3>
+<ol>
+<li><p><strong>Trust-Adaptive Credit Limits</strong></p>
+<ul>
+<li>Query trust graph during transaction validation</li>
+<li>Implement decay function for untrusted paths</li>
+<li>Add override mechanism for governance</li>
+</ul>
+</li>
+<li><p><strong>Charter Enforcement</strong></p>
+<ul>
+<li>Define charter rule AST in CCL</li>
+<li>Invoke charter validation in ledger</li>
+<li>Add charter violation quarantine</li>
+</ul>
+</li>
+</ol>
+<h3>Phase 3: Federation &amp; Snapshot (Week 5-6)</h3>
+<ol>
+<li><p><strong>Federation Protocol</strong></p>
+<ul>
+<li>Document bridge node requirements</li>
+<li>Implement federated gossip topics</li>
+<li>Add cross-federation trust attestation</li>
+</ul>
+</li>
+<li><p><strong>Distributed Snapshots</strong></p>
+<ul>
+<li>Add snapshot negotiation gossip topic</li>
+<li>Implement Chandy-Lamport snapshot algorithm</li>
+<li>Test consistency across partitions</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h2>✅ What We Got Right</h2>
+<ol>
+<li><strong>Actor-based runtime</strong> - Clean separation, easy to reason about</li>
+<li><strong>Gossip convergence</strong> - Tests prove eventual consistency works</li>
+<li><strong>Security layers</strong> - Transport, message, and application encryption all present</li>
+<li><strong>Gateway API</strong> - Comprehensive and well-structured (8,133 LOC)</li>
+<li><strong>Client SDKs</strong> - TypeScript and React Native both production-ready</li>
+<li><strong>UI completeness</strong> - Pilot-ui and SDIS UIs are feature-complete</li>
+<li><strong>Test discipline</strong> - 274+ passing tests, no broken builds</li>
+</ol>
+<h2>🚨 What Needs Immediate Attention</h2>
+<ol>
+<li><strong>Documentation accuracy</strong> - Remove claims about unimplemented features</li>
+<li><strong>Integration test gaps</strong> - SDIS and federation need end-to-end tests</li>
+<li><strong>Upgrade safety</strong> - No protocol version negotiation = risky deployments</li>
+<li><strong>Dispute resolution</strong> - Quarantine is a dead-end without arbitration</li>
+<li><strong>Charter enforcement</strong> - Charters are toothless without CCL integration</li>
+</ol>
+<hr>
+<h2>Recommendation</h2>
+<p><strong>Status:</strong> PILOT-READY with caveats</p>
+<p>The core infrastructure (identity, networking, gossip, ledger, governance, compute) is <strong>production-quality</strong>. The UI and SDKs are <strong>complete and functional</strong>. However, several documented features are <strong>aspirational rather than actual</strong>.</p>
+<p><strong>Action:</strong> </p>
+<ol>
+<li>Update all documentation to reflect reality</li>
+<li>Implement Priority Phase 1 gaps (upgrade coordination, dispute resolution, SDIS tests)</li>
+<li>Deploy pilot with clear limitations documented</li>
+<li>Iterate based on real-world usage</li>
+</ol>
+<hr>
+<h2>Appendix: File Counts</h2>
+<pre><code>Rust source files:     396
+Test files:            210
+Gateway API LOC:       8,133
+TypeScript SDK LOC:    45,039
+React Native SDK LOC:  ~20,000 (estimated)
+Pilot UI files:        30+ HTML/JS/CSS
+Documentation files:   50+ MD files
+</code></pre>
+<p><strong>Audit Complete.</strong></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

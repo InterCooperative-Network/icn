@@ -1,0 +1,637 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Sprint 11: Federated Governance Wiring — Implementation Plan | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>plans</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>2026 02 21 sprint 11 federated governance design</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/plans/2026-02-21-sprint-11-federated-governance-design.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Sprint 11: Federated Governance Wiring — Implementation Plan</h1>
+<blockquote>
+<p><strong>For Claude:</strong> REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.</p>
+</blockquote>
+<p><strong>Goal:</strong> Create a federation-scoped proposal on one coop node, have it propagate to all 4 coop nodes via gossip, collect votes from multiple nodes, and verify converged outcomes everywhere.</p>
+<p><strong>Architecture:</strong> The federation gossip transport already exists (<code>icn-federation</code>). The governance actor already publishes to <code>federation:governance</code> topic when <code>ProposalScope::Federation</code>. The only code gap is that <code>CreateProposalRequest</code> has no <code>scope</code> field, so every proposal defaults to <code>Local</code>. We thread <code>scope</code> through the gateway → manager → actor → command chain, then deploy NodePorts + CORS to make each coop&#39;s gateway accessible externally. Scripts prove it works end-to-end.</p>
+<p><strong>Tech Stack:</strong> Rust (actix-web gateway, governance actor), K8s YAML (NodePort services), Bash (demo scripts)</p>
+<hr>
+<h2>PR A: Thread <code>scope</code> through proposal creation (T1)</h2>
+<h3>Task 1: Add <code>ProposalScopeRequest</code> type to gateway models</h3>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>icn/crates/icn-gateway/src/models.rs:296-301</code></li>
+</ul>
+<p><strong>Step 1: Add the scope request type</strong></p>
+<p>After <code>CreateProposalRequest</code> (line 301), add:</p>
+<pre><code class="language-rust">/// Proposal scope — determines gossip routing
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(tag = &quot;type&quot;, rename_all = &quot;snake_case&quot;)]
+pub enum ProposalScopeRequest {
+    /// Local to this cooperative (default)
+    Local,
+    /// Visible across a federation
+    Federation {
+        federation_id: String,
+    },
+}
+</code></pre>
+<p><strong>Step 2: Add <code>scope</code> field to <code>CreateProposalRequest</code></strong></p>
+<p>Add to the struct at line 296:</p>
+<pre><code class="language-rust">pub struct CreateProposalRequest {
+    pub domain_id: String,
+    pub title: String,
+    pub description: String,
+    pub payload: ProposalPayloadRequest,
+    /// Proposal scope. Omit or set to &quot;local&quot; for local-only.
+    /// Set to {&quot;type&quot;: &quot;federation&quot;, &quot;federation_id&quot;: &quot;...&quot;} for federation-wide.
+    #[serde(default)]
+    pub scope: Option&lt;ProposalScopeRequest&gt;,
+}
+</code></pre>
+<p><strong>Step 3: Run <code>cargo check -p icn-gateway</code></strong></p>
+<p>Expected: compile errors in <code>governance_mgr.rs</code> because <code>create_proposal</code> doesn&#39;t accept scope yet.</p>
+<p><strong>Step 4: Commit</strong></p>
+<pre><code class="language-bash">git add icn/crates/icn-gateway/src/models.rs
+git commit -m &quot;feat(gateway): add ProposalScopeRequest to CreateProposalRequest&quot;
+</code></pre>
+<h3>Task 2: Thread scope through GovernanceManager</h3>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>icn/crates/icn-gateway/src/governance_mgr.rs:525-540</code></li>
+</ul>
+<p><strong>Step 1: Add scope parameter to <code>GovernanceManager::create_proposal</code></strong></p>
+<p>Change signature at line 525:</p>
+<pre><code class="language-rust">pub async fn create_proposal(
+    &amp;self,
+    proposal_id: ProposalId,
+    domain_id: GovernanceDomainId,
+    proposer: Did,
+    title: String,
+    description: String,
+    payload: ProposalPayload,
+    scope: icn_governance::ProposalScope,
+) -&gt; Result&lt;ProposalId&gt; {
+</code></pre>
+<p>In actor-backed mode (line 534-540), pass scope:</p>
+<pre><code class="language-rust">if let Some(ref handle) = self.governance_handle {
+    let generated_id = handle
+        .create_proposal(domain_id, title, description, payload, scope)
+        .await?;
+    return Ok(generated_id);
+}
+</code></pre>
+<p>In standalone mode (line 556), apply scope:</p>
+<pre><code class="language-rust">let mut proposal = Proposal::new(domain_id, proposer, title, description, payload);
+proposal = proposal.with_scope(scope);
+proposal.id = proposal_id.clone();
+</code></pre>
+<p><strong>Step 2: Run <code>cargo check -p icn-gateway</code></strong></p>
+<p>Expected: compile errors because <code>GovernanceHandle::create_proposal</code> doesn&#39;t accept scope yet, and the call site in <code>governance.rs</code> doesn&#39;t pass scope.</p>
+<p><strong>Step 3: Commit</strong></p>
+<pre><code class="language-bash">git add icn/crates/icn-gateway/src/governance_mgr.rs
+git commit -m &quot;feat(gateway): thread scope through GovernanceManager::create_proposal&quot;
+</code></pre>
+<h3>Task 3: Thread scope through GovernanceActor</h3>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>icn/apps/governance/src/actor.rs</code> (lines 121-131, 697-703, 848-858, 1280-1298)</li>
+</ul>
+<p><strong>Step 1: Add scope to <code>GovernanceCommand::CreateProposal</code></strong></p>
+<p>At line 121:</p>
+<pre><code class="language-rust">CreateProposal {
+    proposal_id: ProposalId,
+    domain_id: GovernanceDomainId,
+    title: String,
+    description: String,
+    payload: ProposalPayload,
+    scope: icn_governance::ProposalScope,
+},
+</code></pre>
+<p><strong>Step 2: Add scope to <code>GovernanceHandle::create_proposal</code></strong></p>
+<p>At line 697:</p>
+<pre><code class="language-rust">async fn create_proposal(
+    &amp;self,
+    domain_id: GovernanceDomainId,
+    title: String,
+    description: String,
+    payload: icn_governance::ProposalPayload,
+    scope: icn_governance::ProposalScope,
+) -&gt; Result&lt;ProposalId&gt; {
+</code></pre>
+<p>At line 851 (submit call):</p>
+<pre><code class="language-rust">self.submit(GovernanceCommand::CreateProposal {
+    proposal_id: proposal_id.clone(),
+    domain_id,
+    title,
+    description,
+    payload,
+    scope,
+})
+.await?;
+</code></pre>
+<p><strong>Step 3: Apply scope in handler</strong></p>
+<p>At line 1289-1298:</p>
+<pre><code class="language-rust">GovernanceCommand::CreateProposal {
+    proposal_id,
+    domain_id,
+    title,
+    description,
+    payload,
+    scope,
+} =&gt; {
+    info!(&quot;Creating proposal: {} (scope: {:?})&quot;, title, scope);
+
+    let mut proposal = Proposal::new(
+        domain_id,
+        self.did.clone(),
+        title.clone(),
+        description,
+        payload,
+    );
+    proposal = proposal.with_scope(scope);
+    proposal.id = proposal_id.clone();
+    // ... rest unchanged
+</code></pre>
+<p><strong>Step 4: Run <code>cargo check -p icn-governance-actor</code></strong></p>
+<p>Expected: should compile. May need to fix the trait definition if <code>create_proposal</code> is in a trait.</p>
+<p><strong>Step 5: Commit</strong></p>
+<pre><code class="language-bash">git add icn/apps/governance/src/actor.rs
+git commit -m &quot;feat(governance): thread scope through GovernanceCommand::CreateProposal&quot;
+</code></pre>
+<h3>Task 4: Wire scope in gateway API handler</h3>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>icn/crates/icn-gateway/src/api/governance.rs:473-488</code></li>
+</ul>
+<p><strong>Step 1: Map scope from request and pass to manager</strong></p>
+<p>After the payload conversion (line 471), add scope conversion:</p>
+<pre><code class="language-rust">// Convert scope (default to Local if not specified)
+let scope = match &amp;req.scope {
+    Some(ProposalScopeRequest::Federation { federation_id }) =&gt; {
+        icn_governance::ProposalScope::Federation(federation_id.clone())
+    }
+    Some(ProposalScopeRequest::Local) | None =&gt; {
+        icn_governance::ProposalScope::Local
+    }
+};
+</code></pre>
+<p>At line 479, pass scope to <code>create_proposal</code>:</p>
+<pre><code class="language-rust">let proposal_id = gov_mgr
+    .create_proposal(
+        suggested_id,
+        domain_id,
+        proposer_did.clone(),
+        req.title.clone(),
+        req.description.clone(),
+        payload,
+        scope,
+    )
+    .await?;
+</code></pre>
+<p>Add the import at the top of the file:</p>
+<pre><code class="language-rust">use crate::models::ProposalScopeRequest;
+</code></pre>
+<p><strong>Step 2: Run full check</strong></p>
+<pre><code class="language-bash">cd icn/icn &amp;&amp; cargo check --workspace
+</code></pre>
+<p>Expected: PASS</p>
+<p><strong>Step 3: Run gateway tests</strong></p>
+<pre><code class="language-bash">cd icn/icn &amp;&amp; cargo test -p icn-gateway --lib
+</code></pre>
+<p>Expected: existing tests pass (they don&#39;t specify scope, so default=Local).</p>
+<p><strong>Step 4: Commit</strong></p>
+<pre><code class="language-bash">git add icn/crates/icn-gateway/src/api/governance.rs
+git commit -m &quot;feat(gateway): map ProposalScopeRequest to ProposalScope in create_proposal&quot;
+</code></pre>
+<h3>Task 5: Add scope to proposal response</h3>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>icn/crates/icn-gateway/src/api/governance.rs</code> (proposal list/get responses)</li>
+</ul>
+<p><strong>Step 1: Check if proposal responses already include scope</strong></p>
+<p>The <code>Proposal</code> struct from <code>icn-governance</code> includes <code>scope: ProposalScope</code> (with <code>#[serde(default)]</code>). If responses serialize the full <code>Proposal</code>, scope is already visible. Verify by checking how proposals are returned in list/get endpoints.</p>
+<p>If proposals are returned directly as <code>Proposal</code> (not a DTO), no change needed — <code>scope</code> serializes automatically.</p>
+<p><strong>Step 2: Run <code>cargo test -p icn-gateway</code></strong></p>
+<pre><code class="language-bash">cd icn/icn &amp;&amp; cargo test -p icn-gateway
+</code></pre>
+<p>Expected: PASS</p>
+<p><strong>Step 3: Commit (only if changes needed)</strong></p>
+<h3>Task 6: Build, push, and verify</h3>
+<p><strong>Step 1: Full workspace check</strong></p>
+<pre><code class="language-bash">cd icn/icn &amp;&amp; cargo fmt --all --check &amp;&amp; cargo clippy --workspace --all-targets -- -D warnings
+</code></pre>
+<p><strong>Step 2: Build Docker image</strong></p>
+<pre><code class="language-bash">cd /home/ubuntu/projects/icn &amp;&amp; docker build -f deploy/Dockerfile.icnd -t icn:latest .
+</code></pre>
+<p><strong>Step 3: Push to registry</strong></p>
+<pre><code class="language-bash">docker tag icn:latest 10.8.10.40:30500/icn:latest
+docker push 10.8.10.40:30500/icn:latest
+</code></pre>
+<p><strong>Step 4: Create PR</strong></p>
+<pre><code class="language-bash">git push -u origin feat/proposal-scope
+gh pr create --title &quot;feat(gateway): add scope field to proposal creation&quot; --body &quot;...&quot;
+</code></pre>
+<hr>
+<h2>PR B: Coop Gateway NodePorts + CORS (T2)</h2>
+<h3>Task 7: Add gateway NodePort to deploy-coop.sh</h3>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>deploy/k8s/multi-node/scripts/deploy-coop.sh:331-387</code></li>
+</ul>
+<p><strong>Step 1: Add gateway NodePort to services section</strong></p>
+<p>After the existing NodePort service (line 387), add a gateway NodePort service. The port needs to be deterministic from coop name. Add a <code>NODEPORT_GATEWAY</code> variable:</p>
+<pre><code class="language-bash"># Add after line 71 (NODEPORT_RPC calculation)
+NODEPORT_GATEWAY=$((30081 + (BASE_PORT - 7777)))
+</code></pre>
+<p>Add to the services YAML (after the existing NodePort service, before the closing <code>EOF</code>):</p>
+<pre><code class="language-yaml">---
+apiVersion: v1
+kind: Service
+metadata:
+  name: icn-${COOP_NAME}-gateway
+  namespace: $NAMESPACE
+  labels:
+    app: icn
+    coop: $COOP_NAME
+spec:
+  type: NodePort
+  selector:
+    app: icn
+    coop: $COOP_NAME
+  ports:
+  - name: gateway
+    port: 8080
+    protocol: TCP
+    targetPort: health
+    nodePort: ${NODEPORT_GATEWAY}
+</code></pre>
+<p><strong>Step 2: Add CORS env var to deployment template</strong></p>
+<p>In the deployment YAML (line 259-268), add after the HOME env var:</p>
+<pre><code class="language-yaml">        - name: ICN_CORS_ORIGINS
+          value: &quot;http://10.8.10.40:30030&quot;
+</code></pre>
+<p><strong>Step 3: Print gateway port in summary</strong></p>
+<p>After line 76 (<code>echo &quot;  Metrics: $METRICS_PORT&quot;</code>), add:</p>
+<pre><code class="language-bash">echo &quot;  Gateway: 8080 (NodePort: $NODEPORT_GATEWAY)&quot;
+</code></pre>
+<p><strong>Step 4: Commit</strong></p>
+<pre><code class="language-bash">git add deploy/k8s/multi-node/scripts/deploy-coop.sh
+git commit -m &quot;feat(deploy): add gateway NodePort and CORS to coop deployments&quot;
+</code></pre>
+<h3>Task 8: Apply NodePort services to existing coops</h3>
+<p><strong>Step 1: Create gateway NodePort for each existing coop</strong></p>
+<p>Run <code>kubectl apply</code> for each coop to add gateway NodePort services. The port numbers for our existing coops are:</p>
+<p>Check the actual ports first:</p>
+<pre><code class="language-bash"># For each coop, check their QUIC port to derive gateway NodePort
+kubectl -n icn-coop-alpha get svc icn-alpha -o jsonpath=&#39;{.spec.ports[?(@.name==&quot;quic&quot;)].port}&#39;
+# Then: NODEPORT_GATEWAY = 30081 + (QUIC_PORT - 7777)
+</code></pre>
+<p>For the existing alpha/beta/gamma/delta coops, create gateway NodePort services:</p>
+<pre><code class="language-bash"># For each coop, apply a gateway NodePort service
+for COOP in alpha beta gamma delta; do
+    NS=&quot;icn-coop-${COOP}&quot;
+    # Get the existing gateway port
+    NODEPORT=$(kubectl -n $NS get svc icn-${COOP}-nodeport -o jsonpath=&#39;{.spec.ports[0].nodePort}&#39;)
+    # Derive gateway nodeport: subtract 30777 base, add 30081 base
+    OFFSET=$((NODEPORT - 30777))
+    GW_PORT=$((30081 + OFFSET))
+
+    kubectl apply -f - &lt;&lt;EOF
+apiVersion: v1
+kind: Service
+metadata:
+  name: icn-${COOP}-gateway
+  namespace: $NS
+  labels:
+    app: icn
+    coop: $COOP
+spec:
+  type: NodePort
+  selector:
+    app: icn
+    coop: $COOP
+  ports:
+  - name: gateway
+    port: 8080
+    protocol: TCP
+    targetPort: health
+    nodePort: $GW_PORT
+EOF
+    echo &quot;Created gateway NodePort for $COOP at :$GW_PORT&quot;
+done
+</code></pre>
+<p><strong>Step 2: Add CORS to existing coop deployments</strong></p>
+<p>For each coop, patch the deployment to add <code>ICN_CORS_ORIGINS</code>:</p>
+<pre><code class="language-bash">for COOP in alpha beta gamma delta; do
+    NS=&quot;icn-coop-${COOP}&quot;
+    kubectl -n $NS set env deployment/icn-${COOP} ICN_CORS_ORIGINS=&quot;http://10.8.10.40:30030&quot;
+done
+</code></pre>
+<p><strong>Step 3: Verify all 4 coop gateways respond</strong></p>
+<pre><code class="language-bash">NODE_IP=10.8.10.40
+for PORT in 30081 30082 30083 30084; do
+    echo -n &quot;Port $PORT: &quot;
+    curl -s &quot;http://${NODE_IP}:${PORT}/v1/health&quot; | jq -r &#39;.status&#39;
+done
+</code></pre>
+<p>Expected: all return <code>ok</code></p>
+<p><strong>Step 4: Commit and create PR</strong></p>
+<pre><code class="language-bash">git push -u origin fix/coop-gateway-nodeports
+gh pr create --title &quot;feat(deploy): add gateway NodePorts for coop instances&quot; --body &quot;...&quot;
+</code></pre>
+<hr>
+<h2>PR C: Federation Init + Demo Scripts (T3, T4, T5, T7)</h2>
+<h3>Task 9: Create federation-init.sh</h3>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Create: <code>scripts/federation-init.sh</code></li>
+</ul>
+<p><strong>Step 1: Write the init script</strong></p>
+<pre><code class="language-bash">#!/usr/bin/env bash
+# Initialize federation on all coop instances.
+# Idempotent: re-running is safe.
+set -euo pipefail
+
+NODE_IP=&quot;${NODE_IP:-10.8.10.40}&quot;
+COOPS=(&quot;alpha:30081&quot; &quot;beta:30082&quot; &quot;gamma:30083&quot; &quot;delta:30084&quot;)
+FED_ID=&quot;${FED_ID:-pilot-fed}&quot;
+
+echo &quot;Initializing federation &#39;${FED_ID}&#39; on ${#COOPS[@]} coops...&quot;
+
+for entry in &quot;${COOPS[@]}&quot;; do
+    COOP=&quot;${entry%%:*}&quot;
+    PORT=&quot;${entry##*:}&quot;
+    URL=&quot;http://${NODE_IP}:${PORT}&quot;
+
+    echo -n &quot;  ${COOP} (${URL}): &quot;
+
+    # Get the node&#39;s DID
+    DID=$(curl -sf &quot;${URL}/v1/health&quot; | jq -r &#39;.version // &quot;unknown&quot;&#39;)
+
+    # Check if already initialized
+    STATUS=$(curl -sf &quot;${URL}/v1/federation/status&quot; 2&gt;/dev/null || echo &#39;{&quot;initialized&quot;:false}&#39;)
+    INITIALIZED=$(echo &quot;$STATUS&quot; | jq -r &#39;.initialized // false&#39;)
+
+    if [ &quot;$INITIALIZED&quot; = &quot;true&quot; ]; then
+        echo &quot;already initialized&quot;
+        continue
+    fi
+
+    # Initialize federation
+    RESULT=$(curl -sf -X POST &quot;${URL}/v1/federation/init&quot; \
+        -H &quot;Content-Type: application/json&quot; \
+        -d &quot;{
+            \&quot;coop_id\&quot;: \&quot;${COOP}\&quot;,
+            \&quot;name\&quot;: \&quot;${COOP} cooperative\&quot;,
+            \&quot;federation_id\&quot;: \&quot;${FED_ID}\&quot;
+        }&quot; 2&gt;&amp;1) || true
+
+    echo &quot;${RESULT}&quot; | jq -r &#39;.status // .error // &quot;done&quot;&#39;
+done
+
+echo &quot;&quot;
+echo &quot;Federation status:&quot;
+for entry in &quot;${COOPS[@]}&quot;; do
+    COOP=&quot;${entry%%:*}&quot;
+    PORT=&quot;${entry##*:}&quot;
+    echo -n &quot;  ${COOP}: &quot;
+    curl -sf &quot;http://${NODE_IP}:${PORT}/v1/federation/status&quot; | jq -c &#39;.&#39; 2&gt;/dev/null || echo &quot;unreachable&quot;
+done
+</code></pre>
+<p><strong>Step 2: Make executable and commit</strong></p>
+<pre><code class="language-bash">chmod +x scripts/federation-init.sh
+git add scripts/federation-init.sh
+git commit -m &quot;feat(scripts): add federation-init.sh for multi-coop federation setup&quot;
+</code></pre>
+<h3>Task 10: Create federated-governance-demo.sh (T7)</h3>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Create: <code>scripts/federated-governance-demo.sh</code></li>
+</ul>
+<p><strong>Step 1: Write the demo script</strong></p>
+<p>This script proves the full federation governance lifecycle. It:</p>
+<ol>
+<li>Health-checks all 4 coop gateways</li>
+<li>Obtains JWT tokens for each coop (via <code>kubectl exec</code>)</li>
+<li>Creates a governance domain on alpha</li>
+<li>Creates a federation-scoped proposal on alpha</li>
+<li>Verifies the proposal propagated to beta/gamma/delta</li>
+<li>Opens voting, casts votes from alpha + beta</li>
+<li>Verifies tally convergence on all coops</li>
+<li>Closes the proposal, verifies closed state everywhere</li>
+</ol>
+<p>Structure should follow <code>scripts/governance-demo.sh</code> as the template, but operate across all 4 coops with per-coop auth tokens and endpoints.</p>
+<p>Key differences from governance-demo.sh:</p>
+<ul>
+<li><code>NODE_IP</code> and per-coop ports (30081-30084) instead of single :30080</li>
+<li>Per-coop JWT tokens obtained from each coop&#39;s pod</li>
+<li>Proposal scope: <code>{&quot;type&quot;: &quot;federation&quot;, &quot;federation_id&quot;: &quot;pilot-fed&quot;}</code></li>
+<li>Propagation verification: poll each coop&#39;s proposal list</li>
+<li>Vote from multiple coops using their respective tokens</li>
+<li>Tally convergence check: compare tallies across all coops</li>
+</ul>
+<p><strong>Step 2: Make executable and test</strong></p>
+<pre><code class="language-bash">chmod +x scripts/federated-governance-demo.sh
+./scripts/federated-governance-demo.sh
+</code></pre>
+<p>Expected: exits 0, all steps pass</p>
+<p><strong>Step 3: Commit</strong></p>
+<pre><code class="language-bash">git add scripts/federated-governance-demo.sh
+git commit -m &quot;feat(scripts): add federated-governance-demo.sh proof-of-life&quot;
+</code></pre>
+<h3>Task 11: Create PR</h3>
+<pre><code class="language-bash">git push -u origin feat/federation-demo
+gh pr create --title &quot;feat(scripts): federation init + federated governance demo&quot; --body &quot;...&quot;
+</code></pre>
+<hr>
+<h2>PR D: Pilot UI Federation View (T6)</h2>
+<h3>Task 12: Add federation indicators to governance tab</h3>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>web/pilot-ui/app.js</code> (governance tab section)</li>
+</ul>
+<p><strong>Step 1: Add origin coop badge to proposal cards</strong></p>
+<p>In the governance tab&#39;s proposal rendering, check if the proposal has <code>scope.federation</code> and display:</p>
+<ul>
+<li>An origin badge: &quot;Created on: alpha&quot; (derive from proposal&#39;s proposer DID or scope metadata)</li>
+<li>A federation indicator: small icon or text showing &quot;Federation: pilot-fed&quot;</li>
+</ul>
+<p><strong>Step 2: Add &quot;seen on N coops&quot; indicator</strong></p>
+<p>Add a function that checks the proposal exists on each coop gateway:</p>
+<pre><code class="language-javascript">async function checkProposalPropagation(proposalId) {
+    const coops = [
+        { name: &#39;alpha&#39;, port: 30081 },
+        { name: &#39;beta&#39;, port: 30082 },
+        { name: &#39;gamma&#39;, port: 30083 },
+        { name: &#39;delta&#39;, port: 30084 },
+    ];
+    let seen = 0;
+    for (const coop of coops) {
+        try {
+            const res = await fetch(`http://${NODE_IP}:${coop.port}/v1/gov/proposals/${proposalId}`);
+            if (res.ok) seen++;
+        } catch { /* unreachable */ }
+    }
+    return { seen, total: coops.length };
+}
+</code></pre>
+<p>Display as &quot;Seen on 4/4 coops&quot; badge in the proposal detail.</p>
+<p><strong>Step 3: Test in browser</strong></p>
+<p>Navigate to Pilot UI → Governance tab → verify federation badges appear on federation-scoped proposals.</p>
+<p><strong>Step 4: Commit and PR</strong></p>
+<pre><code class="language-bash">git add web/pilot-ui/app.js
+git commit -m &quot;feat(pilot-ui): add federation indicators to governance tab&quot;
+git push -u origin feat/pilot-ui-federation
+gh pr create --title &quot;feat(pilot-ui): federation view indicators&quot; --body &quot;...&quot;
+</code></pre>
+<hr>
+<h2>Merge Order</h2>
+<ol>
+<li><strong>PR A</strong> (scope field) — independent Rust change</li>
+<li><strong>PR B</strong> (NodePorts + CORS) — independent K8s/deploy change</li>
+<li><strong>PR C</strong> (scripts) — depends on A + B being deployed</li>
+<li><strong>PR D</strong> (Pilot UI) — depends on A + B being deployed</li>
+</ol>
+<p>A and B can merge in parallel. C and D wait for A + B to be deployed to the cluster.</p>
+<hr>
+<h2>Acceptance Criteria</h2>
+<ol>
+<li><code>POST /v1/gov/proposals</code> with <code>&quot;scope&quot;: {&quot;type&quot;: &quot;federation&quot;, &quot;federation_id&quot;: &quot;pilot-fed&quot;}</code> returns 201 on alpha</li>
+<li>Proposal appears on beta/gamma/delta within 30 seconds</li>
+<li>Votes from alpha + beta produce identical tallies on all 4 coops</li>
+<li>Close on alpha → closed state on all 4 coops</li>
+<li><code>federated-governance-demo.sh</code> exits 0 with clean transcript</li>
+<li>Pilot UI shows federation badge on federation-scoped proposals</li>
+</ol>
+<h2>Key File Map</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Change</th>
+<th>PR</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icn/crates/icn-gateway/src/models.rs</code></td>
+<td>Add <code>ProposalScopeRequest</code>, scope field</td>
+<td>A</td>
+</tr>
+<tr>
+<td><code>icn/crates/icn-gateway/src/api/governance.rs</code></td>
+<td>Map scope, pass to manager</td>
+<td>A</td>
+</tr>
+<tr>
+<td><code>icn/crates/icn-gateway/src/governance_mgr.rs</code></td>
+<td>Accept scope parameter</td>
+<td>A</td>
+</tr>
+<tr>
+<td><code>icn/apps/governance/src/actor.rs</code></td>
+<td>Scope in command, handle, handler</td>
+<td>A</td>
+</tr>
+<tr>
+<td><code>deploy/k8s/multi-node/scripts/deploy-coop.sh</code></td>
+<td>Gateway NodePort + CORS</td>
+<td>B</td>
+</tr>
+<tr>
+<td><code>scripts/federation-init.sh</code></td>
+<td>New: init federation on coops</td>
+<td>C</td>
+</tr>
+<tr>
+<td><code>scripts/federated-governance-demo.sh</code></td>
+<td>New: end-to-end proof script</td>
+<td>C</td>
+</tr>
+<tr>
+<td><code>web/pilot-ui/app.js</code></td>
+<td>Federation indicators</td>
+<td>D</td>
+</tr>
+</tbody></table>
+<h2>Risks</h2>
+<table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Gossip not connecting between coops</td>
+<td>Check mDNS discovery, verify coops can see each other with <code>/v1/federation/status</code></td>
+</tr>
+<tr>
+<td>Proposals don&#39;t propagate</td>
+<td>Check governance actor logs for federation publish attempts, verify gossip topic subscription</td>
+</tr>
+<tr>
+<td>Port conflicts (NodePorts overlap)</td>
+<td>Ports derived deterministically from coop name hash; verify no collision</td>
+</tr>
+<tr>
+<td>CORS issues on coop gateways</td>
+<td>Same fix as Sprint 10: <code>ICN_CORS_ORIGINS</code> env var on each coop deployment</td>
+</tr>
+</tbody></table>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

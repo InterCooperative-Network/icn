@@ -1,0 +1,512 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Post-Quantum Cryptography in ICN | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>post quantum crypto</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/post-quantum-crypto.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Post-Quantum Cryptography in ICN</h1>
+<blockquote>
+<p><strong>⚠️ STATUS: DESIGN / EXPERIMENTAL / NOT ENABLED BY DEFAULT</strong></p>
+<p>This document describes a <strong>proposed</strong> post-quantum cryptography design. It is NOT the current production default.</p>
+<p><strong>Current Reality</strong>:</p>
+<ul>
+<li>Default ICN identities use <strong>Ed25519 only</strong> (NOT post-quantum safe)</li>
+<li>PQ features require opt-in via <code>post-quantum</code> feature flag</li>
+<li>SDIS/Anchor identities have experimental PQ support</li>
+</ul>
+<p>This doc becomes &quot;implemented&quot; when:</p>
+<ul>
+<li>Tests exist in <code>icn-crypto-pq</code> crate</li>
+<li>Integration tests verify hybrid signature workflows</li>
+<li>Feature flag is documented in deployment guides</li>
+</ul>
+</blockquote>
+<h2>Overview</h2>
+<p>ICN supports <strong>hybrid post-quantum cryptography</strong> that combines classical Ed25519 signatures with ML-DSA (Module-Lattice Digital Signature Algorithm, aka Dilithium3) to provide quantum-resistant security.</p>
+<p>This implementation follows the defense-in-depth principle: <strong>both signatures must be valid</strong> for verification to succeed. An attacker must break BOTH classical and post-quantum algorithms to forge a signature.</p>
+<h2>Architecture</h2>
+<h3>Two-Tier PQ Support</h3>
+<p>ICN implements post-quantum cryptography at two levels:</p>
+<ol>
+<li><p><strong>SDIS/Anchor Identities</strong> (Always PQ): The <code>KeyBundle</code> used by Anchor-based identities (<code>did:icn:&lt;anchor-id&gt;</code>) has <strong>always</strong> used hybrid signatures since v4.</p>
+</li>
+<li><p><strong>Core Identities</strong> (Optional PQ): Traditional Ed25519-based DIDs (<code>did:icn:&lt;pubkey&gt;</code>) can be <strong>upgraded</strong> to use hybrid signatures via the <code>post-quantum</code> feature flag.</p>
+</li>
+</ol>
+<h3>Feature Flag</h3>
+<p>The <code>post-quantum</code> feature is <strong>optional</strong> to keep ICN lightweight for resource-constrained nodes:</p>
+<pre><code class="language-toml"># Cargo.toml
+[features]
+default = []
+post-quantum = []
+
+[dependencies]
+icn-crypto-pq.workspace = true
+</code></pre>
+<p>When disabled, core identities use classical Ed25519 only. When enabled, newly generated identities automatically get ML-DSA keys, and existing identities can be upgraded.</p>
+<h2>Cryptographic Primitives</h2>
+<h3>Signature Algorithms</h3>
+<table>
+<thead>
+<tr>
+<th>Algorithm</th>
+<th>Key Size</th>
+<th>Signature Size</th>
+<th>Security Level</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Ed25519 (Classical)</td>
+<td>32 bytes</td>
+<td>64 bytes</td>
+<td>~128-bit classical</td>
+</tr>
+<tr>
+<td>ML-DSA-65 (Post-Quantum)</td>
+<td>1952 bytes (public)<br>4032 bytes (secret)</td>
+<td>3309 bytes</td>
+<td>~128-bit post-quantum</td>
+</tr>
+<tr>
+<td><strong>Hybrid</strong></td>
+<td><strong>~2 KB</strong></td>
+<td><strong>~3.4 KB</strong></td>
+<td><strong>Both</strong></td>
+</tr>
+</tbody></table>
+<h3>Key Encapsulation</h3>
+<p>For encryption, ICN uses <strong>hybrid KEM</strong>:</p>
+<ul>
+<li><strong>Classical</strong>: X25519</li>
+<li><strong>Post-Quantum</strong>: ML-KEM (Kyber768)</li>
+<li><strong>Combined</strong>: XOR or KDF mix of both shared secrets</li>
+</ul>
+<h2>Identity Structure</h2>
+<h3>KeyPair with PQ Support</h3>
+<pre><code class="language-rust">pub struct KeyPair {
+    secret_bytes: Zeroizing&lt;[u8; 32]&gt;,
+    verifying_key: VerifyingKey,
+    did: Did,
+    
+    // Only present when post-quantum feature is enabled
+    #[cfg(feature = &quot;post-quantum&quot;)]
+    pq_keypair: Option&lt;icn_crypto_pq::MlDsaKeypair&gt;,
+}
+</code></pre>
+<h3>Hybrid Signature Format</h3>
+<pre><code class="language-rust">pub struct HybridSignature {
+    classical: Vec&lt;u8&gt;,  // 64 bytes (Ed25519)
+    pq: Vec&lt;u8&gt;,         // 3309 bytes (ML-DSA)
+}
+</code></pre>
+<h3>Verification Rules</h3>
+<ol>
+<li><strong>Classical-only identity</strong> signing with <code>.sign()</code> → Classical Ed25519 signature (64 bytes)</li>
+<li><strong>Hybrid identity</strong> signing with <code>.sign()</code> → Still returns Ed25519 signature (backward compatible)</li>
+<li><strong>Hybrid identity</strong> signing with <code>.sign_hybrid()</code> → Returns <code>HybridSignatureOrClassical</code> enum</li>
+</ol>
+<pre><code class="language-rust">pub enum HybridSignatureOrClassical {
+    Hybrid(icn_crypto_pq::HybridSignature),
+    Classical(ed25519_dalek::Signature),
+}
+</code></pre>
+<p>Verification logic:</p>
+<ul>
+<li><code>Classical</code> variant: Verify with Ed25519 only</li>
+<li><code>Hybrid</code> variant: <strong>BOTH</strong> Ed25519 and ML-DSA must verify successfully</li>
+</ul>
+<h2>DID Format</h2>
+<h3>Design Decision: Non-Breaking DID Format</h3>
+<p><strong>Option A (Implemented)</strong>: Keep DID derived from Ed25519 key only</p>
+<ul>
+<li>DID: <code>did:icn:&lt;base58-ed25519-pubkey&gt;</code></li>
+<li>PQ public key discovered via <code>IdentityBundle</code> or DID Document</li>
+<li><strong>Advantage</strong>: Existing identities can be upgraded without changing DID</li>
+<li><strong>Downside</strong>: DID string doesn&#39;t cryptographically bind to PQ key</li>
+</ul>
+<p><strong>Option B (Not Implemented)</strong>: Hash combined keys</p>
+<ul>
+<li>DID: <code>did:icn:&lt;hash(ed25519||ml-dsa)&gt;</code></li>
+<li><strong>Advantage</strong>: Locks PQ key to identity at birth</li>
+<li><strong>Downside</strong>: Breaks backward compatibility, forces all nodes to upgrade</li>
+</ul>
+<p>We chose <strong>Option A</strong> for easier migration.</p>
+<h2>Keystore Format</h2>
+<h3>v4 Format (SDIS)</h3>
+<p>Already supports hybrid signatures via <code>KeyBundle</code>:</p>
+<pre><code class="language-rust">struct StoredKeyV4 {
+    version: u8,
+    
+    // Classical identity keys
+    secret_bytes: [u8; 32],
+    public_bytes: [u8; 32],
+    did: String,
+    
+    // TLS binding
+    tls_cert_der: Vec&lt;u8&gt;,
+    tls_key_der: Vec&lt;u8&gt;,
+    tls_binding_sig: Vec&lt;u8&gt;,
+    
+    // X25519 encryption
+    x25519_secret: Vec&lt;u8&gt;,
+    x25519_public: [u8; 32],
+    
+    // Multi-device
+    did_document: DidDocument,
+    device_id: String,
+    rotation_chain: Vec&lt;RotationEvent&gt;,
+    
+    // SDIS
+    anchor: Option&lt;Anchor&gt;,
+    keybundles: Vec&lt;StoredKeyBundleV4&gt;,
+    
+    // PQ keys for core identity (v5 addition)
+    #[cfg(feature = &quot;post-quantum&quot;)]
+    pq_secret: Option&lt;Vec&lt;u8&gt;&gt;,
+    #[cfg(feature = &quot;post-quantum&quot;)]
+    pq_public: Option&lt;Vec&lt;u8&gt;&gt;,
+}
+</code></pre>
+<h3>Backward Compatibility</h3>
+<ul>
+<li><strong>v1/v2/v3 keystores</strong>: Load as classical-only identities</li>
+<li><strong>v4 keystores without PQ</strong>: Load as classical-only</li>
+<li><strong>v4 keystores with PQ</strong>: Load with hybrid support</li>
+<li><strong>Upgrade path</strong>: <code>icnctl id upgrade-pq</code> adds PQ keys without changing DID</li>
+</ul>
+<h2>CLI Commands</h2>
+<h3>Generate PQ Identity</h3>
+<p>When the <code>post-quantum</code> feature is enabled, newly generated identities automatically include ML-DSA keys:</p>
+<pre><code class="language-bash"># Build with PQ support
+cargo build --features post-quantum
+
+# Initialize new identity (automatically hybrid)
+./target/debug/icnctl id init
+</code></pre>
+<h3>Upgrade Existing Identity</h3>
+<p>Existing classical identities can be upgraded:</p>
+<pre><code class="language-bash"># Upgrade to post-quantum
+./target/debug/icnctl id upgrade-pq
+
+# Output:
+# ✓ Post-quantum upgrade successful!
+#   DID: did:icn:z... (unchanged)
+#   Classical: Ed25519 (32-byte keys, 64-byte signatures)
+#   Post-Quantum: ML-DSA-65 (~2KB keys, ~3.3KB signatures)
+#   Security: Hybrid (both signatures required)
+</code></pre>
+<h3>Check PQ Status</h3>
+<pre><code class="language-bash">./target/debug/icnctl id show
+
+# Output includes:
+# PQ Keys: Yes / No
+</code></pre>
+<h2>Network Protocol Integration</h2>
+<h3>SignedEnvelope</h3>
+<p>The <code>SignedEnvelope</code> used for network messages accepts variable-length signatures:</p>
+<pre><code class="language-rust">pub struct SignedEnvelope {
+    pub from: Did,
+    pub payload: Vec&lt;u8&gt;,
+    pub signature: Vec&lt;u8&gt;,  // Can hold 64 bytes or ~3.4 KB
+    pub timestamp: u64,
+}
+</code></pre>
+<p>QUIC handles fragmentation automatically, so large signatures don&#39;t break the protocol.</p>
+<h3>EncryptedEnvelope</h3>
+<p>For end-to-end encryption, integrate ML-KEM:</p>
+<pre><code class="language-rust">// Current (classical only)
+let shared_secret = x25519_ecdh(my_secret, peer_public);
+
+// Hybrid (when PQ enabled)
+let classical_secret = x25519_ecdh(my_x25519_secret, peer_x25519_public);
+let pq_secret = ml_kem_decapsulate(ciphertext, my_ml_kem_secret);
+let combined_secret = kdf([classical_secret, pq_secret]);
+</code></pre>
+<p>This requires:</p>
+<ol>
+<li>Extending <code>IdentityBundle</code> to include ML-KEM public key</li>
+<li>Updating <code>EncryptedEnvelope</code> creation in <code>icn-net</code></li>
+<li>Negotiating hybrid encryption during QUIC handshake</li>
+</ol>
+<p><strong>Status</strong>: Not yet implemented. Current encryption remains X25519-only even with PQ signatures enabled.</p>
+<h2>Protocol Negotiation</h2>
+<p>This section documents how nodes negotiate post-quantum capabilities during connection establishment.</p>
+<h3>Capability Flags</h3>
+<p>Two capability flags control PQ behavior (defined in <code>icn-net/src/version.rs</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Bit Value</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>HYBRID_SIGNATURES</code></td>
+<td><code>0b1000000000</code></td>
+<td>Ed25519 + ML-DSA signatures</td>
+</tr>
+<tr>
+<td><code>HYBRID_KEM</code></td>
+<td><code>0b10000000000</code></td>
+<td>X25519 + ML-KEM encryption</td>
+</tr>
+</tbody></table>
+<p>These flags are only advertised when the <code>post-quantum</code> feature is enabled at compile time.</p>
+<h3>Hello Message Exchange</h3>
+<p>The Hello message includes optional PQ fields (defined in <code>icn-net/src/protocol.rs</code>):</p>
+<pre><code class="language-rust">Hello {
+    binding_info: BindingInfo,
+    version_info: Option&lt;VersionInfo&gt;,
+    topology_info: Option&lt;TopologyInfo&gt;,
+    x25519_public: [u8; 32],
+    ml_dsa_public: Option&lt;Vec&lt;u8&gt;&gt;,        // ~1952 bytes
+    ml_kem_public: Option&lt;Vec&lt;u8&gt;&gt;,        // ~1184 bytes
+    pq_binding_proof: Option&lt;PqBindingProof&gt;,
+}
+</code></pre>
+<blockquote>
+<p><strong>Note</strong>: PQ fields use <code>#[serde(default)]</code> for backward compatibility—pre-PQ nodes can deserialize Hello messages without these fields.</p>
+</blockquote>
+<h3>PQ Binding Proof</h3>
+<p>The <code>PqBindingProof</code> cryptographically binds the ML-DSA public key to the sender&#39;s DID, preventing key substitution attacks:</p>
+<pre><code class="language-rust">pub struct PqBindingProof {
+    pub timestamp_millis: u64,
+    pub signature: Vec&lt;u8&gt;,  // 3309 bytes (ML-DSA)
+}
+</code></pre>
+<p><strong>Message format signed</strong>: <code>&quot;DID-PQ-BINDING-V1:&lt;did&gt;:&lt;timestamp_millis&gt;&quot;</code></p>
+<p><strong>Validation rules</strong>:</p>
+<ul>
+<li>Timestamp max age: 5 minutes (prevents replay of old proofs)</li>
+<li>Future tolerance: 1 minute (clock skew allowance)</li>
+<li>Signature must verify with the provided ML-DSA public key</li>
+</ul>
+<h3>Negotiation Sequence</h3>
+<pre><code>Node A                                    Node B
+   |                                         |
+   |-- Hello (ml_dsa_pub, pq_binding_proof) -&gt;|
+   |                                         |
+   |&lt;- Hello (ml_dsa_pub, pq_binding_proof) --|
+   |                                         |
+   |   [Compute common_capabilities()]       |
+   |   [Verify PQ binding proofs]            |
+   |   [Store peer PQ keys if verified]      |
+   |                                         |
+   |== Use hybrid signatures if both support =|
+</code></pre>
+<p>The <code>handle_hello()</code> handler in <code>icn-net/src/handlers/hello.rs</code> processes these steps:</p>
+<ol>
+<li>Verify DID-TLS binding (TOFU model)</li>
+<li>Verify DID-PQ binding proof (if present)</li>
+<li>Negotiate protocol version</li>
+<li>Compute capability intersection</li>
+<li>Validate PQ key format</li>
+<li>Store validated peer info</li>
+</ol>
+<h3>Fallback Behavior</h3>
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Behavior</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Both support <code>HYBRID_SIGNATURES</code></td>
+<td>Use hybrid (both must verify)</td>
+</tr>
+<tr>
+<td>Only sender supports PQ</td>
+<td>Send classical signature</td>
+</tr>
+<tr>
+<td>Receiver has PQ, sender doesn&#39;t</td>
+<td>Accept classical signature</td>
+</tr>
+<tr>
+<td>Invalid binding proof</td>
+<td><strong>Reject connection</strong> (fail-closed security policy)</td>
+</tr>
+<tr>
+<td>Missing binding proof (legacy node)</td>
+<td>Accept with classical-only capability (PQ keys ignored)</td>
+</tr>
+<tr>
+<td>Advertises <code>HYBRID_SIGNATURES</code> but no <code>ml_dsa_public</code></td>
+<td>Log warning, discard capability (treat as classical)</td>
+</tr>
+</tbody></table>
+<h3>Peer State Storage</h3>
+<p>Validated PQ keys are cached in <code>PeerConnectionInfo</code> for the session:</p>
+<pre><code class="language-rust">pub struct PeerConnectionInfo {
+    did: Did,
+    negotiated_version: u32,
+    peer_capabilities: CapabilityFlags,
+    peer_software: String,
+    x25519_key: [u8; 32],
+    ml_dsa_public: Option&lt;Vec&lt;u8&gt;&gt;,  // Only if HYBRID_SIGNATURES negotiated
+    ml_kem_public: Option&lt;Vec&lt;u8&gt;&gt;,  // Only if HYBRID_KEM negotiated
+}
+</code></pre>
+<p>When sending messages, check <code>peer_capabilities.contains(HYBRID_SIGNATURES)</code> to decide whether to use <code>sign_hybrid()</code> or classical <code>sign()</code>.</p>
+<h2>Security Properties</h2>
+<h3>Downgrade Protection</h3>
+<p>Once a peer advertises PQ capability (via <code>IdentityBundle</code> or DID Document), verifiers <strong>must</strong> require hybrid signatures. Classical-only signatures are rejected.</p>
+<p>This prevents MITM downgrade attacks where an attacker strips PQ keys.</p>
+<h3>Quantum Timeline</h3>
+<ul>
+<li><strong>Classical Ed25519</strong>: Vulnerable to Shor&#39;s algorithm on a CRQC (Cryptographically Relevant Quantum Computer)</li>
+<li><strong>ML-DSA (Dilithium)</strong>: Based on lattice problems, believed quantum-resistant</li>
+<li><strong>Hybrid Construction</strong>: Secure as long as <strong>either</strong> algorithm remains unbroken</li>
+</ul>
+<p>NIST estimates CRQCs may exist by 2030-2035. Upgrading identities now provides forward security against &quot;harvest now, decrypt later&quot; attacks.</p>
+<h2>Performance Considerations</h2>
+<h3>Signature Size Impact</h3>
+<ul>
+<li><strong>Ed25519 signature</strong>: 64 bytes</li>
+<li><strong>Hybrid signature</strong>: ~3.4 KB (53× larger)</li>
+<li><strong>QUIC MTU</strong>: 1200 bytes typical</li>
+<li><strong>Fragmentation</strong>: Automatic via QUIC streams</li>
+</ul>
+<p>Large signatures don&#39;t block the protocol, but they do increase bandwidth:</p>
+<ul>
+<li><strong>Gossip messages</strong>: ~3.4 KB overhead per signed message</li>
+<li><strong>Ledger entries</strong>: ~3.4 KB overhead per transaction</li>
+<li><strong>Network traffic</strong>: Approximately 50× increase in signature bandwidth</li>
+</ul>
+<h3>Key Generation Time</h3>
+<ul>
+<li><strong>Ed25519</strong>: ~100 μs</li>
+<li><strong>ML-DSA</strong>: ~10 ms (100× slower)</li>
+</ul>
+<p>Key generation is infrequent (once per identity or rotation), so the delay is acceptable.</p>
+<h3>Verification Time</h3>
+<ul>
+<li><strong>Ed25519</strong>: ~50 μs</li>
+<li><strong>ML-DSA</strong>: ~150 μs</li>
+<li><strong>Hybrid</strong>: ~200 μs (both must verify)</li>
+</ul>
+<p>Verification is fast enough for real-time use.</p>
+<h2>Testing</h2>
+<h3>Unit Tests</h3>
+<p>All existing tests pass with and without the <code>post-quantum</code> feature:</p>
+<pre><code class="language-bash"># Classical mode (default)
+cargo test -p icn-identity
+
+# Post-quantum mode
+cargo test -p icn-identity --features post-quantum
+</code></pre>
+<h3>Integration Tests</h3>
+<p>To test PQ upgrade workflow:</p>
+<pre><code class="language-bash"># Start node without PQ
+cargo run --bin icnd
+
+# In another terminal, upgrade identity
+cargo run --bin icnctl --features post-quantum -- id upgrade-pq
+
+# Restart node with PQ support
+cargo run --bin icnd --features post-quantum
+</code></pre>
+<h2>Roadmap</h2>
+<h3>Phase 1: Signatures (COMPLETE)</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> Hybrid signature support in <code>icn-crypto-pq</code></li>
+<li><input checked="" disabled="" type="checkbox"> Feature-gated PQ keys in <code>KeyPair</code></li>
+<li><input checked="" disabled="" type="checkbox"> Keystore v4 with PQ fields</li>
+<li><input checked="" disabled="" type="checkbox"> <code>icnctl id upgrade-pq</code> command</li>
+<li><input checked="" disabled="" type="checkbox"> Verification with downgrade protection</li>
+</ul>
+<h3>Phase 2: Encryption (TODO)</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Add ML-KEM public key to <code>IdentityBundle</code></li>
+<li><input disabled="" type="checkbox"> Hybrid KEM in <code>EncryptedEnvelope</code></li>
+<li><input disabled="" type="checkbox"> QUIC handshake negotiation for hybrid encryption</li>
+<li><input disabled="" type="checkbox"> <code>icnctl id upgrade-kem</code> command</li>
+</ul>
+<h3>Phase 3: Default Rollout (TODO)</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Enable <code>post-quantum</code> by default in workspace</li>
+<li><input disabled="" type="checkbox"> Automatic PQ upgrade on keystore unlock</li>
+<li><input disabled="" type="checkbox"> Migration guide for existing networks</li>
+<li><input disabled="" type="checkbox"> Performance benchmarks with PQ enabled</li>
+</ul>
+<h3>Phase 4: Pure PQ Mode (FUTURE)</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Optional &quot;pure PQ&quot; mode (ML-DSA only, no Ed25519)</li>
+<li><input disabled="" type="checkbox"> Smaller DID format using ML-DSA-44 (smaller variant)</li>
+<li><input disabled="" type="checkbox"> Migration path from hybrid → pure PQ</li>
+</ul>
+<h2>References</h2>
+<ul>
+<li><strong>NIST FIPS 204</strong>: Module-Lattice-Based Digital Signature Standard (ML-DSA)</li>
+<li><strong>NIST FIPS 203</strong>: Module-Lattice-Based Key Encapsulation Mechanism (ML-KEM)</li>
+<li><strong>pqcrypto-dilithium</strong>: Rust implementation used by ICN</li>
+<li><strong>Hybrid Signature Standard</strong>: NIST SP 800-227 (Draft)</li>
+</ul>
+<h2>FAQs</h2>
+<p><strong>Q: Should I enable post-quantum now?</strong><br>A: If you&#39;re starting a new network, yes. For existing networks, plan a coordinated upgrade to minimize disruption.</p>
+<p><strong>Q: What happens if I upgrade but my peers haven&#39;t?</strong><br>A: Your node will still generate classical signatures for backward compatibility via <code>.sign()</code>. Use <code>.sign_hybrid()</code> when you know the peer supports PQ.</p>
+<p><strong>Q: Can I downgrade after upgrading?</strong><br>A: No. Once a keystore has PQ keys, it cannot be downgraded without losing the PQ keys. Backup before upgrading.</p>
+<p><strong>Q: Why not make PQ the default?</strong><br>A: Resource-constrained edge nodes (e.g., IoT devices) benefit from smaller signatures. The feature flag allows opt-in based on threat model.</p>
+<p><strong>Q: What about X25519 encryption?</strong><br>A: Encryption upgrade is Phase 2. Current encryption remains X25519-only even with PQ signatures enabled.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

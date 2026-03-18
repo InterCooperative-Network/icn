@@ -1,0 +1,1309 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Identity and Membership Architecture for ICN | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>IDENTITY MEMBERSHIP ARCHITECTURE</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/IDENTITY_MEMBERSHIP_ARCHITECTURE.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Identity and Membership Architecture for ICN</h1>
+<p><strong>Status</strong>: Design Document
+<strong>Date</strong>: 2025-12-25
+<strong>Author</strong>: Architecture Review</p>
+<h2>Executive Summary</h2>
+<p>This document proposes a unified identity and membership architecture for ICN that addresses:</p>
+<ul>
+<li>Individual identity independent of infrastructure nodes</li>
+<li>Multi-device support with key rotation and recovery</li>
+<li>Membership lifecycle for cooperatives and communities</li>
+<li>Federation identity for cross-entity recognition</li>
+<li>Flexible node topology supporting full nodes, light clients, and gateway access</li>
+</ul>
+<p>The design adheres to cooperative principles of democratic control and voluntary membership while maintaining cryptographic security.</p>
+<hr>
+<h2>Table of Contents</h2>
+<ol>
+<li><a href="#1-current-state-analysis">Current State Analysis</a></li>
+<li><a href="#2-individual-identity-model">Individual Identity Model</a></li>
+<li><a href="#3-membership-lifecycle">Membership Lifecycle</a></li>
+<li><a href="#4-federation-identity">Federation Identity</a></li>
+<li><a href="#5-node-topology">Node Topology</a></li>
+<li><a href="#6-implementation-phases">Implementation Phases</a></li>
+<li><a href="#7-security-considerations">Security Considerations</a></li>
+<li><a href="#8-migration-strategy">Migration Strategy</a></li>
+</ol>
+<hr>
+<h2>1. Current State Analysis</h2>
+<h3>1.1 Identity Layer (icn-identity)</h3>
+<p>The current implementation provides a robust foundation:</p>
+<h4>DID Types</h4>
+<pre><code>did:icn:&lt;base58-ed25519-pubkey&gt;     # Legacy: key-derived DID
+did:icn:&lt;base58-anchor-id&gt;          # SDIS: anchor-derived DID
+</code></pre>
+<h4>Key Components</h4>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Location</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>KeyPair</code></td>
+<td><code>lib.rs</code></td>
+<td>Ed25519 signing with optional PQ hybrid (ML-DSA)</td>
+</tr>
+<tr>
+<td><code>DidDocument</code></td>
+<td><code>multi_device.rs</code></td>
+<td>Multi-device with verification methods and capabilities</td>
+</tr>
+<tr>
+<td><code>AgeKeyStore</code></td>
+<td><code>keystore.rs</code></td>
+<td>Encrypted storage (v4 format with SDIS support)</td>
+</tr>
+<tr>
+<td><code>Anchor</code></td>
+<td><code>anchor.rs</code></td>
+<td>Permanent identity root with VUI commitment</td>
+</tr>
+<tr>
+<td><code>PersonhoodAnchor</code></td>
+<td><code>personhood.rs</code></td>
+<td>Commons layer with POP attestations</td>
+</tr>
+<tr>
+<td><code>RecoveryEvent</code></td>
+<td><code>recovery.rs</code></td>
+<td>M-of-N social recovery protocol</td>
+</tr>
+</tbody></table>
+<h4>Keystore Format Progression</h4>
+<ul>
+<li><strong>v1</strong>: Basic Ed25519 keypair</li>
+<li><strong>v2</strong>: Added TLS binding for DID-TLS security</li>
+<li><strong>v2.1</strong>: Added X25519 encryption keys</li>
+<li><strong>v3</strong>: Added DID Document and multi-device support</li>
+<li><strong>v4</strong>: Added SDIS Anchor and KeyBundle (hybrid PQ signatures)</li>
+</ul>
+<h3>1.2 Cooperative Membership (icn-cooperative)</h3>
+<p>Current cooperative membership model:</p>
+<pre><code class="language-rust">pub struct Member {
+    pub did: String,              // Member&#39;s DID
+    pub joined_at: DateTime&lt;Utc&gt;,
+    pub tier: MembershipTier,     // Worker, Consumer, etc.
+    pub capital_contribution: u64,
+    pub active: bool,
+}
+
+pub enum CooperativeType {
+    Worker, Consumer, Producer, MultiStakeholder, Platform, Housing, CreditUnion
+}
+
+pub enum CooperativeStatus {
+    Forming, Active, Suspended, Dissolving, Dissolved
+}
+</code></pre>
+<p><strong>Membership Actions</strong>: Apply, Approve, Reject, Remove, ChangeTier, Suspend, Reinstate</p>
+<h3>1.3 Community Membership (icn-community)</h3>
+<p>Current community membership model:</p>
+<pre><code class="language-rust">pub enum MemberType {
+    Individual(String),   // DID
+    Cooperative(String),  // CooperativeId
+}
+
+pub struct Member {
+    pub id: MemberId,
+    pub member_type: MemberType,
+    pub joined_at: DateTime&lt;Utc&gt;,
+    pub voting_weight: u32,
+    pub active: bool,
+}
+
+pub enum CommunityType {
+    Geographic, Interest, Solidarity, Ecosystem
+}
+</code></pre>
+<p>Communities support both individual and organizational members.</p>
+<h3>1.4 Federation (icn-federation)</h3>
+<p>Federation operates at the cooperative level:</p>
+<pre><code class="language-rust">pub struct CooperativeInfo {
+    pub coop_id: String,
+    pub name: String,
+    pub public_did: Did,           // Institutional DID
+    pub gateway_endpoints: Vec&lt;String&gt;,
+    pub federation_policy: FederationPolicy,
+    pub currencies: Vec&lt;CurrencyInfo&gt;,
+    pub capabilities: Vec&lt;String&gt;,
+}
+
+pub enum FederationPolicy {
+    Open,
+    Vouched { min_vouches: u8 },
+    Closed,
+}
+</code></pre>
+<h3>1.5 Current Gaps</h3>
+<ol>
+<li><strong>Identity-Node Coupling</strong>: Node identity currently equals user identity</li>
+<li><strong>No Individual-Coop Separation</strong>: An individual joining multiple coops needs multiple nodes</li>
+<li><strong>Limited Delegation</strong>: Cannot delegate authority to other devices/services</li>
+<li><strong>Gateway Access</strong>: Light clients have no first-class support</li>
+<li><strong>Cross-Coop Identity</strong>: Same person in multiple coops has no identity linking</li>
+</ol>
+<hr>
+<h2>2. Individual Identity Model</h2>
+<h3>2.1 Design Principles</h3>
+<ol>
+<li><strong>Identity Independence</strong>: Individuals have DIDs independent of any node</li>
+<li><strong>Multi-Device Native</strong>: Design assumes multiple devices from the start</li>
+<li><strong>Recoverable</strong>: All identities must have a recovery path</li>
+<li><strong>Privacy-Preserving</strong>: No PII in DIDs or public data</li>
+<li><strong>Progressive Trust</strong>: Identity strength grows with attestations</li>
+</ol>
+<h3>2.2 Proposed Identity Architecture</h3>
+<pre><code>                        ┌──────────────────────────────────────────────────┐
+                        │               PersonhoodAnchor                   │
+                        │  (Permanent, survives all key rotations)         │
+                        │  ┌────────────────────────────────────────────┐  │
+                        │  │  anchor_id: H(VUI || genesis)              │  │
+                        │  │  vui_commitment: H(VUI)                    │  │
+                        │  │  pop_attestations: Vec&lt;POPAttestation&gt;     │  │
+                        │  │  status: Active | Suspended | Revoked      │  │
+                        │  └────────────────────────────────────────────┘  │
+                        └──────────────────────────────┬───────────────────┘
+                                                       │
+                        ┌──────────────────────────────┴───────────────────┐
+                        │                  DID Document                     │
+                        │  (Versioned, synchronized via gossip)             │
+                        │  ┌────────────────────────────────────────────┐  │
+                        │  │  id: did:icn:&lt;anchor-id&gt;                   │  │
+                        │  │  verification_method: Vec&lt;Device&gt;          │  │
+                        │  │  recovery: RecoveryConfig                  │  │
+                        │  └────────────────────────────────────────────┘  │
+                        └──────────────┬─────────────┬─────────────────────┘
+                                       │             │
+            ┌──────────────────────────┴──┐       ┌──┴──────────────────────────┐
+            │        Device 1              │       │        Device 2             │
+            │  ┌────────────────────────┐  │       │  ┌────────────────────────┐ │
+            │  │ id: &quot;phone&quot;            │  │       │  │ id: &quot;laptop&quot;           │ │
+            │  │ ed25519_key: [pub]     │  │       │  │ ed25519_key: [pub]     │ │
+            │  │ x25519_key: [pub]      │  │       │  │ x25519_key: [pub]      │ │
+            │  │ capabilities: [Sign,   │  │       │  │ capabilities: [Sign,   │ │
+            │  │   AddDevice, Recover]  │  │       │  │   AddDevice]           │ │
+            │  └────────────────────────┘  │       │  └────────────────────────┘ │
+            └─────────────┬────────────────┘       └──────────────┬──────────────┘
+                          │                                       │
+                          │     ┌──────────────────────────┐      │
+                          └─────►       Full Node          │◄─────┘
+                                │  (may be shared/hosted)  │
+                                │  Stores local keychain   │
+                                └──────────────────────────┘
+</code></pre>
+<h3>2.3 Individuals Independent of Nodes</h3>
+<p><strong>Question</strong>: Should individuals have DIDs independent of nodes?
+<strong>Answer</strong>: <strong>Yes, absolutely.</strong></p>
+<h4>Rationale</h4>
+<ol>
+<li><p><strong>Real-World Mapping</strong>: People are not machines. An individual should have a persistent identity across:</p>
+<ul>
+<li>Multiple personal devices (phone, laptop, tablet)</li>
+<li>Shared cooperative infrastructure</li>
+<li>Gateway-accessed web applications</li>
+</ul>
+</li>
+<li><p><strong>Key Rotation</strong>: Keys get compromised, devices get lost. The identity must survive.</p>
+</li>
+<li><p><strong>Cooperative Mobility</strong>: Members may leave one coop and join another. Their identity and reputation should be portable.</p>
+</li>
+</ol>
+<h4>Implementation</h4>
+<pre><code class="language-rust">/// Individual identity structure
+pub struct IndividualIdentity {
+    /// Permanent anchor (survives key rotation)
+    pub anchor: PersonhoodAnchor,
+
+    /// Current DID Document
+    pub did_document: DidDocument,
+
+    /// Membership records across organizations
+    pub memberships: Vec&lt;MembershipRecord&gt;,
+
+    /// Trust attestations from other identities
+    pub trust_attestations: Vec&lt;TrustAttestation&gt;,
+}
+
+/// Record of membership in an organization
+pub struct MembershipRecord {
+    /// Type of organization
+    pub org_type: OrganizationType,
+    /// Organization identifier
+    pub org_id: String,
+    /// DID of the organization
+    pub org_did: Did,
+    /// Role within the organization
+    pub role: String,
+    /// Join timestamp
+    pub joined_at: u64,
+    /// Status
+    pub status: MembershipStatus,
+}
+
+pub enum OrganizationType {
+    Cooperative,
+    Community,
+    Federation,
+}
+</code></pre>
+<h3>2.4 Multi-Device Support</h3>
+<p>The existing <code>DidDocument</code> with <code>VerificationMethod</code> array already supports this. Enhancements:</p>
+<pre><code class="language-rust">/// Enhanced device capabilities
+pub enum Capability {
+    /// Can sign messages on behalf of this DID
+    Sign,
+    /// Can add new devices to this DID
+    AddDevice,
+    /// Can revoke devices (including self)
+    RevokeDevice,
+    /// Can rotate keys
+    RotateKey,
+    /// Can participate in recovery
+    Recover,
+    /// Can encrypt/decrypt messages
+    Encrypt,
+    /// NEW: Can delegate authority temporarily
+    Delegate,
+    /// NEW: Can act as recovery guardian for others
+    Guardian,
+    /// NEW: Can access cooperative services
+    CoopAccess { coop_id: String },
+}
+
+/// Device classification for trust scoring
+pub enum DeviceClass {
+    /// Hardware security module or secure enclave
+    HardwareSecured,
+    /// Full-featured device with local keystore
+    FullDevice,
+    /// Browser-based with encrypted local storage
+    WebClient,
+    /// Delegated access through gateway
+    GatewayDelegated,
+}
+</code></pre>
+<h3>2.5 Key Rotation and Recovery</h3>
+<h4>Proactive Rotation</h4>
+<pre><code class="language-rust">pub struct RotationPolicy {
+    /// Maximum key age before forced rotation
+    pub max_key_age_days: u32,
+    /// Whether to allow automatic rotation
+    pub auto_rotate: bool,
+    /// Notification period before rotation
+    pub notify_days_before: u32,
+}
+</code></pre>
+<h4>Recovery Options</h4>
+<p>The existing <code>RecoveryConfig</code> supports M-of-N social recovery. Extensions:</p>
+<pre><code class="language-rust">pub enum RecoveryMethod {
+    /// M-of-N social recovery (existing)
+    Social { m: u8, n: u8 },
+
+    /// Encrypted backup seed (existing)
+    BackupSeed,
+
+    /// NEW: Cooperative-assisted recovery
+    CooperativeAssisted {
+        /// Cooperative that can assist
+        coop_did: Did,
+        /// Required steward signatures
+        steward_threshold: u8,
+    },
+
+    /// NEW: Time-locked backup
+    TimeLocked {
+        /// Backup recovery seed (encrypted)
+        backup_hash: [u8; 32],
+        /// Time lock duration
+        lock_duration_days: u32,
+    },
+
+    /// No recovery (accept total loss risk)
+    None,
+}
+</code></pre>
+<h3>2.6 Identity Synchronization</h3>
+<p>DID Documents are synchronized via gossip (existing <code>identity:updates</code> topic):</p>
+<pre><code class="language-rust">/// Enhanced identity update for multi-org context
+pub struct IdentityUpdateMessage {
+    /// The DID this update applies to
+    pub did: Did,
+    /// The rotation event describing the change
+    pub event: RotationEvent,
+    /// Current DID Document version
+    pub new_version: u64,
+    /// Timestamp
+    pub timestamp: u64,
+    /// NEW: Affected organization scopes
+    pub affected_orgs: Vec&lt;String&gt;,
+}
+</code></pre>
+<hr>
+<h2>3. Membership Lifecycle</h2>
+<h3>3.1 Design Principles</h3>
+<ol>
+<li><strong>Democratic Control</strong>: Membership decisions follow cooperative governance</li>
+<li><strong>Voluntary Membership</strong>: Easy exit without losing identity</li>
+<li><strong>Role Clarity</strong>: Clear capability mapping per membership tier</li>
+<li><strong>Auditability</strong>: All membership changes are recorded</li>
+</ol>
+<h3>3.2 Unified Membership Model</h3>
+<pre><code class="language-rust">/// Universal membership structure (works for Coops, Communities, Federations)
+pub struct Membership {
+    /// Member&#39;s DID (individual or organization)
+    pub member_did: Did,
+
+    /// Entity being joined
+    pub entity_id: EntityId,
+
+    /// Type of entity
+    pub entity_type: EntityType,
+
+    /// Membership class within this entity
+    pub membership_class: MembershipClass,
+
+    /// Current status
+    pub status: MembershipStatus,
+
+    /// Capabilities granted by this membership
+    pub capabilities: Vec&lt;MembershipCapability&gt;,
+
+    /// Timestamps
+    pub applied_at: u64,
+    pub approved_at: Option&lt;u64&gt;,
+    pub suspended_at: Option&lt;u64&gt;,
+    pub left_at: Option&lt;u64&gt;,
+
+    /// Governance participation metrics
+    pub participation: ParticipationMetrics,
+}
+
+pub enum EntityType {
+    Cooperative,
+    Community,
+    Federation,
+    WorkingGroup,
+}
+
+pub enum MembershipStatus {
+    /// Application submitted, awaiting approval
+    Pending,
+    /// Approved by invitation, awaiting acceptance
+    Invited,
+    /// Full active member
+    Active,
+    /// Membership suspended (with reason)
+    Suspended { reason: String, until: Option&lt;u64&gt; },
+    /// Voluntarily departed
+    Departed,
+    /// Removed by governance action
+    Removed { reason: String },
+}
+</code></pre>
+<h3>3.3 Joining a Cooperative</h3>
+<pre><code>┌─────────────┐                    ┌─────────────┐                    ┌─────────────┐
+│  Applicant  │                    │ Cooperative │                    │ Governance  │
+│   (DID)     │                    │   System    │                    │   Process   │
+└──────┬──────┘                    └──────┬──────┘                    └──────┬──────┘
+       │                                   │                                   │
+       │  1. Submit Application            │                                   │
+       │──────────────────────────────────►│                                   │
+       │                                   │                                   │
+       │                                   │  2. Route based on policy         │
+       │                                   │──────────────────────────────────►│
+       │                                   │                                   │
+       │                                   │  3a. Open: Auto-approve           │
+       │                                   │◄──────────────────────────────────│
+       │                                   │                                   │
+       │                                   │  3b. Approval: Vote               │
+       │                                   │◄──────────────────────────────────│
+       │                                   │                                   │
+       │                                   │  3c. Invitation: Check invite     │
+       │                                   │◄──────────────────────────────────│
+       │                                   │                                   │
+       │  4. Status Update                 │                                   │
+       │◄──────────────────────────────────│                                   │
+       │                                   │                                   │
+       │  5. (If approved) Complete        │                                   │
+       │     onboarding actions            │                                   │
+       │──────────────────────────────────►│                                   │
+       │                                   │                                   │
+</code></pre>
+<h4>Membership Policies</h4>
+<pre><code class="language-rust">pub enum MembershipPolicy {
+    /// Anyone can join
+    Open,
+
+    /// Requires invitation from existing member
+    InvitationOnly {
+        /// Minimum trust score of inviter
+        inviter_min_trust: f64,
+    },
+
+    /// Requires governance approval vote
+    ApprovalRequired {
+        /// Quorum percentage
+        quorum: f64,
+        /// Approval threshold
+        threshold: f64,
+        /// Voting period in seconds
+        voting_period: u64,
+    },
+
+    /// Combination: invitation + approval
+    InvitationAndApproval {
+        inviter_min_trust: f64,
+        quorum: f64,
+        threshold: f64,
+        voting_period: u64,
+    },
+
+    /// Closed to new members
+    Closed,
+}
+</code></pre>
+<h3>3.4 Joining a Community</h3>
+<p>Communities have more flexible membership, supporting both individuals and organizations:</p>
+<pre><code class="language-rust">pub struct CommunityMembershipRequest {
+    /// Applicant (individual or coop)
+    pub applicant: MemberIdentity,
+
+    /// Community being joined
+    pub community_id: CommunityId,
+
+    /// Requested role
+    pub requested_role: CommunityRole,
+
+    /// Statement of purpose
+    pub statement: String,
+
+    /// Sponsor (if required by policy)
+    pub sponsor: Option&lt;Did&gt;,
+}
+
+pub enum MemberIdentity {
+    Individual(Did),
+    Cooperative {
+        coop_id: String,
+        coop_did: Did,
+        representative_did: Did,
+    },
+}
+
+pub enum CommunityRole {
+    /// Observer - can view, limited participation
+    Observer,
+    /// Participant - full participation rights
+    Participant,
+    /// Contributor - can create resources
+    Contributor,
+    /// Steward - governance responsibilities
+    Steward,
+}
+</code></pre>
+<h3>3.5 Role-Based Permissions</h3>
+<pre><code class="language-rust">/// Capability matrix for membership tiers
+pub struct TierCapabilities {
+    pub tier_name: String,
+    pub capabilities: HashSet&lt;MembershipCapability&gt;,
+}
+
+pub enum MembershipCapability {
+    // Governance
+    Vote,
+    Propose,
+    Steward,
+
+    // Resources
+    AccessResources,
+    AllocateResources,
+    ManageResources,
+
+    // Membership
+    InviteMembers,
+    ApproveMembership,
+    SuspendMembers,
+
+    // Financial
+    Transact,
+    ViewLedger,
+    ManageTreasury,
+
+    // Compute
+    SubmitTasks,
+    ProvideCompute,
+    ManageCompute,
+
+    // Identity
+    AttestIdentity,
+    RecoveryGuardian,
+}
+</code></pre>
+<h3>3.6 Departure and Removal</h3>
+<pre><code class="language-rust">pub enum DepartureType {
+    /// Voluntary resignation
+    Voluntary {
+        reason: Option&lt;String&gt;,
+        effective_date: u64,
+    },
+
+    /// Governance-initiated removal
+    Removal {
+        reason: String,
+        governance_ref: String,  // Reference to decision
+        effective_date: u64,
+    },
+
+    /// Automatic (policy-based)
+    Automatic {
+        policy: String,
+        triggered_at: u64,
+    },
+}
+
+pub struct DepartureEffects {
+    /// Capital to be returned (for coops)
+    pub capital_return: Option&lt;u64&gt;,
+    /// Grace period for data export
+    pub data_export_deadline: u64,
+    /// Outstanding obligations
+    pub pending_obligations: Vec&lt;Obligation&gt;,
+    /// Transferred responsibilities
+    pub responsibility_transfers: Vec&lt;Transfer&gt;,
+}
+</code></pre>
+<hr>
+<h2>4. Federation Identity</h2>
+<h3>4.1 Entity Representation in Federations</h3>
+<p>Federations in ICN connect cooperatives and communities, not individuals directly.</p>
+<pre><code class="language-rust">/// Entity that can participate in federation
+pub struct FederatedEntity {
+    /// Entity type
+    pub entity_type: FederatedEntityType,
+
+    /// Entity&#39;s institutional DID
+    pub entity_did: Did,
+
+    /// Human-readable name
+    pub name: String,
+
+    /// Federation metadata
+    pub federation_metadata: FederationMetadata,
+
+    /// Representatives authorized to act on behalf
+    pub authorized_representatives: Vec&lt;RepresentativeAuth&gt;,
+}
+
+pub enum FederatedEntityType {
+    /// Worker, consumer, producer cooperative
+    Cooperative(CooperativeType),
+    /// Geographic, interest, solidarity community
+    Community(CommunityType),
+    /// Federation of federations
+    MetaFederation,
+}
+
+pub struct RepresentativeAuth {
+    /// Representative&#39;s personal DID
+    pub did: Did,
+    /// Role within the entity
+    pub role: String,
+    /// Specific delegated capabilities
+    pub delegated_capabilities: Vec&lt;FederationCapability&gt;,
+    /// Validity period
+    pub valid_from: u64,
+    pub valid_until: Option&lt;u64&gt;,
+    /// Signature by entity
+    pub delegation_signature: Vec&lt;u8&gt;,
+}
+</code></pre>
+<h3>4.2 Cross-Entity Identity Recognition</h3>
+<p>When an individual belongs to multiple entities in a federation:</p>
+<pre><code class="language-rust">/// Cross-entity identity claim
+pub struct CrossEntityClaim {
+    /// Individual&#39;s DID
+    pub individual_did: Did,
+
+    /// Entity making the claim
+    pub claiming_entity: EntityId,
+
+    /// Claimed memberships in other entities
+    pub claimed_memberships: Vec&lt;MembershipClaim&gt;,
+
+    /// Timestamp
+    pub claimed_at: u64,
+
+    /// Signature by individual
+    pub individual_signature: Vec&lt;u8&gt;,
+}
+
+pub struct MembershipClaim {
+    /// Target entity
+    pub entity_id: EntityId,
+    /// Claimed role
+    pub role: String,
+    /// Proof (could be attestation, membership record hash)
+    pub proof: MembershipProof,
+}
+
+pub enum MembershipProof {
+    /// Attestation from the entity
+    EntityAttestation {
+        attestation: Vec&lt;u8&gt;,
+        entity_signature: Vec&lt;u8&gt;,
+    },
+    /// Merkle proof against entity&#39;s membership tree
+    MerkleProof {
+        root: [u8; 32],
+        proof: Vec&lt;[u8; 32]&gt;,
+    },
+    /// Third-party verification
+    ThirdPartyAttestation {
+        attestor_did: Did,
+        attestation: Vec&lt;u8&gt;,
+    },
+}
+</code></pre>
+<h3>4.3 Trust Propagation Through Federations</h3>
+<pre><code class="language-rust">/// Trust propagation rules for federation
+pub struct FederationTrustPolicy {
+    /// Base trust for member entities
+    pub member_base_trust: f64,
+
+    /// Trust decay per hop (transitive trust)
+    pub hop_decay: f64,
+
+    /// Maximum hops for trust propagation
+    pub max_hops: u8,
+
+    /// Category-specific trust weights
+    pub category_weights: HashMap&lt;TrustCategory, f64&gt;,
+}
+
+pub enum TrustCategory {
+    /// Financial transactions
+    Financial,
+    /// Governance participation
+    Governance,
+    /// Identity attestation
+    Identity,
+    /// Compute resources
+    Compute,
+    /// General operations
+    General,
+}
+
+/// Trust flow through federation
+pub struct FederatedTrustPath {
+    /// Source entity
+    pub source: EntityId,
+    /// Target entity
+    pub target: EntityId,
+    /// Intermediate entities
+    pub path: Vec&lt;EntityId&gt;,
+    /// Computed trust score
+    pub trust_score: f64,
+    /// Category
+    pub category: TrustCategory,
+}
+</code></pre>
+<hr>
+<h2>5. Node Topology</h2>
+<h3>5.1 Node Types</h3>
+<pre><code>┌────────────────────────────────────────────────────────────────────────────────┐
+│                             ICN Node Topology                                    │
+├────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                  │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐              │
+│  │   Full Node      │  │  Cooperative     │  │  Federation      │              │
+│  │   (Personal)     │  │  Node (Shared)   │  │  Gateway         │              │
+│  │                  │  │                  │  │                  │              │
+│  │ - Single user    │  │ - Multi-tenant   │  │ - Inter-coop     │              │
+│  │ - Local keystore │  │ - Member access  │  │ - API routing    │              │
+│  │ - Full P2P       │  │ - Shared storage │  │ - Trust bridge   │              │
+│  │ - Optional host  │  │ - Governance     │  │ - Clearing       │              │
+│  └────────┬─────────┘  └────────┬─────────┘  └────────┬─────────┘              │
+│           │                     │                     │                         │
+│           └──────────────┬──────┴─────────────────────┘                         │
+│                          │                                                       │
+│                          ▼                                                       │
+│  ┌────────────────────────────────────────────────────────────────────────────┐ │
+│  │                        ICN P2P Network                                      │ │
+│  │                 (QUIC/TLS + Gossip + Ledger Sync)                          │ │
+│  └────────────────────────────────────────────────────────────────────────────┘ │
+│                          ▲                                                       │
+│                          │                                                       │
+│           ┌──────────────┴────────────────────────────┐                         │
+│           │                                           │                         │
+│  ┌────────┴─────────┐                     ┌───────────┴────────┐               │
+│  │  Light Client    │                     │  Web Application   │               │
+│  │  (Mobile/Web)    │                     │  (Gateway-only)    │               │
+│  │                  │                     │                    │               │
+│  │ - Delegated auth │                     │ - No local keys    │               │
+│  │ - Gateway relay  │                     │ - Session-based    │               │
+│  │ - Local signing  │                     │ - Scoped access    │               │
+│  └──────────────────┘                     └────────────────────┘               │
+│                                                                                  │
+└────────────────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<h3>5.2 Full Node (Personal)</h3>
+<p>Individual-owned node with complete functionality:</p>
+<pre><code class="language-rust">pub struct PersonalNode {
+    /// Node&#39;s operational keypair (distinct from user DID)
+    pub node_keypair: KeyPair,
+
+    /// Owner&#39;s identity (may have multiple)
+    pub owner_identities: Vec&lt;Did&gt;,
+
+    /// Local keystore path
+    pub keystore: AgeKeyStore,
+
+    /// Node capabilities
+    pub capabilities: NodeCapabilities,
+
+    /// Hosting mode
+    pub hosting: HostingMode,
+}
+
+pub enum HostingMode {
+    /// Self-hosted on personal hardware
+    SelfHosted,
+    /// Hosted by a cooperative
+    CoopHosted { coop_id: String },
+    /// Cloud-hosted (user-controlled)
+    CloudHosted { provider: String },
+}
+
+pub struct NodeCapabilities {
+    pub gossip: bool,
+    pub ledger_sync: bool,
+    pub compute_provider: bool,
+    pub gateway: bool,
+    pub federation_relay: bool,
+}
+</code></pre>
+<h3>5.3 Shared/Hosted Nodes</h3>
+<p>Cooperative infrastructure supporting multiple members:</p>
+<pre><code class="language-rust">pub struct SharedNode {
+    /// Node&#39;s institutional identity
+    pub node_did: Did,
+
+    /// Operating cooperative
+    pub operator_coop: CooperativeId,
+
+    /// Member access configuration
+    pub member_access: MemberAccessConfig,
+
+    /// Resource allocation
+    pub resources: ResourceAllocation,
+
+    /// Tenancy mode
+    pub tenancy: TenancyMode,
+}
+
+pub struct MemberAccessConfig {
+    /// Authentication methods accepted
+    pub auth_methods: Vec&lt;AuthMethod&gt;,
+
+    /// Per-member resource limits
+    pub default_limits: ResourceLimits,
+
+    /// Access control list
+    pub acl: AccessControlList,
+}
+
+pub enum AuthMethod {
+    /// DID-based signature challenge
+    DidAuth,
+    /// Delegated session token
+    SessionToken,
+    /// Capability-based access
+    CapabilityToken { capabilities: Vec&lt;String&gt; },
+}
+
+pub enum TenancyMode {
+    /// Shared resources, logical separation
+    MultiTenant,
+    /// Isolated containers per member
+    Containerized,
+    /// VMs per member
+    VirtualMachine,
+}
+</code></pre>
+<h3>5.4 Light Clients</h3>
+<p>Mobile and web clients that don&#39;t run full nodes:</p>
+<pre><code class="language-rust">pub struct LightClient {
+    /// Client identity
+    pub did: Did,
+
+    /// Local device keypair (for signing)
+    pub device_keypair: KeyPair,
+
+    /// Connected gateway(s)
+    pub gateways: Vec&lt;GatewayConnection&gt;,
+
+    /// Cached data
+    pub local_cache: LightClientCache,
+
+    /// Sync state
+    pub sync_state: SyncState,
+}
+
+pub struct GatewayConnection {
+    /// Gateway endpoint
+    pub endpoint: String,
+
+    /// Gateway DID (for verification)
+    pub gateway_did: Did,
+
+    /// Session token
+    pub session: Option&lt;SessionToken&gt;,
+
+    /// Delegated capabilities
+    pub delegated_caps: Vec&lt;Capability&gt;,
+
+    /// Connection status
+    pub status: ConnectionStatus,
+}
+
+pub struct LightClientCache {
+    /// Own DID document
+    pub did_document: DidDocument,
+
+    /// Known peer documents
+    pub peer_documents: HashMap&lt;Did, DidDocument&gt;,
+
+    /// Recent transactions
+    pub recent_transactions: Vec&lt;Transaction&gt;,
+
+    /// Governance proposals (if participating)
+    pub active_proposals: Vec&lt;ProposalSummary&gt;,
+}
+</code></pre>
+<h3>5.5 Gateway Access Patterns</h3>
+<pre><code class="language-rust">pub struct GatewayService {
+    /// Gateway identity
+    pub gateway_did: Did,
+
+    /// Operating cooperative
+    pub operator: CooperativeId,
+
+    /// Supported protocols
+    pub protocols: Vec&lt;GatewayProtocol&gt;,
+
+    /// Rate limiting
+    pub rate_limits: RateLimitConfig,
+
+    /// Federation routing
+    pub federation_routes: Vec&lt;FederationRoute&gt;,
+}
+
+pub enum GatewayProtocol {
+    /// REST API
+    Rest { base_url: String },
+    /// WebSocket
+    WebSocket { url: String },
+    /// gRPC
+    Grpc { endpoint: String },
+    /// GraphQL
+    GraphQL { endpoint: String },
+}
+
+/// Session for gateway-authenticated users
+pub struct GatewaySession {
+    /// Session ID
+    pub session_id: String,
+
+    /// User&#39;s DID
+    pub user_did: Did,
+
+    /// Device that created session
+    pub device_id: String,
+
+    /// Granted capabilities
+    pub capabilities: Vec&lt;Capability&gt;,
+
+    /// Expiration
+    pub expires_at: u64,
+
+    /// Refresh token
+    pub refresh_token: Option&lt;String&gt;,
+}
+</code></pre>
+<h3>5.6 Node-Identity Separation</h3>
+<p><strong>Key Principle</strong>: Node identity is operational; user identity is personal.</p>
+<pre><code class="language-rust">/// Mapping between nodes and identities
+pub struct IdentityNodeMapping {
+    /// User&#39;s DID
+    pub user_did: Did,
+
+    /// Nodes this user has access to
+    pub accessible_nodes: Vec&lt;NodeAccess&gt;,
+
+    /// Primary node (for routing)
+    pub primary_node: Option&lt;NodeId&gt;,
+}
+
+pub struct NodeAccess {
+    /// Node identifier
+    pub node_id: NodeId,
+
+    /// How user accesses this node
+    pub access_type: NodeAccessType,
+
+    /// Capabilities available on this node
+    pub node_capabilities: Vec&lt;Capability&gt;,
+
+    /// Trustworthiness of this access
+    pub trust_level: TrustLevel,
+}
+
+pub enum NodeAccessType {
+    /// User owns/controls the node
+    Owner,
+    /// User is a member with access
+    Member,
+    /// User accesses via gateway
+    Gateway,
+    /// User has delegated access
+    Delegated { delegator: Did },
+}
+</code></pre>
+<hr>
+<h2>6. Implementation Phases</h2>
+<h3>Phase 1: Identity Foundation (4 weeks)</h3>
+<p><strong>Goal</strong>: Establish individual identity independent of nodes</p>
+<ol>
+<li><p><strong>Extend DID Document</strong> (1 week)</p>
+<ul>
+<li>Add <code>DeviceClass</code> to verification methods</li>
+<li>Add <code>Delegate</code> and <code>Guardian</code> capabilities</li>
+<li>Add organization-scoped capabilities</li>
+</ul>
+</li>
+<li><p><strong>Membership Registry</strong> (1 week)</p>
+<ul>
+<li>Create <code>MembershipRecord</code> structure</li>
+<li>Implement storage in icn-store</li>
+<li>Add gossip sync for membership changes</li>
+</ul>
+</li>
+<li><p><strong>Light Client Protocol</strong> (2 weeks)</p>
+<ul>
+<li>Define gateway authentication protocol</li>
+<li>Implement session management</li>
+<li>Create WebSocket subscription model</li>
+</ul>
+</li>
+</ol>
+<h3>Phase 2: Membership Lifecycle (3 weeks)</h3>
+<p><strong>Goal</strong>: Unified membership model across entity types</p>
+<ol>
+<li><p><strong>Unified Membership API</strong> (1 week)</p>
+<ul>
+<li>Refactor icn-cooperative and icn-community to use common types</li>
+<li>Implement <code>MembershipPolicy</code> evaluation</li>
+</ul>
+</li>
+<li><p><strong>Membership Governance Integration</strong> (1 week)</p>
+<ul>
+<li>Connect membership decisions to icn-governance</li>
+<li>Implement approval voting for membership</li>
+</ul>
+</li>
+<li><p><strong>Departure and Transfer</strong> (1 week)</p>
+<ul>
+<li>Implement graceful departure process</li>
+<li>Build membership transfer between entities</li>
+</ul>
+</li>
+</ol>
+<h3>Phase 3: Federation Identity (3 weeks)</h3>
+<p><strong>Goal</strong>: Cross-entity identity and trust</p>
+<ol>
+<li><p><strong>Representative Delegation</strong> (1 week)</p>
+<ul>
+<li>Implement <code>RepresentativeAuth</code> structure</li>
+<li>Add delegation verification to federation messages</li>
+</ul>
+</li>
+<li><p><strong>Cross-Entity Claims</strong> (1 week)</p>
+<ul>
+<li>Implement <code>CrossEntityClaim</code> protocol</li>
+<li>Build membership proof verification</li>
+</ul>
+</li>
+<li><p><strong>Federated Trust Paths</strong> (1 week)</p>
+<ul>
+<li>Implement trust propagation algorithm</li>
+<li>Add category-specific trust scoring</li>
+</ul>
+</li>
+</ol>
+<h3>Phase 4: Node Topology (4 weeks)</h3>
+<p><strong>Goal</strong>: Support for diverse deployment patterns</p>
+<ol>
+<li><p><strong>Shared Node Support</strong> (1.5 weeks)</p>
+<ul>
+<li>Implement multi-tenant architecture</li>
+<li>Add member access control</li>
+</ul>
+</li>
+<li><p><strong>Gateway Services</strong> (1.5 weeks)</p>
+<ul>
+<li>Build gateway authentication service</li>
+<li>Implement session management</li>
+<li>Add federation routing</li>
+</ul>
+</li>
+<li><p><strong>Light Client SDK</strong> (1 week)</p>
+<ul>
+<li>Create TypeScript/JavaScript SDK</li>
+<li>Implement React Native bindings</li>
+<li>Add offline-first support</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h2>7. Security Considerations</h2>
+<h3>7.1 Threat Model</h3>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Key compromise</td>
+<td>Multi-device, social recovery, key rotation</td>
+</tr>
+<tr>
+<td>Sybil attacks</td>
+<td>POP attestations, VUI commitments</td>
+</tr>
+<tr>
+<td>Node compromise</td>
+<td>Identity independent of nodes, delegation revocation</td>
+</tr>
+<tr>
+<td>Gateway attacks</td>
+<td>E2E encryption, signed envelopes, session limits</td>
+</tr>
+<tr>
+<td>Federation attacks</td>
+<td>Vouch-based admission, trust decay</td>
+</tr>
+<tr>
+<td>Membership fraud</td>
+<td>Governance approval, sponsor accountability</td>
+</tr>
+</tbody></table>
+<h3>7.2 Cryptographic Requirements</h3>
+<ol>
+<li><strong>Identity Keys</strong>: Ed25519 (with ML-DSA hybrid option)</li>
+<li><strong>Encryption</strong>: X25519 for key agreement, AES-256-GCM for data</li>
+<li><strong>Signatures</strong>: Ed25519 for speed, ML-DSA for PQ resistance</li>
+<li><strong>Key Derivation</strong>: HKDF-SHA256</li>
+<li><strong>Commitments</strong>: SHA-256</li>
+</ol>
+<h3>7.3 Access Control</h3>
+<pre><code class="language-rust">/// Access check for any operation
+pub struct AccessCheck {
+    /// Who is requesting
+    pub requester: Did,
+    /// What operation
+    pub operation: Operation,
+    /// Which resource
+    pub resource: ResourceId,
+    /// Context (e.g., which org, which node)
+    pub context: AccessContext,
+}
+
+/// Result of access check
+pub enum AccessDecision {
+    /// Access granted
+    Allowed { capabilities_used: Vec&lt;Capability&gt; },
+    /// Access denied
+    Denied { reason: String },
+    /// Need additional auth
+    NeedsElevation { required: Vec&lt;Capability&gt; },
+}
+</code></pre>
+<hr>
+<h2>8. Migration Strategy</h2>
+<h3>8.1 From Node-Centric to Individual-Centric</h3>
+<p>Current state: Node keypair = User DID</p>
+<p>Target state: User DID independent, Node has operational keypair</p>
+<p><strong>Migration Steps</strong>:</p>
+<ol>
+<li><strong>Phase A</strong>: Allow opt-in individual DID creation separate from node</li>
+<li><strong>Phase B</strong>: New users default to individual DID pattern</li>
+<li><strong>Phase C</strong>: Provide migration tool for existing users</li>
+<li><strong>Phase D</strong>: Deprecate node-as-identity pattern (soft deprecation)</li>
+<li><strong>Phase E</strong>: Full separation (breaking change, major version)</li>
+</ol>
+<h3>8.2 Backward Compatibility</h3>
+<pre><code class="language-rust">/// Legacy compatibility wrapper
+pub enum IdentityMode {
+    /// New mode: individual DID separate from node
+    IndividualIdentity {
+        individual_did: Did,
+        node_operational_did: Did,
+    },
+
+    /// Legacy mode: node DID is user DID
+    NodeIdentity {
+        node_did: Did,
+    },
+}
+
+impl IdentityMode {
+    /// Get the DID to use for signing user actions
+    pub fn user_did(&amp;self) -&gt; &amp;Did {
+        match self {
+            Self::IndividualIdentity { individual_did, .. } =&gt; individual_did,
+            Self::NodeIdentity { node_did } =&gt; node_did,
+        }
+    }
+}
+</code></pre>
+<h3>8.3 Data Migration</h3>
+<ol>
+<li><strong>Membership records</strong>: Add <code>member_identity_type</code> field</li>
+<li><strong>Trust relationships</strong>: Preserve for both DID types</li>
+<li><strong>Ledger entries</strong>: Signed by DID, no migration needed</li>
+<li><strong>Governance votes</strong>: Include identity type in vote metadata</li>
+</ol>
+<hr>
+<h2>Appendix A: Cooperative Principles Alignment</h2>
+<table>
+<thead>
+<tr>
+<th>ICA Principle</th>
+<th>Architecture Support</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1. Voluntary and Open Membership</td>
+<td>Open/InvitationOnly/Approval policies, easy departure</td>
+</tr>
+<tr>
+<td>2. Democratic Member Control</td>
+<td>One-member-one-vote, tier-based participation rights</td>
+</tr>
+<tr>
+<td>3. Member Economic Participation</td>
+<td>Capital contributions, profit sharing in membership</td>
+</tr>
+<tr>
+<td>4. Autonomy and Independence</td>
+<td>Individual DIDs, cooperative institutional DIDs</td>
+</tr>
+<tr>
+<td>5. Education, Training, Information</td>
+<td>Not directly addressed (application layer)</td>
+</tr>
+<tr>
+<td>6. Cooperation Among Cooperatives</td>
+<td>Federation model with trust propagation</td>
+</tr>
+<tr>
+<td>7. Concern for Community</td>
+<td>Community entity type, geographic communities</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Appendix B: Related Documents</h2>
+<ul>
+<li><code>/home/matt/projects/icn/docs/ARCHITECTURE.md</code> - System architecture overview</li>
+<li><code>/home/matt/projects/icn/docs/trust-multi-graph-migration.md</code> - Trust system design</li>
+<li><code>/home/matt/projects/icn/docs/production-hardening.md</code> - Security measures</li>
+<li><code>/home/matt/projects/icn/CLAUDE.md</code> - Development guidelines</li>
+</ul>
+<hr>
+<h2>Appendix C: Open Questions</h2>
+<ol>
+<li><p><strong>Identity Portability</strong>: How to handle identity when leaving all cooperatives? Should &quot;homeless&quot; identities be allowed?</p>
+</li>
+<li><p><strong>Organization DIDs</strong>: Should cooperatives use anchor-based DIDs or remain with key-derived DIDs?</p>
+</li>
+<li><p><strong>Cross-Federation Identity</strong>: If Alice is in Federation A and Federation B, how do we handle identity claims across federations that don&#39;t directly federate?</p>
+</li>
+<li><p><strong>Pseudonymity</strong>: Should ICN support pseudonymous identities without full POP attestations? What are the implications for Sybil resistance?</p>
+</li>
+<li><p><strong>Identity Recovery Governance</strong>: When social recovery is used, should the cooperative have a say if the identity has membership? Risk of collusion.</p>
+</li>
+</ol>
+<hr>
+<p><em>Document Version: 1.0</em>
+<em>Last Updated: 2025-12-25</em></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

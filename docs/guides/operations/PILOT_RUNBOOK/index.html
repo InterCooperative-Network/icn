@@ -1,0 +1,481 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Pilot Cluster Operator Runbook | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>guides</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>operations</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>PILOT RUNBOOK</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/guides/operations/PILOT_RUNBOOK.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Pilot Cluster Operator Runbook</h1>
+<p><strong>Audience</strong>: Operators running the ICN pilot on the K3s homelab cluster.<br><strong>Last updated</strong>: 2026-02-22</p>
+<hr>
+<h2>Table of Contents</h2>
+<ol>
+<li><a href="#1-prerequisites">Prerequisites</a></li>
+<li><a href="#2-environment-setup">Environment Setup</a></li>
+<li><a href="#3-cluster-health-check">Cluster Health Check</a></li>
+<li><a href="#4-authentication--getting-a-jwt">Authentication — Getting a JWT</a></li>
+<li><a href="#5-governance-lifecycle">Governance Lifecycle</a></li>
+<li><a href="#6-ledger-verification">Ledger Verification</a></li>
+<li><a href="#7-smoke-test">Smoke Test</a></li>
+<li><a href="#8-reset-test-data">Reset Test Data</a></li>
+<li><a href="#9-troubleshooting">Troubleshooting</a></li>
+</ol>
+<hr>
+<h2>1. Prerequisites</h2>
+<h3>What must be running</h3>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Where</th>
+<th>How to verify</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>K3s control plane</td>
+<td><code>k3s-control</code> (10.8.10.40)</td>
+<td><code>kubectl get nodes</code></td>
+</tr>
+<tr>
+<td>ICN gateway pods</td>
+<td><code>icn</code> namespace</td>
+<td><code>kubectl get pods -n icn</code></td>
+</tr>
+<tr>
+<td>Atlas NFS</td>
+<td>10.8.10.25</td>
+<td><code>kubectl get pvc -n icn</code> — must be <code>Bound</code></td>
+</tr>
+</tbody></table>
+<h3>Tools required on your workstation</h3>
+<pre><code>curl       &gt;= 7.68
+jq         &gt;= 1.6
+kubectl    &gt;= 1.28   (optional — for pod inspection)
+icnctl              (optional — for DID operations)
+</code></pre>
+<p>Check:</p>
+<pre><code class="language-bash">curl --version | head -1
+jq --version
+</code></pre>
+<h3>Gateway NodePorts</h3>
+<table>
+<thead>
+<tr>
+<th>Port</th>
+<th>Instance</th>
+<th>URL</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>30080</td>
+<td>Default gateway</td>
+<td><a href="http://10.8.10.40:30080" target="_blank" rel="noopener">http://10.8.10.40:30080</a></td>
+</tr>
+<tr>
+<td>30081</td>
+<td>Coop instance 1</td>
+<td><a href="http://10.8.10.40:30081" target="_blank" rel="noopener">http://10.8.10.40:30081</a></td>
+</tr>
+<tr>
+<td>30082</td>
+<td>Coop instance 2</td>
+<td><a href="http://10.8.10.40:30082" target="_blank" rel="noopener">http://10.8.10.40:30082</a></td>
+</tr>
+<tr>
+<td>30083</td>
+<td>Coop instance 3</td>
+<td><a href="http://10.8.10.40:30083" target="_blank" rel="noopener">http://10.8.10.40:30083</a></td>
+</tr>
+<tr>
+<td>30084</td>
+<td>Coop instance 4</td>
+<td><a href="http://10.8.10.40:30084" target="_blank" rel="noopener">http://10.8.10.40:30084</a></td>
+</tr>
+</tbody></table>
+<hr>
+<h2>2. Environment Setup</h2>
+<p>Set these in your shell before running any commands:</p>
+<pre><code class="language-bash">export HOST=&quot;http://10.8.10.40:30080&quot;   # default gateway
+export COOP_ID=&quot;pilot-coop-1&quot;           # your cooperative ID
+export TOKEN=&quot;&quot;                         # filled in after auth (§4)
+</code></pre>
+<p>All <code>curl</code> examples below assume these are set.</p>
+<hr>
+<h2>3. Cluster Health Check</h2>
+<h3>Single gateway</h3>
+<pre><code class="language-bash">curl -sf &quot;$HOST/v1/health&quot; | jq .
+</code></pre>
+<p>Expected response:</p>
+<pre><code class="language-json">{&quot;status&quot;: &quot;ok&quot;}
+</code></pre>
+<p>HTTP 200 means the gateway is up and accepting requests.</p>
+<h3>All five gateway ports</h3>
+<pre><code class="language-bash">for port in 30080 30081 30082 30083 30084; do
+    code=$(curl -s -o /dev/null -w &quot;%{http_code}&quot; --max-time 5 &quot;http://10.8.10.40:${port}/v1/health&quot;)
+    echo &quot;port $port → $code&quot;
+done
+</code></pre>
+<p>All should return <code>200</code>. A <code>000</code> means the port is not listening — check the pod:</p>
+<pre><code class="language-bash">kubectl get pods -n icn -l app=icnd
+kubectl logs -n icn -l app=icnd --tail=50
+</code></pre>
+<h3>Quick K3s node check (if you have kubectl)</h3>
+<pre><code class="language-bash">kubectl get nodes -o wide
+kubectl get pods -n icn
+kubectl get pvc -n icn
+</code></pre>
+<p>All nodes <code>Ready</code>, all pods <code>Running</code>, all PVCs <code>Bound</code>.</p>
+<hr>
+<h2>4. Authentication — Getting a JWT</h2>
+<p>The gateway uses DID-based challenge–response auth. You need an Ed25519 DID keypair.</p>
+<h3>Option A: Use icnctl (recommended)</h3>
+<pre><code class="language-bash"># Generate a DID keypair if you don&#39;t have one
+icnctl id init
+
+# Show your DID
+icnctl id show
+
+# Get a token (icnctl handles challenge + sign + verify internally)
+TOKEN=$(icnctl auth login --gateway &quot;$HOST&quot; --output token)
+export TOKEN
+</code></pre>
+<h3>Option B: Manual curl flow</h3>
+<p><strong>Step 1 — Request a challenge</strong></p>
+<pre><code class="language-bash">DID=&quot;did:icn:&lt;your-base58-pubkey&gt;&quot;
+
+CHALLENGE=$(curl -s -X POST &quot;$HOST/v1/auth/challenge&quot; \
+    -H &quot;Content-Type: application/json&quot; \
+    -d &quot;{\&quot;did\&quot;: \&quot;$DID\&quot;}&quot; | jq -r &#39;.challenge&#39;)
+
+echo &quot;Challenge: $CHALLENGE&quot;
+</code></pre>
+<p><strong>Step 2 — Sign the challenge</strong></p>
+<p>Sign the raw challenge string with your Ed25519 private key. The signature must be base64-encoded (standard, no padding).</p>
+<p>With icnctl:</p>
+<pre><code class="language-bash">SIG=$(icnctl id sign &quot;$CHALLENGE&quot; --base64)
+</code></pre>
+<p><strong>Step 3 — Verify and get JWT</strong></p>
+<pre><code class="language-bash">TOKEN=$(curl -s -X POST &quot;$HOST/v1/auth/verify&quot; \
+    -H &quot;Content-Type: application/json&quot; \
+    -d &quot;{\&quot;did\&quot;: \&quot;$DID\&quot;, \&quot;challenge\&quot;: \&quot;$CHALLENGE\&quot;, \&quot;signature\&quot;: \&quot;$SIG\&quot;}&quot; \
+    | jq -r &#39;.token&#39;)
+
+export TOKEN
+echo &quot;Token: ${TOKEN:0:40}...&quot;
+</code></pre>
+<p>A token is a signed JWT valid for the session. Pass it as <code>Authorization: Bearer $TOKEN</code> on all authenticated requests.</p>
+<hr>
+<h2>5. Governance Lifecycle</h2>
+<p>These steps exercise the full governance flow: domain creation → proposal → vote → close.</p>
+<h3>5.1 Create a governance domain</h3>
+<p>A domain is the container for proposals and membership.</p>
+<pre><code class="language-bash">DOMAIN_ID=&quot;ops-test-$(date +%s)&quot;
+
+curl -s -X POST &quot;$HOST/v1/gov/domains&quot; \
+    -H &quot;Authorization: Bearer $TOKEN&quot; \
+    -H &quot;Content-Type: application/json&quot; \
+    -d &quot;{
+        \&quot;id\&quot;: \&quot;$DOMAIN_ID\&quot;,
+        \&quot;name\&quot;: \&quot;Ops Test Domain\&quot;,
+        \&quot;profile\&quot;: \&quot;cooperative_default\&quot;,
+        \&quot;quorum_percent\&quot;: 1,
+        \&quot;approval_percent\&quot;: 51,
+        \&quot;voting_period_days\&quot;: 1,
+        \&quot;members\&quot;: []
+    }&quot; | jq .
+</code></pre>
+<p>Expected: HTTP 201 with domain object. A 400 with &quot;already exists&quot; is safe to ignore if the domain was created earlier.</p>
+<h3>5.2 Submit a text proposal</h3>
+<pre><code class="language-bash">PROPOSAL_TITLE=&quot;Test Proposal $(date +%s)&quot;
+
+PROPOSAL_ID=$(curl -s -X POST &quot;$HOST/v1/gov/proposals&quot; \
+    -H &quot;Authorization: Bearer $TOKEN&quot; \
+    -H &quot;Content-Type: application/json&quot; \
+    -d &quot;{
+        \&quot;domain_id\&quot;: \&quot;$DOMAIN_ID\&quot;,
+        \&quot;title\&quot;: \&quot;$PROPOSAL_TITLE\&quot;,
+        \&quot;description\&quot;: \&quot;Manual ops test proposal.\&quot;,
+        \&quot;payload\&quot;: {
+            \&quot;type\&quot;: \&quot;text\&quot;,
+            \&quot;body\&quot;: \&quot;Approve routine maintenance window.\&quot;
+        }
+    }&quot; | jq -r &#39;.id&#39;)
+
+echo &quot;Proposal ID: $PROPOSAL_ID&quot;
+</code></pre>
+<h3>5.3 Open the proposal for voting</h3>
+<pre><code class="language-bash">curl -s -X POST &quot;$HOST/v1/gov/proposals/$PROPOSAL_ID/open&quot; \
+    -H &quot;Authorization: Bearer $TOKEN&quot; \
+    -H &quot;Content-Type: application/json&quot; \
+    -d &#39;{&quot;voting_period_seconds&quot;: 3600}&#39; | jq &#39;.state&#39;
+</code></pre>
+<p>Expected: proposal state transitions to <code>open</code>.</p>
+<h3>5.4 Cast a vote</h3>
+<pre><code class="language-bash">curl -s -X POST &quot;$HOST/v1/gov/proposals/$PROPOSAL_ID/vote&quot; \
+    -H &quot;Authorization: Bearer $TOKEN&quot; \
+    -H &quot;Content-Type: application/json&quot; \
+    -d &#39;{&quot;choice&quot;: &quot;for&quot;, &quot;comment&quot;: &quot;Approved by ops.&quot;}&#39; | jq .
+</code></pre>
+<p>Valid choices: <code>&quot;for&quot;</code>, <code>&quot;against&quot;</code>, <code>&quot;abstain&quot;</code>.</p>
+<h3>5.5 Close the proposal</h3>
+<pre><code class="language-bash">curl -s -X POST &quot;$HOST/v1/gov/proposals/$PROPOSAL_ID/close&quot; \
+    -H &quot;Authorization: Bearer $TOKEN&quot; \
+    -H &quot;Content-Type: application/json&quot; \
+    -d &#39;{}&#39; | jq &#39;{state, outcome: .outcome}&#39;
+</code></pre>
+<p>Expected: state is one of <code>accepted</code>, <code>rejected</code>, or <code>no_quorum</code>.</p>
+<h3>5.6 Read the result</h3>
+<pre><code class="language-bash">curl -s &quot;$HOST/v1/gov/proposals/$PROPOSAL_ID&quot; \
+    -H &quot;Authorization: Bearer $TOKEN&quot; | jq &#39;{id, title, state}&#39;
+</code></pre>
+<hr>
+<h2>6. Ledger Verification</h2>
+<h3>Check a balance</h3>
+<pre><code class="language-bash">DID=&quot;did:icn:&lt;member-did&gt;&quot;
+
+curl -s &quot;$HOST/v1/ledger/$COOP_ID/balance/$DID&quot; \
+    -H &quot;Authorization: Bearer $TOKEN&quot; | jq .
+</code></pre>
+<h3>Ledger entries linked to a decision</h3>
+<p>After governance closes a proposal that triggers economic effects, the decision hash links to ledger entries.</p>
+<pre><code class="language-bash">DECISION_HASH=&quot;&lt;hex-hash-from-governance-receipt&gt;&quot;
+
+curl -s &quot;$HOST/v1/ledger/$COOP_ID/entries/by-decision?decision_hash=$DECISION_HASH&quot; \
+    -H &quot;Authorization: Bearer $TOKEN&quot; | jq .
+</code></pre>
+<p>An empty result is normal for text proposals (no economic effect). Budget proposals should produce entries.</p>
+<h3>Decision registry trace</h3>
+<p>The registry tracks the full provenance chain:</p>
+<pre><code class="language-bash"># List decisions for a coop
+curl -s &quot;$HOST/v1/registry/decisions?coop_id=$COOP_ID&quot; \
+    -H &quot;Authorization: Bearer $TOKEN&quot; | jq &#39;.[].decision_receipt_id&#39;
+
+# Get a specific decision with trace
+RECEIPT_ID=&quot;&lt;receipt-id-from-above&gt;&quot;
+
+curl -s &quot;$HOST/v1/registry/decisions/$RECEIPT_ID&quot; \
+    -H &quot;Authorization: Bearer $TOKEN&quot; | jq .
+
+curl -s &quot;$HOST/v1/registry/decisions/$RECEIPT_ID/trace&quot; \
+    -H &quot;Authorization: Bearer $TOKEN&quot; | jq .
+</code></pre>
+<p>The <code>/trace</code> endpoint shows the linkage: <code>DecisionReceipt → AllocationReceipt → LedgerEntry</code>.</p>
+<hr>
+<h2>7. Smoke Test</h2>
+<p>The smoke test script runs the full governance lifecycle in one command and exits non-zero on any failure. It is safe to run against the live pilot cluster — it creates unique IDs per run and does not modify persistent state beyond the in-memory governance store.</p>
+<pre><code class="language-bash">HOST=$HOST TOKEN=$TOKEN COOP_ID=$COOP_ID ./scripts/smoke-test.sh
+</code></pre>
+<h3>What it tests</h3>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Endpoint</th>
+<th>Success criteria</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td><code>GET /v1/health</code></td>
+<td>200</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>GET /v1/gov/domains</code> (no auth)</td>
+<td>401</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>POST /v1/gov/domains</code></td>
+<td>201 or 200</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>POST /v1/gov/proposals</code></td>
+<td>201 or 200, <code>id</code> field present</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>POST /v1/gov/proposals/{id}/open</code></td>
+<td>200</td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>POST /v1/gov/proposals/{id}/vote</code></td>
+<td>200 or 201</td>
+</tr>
+<tr>
+<td>7</td>
+<td><code>POST /v1/gov/proposals/{id}/close</code></td>
+<td>200</td>
+</tr>
+<tr>
+<td>8</td>
+<td><code>GET /v1/gov/proposals/{id}</code></td>
+<td>200</td>
+</tr>
+<tr>
+<td>9</td>
+<td><code>GET /v1/registry/decisions</code></td>
+<td>200</td>
+</tr>
+<tr>
+<td>10</td>
+<td><code>GET /v1/ledger/{coop}/entries/by-decision</code></td>
+<td>200 or 404</td>
+</tr>
+<tr>
+<td>11</td>
+<td><code>GET /v1/gov/proposals</code></td>
+<td>200</td>
+</tr>
+</tbody></table>
+<h3>Interpreting output</h3>
+<pre><code>PASS Gateway health check (200)
+PASS Unauthenticated request rejected (401)
+PASS Create governance domain (201)
+PASS Create proposal (201) → id=prop-abc123
+PASS Open proposal (200) state=open
+PASS Cast vote (200)
+PASS Close proposal (200) outcome=accepted
+PASS Get closed proposal (200) state=accepted
+PASS List registry decisions (200) count=0
+PASS Ledger entries-by-decision endpoint reachable (200)
+PASS List proposals (200)
+
+Results: 11 passed, 0 failed, 0 skipped (11 total)
+SMOKE PASS
+</code></pre>
+<p>A <code>FAIL</code> line means that specific HTTP call returned an unexpected status. The body is printed below the FAIL line for diagnosis. The script exits <code>1</code>.</p>
+<p>A <code>WARN</code> line is non-fatal (e.g., domain already exists from a previous run).</p>
+<hr>
+<h2>8. Reset Test Data</h2>
+<p>The governance store is in-memory per pod restart. To reset all governance state:</p>
+<pre><code class="language-bash"># Rolling restart of ICN pods (drops in-memory state, PVC data is preserved)
+kubectl rollout restart deployment/icnd -n icn
+
+# Wait for pods to come back
+kubectl rollout status deployment/icnd -n icn
+</code></pre>
+<p>Ledger entries on NFS-backed PVCs survive restarts. To clear ledger data for a specific coop, there is no REST endpoint — this requires direct Sled store access (see ops team).</p>
+<hr>
+<h2>9. Troubleshooting</h2>
+<h3>Gateway returns 000 (connection refused)</h3>
+<p>The pod is not running or the NodePort is not bound.</p>
+<pre><code class="language-bash">kubectl get pods -n icn
+kubectl describe pod &lt;pod-name&gt; -n icn
+kubectl logs &lt;pod-name&gt; -n icn --tail=100
+</code></pre>
+<p>Common causes:</p>
+<ul>
+<li>PVC not bound (NFS unreachable) — check <code>kubectl get pvc -n icn</code></li>
+<li>OOMKilled — check <code>kubectl describe pod</code> for exit code 137</li>
+<li>CrashLoopBackOff — check logs for keystore unlock failure</li>
+</ul>
+<h3>401 Unauthorized on authenticated requests</h3>
+<p>Your JWT has expired or the wrong secret was used.</p>
+<pre><code class="language-bash"># Decode the JWT payload (no verification, just inspect)
+echo &quot;$TOKEN&quot; | cut -d. -f2 | base64 -d 2&gt;/dev/null | jq &#39;{sub, exp}&#39;
+</code></pre>
+<p><code>exp</code> is a Unix timestamp. Re-authenticate if expired (§4).</p>
+<h3>403 Forbidden on domain/proposal operations</h3>
+<p>The DID in your JWT is not a member of the target domain. Either:</p>
+<ol>
+<li>Add your DID to the domain: <code>POST /v1/gov/domains/{id}/members</code></li>
+<li>Create a new domain with your DID in the <code>members</code> array</li>
+</ol>
+<h3>400 on create domain — &quot;already exists&quot;</h3>
+<p>Safe to ignore. The domain with that ID was created in a previous run. Use a different <code>DOMAIN_ID</code> or proceed with the existing domain.</p>
+<h3>Proposal stuck in <code>draft</code> state</h3>
+<p>A proposal must be explicitly opened before votes can be cast:</p>
+<pre><code class="language-bash">curl -s -X POST &quot;$HOST/v1/gov/proposals/$PROPOSAL_ID/open&quot; \
+    -H &quot;Authorization: Bearer $TOKEN&quot; \
+    -H &quot;Content-Type: application/json&quot; \
+    -d &#39;{&quot;voting_period_seconds&quot;: 3600}&#39;
+</code></pre>
+<h3>Close returns 404</h3>
+<p>The proposal ID is wrong or the gateway was restarted (in-memory state lost). Re-create via §5.</p>
+<h3>Ledger entries/by-decision returns empty</h3>
+<p>Text proposals do not generate ledger entries — this is correct. Only budget proposals (payload type <code>budget</code>) trigger ledger writes. Verify the proposal payload type:</p>
+<pre><code class="language-bash">curl -s &quot;$HOST/v1/gov/proposals/$PROPOSAL_ID&quot; \
+    -H &quot;Authorization: Bearer $TOKEN&quot; | jq &#39;.payload.type&#39;
+</code></pre>
+<h3>Checking metrics</h3>
+<p>Prometheus scrapes on port 30090:</p>
+<pre><code class="language-bash">curl -s http://10.8.10.40:30090/metrics | grep gateway_governance
+</code></pre>
+<p>Key metrics:</p>
+<ul>
+<li><code>gateway_governance_proposals_created_total</code></li>
+<li><code>gateway_governance_proposals_opened_total</code></li>
+<li><code>gateway_governance_proposals_closed_total</code></li>
+<li><code>gateway_governance_votes_cast_total</code></li>
+</ul>
+<h3>Pod logs for a specific operation</h3>
+<p>Enable debug logging for a single pod:</p>
+<pre><code class="language-bash">kubectl exec -n icn &lt;pod-name&gt; -- sh -c &#39;kill -USR1 1&#39;  # toggles log level if supported
+kubectl logs -n icn &lt;pod-name&gt; -f --tail=200
+</code></pre>
+<p>Or filter for a specific proposal ID:</p>
+<pre><code class="language-bash">kubectl logs -n icn &lt;pod-name&gt; --tail=500 | grep &quot;$PROPOSAL_ID&quot;
+</code></pre>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

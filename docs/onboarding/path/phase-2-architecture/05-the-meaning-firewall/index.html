@@ -1,0 +1,367 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>05: The Meaning Firewall — ICN&#39;s Central Design Principle | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>onboarding</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>path</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>phase 2 architecture</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>05 the meaning firewall</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/onboarding/path/phase-2-architecture/05-the-meaning-firewall.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>05: The Meaning Firewall — ICN&#39;s Central Design Principle</h1>
+<blockquote>
+<p><strong>Phase</strong>: 2 | <strong>Tier</strong>: Fixer<br><strong>Patterns introduced</strong>: <a href="#policyoracle--meaning-firewall">PolicyOracle / Meaning Firewall</a>, <a href="#oracleregistry">OracleRegistry</a>, <a href="#trust-gated-operations">Trust-Gated Operations</a><br><strong>Prerequisite</strong>: 04-actors-and-concurrency.md</p>
+</blockquote>
+<h2>Why This Matters</h2>
+<p><strong>&quot;ICN is a constraint engine: apps translate meaning into constraints; the kernel enforces constraints without understanding meaning.&quot;</strong></p>
+<p>This is ICN&#39;s <strong>central design principle</strong>. It separates:</p>
+<ul>
+<li><strong>What to enforce</strong> (kernel) from <strong>why to enforce it</strong> (apps)</li>
+<li><strong>Generic mechanisms</strong> (rate limits, quotas) from <strong>domain semantics</strong> (trust scores, governance weights)</li>
+<li><strong>Predictable substrate</strong> (kernel) from <strong>adaptable policy</strong> (cooperative governance)</li>
+</ul>
+<p>The <strong>Meaning Firewall</strong> is the boundary between these worlds. Understanding it transforms how you read ICN code — it&#39;s not just &quot;good architecture&quot;; it&#39;s the invariant that makes cooperative self-governance possible without kernel rewrites.</p>
+<p>→ See <code>manual.md</code> § &quot;The Constraint Engine&quot; for the full narrative.</p>
+<h2>What You&#39;ll Read</h2>
+<h3>1. The Boundary Contract: <code>icn/crates/icn-kernel-api/src/authz.rs</code></h3>
+<p>This file defines the <strong>interface</strong> between kernel and apps.</p>
+<h4><strong>The PolicyOracle Trait</strong></h4>
+<pre><code class="language-rust">#[async_trait]
+pub trait PolicyOracle: Send + Sync {
+    /// Evaluate a policy request and return a decision.
+    fn evaluate(&amp;self, request: &amp;PolicyRequest) -&gt; PolicyDecision;
+}
+</code></pre>
+<p><strong>This is the firewall.</strong> Everything on the kernel side of this trait is <strong>domain-agnostic</strong>. Everything on the app side is <strong>domain-aware</strong>.</p>
+<h4><strong>PolicyRequest: What the Kernel Asks</strong></h4>
+<pre><code class="language-rust">pub struct PolicyRequest {
+    pub core: PolicyRequestCore,  // cacheable actor/action/domain tuple
+    pub context: PolicyContext,   // resource + metadata + optional capability
+}
+
+pub struct PolicyRequestCore {
+    pub actor: Did,
+    pub action: ActionKind,
+    pub domain: Domain,
+}
+</code></pre>
+<p><strong>Key insight</strong>: The kernel knows <strong>operations</strong> (generic verbs), not <strong>meanings</strong> (why they matter).</p>
+<h4><strong>PolicyDecision: What the Kernel Gets Back</strong></h4>
+<pre><code class="language-rust">pub enum PolicyDecision {
+    Allow { constraints: ConstraintSet },
+    Deny { reason: PolicyError },
+}
+
+pub struct ConstraintSet {
+    pub rate_limit: Option&lt;RateLimit&gt;,
+    pub max_topics: Option&lt;u32&gt;,
+    pub max_message_size: Option&lt;u64&gt;,
+    pub max_connections: Option&lt;u32&gt;,
+    pub max_subscriptions: Option&lt;u32&gt;,
+    pub max_outstanding_requests: Option&lt;u32&gt;,
+    pub custom: HashMap&lt;String, ConstraintValue&gt;,
+}
+</code></pre>
+<p><strong>Key insight</strong>: The kernel receives <strong>constraints</strong> (numbers, limits, timeouts), not <strong>reasoning</strong> (trust scores, governance weights).</p>
+<h4><strong>What the Kernel Does NOT Understand</strong></h4>
+<p>From the doc comment (lines 18-24):</p>
+<blockquote>
+<p>The kernel does NOT understand:</p>
+<ul>
+<li>Trust classes or scores</li>
+<li>Governance weights</li>
+<li>Credit multipliers</li>
+<li>Membership status</li>
+</ul>
+<p>It only understands:</p>
+<ul>
+<li>Allow with constraints</li>
+<li>Deny with reason</li>
+</ul>
+</blockquote>
+<p><strong>This is enforced at compile time</strong>: Kernel crates have zero dependencies on domain crates.</p>
+<h3>2. Three Oracle Implementations Side-by-Side</h3>
+<p>Read these three files <strong>in parallel</strong> to see the pattern:</p>
+<h4><strong><code>icn/crates/icn-gateway/src/trust_mgr.rs</code> — Trust Scores → Rate Limits</strong></h4>
+<pre><code class="language-rust">impl PolicyOracle for TrustPolicyOracle {
+    fn evaluate(&amp;self, request: &amp;PolicyRequest) -&gt; PolicyDecision {
+        // 1. Query domain-specific state
+        let trust_score = self.trust_graph
+            .read()
+            .compute_trust(request.actor(), &amp;target)?;
+        
+        // 2. Translate to constraints
+        let constraints = self.trust_score_to_constraints(trust_score);
+        
+        // 3. Return generic decision
+        PolicyDecision::allow_with(constraints)
+    }
+}
+
+fn trust_score_to_constraints(&amp;self, score: f64) -&gt; ConstraintSet {
+    // THIS IS THE FIREWALL BOUNDARY
+    ConstraintSet {
+        rate_limit: Some(RateLimit {
+            max_requests: (score * 100.0) as u32,  // Higher trust = higher rate
+            window: Duration::from_secs(60),
+        }),
+        ..Default::default()
+    }
+}
+</code></pre>
+<p><strong>The firewall</strong>: <code>trust_score_to_constraints()</code> is the exact point where domain meaning (trust scores) becomes kernel constraints (rate limits). The kernel never sees the trust score.</p>
+<h4><strong><code>icn/crates/icn-kernel-api/src/bootstrap.rs</code> — Domain Routing / Oracle Registry</strong></h4>
+<pre><code class="language-rust">let decision = registry.evaluate(
+    Domain::governance(),
+    &amp;PolicyRequest::new(actor.clone(), ActionKind::Write, Domain::governance()),
+);
+</code></pre>
+<p><strong>The firewall</strong>: Kernel routing is domain-aware, but decision semantics still stay in oracle implementations.</p>
+<h4><strong><code>icn/crates/icn-gateway/src/trust_mgr.rs</code> — Constraint Translation Example</strong></h4>
+<pre><code class="language-rust">fn trust_score_to_constraints(&amp;self, score: f64) -&gt; ConstraintSet {
+    ConstraintSet {
+        rate_limit: Some(RateLimit::new((score * 100.0) as u32, 25)),
+        max_connections: Some((score * 50.0) as u32),
+        ..Default::default()
+    }
+}
+
+impl PolicyOracle for TrustPolicyOracle {
+    fn evaluate(&amp;self, request: &amp;PolicyRequest) -&gt; PolicyDecision {
+        let trust_score = self.trust_graph.read().compute_trust(request.actor(), request.actor());
+        PolicyDecision::allow_with(self.trust_score_to_constraints(trust_score))
+    }
+}
+</code></pre>
+<p><strong>The firewall</strong>: The kernel never sees &quot;credit limits&quot; or &quot;balances&quot; — it only enforces <code>max_transaction_amount</code> as a numerical constraint.</p>
+<h3>3. Firewall Violations and Correct Patterns</h3>
+<p><strong>File</strong>: <code>docs/architecture/KERNEL_APP_SEPARATION.md</code></p>
+<h4><strong>❌ VIOLATION: Kernel Reading Trust Scores Directly</strong></h4>
+<pre><code class="language-rust">// In icn-net/src/actor.rs (WRONG)
+use icn_trust::TrustGraph;  // ❌ Domain import in kernel
+
+let trust_score = trust_graph.compute_trust(&amp;peer_did)?;
+if trust_score &lt; 0.5 {
+    return Err(&quot;Insufficient trust&quot;);
+}
+</code></pre>
+<p><strong>Why this breaks the firewall</strong>: The kernel (<code>icn-net</code>) now understands domain semantics (trust scores), making it impossible to change trust policy without kernel changes.</p>
+<h4><strong>✅ CORRECT: Oracle Translating Trust to Constraints</strong></h4>
+<pre><code class="language-rust">// In icn/crates/icn-net/src/actor.rs (CORRECT)
+let request = PolicyRequest::new(
+    peer_did.clone(),
+    ActionKind::custom(&quot;dial_peer&quot;),
+    Domain::trust(),
+);
+let decision = self.policy_oracle.evaluate(&amp;request);
+
+match decision {
+    PolicyDecision::Allow { constraints } =&gt; {
+        // Enforce rate limit (generic constraint)
+        if let Some(rate_limit) = constraints.rate_limit {
+            self.rate_limiter.check(&amp;peer_did, &amp;rate_limit)?;
+        }
+    }
+    PolicyDecision::Deny { reason } =&gt; {
+        return Err(reason);
+    }
+}
+</code></pre>
+<p><strong>Why this preserves the firewall</strong>: The kernel only sees <code>rate_limit</code> (generic). Trust policy can change without touching kernel code.</p>
+<h3>4. Compile-Time Enforcement: <code>icn/crates/icn-core/src/meaning_firewall.rs</code></h3>
+<p>This file contains <strong>CI tests</strong> that scan kernel crates for forbidden domain imports:</p>
+<pre><code class="language-rust">#[test]
+fn test_kernel_does_not_import_domain() {
+    let kernel_crates = [&quot;icn-core&quot;, &quot;icn-net&quot;, &quot;icn-gossip&quot;, &quot;icn-store&quot;];
+    let domain_crates = [&quot;icn-trust&quot;, &quot;icn-ledger&quot;, &quot;icn-governance&quot;, &quot;icn-ccl&quot;];
+    
+    for kernel in &amp;kernel_crates {
+        let cargo_toml = read_cargo_toml(kernel);
+        for domain in &amp;domain_crates {
+            assert!(
+                !cargo_toml.contains(domain),
+                &quot;Kernel crate {} imports domain crate {}&quot;,
+                kernel, domain
+            );
+        }
+    }
+}
+</code></pre>
+<p><strong>Pinned violation counts</strong>: If the test detects a new violation, CI fails. This makes firewall violations <strong>visible and blocking</strong>.</p>
+<h3>5. The OracleRegistry: Phase-Aware Bootstrap</h3>
+<p><strong>File</strong>: <code>icn/crates/icn-kernel-api/src/bootstrap.rs</code></p>
+<p>The kernel needs oracles to start, but oracles depend on subsystems. The OracleRegistry solves this with <strong>phased bootstrapping</strong>:</p>
+<pre><code class="language-rust">pub struct OracleRegistry {
+    oracles: Arc&lt;DashMap&lt;Domain, Arc&lt;dyn PolicyOracle&gt;&gt;&gt;,
+    phase: Arc&lt;ArcSwap&lt;BootstrapPhase&gt;&gt;,
+}
+
+pub enum BootstrapPhase {
+    Genesis,        // No oracles, fallback to AllowAllOracle
+    CoreApps,       // Trust/Ledger loaded, limited functionality
+    Running,        // Full system operational
+}
+</code></pre>
+<p><strong>Atomic oracle replacement via ArcSwap</strong>:</p>
+<pre><code class="language-rust">// During bootstrap
+registry.register(Domain::Trust, Arc::new(TrustPolicyOracle::new()));
+
+// Atomic swap to Running phase
+registry.set_phase(BootstrapPhase::Running);
+</code></pre>
+<p><strong>Why ArcSwap</strong>: Allows replacing oracles without locking. Old references remain valid (via <code>Arc</code>), new requests get the new oracle.</p>
+<p><strong>Rust concepts inline</strong>:</p>
+<ul>
+<li><code>Arc&lt;dyn PolicyOracle&gt;</code>: Trait object for runtime polymorphism (different oracle types behind same interface)</li>
+<li><code>ArcSwap</code>: Atomic replacement of <code>Arc</code> pointers without locks (from <code>arc-swap</code> crate)</li>
+<li><code>DashMap</code>: Concurrent HashMap (from <code>dashmap</code> crate) for lock-free multi-threaded access</li>
+<li><code>Domain</code> enum: Routes requests to the right oracle (Trust vs Governance vs Ledger)</li>
+</ul>
+<h3>6. Example: End-to-End Request Flow</h3>
+<p><strong>Trace this sequence</strong>:</p>
+<ol>
+<li><p><strong>Gateway</strong>: User submits task via REST API<br><code>POST /v1/compute/tasks</code></p>
+</li>
+<li><p><strong>Gateway → Kernel</strong>: Call <code>compute_actor.submit_task(task)</code></p>
+</li>
+<li><p><strong>ComputeActor → PolicyOracle</strong>: Request authorization  </p>
+<pre><code class="language-rust">let request = PolicyRequest::with_context(
+    PolicyRequestCore::new(task.submitter.clone(), ActionKind::Execute, Domain::trust()),
+    PolicyContext::new().with_metadata(&quot;task_type&quot;, &quot;wasm&quot;),
+);
+let decision = self.oracle.evaluate(&amp;request);
+</code></pre>
+</li>
+<li><p><strong>TrustPolicyOracle</strong>: Query trust graph  </p>
+<pre><code class="language-rust">let trust_score = self.trust_graph.compute_trust(request.actor(), request.actor());
+</code></pre>
+</li>
+<li><p><strong>TrustPolicyOracle → Kernel</strong>: Translate to constraints  </p>
+<pre><code class="language-rust">let constraints = ConstraintSet {
+    rate_limit: Some(RateLimit {
+        max_requests: (trust_score * 50.0) as u32,
+        window: Duration::from_secs(60),
+    }),
+    custom: HashMap::from([
+        (&quot;max_cpu_ms&quot;, trust_score * 10000.0),
+    ]),
+};
+PolicyDecision::allow_with(constraints)
+</code></pre>
+</li>
+<li><p><strong>ComputeActor</strong>: Enforce constraints  </p>
+<pre><code class="language-rust">match decision {
+    PolicyDecision::Allow { constraints } =&gt; {
+        self.rate_limiter.check(request.actor(), &amp;constraints.rate_limit)?;
+        let max_cpu = constraints.custom.get(&quot;max_cpu_ms&quot;).unwrap();
+        self.execute_task(task, *max_cpu as u64).await?;
+    }
+    PolicyDecision::Deny { reason } =&gt; {
+        return Err(reason);
+    }
+}
+</code></pre>
+</li>
+<li><p><strong>Response</strong>: Task accepted or rejected based on constraints (not trust score)</p>
+</li>
+</ol>
+<p><strong>At no point</strong> does the kernel see trust scores, trust classes, or governance weights. It only sees constraints and enforces them.</p>
+<h2>Patterns Introduced</h2>
+<h3>PolicyOracle / Meaning Firewall</h3>
+<p><strong>The central pattern</strong>: Apps translate domain semantics into generic constraints the kernel enforces.</p>
+<p>→ See <code>patterns.md</code> #11 for full template.</p>
+<h3>OracleRegistry</h3>
+<p><strong>Phase-aware bootstrap</strong>: Allows kernel to start before oracles are ready, then swap them in atomically.</p>
+<p>→ See <code>patterns.md</code> #13 for full template.</p>
+<h3>Trust-Gated Operations</h3>
+<p><strong>Trust as constraint source</strong>: Trust scores → rate limits, quotas, resource allocations.</p>
+<p>→ See <code>patterns.md</code> #8 for full template.</p>
+<h2>What You&#39;ll Build</h2>
+<p>→ <strong>Lab</strong>: <code>labs/lab-04-firewall-oracle/</code> — <strong>THE KEYSTONE LAB</strong></p>
+<p>Build three crates:</p>
+<ol>
+<li><strong>kernel/</strong> — enforces constraints (rate limiter, permission gate). Only sees <code>ConstraintSet</code>. Has ZERO imports from <code>domain/</code>.</li>
+<li><strong>domain/</strong> — understands &quot;reputation scores&quot; (or any domain concept). Internal types the kernel never sees.</li>
+<li><strong>oracle/</strong> — implements <code>PolicyOracle</code> trait that translates domain semantics → generic constraints.</li>
+</ol>
+<p><strong>Tests proving</strong>:</p>
+<ul>
+<li>Kernel crate has zero imports from domain crate (compile-time check)</li>
+<li>Oracle correctly translates domain state to constraints</li>
+<li>Changing oracle behavior changes kernel enforcement without kernel code changes</li>
+</ul>
+<p><strong>Done when</strong>: Kernel has zero domain dependencies, oracle imports both, tests prove boundary holds.</p>
+<h2>Checkpoint</h2>
+<p>You&#39;ve completed this layer when you can:</p>
+<ol>
+<li><strong>Trace end-to-end</strong>: Diagram a request from Gateway → Kernel → PolicyOracle → ConstraintSet → enforcement → response</li>
+<li><strong>Identify violations</strong>: Given a code snippet with a Meaning Firewall violation, identify and fix it</li>
+<li><strong>Explain the boundary</strong>: Describe why <code>icn-net</code> cannot import <code>icn-trust</code>, and how it gets trust-related constraints anyway</li>
+<li><strong>Lock choice rationale</strong>: Explain why <code>oracle.rs</code> uses <code>parking_lot::RwLock</code> while <code>oracle_tokio.rs</code> uses <code>tokio::sync::RwLock</code></li>
+</ol>
+<p><strong>Artifact</strong>: Complete lab-04 and submit:</p>
+<ol>
+<li>Proof that <code>kernel/Cargo.toml</code> has no <code>domain</code> dependency</li>
+<li>Test output showing oracle translation working</li>
+<li>Diagram showing request → oracle → constraints → enforcement flow</li>
+</ol>
+<h2>Deep Reference</h2>
+<p>→ <code>reference/module-02-architecture-overview.md</code> — Full architecture with diagrams<br>→ <code>docs/architecture/KERNEL_APP_SEPARATION.md</code> — Detailed firewall examples and anti-patterns<br>→ <code>icn/crates/icn-kernel-api/src/authz.rs</code> — Source of truth for the PolicyOracle interface<br>→ <code>icn/crates/icn-kernel-api/src/bootstrap.rs</code> — OracleRegistry implementation</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

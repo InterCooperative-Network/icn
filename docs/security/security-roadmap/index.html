@@ -1,0 +1,2398 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Security Roadmap | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>security</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>security roadmap</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/security/security-roadmap.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Security Roadmap</h1>
+<h2>Overview</h2>
+<p>This document outlines the security architecture and implementation plan for ICN. It captures a phased hardening approach and should be interpreted as roadmap guidance rather than a current-state readiness declaration.</p>
+<p><strong>Status (snapshot):</strong> In Progress - Phases 7-9 marked complete in this roadmap revision</p>
+<p><strong>Latest:</strong> Phase 9 - Message &amp; Identity Integrity (Complete)
+<strong>Target:</strong> Phase 10 - Payload Encryption &amp; Forward Secrecy</p>
+<h2>Sequencing Strategy</h2>
+<p>Security work follows a layered approach, building from network foundations to application-level integrity:</p>
+<h3>1. Network Hardening</h3>
+<ul>
+<li>Connection limits + backpressure</li>
+<li>Basic peer admission/rate limiting</li>
+<li>Bind TLS to DIDs</li>
+</ul>
+<h3>2. Message &amp; Identity Integrity ✅ COMPLETE (Phase 9)</h3>
+<ul>
+<li>✅ Signed envelopes at the protocol layer (SignedEnvelope with Ed25519)</li>
+<li>✅ Replay protection window (ReplayGuard with Bloom filters)</li>
+<li>✅ Clear story for internal vs external message trust (NetworkActor verifies all Signed messages)</li>
+</ul>
+<h3>3. Trust System Hardening</h3>
+<ul>
+<li>Cap/shape transitive trust</li>
+<li>Add decay</li>
+<li>Introduce basic evidence hooks for later &quot;participation-based trust&quot;</li>
+</ul>
+<h3>4. Key Lifecycle</h3>
+<ul>
+<li>Rotation events + DID transitions</li>
+<li>Prepare for multi-device identities (even if not fully wired yet)</li>
+</ul>
+<h3>5. Ledger &amp; Causal Consistency</h3>
+<ul>
+<li>Minimal ledger sync over gossip</li>
+<li>Causal handling policy (even if it&#39;s &quot;last writer wins + metrics&quot; at first)</li>
+</ul>
+<h2>1. Connection Flooding / DoS Prevention</h2>
+<p><strong>Priority:</strong> HIGH
+<strong>Effort:</strong> LOW
+<strong>Risk:</strong> Connection exhaustion, memory exhaustion, CPU exhaustion</p>
+<h3>Current State</h3>
+<ul>
+<li><code>handle_incoming</code> in <code>icn-net</code> accepts all connections</li>
+<li>No maximum peer limit</li>
+<li>No eviction policy</li>
+<li>No per-peer rate limiting</li>
+<li>Memory usage grows unbounded with peer count</li>
+</ul>
+<h3>Design Goal</h3>
+<p>Prevent a single malicious or malfunctioning node from:</p>
+<ul>
+<li>Exhausting file descriptors/sockets</li>
+<li>Consuming excessive CPU with handshakes</li>
+<li>Filling memory with connection state</li>
+</ul>
+<p>Maintain bounded resources:</p>
+<ul>
+<li>Bounded number of active peers</li>
+<li>Bounded number of pending handshakes</li>
+<li>Bounded memory per peer</li>
+</ul>
+<h3>Implementation Plan</h3>
+<h4>1.1 PeerRegistry + Limits</h4>
+<p>Create <code>icn-net/src/peer_registry.rs</code>:</p>
+<pre><code class="language-rust">pub struct PeerRegistry {
+    /// Active peer connections
+    active: HashMap&lt;Did, PeerInfo&gt;,
+
+    /// Maximum number of active peers
+    max_peers: usize,
+
+    /// Maximum number of pending handshakes
+    max_pending: usize,
+
+    /// Currently pending handshakes
+    pending: HashSet&lt;SocketAddr&gt;,
+}
+
+pub struct PeerInfo {
+    pub did: Did,
+    pub addr: SocketAddr,
+    pub connected_at: Instant,
+    pub last_activity: Instant,
+    pub bytes_sent: u64,
+    pub bytes_received: u64,
+    pub trust_score: f32,
+}
+
+impl PeerRegistry {
+    pub fn new(max_peers: usize, max_pending: usize) -&gt; Self;
+
+    pub fn is_full(&amp;self) -&gt; bool;
+
+    pub fn can_accept(&amp;self) -&gt; bool;
+
+    pub fn add_pending(&amp;mut self, addr: SocketAddr) -&gt; Result&lt;()&gt;;
+
+    pub fn promote_to_active(&amp;mut self, addr: SocketAddr, did: Did) -&gt; Result&lt;()&gt;;
+
+    pub fn remove(&amp;mut self, did: &amp;Did);
+
+    pub fn maybe_evict_for(&amp;mut self, candidate: &amp;PeerInfo) -&gt; Option&lt;Did&gt;;
+}
+</code></pre>
+<p>Configuration in <code>icn-core/src/config.rs</code>:</p>
+<pre><code class="language-toml">[network]
+max_peers = 100           # Maximum active peers
+max_pending_handshakes = 50  # Maximum concurrent handshakes
+</code></pre>
+<p>Integration in <code>icn-net/src/actor.rs</code>:</p>
+<pre><code class="language-rust">pub async fn handle_incoming(&amp;mut self, mut incoming: quinn::Incoming) {
+    while let Some(connecting) = incoming.next().await {
+        // Check if we can accept more connections
+        if !self.peer_registry.can_accept() {
+            icn_obs::metrics::network::connections_rejected_inc();
+            drop(connecting);
+            continue;
+        }
+
+        // Add to pending set
+        let addr = connecting.remote_address();
+        if let Err(e) = self.peer_registry.add_pending(addr) {
+            warn!(&quot;Cannot accept connection from {}: {}&quot;, addr, e);
+            drop(connecting);
+            continue;
+        }
+
+        // Spawn task to complete handshake
+        let registry = self.peer_registry.clone();
+        tokio::spawn(async move {
+            match connecting.await {
+                Ok(connection) =&gt; {
+                    // Complete handshake, extract DID, promote to active
+                    // ...
+                }
+                Err(e) =&gt; {
+                    warn!(&quot;Handshake failed from {}: {}&quot;, addr, e);
+                    registry.remove_pending(addr);
+                }
+            }
+        });
+    }
+}
+</code></pre>
+<h4>1.2 Eviction Policy</h4>
+<p>Implement LRU-style eviction with trust awareness:</p>
+<pre><code class="language-rust">impl PeerRegistry {
+    /// Evict lowest-value peer to make room for candidate
+    pub fn maybe_evict_for(&amp;mut self, candidate: &amp;PeerInfo) -&gt; Option&lt;Did&gt; {
+        if self.active.len() &lt; self.max_peers {
+            return None; // No eviction needed
+        }
+
+        // Find eviction candidate
+        let mut worst_peer: Option&lt;(&amp;Did, &amp;PeerInfo)&gt; = None;
+        let mut worst_score = f32::MAX;
+
+        for (did, info) in &amp;self.active {
+            // Compute eviction score (lower = more likely to evict)
+            let score = self.compute_eviction_score(info);
+
+            if score &lt; worst_score {
+                worst_score = score;
+                worst_peer = Some((did, info));
+            }
+        }
+
+        // Only evict if candidate is better than worst peer
+        if self.compute_eviction_score(candidate) &gt; worst_score {
+            worst_peer.map(|(did, _)| did.clone())
+        } else {
+            None // Reject candidate
+        }
+    }
+
+    fn compute_eviction_score(&amp;self, info: &amp;PeerInfo) -&gt; f32 {
+        // Higher score = keep peer
+        // Lower score = evict peer
+
+        let trust_weight = info.trust_score * 10.0;
+        let activity_weight = info.activity_score() * 5.0;
+        let age_penalty = info.connected_duration().as_secs() as f32 * 0.01;
+
+        trust_weight + activity_weight - age_penalty
+    }
+}
+
+impl PeerInfo {
+    fn activity_score(&amp;self) -&gt; f32 {
+        let seconds_since_activity = self.last_activity.elapsed().as_secs() as f32;
+        1.0 / (1.0 + seconds_since_activity / 60.0) // Decay over minutes
+    }
+
+    fn connected_duration(&amp;self) -&gt; Duration {
+        self.connected_at.elapsed()
+    }
+}
+</code></pre>
+<p>Prefer keeping peers with:</p>
+<ul>
+<li>Higher trust scores (from trust graph)</li>
+<li>Recent activity</li>
+<li>Stable connections</li>
+</ul>
+<p>Evict peers with:</p>
+<ul>
+<li>Low trust scores</li>
+<li>No recent activity</li>
+<li>Connection issues</li>
+</ul>
+<h4>1.3 Per-Peer Rate Limiting</h4>
+<p>Add per-peer bandwidth tracking and throttling:</p>
+<pre><code class="language-rust">pub struct PeerRateLimiter {
+    /// Bytes per second limit
+    bytes_per_sec: u64,
+
+    /// Current window
+    window_start: Instant,
+    window_bytes: u64,
+}
+
+impl PeerRateLimiter {
+    pub fn check_and_update(&amp;mut self, bytes: u64) -&gt; Result&lt;(), RateLimitError&gt; {
+        // Reset window if needed
+        let now = Instant::now();
+        if now.duration_since(self.window_start) &gt;= Duration::from_secs(1) {
+            self.window_start = now;
+            self.window_bytes = 0;
+        }
+
+        // Check limit
+        if self.window_bytes + bytes &gt; self.bytes_per_sec {
+            return Err(RateLimitError::ExceededLimit);
+        }
+
+        self.window_bytes += bytes;
+        Ok(())
+    }
+}
+</code></pre>
+<p>Integrate into message handling:</p>
+<pre><code class="language-rust">async fn handle_peer_message(&amp;mut self, peer: &amp;Did, msg: NetworkMessage) -&gt; Result&lt;()&gt; {
+    let msg_size = msg.encoded_size();
+
+    // Check per-peer rate limit
+    if let Some(info) = self.peer_registry.get_mut(peer) {
+        if let Err(e) = info.rate_limiter.check_and_update(msg_size) {
+            warn!(&quot;Rate limited peer {}: {:?}&quot;, peer, e);
+            icn_obs::metrics::network::peer_rate_limited_inc(peer);
+            return Err(e.into());
+        }
+
+        info.bytes_received += msg_size;
+        info.last_activity = Instant::now();
+    }
+
+    // Process message
+    self.route_message(msg).await
+}
+</code></pre>
+<h4>1.4 Metrics</h4>
+<p>Add Prometheus metrics for monitoring:</p>
+<pre><code class="language-rust">// In icn-obs/src/metrics/network.rs
+
+/// Total connections accepted
+pub fn connections_total_inc();
+
+/// Total connections rejected (at capacity)
+pub fn connections_rejected_inc();
+
+/// Current active peer count
+pub fn active_peers_set(count: usize);
+
+/// Current pending handshake count
+pub fn pending_handshakes_set(count: usize);
+
+/// Per-peer rate limiting events
+pub fn peer_rate_limited_inc(peer: &amp;Did);
+
+/// Peer eviction events
+pub fn peer_evicted_inc(reason: &amp;str);
+</code></pre>
+<h3>Testing</h3>
+<p>Create <code>icn-net/tests/connection_limits.rs</code>:</p>
+<pre><code class="language-rust">#[tokio::test]
+async fn test_connection_limit_enforcement() {
+    // Create node with max_peers = 3
+    // Attempt to connect 5 peers
+    // Verify only 3 are accepted
+}
+
+#[tokio::test]
+async fn test_eviction_policy() {
+    // Create node with max_peers = 2
+    // Connect 3 peers with different trust scores
+    // Verify lowest trust peer is evicted
+}
+
+#[tokio::test]
+async fn test_pending_handshake_limit() {
+    // Create node with max_pending = 2
+    // Initiate 4 connections but don&#39;t complete handshake
+    // Verify only 2 are pending, others rejected
+}
+
+#[tokio::test]
+async fn test_per_peer_rate_limiting() {
+    // Connect peer
+    // Send messages rapidly
+    // Verify rate limiting kicks in
+}
+</code></pre>
+<h2>2. DID-TLS Binding (MITM Prevention)</h2>
+<p><strong>Priority:</strong> CRITICAL
+<strong>Effort:</strong> MODERATE
+<strong>Risk:</strong> Man-in-the-middle attacks, identity spoofing</p>
+<h3>Current State</h3>
+<ul>
+<li>Self-signed TLS certificates generated at runtime</li>
+<li>No cryptographic binding between TLS cert and DID</li>
+<li>Peer can claim any DID without proof of key ownership</li>
+<li>TLS provides channel security but not endpoint authentication</li>
+</ul>
+<p><strong>This is the foundational vulnerability that undermines the entire trust model.</strong></p>
+<h3>Design Goal</h3>
+<p>Establish cryptographic proof that:</p>
+<ul>
+<li>The TLS peer holds the private key for their claimed DID</li>
+<li>The TLS connection is authenticated by DID keys, not runtime-generated certs</li>
+<li>Any peer can verify the binding without external PKI</li>
+</ul>
+<h3>Implementation Plan</h3>
+<h4>2.1 Identity Bundle Architecture</h4>
+<p>Create <code>icn-identity/src/bundle.rs</code>:</p>
+<pre><code class="language-rust">/// Cryptographically bound identity bundle
+pub struct IdentityBundle {
+    /// The DID for this identity
+    pub did: Did,
+
+    /// Ed25519 keypair for DID operations (signing, etc.)
+    pub did_keypair: KeyPair,
+
+    /// TLS certificate (self-signed)
+    pub tls_cert: rustls::Certificate,
+
+    /// TLS private key
+    pub tls_key: rustls::PrivateKey,
+
+    /// Binding signature proving ownership
+    /// Signature = Sign_did_key(SHA256(tls_cert))
+    pub tls_binding_sig: Vec&lt;u8&gt;,
+
+    /// Timestamp when binding was created
+    pub created_at: u64,
+}
+
+impl IdentityBundle {
+    /// Generate new identity bundle with bound TLS cert
+    pub fn generate() -&gt; Result&lt;Self&gt; {
+        // 1. Generate Ed25519 keypair for DID
+        let did_keypair = KeyPair::generate()?;
+        let did = did_keypair.did().clone();
+
+        // 2. Generate TLS certificate
+        // Option A: Use same Ed25519 key (convert to x25519 if needed)
+        // Option B: Generate separate key and sign binding
+        let (tls_cert, tls_key) = Self::generate_tls_cert(&amp;did_keypair)?;
+
+        // 3. Compute cert hash and sign with DID key
+        let cert_hash = Self::hash_certificate(&amp;tls_cert);
+        let tls_binding_sig = did_keypair.sign(&amp;cert_hash)?;
+
+        Ok(IdentityBundle {
+            did,
+            did_keypair,
+            tls_cert,
+            tls_key,
+            tls_binding_sig,
+            created_at: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+        })
+    }
+
+    /// Verify the TLS binding signature
+    pub fn verify_binding(&amp;self) -&gt; Result&lt;()&gt; {
+        let cert_hash = Self::hash_certificate(&amp;self.tls_cert);
+        self.did.verify(&amp;cert_hash, &amp;self.tls_binding_sig)?;
+        Ok(())
+    }
+
+    fn generate_tls_cert(keypair: &amp;KeyPair) -&gt; Result&lt;(rustls::Certificate, rustls::PrivateKey)&gt; {
+        // Generate self-signed cert with:
+        // - Subject: DID as CN
+        // - SAN extension: DID as URI
+        // - Key: Derived from or separate from DID key
+
+        use rcgen::{Certificate, CertificateParams, DnType};
+
+        let mut params = CertificateParams::default();
+        params.distinguished_name.push(
+            DnType::CommonName,
+            keypair.did().to_string()
+        );
+        params.subject_alt_names = vec![
+            rcgen::SanType::URI(keypair.did().to_string()),
+        ];
+
+        // Use Ed25519 key directly or convert
+        let cert = Certificate::from_params(params)?;
+        let cert_der = cert.serialize_der()?;
+        let key_der = cert.serialize_private_key_der();
+
+        Ok((
+            rustls::Certificate(cert_der),
+            rustls::PrivateKey(key_der),
+        ))
+    }
+
+    fn hash_certificate(cert: &amp;rustls::Certificate) -&gt; [u8; 32] {
+        use sha2::{Sha256, Digest};
+        let mut hasher = Sha256::new();
+        hasher.update(&amp;cert.0);
+        hasher.finalize().into()
+    }
+}
+</code></pre>
+<h4>2.2 Protocol Handshake Extension</h4>
+<p>Define handshake message in <code>icn-net/src/protocol.rs</code>:</p>
+<pre><code class="language-rust">/// Initial protocol handshake message
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HelloMessage {
+    /// Claimed DID
+    pub did: Did,
+
+    /// SHA256 hash of TLS certificate
+    pub tls_cert_hash: [u8; 32],
+
+    /// Signature proving DID owns cert
+    /// Signature = Sign_did_key(tls_cert_hash)
+    pub tls_binding_sig: Vec&lt;u8&gt;,
+
+    /// Protocol version
+    pub protocol_version: u32,
+
+    /// Optional: Topology info (region, cluster)
+    pub topology_info: Option&lt;TopologyInfo&gt;,
+}
+
+impl HelloMessage {
+    pub fn new(bundle: &amp;IdentityBundle, topology: Option&lt;TopologyInfo&gt;) -&gt; Self {
+        let tls_cert_hash = IdentityBundle::hash_certificate(&amp;bundle.tls_cert);
+
+        HelloMessage {
+            did: bundle.did.clone(),
+            tls_cert_hash,
+            tls_binding_sig: bundle.tls_binding_sig.clone(),
+            protocol_version: 1,
+            topology_info: topology,
+        }
+    }
+
+    /// Verify the binding signature
+    pub fn verify(&amp;self, peer_cert: &amp;rustls::Certificate) -&gt; Result&lt;()&gt; {
+        // 1. Hash the certificate we received via TLS
+        let actual_hash = IdentityBundle::hash_certificate(peer_cert);
+
+        // 2. Verify it matches claimed hash
+        if actual_hash != self.tls_cert_hash {
+            return Err(anyhow!(&quot;TLS certificate hash mismatch&quot;));
+        }
+
+        // 3. Verify signature with DID public key
+        self.did.verify(&amp;self.tls_cert_hash, &amp;self.tls_binding_sig)?;
+
+        Ok(())
+    }
+}
+</code></pre>
+<h4>2.3 TLS Configuration Update</h4>
+<p>Update <code>icn-net/src/tls.rs</code>:</p>
+<pre><code class="language-rust">/// Create TLS config from identity bundle
+pub fn create_tls_config(bundle: &amp;IdentityBundle) -&gt; Result&lt;rustls::ServerConfig&gt; {
+    // Verify bundle integrity before using
+    bundle.verify_binding()?;
+
+    let cert_chain = vec![bundle.tls_cert.clone()];
+    let key = bundle.tls_key.clone();
+
+    let mut config = rustls::ServerConfig::builder()
+        .with_safe_defaults()
+        .with_no_client_auth()
+        .with_single_cert(cert_chain, key)?;
+
+    // Use custom verifier that checks DID binding
+    config.dangerous()
+        .set_certificate_verifier(Arc::new(DidBindingVerifier::new()));
+
+    Ok(config)
+}
+
+/// Custom certificate verifier that enforces DID binding
+struct DidBindingVerifier {
+    // Store pending verifications
+    pending: Arc&lt;RwLock&lt;HashMap&lt;Vec&lt;u8&gt;, HelloMessage&gt;&gt;&gt;,
+}
+
+impl rustls::client::ServerCertVerifier for DidBindingVerifier {
+    fn verify_server_cert(
+        &amp;self,
+        end_entity: &amp;rustls::Certificate,
+        intermediates: &amp;[rustls::Certificate],
+        server_name: &amp;rustls::ServerName,
+        scts: &amp;mut dyn Iterator&lt;Item = &amp;[u8]&gt;,
+        ocsp_response: &amp;[u8],
+        now: std::time::SystemTime,
+    ) -&gt; Result&lt;rustls::client::ServerCertVerified, rustls::Error&gt; {
+        // Accept the cert at TLS layer
+        // We&#39;ll verify DID binding in the application handshake
+        Ok(rustls::client::ServerCertVerified::assertion())
+    }
+}
+</code></pre>
+<h4>2.4 Connection Handshake Flow</h4>
+<p>Update <code>icn-net/src/actor.rs</code>:</p>
+<pre><code class="language-rust">async fn complete_connection_handshake(
+    &amp;mut self,
+    connection: quinn::Connection,
+) -&gt; Result&lt;Did&gt; {
+    // 1. Extract TLS certificate from QUIC connection
+    let peer_cert = connection
+        .peer_identity()
+        .and_then(|id| id.downcast::&lt;Vec&lt;rustls::Certificate&gt;&gt;().ok())
+        .and_then(|certs| certs.first().cloned())
+        .ok_or_else(|| anyhow!(&quot;No peer certificate&quot;))?;
+
+    // 2. Send our HelloMessage
+    let (mut send, mut recv) = connection.open_bi().await?;
+    let our_hello = HelloMessage::new(&amp;self.identity_bundle, self.topology_config.clone());
+    write_message(&amp;mut send, &amp;our_hello).await?;
+
+    // 3. Receive peer HelloMessage
+    let peer_hello: HelloMessage = read_message(&amp;mut recv).await?;
+
+    // 4. Verify DID-TLS binding
+    peer_hello.verify(&amp;peer_cert).context(&quot;DID-TLS binding verification failed&quot;)?;
+
+    // 5. Update topology if provided
+    if let Some(topology) = peer_hello.topology_info {
+        self.update_neighbor_sets(&amp;peer_hello.did, topology);
+    }
+
+    info!(&quot;✅ Verified DID-TLS binding for {}&quot;, peer_hello.did);
+
+    Ok(peer_hello.did)
+}
+
+async fn handle_incoming_connection(
+    &amp;mut self,
+    connection: quinn::Connection,
+) -&gt; Result&lt;()&gt; {
+    // Complete handshake and verify DID binding
+    let peer_did = self.complete_connection_handshake(connection.clone()).await?;
+
+    // Register peer
+    self.peer_registry.add_peer(peer_did.clone(), connection)?;
+
+    // Spawn message handler
+    self.spawn_connection_handler(peer_did, connection).await;
+
+    Ok(())
+}
+</code></pre>
+<h4>2.5 Backwards Compatibility</h4>
+<p>Add configuration flag:</p>
+<pre><code class="language-toml">[network.security]
+# Enforce DID-TLS binding (disable only for testing)
+enforce_did_tls_binding = true
+
+# Allow insecure connections in development
+dev_mode = false
+</code></pre>
+<pre><code class="language-rust">impl NetworkActor {
+    async fn verify_peer(&amp;self, hello: &amp;HelloMessage, cert: &amp;rustls::Certificate) -&gt; Result&lt;()&gt; {
+        if !self.config.enforce_did_tls_binding || self.config.dev_mode {
+            warn!(&quot;⚠️  DID-TLS binding verification disabled (dev mode)&quot;);
+            return Ok(());
+        }
+
+        hello.verify(cert)
+    }
+}
+</code></pre>
+<h3>Testing</h3>
+<p>Create <code>icn-identity/tests/bundle_tests.rs</code>:</p>
+<pre><code class="language-rust">#[test]
+fn test_bundle_generation() {
+    let bundle = IdentityBundle::generate().unwrap();
+    assert!(bundle.verify_binding().is_ok());
+}
+
+#[test]
+fn test_binding_tampering() {
+    let mut bundle = IdentityBundle::generate().unwrap();
+
+    // Tamper with signature
+    bundle.tls_binding_sig[0] ^= 0xFF;
+
+    assert!(bundle.verify_binding().is_err());
+}
+</code></pre>
+<p>Create <code>icn-net/tests/did_tls_binding.rs</code>:</p>
+<pre><code class="language-rust">#[tokio::test]
+async fn test_valid_did_tls_binding() {
+    // Create two nodes with proper bindings
+    // Connect them
+    // Verify handshake succeeds
+}
+
+#[tokio::test]
+async fn test_reject_mismatched_did() {
+    // Create node A with DID_A
+    // Create node B with DID_B
+    // Node B claims DID_A in HelloMessage
+    // Verify connection is rejected
+}
+
+#[tokio::test]
+async fn test_reject_invalid_signature() {
+    // Create valid bundle
+    // Tamper with signature
+    // Attempt connection
+    // Verify rejection
+}
+</code></pre>
+<h2>3. Message Verification Between Nodes</h2>
+<p><strong>Priority:</strong> CRITICAL
+<strong>Effort:</strong> MODERATE
+<strong>Risk:</strong> Message tampering, replay attacks, spoofing</p>
+<h3>Current State</h3>
+<ul>
+<li>QUIC/TLS provides channel integrity</li>
+<li>No application-level message signing</li>
+<li>No replay protection</li>
+<li>Cannot verify message origin beyond TLS session</li>
+</ul>
+<h3>Design Goal</h3>
+<p>Every application-level message must:</p>
+<ul>
+<li>Be signed by sender&#39;s DID key</li>
+<li>Include freshness/sequence information</li>
+<li>Be verifiable by any receiver</li>
+<li>Prevent replay attacks</li>
+</ul>
+<h3>Implementation Plan</h3>
+<h4>3.1 SignedEnvelope Protocol</h4>
+<p>Create <code>icn-net/src/envelope.rs</code>:</p>
+<pre><code class="language-rust">/// Application-level signed message envelope
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SignedEnvelope {
+    /// Sender DID (verified via signature)
+    pub from: Did,
+
+    /// Monotonic sequence number (per-sender)
+    pub sequence: u64,
+
+    /// Timestamp (milliseconds since epoch)
+    pub timestamp: u64,
+
+    /// Payload type discriminator
+    pub payload_type: PayloadType,
+
+    /// Serialized payload bytes
+    pub payload: Vec&lt;u8&gt;,
+
+    /// Ed25519 signature over canonical encoding
+    /// Signature = Sign_from(sequence || timestamp || payload_type || payload)
+    pub signature: Vec&lt;u8&gt;,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum PayloadType {
+    Gossip = 1,
+    Ledger = 2,
+    Trust = 3,
+    Contract = 4,
+    Rpc = 5,
+}
+
+impl SignedEnvelope {
+    /// Create and sign a new envelope
+    pub fn new(
+        from: &amp;Did,
+        keypair: &amp;KeyPair,
+        sequence: u64,
+        payload_type: PayloadType,
+        payload: Vec&lt;u8&gt;,
+    ) -&gt; Result&lt;Self&gt; {
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)?
+            .as_millis() as u64;
+
+        let mut envelope = SignedEnvelope {
+            from: from.clone(),
+            sequence,
+            timestamp,
+            payload_type,
+            payload,
+            signature: Vec::new(),
+        };
+
+        // Compute signature over canonical encoding
+        let sig_input = envelope.canonical_encoding();
+        envelope.signature = keypair.sign(&amp;sig_input)?;
+
+        Ok(envelope)
+    }
+
+    /// Verify signature and freshness
+    pub fn verify(&amp;self, max_age_secs: u64) -&gt; Result&lt;()&gt; {
+        // 1. Verify signature
+        let sig_input = self.canonical_encoding();
+        self.from.verify(&amp;sig_input, &amp;self.signature)?;
+
+        // 2. Check timestamp freshness
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)?
+            .as_millis() as u64;
+
+        let age = now.saturating_sub(self.timestamp) / 1000;
+        if age &gt; max_age_secs {
+            return Err(anyhow!(&quot;Message too old: {} seconds&quot;, age));
+        }
+
+        Ok(())
+    }
+
+    fn canonical_encoding(&amp;self) -&gt; Vec&lt;u8&gt; {
+        // Deterministic encoding for signing
+        let mut buf = Vec::new();
+        buf.extend_from_slice(self.from.as_bytes());
+        buf.extend_from_slice(&amp;self.sequence.to_be_bytes());
+        buf.extend_from_slice(&amp;self.timestamp.to_be_bytes());
+        buf.push(self.payload_type as u8);
+        buf.extend_from_slice(&amp;self.payload);
+        buf
+    }
+
+    /// Deserialize payload
+    pub fn decode_payload&lt;T: serde::de::DeserializeOwned&gt;(&amp;self) -&gt; Result&lt;T&gt; {
+        bincode::deserialize(&amp;self.payload)
+            .context(&quot;Failed to deserialize payload&quot;)
+    }
+}
+</code></pre>
+<h4>3.2 Sequence Number Tracking</h4>
+<p>Create <code>icn-net/src/replay_guard.rs</code>:</p>
+<pre><code class="language-rust">/// Per-peer sequence tracking for replay protection
+pub struct ReplayGuard {
+    /// Last seen sequence per peer
+    sequences: HashMap&lt;Did, SequenceWindow&gt;,
+
+    /// Maximum allowed clock skew (seconds)
+    max_clock_skew: u64,
+}
+
+struct SequenceWindow {
+    /// Highest sequence number seen
+    max_seq: u64,
+
+    /// Bloom filter of recent sequences (for out-of-order)
+    recent: BloomFilter,
+
+    /// Last update time
+    last_update: Instant,
+}
+
+impl ReplayGuard {
+    pub fn new(max_clock_skew: u64) -&gt; Self {
+        ReplayGuard {
+            sequences: HashMap::new(),
+            max_clock_skew,
+        }
+    }
+
+    /// Check if message is fresh (not replayed)
+    pub fn check(&amp;mut self, envelope: &amp;SignedEnvelope) -&gt; Result&lt;()&gt; {
+        // Verify signature and age
+        envelope.verify(self.max_clock_skew)?;
+
+        // Get or create sequence window
+        let window = self.sequences
+            .entry(envelope.from.clone())
+            .or_insert_with(|| SequenceWindow::new());
+
+        // Check sequence number
+        if envelope.sequence &lt;= window.max_seq {
+            // Could be replay or out-of-order
+            if window.recent.contains(&amp;envelope.sequence.to_be_bytes()) {
+                return Err(anyhow!(&quot;Replay detected: sequence {}&quot;, envelope.sequence));
+            }
+        }
+
+        // Update window
+        window.max_seq = window.max_seq.max(envelope.sequence);
+        window.recent.insert(&amp;envelope.sequence.to_be_bytes());
+        window.last_update = Instant::now();
+
+        Ok(())
+    }
+
+    /// Periodic cleanup of stale windows
+    pub fn cleanup(&amp;mut self, max_age: Duration) {
+        let now = Instant::now();
+        self.sequences.retain(|_, window| {
+            now.duration_since(window.last_update) &lt; max_age
+        });
+    }
+}
+
+impl SequenceWindow {
+    fn new() -&gt; Self {
+        SequenceWindow {
+            max_seq: 0,
+            recent: BloomFilter::new(10000, 0.001), // 10k recent, 0.1% FP rate
+            last_update: Instant::now(),
+        }
+    }
+}
+</code></pre>
+<h4>3.3 Actor Integration</h4>
+<p>Update actors to use <code>SignedEnvelope</code>:</p>
+<pre><code class="language-rust">// In icn-net/src/actor.rs
+
+/// Outgoing message with auto-signing
+pub async fn send_message(&amp;mut self, to: Did, payload_type: PayloadType, payload: Vec&lt;u8&gt;) -&gt; Result&lt;()&gt; {
+    // Get next sequence number
+    let sequence = self.next_sequence();
+
+    // Create signed envelope
+    let envelope = SignedEnvelope::new(
+        &amp;self.identity_bundle.did,
+        &amp;self.identity_bundle.did_keypair,
+        sequence,
+        payload_type,
+        payload,
+    )?;
+
+    // Send over QUIC
+    self.send_envelope(to, envelope).await
+}
+
+/// Incoming message with verification
+async fn handle_envelope(&amp;mut self, from: Did, envelope: SignedEnvelope) -&gt; Result&lt;()&gt; {
+    // Verify signature and replay
+    self.replay_guard.check(&amp;envelope)?;
+
+    // Route to appropriate actor based on payload_type
+    match envelope.payload_type {
+        PayloadType::Gossip =&gt; {
+            let msg: GossipMessage = envelope.decode_payload()?;
+            self.route_to_gossip(from, msg).await
+        }
+        PayloadType::Ledger =&gt; {
+            let msg: LedgerMessage = envelope.decode_payload()?;
+            self.route_to_ledger(from, msg).await
+        }
+        // ... other types
+    }
+}
+</code></pre>
+<h4>3.4 Internal Actor Messages</h4>
+<p>For internal actor communication (same process), define typed messages:</p>
+<pre><code class="language-rust">// In icn-core/src/messages.rs
+
+/// Internal actor message enum (no crypto needed)
+pub enum ActorMessage {
+    Gossip(GossipMessage),
+    Ledger(LedgerMessage),
+    Trust(TrustMessage),
+    Contract(ContractMessage),
+    Network(NetworkMessage),
+}
+
+impl ActorMessage {
+    pub fn gossip(msg: GossipMessage) -&gt; Self {
+        ActorMessage::Gossip(msg)
+    }
+
+    // ... constructors for each type
+}
+
+/// Actor message handler trait
+#[async_trait]
+pub trait ActorHandler {
+    async fn handle(&amp;mut self, msg: ActorMessage) -&gt; Result&lt;()&gt;;
+}
+</code></pre>
+<p>Replace closure-based callbacks with typed message passing:</p>
+<pre><code class="language-rust">// Before (closure)
+let callback: Arc&lt;dyn Fn(GossipMessage) + Send + Sync&gt; = Arc::new(|msg| {
+    // ...
+});
+
+// After (typed message)
+actor.send(ActorMessage::gossip(msg)).await?;
+</code></pre>
+<h3>Testing</h3>
+<p>Create <code>icn-net/tests/signed_envelopes.rs</code>:</p>
+<pre><code class="language-rust">#[test]
+fn test_envelope_signing() {
+    let keypair = KeyPair::generate().unwrap();
+    let did = keypair.did().clone();
+
+    let envelope = SignedEnvelope::new(
+        &amp;did,
+        &amp;keypair,
+        1,
+        PayloadType::Gossip,
+        b&quot;test payload&quot;.to_vec(),
+    ).unwrap();
+
+    assert!(envelope.verify(300).is_ok());
+}
+
+#[test]
+fn test_tampered_envelope() {
+    let keypair = KeyPair::generate().unwrap();
+    let mut envelope = SignedEnvelope::new(
+        keypair.did(),
+        &amp;keypair,
+        1,
+        PayloadType::Gossip,
+        b&quot;test payload&quot;.to_vec(),
+    ).unwrap();
+
+    // Tamper with payload
+    envelope.payload[0] ^= 0xFF;
+
+    assert!(envelope.verify(300).is_err());
+}
+
+#[tokio::test]
+async fn test_replay_detection() {
+    let mut guard = ReplayGuard::new(300);
+    let keypair = KeyPair::generate().unwrap();
+
+    let envelope = SignedEnvelope::new(
+        keypair.did(),
+        &amp;keypair,
+        1,
+        PayloadType::Gossip,
+        b&quot;test&quot;.to_vec(),
+    ).unwrap();
+
+    // First delivery: OK
+    assert!(guard.check(&amp;envelope).is_ok());
+
+    // Replay: Rejected
+    assert!(guard.check(&amp;envelope).is_err());
+}
+</code></pre>
+<h2>4. Trust Inflation &amp; Decay</h2>
+<p><strong>Priority:</strong> MEDIUM
+<strong>Effort:</strong> MODERATE
+<strong>Risk:</strong> Trust loops, unbounded trust, stale trust values</p>
+<h3>Current State</h3>
+<ul>
+<li>Weighted directed graph with simple path lookup</li>
+<li>No decay over time</li>
+<li>No cycle handling</li>
+<li>No cap on transitive trust</li>
+<li>No distinction between trust sources</li>
+</ul>
+<h3>Design Goal</h3>
+<ul>
+<li>Prevent &quot;trust loops&quot; where mutual vouching inflates scores</li>
+<li>Ground trust values in time and participation</li>
+<li>Cap transitive trust propagation</li>
+<li>Prepare for participation-based trust signals</li>
+</ul>
+<h3>Implementation Plan</h3>
+<h4>4.1 Trust Edge Metadata</h4>
+<p>Update <code>icn-trust/src/types.rs</code>:</p>
+<pre><code class="language-rust">#[derive(Debug, Clone)]
+pub struct TrustEdge {
+    pub from: Did,
+    pub to: Did,
+    pub weight: f64,           // [0.0, 1.0]
+    pub timestamp: u64,        // When edge was created/updated
+    pub kind: TrustKind,       // Source of trust
+    pub evidence: Vec&lt;TrustEvidence&gt;,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TrustKind {
+    /// Manually set by user
+    Manual,
+
+    /// Derived from participation (ledger, contracts, etc.)
+    Participation,
+
+    /// System-level trust (bootstrap nodes, etc.)
+    System,
+}
+
+#[derive(Debug, Clone)]
+pub enum TrustEvidence {
+    LedgerCooperation {
+        transaction_count: u64,
+        total_value: i64,
+    },
+    ContractSuccess {
+        contract_id: String,
+        execution_count: u64,
+    },
+    ManualVouch {
+        note: String,
+    },
+}
+</code></pre>
+<h4>4.2 Bounded Transitive Trust Computation</h4>
+<p>Update <code>icn-trust/src/compute.rs</code>:</p>
+<pre><code class="language-rust">pub struct TrustComputeConfig {
+    /// Maximum path depth for transitive trust
+    pub max_depth: usize,
+
+    /// Per-hop decay factor (multiplied at each step)
+    pub hop_decay: f64,
+
+    /// Time decay rate (exponential)
+    pub time_decay_lambda: f64,
+
+    /// Minimum edge weight to consider
+    pub min_edge_weight: f64,
+}
+
+impl Default for TrustComputeConfig {
+    fn default() -&gt; Self {
+        TrustComputeConfig {
+            max_depth: 3,              // Max 3 hops
+            hop_decay: 0.7,            // 70% retained per hop
+            time_decay_lambda: 0.0001, // Slow decay
+            min_edge_weight: 0.1,      // Ignore weak edges
+        }
+    }
+}
+
+impl TrustGraph {
+    pub fn compute_trust_with_config(
+        &amp;self,
+        from: &amp;Did,
+        to: &amp;Did,
+        config: &amp;TrustComputeConfig,
+    ) -&gt; f64 {
+        let now = current_timestamp();
+
+        // BFS with depth limit
+        let mut visited = HashSet::new();
+        let mut max_trust = 0.0;
+
+        self.explore_paths(
+            from,
+            to,
+            &amp;config,
+            0,      // current depth
+            1.0,    // current trust (no decay yet)
+            now,
+            &amp;mut visited,
+            &amp;mut max_trust,
+        );
+
+        max_trust.min(1.0)
+    }
+
+    fn explore_paths(
+        &amp;self,
+        current: &amp;Did,
+        target: &amp;Did,
+        config: &amp;TrustComputeConfig,
+        depth: usize,
+        path_trust: f64,
+        now: u64,
+        visited: &amp;mut HashSet&lt;Did&gt;,
+        max_trust: &amp;mut f64,
+    ) {
+        // Base cases
+        if depth &gt;= config.max_depth {
+            return;
+        }
+        if visited.contains(current) {
+            return; // Prevent cycles
+        }
+        if path_trust &lt; config.min_edge_weight {
+            return; // Path too weak
+        }
+
+        visited.insert(current.clone());
+
+        // Get outgoing edges
+        for edge in self.get_outgoing_edges(current) {
+            // Apply time decay to edge weight
+            let age = now.saturating_sub(edge.timestamp);
+            let decayed_weight = edge.weight * Self::time_decay(age, config.time_decay_lambda);
+
+            if decayed_weight &lt; config.min_edge_weight {
+                continue;
+            }
+
+            // Apply hop decay
+            let new_trust = path_trust * decayed_weight * config.hop_decay;
+
+            if edge.to == *target {
+                // Found target
+                *max_trust = max_trust.max(new_trust);
+            } else {
+                // Continue exploring
+                self.explore_paths(
+                    &amp;edge.to,
+                    target,
+                    config,
+                    depth + 1,
+                    new_trust,
+                    now,
+                    visited,
+                    max_trust,
+                );
+            }
+        }
+
+        visited.remove(current);
+    }
+
+    fn time_decay(age_seconds: u64, lambda: f64) -&gt; f64 {
+        // Exponential decay: e^(-λ * t)
+        let t = age_seconds as f64;
+        (-lambda * t).exp()
+    }
+}
+</code></pre>
+<h4>4.3 Participation Evidence Hooks</h4>
+<p>Add API for future participation tracking:</p>
+<pre><code class="language-rust">// In icn-trust/src/events.rs
+
+pub enum TrustEvent {
+    /// Manual trust update
+    ManualUpdate {
+        from: Did,
+        to: Did,
+        delta: f64,
+        note: String,
+    },
+
+    /// Ledger cooperation observed
+    LedgerCoop {
+        party_a: Did,
+        party_b: Did,
+        amount: i64,
+    },
+
+    /// Successful contract execution
+    ContractSuccess {
+        participants: Vec&lt;Did&gt;,
+        contract_id: String,
+    },
+
+    /// Observed reliable message delivery
+    NetworkReliability {
+        peer: Did,
+        messages_delivered: u64,
+    },
+}
+
+impl TrustGraph {
+    /// Process trust event and update graph
+    pub fn process_event(&amp;mut self, event: TrustEvent) -&gt; Result&lt;()&gt; {
+        match event {
+            TrustEvent::ManualUpdate { from, to, delta, note } =&gt; {
+                self.update_manual_trust(from, to, delta, note)?;
+            }
+            TrustEvent::LedgerCoop { party_a, party_b, amount } =&gt; {
+                // Future: Derive trust from successful ledger cooperation
+                // For now: no-op, just log
+                info!(&quot;Ledger cooperation: {} &lt;-&gt; {} ({})&quot;, party_a, party_b, amount);
+            }
+            TrustEvent::ContractSuccess { participants, contract_id } =&gt; {
+                // Future: Multi-party contract builds trust between all participants
+                info!(&quot;Contract success: {:?} in {}&quot;, participants, contract_id);
+            }
+            TrustEvent::NetworkReliability { peer, messages_delivered } =&gt; {
+                // Future: Reliable peers earn minor trust bump
+                info!(&quot;Peer {} delivered {} messages&quot;, peer, messages_delivered);
+            }
+        }
+        Ok(())
+    }
+}
+</code></pre>
+<p>Emit events from other subsystems:</p>
+<pre><code class="language-rust">// In icn-ledger/src/ledger.rs
+impl Ledger {
+    async fn apply_entry(&amp;mut self, entry: JournalEntry) -&gt; Result&lt;()&gt; {
+        // ... existing logic ...
+
+        // Emit trust event for successful cooperation
+        if let Some(trust_graph) = &amp;self.trust_graph {
+            trust_graph.write().await.process_event(TrustEvent::LedgerCoop {
+                party_a: entry.from.clone(),
+                party_b: entry.to.clone(),
+                amount: entry.amount,
+            })?;
+        }
+
+        Ok(())
+    }
+}
+</code></pre>
+<h4>4.4 Trust Classes with Bounded Computation</h4>
+<p>Update trust class computation to use new bounded algorithm:</p>
+<pre><code class="language-rust">impl TrustGraph {
+    pub fn classify_peer(&amp;self, peer: &amp;Did) -&gt; TrustClass {
+        let config = TrustComputeConfig::default();
+        let score = self.compute_trust_with_config(&amp;self.owner_did, peer, &amp;config);
+
+        match score {
+            s if s &gt;= 0.7 =&gt; TrustClass::Federated,
+            s if s &gt;= 0.4 =&gt; TrustClass::Partner,
+            s if s &gt;= 0.1 =&gt; TrustClass::Known,
+            _ =&gt; TrustClass::Isolated,
+        }
+    }
+}
+</code></pre>
+<h3>Testing</h3>
+<p>Create <code>icn-trust/tests/bounded_trust.rs</code>:</p>
+<pre><code class="language-rust">#[test]
+fn test_depth_limited_paths() {
+    // Create chain: A -&gt; B -&gt; C -&gt; D -&gt; E
+    // With max_depth=3, A should not reach E
+}
+
+#[test]
+fn test_cycle_prevention() {
+    // Create cycle: A -&gt; B -&gt; C -&gt; A
+    // Verify computation terminates and doesn&#39;t inflate trust
+}
+
+#[test]
+fn test_time_decay() {
+    // Create edge with old timestamp
+    // Verify trust score is reduced
+}
+
+#[test]
+fn test_hop_decay() {
+    // Create path: A -1.0-&gt; B -1.0-&gt; C
+    // With hop_decay=0.7, trust(A,C) should be ~0.7, not 1.0
+}
+</code></pre>
+<h2>5. Key Rotation &amp; DID Transitions</h2>
+<p><strong>Priority:</strong> MEDIUM
+<strong>Effort:</strong> MODERATE
+<strong>Risk:</strong> Lost keys, identity continuity, trust graph consistency</p>
+<h3>Current State</h3>
+<ul>
+<li>Single Ed25519 keypair per DID</li>
+<li>No rotation mechanism</li>
+<li>No migration path if key is compromised</li>
+<li>No multi-device support</li>
+</ul>
+<h3>Design Goal</h3>
+<ul>
+<li>Allow keypairs to rotate without losing identity</li>
+<li>Maintain continuity of trust relationships</li>
+<li>Prepare for multi-device scenarios</li>
+<li>Preserve ledger and contract history</li>
+</ul>
+<h3>Implementation Plan</h3>
+<h4>5.1 Rotation Event Type</h4>
+<p>Create <code>icn-identity/src/rotation.rs</code>:</p>
+<pre><code class="language-rust">/// Key rotation event proving ownership of both old and new keys
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KeyRotationEvent {
+    /// Old DID being rotated away from
+    pub old_did: Did,
+
+    /// New DID being rotated to
+    pub new_did: Did,
+
+    /// Signature by old key over (old_did || new_did)
+    pub old_key_signature: Vec&lt;u8&gt;,
+
+    /// Signature by new key over (old_did || new_did)
+    pub new_key_signature: Vec&lt;u8&gt;,
+
+    /// Timestamp of rotation
+    pub timestamp: u64,
+
+    /// Optional reason/note
+    pub reason: String,
+}
+
+impl KeyRotationEvent {
+    pub fn create(
+        old_keypair: &amp;KeyPair,
+        new_keypair: &amp;KeyPair,
+        reason: String,
+    ) -&gt; Result&lt;Self&gt; {
+        let old_did = old_keypair.did().clone();
+        let new_did = new_keypair.did().clone();
+
+        // Canonical encoding for signing
+        let mut sig_input = Vec::new();
+        sig_input.extend_from_slice(old_did.as_bytes());
+        sig_input.extend_from_slice(new_did.as_bytes());
+
+        let old_key_signature = old_keypair.sign(&amp;sig_input)?;
+        let new_key_signature = new_keypair.sign(&amp;sig_input)?;
+
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)?
+            .as_secs();
+
+        Ok(KeyRotationEvent {
+            old_did,
+            new_did,
+            old_key_signature,
+            new_key_signature,
+            timestamp,
+            reason,
+        })
+    }
+
+    pub fn verify(&amp;self) -&gt; Result&lt;()&gt; {
+        let mut sig_input = Vec::new();
+        sig_input.extend_from_slice(self.old_did.as_bytes());
+        sig_input.extend_from_slice(self.new_did.as_bytes());
+
+        // Verify both signatures
+        self.old_did.verify(&amp;sig_input, &amp;self.old_key_signature)?;
+        self.new_did.verify(&amp;sig_input, &amp;self.new_key_signature)?;
+
+        Ok(())
+    }
+}
+
+/// Rotation chain tracking identity evolution
+pub struct RotationChain {
+    /// Current (most recent) DID
+    pub current_did: Did,
+
+    /// Historical rotations
+    pub rotations: Vec&lt;KeyRotationEvent&gt;,
+}
+
+impl RotationChain {
+    /// Resolve any historical DID to current DID
+    pub fn resolve(&amp;self, historical_did: &amp;Did) -&gt; Option&lt;Did&gt; {
+        if historical_did == &amp;self.current_did {
+            return Some(self.current_did.clone());
+        }
+
+        // Search rotation history
+        for rotation in &amp;self.rotations {
+            if &amp;rotation.old_did == historical_did {
+                // Follow chain forward
+                return Some(self.current_did.clone());
+            }
+        }
+
+        None
+    }
+
+    /// Add rotation event
+    pub fn add_rotation(&amp;mut self, event: KeyRotationEvent) -&gt; Result&lt;()&gt; {
+        event.verify()?;
+
+        if event.old_did != self.current_did {
+            return Err(anyhow!(&quot;Rotation chain broken: old_did mismatch&quot;));
+        }
+
+        self.current_did = event.new_did.clone();
+        self.rotations.push(event);
+
+        Ok(())
+    }
+}
+</code></pre>
+<h4>5.2 Keystore Integration</h4>
+<p>Update <code>icn-identity/src/keystore.rs</code>:</p>
+<pre><code class="language-rust">impl AgeKeyStore {
+    /// Rotate to new keypair and record transition
+    pub fn rotate(&amp;mut self, new_keypair: KeyPair, reason: String) -&gt; Result&lt;KeyRotationEvent&gt; {
+        let old_keypair = &amp;self.keypair;
+
+        // Create rotation event
+        let event = KeyRotationEvent::create(old_keypair, &amp;new_keypair, reason)?;
+
+        // Update keypair
+        self.keypair = new_keypair;
+
+        // Store rotation event
+        self.rotation_chain.add_rotation(event.clone())?;
+
+        // Persist to disk
+        self.save()?;
+
+        Ok(event)
+    }
+
+    /// Export rotation history
+    pub fn export_rotation_chain(&amp;self) -&gt; RotationChain {
+        self.rotation_chain.clone()
+    }
+}
+</code></pre>
+<h4>5.3 Trust Graph Awareness</h4>
+<p>Update <code>icn-trust/src/trust_graph.rs</code>:</p>
+<pre><code class="language-rust">impl TrustGraph {
+    /// Maintain DID alias mapping for rotations
+    did_aliases: HashMap&lt;Did, Did&gt;, // old -&gt; current
+
+    /// Process rotation event
+    pub fn apply_rotation(&amp;mut self, event: KeyRotationEvent) -&gt; Result&lt;()&gt; {
+        event.verify()?;
+
+        // Update alias mapping
+        self.did_aliases.insert(event.old_did.clone(), event.new_did.clone());
+
+        // Migrate edges
+        self.migrate_edges(&amp;event.old_did, &amp;event.new_did)?;
+
+        info!(&quot;Applied key rotation: {} -&gt; {}&quot;, event.old_did, event.new_did);
+        Ok(())
+    }
+
+    fn migrate_edges(&amp;mut self, old_did: &amp;Did, new_did: &amp;Did) -&gt; Result&lt;()&gt; {
+        // Update all edges referencing old_did
+        for edge in self.edges.iter_mut() {
+            if &amp;edge.from == old_did {
+                edge.from = new_did.clone();
+            }
+            if &amp;edge.to == old_did {
+                edge.to = new_did.clone();
+            }
+        }
+        Ok(())
+    }
+
+    /// Resolve DID through alias chain
+    pub fn resolve_did(&amp;self, did: &amp;Did) -&gt; Did {
+        self.did_aliases.get(did).cloned().unwrap_or_else(|| did.clone())
+    }
+
+    /// Compute trust with alias resolution
+    pub fn compute_trust(&amp;self, from: &amp;Did, to: &amp;Did) -&gt; f64 {
+        let from_resolved = self.resolve_did(from);
+        let to_resolved = self.resolve_did(to);
+
+        self.compute_trust_resolved(&amp;from_resolved, &amp;to_resolved)
+    }
+}
+</code></pre>
+<h4>5.4 CLI Commands</h4>
+<p>Add to <code>icnctl</code>:</p>
+<pre><code class="language-rust">// In bins/icnctl/src/commands/identity.rs
+
+pub async fn cmd_rotate(reason: Option&lt;String&gt;) -&gt; Result&lt;()&gt; {
+    // Load current keystore
+    let mut keystore = load_keystore()?;
+
+    println!(&quot;Current DID: {}&quot;, keystore.keypair.did());
+    println!(&quot;⚠️  This will rotate to a new keypair.&quot;);
+    println!(&quot;⚠️  Make sure to back up the new keystore!&quot;);
+
+    if !confirm(&quot;Proceed with rotation?&quot;)? {
+        println!(&quot;Rotation cancelled.&quot;);
+        return Ok(());
+    }
+
+    // Generate new keypair
+    let new_keypair = KeyPair::generate()?;
+    println!(&quot;New DID: {}&quot;, new_keypair.did());
+
+    // Perform rotation
+    let event = keystore.rotate(
+        new_keypair,
+        reason.unwrap_or_else(|| &quot;Manual rotation via icnctl&quot;.to_string()),
+    )?;
+
+    println!(&quot;✅ Rotation complete!&quot;);
+    println!(&quot;Rotation event:&quot;);
+    println!(&quot;{}&quot;, serde_json::to_string_pretty(&amp;event)?);
+
+    // Optionally gossip rotation to trusted peers
+    if confirm(&quot;Broadcast rotation to network?&quot;)? {
+        broadcast_rotation_event(event).await?;
+    }
+
+    Ok(())
+}
+
+pub async fn cmd_show_rotation_history() -&gt; Result&lt;()&gt; {
+    let keystore = load_keystore()?;
+    let chain = keystore.export_rotation_chain();
+
+    println!(&quot;Current DID: {}&quot;, chain.current_did);
+    println!(&quot;\nRotation history:&quot;);
+
+    for (i, event) in chain.rotations.iter().enumerate() {
+        println!(&quot;\n#{} - {}&quot;, i + 1, format_timestamp(event.timestamp));
+        println!(&quot;  {} -&gt; {}&quot;, event.old_did, event.new_did);
+        println!(&quot;  Reason: {}&quot;, event.reason);
+    }
+
+    Ok(())
+}
+</code></pre>
+<p>Usage:</p>
+<pre><code class="language-bash"># Rotate keypair
+icnctl identity rotate --reason &quot;Scheduled rotation&quot;
+
+# View rotation history
+icnctl identity history
+
+# Export rotation chain (for verification)
+icnctl identity export-chain &gt; rotation-chain.json
+</code></pre>
+<h4>5.5 Multi-Device Preparation (Design Only)</h4>
+<p>Design for future multi-device support:</p>
+<pre><code class="language-rust">// Future: icn-identity/src/multidevice.rs
+
+/// Root identity with multiple device keys
+pub struct MultiDeviceIdentity {
+    /// Root DID (primary identity)
+    pub root_did: Did,
+
+    /// Root keypair (kept offline/secure)
+    root_keypair: Option&lt;KeyPair&gt;,
+
+    /// Device DIDs signed by root
+    pub devices: Vec&lt;DeviceKey&gt;,
+}
+
+pub struct DeviceKey {
+    /// Device-specific DID
+    pub device_did: Did,
+
+    /// Device keypair
+    pub keypair: KeyPair,
+
+    /// Device name/description
+    pub name: String,
+
+    /// Root signature authorizing this device
+    /// Signature = Sign_root(device_did || name || timestamp)
+    pub authorization: Vec&lt;u8&gt;,
+
+    /// Creation timestamp
+    pub created_at: u64,
+}
+</code></pre>
+<p>This allows:</p>
+<ul>
+<li>Root DID represents the person/organization</li>
+<li>Each device has its own DID and keypair</li>
+<li>Root key signs authorization for each device</li>
+<li>Devices can act on behalf of root identity</li>
+<li>Root key can revoke device authorizations</li>
+</ul>
+<h3>Testing</h3>
+<p>Create <code>icn-identity/tests/rotation_tests.rs</code>:</p>
+<pre><code class="language-rust">#[test]
+fn test_rotation_event_creation() {
+    let old_kp = KeyPair::generate().unwrap();
+    let new_kp = KeyPair::generate().unwrap();
+
+    let event = KeyRotationEvent::create(&amp;old_kp, &amp;new_kp, &quot;test&quot;.into()).unwrap();
+    assert!(event.verify().is_ok());
+}
+
+#[test]
+fn test_rotation_chain() {
+    let mut chain = RotationChain::new(did_1);
+
+    let event = KeyRotationEvent::create(&amp;kp1, &amp;kp2, &quot;rotate&quot;.into()).unwrap();
+    chain.add_rotation(event).unwrap();
+
+    assert_eq!(chain.resolve(&amp;did_1), Some(did_2));
+}
+
+#[tokio::test]
+async fn test_trust_graph_rotation() {
+    let mut tg = TrustGraph::new(store, owner);
+
+    // Add trust edge to old_did
+    tg.add_edge(TrustEdge::new(owner, old_did, 0.8)).unwrap();
+
+    // Apply rotation
+    tg.apply_rotation(rotation_event).unwrap();
+
+    // Trust should follow to new_did
+    let trust = tg.compute_trust(&amp;owner, &amp;new_did);
+    assert!(trust &gt; 0.7);
+}
+</code></pre>
+<h2>6. Minimal Ledger &amp; Gossip Security</h2>
+<p><strong>Priority:</strong> MEDIUM
+<strong>Effort:</strong> MODERATE
+<strong>Risk:</strong> Ledger forks, equivocation, hidden conflicts</p>
+<h3>Current State</h3>
+<ul>
+<li>No ledger sync over gossip</li>
+<li>No causal ordering enforcement</li>
+<li>No integration between ledger and gossip</li>
+<li>No detection of ledger forks or equivocation</li>
+</ul>
+<h3>Design Goal</h3>
+<ul>
+<li>Basic ledger anti-entropy via gossip</li>
+<li>Detect (but don&#39;t necessarily resolve) conflicts</li>
+<li>Surface causal anomalies via metrics</li>
+<li>Prepare for future conflict resolution policies</li>
+</ul>
+<h3>Implementation Plan</h3>
+<h4>6.1 Ledger Gossip Messages</h4>
+<p>Create <code>icn-ledger/src/gossip_sync.rs</code>:</p>
+<pre><code class="language-rust">/// Ledger synchronization messages over gossip
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum LedgerGossipMsg {
+    /// Announce ledger head(s)
+    AnnounceHead {
+        ledger_id: LedgerId,
+        head_hash: Hash,
+        entry_count: u64,
+        timestamp: u64,
+    },
+
+    /// Request entries between two hashes
+    RequestDiff {
+        ledger_id: LedgerId,
+        from_hash: Hash,
+        to_hash: Hash,
+    },
+
+    /// Respond with entries
+    Entries {
+        ledger_id: LedgerId,
+        entries: Vec&lt;JournalEntry&gt;,
+    },
+
+    /// Report detected conflict/fork
+    ConflictReport {
+        ledger_id: LedgerId,
+        conflicting_heads: Vec&lt;Hash&gt;,
+    },
+}
+
+pub type LedgerId = Did; // Each DID has their own ledger
+
+impl Ledger {
+    /// Start periodic anti-entropy
+    pub async fn start_sync_loop(&amp;self, gossip: Arc&lt;RwLock&lt;GossipActor&gt;&gt;) {
+        let ledger = self.clone();
+
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(Duration::from_secs(30));
+
+            loop {
+                interval.tick().await;
+
+                if let Err(e) = ledger.announce_heads(&amp;gossip).await {
+                    warn!(&quot;Failed to announce ledger heads: {}&quot;, e);
+                }
+            }
+        });
+    }
+
+    /// Announce our ledger head(s) to the network
+    async fn announce_heads(&amp;self, gossip: &amp;Arc&lt;RwLock&lt;GossipActor&gt;&gt;) -&gt; Result&lt;()&gt; {
+        let heads = self.get_heads()?;
+
+        for (ledger_id, head) in heads {
+            let msg = LedgerGossipMsg::AnnounceHead {
+                ledger_id: ledger_id.clone(),
+                head_hash: head.hash,
+                entry_count: head.entry_count,
+                timestamp: current_timestamp(),
+            };
+
+            // Publish to ledger sync topic
+            let payload = bincode::serialize(&amp;msg)?;
+            gossip.write().await.publish(&quot;ledger:sync&quot;, payload)?;
+        }
+
+        Ok(())
+    }
+
+    /// Handle incoming ledger gossip message
+    pub async fn handle_gossip_msg(&amp;mut self, from: &amp;Did, msg: LedgerGossipMsg) -&gt; Result&lt;()&gt; {
+        match msg {
+            LedgerGossipMsg::AnnounceHead { ledger_id, head_hash, .. } =&gt; {
+                self.handle_head_announcement(from, ledger_id, head_hash).await
+            }
+            LedgerGossipMsg::RequestDiff { ledger_id, from_hash, to_hash } =&gt; {
+                self.handle_diff_request(from, ledger_id, from_hash, to_hash).await
+            }
+            LedgerGossipMsg::Entries { ledger_id, entries } =&gt; {
+                self.handle_entries(from, ledger_id, entries).await
+            }
+            LedgerGossipMsg::ConflictReport { ledger_id, conflicting_heads } =&gt; {
+                self.handle_conflict_report(from, ledger_id, conflicting_heads).await
+            }
+        }
+    }
+
+    async fn handle_head_announcement(
+        &amp;mut self,
+        from: &amp;Did,
+        ledger_id: LedgerId,
+        remote_head: Hash,
+    ) -&gt; Result&lt;()&gt; {
+        // Check if we have this ledger
+        let local_head = match self.get_head(&amp;ledger_id) {
+            Some(head) =&gt; head,
+            None =&gt; {
+                // We don&#39;t have this ledger, request full history
+                self.request_full_ledger(from, &amp;ledger_id).await?;
+                return Ok(());
+            }
+        };
+
+        if local_head.hash == remote_head {
+            // Already synced
+            return Ok(());
+        }
+
+        // Check if remote_head is in our history
+        if self.has_entry(&amp;remote_head)? {
+            // Remote is behind us
+            return Ok(());
+        }
+
+        // Check if local_head is in remote&#39;s history (need to ask)
+        // For now: request diff
+        self.request_diff(from, &amp;ledger_id, local_head.hash, remote_head).await?;
+
+        Ok(())
+    }
+
+    async fn handle_diff_request(
+        &amp;mut self,
+        from: &amp;Did,
+        ledger_id: LedgerId,
+        from_hash: Hash,
+        to_hash: Hash,
+    ) -&gt; Result&lt;()&gt; {
+        // Find entries between hashes
+        let entries = self.get_entries_between(&amp;ledger_id, &amp;from_hash, &amp;to_hash)?;
+
+        if entries.is_empty() {
+            // Potential fork: we don&#39;t have a path from from_hash to to_hash
+            warn!(&quot;⚠️  Fork detected in ledger {}: no path from {} to {}&quot;,
+                  ledger_id, from_hash, to_hash);
+
+            icn_obs::metrics::ledger::fork_detected_inc(&amp;ledger_id);
+
+            // Send conflict report
+            self.send_conflict_report(from, ledger_id, vec![from_hash, to_hash]).await?;
+            return Ok(());
+        }
+
+        // Send entries
+        let msg = LedgerGossipMsg::Entries { ledger_id, entries };
+        self.send_gossip_msg(from, msg).await?;
+
+        Ok(())
+    }
+
+    async fn handle_entries(
+        &amp;mut self,
+        from: &amp;Did,
+        ledger_id: LedgerId,
+        entries: Vec&lt;JournalEntry&gt;,
+    ) -&gt; Result&lt;()&gt; {
+        // Validate and apply entries
+        for entry in entries {
+            // Verify signatures, causality, etc.
+            if let Err(e) = self.validate_entry(&amp;entry) {
+                warn!(&quot;⚠️  Invalid entry from {}: {}&quot;, from, e);
+                icn_obs::metrics::ledger::invalid_entry_inc(&amp;ledger_id);
+                continue;
+            }
+
+            // Apply entry
+            match self.apply_entry(entry.clone()) {
+                Ok(_) =&gt; {
+                    icn_obs::metrics::ledger::entries_synced_inc(&amp;ledger_id);
+                }
+                Err(e) =&gt; {
+                    warn!(&quot;⚠️  Failed to apply entry: {}&quot;, e);
+                    // Quarantine entry for manual review
+                    self.quarantine_entry(entry)?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
+</code></pre>
+<h4>6.2 Causal Ordering</h4>
+<p>Add vector clock validation:</p>
+<pre><code class="language-rust">impl Ledger {
+    fn validate_entry(&amp;self, entry: &amp;JournalEntry) -&gt; Result&lt;()&gt; {
+        // 1. Verify signature
+        entry.verify_signature()?;
+
+        // 2. Check vector clock causality
+        if let Some(expected_clock) = self.get_vector_clock(&amp;entry.ledger_id) {
+            if !entry.vector_clock.is_causal_successor(&amp;expected_clock) {
+                return Err(anyhow!(&quot;Causal violation: entry not a successor&quot;));
+            }
+        }
+
+        // 3. Check parent hash
+        if let Some(parent) = &amp;entry.parent_hash {
+            if !self.has_entry(parent)? {
+                return Err(anyhow!(&quot;Missing parent entry: {}&quot;, parent));
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Quarantine entry for later resolution
+    fn quarantine_entry(&amp;mut self, entry: JournalEntry) -&gt; Result&lt;()&gt; {
+        self.quarantined_entries.insert(entry.hash.clone(), entry);
+        icn_obs::metrics::ledger::entries_quarantined_inc();
+        Ok(())
+    }
+}
+</code></pre>
+<h4>6.3 Conflict Detection &amp; Reporting</h4>
+<p>Add fork detection:</p>
+<pre><code class="language-rust">impl Ledger {
+    /// Detect if ledger has forked
+    pub fn detect_fork(&amp;self, ledger_id: &amp;LedgerId) -&gt; Option&lt;ForkInfo&gt; {
+        let heads = self.get_heads_for_ledger(ledger_id);
+
+        if heads.len() &gt; 1 {
+            Some(ForkInfo {
+                ledger_id: ledger_id.clone(),
+                conflicting_heads: heads,
+                detected_at: Instant::now(),
+            })
+        } else {
+            None
+        }
+    }
+
+    /// Periodic fork detection
+    pub async fn check_for_forks(&amp;self) {
+        for ledger_id in self.ledgers.keys() {
+            if let Some(fork) = self.detect_fork(ledger_id) {
+                warn!(&quot;⚠️  Fork detected in ledger {}: {} conflicting heads&quot;,
+                      ledger_id, fork.conflicting_heads.len());
+
+                // Emit metric
+                icn_obs::metrics::ledger::fork_detected_inc(ledger_id);
+
+                // For now: just log and metric
+                // Future: implement conflict resolution policy
+            }
+        }
+    }
+}
+</code></pre>
+<h4>6.4 Metrics</h4>
+<p>Add ledger sync metrics:</p>
+<pre><code class="language-rust">// In icn-obs/src/metrics/ledger.rs
+
+pub fn entries_synced_inc(ledger_id: &amp;LedgerId);
+pub fn invalid_entry_inc(ledger_id: &amp;LedgerId);
+pub fn entries_quarantined_inc();
+pub fn fork_detected_inc(ledger_id: &amp;LedgerId);
+pub fn causal_anomaly_inc(ledger_id: &amp;LedgerId);
+</code></pre>
+<h3>Testing</h3>
+<p>Create <code>icn-ledger/tests/gossip_sync.rs</code>:</p>
+<pre><code class="language-rust">#[tokio::test]
+async fn test_ledger_sync() {
+    // Create two nodes
+    // Node A adds entry
+    // Wait for gossip propagation
+    // Verify Node B has entry
+}
+
+#[tokio::test]
+async fn test_fork_detection() {
+    // Create two nodes
+    // Both add conflicting entries to same ledger
+    // Verify fork is detected and reported
+}
+
+#[tokio::test]
+async fn test_causal_ordering() {
+    // Send entries out of causal order
+    // Verify rejected until dependencies available
+}
+</code></pre>
+<h2>7. Supervisor &amp; Actor Failure Resilience</h2>
+<p><strong>Priority:</strong> MEDIUM
+<strong>Effort:</strong> LOW
+<strong>Risk:</strong> Permanent actor failures, message loss, service unavailability</p>
+<h3>Current State</h3>
+<ul>
+<li>Actors fail permanently on panic</li>
+<li>No restart policy</li>
+<li>In-flight messages lost on crash</li>
+<li>No backoff or flap detection</li>
+</ul>
+<h3>Design Goal</h3>
+<ul>
+<li>Actors restart automatically on failure (with limits)</li>
+<li>Supervisor tracks failures and applies backoff</li>
+<li>Critical subsystems marked for aggressive restart</li>
+<li>Flapping actors detected and isolated</li>
+</ul>
+<h3>Implementation Plan</h3>
+<h4>7.1 Actor Restart Policy</h4>
+<p>Update <code>icn-core/src/supervisor.rs</code>:</p>
+<pre><code class="language-rust">pub struct ActorSpec {
+    pub name: &amp;&#39;static str,
+    pub start: fn(SupervisorHandle) -&gt; Pin&lt;Box&lt;dyn Future&lt;Output = Result&lt;()&gt;&gt; + Send&gt;&gt;,
+    pub restart_on_fail: bool,
+    pub restart_policy: RestartPolicy,
+}
+
+pub enum RestartPolicy {
+    /// Never restart
+    Never,
+
+    /// Restart immediately
+    Immediate,
+
+    /// Restart with exponential backoff
+    Backoff {
+        initial_delay: Duration,
+        max_delay: Duration,
+        max_restarts: usize,
+        window_secs: u64,
+    },
+}
+
+impl Default for RestartPolicy {
+    fn default() -&gt; Self {
+        RestartPolicy::Backoff {
+            initial_delay: Duration::from_secs(1),
+            max_delay: Duration::from_secs(60),
+            max_restarts: 5,
+            window_secs: 300, // 5 minute window
+        }
+    }
+}
+
+struct ActorState {
+    spec: ActorSpec,
+    handle: Option&lt;JoinHandle&lt;()&gt;&gt;,
+    failure_count: usize,
+    last_failure: Option&lt;Instant&gt;,
+    restart_attempts: Vec&lt;Instant&gt;,
+}
+
+impl Supervisor {
+    async fn monitor_actor(&amp;mut self, name: &amp;&#39;static str, mut state: ActorState) {
+        loop {
+            let handle = match state.handle.take() {
+                Some(h) =&gt; h,
+                None =&gt; {
+                    // Spawn actor
+                    let handle = tokio::spawn((state.spec.start)(self.handle.clone()));
+                    state.handle = Some(handle);
+                    state.handle.take().unwrap()
+                }
+            };
+
+            // Wait for actor to exit
+            match handle.await {
+                Ok(Ok(())) =&gt; {
+                    // Clean exit
+                    info!(&quot;Actor {} exited cleanly&quot;, name);
+                    break;
+                }
+                Ok(Err(e)) =&gt; {
+                    // Actor returned error
+                    error!(&quot;Actor {} failed: {}&quot;, name, e);
+                    state.failure_count += 1;
+                    state.last_failure = Some(Instant::now());
+                }
+                Err(e) =&gt; {
+                    // Actor panicked
+                    error!(&quot;Actor {} panicked: {}&quot;, name, e);
+                    state.failure_count += 1;
+                    state.last_failure = Some(Instant::now());
+                }
+            }
+
+            // Check restart policy
+            if !state.spec.restart_on_fail {
+                error!(&quot;Actor {} failed and restart disabled&quot;, name);
+                break;
+            }
+
+            // Check if flapping
+            if self.is_flapping(&amp;state) {
+                error!(&quot;Actor {} is flapping, giving up&quot;, name);
+                icn_obs::metrics::supervisor::actor_flapping_inc(name);
+                break;
+            }
+
+            // Apply restart policy
+            match state.spec.restart_policy {
+                RestartPolicy::Never =&gt; break,
+                RestartPolicy::Immediate =&gt; {
+                    warn!(&quot;Restarting actor {} immediately&quot;, name);
+                }
+                RestartPolicy::Backoff { initial_delay, max_delay, max_restarts, window_secs } =&gt; {
+                    // Clean old restart attempts
+                    let cutoff = Instant::now() - Duration::from_secs(window_secs);
+                    state.restart_attempts.retain(|t| *t &gt; cutoff);
+
+                    if state.restart_attempts.len() &gt;= max_restarts {
+                        error!(&quot;Actor {} exceeded max restarts ({}) in {}s&quot;,
+                               name, max_restarts, window_secs);
+                        icn_obs::metrics::supervisor::actor_restart_limit_inc(name);
+                        break;
+                    }
+
+                    // Compute backoff delay
+                    let attempt = state.restart_attempts.len();
+                    let delay = initial_delay * 2u32.pow(attempt as u32);
+                    let delay = delay.min(max_delay);
+
+                    warn!(&quot;Restarting actor {} in {:?} (attempt {})&quot;, name, delay, attempt + 1);
+                    tokio::time::sleep(delay).await;
+
+                    state.restart_attempts.push(Instant::now());
+                }
+            }
+
+            icn_obs::metrics::supervisor::actor_restarts_inc(name);
+        }
+
+        // Actor gave up
+        self.failed_actors.insert(name);
+    }
+
+    fn is_flapping(&amp;self, state: &amp;ActorState) -&gt; bool {
+        // Flapping = multiple failures in short time
+        if state.restart_attempts.len() &lt; 3 {
+            return false;
+        }
+
+        let recent = &amp;state.restart_attempts[state.restart_attempts.len() - 3..];
+        let time_span = recent.last().unwrap().duration_since(*recent.first().unwrap());
+
+        time_span &lt; Duration::from_secs(10) // 3 restarts in 10 seconds
+    }
+}
+</code></pre>
+<h4>7.2 Actor Specifications</h4>
+<p>Define restart policies for each actor:</p>
+<pre><code class="language-rust">const ACTOR_SPECS: &amp;[ActorSpec] = &amp;[
+    ActorSpec {
+        name: &quot;network&quot;,
+        start: start_network_actor,
+        restart_on_fail: true,
+        restart_policy: RestartPolicy::Backoff {
+            initial_delay: Duration::from_secs(1),
+            max_delay: Duration::from_secs(30),
+            max_restarts: 10, // Network is critical
+            window_secs: 300,
+        },
+    },
+    ActorSpec {
+        name: &quot;gossip&quot;,
+        start: start_gossip_actor,
+        restart_on_fail: true,
+        restart_policy: RestartPolicy::Backoff {
+            initial_delay: Duration::from_secs(2),
+            max_delay: Duration::from_secs(60),
+            max_restarts: 5,
+            window_secs: 300,
+        },
+    },
+    ActorSpec {
+        name: &quot;ledger&quot;,
+        start: start_ledger_actor,
+        restart_on_fail: true,
+        restart_policy: RestartPolicy::Backoff {
+            initial_delay: Duration::from_secs(1),
+            max_delay: Duration::from_secs(30),
+            max_restarts: 10, // Ledger is critical
+            window_secs: 300,
+        },
+    },
+    // ... other actors
+];
+</code></pre>
+<h4>7.3 Metrics</h4>
+<p>Add supervisor metrics:</p>
+<pre><code class="language-rust">// In icn-obs/src/metrics/supervisor.rs
+
+pub fn actor_restarts_inc(actor: &amp;str);
+pub fn actor_flapping_inc(actor: &amp;str);
+pub fn actor_restart_limit_inc(actor: &amp;str);
+pub fn actor_status_set(actor: &amp;str, status: &amp;str); // &quot;running&quot;, &quot;failed&quot;, &quot;restarting&quot;
+</code></pre>
+<h4>7.4 Health Endpoint</h4>
+<p>Expose actor status via RPC:</p>
+<pre><code class="language-rust">// In icn-rpc/src/server.rs
+
+pub async fn get_system_health() -&gt; Result&lt;SystemHealth&gt; {
+    let supervisor_status = get_supervisor_status().await?;
+
+    Ok(SystemHealth {
+        actors: supervisor_status.actors.iter().map(|(name, state)| {
+            ActorHealth {
+                name: name.to_string(),
+                status: state.status.clone(),
+                failure_count: state.failure_count,
+                last_failure: state.last_failure.map(|t| t.elapsed().as_secs()),
+            }
+        }).collect(),
+        overall_status: compute_overall_status(&amp;supervisor_status),
+    })
+}
+</code></pre>
+<h3>Testing</h3>
+<p>Create <code>icn-core/tests/supervisor_restart.rs</code>:</p>
+<pre><code class="language-rust">#[tokio::test]
+async fn test_actor_restart() {
+    // Create supervisor
+    // Register actor that fails after 1 second
+    // Verify it restarts
+}
+
+#[tokio::test]
+async fn test_restart_limit() {
+    // Create actor that always fails
+    // Verify it&#39;s shut down after max_restarts
+}
+
+#[tokio::test]
+async fn test_flap_detection() {
+    // Create actor that fails rapidly
+    // Verify flap detection and shutdown
+}
+</code></pre>
+<h2>Implementation Roadmap</h2>
+<h3>Phase 1: Network Hardening (Week 1-2)</h3>
+<p><strong>Goal:</strong> Prevent DoS and establish identity binding</p>
+<ol>
+<li><p><strong>Connection Flooding</strong> (#1)</p>
+<ul>
+<li><input disabled="" type="checkbox"> Implement PeerRegistry</li>
+<li><input disabled="" type="checkbox"> Add connection limits</li>
+<li><input disabled="" type="checkbox"> Implement eviction policy</li>
+<li><input disabled="" type="checkbox"> Add per-peer rate limiting</li>
+<li><input disabled="" type="checkbox"> Write tests</li>
+</ul>
+</li>
+<li><p><strong>DID-TLS Binding</strong> (#2)</p>
+<ul>
+<li><input disabled="" type="checkbox"> Create IdentityBundle</li>
+<li><input disabled="" type="checkbox"> Implement cert generation</li>
+<li><input disabled="" type="checkbox"> Add HelloMessage protocol</li>
+<li><input disabled="" type="checkbox"> Update connection handshake</li>
+<li><input disabled="" type="checkbox"> Write tests</li>
+</ul>
+</li>
+</ol>
+<p><strong>Deliverable:</strong> Nodes reject connection floods and cryptographically verify peer identities</p>
+<h3>Phase 2: Message Integrity (Week 3)</h3>
+<p><strong>Goal:</strong> Signed messages with replay protection</p>
+<ol start="3">
+<li><strong>Message Verification</strong> (#3)<ul>
+<li><input disabled="" type="checkbox"> Implement SignedEnvelope</li>
+<li><input disabled="" type="checkbox"> Add ReplayGuard</li>
+<li><input disabled="" type="checkbox"> Update NetworkActor</li>
+<li><input disabled="" type="checkbox"> Convert actors to typed messages</li>
+<li><input disabled="" type="checkbox"> Write tests</li>
+</ul>
+</li>
+</ol>
+<p><strong>Deliverable:</strong> All inter-node messages are signed and replay-protected</p>
+<h3>Phase 3: Trust &amp; Identity (Week 4)</h3>
+<p><strong>Goal:</strong> Bounded trust computation and key rotation</p>
+<ol start="4">
+<li><p><strong>Trust Hardening</strong> (#4)</p>
+<ul>
+<li><input disabled="" type="checkbox"> Add trust edge metadata</li>
+<li><input disabled="" type="checkbox"> Implement bounded computation</li>
+<li><input disabled="" type="checkbox"> Add participation hooks</li>
+<li><input disabled="" type="checkbox"> Write tests</li>
+</ul>
+</li>
+<li><p><strong>Key Rotation</strong> (#5)</p>
+<ul>
+<li><input disabled="" type="checkbox"> Implement KeyRotationEvent</li>
+<li><input disabled="" type="checkbox"> Update keystore</li>
+<li><input disabled="" type="checkbox"> Add trust graph aliases</li>
+<li><input disabled="" type="checkbox"> Add icnctl commands</li>
+<li><input disabled="" type="checkbox"> Write tests</li>
+</ul>
+</li>
+</ol>
+<p><strong>Deliverable:</strong> Trust system with decay/bounds, key rotation support</p>
+<h3>Phase 4: Ledger &amp; Resilience (Week 5)</h3>
+<p><strong>Goal:</strong> Ledger sync and failure recovery</p>
+<ol start="6">
+<li><p><strong>Ledger Gossip</strong> (#6)</p>
+<ul>
+<li><input disabled="" type="checkbox"> Add LedgerGossipMsg types</li>
+<li><input disabled="" type="checkbox"> Implement anti-entropy</li>
+<li><input disabled="" type="checkbox"> Add fork detection</li>
+<li><input disabled="" type="checkbox"> Write tests</li>
+</ul>
+</li>
+<li><p><strong>Supervisor Restart</strong> (#7)</p>
+<ul>
+<li><input disabled="" type="checkbox"> Implement restart policies</li>
+<li><input disabled="" type="checkbox"> Add flap detection</li>
+<li><input disabled="" type="checkbox"> Add health endpoint</li>
+<li><input disabled="" type="checkbox"> Write tests</li>
+</ul>
+</li>
+</ol>
+<p><strong>Deliverable:</strong> Ledger sync over gossip, automatic actor restart</p>
+<h2>Testing Strategy</h2>
+<h3>Unit Tests</h3>
+<ul>
+<li>Each component tested in isolation</li>
+<li>Mock dependencies</li>
+<li>Focus on correctness of algorithms</li>
+</ul>
+<h3>Integration Tests</h3>
+<ul>
+<li>Multi-node scenarios</li>
+<li>Simulated attack scenarios</li>
+<li>Performance under load</li>
+</ul>
+<h3>Security Tests</h3>
+<ul>
+<li>Fuzz testing for message parsing</li>
+<li>Replay attack scenarios</li>
+<li>Connection flood scenarios</li>
+<li>Fork/conflict scenarios</li>
+</ul>
+<h3>Regression Tests</h3>
+<ul>
+<li>Ensure new security doesn&#39;t break existing features</li>
+<li>Run full test suite on each commit</li>
+</ul>
+<h2>Metrics &amp; Monitoring</h2>
+<h3>Security Metrics</h3>
+<h4>Network</h4>
+<ul>
+<li><code>icn_network_connections_rejected_total</code> - Connection rejections</li>
+<li><code>icn_network_connections_active</code> - Current active peers</li>
+<li><code>icn_network_peer_rate_limited_total</code> - Rate limiting events</li>
+<li><code>icn_network_peer_evicted_total{reason}</code> - Peer evictions</li>
+</ul>
+<h4>Identity</h4>
+<ul>
+<li><code>icn_identity_verification_failures_total</code> - DID-TLS binding failures</li>
+<li><code>icn_identity_rotations_total</code> - Key rotations performed</li>
+</ul>
+<h4>Messages</h4>
+<ul>
+<li><code>icn_messages_signature_failures_total</code> - Signature verification failures</li>
+<li><code>icn_messages_replay_detected_total</code> - Replay attempts</li>
+<li><code>icn_messages_malformed_total</code> - Malformed messages</li>
+</ul>
+<h4>Ledger</h4>
+<ul>
+<li><code>icn_ledger_fork_detected_total</code> - Fork detections</li>
+<li><code>icn_ledger_causal_anomaly_total</code> - Causal violations</li>
+<li><code>icn_ledger_entries_quarantined_total</code> - Quarantined entries</li>
+</ul>
+<h4>Supervisor</h4>
+<ul>
+<li><code>icn_supervisor_actor_restarts_total{actor}</code> - Actor restarts</li>
+<li><code>icn_supervisor_actor_flapping_total{actor}</code> - Flapping detections</li>
+</ul>
+<h3>Alerts</h3>
+<p><strong>Critical:</strong></p>
+<ul>
+<li>Fork detected in own ledger</li>
+<li>DID-TLS verification failing for &gt;50% of connections</li>
+<li>Multiple actors flapping</li>
+</ul>
+<p><strong>Warning:</strong></p>
+<ul>
+<li>Connection rejection rate &gt;10/sec</li>
+<li>Replay detection rate &gt;1/min</li>
+<li>Actor restart rate &gt;1/hour</li>
+</ul>
+<h2>Security Assumptions</h2>
+<h3>What This Design Provides</h3>
+<p>✅ Connection DoS prevention
+✅ Cryptographic identity binding
+✅ Message integrity and authenticity
+✅ Replay protection
+✅ Bounded trust computation
+✅ Key rotation capability
+✅ Basic fork detection</p>
+<h3>What This Design Does NOT Provide</h3>
+<p>❌ Byzantine fault tolerance
+❌ Sybil attack prevention (requires external identity)
+❌ Perfect conflict resolution (detects but doesn&#39;t resolve)
+❌ Protection against compromised root keys
+❌ Traffic analysis resistance
+❌ Perfect forward secrecy (future work)</p>
+<h2>References</h2>
+<ul>
+<li><a href="/docs/ARCHITECTURE">ARCHITECTURE.md</a> - System architecture</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/production-hardening">production-hardening.md</a> - Production hardening measures</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CLAUDE">CLAUDE.md</a> - Development guidance</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

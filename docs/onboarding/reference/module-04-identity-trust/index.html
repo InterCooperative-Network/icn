@@ -1,0 +1,781 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Module 4: Identity and Trust | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>onboarding</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>reference</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>module 04 identity trust</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/onboarding/reference/module-04-identity-trust.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Module 4: Identity and Trust</h1>
+<h2>Overview</h2>
+<p>This module teaches you ICN&#39;s foundational identity and trust systems. Identity
+proves who you are; trust determines how much the system trusts you. Together,
+they enable secure, socially-aware coordination without central authorities.</p>
+<h2>Objectives</h2>
+<ul>
+<li>Understand DIDs (Decentralized Identifiers) and why ICN uses them</li>
+<li>Master the keystore lifecycle: creation, encryption, rotation</li>
+<li>Learn how trust graphs model social relationships</li>
+<li>Understand trust computation: direct, transitive, and multi-dimensional</li>
+<li>Know how trust influences access control and rate limiting</li>
+</ul>
+<h2>Prerequisites</h2>
+<ul>
+<li>Module 3 (Runtime &amp; Actors)</li>
+<li>Module 1 (Rust Fundamentals)</li>
+</ul>
+<h2>Key Reading</h2>
+<ul>
+<li><code>icn/crates/icn-identity/src/keystore.rs</code> - Key storage</li>
+<li><code>icn/crates/icn-trust/src/lib.rs</code> - Trust graph</li>
+<li><code>docs/ARCHITECTURE.md</code> - Sections 1 and 2</li>
+</ul>
+<hr>
+<h2>Core Concepts</h2>
+<h3>1. What is a DID?</h3>
+<p>A <strong>DID</strong> (Decentralized Identifier) is a globally unique identifier that:</p>
+<ul>
+<li>Is <strong>self-certifying</strong>: The identifier itself proves ownership</li>
+<li>Requires <strong>no registry</strong>: No central authority needed</li>
+<li>Enables <strong>cryptographic verification</strong>: Anyone can verify signatures</li>
+</ul>
+<p><strong>ICN&#39;s DID format:</strong></p>
+<pre><code>did:icn:5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP
+├──┼──┼──────────────────────────────────────────────
+│  │  └─ Base58-encoded Ed25519 public key
+│  └──── ICN method (our DID scheme)
+└─────── DID scheme prefix
+</code></pre>
+<p><strong>Why this format?</strong></p>
+<ul>
+<li><strong>Simple</strong>: DID = public key (no lookup needed)</li>
+<li><strong>Verifiable</strong>: Anyone can verify signatures</li>
+<li><strong>Portable</strong>: Works offline, no network required</li>
+<li><strong>Deterministic</strong>: Same key = same DID always</li>
+</ul>
+<h3>2. Ed25519 Cryptography</h3>
+<p>ICN uses <strong>Ed25519</strong> for all identity operations:</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Key type</td>
+<td>EdDSA (Edwards curve)</td>
+</tr>
+<tr>
+<td>Public key</td>
+<td>32 bytes</td>
+</tr>
+<tr>
+<td>Private key</td>
+<td>32 bytes</td>
+</tr>
+<tr>
+<td>Signature</td>
+<td>64 bytes</td>
+</tr>
+<tr>
+<td>Security</td>
+<td>~128-bit equivalent</td>
+</tr>
+</tbody></table>
+<p><strong>Why Ed25519?</strong></p>
+<ul>
+<li><strong>Fast</strong>: Signing and verification are quick</li>
+<li><strong>Secure</strong>: No known practical attacks</li>
+<li><strong>Deterministic</strong>: Same key + message = same signature</li>
+<li><strong>Small</strong>: Compact keys and signatures</li>
+<li><strong>Audited</strong>: Well-studied, widely deployed</li>
+</ul>
+<pre><code class="language-rust">// DID from public key
+pub struct Did(String);
+
+impl Did {
+    pub fn from_public_key(pubkey: &amp;[u8; 32]) -&gt; Self {
+        let encoded = bs58::encode(pubkey).into_string();
+        Did(format!(&quot;did:icn:{}&quot;, encoded))
+    }
+
+    pub fn to_public_key(&amp;self) -&gt; Result&lt;[u8; 32]&gt; {
+        let encoded = self.0.strip_prefix(&quot;did:icn:&quot;)
+            .ok_or(anyhow!(&quot;Invalid DID format&quot;))?;
+        let bytes = bs58::decode(encoded).into_vec()?;
+        Ok(bytes.try_into()?)
+    }
+}
+</code></pre>
+<hr>
+<h2>The Keystore</h2>
+<h3>3. Keystore Architecture</h3>
+<p>The <strong>keystore</strong> securely stores private keys:</p>
+<pre><code>┌─────────────────────────────────────────────────────────┐
+│                      KEYSTORE                            │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  {data_dir}/identity.age                                │
+│                                                         │
+│  ┌─────────────────────────────────────────────────┐   │
+│  │  Encrypted with Age (passphrase or YubiKey)     │   │
+│  │                                                  │   │
+│  │  Contents:                                       │   │
+│  │  - Ed25519 signing key (32 bytes)               │   │
+│  │  - X25519 encryption key (32 bytes)             │   │
+│  │  - TLS certificate (self-signed)                │   │
+│  │  - Metadata (version, created_at)               │   │
+│  │                                                  │   │
+│  └─────────────────────────────────────────────────┘   │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+</code></pre>
+<h3>4. Keystore Lifecycle</h3>
+<pre><code class="language-rust">pub trait KeyStore: Send + Sync {
+    /// Unlock the keystore with a passphrase
+    fn unlock(&amp;mut self, passphrase: &amp;[u8]) -&gt; Result&lt;()&gt;;
+
+    /// Lock the keystore (clear in-memory keys)
+    fn lock(&amp;mut self);
+
+    /// Check if the keystore is locked
+    fn is_locked(&amp;self) -&gt; bool;
+
+    /// Get the keypair (fails if locked)
+    fn get_keypair(&amp;self) -&gt; Result&lt;&amp;KeyPair&gt;;
+
+    /// Rotate to a new keypair
+    fn rotate(&amp;mut self, new_keypair: KeyPair) -&gt; Result&lt;KeyRotation&gt;;
+}
+</code></pre>
+<p><strong>Lifecycle stages:</strong></p>
+<ol>
+<li><strong>Creation</strong>: <code>icnctl id init</code> generates keypair, encrypts with Age</li>
+<li><strong>Storage</strong>: Written to <code>{data_dir}/identity.age</code></li>
+<li><strong>Unlock</strong>: At daemon startup, passphrase decrypts keys</li>
+<li><strong>Usage</strong>: IdentityBundle available for signing, TLS, etc.</li>
+<li><strong>Lock</strong>: On shutdown or explicit lock, keys cleared from memory</li>
+<li><strong>Rotation</strong>: Create new keypair, publish rotation record</li>
+</ol>
+<h3>5. The Identity Bundle</h3>
+<p>When the keystore is unlocked, it produces an <strong>IdentityBundle</strong>:</p>
+<pre><code class="language-rust">pub struct IdentityBundle {
+    /// The DID for this identity
+    did: Did,
+    /// Ed25519 keypair for signing
+    did_keypair: KeyPair,
+    /// X25519 secret for encryption
+    x25519_secret: x25519_dalek::StaticSecret,
+    /// Self-signed TLS certificate
+    tls_cert: CertificateDer&lt;&#39;static&gt;,
+    /// TLS private key
+    tls_key: PrivateKeyDer&lt;&#39;static&gt;,
+    /// Binding signature: Sign_did(SHA256(tls_cert))
+    tls_binding_sig: Vec&lt;u8&gt;,
+}
+
+impl IdentityBundle {
+    /// Get the DID
+    pub fn did(&amp;self) -&gt; &amp;Did {
+        &amp;self.did
+    }
+
+    /// Sign a message
+    pub fn sign(&amp;self, message: &amp;[u8]) -&gt; Signature {
+        self.did_keypair.sign(message)
+    }
+
+    /// Get TLS config for network connections
+    pub fn tls_config(&amp;self) -&gt; TlsConfig {
+        TlsConfig {
+            cert: self.tls_cert.clone(),
+            key: self.tls_key.clone(),
+            binding_sig: self.tls_binding_sig.clone(),
+        }
+    }
+}
+</code></pre>
+<h3>6. DID-TLS Binding</h3>
+<p>The TLS certificate is cryptographically bound to the DID:</p>
+<pre><code>┌─────────────────────────────────────────────────────────┐
+│                    DID-TLS BINDING                       │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  1. Generate self-signed TLS certificate                │
+│                                                         │
+│  2. Hash the certificate:                               │
+│     cert_hash = SHA256(tls_certificate)                 │
+│                                                         │
+│  3. Sign with DID key:                                  │
+│     binding_sig = Sign_did_key(cert_hash)               │
+│                                                         │
+│  4. Verification (by peer):                             │
+│     a. Receive certificate during TLS handshake         │
+│     b. Extract DID from certificate                     │
+│     c. Compute cert_hash                                │
+│     d. Verify: Verify_did_pubkey(cert_hash, binding_sig)│
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+</code></pre>
+<p><strong>This proves:</strong> &quot;The entity with this DID controls this TLS connection.&quot;</p>
+<h3>7. Key Rotation</h3>
+<p>Keys can be rotated without losing identity (with caveats):</p>
+<pre><code class="language-rust">pub struct KeyRotation {
+    /// Old DID (being rotated from)
+    old_did: Did,
+    /// New DID (being rotated to)
+    new_did: Did,
+    /// When rotation occurred
+    timestamp: u64,
+    /// Why rotation happened
+    reason: RotationReason,
+    /// Signature from old key
+    old_signature: Signature,
+    /// Signature from new key
+    new_signature: Signature,
+}
+
+pub enum RotationReason {
+    /// Scheduled key refresh
+    Scheduled,
+    /// Key suspected compromised
+    Compromised,
+    /// Upgrading key algorithm
+    Upgrade,
+    /// Device lost/replaced
+    DeviceLost,
+}
+</code></pre>
+<p><strong>Rotation protocol:</strong></p>
+<ol>
+<li>Generate new keypair</li>
+<li>Create rotation record signed by BOTH old and new keys</li>
+<li>Publish rotation record (gossip)</li>
+<li>Old key enters grace period</li>
+<li>After grace period, old key is invalid</li>
+</ol>
+<h3>8. Hardware-Backed Keys (TPM/HSM)</h3>
+<blockquote>
+<p><strong>Current Status</strong>: ⏳ Planned for Phase 22 (Security Hardening)</p>
+<p>TPM/HSM support is not yet implemented. The APIs shown below represent the
+intended design. All current deployments use software-backed Age-encrypted
+keystores.</p>
+</blockquote>
+<p>For production deployments, ICN supports <strong>hardware security modules</strong> that protect
+private keys from software extraction:</p>
+<pre><code>┌─────────────────────────────────────────────────────────────────┐
+│                    KEY BACKEND ARCHITECTURE                      │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   Application Code                                              │
+│         │                                                       │
+│         ▼                                                       │
+│   ┌─────────────────┐                                          │
+│   │   DidSigner     │  Trait abstraction for signing           │
+│   │   interface     │                                          │
+│   └────────┬────────┘                                          │
+│            │                                                    │
+│     ┌──────┴──────┬────────────────┐                           │
+│     ▼             ▼                ▼                           │
+│  ┌───────┐   ┌─────────┐     ┌──────────┐                      │
+│  │Soft   │   │  TPM    │     │  PKCS#11 │                      │
+│  │ware  │   │  2.0    │     │   (HSM)  │                      │
+│  └───────┘   └─────────┘     └──────────┘                      │
+│  In-memory   Hardware        Hardware                          │
+│  keys        sealed keys     external module                    │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+</code></pre>
+<p><strong>DidKey enum for honest semantics:</strong></p>
+<pre><code class="language-rust">pub enum DidKey {
+    /// Key is stored in software (extractable)
+    Software(SoftwareKeyPair),
+    /// Key is protected by hardware (non-extractable)
+    Hardware(HardwareKeyHandle),
+}
+
+impl DidKey {
+    /// Returns true if key material can be exported
+    pub fn is_extractable(&amp;self) -&gt; bool {
+        matches!(self, DidKey::Software(_))
+    }
+}
+</code></pre>
+<p><strong>TPM 2.0 Features:</strong></p>
+<ul>
+<li><strong>Key sealing</strong>: Keys encrypted to TPM state, bound to boot configuration</li>
+<li><strong>PCR policies</strong>: Keys only usable when system is in expected state</li>
+<li><strong>Non-exportable</strong>: Private key never leaves the TPM chip</li>
+<li><strong>Attestation</strong>: Prove key is hardware-protected to remote parties</li>
+</ul>
+<pre><code class="language-rust">pub struct TpmBackend {
+    context: tss_esapi::Context,
+    primary_handle: KeyHandle,
+}
+
+impl DidSigner for TpmBackend {
+    fn sign(&amp;self, data: &amp;[u8]) -&gt; Result&lt;Signature&gt; {
+        // Sign operation happens inside TPM
+        // Private key never exposed to software
+        let signature = self.context.sign(
+            self.primary_handle,
+            data,
+            SignatureScheme::Ed25519,
+        )?;
+        Ok(Signature::from_tpm(signature))
+    }
+}
+</code></pre>
+<p><strong>Configuration:</strong></p>
+<pre><code class="language-toml"># config.toml
+[keystore]
+# Options: &quot;software&quot;, &quot;tpm&quot;, &quot;pkcs11&quot;
+backend = &quot;tpm&quot;
+
+[keystore.tpm]
+# TPM device path (Linux)
+device = &quot;/dev/tpmrm0&quot;
+# Optional: PCR policy for key usage
+pcr_policy = [0, 7]
+</code></pre>
+<p><strong>Use cases for hardware keys:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Recommendation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Development</td>
+<td>Software backend (easier debugging)</td>
+</tr>
+<tr>
+<td>Test nodes</td>
+<td>Software backend</td>
+</tr>
+<tr>
+<td>Production servers</td>
+<td>TPM 2.0 (built-in, no extra cost)</td>
+</tr>
+<tr>
+<td>High-security nodes</td>
+<td>External HSM (PKCS#11)</td>
+</tr>
+</tbody></table>
+<p><strong>Limitations:</strong></p>
+<ul>
+<li>TPM operations are slower than software (~100ms vs ~1ms per signature)</li>
+<li>Key rotation requires re-enrollment with the TPM</li>
+<li>Remote attestation requires additional infrastructure</li>
+</ul>
+<hr>
+<h2>The Trust Graph</h2>
+<h3>8. What is Trust in ICN?</h3>
+<p><strong>Trust</strong> models social relationships between identities:</p>
+<pre><code>       Alice ────0.8───► Bob
+         │                 │
+        0.6               0.5
+         │                 │
+         ▼                 ▼
+      Charlie ◄───0.4─── David
+</code></pre>
+<ul>
+<li><strong>Edges</strong> represent trust relationships</li>
+<li><strong>Weights</strong> (0.0 to 1.0) represent trust level</li>
+<li><strong>Directed</strong>: Alice trusting Bob ≠ Bob trusting Alice</li>
+</ul>
+<h3>9. Trust Dimensions</h3>
+<p>ICN models trust across multiple <strong>dimensions</strong>:</p>
+<pre><code class="language-rust">pub enum TrustGraphType {
+    /// Social relationships (friendship, community membership)
+    Social,
+    /// Economic reliability (payment history, credit worthiness)
+    EconomicReliability,
+    /// Technical reliability (uptime, correct behavior)
+    TechnicalReliability,
+}
+</code></pre>
+<p><strong>Why separate dimensions?</strong></p>
+<ul>
+<li>Someone can be socially trusted but technically unreliable</li>
+<li>Someone can pay reliably but be new to the community</li>
+<li>Prevents gaming: can&#39;t boost economic trust through social manipulation</li>
+</ul>
+<h3>10. Trust Storage</h3>
+<pre><code class="language-rust">pub struct TrustEdge {
+    /// Who is granting trust
+    pub from: Did,
+    /// Who is receiving trust
+    pub to: Did,
+    /// Trust level (0.0 to 1.0)
+    pub weight: f64,
+    /// Which dimension
+    pub graph_type: TrustGraphType,
+    /// When this edge was created/updated
+    pub timestamp: u64,
+    /// Optional expiration
+    pub expires_at: Option&lt;u64&gt;,
+    /// Signature from grantor
+    pub signature: Signature,
+}
+
+pub struct TrustGraph {
+    /// Stored edges by (from, to, type)
+    edges: HashMap&lt;(Did, Did, TrustGraphType), TrustEdge&gt;,
+    /// Our identity for self-trust
+    our_did: Did,
+    /// Persistent storage
+    store: Arc&lt;dyn Store&gt;,
+}
+</code></pre>
+<h3>11. Computing Trust Scores</h3>
+<p><strong>Direct trust:</strong> Explicitly stated edges</p>
+<pre><code class="language-rust">pub fn get_direct_trust(&amp;self, from: &amp;Did, to: &amp;Did, graph_type: TrustGraphType) -&gt; Option&lt;f64&gt; {
+    self.edges.get(&amp;(from.clone(), to.clone(), graph_type))
+        .map(|edge| edge.weight)
+}
+</code></pre>
+<p><strong>Transitive trust:</strong> Trust through intermediaries</p>
+<pre><code class="language-rust">pub fn compute_trust_score(&amp;self, target: &amp;Did) -&gt; Result&lt;f64&gt; {
+    // Start from our perspective
+    let from = &amp;self.our_did;
+
+    // Direct trust (if exists)
+    if let Some(direct) = self.get_direct_trust(from, target, TrustGraphType::Social) {
+        return Ok(direct);
+    }
+
+    // Transitive trust via graph traversal
+    self.compute_transitive_trust(from, target, MAX_DEPTH, DECAY_FACTOR)
+}
+
+fn compute_transitive_trust(
+    &amp;self,
+    from: &amp;Did,
+    to: &amp;Did,
+    max_depth: usize,
+    decay: f64,
+) -&gt; Result&lt;f64&gt; {
+    // BFS/DFS with decay per hop
+    // Combine multiple paths (max, average, or custom)
+    // Return 0.0 if no path found
+}
+</code></pre>
+<p><strong>Example calculation:</strong></p>
+<pre><code>Alice trusts Bob: 0.8
+Bob trusts Carol: 0.6
+Decay per hop: 0.5
+
+Alice&#39;s transitive trust of Carol:
+= Alice→Bob × Bob→Carol × decay
+= 0.8 × 0.6 × 0.5
+= 0.24
+</code></pre>
+<h3>12. Trust Classes</h3>
+<p>Trust scores map to <strong>trust classes</strong> for policy decisions:</p>
+<pre><code class="language-rust">pub enum TrustClass {
+    /// Trust &lt; 0.1 - Unknown or untrusted
+    Isolated,
+    /// Trust 0.1 - 0.4 - Recognized but not trusted
+    Known,
+    /// Trust 0.4 - 0.7 - Regular collaborators
+    Partner,
+    /// Trust &gt; 0.7 - Highly trusted (federation partners)
+    Federated,
+}
+
+impl TrustClass {
+    pub fn from_score(score: f64) -&gt; Self {
+        match score {
+            s if s &lt; 0.1 =&gt; TrustClass::Isolated,
+            s if s &lt; 0.4 =&gt; TrustClass::Known,
+            s if s &lt; 0.7 =&gt; TrustClass::Partner,
+            _ =&gt; TrustClass::Federated,
+        }
+    }
+
+    pub fn rate_limit(&amp;self) -&gt; u32 {
+        match self {
+            TrustClass::Isolated =&gt; 10,    // messages per second
+            TrustClass::Known =&gt; 50,
+            TrustClass::Partner =&gt; 100,
+            TrustClass::Federated =&gt; 200,
+        }
+    }
+}
+</code></pre>
+<hr>
+<h2>Trust in Action</h2>
+<h3>13. Trust-Based Rate Limiting</h3>
+<p>Network traffic is limited based on trust:</p>
+<pre><code class="language-rust">pub struct TrustRateLimiter {
+    /// Remaining tokens per peer
+    tokens: HashMap&lt;Did, u32&gt;,
+    /// Trust graph for score lookup
+    trust_graph: Arc&lt;RwLock&lt;TrustGraph&gt;&gt;,
+}
+
+impl TrustRateLimiter {
+    pub fn allow(&amp;mut self, peer: &amp;Did) -&gt; bool {
+        let trust_score = self.trust_graph.read()
+            .unwrap()
+            .compute_trust_score(peer)
+            .unwrap_or(0.0);
+
+        let class = TrustClass::from_score(trust_score);
+        let limit = class.rate_limit();
+
+        let tokens = self.tokens.entry(peer.clone()).or_insert(limit);
+        if *tokens &gt; 0 {
+            *tokens -= 1;
+            true
+        } else {
+            false
+        }
+    }
+}
+</code></pre>
+<h3>14. Trust-Gated Topic Access</h3>
+<p>Gossip topics can require minimum trust:</p>
+<pre><code class="language-rust">pub fn check_topic_access(&amp;self, peer: &amp;Did, topic: &amp;str) -&gt; Result&lt;()&gt; {
+    let policy = self.get_topic_policy(topic);
+
+    match policy {
+        AccessControl::Public =&gt; Ok(()),
+
+        AccessControl::TrustGated { min_trust } =&gt; {
+            let score = self.trust_graph.compute_trust_score(peer)?;
+            if score &lt; min_trust {
+                bail!(&quot;Insufficient trust for topic: {:.2} &lt; {:.2}&quot;, score, min_trust);
+            }
+            Ok(())
+        }
+
+        AccessControl::CoopMembers { coop_did } =&gt; {
+            // Check membership through coop registry
+            if !self.is_coop_member(peer, &amp;coop_did)? {
+                bail!(&quot;Not a member of cooperative&quot;);
+            }
+            Ok(())
+        }
+    }
+}
+</code></pre>
+<h3>15. Trust in Ledger Operations</h3>
+<p>Ledger entries can require author trust:</p>
+<pre><code class="language-rust">impl Ledger {
+    fn validate_entry(&amp;self, entry: &amp;JournalEntry) -&gt; Result&lt;()&gt; {
+        // ... other validation ...
+
+        // Optional trust validation
+        if let Some(min_trust) = self.config.min_author_trust {
+            let trust = self.trust_graph
+                .read().await
+                .compute_trust_score(&amp;entry.author)?;
+
+            if trust &lt; min_trust {
+                bail!(&quot;Entry author has insufficient trust: {:.2}&quot;, trust);
+            }
+        }
+
+        Ok(())
+    }
+}
+</code></pre>
+<hr>
+<h2>Diagrams</h2>
+<h3>Identity Flow</h3>
+<pre><code class="language-mermaid">flowchart TB
+    subgraph Creation
+        Init[icnctl id init]
+        Gen[Generate Ed25519 keypair]
+        Enc[Encrypt with Age]
+        Save[Save to {data_dir}/identity.age]
+    end
+
+    subgraph Runtime
+        Load[Load keystore]
+        Unlock[Unlock with passphrase]
+        Bundle[Create IdentityBundle]
+    end
+
+    subgraph Usage
+        Sign[Sign messages]
+        TLS[TLS connections]
+        Author[Author entries]
+    end
+
+    Init --&gt; Gen --&gt; Enc --&gt; Save
+    Save --&gt; Load --&gt; Unlock --&gt; Bundle
+    Bundle --&gt; Sign
+    Bundle --&gt; TLS
+    Bundle --&gt; Author
+</code></pre>
+<h3>Trust Computation</h3>
+<pre><code class="language-mermaid">flowchart LR
+    subgraph Input
+        Edges[(Trust Edges)]
+        Target[Target DID]
+    end
+
+    subgraph Computation
+        Direct{Direct Trust?}
+        Trans[Transitive Search]
+        Combine[Combine Paths]
+    end
+
+    subgraph Output
+        Score[Trust Score]
+        Class[Trust Class]
+    end
+
+    Edges --&gt; Direct
+    Target --&gt; Direct
+    Direct --&gt;|Yes| Score
+    Direct --&gt;|No| Trans
+    Trans --&gt; Combine --&gt; Score
+    Score --&gt; Class
+</code></pre>
+<hr>
+<h2>Exercises</h2>
+<ol>
+<li><p><strong>DID Parsing</strong>: Write a function that extracts the public key bytes from
+a DID string <code>did:icn:5KQwrPbwdL6PhXujxW37...</code>.</p>
+</li>
+<li><p><strong>Trust Calculation</strong>: Given these edges, compute Alice&#39;s trust of Eve:</p>
+<ul>
+<li>Alice → Bob: 0.8</li>
+<li>Bob → Carol: 0.6</li>
+<li>Carol → David: 0.7</li>
+<li>David → Eve: 0.5</li>
+<li>Decay per hop: 0.5</li>
+</ul>
+</li>
+<li><p><strong>Trust Classes</strong>: Find where trust classes are used for rate limiting in
+the codebase. What are the rate limits for each class?</p>
+</li>
+<li><p><strong>Key Rotation</strong>: Trace the key rotation code path. What signatures are
+required in a KeyRotation record?</p>
+</li>
+<li><p><strong>Multi-Graph</strong>: ICN supports multiple trust graph types. Find where
+<code>TrustGraphType</code> is used differently for different purposes.</p>
+</li>
+</ol>
+<hr>
+<h2>Checkpoints</h2>
+<ul>
+<li><input disabled="" type="checkbox"> You can explain the DID format and why it&#39;s self-certifying</li>
+<li><input disabled="" type="checkbox"> You understand the keystore lifecycle (create, unlock, rotate)</li>
+<li><input disabled="" type="checkbox"> You know what the IdentityBundle contains</li>
+<li><input disabled="" type="checkbox"> You can explain DID-TLS binding</li>
+<li><input disabled="" type="checkbox"> You understand trust dimensions (social, economic, technical)</li>
+<li><input disabled="" type="checkbox"> You can compute transitive trust with decay</li>
+<li><input disabled="" type="checkbox"> You know how trust classes affect rate limiting</li>
+</ul>
+<hr>
+<h2>Quick Reference</h2>
+<table>
+<thead>
+<tr>
+<th>Concept</th>
+<th>Definition</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>DID</td>
+<td>Decentralized Identifier - <code>did:icn:&lt;base58-pubkey&gt;</code></td>
+</tr>
+<tr>
+<td>Keystore</td>
+<td>Age-encrypted file storing private keys</td>
+</tr>
+<tr>
+<td>IdentityBundle</td>
+<td>Runtime identity (DID + keys + TLS binding)</td>
+</tr>
+<tr>
+<td>Trust Edge</td>
+<td>Directed, weighted relationship between DIDs</td>
+</tr>
+<tr>
+<td>Trust Dimension</td>
+<td>Category of trust (social, economic, technical)</td>
+</tr>
+<tr>
+<td>Transitive Trust</td>
+<td>Trust computed through graph traversal</td>
+</tr>
+<tr>
+<td>Trust Class</td>
+<td>Category based on trust score (Isolated → Federated)</td>
+</tr>
+<tr>
+<td>Key Rotation</td>
+<td>Protocol for changing keys while preserving identity</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Next Steps</h2>
+<p>Proceed to <strong>Module 5: Network &amp; Gossip</strong> to understand how identities connect
+and how trust enables secure peer-to-peer communication.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

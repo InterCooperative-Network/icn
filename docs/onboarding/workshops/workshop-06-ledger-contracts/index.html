@@ -1,0 +1,576 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Workshop 6: Ledger and Contract Flow | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>onboarding</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>workshops</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>workshop 06 ledger contracts</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/onboarding/workshops/workshop-06-ledger-contracts.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Workshop 6: Ledger and Contract Flow</h1>
+<h2>Learning Objectives</h2>
+<p>By the end of this workshop, you will be able to:</p>
+<ol>
+<li><strong>Explain double-entry accounting</strong> - Understand debits, credits, and balance computation</li>
+<li><strong>Navigate the Merkle-DAG</strong> - Trace entry relationships and verify integrity</li>
+<li><strong>Validate transactions</strong> - Know what checks are performed before entry acceptance</li>
+<li><strong>Execute CCL contracts</strong> - Understand capability-based contract execution</li>
+<li><strong>Debug ledger issues</strong> - Use logs to trace transaction flow and identify problems</li>
+</ol>
+<h2>Goal</h2>
+<p>Trace a ledger payment flow from API request to gossip propagation, and understand
+how CCL contracts execute with capabilities.</p>
+<h2>Prerequisites</h2>
+<ul>
+<li>Completed <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/reference/module-06-ledger-contracts">Module 6: Ledger and CCL</a></li>
+<li>ICN binaries built (<code>cargo build</code>)</li>
+<li>Understanding of double-entry accounting basics</li>
+</ul>
+<h2>Estimated time</h2>
+<p>3-4 hours</p>
+<h2>Related Materials</h2>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/reference/module-06-ledger-contracts">Module 6: Ledger and CCL</a> - Background reading</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/workshop-05-network-gossip">Workshop 5: Network and Gossip</a> - How entries propagate</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/workshop-07-gateway-sdk">Workshop 7: Gateway and SDK</a> - API for ledger operations</li>
+</ul>
+<h2>Part 1: Ledger Entry Structure</h2>
+<h3>Steps</h3>
+<ol>
+<li>Open <code>icn/crates/icn-ledger/src/types.rs</code> (or search for LedgerEntry)</li>
+<li>Find the <code>LedgerEntry</code> struct definition</li>
+<li>Identify all fields and their purposes</li>
+</ol>
+<h3>Actual structure</h3>
+<p>The actual code uses <code>JournalEntry</code> (in <code>icn/crates/icn-ledger/src/types.rs</code>):</p>
+<pre><code class="language-rust">pub struct JournalEntry {
+    pub id: Option&lt;ContentHash&gt;,      // Hash-based identifier (computed)
+    pub author: Did,                   // Who created this entry
+    pub accounts: Vec&lt;AccountDelta&gt;,   // Multi-currency double-entry (debits/credits)
+    pub timestamp: u64,                // When created
+    pub parents: Vec&lt;ContentHash&gt;,     // Merkle-DAG references
+    pub signature: Option&lt;Signature&gt;,  // Creator&#39;s signature
+    pub contract_ref: Option&lt;String&gt;,  // Related CCL contract
+}
+
+pub struct AccountDelta {
+    pub account_id: String,     // Account identifier
+    pub currency: String,       // Currency code
+    pub debit: Option&lt;i64&gt;,     // Amount debited (leaves account)
+    pub credit: Option&lt;i64&gt;,    // Amount credited (enters account)
+}
+</code></pre>
+<p>Key difference: Instead of a single debit/credit pair, entries use <code>Vec&lt;AccountDelta&gt;</code>
+to support multi-currency, generalized double-entry bookkeeping.</p>
+<h3>Questions to answer</h3>
+<ol>
+<li>Why are there two accounts (debit and credit) per entry?</li>
+<li>What does the <code>parents</code> field enable?</li>
+<li>How is the entry ID computed?</li>
+</ol>
+<h3>Checkpoint</h3>
+<ul>
+<li><input disabled="" type="checkbox"> You understand double-entry structure</li>
+<li><input disabled="" type="checkbox"> You can explain the Merkle-DAG relationship</li>
+</ul>
+<h2>Part 2: Merkle-DAG Structure</h2>
+<h3>Steps</h3>
+<ol>
+<li>Search for parent/child handling:<pre><code class="language-bash">grep -r &quot;parents\|parent&quot; icn/crates/icn-ledger/src/ --include=&quot;*.rs&quot; | head -15
+</code></pre>
+</li>
+<li>Find how entry IDs are computed</li>
+<li>Understand how entries reference each other</li>
+</ol>
+<h3>Diagram: Merkle-DAG</h3>
+<pre><code>    Entry A (genesis)
+         │
+         ▼
+    Entry B ◄─────────┐
+         │            │
+         ▼            │
+    Entry C      Entry D
+         │            │
+         └────────────┤
+                      ▼
+                  Entry E
+                (references B, C, D)
+</code></pre>
+<h3>Questions to answer</h3>
+<ol>
+<li>What is a genesis entry?</li>
+<li>Can an entry have multiple parents?</li>
+<li>How does the DAG enable parallel transactions?</li>
+</ol>
+<h3>Code to find</h3>
+<p>In <code>icn/crates/icn-ledger/src/entry.rs</code>, find the hash computation:</p>
+<pre><code class="language-rust">impl JournalEntry {
+    pub fn compute_hash(&amp;self) -&gt; ContentHash {
+        // Hash of entry content (excluding signature and id)
+        let mut hasher = Blake2b256::new();
+        hasher.update(self.author.as_bytes());
+        // Hash each account delta
+        for delta in &amp;self.accounts {
+            hasher.update(delta.account_id.as_bytes());
+            hasher.update(delta.currency.as_bytes());
+            // ... hash amounts
+        }
+        // Hash parents for DAG integrity
+        for parent in &amp;self.parents {
+            hasher.update(parent.as_bytes());
+        }
+        ContentHash::from(hasher.finalize())
+    }
+}
+</code></pre>
+<h3>Checkpoint</h3>
+<ul>
+<li><input disabled="" type="checkbox"> You understand Merkle-DAG structure</li>
+<li><input disabled="" type="checkbox"> You can explain how integrity is verified</li>
+</ul>
+<h2>Part 3: Balance Computation</h2>
+<h3>Steps</h3>
+<ol>
+<li>Find balance calculation code in <code>icn-ledger</code></li>
+<li>Understand how balances are derived from entries</li>
+<li>Identify caching or optimization strategies</li>
+</ol>
+<h3>Balance computation (simplified concept)</h3>
+<p>The basic formula for a single currency:</p>
+<pre><code>Balance(Account, Currency) = Σ credits_to_Account - Σ debits_from_Account
+</code></pre>
+<p><strong>Conceptual example</strong> (simplified - actual entries use <code>AccountDelta</code>):</p>
+<blockquote>
+<p><strong>Warning</strong>: This example is conceptual. Real entries use <code>Vec&lt;AccountDelta&gt;</code>
+for multi-currency support. See the actual code pattern below.</p>
+</blockquote>
+<pre><code>Entry 1: Bob → Alice: 100 USD   (Alice&#39;s USD balance +100)
+Entry 2: Alice → Carol: 30 USD  (Alice&#39;s USD balance -30)
+Entry 3: Dan → Alice: 50 USD    (Alice&#39;s USD balance +50)
+---
+Balance(Alice, USD) = 100 - 30 + 50 = 120
+</code></pre>
+<p><strong>Important</strong>: The actual ledger is multi-currency. Each <code>JournalEntry</code> contains
+<code>Vec&lt;AccountDelta&gt;</code> where each delta specifies the currency. Balances are computed
+per-account and per-currency.</p>
+<h3>Questions to answer</h3>
+<ol>
+<li>How does the ledger handle concurrent balance queries?</li>
+<li>Is balance computed on-demand or cached?</li>
+<li>What happens if an entry is missing from the DAG?</li>
+</ol>
+<h3>Exercise</h3>
+<p>Search for balance methods:</p>
+<pre><code class="language-bash">grep -r &quot;balance\|Balance&quot; icn/crates/icn-ledger/src/ --include=&quot;*.rs&quot; | head -20
+</code></pre>
+<h3>Checkpoint</h3>
+<ul>
+<li><input disabled="" type="checkbox"> You understand how balances are derived</li>
+<li><input disabled="" type="checkbox"> You can trace the balance computation path</li>
+</ul>
+<h2>Part 4: Transaction Validation</h2>
+<h3>Steps</h3>
+<ol>
+<li>Find the validation code for new entries</li>
+<li>List all validation checks performed</li>
+<li>Understand error handling</li>
+</ol>
+<h3>Validation checks</h3>
+<ol>
+<li><strong>Signature valid</strong>: Entry is signed by debit account holder</li>
+<li><strong>Amount positive</strong>: Cannot transfer negative amounts</li>
+<li><strong>Sufficient balance</strong>: Debit account has enough (may allow credit limits)</li>
+<li><strong>Unique ID</strong>: Entry hasn&#39;t been processed before</li>
+<li><strong>Valid parents</strong>: Referenced entries exist</li>
+</ol>
+<h3>Questions to answer</h3>
+<ol>
+<li>Who must sign a ledger entry?</li>
+<li>What happens if validation fails?</li>
+<li>How are credit limits enforced?</li>
+</ol>
+<h3>Code pattern (conceptual)</h3>
+<p>The actual validation in <code>icn/crates/icn-ledger/src/ledger.rs</code> uses <code>JournalEntry</code>:</p>
+<pre><code class="language-rust">fn validate_entry(&amp;self, entry: &amp;JournalEntry) -&gt; Result&lt;()&gt; {
+    // 1. Verify signature from author
+    if let Some(sig) = &amp;entry.signature {
+        entry.author.verify(sig, &amp;entry.compute_hash().as_bytes())?;
+    }
+
+    // 2. Check all account deltas have valid amounts
+    for delta in &amp;entry.accounts {
+        if let Some(debit) = delta.debit {
+            if debit &lt;= 0 { return Err(LedgerError::InvalidAmount); }
+        }
+        if let Some(credit) = delta.credit {
+            if credit &lt;= 0 { return Err(LedgerError::InvalidAmount); }
+        }
+    }
+
+    // 3. Check author has sufficient balance (per currency)
+    // ... currency-specific balance checks
+
+    Ok(())
+}
+</code></pre>
+<p><strong>Note</strong>: This is simplified. The actual validation includes trust checks,
+witness requirements for high-value transactions, and more.</p>
+<h3>Checkpoint</h3>
+<ul>
+<li><input disabled="" type="checkbox"> You can list all validation checks</li>
+<li><input disabled="" type="checkbox"> You understand error handling for invalid entries</li>
+</ul>
+<h2>Part 5: Gossip Integration</h2>
+<h3>Steps</h3>
+<ol>
+<li>Find where ledger entries are announced to gossip</li>
+<li>Trace how incoming gossip entries are processed</li>
+<li>Understand conflict resolution</li>
+</ol>
+<h3>Flow: Creating a Transaction</h3>
+<pre><code>Gateway API
+    │
+    ▼
+Ledger.create_entry()
+    │
+    ├─► Validate
+    │
+    ├─► Store locally
+    │
+    └─► GossipActor.announce(&quot;ledger:entries&quot;, entry)
+            │
+            └─► NetworkActor.broadcast()
+</code></pre>
+<h3>Flow: Receiving a Transaction</h3>
+<pre><code>NetworkActor
+    │
+    ▼
+GossipActor.handle_message()
+    │
+    ▼
+Ledger.apply_entry()
+    │
+    ├─► Validate
+    │
+    └─► Store locally
+</code></pre>
+<h3>Questions to answer</h3>
+<ol>
+<li>How is the &quot;ledger:entries&quot; topic used?</li>
+<li>What happens if an entry arrives out of order?</li>
+<li>How are duplicate entries handled?</li>
+</ol>
+<h3>Checkpoint</h3>
+<ul>
+<li><input disabled="" type="checkbox"> You understand ledger-gossip integration</li>
+<li><input disabled="" type="checkbox"> You can trace an entry from creation to propagation</li>
+</ul>
+<h2>Part 6: CCL Contract Structure</h2>
+<h3>Steps</h3>
+<ol>
+<li>Open <code>icn/crates/icn-ccl/src/ast.rs</code></li>
+<li>Find the <code>Contract</code> struct</li>
+<li>Explore <code>Rule</code>, <code>Condition</code>, and <code>Effect</code> types</li>
+</ol>
+<h3>Contract structure</h3>
+<p>From <code>icn/crates/icn-ccl/src/ast.rs</code>:</p>
+<pre><code class="language-rust">pub struct Contract {
+    pub name: String,
+    pub participants: Vec&lt;Did&gt;,      // Who can participate
+    pub currency: Option&lt;String&gt;,    // Optional currency code
+    pub rules: Vec&lt;Rule&gt;,            // Conditional logic
+    pub state_vars: Vec&lt;StateVar&gt;,   // Mutable state variables
+    pub triggers: Vec&lt;Trigger&gt;,      // Event triggers
+}
+
+pub struct Rule {
+    pub name: String,
+    pub params: Vec&lt;Param&gt;,     // Rule parameters
+    pub requires: Vec&lt;Expr&gt;,    // Preconditions
+    pub body: Vec&lt;Stmt&gt;,        // Rule body (what happens)
+}
+</code></pre>
+<h3>Questions to answer</h3>
+<ol>
+<li>What makes CCL &quot;not Turing-complete&quot;?</li>
+<li>How are contract parties specified?</li>
+<li>Where is contract state stored?</li>
+</ol>
+<h3>Checkpoint</h3>
+<ul>
+<li><input disabled="" type="checkbox"> You understand contract structure</li>
+<li><input disabled="" type="checkbox"> You can identify rules and their components</li>
+</ul>
+<h2>Part 7: Capability System</h2>
+<h3>Steps</h3>
+<ol>
+<li>Find the <code>Capability</code> enum in <code>icn-ccl</code></li>
+<li>List all capability types</li>
+<li>Understand how capabilities are checked</li>
+</ol>
+<h3>Capabilities</h3>
+<pre><code class="language-rust">pub enum Capability {
+    ReadLedger,                    // Query balances
+    WriteLedger { max_amount: i64 }, // Transfer up to max
+    ReadTrust,                     // Query trust scores
+    SendMessage { topic: Topic },  // Publish to topic
+}
+</code></pre>
+<h3>Questions to answer</h3>
+<ol>
+<li>How does a contract declare required capabilities?</li>
+<li>Who grants capabilities to a contract?</li>
+<li>What happens if a contract exceeds its capabilities?</li>
+</ol>
+<h3>Example</h3>
+<pre><code>Contract &quot;profit-share&quot; requires:
+  - ReadLedger (to check current balances)
+  - WriteLedger { max_amount: 1000 } (to distribute profits)
+</code></pre>
+<h3>Checkpoint</h3>
+<ul>
+<li><input disabled="" type="checkbox"> You understand capability-based security</li>
+<li><input disabled="" type="checkbox"> You can trace capability checking</li>
+</ul>
+<h2>Part 8: Fuel Metering</h2>
+<h3>Steps</h3>
+<ol>
+<li>Search for fuel/gas metering:<pre><code class="language-bash">grep -r &quot;fuel\|Fuel&quot; icn/crates/icn-ccl/src/ --include=&quot;*.rs&quot; | head -15
+</code></pre>
+</li>
+<li>Find how fuel is consumed</li>
+<li>Understand fuel limits</li>
+</ol>
+<h3>Fuel costs (conceptual)</h3>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>Fuel Cost</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Variable read</td>
+<td>1</td>
+</tr>
+<tr>
+<td>Arithmetic op</td>
+<td>1</td>
+</tr>
+<tr>
+<td>Ledger read</td>
+<td>10</td>
+</tr>
+<tr>
+<td>Ledger write</td>
+<td>100</td>
+</tr>
+<tr>
+<td>Loop iteration</td>
+<td>5</td>
+</tr>
+</tbody></table>
+<h3>Questions to answer</h3>
+<ol>
+<li>Why is fuel metering necessary?</li>
+<li>How is fuel limit set for a contract execution?</li>
+<li>What happens when fuel is exhausted?</li>
+</ol>
+<h3>Code pattern</h3>
+<pre><code class="language-rust">struct Interpreter {
+    fuel: u64,
+    fuel_limit: u64,
+}
+
+impl Interpreter {
+    fn consume_fuel(&amp;mut self, amount: u64) -&gt; Result&lt;()&gt; {
+        if self.fuel + amount &gt; self.fuel_limit {
+            return Err(ExecutionError::OutOfFuel);
+        }
+        self.fuel += amount;
+        Ok(())
+    }
+}
+</code></pre>
+<h3>Checkpoint</h3>
+<ul>
+<li><input disabled="" type="checkbox"> You understand fuel metering purpose</li>
+<li><input disabled="" type="checkbox"> You can trace fuel consumption</li>
+</ul>
+<h2>Part 9: End-to-End Transaction Exercise</h2>
+<h3>Steps</h3>
+<ol>
+<li>Set up a local node (if not already running)</li>
+<li>Use the SDK or CLI to create a transaction</li>
+<li>Trace through logs to see the flow</li>
+</ol>
+<h3>Using CLI</h3>
+<pre><code class="language-bash">export ICN_DATA=$(mktemp -d)
+export ICN_PASSPHRASE=&quot;workshop&quot;
+
+# Initialize identity
+./target/debug/icnctl --data-dir &quot;$ICN_DATA&quot; id init
+
+# Start daemon with debug logging
+RUST_LOG=icn_ledger=debug ./target/debug/icnd --data-dir &quot;$ICN_DATA&quot; &amp;
+
+# Note: Transactions are created via the Gateway API or SDK, not icnctl.
+# Use icnctl to inspect ledger state after transactions:
+./target/debug/icnctl --data-dir &quot;$ICN_DATA&quot; ledger head
+./target/debug/icnctl --data-dir &quot;$ICN_DATA&quot; ledger history
+./target/debug/icnctl --data-dir &quot;$ICN_DATA&quot; ledger balance &lt;account-id&gt;
+</code></pre>
+<h3>Available icnctl ledger commands</h3>
+<ul>
+<li><code>ledger head</code> - Show most recent ledger entry</li>
+<li><code>ledger balance &lt;account&gt;</code> - Show balance for an account</li>
+<li><code>ledger history</code> - Show recent ledger history</li>
+<li><code>ledger quarantine</code> - Quarantine management</li>
+</ul>
+<h3>Expected log output</h3>
+<ul>
+<li>&quot;Creating ledger entry&quot;</li>
+<li>&quot;Validating entry...&quot;</li>
+<li>&quot;Entry stored: <id>&quot;</li>
+<li>&quot;Announcing to gossip&quot;</li>
+</ul>
+<h3>Checkpoint</h3>
+<ul>
+<li><input disabled="" type="checkbox"> You started the daemon with debug logging</li>
+<li><input disabled="" type="checkbox"> You understand how to inspect ledger state</li>
+</ul>
+<h2>Summary</h2>
+<p>After completing this workshop you should be able to:</p>
+<ul>
+<li>Trace a ledger transaction from creation to gossip propagation</li>
+<li>Explain Merkle-DAG structure and validation</li>
+<li>Understand CCL contract structure and capabilities</li>
+<li>Describe fuel metering and its purpose</li>
+<li>Debug ledger operations using logs</li>
+</ul>
+<h2>Key Takeaways</h2>
+<table>
+<thead>
+<tr>
+<th>Concept</th>
+<th>Key Point</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>JournalEntry</strong></td>
+<td>Uses <code>Vec&lt;AccountDelta&gt;</code> for multi-currency double-entry</td>
+</tr>
+<tr>
+<td><strong>Merkle-DAG</strong></td>
+<td>Each entry references parents; hash includes parent hashes</td>
+</tr>
+<tr>
+<td><strong>Balance</strong></td>
+<td>Computed from sum of credits minus sum of debits per currency</td>
+</tr>
+<tr>
+<td><strong>Validation</strong></td>
+<td>Signature + amount + balance + parents + uniqueness</td>
+</tr>
+<tr>
+<td><strong>CCL Capabilities</strong></td>
+<td>Contracts declare required permissions (ReadLedger, WriteLedger, etc.)</td>
+</tr>
+<tr>
+<td><strong>Fuel Metering</strong></td>
+<td>Prevents infinite loops; each operation costs fuel</td>
+</tr>
+</tbody></table>
+<h2>Try It Yourself</h2>
+<p><strong>Challenge 1</strong>: Trace a complete transaction</p>
+<ol>
+<li>Start the daemon with ledger debug logging:<pre><code class="language-bash">RUST_LOG=icn_ledger=debug ./target/debug/icnd --data-dir &quot;$ICN_DATA&quot;
+</code></pre>
+</li>
+<li>Create a transaction via the gateway API</li>
+<li>Follow the logs to see: validation → storage → gossip announcement</li>
+<li>Query the transaction using <code>icnctl ledger history</code></li>
+</ol>
+<p><strong>Challenge 2</strong>: Explore the DAG structure</p>
+<ol>
+<li>Create several transactions</li>
+<li>Use <code>icnctl ledger head</code> to find the latest entry</li>
+<li>Trace back through parents to understand the DAG shape</li>
+<li>What happens if you create transactions in parallel?</li>
+</ol>
+<p><strong>Challenge 3</strong>: CCL contract exploration
+Find a CCL contract in the codebase and analyze:</p>
+<ul>
+<li>What capabilities does it require?</li>
+<li>What operations does it perform?</li>
+<li>How much fuel would it consume?</li>
+</ul>
+<h2>Troubleshooting</h2>
+<h3>&quot;Insufficient balance&quot;</h3>
+<p>The source account doesn&#39;t have enough credits. Check balance with CLI.</p>
+<h3>&quot;Invalid signature&quot;</h3>
+<p>The transaction must be signed by the debit account&#39;s private key.</p>
+<h3>&quot;Entry already exists&quot;</h3>
+<p>Duplicate entries are rejected. Check if transaction was already processed.</p>
+<h3>&quot;Out of fuel&quot;</h3>
+<p>Contract execution exceeded fuel limit. Reduce complexity or increase limit.</p>
+<h2>Next steps</h2>
+<p>Proceed to Workshop 7: Gateway Auth and SDK Usage</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

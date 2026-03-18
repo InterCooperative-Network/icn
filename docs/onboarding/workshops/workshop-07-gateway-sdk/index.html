@@ -1,0 +1,565 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Workshop 7: Gateway Auth and SDK Usage | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>onboarding</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>workshops</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>workshop 07 gateway sdk</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/onboarding/workshops/workshop-07-gateway-sdk.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Workshop 7: Gateway Auth and SDK Usage</h1>
+<h2>Learning Objectives</h2>
+<p>By the end of this workshop, you will be able to:</p>
+<ol>
+<li><strong>Authenticate via challenge-response</strong> - Obtain and use JWT tokens for API access</li>
+<li><strong>Navigate the REST API</strong> - Know which endpoints are available and how to use them</li>
+<li><strong>Use the TypeScript SDK</strong> - Perform ledger and trust operations programmatically</li>
+<li><strong>Handle WebSocket events</strong> - Subscribe to real-time updates from cooperatives</li>
+<li><strong>Understand rate limiting</strong> - Know the limits and how trust affects them</li>
+</ol>
+<h2>Goal</h2>
+<p>Authenticate against the ICN gateway API, understand the challenge-response flow,
+and use the TypeScript SDK to interact with the ledger.</p>
+<h2>Prerequisites</h2>
+<ul>
+<li>Completed <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/reference/module-07-gateway-sdk">Module 7: Gateway and SDK</a></li>
+<li>ICN daemon running (<code>icnd</code>)</li>
+<li>Node.js 18+ installed (for SDK exercises)</li>
+</ul>
+<h2>Estimated time</h2>
+<p>2-3 hours</p>
+<h2>Related Materials</h2>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/reference/module-07-gateway-sdk">Module 7: Gateway and SDK</a> - Background reading</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/workshop-06-ledger-contracts">Workshop 6: Ledger and Contracts</a> - Ledger operations</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/sdk/typescript/README">TypeScript SDK README</a> - SDK reference (if available)</li>
+</ul>
+<h2>Part 1: Gateway Architecture</h2>
+<h3>Steps</h3>
+<ol>
+<li>Open <code>icn/crates/icn-gateway/src/lib.rs</code></li>
+<li>Find the route definitions</li>
+<li>Identify the authentication middleware</li>
+</ol>
+<h3>Gateway structure</h3>
+<pre><code>┌─────────────────────────────────────────┐
+│             ICN Gateway                  │
+├─────────────────────────────────────────┤
+│  /auth/challenge  │  Get auth challenge  │
+│  /v1/auth/verify     │  Submit signed proof │
+├─────────────────────────────────────────┤
+│  /ledger/*        │  Ledger operations   │
+│  /trust/*         │  Trust queries       │
+│  /governance/*    │  Voting/proposals    │
+│  /compute/*       │  Task submission     │
+├─────────────────────────────────────────┤
+│  /ws              │  WebSocket events    │
+│  /health          │  Health check        │
+│  /metrics         │  Prometheus metrics  │
+└─────────────────────────────────────────┘
+</code></pre>
+<h3>Questions to answer</h3>
+<ol>
+<li>What web framework is used (Actix, Axum, etc.)?</li>
+<li>How are routes grouped by functionality?</li>
+<li>Which routes require authentication?</li>
+</ol>
+<h3>Checkpoint</h3>
+<ul>
+<li><input disabled="" type="checkbox"> You understand gateway route structure</li>
+<li><input disabled="" type="checkbox"> You can identify protected vs public routes</li>
+</ul>
+<h2>Part 2: Challenge-Response Authentication</h2>
+<h3>Steps</h3>
+<ol>
+<li>Open <code>icn/crates/icn-gateway/src/auth/</code> (or search for &quot;challenge&quot;)</li>
+<li>Find the challenge generation code</li>
+<li>Trace the verification flow</li>
+</ol>
+<h3>Auth flow diagram</h3>
+<pre><code>Client                           Gateway
+   │                                │
+   │──── GET /auth/challenge ──────►│
+   │                                │ Generate random nonce
+   │◄─── { challenge, expires } ────│
+   │                                │
+   │ Sign challenge with DID key    │
+   │                                │
+   │── POST /v1/auth/verify ──────────►│
+   │    { did, signature }          │ Verify signature
+   │                                │ Generate JWT
+   │◄─── { token, expires } ────────│
+   │                                │
+   │ Include token in future requests
+   │                                │
+   │── GET /ledger/balance ────────►│
+   │    Authorization: Bearer &lt;jwt&gt; │ Validate JWT
+   │◄─── { balance: 100 } ──────────│
+</code></pre>
+<h3>Questions to answer</h3>
+<ol>
+<li>What is included in the challenge?</li>
+<li>How long is the challenge valid?</li>
+<li>What claims are in the JWT?</li>
+</ol>
+<h3>Code to find</h3>
+<pre><code class="language-rust">pub struct AuthChallenge {
+    pub challenge: String,  // Random nonce
+    pub expires_at: u64,    // Unix timestamp
+}
+
+pub struct VerifyRequest {
+    pub did: Did,
+    pub signature: Signature,
+}
+</code></pre>
+<h3>Checkpoint</h3>
+<ul>
+<li><input disabled="" type="checkbox"> You understand the challenge-response flow</li>
+<li><input disabled="" type="checkbox"> You can trace JWT generation</li>
+</ul>
+<h2>Part 3: Testing Auth with curl</h2>
+<h3>Steps</h3>
+<ol>
+<li><p>Start the daemon if not running:</p>
+<pre><code class="language-bash">export ICN_DATA=$(mktemp -d)
+export ICN_PASSPHRASE=&quot;workshop&quot;
+./target/debug/icnctl --data-dir &quot;$ICN_DATA&quot; id init
+./target/debug/icnd --data-dir &quot;$ICN_DATA&quot; &amp;
+</code></pre>
+</li>
+<li><p>Get a challenge:</p>
+<pre><code class="language-bash">curl -s http://localhost:8080/v1/auth/challenge | jq
+</code></pre>
+</li>
+<li><p>Expected response:</p>
+<pre><code class="language-json">{
+  &quot;challenge&quot;: &quot;abc123...&quot;,
+  &quot;expires_at&quot;: 1700000000
+}
+</code></pre>
+</li>
+</ol>
+<h3>Manual signing (conceptual)</h3>
+<p>To complete auth, you would:</p>
+<ol>
+<li>Sign the challenge with your DID private key</li>
+<li>POST to <code>/v1/auth/verify</code> with DID and signature</li>
+<li>Receive JWT token</li>
+</ol>
+<p>Note: The SDK handles this automatically.</p>
+<h3>Checkpoint</h3>
+<ul>
+<li><input disabled="" type="checkbox"> You obtained a challenge from the gateway</li>
+<li><input disabled="" type="checkbox"> You understand what happens next</li>
+</ul>
+<h2>Part 4: TypeScript SDK Setup</h2>
+<h3>Steps</h3>
+<ol>
+<li><p>Check for SDK location:</p>
+<pre><code class="language-bash">ls sdk/typescript/ 2&gt;/dev/null || echo &quot;SDK not found&quot;
+</code></pre>
+<p>If the SDK is not found:</p>
+<pre><code class="language-bash">if [ ! -d sdk/typescript ]; then
+  echo &quot;TypeScript SDK not available. Refer to Module 7 for API specs.&quot;
+  echo &quot;You can still use the REST API directly via curl.&quot;
+fi
+</code></pre>
+</li>
+<li><p>If SDK exists, install dependencies:</p>
+<pre><code class="language-bash">cd sdk/typescript
+npm install
+</code></pre>
+</li>
+<li><p>Review the SDK README for usage examples</p>
+</li>
+</ol>
+<h3>SDK structure (expected)</h3>
+<pre><code>sdk/typescript/
+├── src/
+│   ├── client.ts      # Main ICN client
+│   ├── auth.ts        # Authentication helpers
+│   ├── ledger.ts      # Ledger operations
+│   ├── trust.ts       # Trust queries
+│   └── types.ts       # TypeScript types
+├── package.json
+└── README.md
+</code></pre>
+<h3>Checkpoint</h3>
+<ul>
+<li><input disabled="" type="checkbox"> You located the TypeScript SDK</li>
+<li><input disabled="" type="checkbox"> Dependencies installed successfully</li>
+</ul>
+<h2>Part 5: SDK Authentication</h2>
+<h3>Steps</h3>
+<ol>
+<li><p>Create a test script <code>test-auth.ts</code>:</p>
+<pre><code class="language-typescript">import { ICNClient } from &#39;@icn/client&#39;;
+
+async function main() {
+  // Create client
+  const client = new ICNClient({
+    baseUrl: &#39;http://localhost:8080&#39;,
+  });
+
+  // Note: The SDK handles authentication via challenge-response
+  // when you call protected endpoints. You can also explicitly
+  // authenticate if needed.
+
+  // Get a challenge
+  const challenge = await client.getChallenge();
+  console.log(&#39;Got challenge:&#39;, challenge.challenge);
+
+  // Verify with signature (SDK handles key management)
+  const token = await client.verify({
+    did: &#39;did:icn:your-did&#39;,
+    signature: &#39;your-signature&#39;,
+  });
+  console.log(&#39;Got JWT token:&#39;, token.token.substring(0, 20) + &#39;...&#39;);
+
+  // Now client is authenticated for protected endpoints
+}
+
+main().catch(console.error);
+</code></pre>
+</li>
+<li><p>Run the script:</p>
+<pre><code class="language-bash">npx ts-node test-auth.ts
+</code></pre>
+</li>
+</ol>
+<h3>Questions to answer</h3>
+<ol>
+<li>How does the SDK sign the challenge?</li>
+<li>How is the token stored for subsequent requests?</li>
+<li>What happens when the token expires?</li>
+</ol>
+<h3>Checkpoint</h3>
+<ul>
+<li><input disabled="" type="checkbox"> You authenticated via the SDK</li>
+<li><input disabled="" type="checkbox"> You understand token lifecycle</li>
+</ul>
+<h2>Part 6: Ledger Operations via SDK</h2>
+<h3>Steps</h3>
+<ol>
+<li><p>Create <code>test-ledger.ts</code>:</p>
+<pre><code class="language-typescript">import { ICNClient } from &#39;@icn/client&#39;;
+
+async function main() {
+  const client = new ICNClient({
+    baseUrl: &#39;http://localhost:8080&#39;,
+    token: &#39;your-jwt-token&#39;, // From authentication step
+  });
+
+  // Get balance for an account
+  const balance = await client.getBalance(&#39;your-account-id&#39;);
+  console.log(&#39;Current balance:&#39;, balance);
+
+  // Note: The SDK provides methods for ledger operations.
+  // Check the SDK README for the complete API:
+  // - client.getBalance(accountId)
+  // - client.getLedgerHead()
+  // - client.getLedgerHistory(options)
+}
+
+main().catch(console.error);
+</code></pre>
+</li>
+<li><p>Run and observe the output</p>
+</li>
+</ol>
+<h3>Expected API calls</h3>
+<pre><code>GET  /ledger/balance?did=&lt;your-did&gt;
+POST /ledger/transfer { to, amount, memo }
+GET  /ledger/history?did=&lt;your-did&gt;&amp;limit=10
+</code></pre>
+<h3>Questions to answer</h3>
+<ol>
+<li>How are ledger entries returned (format)?</li>
+<li>How does the SDK handle errors?</li>
+<li>Can you query another DID&#39;s balance?</li>
+</ol>
+<h3>Checkpoint</h3>
+<ul>
+<li><input disabled="" type="checkbox"> You queried your balance</li>
+<li><input disabled="" type="checkbox"> You understand the ledger API</li>
+</ul>
+<h2>Part 7: Trust Queries via SDK</h2>
+<h3>Steps</h3>
+<ol>
+<li>Extend your script to query trust:<pre><code class="language-typescript">import { ICNClient } from &#39;@icn/client&#39;;
+
+// Get trust score between two DIDs
+const trust = await client.getTrustScore({
+  from: &#39;did:icn:my-did&#39;,
+  to: &#39;did:icn:peer-did&#39;
+});
+console.log(&#39;Trust score:&#39;, trust);
+
+// Add a trust edge (requires auth)
+// Note: Check SDK API for exact method signatures
+</code></pre>
+</li>
+</ol>
+<h3>Trust API endpoints</h3>
+<pre><code>GET  /trust/score?from=&lt;did&gt;&amp;to=&lt;did&gt;
+GET  /trust/edges?did=&lt;did&gt;
+POST /trust/edge { to, score, dimension }
+</code></pre>
+<h3>Questions to answer</h3>
+<ol>
+<li>What trust dimensions are available?</li>
+<li>Can you remove a trust edge?</li>
+<li>How is transitive trust computed (client vs server)?</li>
+</ol>
+<h3>Checkpoint</h3>
+<ul>
+<li><input disabled="" type="checkbox"> You queried trust scores</li>
+<li><input disabled="" type="checkbox"> You understand trust API operations</li>
+</ul>
+<h2>Part 8: WebSocket Events</h2>
+<h3>Steps</h3>
+<ol>
+<li><p>Create <code>test-websocket.ts</code>:</p>
+<pre><code class="language-typescript">import { ICNClient, ICNSubscription } from &#39;@icn/client&#39;;
+
+async function main() {
+  const client = new ICNClient({
+    baseUrl: &#39;http://localhost:8080&#39;,
+    token: &#39;your-jwt-token&#39;,
+  });
+
+  // Subscribe to cooperative events
+  const subscription = client.subscribe(&#39;coop-id&#39;, {
+    onEvent: (event) =&gt; {
+      console.log(&#39;Event received:&#39;, event);
+    },
+    onError: (error) =&gt; {
+      console.error(&#39;Subscription error:&#39;, error);
+    },
+    onClose: () =&gt; {
+      console.log(&#39;Connection closed&#39;);
+    },
+  });
+
+  console.log(&#39;Listening for events... (Ctrl+C to exit)&#39;);
+
+  // Keep running
+  await new Promise(() =&gt; {});
+
+  // Cleanup when done
+  subscription.close();
+}
+
+main().catch(console.error);
+</code></pre>
+</li>
+<li><p>Run and observe events when activity occurs</p>
+</li>
+</ol>
+<h3>WebSocket protocol</h3>
+<pre><code>Client connects to /ws with JWT in query string
+Server sends events as JSON messages:
+{
+  &quot;type&quot;: &quot;ledger:entry&quot;,
+  &quot;data&quot;: { ... entry details ... }
+}
+</code></pre>
+<h3>Checkpoint</h3>
+<ul>
+<li><input disabled="" type="checkbox"> You connected to WebSocket</li>
+<li><input disabled="" type="checkbox"> You received real-time events</li>
+</ul>
+<h2>Part 9: Rate Limiting Exploration</h2>
+<h3>Steps</h3>
+<ol>
+<li>Open <code>icn/crates/icn-gateway/src/rate_limit.rs</code></li>
+<li>Find the rate limit configuration</li>
+<li>Understand per-DID vs per-IP limits</li>
+</ol>
+<h3>Rate limit tiers</h3>
+<table>
+<thead>
+<tr>
+<th>Endpoint Category</th>
+<th>Limit</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Read operations</td>
+<td>200/min</td>
+</tr>
+<tr>
+<td>Write operations</td>
+<td>60/min</td>
+</tr>
+<tr>
+<td>Auth endpoints</td>
+<td>120/min per IP</td>
+</tr>
+<tr>
+<td>Governance</td>
+<td>30/min</td>
+</tr>
+<tr>
+<td>Compute</td>
+<td>10/min</td>
+</tr>
+</tbody></table>
+<h3>Questions to answer</h3>
+<ol>
+<li>What header indicates remaining rate limit?</li>
+<li>What happens when rate limited?</li>
+<li>How does trust level affect limits?</li>
+</ol>
+<h3>Test rate limiting</h3>
+<pre><code class="language-bash"># Rapid requests to trigger rate limit
+for i in {1..100}; do
+  curl -s http://localhost:8080/v1/health &gt; /dev/null
+done
+# Should see 429 responses eventually
+</code></pre>
+<h3>Checkpoint</h3>
+<ul>
+<li><input disabled="" type="checkbox"> You understand rate limiting tiers</li>
+<li><input disabled="" type="checkbox"> You know how to handle rate limit errors</li>
+</ul>
+<h2>Summary</h2>
+<p>After completing this workshop you should be able to:</p>
+<ul>
+<li>Authenticate with the ICN gateway using challenge-response</li>
+<li>Use the TypeScript SDK for ledger and trust operations</li>
+<li>Connect to WebSocket for real-time events</li>
+<li>Understand rate limiting and error handling</li>
+</ul>
+<h2>Key Takeaways</h2>
+<table>
+<thead>
+<tr>
+<th>Concept</th>
+<th>Key Point</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Auth Flow</strong></td>
+<td>GET challenge → sign with DID key → POST verify → receive JWT</td>
+</tr>
+<tr>
+<td><strong>JWT Token</strong></td>
+<td>Include as <code>Authorization: Bearer &lt;token&gt;</code> header</td>
+</tr>
+<tr>
+<td><strong>Protected Routes</strong></td>
+<td><code>/v1/ledger/*</code>, <code>/v1/trust/*</code>, <code>/v1/gov/*</code> require auth</td>
+</tr>
+<tr>
+<td><strong>Public Routes</strong></td>
+<td><code>/v1/health</code>, <code>/v1/auth/*</code> are unauthenticated</td>
+</tr>
+<tr>
+<td><strong>WebSocket</strong></td>
+<td>Connect to <code>/v1/ws/{coop_id}</code> for real-time events</td>
+</tr>
+<tr>
+<td><strong>Rate Limits</strong></td>
+<td>Trust level affects limits (Isolated: 10/sec, Federated: 200/sec)</td>
+</tr>
+</tbody></table>
+<h2>Try It Yourself</h2>
+<p><strong>Challenge 1</strong>: Build a simple CLI client
+Create a Node.js script that:</p>
+<ol>
+<li>Gets a challenge from the gateway</li>
+<li>Signs it (use a test key or mock)</li>
+<li>Verifies to get a JWT</li>
+<li>Fetches your balance</li>
+</ol>
+<p><strong>Challenge 2</strong>: Monitor real-time events</p>
+<ol>
+<li>Connect to the WebSocket endpoint</li>
+<li>Subscribe to a cooperative&#39;s events</li>
+<li>Trigger an action (e.g., create a ledger entry in another terminal)</li>
+<li>Observe the event arrive</li>
+</ol>
+<p><strong>Challenge 3</strong>: Explore rate limiting behavior</p>
+<pre><code class="language-bash"># Test different trust levels (if you can simulate them)
+# or just observe the headers:
+curl -v http://localhost:8080/v1/health 2&gt;&amp;1 | grep -i rate
+</code></pre>
+<p><strong>Challenge 4</strong>: Error handling
+Try to trigger each error condition and handle it gracefully:</p>
+<ul>
+<li>Expired token</li>
+<li>Invalid signature</li>
+<li>Rate limit exceeded</li>
+<li>Missing authentication</li>
+</ul>
+<h2>Troubleshooting</h2>
+<h3>&quot;Authentication failed&quot;</h3>
+<p>Ensure your keystore is properly unlocked and the DID matches.</p>
+<h3>&quot;Token expired&quot;</h3>
+<p>Re-authenticate to get a fresh JWT token.</p>
+<h3>&quot;Rate limit exceeded&quot;</h3>
+<p>Wait for the rate limit window to reset, or reduce request frequency.</p>
+<h3>&quot;Connection refused&quot;</h3>
+<p>Ensure the ICN daemon is running and listening on the expected port.</p>
+<h2>Next steps</h2>
+<p>Proceed to Workshop 8: Web UI</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

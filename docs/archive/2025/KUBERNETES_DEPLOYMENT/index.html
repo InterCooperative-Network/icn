@@ -1,0 +1,700 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Kubernetes Deployment Guide | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>archive</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>2025</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>KUBERNETES DEPLOYMENT</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/archive/2025/KUBERNETES_DEPLOYMENT.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><p>⚠️ <strong>SUPERSEDED</strong> - This document has been superseded.</p>
+<blockquote>
+<p><strong>Archived Document Notice (2026-02-12):</strong> This file is retained for historical context and may not reflect current code, APIs, runtime defaults, CI status, or deployment posture.
+Use active documentation under <code>docs/</code> as authoritative.</p>
+</blockquote>
+<p>See current deployment guide: <a href="/docs/operations/deployment/HOMELAB_DEPLOYMENT">HOMELAB_DEPLOYMENT.md</a></p>
+<hr>
+<h1>Kubernetes Deployment Guide</h1>
+<p>Complete guide for deploying ICN to Kubernetes clusters.</p>
+<h2>Prerequisites</h2>
+<ul>
+<li>Kubernetes 1.24+ cluster</li>
+<li><code>kubectl</code> configured</li>
+<li>Helm 3.x (optional, for Helm charts)</li>
+<li>Storage class for persistent volumes</li>
+<li>Optional: Ingress controller (nginx, traefik)</li>
+<li>Optional: cert-manager for TLS</li>
+</ul>
+<h2>Deployment Options</h2>
+<h3>1. Quick Start (kubectl)</h3>
+<p>Basic deployment using raw manifests.</p>
+<h3>2. Helm Charts (Recommended)</h3>
+<p>Production deployment with configurable Helm charts.</p>
+<h3>3. Production Setup</h3>
+<p>High-availability deployment with monitoring.</p>
+<hr>
+<h2>Quick Start with kubectl</h2>
+<h3>1. Create Namespace</h3>
+<pre><code class="language-bash">kubectl create namespace icn
+</code></pre>
+<h3>2. Create Secrets</h3>
+<pre><code class="language-bash"># Generate JWT secret
+JWT_SECRET=$(openssl rand -hex 32)
+
+# Create secret
+kubectl create secret generic icn-secrets \
+  --namespace=icn \
+  --from-literal=jwt-secret=$JWT_SECRET
+</code></pre>
+<h3>3. Apply Manifests</h3>
+<pre><code class="language-bash">cd deploy/kubernetes
+
+# Apply in order
+kubectl apply -f namespace.yaml
+kubectl apply -f configmap.yaml
+kubectl apply -f secret.yaml
+kubectl apply -f pvc.yaml
+kubectl apply -f deployment.yaml
+kubectl apply -f service.yaml
+kubectl apply -f ingress.yaml
+</code></pre>
+<h3>4. Verify Deployment</h3>
+<pre><code class="language-bash"># Check pods
+kubectl get pods -n icn
+
+# Check services
+kubectl get svc -n icn
+
+# View logs
+kubectl logs -n icn -l app=icnd -f
+</code></pre>
+<h3>5. Initialize Identity</h3>
+<pre><code class="language-bash"># Get pod name
+POD=$(kubectl get pods -n icn -l app=icnd -o jsonpath=&#39;{.items[0].metadata.name}&#39;)
+
+# Initialize identity
+kubectl exec -n icn $POD -- icnctl id init
+
+# Show DID
+kubectl exec -n icn $POD -- icnctl id show
+</code></pre>
+<hr>
+<h2>Helm Deployment</h2>
+<h3>1. Install from Local Charts</h3>
+<pre><code class="language-bash">cd deploy/helm
+
+helm install icn ./icn \
+  --namespace icn \
+  --create-namespace \
+  --set jwtSecret=$(openssl rand -hex 32) \
+  --set ingress.enabled=true \
+  --set ingress.host=icn.example.com
+</code></pre>
+<h3>2. Configuration Options</h3>
+<pre><code class="language-bash"># Custom values file
+cat &gt; values.yaml &lt;&lt;EOF
+replicaCount: 3
+
+resources:
+  limits:
+    cpu: 2
+    memory: 4Gi
+  requests:
+    cpu: 500m
+    memory: 1Gi
+
+persistence:
+  enabled: true
+  size: 20Gi
+  storageClass: fast-ssd
+
+ingress:
+  enabled: true
+  host: icn.example.com
+  tls:
+    enabled: true
+    secretName: icn-tls
+
+monitoring:
+  enabled: true
+  prometheus:
+    enabled: true
+  grafana:
+    enabled: true
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+EOF
+
+# Install with custom values
+helm install icn ./icn -f values.yaml --namespace icn
+</code></pre>
+<h3>3. Upgrade Deployment</h3>
+<pre><code class="language-bash"># Upgrade to new version
+helm upgrade icn ./icn \
+  --namespace icn \
+  -f values.yaml
+
+# Rollback if needed
+helm rollback icn --namespace icn
+</code></pre>
+<h3>4. Uninstall</h3>
+<pre><code class="language-bash">helm uninstall icn --namespace icn
+</code></pre>
+<hr>
+<h2>Production Setup</h2>
+<h3>Architecture</h3>
+<pre><code>┌─────────────────────────────────────────────────┐
+│                  Ingress Controller              │
+│              (TLS Termination)                   │
+└──────────────────┬──────────────────────────────┘
+                   │
+       ┌───────────┴───────────┐
+       │                       │
+┌──────▼──────┐        ┌──────▼──────┐
+│  Gateway     │        │   WebSocket  │
+│  Service     │        │   Service    │
+│  (ClusterIP) │        │  (ClusterIP) │
+└──────┬──────┘        └──────┬──────┘
+       │                       │
+       └───────────┬───────────┘
+                   │
+         ┌─────────▼─────────┐
+         │  ICNd StatefulSet  │
+         │  (3+ replicas)     │
+         └─────────┬─────────┘
+                   │
+         ┌─────────▼─────────┐
+         │  Persistent Volume │
+         │  (Per Pod)         │
+         └───────────────────┘
+</code></pre>
+<h3>1. High Availability Configuration</h3>
+<pre><code class="language-yaml"># icn-ha-values.yaml
+replicaCount: 3
+
+# Pod anti-affinity for distribution
+affinity:
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+    - labelSelector:
+        matchExpressions:
+        - key: app
+          operator: In
+          values:
+          - icnd
+      topologyKey: kubernetes.io/hostname
+
+# Pod disruption budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+
+# Resource limits
+resources:
+  limits:
+    cpu: &quot;2&quot;
+    memory: &quot;4Gi&quot;
+  requests:
+    cpu: &quot;500m&quot;
+    memory: &quot;1Gi&quot;
+
+# Health checks
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /ready
+    port: 8080
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+</code></pre>
+<h3>2. Storage Configuration</h3>
+<pre><code class="language-yaml"># Persistent storage
+persistence:
+  enabled: true
+  storageClass: &quot;fast-ssd&quot;  # Use your cluster&#39;s fast storage class
+  size: 50Gi
+  accessMode: ReadWriteOnce
+
+# Backup configuration
+backup:
+  enabled: true
+  schedule: &quot;0 2 * * *&quot;  # Daily at 2 AM
+  retention: 7  # Keep 7 days of backups
+  storageClass: &quot;standard&quot;  # Use cheaper storage for backups
+</code></pre>
+<h3>3. Monitoring Stack</h3>
+<pre><code class="language-bash"># Install Prometheus Operator
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm install prometheus prometheus-community/kube-prometheus-stack \
+  --namespace monitoring \
+  --create-namespace
+
+# Deploy ICN with monitoring
+helm install icn ./icn \
+  --namespace icn \
+  --set monitoring.enabled=true \
+  --set monitoring.serviceMonitor.enabled=true \
+  -f icn-ha-values.yaml
+</code></pre>
+<h3>4. Ingress with TLS</h3>
+<pre><code class="language-yaml"># ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: icn-ingress
+  namespace: icn
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: &quot;true&quot;
+    nginx.ingress.kubernetes.io/websocket-services: icn-websocket
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - icn.example.com
+    - api.icn.example.com
+    secretName: icn-tls
+  rules:
+  - host: icn.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: icn-web
+            port:
+              number: 80
+  - host: api.icn.example.com
+    http:
+      paths:
+      - path: /ws
+        pathType: Prefix
+        backend:
+          service:
+            name: icn-websocket
+            port:
+              number: 8080
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: icn-gateway
+            port:
+              number: 8080
+</code></pre>
+<h3>5. Network Policies</h3>
+<pre><code class="language-yaml"># network-policy.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: icn-network-policy
+  namespace: icn
+spec:
+  podSelector:
+    matchLabels:
+      app: icnd
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: icn
+    - podSelector:
+        matchLabels:
+          app: nginx-ingress
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: UDP
+      port: 7777  # QUIC
+  egress:
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - protocol: TCP
+      port: 53  # DNS
+    - protocol: UDP
+      port: 53
+  - to:
+    - podSelector:
+        matchLabels:
+          app: icnd
+    ports:
+    - protocol: TCP
+      port: 7777
+    - protocol: UDP
+      port: 7777
+</code></pre>
+<hr>
+<h2>Operations</h2>
+<h3>Scaling</h3>
+<pre><code class="language-bash"># Manual scaling
+kubectl scale deployment icnd --replicas=5 -n icn
+
+# Horizontal Pod Autoscaler
+kubectl autoscale deployment icnd \
+  --namespace=icn \
+  --min=3 \
+  --max=10 \
+  --cpu-percent=70
+</code></pre>
+<h3>Rolling Updates</h3>
+<pre><code class="language-bash"># Update image
+kubectl set image deployment/icnd \
+  icnd=icn/icnd:v0.2.0 \
+  --namespace=icn \
+  --record
+
+# Check rollout status
+kubectl rollout status deployment/icnd -n icn
+
+# Rollback if needed
+kubectl rollout undo deployment/icnd -n icn
+</code></pre>
+<h3>Backup and Restore</h3>
+<pre><code class="language-bash"># Manual backup
+kubectl exec -n icn icnd-0 -- icnctl backup create -o /data/backup.tar.enc
+
+# Copy backup out
+kubectl cp icn/icnd-0:/data/backup.tar.enc ./backup-$(date +%Y%m%d).tar.enc
+
+# Restore backup
+kubectl cp backup.tar.enc icn/icnd-0:/data/backup.tar.enc
+kubectl exec -n icn icnd-0 -- icnctl backup restore -i /data/backup.tar.enc
+</code></pre>
+<h3>Log Aggregation</h3>
+<pre><code class="language-bash"># View logs
+kubectl logs -n icn -l app=icnd -f
+
+# With stern (multi-pod tailing)
+stern icnd -n icn
+
+# Export logs
+kubectl logs -n icn -l app=icnd --since=24h &gt; icn-logs.txt
+</code></pre>
+<h3>Debugging</h3>
+<pre><code class="language-bash"># Get shell in pod
+kubectl exec -n icn -it icnd-0 -- /bin/bash
+
+# Port forward for local access
+kubectl port-forward -n icn svc/icn-gateway 8080:8080
+
+# Check events
+kubectl get events -n icn --sort-by=&#39;.lastTimestamp&#39;
+</code></pre>
+<hr>
+<h2>Monitoring and Alerts</h2>
+<h3>Grafana Dashboards</h3>
+<p>Access Grafana:</p>
+<pre><code class="language-bash">kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80
+</code></pre>
+<p>Default credentials: <code>admin</code> / <code>prom-operator</code></p>
+<p>Import ICN dashboard from <code>deploy/grafana/dashboards/icn-overview.json</code></p>
+<h3>Prometheus Alerts</h3>
+<p>Example alert rules:</p>
+<pre><code class="language-yaml"># icn-alerts.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: icn-alerts
+  namespace: icn
+spec:
+  groups:
+  - name: icn
+    interval: 30s
+    rules:
+    - alert: ICNHighMemoryUsage
+      expr: container_memory_usage_bytes{pod=~&quot;icnd-.*&quot;} / container_spec_memory_limit_bytes &gt; 0.8
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: &quot;ICN pod {{ $labels.pod }} high memory usage&quot;
+        
+    - alert: ICNPodDown
+      expr: up{job=&quot;icnd&quot;} == 0
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: &quot;ICN pod is down&quot;
+        
+    - alert: ICNHighLatency
+      expr: histogram_quantile(0.95, rate(icn_request_duration_seconds_bucket[5m])) &gt; 1
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: &quot;ICN API latency is high&quot;
+</code></pre>
+<hr>
+<h2>Security Hardening</h2>
+<h3>1. Pod Security Standards</h3>
+<pre><code class="language-yaml"># Apply restricted security context
+apiVersion: v1
+kind: Pod
+metadata:
+  name: icnd
+spec:
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+  - name: icnd
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+      readOnlyRootFilesystem: true
+</code></pre>
+<h3>2. Secrets Management</h3>
+<pre><code class="language-bash"># Use external secrets (recommended for production)
+kubectl apply -f https://raw.githubusercontent.com/external-secrets/external-secrets/main/deploy/crds/bundle.yaml
+
+# Configure with your secrets backend (Vault, AWS Secrets Manager, etc.)
+</code></pre>
+<h3>3. RBAC Configuration</h3>
+<pre><code class="language-yaml">apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: icnd
+  namespace: icn
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: icnd-role
+  namespace: icn
+rules:
+- apiGroups: [&quot;&quot;]
+  resources: [&quot;configmaps&quot;, &quot;secrets&quot;]
+  verbs: [&quot;get&quot;, &quot;list&quot;]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: icnd-rolebinding
+  namespace: icn
+subjects:
+- kind: ServiceAccount
+  name: icnd
+  namespace: icn
+roleRef:
+  kind: Role
+  name: icnd-role
+  apiGroup: rbac.authorization.k8s.io
+</code></pre>
+<hr>
+<h2>Cost Optimization</h2>
+<h3>1. Resource Requests/Limits</h3>
+<p>Start conservative and tune based on metrics:</p>
+<pre><code class="language-yaml">resources:
+  requests:
+    cpu: &quot;250m&quot;
+    memory: &quot;512Mi&quot;
+  limits:
+    cpu: &quot;1&quot;
+    memory: &quot;2Gi&quot;
+</code></pre>
+<h3>2. Storage Optimization</h3>
+<p>Use tiered storage:</p>
+<ul>
+<li>Fast SSD for active data</li>
+<li>Standard HDD for backups</li>
+<li>Object storage for long-term archives</li>
+</ul>
+<h3>3. Autoscaling</h3>
+<p>Use HPA to scale based on load:</p>
+<pre><code class="language-yaml">apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: icnd-hpa
+  namespace: icn
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: icnd
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+</code></pre>
+<hr>
+<h2>Troubleshooting</h2>
+<h3>Pods Not Starting</h3>
+<pre><code class="language-bash"># Describe pod
+kubectl describe pod -n icn icnd-0
+
+# Check events
+kubectl get events -n icn | grep icnd
+
+# Common issues:
+# - Image pull errors: Check image name/tag
+# - CrashLoopBackOff: Check logs and liveness probe
+# - Pending: Check PVC binding and node resources
+</code></pre>
+<h3>Network Issues</h3>
+<pre><code class="language-bash"># Test internal connectivity
+kubectl run -n icn test --rm -it --image=busybox -- sh
+wget -O- http://icn-gateway:8080/health
+
+# Check DNS
+kubectl exec -n icn icnd-0 -- nslookup icn-gateway
+
+# Verify network policies
+kubectl get networkpolicy -n icn
+</code></pre>
+<h3>Performance Issues</h3>
+<pre><code class="language-bash"># Check resource usage
+kubectl top pods -n icn
+
+# Check for CPU throttling
+kubectl describe pod -n icn icnd-0 | grep -i throttl
+
+# Review metrics in Grafana
+kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80
+</code></pre>
+<hr>
+<h2>Migration Guide</h2>
+<h3>From Docker Compose to Kubernetes</h3>
+<ol>
+<li><p><strong>Export data</strong>:</p>
+<pre><code class="language-bash">docker-compose exec icnd icnctl backup create -o /root/.icn/backup.tar.enc
+docker cp icn-daemon:/root/.icn/backup.tar.enc ./backup.tar.enc
+</code></pre>
+</li>
+<li><p><strong>Deploy to Kubernetes</strong>:</p>
+<pre><code class="language-bash">helm install icn ./icn --namespace icn -f values.yaml
+</code></pre>
+</li>
+<li><p><strong>Import data</strong>:</p>
+<pre><code class="language-bash">kubectl cp backup.tar.enc icn/icnd-0:/data/backup.tar.enc
+kubectl exec -n icn icnd-0 -- icnctl backup restore -i /data/backup.tar.enc
+</code></pre>
+</li>
+<li><p><strong>Verify</strong>:</p>
+<pre><code class="language-bash">kubectl logs -n icn icnd-0
+kubectl port-forward -n icn svc/icn-gateway 8080:8080
+curl http://localhost:8080/health
+</code></pre>
+</li>
+</ol>
+<hr>
+<h2>Best Practices</h2>
+<ol>
+<li><strong>Always use persistent volumes</strong> for production</li>
+<li><strong>Run at least 3 replicas</strong> for high availability</li>
+<li><strong>Set resource requests/limits</strong> based on load testing</li>
+<li><strong>Use pod disruption budgets</strong> to ensure availability during updates</li>
+<li><strong>Enable monitoring</strong> and set up alerts</li>
+<li><strong>Regular backups</strong> with automated retention</li>
+<li><strong>Use network policies</strong> to restrict traffic</li>
+<li><strong>Keep secrets encrypted</strong> at rest and in transit</li>
+<li><strong>Test disaster recovery</strong> procedures regularly</li>
+<li><strong>Document your configuration</strong> and runbooks</li>
+</ol>
+<hr>
+<h2>Additional Resources</h2>
+<ul>
+<li><a href="https://kubernetes.io/docs/" target="_blank" rel="noopener">Kubernetes Documentation</a></li>
+<li><a href="https://helm.sh/docs/" target="_blank" rel="noopener">Helm Documentation</a></li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/docs/ARCHITECTURE">ICN Architecture</a></li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/docs/API_REFERENCE">ICN API Reference</a></li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/docs/production-hardening">Production Hardening</a></li>
+</ul>
+<h2>Support</h2>
+<ul>
+<li>GitHub Issues: <a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">https://github.com/InterCooperative-Network/icn/issues</a></li>
+<li>Discussions: <a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">https://github.com/InterCooperative-Network/icn/discussions</a></li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

@@ -1,0 +1,389 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Systems Textbook | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>onboarding</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>manual</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/onboarding/manual.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Systems Textbook</h1>
+<p>This manual is a comprehensive, explanatory guide to ICN: what it is, how the
+systems work, and why they are designed the way they are. Coding and setup are
+secondary and live in the appendix.</p>
+<p>Use this manual as the narrative foundation. When you want code-level detail,
+follow the &quot;Explore the Code&quot; sections to the corresponding modules.</p>
+<h2>How to Use This Manual</h2>
+<ul>
+<li>Read Parts 0-8 in order to build a mental model of ICN.</li>
+<li>Use the module links in each chapter to connect concepts to code.</li>
+<li>Treat this as a textbook: reread the system map and data flows frequently.</li>
+</ul>
+<h2>Part 0: What is ICN and Why it Exists</h2>
+<p>ICN (InterCooperative Network) is a decentralized coordination substrate for
+cooperative organizations. It focuses on trust-based coordination, cooperative
+economics, and federation rather than global consensus.</p>
+<h3>The Problem ICN Solves</h3>
+<p>Cooperatives need to coordinate across boundaries without a central authority,
+without assuming every peer is adversarial, and without the overhead of global
+consensus. ICN provides:</p>
+<ul>
+<li>A shared identity system anchored in cryptographic proof.</li>
+<li>A trust model that mirrors real relationships.</li>
+<li>A coordination protocol that tolerates offline operation.</li>
+<li>A mutual credit ledger for exchange without external money supply.</li>
+<li>A governance layer for human decision-making.</li>
+</ul>
+<h3>Core Design Principles (How and Why)</h3>
+<ul>
+<li><strong>Local-first</strong>: Nodes operate independently and reconcile via gossip.
+This keeps the system resilient to partitions and offline work.</li>
+<li><strong>Trust-native</strong>: Access and coordination are gated by trust scores.
+This reflects cooperative social dynamics.</li>
+<li><strong>Deterministic compute</strong>: The same inputs yield the same outputs.
+This allows verification without global consensus.</li>
+<li><strong>Capability-based security</strong>: Actions require explicit permissions.
+This limits blast radius and supports auditing.</li>
+<li><strong>Human-governed</strong>: Policy changes are decided by people.
+This aligns with cooperative governance norms.</li>
+</ul>
+<h3>What ICN is Not</h3>
+<ul>
+<li>Not a blockchain: there is no global consensus or gas fee model.</li>
+<li>Not a federation server: ICN is a P2P coordination layer.</li>
+<li>Not a single app: it is a substrate for many applications.</li>
+</ul>
+<h2>Part 1: System Map and Architecture Overview</h2>
+<p>ICN is composed of several subsystems that collaborate through the actor model.
+Each subsystem has a clear responsibility and explicit interfaces.</p>
+<h3>System Map (Conceptual)</h3>
+<pre><code>Transport (icn-net)
+  -&gt; Identity (icn-identity)
+    -&gt; Trust (icn-trust)
+      -&gt; Gossip (icn-gossip)
+        -&gt; Ledger (icn-ledger)
+          -&gt; Contracts (icn-ccl)
+            -&gt; Governance (icn-governance)
+          -&gt; Gateway (icn-gateway) -&gt; SDK/UI
+Storage (icn-store) and Observability (icn-obs) support all layers
+Security (icn-security) and Privacy (icn-privacy) wrap critical paths
+Federation (icn-federation) coordinates across cooperatives
+</code></pre>
+<h3>Why a Layered Architecture?</h3>
+<p>Layering isolates concerns and keeps reasoning local:</p>
+<ul>
+<li>Transport focuses on secure connectivity.</li>
+<li>Identity and trust establish who you are and how you are treated.</li>
+<li>Gossip provides eventual consistency without centralized consensus.</li>
+<li>Ledger and contracts encode economic agreements.</li>
+<li>Governance formalizes human decision-making.</li>
+<li>Gateway and UI provide application-facing access.</li>
+</ul>
+<h3>Key Data Flows</h3>
+<ol>
+<li><strong>Incoming Message Flow</strong>: Network -&gt; Gossip -&gt; Ledger -&gt; Storage</li>
+<li><strong>Outgoing Transaction Flow</strong>: Gateway -&gt; Ledger -&gt; Gossip -&gt; Network</li>
+<li><strong>Governance Flow</strong>: Proposal -&gt; Vote -&gt; Policy -&gt; Enforcement</li>
+</ol>
+<h3>Explore the Code</h3>
+<ul>
+<li><code>docs/onboarding/reference/module-02-architecture-overview.md</code></li>
+<li><code>docs/ARCHITECTURE.md</code></li>
+<li><code>docs/architecture/ARCHITECTURE_MAP.md</code></li>
+</ul>
+<h2>Part 2: Identity and Trust</h2>
+<p>Identity and trust turn anonymous peers into accountable collaborators.</p>
+<h3>Identity (icn-identity)</h3>
+<p><strong>How it works:</strong></p>
+<ul>
+<li>DIDs are derived from Ed25519 public keys: <code>did:icn:&lt;base58&gt;</code>.</li>
+<li>Keys are stored in an age-encrypted keystore.</li>
+<li>Rotation creates a signed chain of custody for identity continuity.</li>
+</ul>
+<p><strong>Why it exists:</strong></p>
+<ul>
+<li>Self-certifying identifiers eliminate centralized registries.</li>
+<li>Key rotation preserves security without losing reputation.</li>
+</ul>
+<h3>Trust (icn-trust)</h3>
+<p><strong>How it works:</strong></p>
+<ul>
+<li>Trust edges form a weighted graph between DIDs.</li>
+<li>Trust propagates transitively with decay.</li>
+<li>Trust classes gate rate limits and access policies.</li>
+</ul>
+<p><strong>Why it exists:</strong></p>
+<ul>
+<li>Cooperatives require graduated access, not binary trust.</li>
+<li>Trust-native behavior enables social accountability.</li>
+</ul>
+<h3>Key Interactions</h3>
+<ul>
+<li>Identity anchors the trust graph.</li>
+<li>Trust scores drive rate limiting and access control.</li>
+</ul>
+<h3>Explore the Code</h3>
+<ul>
+<li><code>docs/onboarding/reference/module-04-identity-trust.md</code></li>
+<li><code>icn/crates/icn-identity/</code></li>
+<li><code>icn/crates/icn-trust/</code></li>
+</ul>
+<h2>Part 3: Networking and Gossip</h2>
+<p>ICN favors eventual consistency with strong identity and trust guarantees.</p>
+<h3>Transport (icn-net)</h3>
+<p><strong>How it works:</strong></p>
+<ul>
+<li>QUIC/TLS for secure streams and connection migration.</li>
+<li>mDNS for peer discovery on local networks.</li>
+<li>Message envelopes include DIDs and payload types.</li>
+</ul>
+<p><strong>Why it exists:</strong></p>
+<ul>
+<li>QUIC provides multiplexing and built-in encryption.</li>
+<li>Local discovery removes centralized dependency.</li>
+</ul>
+<h3>Gossip (icn-gossip)</h3>
+<p><strong>How it works:</strong></p>
+<ul>
+<li>Topics partition data by purpose.</li>
+<li>Vector clocks track causality.</li>
+<li>Anti-entropy repairs partitions and missing data.</li>
+</ul>
+<p><strong>Why it exists:</strong></p>
+<ul>
+<li>Gossip scales without global consensus.</li>
+<li>Vector clocks provide causal ordering without locks.</li>
+</ul>
+<h3>Key Interactions</h3>
+<ul>
+<li>Network authenticates peers; gossip synchronizes state.</li>
+<li>Trust gates topic access and message rate limits.</li>
+</ul>
+<h3>Explore the Code</h3>
+<ul>
+<li><code>docs/onboarding/reference/module-05-network-gossip.md</code></li>
+<li><code>icn/crates/icn-net/</code></li>
+<li><code>icn/crates/icn-gossip/</code></li>
+</ul>
+<h2>Part 4: Ledger and Contracts</h2>
+<p>The ledger encodes cooperative economics; contracts encode cooperative rules.</p>
+<h3>Ledger (icn-ledger)</h3>
+<p><strong>How it works:</strong></p>
+<ul>
+<li>Mutual credit creates balances via transactions.</li>
+<li>Double-entry entries ensure conservation of value.</li>
+<li>Merkle-DAG structure supports integrity and sync.</li>
+</ul>
+<p><strong>Why it exists:</strong></p>
+<ul>
+<li>Mutual credit enables exchange without external currency.</li>
+<li>Merkle-DAG enables auditability without total ordering.</li>
+</ul>
+<h3>Contracts (icn-ccl)</h3>
+<p><strong>How it works:</strong></p>
+<ul>
+<li>Deterministic contract execution with fuel limits.</li>
+<li>Capability-based permissions define allowed actions.</li>
+</ul>
+<p><strong>Why it exists:</strong></p>
+<ul>
+<li>Cooperative agreements must be explicit and auditable.</li>
+<li>Capabilities prevent unbounded behavior in contracts.</li>
+</ul>
+<h3>Explore the Code</h3>
+<ul>
+<li><code>docs/onboarding/reference/module-06-ledger-contracts.md</code></li>
+<li><code>icn/crates/icn-ledger/</code></li>
+<li><code>icn/crates/icn-ccl/</code></li>
+</ul>
+<h2>Part 5: Governance</h2>
+<p>Governance is how communities change rules without breaking trust.</p>
+<h3>Governance (icn-governance)</h3>
+<p><strong>How it works:</strong></p>
+<ul>
+<li>Proposals define policy changes.</li>
+<li>Votes determine acceptance.</li>
+<li>Policies become enforceable configuration and contract rules.</li>
+</ul>
+<p><strong>Why it exists:</strong></p>
+<ul>
+<li>Human governance aligns with cooperative values.</li>
+<li>Transparent decision records enable accountability.</li>
+</ul>
+<h3>Key Interactions</h3>
+<ul>
+<li>Governance events are gossiped and stored.</li>
+<li>Contract capabilities and policy settings enforce decisions.</li>
+</ul>
+<h3>Explore the Code</h3>
+<ul>
+<li><code>docs/onboarding/reference/module-14-governance-ccl-deep-dive.md</code></li>
+<li><code>icn/crates/icn-governance/</code></li>
+<li><code>docs/governance-primitives.md</code></li>
+</ul>
+<h2>Part 6: Gateway, SDK, and Web UI</h2>
+<p>These layers provide application access and user interfaces.</p>
+<h3>Gateway (icn-gateway)</h3>
+<p><strong>How it works:</strong></p>
+<ul>
+<li>REST + WebSocket APIs expose core functionality.</li>
+<li>Auth and scopes gate access to sensitive operations.</li>
+</ul>
+<p><strong>Why it exists:</strong></p>
+<ul>
+<li>Apps need stable interfaces, not internal actor wiring.</li>
+</ul>
+<h3>SDK and UI</h3>
+<p><strong>How it works:</strong></p>
+<ul>
+<li>SDKs wrap gateway APIs with typed interfaces.</li>
+<li>Pilot UI demonstrates cooperative workflows.</li>
+</ul>
+<p><strong>Why it exists:</strong></p>
+<ul>
+<li>Developer ergonomics and consistent client behavior.</li>
+</ul>
+<h3>Explore the Code</h3>
+<ul>
+<li><code>docs/onboarding/reference/module-07-gateway-sdk.md</code></li>
+<li><code>docs/onboarding/reference/module-08-web-ui.md</code></li>
+<li><code>icn/crates/icn-gateway/</code></li>
+<li><code>sdk/typescript/</code></li>
+<li><code>web/pilot-ui/</code></li>
+</ul>
+<h2>Part 7: Observability and Security</h2>
+<p>ICN must be observable and secure under real-world conditions.</p>
+<h3>Observability (icn-obs)</h3>
+<p><strong>How it works:</strong></p>
+<ul>
+<li>Metrics are defined per subsystem.</li>
+<li>Tracing and logging expose internal behavior.</li>
+<li>Prometheus and Grafana visualize health.</li>
+</ul>
+<p><strong>Why it exists:</strong></p>
+<ul>
+<li>Distributed systems require visibility to debug and operate safely.</li>
+</ul>
+<h3>Security and Privacy (icn-security, icn-privacy)</h3>
+<p><strong>How it works:</strong></p>
+<ul>
+<li>Transport security: QUIC/TLS with DID binding.</li>
+<li>Message security: Signed envelopes + replay guards.</li>
+<li>Application security: Encrypted payloads when needed.</li>
+</ul>
+<p><strong>Why it exists:</strong></p>
+<ul>
+<li>Trust-native does not mean trust-blind.</li>
+<li>Security layers ensure integrity, authenticity, and confidentiality.</li>
+</ul>
+<h3>Explore the Code</h3>
+<ul>
+<li><code>docs/onboarding/reference/module-12-observability.md</code></li>
+<li><code>docs/onboarding/reference/module-13-security-privacy.md</code></li>
+<li><code>icn/crates/icn-obs/</code></li>
+<li><code>icn/crates/icn-security/</code></li>
+<li><code>icn/crates/icn-privacy/</code></li>
+<li><code>monitoring/</code></li>
+</ul>
+<h2>Part 8: Operations and Federation</h2>
+<p>ICN is designed to run in production and across cooperative boundaries.</p>
+<h3>Operations</h3>
+<p><strong>How it works:</strong></p>
+<ul>
+<li>Configuration defines runtime behavior and limits.</li>
+<li>Deployment uses containerized workflows.</li>
+<li>Monitoring and alerting protect reliability.</li>
+</ul>
+<p><strong>Why it exists:</strong></p>
+<ul>
+<li>Cooperative infrastructure must be reliable and auditable.</li>
+</ul>
+<h3>Federation</h3>
+<p><strong>How it works:</strong></p>
+<ul>
+<li>Agreements formalize inter-cooperative relationships.</li>
+<li>Clearing and settlement reduce transaction volume.</li>
+</ul>
+<p><strong>Why it exists:</strong></p>
+<ul>
+<li>Coops coordinate without merging governance structures.</li>
+</ul>
+<h3>Explore the Code</h3>
+<ul>
+<li><code>docs/onboarding/reference/module-09-ops-deploy.md</code></li>
+<li><code>docs/onboarding/reference/module-11-federation.md</code></li>
+<li><code>icn/crates/icn-federation/</code></li>
+<li><code>deploy/</code></li>
+</ul>
+<h2>Appendix: Developer Prerequisites</h2>
+<p>If you are new to the codebase or Rust, use these modules as references:</p>
+<ul>
+<li><code>docs/onboarding/reference/module-00-setup.md</code></li>
+<li><code>docs/onboarding/reference/module-01-rust-fundamentals.md</code></li>
+</ul>
+<h2>Glossary (Abbreviated)</h2>
+<ul>
+<li><strong>DID</strong>: Decentralized Identifier anchored in a public key.</li>
+<li><strong>Gossip</strong>: Peer-to-peer synchronization protocol.</li>
+<li><strong>Mutual Credit</strong>: Ledger model where transactions create balances.</li>
+<li><strong>CCL</strong>: Cooperative Contract Language.</li>
+<li><strong>Capability</strong>: Explicit permission for a contract action.</li>
+<li><strong>Supervisor</strong>: Actor orchestrator that wires subsystems together.</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

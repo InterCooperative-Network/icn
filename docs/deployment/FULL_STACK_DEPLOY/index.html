@@ -1,0 +1,435 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Full Stack Deployment Guide | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>deployment</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>FULL STACK DEPLOY</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/deployment/FULL_STACK_DEPLOY.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Full Stack Deployment Guide</h1>
+<p>Complete end-to-end ICN system deployment with all components wired together.</p>
+<blockquote>
+<p>Historical deployment recipe snapshot.
+For current API surface, verify <code>docs/api/openapi.yaml</code> and <code>icn/crates/icn-gateway/src/server.rs</code>.</p>
+</blockquote>
+<h2>Architecture Overview</h2>
+<pre><code>┌─────────────────────────────────────────────────────────────┐
+│                     User Applications                        │
+├──────────────────────┬──────────────────────────────────────┤
+│   Web UI (Next.js)   │   Mobile App (React Native)          │
+│   Port: 3001         │   (Expo Go / Native)                 │
+└──────────┬───────────┴───────────────┬──────────────────────┘
+           │                           │
+           │ HTTP/WebSocket            │ HTTP/WebSocket
+           │                           │
+           ▼                           ▼
+┌──────────────────────────────────────────────────────────────┐
+│               Gateway API (icn-gateway)                       │
+│         REST API (8080) + WebSocket Events (8080)            │
+├───────────────────────────────────────────────────────────────┤
+│                    ICN Network Layer                          │
+│  ┌────────────┐  ┌────────────┐  ┌────────────┐             │
+│  │  Node 1    │  │  Node 2    │  │  Node 3    │             │
+│  │  (Primary) │  │  (Peer)    │  │  (Peer)    │             │
+│  │  :5001     │  │  :5002     │  │  :5003     │             │
+│  └────────────┘  └────────────┘  └────────────┘             │
+│         │                │                │                   │
+│         └────────────────┴────────────────┘                   │
+│              QUIC/TLS P2P + Gossip                           │
+└───────────────────────────────────────────────────────────────┘
+           │                           │
+           ▼                           ▼
+┌──────────────────────────────────────────────────────────────┐
+│                  Monitoring Stack                             │
+│  ┌─────────────────┐         ┌──────────────────┐            │
+│  │  Prometheus     │────────▶│    Grafana       │            │
+│  │  :9090          │         │    :3000         │            │
+│  └─────────────────┘         └──────────────────┘            │
+└──────────────────────────────────────────────────────────────┘
+</code></pre>
+<h2>Components</h2>
+<h3>1. ICN Network (Backend)</h3>
+<ul>
+<li><strong>Node 1</strong>: Primary node with Gateway API enabled (ports 5001, 8080, 9100)</li>
+<li><strong>Node 2</strong>: Peer node (ports 5002, 9101)</li>
+<li><strong>Node 3</strong>: Peer node (ports 5003, 9102)</li>
+<li><strong>Features</strong>: Identity, Trust Graph, Gossip, Ledger, Governance, Compute</li>
+</ul>
+<h3>2. Gateway API</h3>
+<ul>
+<li><strong>REST API</strong>: Standard HTTP endpoints for all operations</li>
+<li><strong>WebSocket</strong>: Real-time event streaming for notifications</li>
+<li><strong>Authentication</strong>: DID-based auth with session tokens</li>
+<li><strong>Events</strong>: <code>notification</code>, <code>trust_update</code>, <code>ledger_update</code>, <code>proposal_update</code></li>
+</ul>
+<h3>3. Web UI (pilot-ui)</h3>
+<ul>
+<li><strong>Framework</strong>: Next.js 14 with App Router</li>
+<li><strong>Port</strong>: 3001</li>
+<li><strong>Features</strong>: <ul>
+<li>Member profiles and trust attestation</li>
+<li>Ledger transactions</li>
+<li>Proposal voting</li>
+<li>Real-time notifications via WebSocket</li>
+<li>Offline queue management</li>
+</ul>
+</li>
+</ul>
+<h3>4. Mobile App (React Native)</h3>
+<ul>
+<li><strong>Framework</strong>: Expo + React Native</li>
+<li><strong>SDK</strong>: <code>@icn/react-native-sdk</code></li>
+<li><strong>Features</strong>:<ul>
+<li>Trust graph visualization</li>
+<li>Push notifications</li>
+<li>Offline-first operation</li>
+<li>Secure storage (Keychain/KeyStore)</li>
+</ul>
+</li>
+</ul>
+<h3>5. Monitoring</h3>
+<ul>
+<li><strong>Prometheus</strong>: Metrics collection from all nodes (9090)</li>
+<li><strong>Grafana</strong>: Visualization dashboards (3000)</li>
+<li><strong>Metrics</strong>: Network health, gossip convergence, trust scores, ledger sync</li>
+</ul>
+<h2>Quick Start</h2>
+<h3>Prerequisites</h3>
+<pre><code class="language-bash"># Ensure Docker and Docker Compose are installed
+docker --version
+docker compose version
+
+# Navigate to ICN project root
+cd /home/matt/projects/icn
+</code></pre>
+<h3>1. Build Everything</h3>
+<pre><code class="language-bash"># Build ICN daemon
+cd icn
+cargo build --release
+cd ..
+
+# Build Web UI
+cd web/pilot-ui
+npm install
+npm run build
+cd ../..
+
+# Build Mobile SDK
+cd sdk/typescript
+npm install
+npm run build
+cd ../..
+</code></pre>
+<h3>2. Deploy Full Stack</h3>
+<pre><code class="language-bash"># Start all services
+docker compose -f docker-compose.full.yml up -d
+
+# Check service health
+docker compose -f docker-compose.full.yml ps
+
+# View logs
+docker compose -f docker-compose.full.yml logs -f
+
+# View specific service logs
+docker compose -f docker-compose.full.yml logs -f web-ui
+docker compose -f docker-compose.full.yml logs -f icn-node1
+</code></pre>
+<h3>3. Verify Services</h3>
+<p><strong>ICN Nodes:</strong></p>
+<pre><code class="language-bash"># Node 1 metrics
+curl http://localhost:9100/metrics
+
+# Gateway API health
+curl http://localhost:8080/v1/health
+
+# Gateway auth challenge (public endpoint)
+curl -X POST http://localhost:8080/v1/auth/challenge \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{&quot;did&quot;:&quot;did:icn:YOUR_DID&quot;}&#39;
+</code></pre>
+<p><strong>Web UI:</strong></p>
+<pre><code class="language-bash"># Open in browser
+open http://localhost:3001
+</code></pre>
+<p><strong>Monitoring:</strong></p>
+<pre><code class="language-bash"># Prometheus targets
+open http://localhost:9090/targets
+
+# Grafana dashboards
+open http://localhost:3000
+# Login: admin/admin
+</code></pre>
+<h3>4. Test WebSocket Connection</h3>
+<pre><code class="language-bash"># Use wscat to test WebSocket
+npm install -g wscat
+wscat -c ws://localhost:8080/v1/ws/YOUR_COOP_ID
+</code></pre>
+<h3>5. Mobile App Development</h3>
+<pre><code class="language-bash">cd sdk/react-native/example
+
+# Update API endpoint in app.json:
+# &quot;extra&quot;: {
+#   &quot;apiUrl&quot;: &quot;http://YOUR_LOCAL_IP:8080&quot;
+# }
+
+# Start Expo
+npm start
+
+# Scan QR code with Expo Go app
+</code></pre>
+<h2>Configuration</h2>
+<h3>Gateway API Environment Variables</h3>
+<pre><code class="language-bash">ICN_GATEWAY_ENABLE=true
+ICN_GATEWAY_PORT=8080
+ICN_GATEWAY_WS_PORT=8080
+ICN_GATEWAY_CORS_ORIGINS=http://localhost:3001,http://localhost:3000
+</code></pre>
+<h3>Web UI Environment Variables</h3>
+<p>Create <code>web/pilot-ui/.env.local</code>:</p>
+<pre><code class="language-bash">NEXT_PUBLIC_API_URL=http://localhost:8080
+NEXT_PUBLIC_WS_URL=ws://localhost:8080
+</code></pre>
+<h3>Mobile App Configuration</h3>
+<p>Update <code>sdk/react-native/example/app.json</code>:</p>
+<pre><code class="language-json">{
+  &quot;expo&quot;: {
+    &quot;extra&quot;: {
+      &quot;apiUrl&quot;: &quot;http://YOUR_LOCAL_IP:8080&quot;,
+      &quot;wsUrl&quot;: &quot;ws://YOUR_LOCAL_IP:8080&quot;
+    }
+  }
+}
+</code></pre>
+<h2>Network Topology</h2>
+<p>The test network includes 3 nodes with trust relationships:</p>
+<pre><code>Node 1 (Primary)
+  ├─ Trusts Node 2 (0.8)
+  └─ Trusts Node 3 (0.7)
+
+Node 2 (Peer)
+  ├─ Trusts Node 1 (0.9)
+  └─ Trusts Node 3 (0.6)
+
+Node 3 (Peer)
+  ├─ Trusts Node 1 (0.8)
+  └─ Trusts Node 2 (0.7)
+</code></pre>
+<p>DIDs are configured in <code>config/node{1,2,3}.toml</code></p>
+<h2>Common Tasks</h2>
+<h3>View Real-time Notifications</h3>
+<pre><code class="language-bash"># Terminal 1: Start stack
+docker compose -f docker-compose.full.yml up
+
+# Terminal 2: Connect to WebSocket
+wscat -c ws://localhost:8080/v1/ws/YOUR_COOP_ID
+
+# Terminal 3: Create a transaction (triggers notification)
+curl -X POST http://localhost:8080/v1/ledger/YOUR_COOP_ID/payment \
+  -H &quot;Content-Type: application/json&quot; \
+  -H &quot;Authorization: Bearer $TOKEN&quot; \
+  -d &#39;{
+    &quot;from&quot;: &quot;did:icn:...&quot;,
+    &quot;to&quot;: &quot;did:icn:...&quot;,
+    &quot;amount&quot;: 100,
+    &quot;currency&quot;: &quot;USD&quot;,
+    &quot;memo&quot;: &quot;Test transaction&quot;
+  }&#39;
+</code></pre>
+<h3>Test Trust Attestation</h3>
+<pre><code class="language-bash"># Trust routes vary by deployment/configuration and may not be present in OpenAPI.
+# Use your running gateway OpenAPI to confirm available trust paths:
+curl -s http://localhost:8080/api-docs/openapi.json | jq &#39;.paths | keys[]&#39; | grep trust
+</code></pre>
+<h3>Create and Vote on Proposals</h3>
+<pre><code class="language-bash"># Create proposal
+curl -X POST http://localhost:8080/v1/gov/proposals \
+  -H &quot;Content-Type: application/json&quot; \
+  -H &quot;Authorization: Bearer $TOKEN&quot; \
+  -d &#39;{
+    &quot;domain_id&quot;: &quot;membership&quot;,
+    &quot;title&quot;: &quot;Add new member&quot;,
+    &quot;description&quot;: &quot;Proposal to add Alice&quot;,
+    &quot;payload&quot;: {&quot;type&quot;: &quot;text&quot;, &quot;body&quot;: &quot;Proposal text body&quot;}
+  }&#39;
+
+# Vote on proposal
+curl -X POST http://localhost:8080/v1/gov/proposals/{id}/vote \
+  -H &quot;Content-Type: application/json&quot; \
+  -H &quot;Authorization: Bearer $TOKEN&quot; \
+  -d &#39;{
+    &quot;choice&quot;: &quot;for&quot;,
+    &quot;comment&quot;: &quot;Strong trust relationship&quot;
+  }&#39;
+</code></pre>
+<h2>Monitoring</h2>
+<h3>Key Metrics to Watch</h3>
+<p><strong>Network Health:</strong></p>
+<ul>
+<li><code>icn_network_peers_connected</code>: Number of connected peers</li>
+<li><code>icn_network_messages_sent_total</code>: Total messages sent</li>
+<li><code>icn_network_messages_received_total</code>: Total messages received</li>
+</ul>
+<p><strong>Gossip Protocol:</strong></p>
+<ul>
+<li><code>icn_gossip_messages_total</code>: Gossip messages processed</li>
+<li><code>icn_gossip_topics</code>: Active gossip topics</li>
+<li><code>icn_gossip_convergence_time_seconds</code>: Time to convergence</li>
+</ul>
+<p><strong>Trust Graph:</strong></p>
+<ul>
+<li><code>icn_trust_attestations_total</code>: Total attestations recorded</li>
+<li><code>icn_trust_score_updates_total</code>: Trust score calculations</li>
+</ul>
+<p><strong>Ledger:</strong></p>
+<ul>
+<li><code>icn_ledger_entries_total</code>: Total ledger entries</li>
+<li><code>icn_ledger_sync_operations_total</code>: Sync operations</li>
+<li><code>icn_ledger_balance</code>: Account balances</li>
+</ul>
+<p><strong>Gateway:</strong></p>
+<ul>
+<li><code>icn_gateway_http_requests_total</code>: API requests</li>
+<li><code>icn_gateway_ws_connections</code>: Active WebSocket connections</li>
+<li><code>icn_gateway_events_sent_total</code>: Events pushed to clients</li>
+</ul>
+<h3>Grafana Dashboards</h3>
+<ol>
+<li><strong>ICN Overview</strong>: System-wide health metrics</li>
+<li><strong>Network Topology</strong>: Peer connections and gossip</li>
+<li><strong>Trust Graph</strong>: Trust attestations and scores</li>
+<li><strong>Ledger Activity</strong>: Transaction volume and balances</li>
+<li><strong>Gateway Performance</strong>: API latency and WebSocket events</li>
+</ol>
+<h2>Troubleshooting</h2>
+<h3>Services Won&#39;t Start</h3>
+<pre><code class="language-bash"># Check Docker logs
+docker compose -f docker-compose.full.yml logs
+
+# Check for port conflicts
+lsof -i :3001
+lsof -i :8080
+lsof -i :9090
+</code></pre>
+<h3>WebSocket Connection Failed</h3>
+<pre><code class="language-bash"># Verify Gateway is running
+curl http://localhost:8080/v1/health
+
+# Check CORS configuration
+# Ensure NEXT_PUBLIC_API_URL matches your client origin
+</code></pre>
+<h3>Mobile App Can&#39;t Connect</h3>
+<pre><code class="language-bash"># Use local IP instead of localhost
+ifconfig | grep &quot;inet &quot;
+
+# Update app.json with your local IP:
+# &quot;apiUrl&quot;: &quot;http://192.168.1.100:8080&quot;
+
+# Ensure phone and computer are on same network
+</code></pre>
+<h3>Nodes Not Discovering Each Other</h3>
+<pre><code class="language-bash"># Check mDNS is working
+docker compose -f docker-compose.full.yml logs icn-node1 | grep mdns
+
+# Verify bootstrap peers in config files
+cat config/node1.toml | grep bootstrap
+</code></pre>
+<h2>Shutdown</h2>
+<pre><code class="language-bash"># Stop all services
+docker compose -f docker-compose.full.yml down
+
+# Stop and remove volumes (resets all data)
+docker compose -f docker-compose.full.yml down -v
+
+# Stop and remove images
+docker compose -f docker-compose.full.yml down --rmi all
+</code></pre>
+<h2>Production Deployment</h2>
+<p>For production deployment:</p>
+<ol>
+<li><strong>Security</strong>: Replace test passphrases with secure secrets</li>
+<li><strong>TLS</strong>: Enable HTTPS for Gateway and Web UI</li>
+<li><strong>Scaling</strong>: Use Kubernetes (see <code>deploy/k8s/</code>)</li>
+<li><strong>Monitoring</strong>: Set up alerting rules in Prometheus</li>
+<li><strong>Backup</strong>: Configure regular backups of node data</li>
+<li><strong>DNS</strong>: Set up proper domain names</li>
+<li><strong>CDN</strong>: Use CDN for Web UI static assets</li>
+</ol>
+<p>See <code>DEPLOYMENT_GUIDE.md</code> for production best practices.</p>
+<h2>Next Steps</h2>
+<ul>
+<li><input disabled="" type="checkbox"> Set up CI/CD pipeline</li>
+<li><input disabled="" type="checkbox"> Add end-to-end integration tests</li>
+<li><input disabled="" type="checkbox"> Configure production secrets management</li>
+<li><input disabled="" type="checkbox"> Set up SSL certificates</li>
+<li><input disabled="" type="checkbox"> Deploy to staging environment</li>
+<li><input disabled="" type="checkbox"> Performance testing and optimization</li>
+<li><input disabled="" type="checkbox"> Security audit</li>
+<li><input disabled="" type="checkbox"> Production deployment</li>
+</ul>
+<h2>Resources</h2>
+<ul>
+<li><strong>Architecture</strong>: <code>docs/ARCHITECTURE.md</code></li>
+<li><strong>API Reference</strong>: <code>docs/api-reference.md</code></li>
+<li><strong>Mobile SDK</strong>: <code>sdk/react-native/README.md</code></li>
+<li><strong>Web UI</strong>: <code>web/pilot-ui/README.md</code></li>
+<li><strong>Deployment</strong>: <code>DEPLOYMENT_GUIDE.md</code></li>
+<li><strong>Troubleshooting</strong>: <code>docs/troubleshooting.md</code></li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

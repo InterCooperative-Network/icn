@@ -1,0 +1,363 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Demo Script | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>demo</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>DEMO SCRIPT</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/demo/DEMO_SCRIPT.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Demo Script</h1>
+<p><strong>Duration</strong>: 20 minutes
+<strong>Audience</strong>: All (cooperative members, developers, funders, other coops)
+<strong>Last Updated</strong>: 2026-02-13</p>
+<hr>
+<h2>Before You Begin</h2>
+<h3>Pre-Demo Checklist (2 minutes)</h3>
+<pre><code class="language-bash"># From repository root
+cd /home/ubuntu/projects/icn
+
+# 1. Verify everything is ready
+./demo/scripts/quick-test.sh
+
+# 2. If issues, reset and rebuild
+./demo/scripts/reset-demo.sh
+cd icn &amp;&amp; cargo build --release
+</code></pre>
+<h3>What You&#39;ll Show</h3>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>What It Proves</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Identity</td>
+<td>&quot;Each member has cryptographic identity they control&quot;</td>
+</tr>
+<tr>
+<td>Governance</td>
+<td>&quot;Cooperatives make democratic decisions&quot;</td>
+</tr>
+<tr>
+<td>Ledger</td>
+<td>&quot;Value exchange without banks or middlemen&quot;</td>
+</tr>
+<tr>
+<td>Trust</td>
+<td>&quot;Accountability through transparent relationships&quot;</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Part 1: Opening (2 minutes)</h2>
+<h3>The Pitch (30 seconds)</h3>
+<blockquote>
+<p>&quot;ICN is infrastructure for the cooperative economy. It lets cooperatives manage identity, make democratic decisions, and exchange value - without depending on corporations or banks.&quot;</p>
+</blockquote>
+<h3>The Problem (30 seconds)</h3>
+<blockquote>
+<p>&quot;Today, cooperatives use Slack for communication, QuickBooks for accounting, Google Docs for governance. Each tool is a dependency on a corporation that doesn&#39;t share their values.&quot;</p>
+</blockquote>
+<h3>The Solution (1 minute)</h3>
+<blockquote>
+<p>&quot;ICN replaces these dependencies with cooperative-owned infrastructure. Members control their own identity. Decisions are recorded transparently. Value flows directly between people.&quot;</p>
+</blockquote>
+<hr>
+<h2>Part 2: Start the Demo (3 minutes)</h2>
+<h3>Launch Everything</h3>
+<pre><code class="language-bash"># From repository root
+./demo/scripts/run-tool-library-demo.sh
+</code></pre>
+<p><strong>What happens:</strong></p>
+<ol>
+<li>Daemon starts with gateway API</li>
+<li>Authentication token generated</li>
+<li>Pilot UI server starts</li>
+<li>Credentials displayed</li>
+</ol>
+<h3>Point Out the Credentials</h3>
+<pre><code>┌──────────────────────────────────────────────────────────────────┐
+│                        DEMO CREDENTIALS                          │
+├──────────────────────────────────────────────────────────────────┤
+│ Gateway URL:    http://localhost:8080                            │
+│ UI URL:         http://localhost:3000                            │
+│ Cooperative:    rochester-tool-library                           │
+│ DID:            did:icn:z...                                     │
+│ JWT Token:      eyJ...                                           │
+└──────────────────────────────────────────────────────────────────┘
+</code></pre>
+<h3>Open the UI</h3>
+<ol>
+<li>Open browser to <a href="http://localhost:3000" target="_blank" rel="noopener">http://localhost:3000</a></li>
+<li>Click &quot;Sign In&quot;</li>
+<li>Enter:<ul>
+<li>Gateway URL: <code>http://localhost:8080</code></li>
+<li>Cooperative ID: <code>rochester-tool-library</code></li>
+<li>DID: (copy from terminal)</li>
+<li>Token: (copy from terminal)</li>
+</ul>
+</li>
+<li>Click &quot;Sign In&quot;</li>
+</ol>
+<p><strong>After login</strong>, the dashboard shows your display name (e.g. &quot;Demo User&quot;) instead of a raw DID.</p>
+<p><strong>Say:</strong> &quot;This is the Rochester Tool Library - a real cooperative that lends tools to community members. Notice you see your name, not a cryptographic identifier.&quot;</p>
+<hr>
+<h2>Part 3: Identity (3 minutes)</h2>
+<h3>Show the Dashboard</h3>
+<p><strong>Point out:</strong></p>
+<ul>
+<li>Your display name (e.g. &quot;Demo User&quot;) — not a raw cryptographic ID</li>
+<li>Balance (hours in the timebank)</li>
+<li>Cooperative context</li>
+</ul>
+<p><strong>Say:</strong> &quot;Every member has a decentralized identifier - a DID - but you don&#39;t have to look at raw crypto strings. The system resolves names so it feels like any normal app.&quot;</p>
+<h3>Edit Your Display Name</h3>
+<ol>
+<li>Click the pencil icon next to your name (top-right)</li>
+<li>Enter a new name (e.g. your real name)</li>
+<li>Notice it updates everywhere immediately</li>
+</ol>
+<p><strong>Say:</strong> &quot;Members control their own profile. Names are stored locally and resolved on demand - no central directory.&quot;</p>
+<h3>Show the Members Tab</h3>
+<ol>
+<li>Click &quot;Members&quot; in sidebar</li>
+<li>Point out the 4 pre-seeded members with real names:<ul>
+<li>Sarah Chen, Marcus Rivera, Priya Patel, James Okafor</li>
+</ul>
+</li>
+<li>Note: names appear throughout - transactions, governance, member list</li>
+</ol>
+<p><strong>Say:</strong> &quot;This information is stored locally and shared only with your cooperative. Not with advertisers or data brokers.&quot;</p>
+<h3>Show Trust (if time)</h3>
+<p><strong>Say:</strong> &quot;Trust is explicit. You can see who vouches for whom. This creates accountability without surveillance.&quot;</p>
+<hr>
+<h2>Part 4: Governance (5 minutes)</h2>
+<h3>Create a Proposal</h3>
+<ol>
+<li>Click &quot;Governance&quot; in sidebar</li>
+<li>Click &quot;Create Proposal&quot;</li>
+<li>Fill in:<ul>
+<li>Title: &quot;Extend tool lending period to 2 weeks&quot;</li>
+<li>Type: Text Proposal</li>
+<li>Description: &quot;Currently tools are due in 1 week. Proposing we extend to 2 weeks for member convenience.&quot;</li>
+</ul>
+</li>
+<li>Submit</li>
+</ol>
+<p><strong>Say:</strong> &quot;Any member can propose changes. Notice the &#39;Proposed by&#39; line shows your name - not a cryptographic hash. This creates a formal record that everyone can see.&quot;</p>
+<h3>Vote on the Proposal</h3>
+<ol>
+<li>Click on the new proposal</li>
+<li>Click &quot;Vote&quot;</li>
+<li>Select &quot;Yes&quot;</li>
+<li>Confirm</li>
+</ol>
+<p><strong>Say:</strong> &quot;Voting is transparent and recorded. You can see who voted which way - or configure anonymous voting if preferred.&quot;</p>
+<h3>Show Delegation (if time)</h3>
+<p><strong>Say:</strong> &quot;You can also delegate your vote to someone you trust. This lets experts handle technical decisions while you retain ultimate control.&quot;</p>
+<hr>
+<h2>Part 5: Ledger &amp; Economic Flows (4 minutes)</h2>
+<h3>Log Hours</h3>
+<ol>
+<li>Click &quot;Transactions&quot; in sidebar</li>
+<li>Click &quot;Log Hours&quot; or &quot;New Transaction&quot;</li>
+<li>Fill in:<ul>
+<li>Recipient: Select from dropdown — names shown, not DIDs</li>
+<li>Activity: &quot;Tool maintenance&quot;</li>
+<li>Hours: 2.0</li>
+<li>Description: &quot;Cleaned and oiled power tools&quot;</li>
+</ul>
+</li>
+<li>Submit</li>
+</ol>
+<p><strong>Say:</strong> &quot;This is mutual credit - value exchange without money. The cooperative tracks contributions and everyone can see the ledger.&quot;</p>
+<h3>Show Transaction History</h3>
+<ol>
+<li>Scroll through transactions</li>
+<li>Point out:<ul>
+<li>Sender/recipient shown as <strong>names</strong> (Sarah Chen, Marcus Rivera, etc.)</li>
+<li>Date/time and activity type</li>
+<li>Hours credited</li>
+<li>The pre-seeded transactions between named members</li>
+</ul>
+</li>
+</ol>
+<p><strong>Say:</strong> &quot;Every transaction is cryptographically signed and linked to the previous one. It&#39;s tamper-evident - any change would be visible. And notice - you see people&#39;s names, not cryptographic hashes.&quot;</p>
+<h3>Show Receipts Tab</h3>
+<ol>
+<li>Click &quot;Receipts&quot; in sidebar</li>
+<li>Point out verification badges</li>
+</ol>
+<p><strong>Say:</strong> &quot;These are economic receipts with deterministic hashes. Any node can verify the entire history independently.&quot;</p>
+<hr>
+<h2>Part 6: Architecture Overview (3 minutes)</h2>
+<h3>Show the Terminal</h3>
+<p>Switch to the terminal running the demo.</p>
+<p><strong>Say:</strong> &quot;What you&#39;re seeing is a single node. In production, each cooperative runs their own node. They connect peer-to-peer - no central server.&quot;</p>
+<h3>Draw the Mental Model</h3>
+<pre><code>┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│  Coop A     │◄───►│  Coop B     │◄───►│  Coop C     │
+│  (node)     │     │  (node)     │     │  (node)     │
+└─────────────┘     └─────────────┘     └─────────────┘
+      │                   │                   │
+      ▼                   ▼                   ▼
+   Members             Members             Members
+</code></pre>
+<p><strong>Say:</strong> &quot;Each cooperative controls their data. They can federate with others for inter-coop transactions. But no one can unilaterally access or shut down another cooperative.&quot;</p>
+<h3>The Key Insight</h3>
+<p><strong>Say:</strong> &quot;This is what makes ICN different from both blockchains and traditional SaaS:</p>
+<ul>
+<li>Unlike blockchain: No global consensus tax. Cooperatives are sovereign.</li>
+<li>Unlike SaaS: No corporate dependency. You own your infrastructure.</li>
+</ul>
+<p>It&#39;s the cooperative principle - user ownership - applied to the infrastructure itself.&quot;</p>
+<hr>
+<h2>Part 7: Closing &amp; Q&amp;A (Remaining time)</h2>
+<h3>Summary</h3>
+<blockquote>
+<p>&quot;You&#39;ve seen identity, governance, and economic exchange - all running on cooperative-owned infrastructure. This is a working pilot. The Rochester Tool Library is one of several cooperatives testing it.&quot;</p>
+</blockquote>
+<h3>Common Questions</h3>
+<p><strong>&quot;How is this different from blockchain?&quot;</strong></p>
+<blockquote>
+<p>&quot;Blockchains force global consensus - every transaction validated by everyone. ICN is local-first. Cooperatives validate their own transactions. They only coordinate with others when needed.&quot;</p>
+</blockquote>
+<p><strong>&quot;What if a node goes down?&quot;</strong></p>
+<blockquote>
+<p>&quot;Data syncs across nodes via gossip. If your node goes down, you restore from backup or sync from peers. No single point of failure.&quot;</p>
+</blockquote>
+<p><strong>&quot;How do cooperatives control policy?&quot;</strong></p>
+<blockquote>
+<p>&quot;Governance. The proposals and voting you saw aren&#39;t just for bylaws - they control technical parameters too. Credit limits, membership rules, federation agreements.&quot;</p>
+</blockquote>
+<p><strong>&quot;Is this ready for production?&quot;</strong></p>
+<blockquote>
+<p>&quot;We&#39;re in pilot phase with real cooperatives. Core infrastructure is solid - 2,000+ tests passing. We&#39;re focused on usability and documentation now.&quot;</p>
+</blockquote>
+<h3>Call to Action</h3>
+<p>For <strong>cooperative members</strong>: &quot;Try the demo. Tell us what&#39;s missing for your workflow.&quot;</p>
+<p>For <strong>developers</strong>: &quot;The code is open. Check out the architecture docs. We welcome contributions.&quot;</p>
+<p>For <strong>funders</strong>: &quot;This is patient infrastructure. It compounds over decades as more cooperatives adopt it.&quot;</p>
+<p>For <strong>other cooperatives</strong>: &quot;Talk to us about running a pilot. We&#39;re looking for diverse use cases.&quot;</p>
+<hr>
+<h2>Stopping the Demo</h2>
+<pre><code class="language-bash"># In the terminal running the demo
+Ctrl+C
+</code></pre>
+<p>Or to fully reset:</p>
+<pre><code class="language-bash">./demo/scripts/reset-demo.sh
+</code></pre>
+<hr>
+<h2>Troubleshooting During Demo</h2>
+<h3>Gateway not responding</h3>
+<pre><code class="language-bash">curl http://localhost:8080/v1/health
+# If no response, restart the demo
+</code></pre>
+<h3>Token expired</h3>
+<p>The demo script displays fresh credentials. If needed:</p>
+<pre><code class="language-bash">cd icn
+ICN_PASSPHRASE=demo123 ./target/release/icnctl \
+  -d ../.demo-data/tool-library \
+  -e 127.0.0.1:15602 \
+  auth token \
+  --coop-id rochester-tool-library \
+  --scopes &quot;coop:write,coop:read,coop:admin,ledger:read,ledger:write,gov:read,gov:write&quot;
+</code></pre>
+<h3>UI shows errors</h3>
+<p>Check browser console (F12). Most common issues:</p>
+<ul>
+<li>CORS: Gateway should allow localhost:3000</li>
+<li>Auth: Token may have expired (regenerate)</li>
+<li>API: Gateway may have stopped (restart demo)</li>
+</ul>
+<hr>
+<h2>Demo Variants</h2>
+<h3>5-Minute Lightning Demo</h3>
+<p>Skip to:</p>
+<ol>
+<li>Start demo (1 min)</li>
+<li>Login + Dashboard (1 min)</li>
+<li>Create proposal + vote (2 min)</li>
+<li>&quot;Questions?&quot; (1 min)</li>
+</ol>
+<h3>45-Minute Deep Dive</h3>
+<p>Add:</p>
+<ul>
+<li>Multi-node setup (show 2 nodes syncing)</li>
+<li>CLI commands (icnctl walkthrough)</li>
+<li>Architecture diagrams (from docs)</li>
+<li>Code walkthrough (crate structure)</li>
+</ul>
+<h3>Hands-On Workshop</h3>
+<p>Provide:</p>
+<ul>
+<li>Pre-built VM or Docker image</li>
+<li>Step-by-step exercises</li>
+<li>Breakout for Q&amp;A</li>
+</ul>
+<hr>
+<h2>Resources</h2>
+<ul>
+<li><strong>Full Documentation</strong>: <code>docs/ARCHITECTURE.md</code></li>
+<li><strong>Quick Start</strong>: <code>docs/GETTING_STARTED.md</code></li>
+<li><strong>API Reference</strong>: <code>docs/api/</code></li>
+<li><strong>Demo Infrastructure</strong>: <code>demo/README.md</code></li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

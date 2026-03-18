@@ -1,0 +1,542 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Phase 10C Security Analysis &amp; Production Hardening | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>security</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>phase 10c security analysis</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/security/phase-10c-security-analysis.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Phase 10C Security Analysis &amp; Production Hardening</h1>
+<p><strong>Date</strong>: 2025-01-12
+<strong>Scope</strong>: Multi-Party Contract Signature System
+<strong>Status</strong>: 🔍 In Progress</p>
+<h2>Executive Summary</h2>
+<p>Security review of Phase 10C multi-party signature implementation identified:</p>
+<ul>
+<li><strong>2 HIGH severity</strong> vulnerabilities (participant validation missing)</li>
+<li><strong>3 MEDIUM severity</strong> issues (edge cases not handled)</li>
+<li><strong>1 LOW severity</strong> issue (minor inefficiency)</li>
+</ul>
+<p>All issues have remediation plans below.</p>
+<hr>
+<h2>HIGH Severity Issues</h2>
+<h3>H1: No Participant Validation in Contract</h3>
+<p><strong>File</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-ccl/src/ast.rs#L259-L350#L259-L350">`crates/icn-ccl/src/ast.rs:259-350`</a></p>
+<p><strong>Issue</strong>: <code>Contract::validate()</code> does NOT validate the <code>participants</code> field.</p>
+<p><strong>Missing Checks</strong>:</p>
+<ol>
+<li><strong>Empty participants list</strong> - Contract with zero participants can be created</li>
+<li><strong>Duplicate participants</strong> - Same DID can be added multiple times</li>
+<li><strong>Maximum participant count</strong> - No upper bound (DoS risk)</li>
+</ol>
+<p><strong>Attack Scenarios</strong>:</p>
+<p><strong>Scenario 1: Zero-Participant Contract</strong></p>
+<pre><code class="language-rust">let contract = Contract::new(&quot;EmptyContract&quot;.to_string()); // No participants
+// contract.validate() passes!
+// Signature verification would succeed (empty set == empty set)
+</code></pre>
+<p><strong>Impact</strong>: Contracts with no accountability, unclear ownership.</p>
+<p><strong>Scenario 2: Duplicate Participant</strong></p>
+<pre><code class="language-rust">let contract = Contract::new(&quot;DupeContract&quot;.to_string())
+    .add_participant(alice_did.clone())
+    .add_participant(alice_did.clone()); // Same DID twice
+</code></pre>
+<p><strong>Code Analysis</strong>:</p>
+<pre><code class="language-rust">// In messages.rs:80-88
+let participant_set: std::collections::HashSet&lt;_&gt; =
+    self.contract.participants.iter().collect(); // Deduplicates!
+let signature_set: std::collections::HashSet&lt;_&gt; =
+    self.installation.signatures.iter().map(|(did, _)| did).collect();
+
+if participant_set != signature_set { ... }
+</code></pre>
+<p><strong>Impact</strong>: If <code>participants = [Alice, Alice]</code> but <code>signatures = {Alice: sig}</code>, the HashSet deduplication means:</p>
+<ul>
+<li><code>participant_set</code> has 1 element (Alice)</li>
+<li><code>signature_set</code> has 1 element (Alice)</li>
+<li>Verification PASSES even though contract.participants.len() == 2</li>
+</ul>
+<p>This breaks the &quot;all participants must sign&quot; invariant!</p>
+<p><strong>Scenario 3: DoS via Large Participant List</strong></p>
+<pre><code class="language-rust">let mut contract = Contract::new(&quot;DoSContract&quot;.to_string());
+for i in 0..1_000_000 {
+    contract = contract.add_participant(generate_did());
+}
+</code></pre>
+<p><strong>Impact</strong>:</p>
+<ul>
+<li>Unbounded memory allocation</li>
+<li>Signature verification O(N) becomes expensive</li>
+<li>Code hash computation becomes expensive</li>
+<li>Network message size grows linearly</li>
+</ul>
+<p><strong>Remediation</strong>:</p>
+<p>Add participant validation to <code>Contract::validate()</code>:</p>
+<pre><code class="language-rust">// In ast.rs, inside validate() function, add after line 272:
+
+// Validate participants
+if self.participants.is_empty() {
+    bail!(&quot;Contract must have at least one participant&quot;);
+}
+if self.participants.len() &gt; MAX_PARTICIPANTS {
+    bail!(&quot;Too many participants: {} (max {})&quot;,
+          self.participants.len(), MAX_PARTICIPANTS);
+}
+
+// Check for duplicate participants
+let mut participant_set = HashSet::new();
+for participant in &amp;self.participants {
+    if !participant_set.insert(participant) {
+        bail!(&quot;Duplicate participant: {}&quot;, participant);
+    }
+}
+</code></pre>
+<p><strong>Recommended Constants</strong>:</p>
+<ul>
+<li><code>MAX_PARTICIPANTS</code>: 100 (reasonable for cooperative agreements)</li>
+<li>Larger groups should use threshold signatures (future enhancement)</li>
+</ul>
+<hr>
+<h3>H2: No Validation of Installation.signatures Map Size</h3>
+<p><strong>File</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-ccl/src/messages.rs#L80-L96#L80-L96">`crates/icn-ccl/src/messages.rs:80-96`</a></p>
+<p><strong>Issue</strong>: While participants list is now bounded (after H1 fix), the <code>installation.signatures</code> HashMap is not validated before set comparison.</p>
+<p><strong>Attack Scenario</strong>:</p>
+<pre><code class="language-rust">let mut signatures = HashMap::new();
+for i in 0..1_000_000 {
+    signatures.insert(generate_did(), vec![0u8; 64]);
+}
+// Send ContractDeploymentMessage with huge signatures map
+</code></pre>
+<p><strong>Impact</strong>:</p>
+<ul>
+<li>Unbounded memory allocation on receipt</li>
+<li>DoS on nodes receiving deployment message</li>
+<li>HashSet construction at line 83 could exhaust memory</li>
+</ul>
+<p><strong>Remediation</strong>:</p>
+<p>Add size check before creating HashSet:</p>
+<pre><code class="language-rust">// In messages.rs:verify(), add before line 80:
+
+// Prevent DoS: validate signature count before creating HashSet
+if self.installation.signatures.len() &gt; MAX_PARTICIPANTS {
+    bail!(&quot;Too many signatures: {} (max {})&quot;,
+          self.installation.signatures.len(), MAX_PARTICIPANTS);
+}
+</code></pre>
+<hr>
+<h2>MEDIUM Severity Issues</h2>
+<h3>M1: Deployer Signature Verified Twice</h3>
+<p><strong>File</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-ccl/src/messages.rs#L101-L131#L101-L131">`crates/icn-ccl/src/messages.rs:101-131`</a></p>
+<p><strong>Issue</strong>: Deployer signature is verified at lines 101-109, then again in the loop at lines 112-131 (since deployer is a participant).</p>
+<p><strong>Impact</strong>: Minor performance inefficiency (extra Ed25519 verification ~50μs)</p>
+<p><strong>Remediation</strong>:</p>
+<p><strong>Option A</strong>: Remove separate deployer signature verification (rely on participant loop)</p>
+<pre><code class="language-rust">// Remove lines 101-109, deployer is verified in participant loop
+</code></pre>
+<p><strong>Option B</strong>: Skip deployer in participant loop</p>
+<pre><code class="language-rust">// At line 112, change to:
+for (participant_did, sig_bytes) in &amp;self.installation.signatures {
+    if participant_did == &amp;self.installation.installed_by {
+        continue; // Already verified deployer signature above
+    }
+    // ... verify participant
+}
+</code></pre>
+<p><strong>Recommendation</strong>: Keep separate deployer verification for clarity (deployer has special status), but add comment explaining the redundancy.</p>
+<hr>
+<h3>M2: No Validation of <code>deployer_signature</code> Field</h3>
+<p><strong>File</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-ccl/src/messages.rs#L22#L22">`crates/icn-ccl/src/messages.rs:22`</a></p>
+<p><strong>Issue</strong>: The <code>ContractDeploymentMessage</code> has both:</p>
+<ul>
+<li><code>deployer_signature: Vec&lt;u8&gt;</code> (line 22)</li>
+<li><code>installation.signatures: HashMap&lt;Did, Vec&lt;u8&gt;&gt;</code> (which includes deployer)</li>
+</ul>
+<p><strong>Attack Scenario</strong>: What if <code>deployer_signature</code> doesn&#39;t match the signature in <code>installation.signatures</code>?</p>
+<pre><code class="language-rust">let deployment_msg = ContractDeploymentMessage {
+    deployer_signature: alice_sig_1.to_vec(),  // Different signature!
+    installation: ContractInstallation {
+        signatures: [
+            (alice_did, alice_sig_2.to_vec()), // Inconsistent!
+        ].into(),
+        ...
+    },
+    ...
+};
+</code></pre>
+<p><strong>Current Behavior</strong>: Both signatures are verified independently (both must be valid), but they could be different signatures over the same data.</p>
+<p><strong>Impact</strong>: Confusing semantics, potential for exploitation if one signature is reused from another context.</p>
+<p><strong>Remediation</strong>:</p>
+<p>Add consistency check:</p>
+<pre><code class="language-rust">// In messages.rs:verify(), add after line 109:
+
+// Verify deployer signature matches installation.signatures
+let deployer_sig_in_installation = self.installation.signatures
+    .get(&amp;self.installation.installed_by)
+    .context(&quot;Deployer signature missing from installation.signatures&quot;)?;
+
+if self.deployer_signature != *deployer_sig_in_installation {
+    bail!(&quot;Deployer signature mismatch: deployer_signature field doesn&#39;t match installation.signatures&quot;);
+}
+</code></pre>
+<hr>
+<h3>M3: No Check for Malformed DIDs in Signatures</h3>
+<p><strong>File</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-ccl/src/messages.rs#L113#L113">`crates/icn-ccl/src/messages.rs:113`</a></p>
+<p><strong>Issue</strong>: <code>participant_did.to_verifying_key()</code> is called without checking if the DID is well-formed.</p>
+<p><strong>Attack Scenario</strong>:</p>
+<pre><code class="language-rust">// Send deployment with invalid DID in signatures
+let mut signatures = HashMap::new();
+signatures.insert(Did::from_string(&quot;did:icn:INVALID!!!&quot;), vec![0u8; 64]);
+</code></pre>
+<p><strong>Current Behavior</strong>: <code>to_verifying_key()</code> returns Result, error is caught at line 114 with <code>.context()</code>.</p>
+<p><strong>Impact</strong>: Low - error is handled gracefully, but error message could be more specific.</p>
+<p><strong>Remediation</strong>:</p>
+<p>Validate DID format before attempting key extraction:</p>
+<pre><code class="language-rust">// In messages.rs:verify(), in participant loop at line 112:
+for (participant_did, sig_bytes) in &amp;self.installation.signatures {
+    // Validate DID is well-formed (has valid base58 key)
+    if !participant_did.is_valid() {
+        bail!(&quot;Invalid participant DID format: {}&quot;, participant_did);
+    }
+
+    let participant_key = participant_did.to_verifying_key()
+        .context(format!(&quot;Failed to extract verifying key for {}&quot;, participant_did))?;
+    // ...
+}
+</code></pre>
+<p><strong>Note</strong>: Requires adding <code>is_valid()</code> method to <code>Did</code> type in <code>icn-identity</code>.</p>
+<hr>
+<h2>LOW Severity Issues</h2>
+<h3>L1: No Bounds on State Variables or Rules</h3>
+<p><strong>File</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-ccl/src/ast.rs#L260-L350#L260-L350">`crates/icn-ccl/src/ast.rs:260-350`</a></p>
+<p><strong>Issue</strong>: <code>Contract::validate()</code> checks <code>MAX_NAME_LENGTH</code> for names but doesn&#39;t bound the number of state variables or rules.</p>
+<p><strong>Attack Scenario</strong>:</p>
+<pre><code class="language-rust">let mut contract = Contract::new(&quot;DoSContract&quot;.to_string());
+for i in 0..100_000 {
+    contract = contract.add_state_var(format!(&quot;var{}&quot;, i), Value::Int(0));
+}
+</code></pre>
+<p><strong>Impact</strong>: Unbounded memory allocation, large gossip messages.</p>
+<p><strong>Remediation</strong>:</p>
+<p>Add bounds check in <code>Contract::validate()</code>:</p>
+<pre><code class="language-rust">// After line 282, add:
+
+// Validate bounded counts
+const MAX_STATE_VARS: usize = 100;
+const MAX_RULES: usize = 50;
+
+if self.state_vars.len() &gt; MAX_STATE_VARS {
+    bail!(&quot;Too many state variables: {} (max {})&quot;,
+          self.state_vars.len(), MAX_STATE_VARS);
+}
+
+if self.rules.len() &gt; MAX_RULES {
+    bail!(&quot;Too many rules: {} (max {})&quot;,
+          self.rules.len(), MAX_RULES);
+}
+</code></pre>
+<hr>
+<h2>Edge Cases to Test</h2>
+<h3>E1: Corrupted Signature Bytes</h3>
+<p><strong>Scenario</strong>: Signature has 64 bytes but invalid Ed25519 signature</p>
+<p><strong>Expected</strong>: Verification fails with clear error message</p>
+<p><strong>Test</strong>:</p>
+<pre><code class="language-rust">#[test]
+fn test_corrupted_signature() {
+    let mut deployment = create_valid_deployment();
+    // Corrupt one byte
+    deployment.deployer_signature[10] ^= 0xFF;
+
+    assert!(deployment.verify().is_err());
+    // Error message should mention &quot;signature verification failed&quot;
+}
+</code></pre>
+<hr>
+<h3>E2: Signature from Wrong Keypair</h3>
+<p><strong>Scenario</strong>: Participant signs with a different keypair than their DID</p>
+<p><strong>Expected</strong>: Verification fails (signature doesn&#39;t match DID&#39;s public key)</p>
+<p><strong>Test</strong>:</p>
+<pre><code class="language-rust">#[test]
+fn test_wrong_keypair_signature() {
+    let alice_keypair = KeyPair::generate();
+    let bob_keypair = KeyPair::generate();
+
+    let signing_bytes = compute_signing_bytes(...);
+    let bob_signature = bob_keypair.sign(&amp;signing_bytes); // Bob signs
+
+    let mut signatures = HashMap::new();
+    signatures.insert(alice_keypair.did(), bob_signature.to_vec()); // But claim it&#39;s Alice!
+
+    let deployment = ContractDeploymentMessage { signatures, ... };
+    assert!(deployment.verify().is_err());
+}
+</code></pre>
+<hr>
+<h3>E3: Empty Signature Bytes</h3>
+<p><strong>Scenario</strong>: Signature is empty <code>vec![]</code></p>
+<p><strong>Expected</strong>: Verification fails (not 64 bytes)</p>
+<p><strong>Test</strong>:</p>
+<pre><code class="language-rust">#[test]
+fn test_empty_signature() {
+    let mut deployment = create_valid_deployment();
+    deployment.installation.signatures.insert(alice_did, vec![]); // Empty
+
+    let err = deployment.verify().unwrap_err();
+    assert!(err.to_string().contains(&quot;Invalid signature length&quot;));
+}
+</code></pre>
+<hr>
+<h3>E4: Signature Too Long</h3>
+<p><strong>Scenario</strong>: Signature is 128 bytes instead of 64</p>
+<p><strong>Expected</strong>: Verification fails</p>
+<p><strong>Test</strong>:</p>
+<pre><code class="language-rust">#[test]
+fn test_oversized_signature() {
+    let mut deployment = create_valid_deployment();
+    deployment.deployer_signature = vec![0u8; 128]; // Too long
+
+    let err = deployment.verify().unwrap_err();
+    assert!(err.to_string().contains(&quot;expected 64 bytes&quot;));
+}
+</code></pre>
+<hr>
+<h3>E5: Participant Not in Contract</h3>
+<p><strong>Scenario</strong>: Signature from DID not in contract.participants</p>
+<p><strong>Expected</strong>: Verification fails (set mismatch)</p>
+<p><strong>Test</strong>:</p>
+<pre><code class="language-rust">#[test]
+fn test_extra_signer() {
+    let contract = Contract::new(&quot;Test&quot;.to_string())
+        .add_participant(alice_did.clone());
+
+    let mut signatures = HashMap::new();
+    signatures.insert(alice_did.clone(), alice_sig.to_vec());
+    signatures.insert(bob_did.clone(), bob_sig.to_vec()); // Bob not a participant!
+
+    let deployment = ContractDeploymentMessage { contract, signatures, ... };
+
+    let err = deployment.verify().unwrap_err();
+    assert!(err.to_string().contains(&quot;signatures incomplete&quot;));
+}
+</code></pre>
+<hr>
+<h3>E6: Missing Participant Signature</h3>
+<p><strong>Scenario</strong>: Contract has [Alice, Bob] but only Alice signed</p>
+<p><strong>Expected</strong>: Verification fails (set mismatch)</p>
+<p><strong>Test</strong>:</p>
+<pre><code class="language-rust">#[test]
+fn test_missing_signature() {
+    let contract = Contract::new(&quot;Test&quot;.to_string())
+        .add_participant(alice_did.clone())
+        .add_participant(bob_did.clone());
+
+    let mut signatures = HashMap::new();
+    signatures.insert(alice_did.clone(), alice_sig.to_vec()); // Bob didn&#39;t sign!
+
+    let deployment = ContractDeploymentMessage { contract, signatures, ... };
+
+    let err = deployment.verify().unwrap_err();
+    assert!(err.to_string().contains(&quot;signatures incomplete&quot;));
+}
+</code></pre>
+<hr>
+<h2>CLI Security Issues</h2>
+<h3>C1: No Validation of Input JSON in <code>contract sign</code></h3>
+<p><strong>File</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/bins/icnctl/src/main.rs#L1074-L1157#L1074-L1157">`bins/icnctl/src/main.rs:1074-1157`</a></p>
+<p><strong>Issue</strong>: <code>handle_contract_sign()</code> loads <code>PartialDeployment</code> JSON without validating structure.</p>
+<p><strong>Attack Scenario</strong>:</p>
+<pre><code class="language-json">{
+  &quot;contract&quot;: { &quot;participants&quot;: [] },  // Empty participants!
+  &quot;signatures&quot;: {},
+  &quot;installed_by&quot;: &quot;did:icn:attacker&quot;
+}
+</code></pre>
+<p><strong>Remediation</strong>: Call <code>contract.validate()</code> after deserializing:</p>
+<pre><code class="language-rust">// After line ~1089 (load JSON), add:
+let partial: PartialDeployment = serde_json::from_reader(file)?;
+
+// Validate contract structure
+partial.contract.validate()
+    .context(&quot;Invalid contract in deployment file&quot;)?;
+</code></pre>
+<hr>
+<h3>C2: No Check for File Size in JSON Loading</h3>
+<p><strong>Issue</strong>: <code>serde_json::from_reader(file)</code> loads entire file into memory.</p>
+<p><strong>Attack Scenario</strong>: Attacker provides 10GB JSON file, causes OOM.</p>
+<p><strong>Remediation</strong>:</p>
+<p>Add file size check before deserializing:</p>
+<pre><code class="language-rust">let file = File::open(deployment_file)?;
+let metadata = file.metadata()?;
+
+const MAX_DEPLOYMENT_FILE_SIZE: u64 = 10 * 1024 * 1024; // 10MB
+if metadata.len() &gt; MAX_DEPLOYMENT_FILE_SIZE {
+    bail!(&quot;Deployment file too large: {} bytes (max {})&quot;,
+          metadata.len(), MAX_DEPLOYMENT_FILE_SIZE);
+}
+
+let partial: PartialDeployment = serde_json::from_reader(file)?;
+</code></pre>
+<hr>
+<h3>C3: Race Condition in File Writing</h3>
+<p><strong>Issue</strong>: <code>contract prepare</code> and <code>contract sign</code> write to <code>--output</code> file directly.</p>
+<p><strong>Attack Scenario</strong>: If output file exists, it&#39;s overwritten. Concurrent writes could corrupt file.</p>
+<p><strong>Remediation</strong>:</p>
+<p>Write to temporary file, then atomic rename:</p>
+<pre><code class="language-rust">use std::fs;
+use tempfile::NamedTempFile;
+
+// Write to temp file
+let temp_file = NamedTempFile::new_in(output.parent().unwrap())?;
+serde_json::to_writer_pretty(&amp;temp_file, &amp;deployment)?;
+
+// Atomic rename
+temp_file.persist(output)?;
+</code></pre>
+<hr>
+<h2>Recommended Constants</h2>
+<p>Add to <code>crates/icn-ccl/src/ast.rs</code>:</p>
+<pre><code class="language-rust">/// Maximum number of participants in a contract
+pub const MAX_PARTICIPANTS: usize = 100;
+
+/// Maximum number of state variables
+pub const MAX_STATE_VARS: usize = 100;
+
+/// Maximum number of rules
+pub const MAX_RULES: usize = 50;
+</code></pre>
+<p>Add to <code>bins/icnctl/src/main.rs</code>:</p>
+<pre><code class="language-rust">/// Maximum deployment file size (10MB)
+const MAX_DEPLOYMENT_FILE_SIZE: u64 = 10 * 1024 * 1024;
+</code></pre>
+<hr>
+<h2>Testing Recommendations</h2>
+<h3>Unit Tests Needed</h3>
+<p><strong>File</strong>: <code>crates/icn-ccl/src/ast.rs</code></p>
+<ol>
+<li><code>test_empty_participants</code> - Contract with no participants fails validation</li>
+<li><code>test_duplicate_participants</code> - Duplicate DIDs fails validation</li>
+<li><code>test_too_many_participants</code> - Exceeding MAX_PARTICIPANTS fails</li>
+<li><code>test_too_many_state_vars</code> - Exceeding MAX_STATE_VARS fails</li>
+<li><code>test_too_many_rules</code> - Exceeding MAX_RULES fails</li>
+</ol>
+<p><strong>File</strong>: <code>crates/icn-ccl/src/messages.rs</code></p>
+<ol>
+<li><code>test_corrupted_signature</code> - Invalid signature bytes fails</li>
+<li><code>test_wrong_keypair</code> - Signature from wrong key fails</li>
+<li><code>test_empty_signature</code> - Zero-length signature fails</li>
+<li><code>test_oversized_signature</code> - &gt;64 bytes signature fails</li>
+<li><code>test_extra_signer</code> - Non-participant signature fails</li>
+<li><code>test_missing_signature</code> - Missing required signature fails</li>
+<li><code>test_deployer_signature_mismatch</code> - Inconsistent deployer signatures fail</li>
+<li><code>test_too_many_signatures_dos</code> - Huge signature map fails</li>
+</ol>
+<p><strong>File</strong>: <code>bins/icnctl/src/main.rs</code></p>
+<ol>
+<li><code>test_sign_oversized_file</code> - Large JSON file rejected</li>
+<li><code>test_sign_malformed_json</code> - Invalid JSON rejected</li>
+<li><code>test_sign_invalid_contract</code> - Contract validation called</li>
+</ol>
+<h3>Integration Tests Needed</h3>
+<p><strong>File</strong>: <code>crates/icn-core/tests/contract_deployment_integration.rs</code></p>
+<ol>
+<li><code>test_deploy_invalid_contract</code> - Deploy contract with duplicate participants, verify rejection</li>
+<li><code>test_deploy_corrupted_signature</code> - Deploy with corrupted signature, verify rejection</li>
+<li><code>test_concurrent_deployments</code> - Multiple deployments in parallel, verify no corruption</li>
+</ol>
+<hr>
+<h2>Remediation Priority</h2>
+<p><strong>Phase 1 (Critical)</strong>: Fix HIGH severity issues</p>
+<ul>
+<li><input disabled="" type="checkbox"> H1: Add participant validation</li>
+<li><input disabled="" type="checkbox"> H2: Add signature map size validation</li>
+</ul>
+<p><strong>Phase 2 (Important)</strong>: Fix MEDIUM severity issues</p>
+<ul>
+<li><input disabled="" type="checkbox"> M2: Add deployer signature consistency check</li>
+<li><input disabled="" type="checkbox"> M3: Add DID format validation</li>
+<li><input disabled="" type="checkbox"> C1: Add JSON validation in CLI</li>
+<li><input disabled="" type="checkbox"> C2: Add file size limits</li>
+</ul>
+<p><strong>Phase 3 (Nice to have)</strong>: Fix LOW severity issues</p>
+<ul>
+<li><input disabled="" type="checkbox"> L1: Add state var and rule bounds</li>
+<li><input disabled="" type="checkbox"> M1: Optimize duplicate verification</li>
+<li><input disabled="" type="checkbox"> C3: Use atomic file writes</li>
+</ul>
+<p><strong>Phase 4 (Testing)</strong>: Comprehensive test coverage</p>
+<ul>
+<li><input disabled="" type="checkbox"> Add all unit tests listed above</li>
+<li><input disabled="" type="checkbox"> Add integration tests for edge cases</li>
+<li><input disabled="" type="checkbox"> Add fuzzing tests for signature verification</li>
+</ul>
+<hr>
+<h2>Conclusion</h2>
+<p>Phase 10C multi-party signature implementation has a solid cryptographic foundation but lacks input validation at critical boundaries. All identified issues are addressable with straightforward validation checks.</p>
+<p><strong>Next Steps</strong>:</p>
+<ol>
+<li>Implement Phase 1 fixes (HIGH severity)</li>
+<li>Add unit tests for fixed issues</li>
+<li>Implement Phase 2 fixes (MEDIUM severity)</li>
+<li>Add comprehensive integration tests</li>
+<li>Update documentation with security best practices</li>
+</ol>
+<p><strong>Estimated Effort</strong>: 4-6 hours for all remediation + testing</p>
+<hr>
+<p>🤖 Generated with <a href="https://claude.com/claude-code" target="_blank" rel="noopener">Claude Code</a></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

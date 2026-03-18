@@ -1,0 +1,934 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Implementation Gap Analysis | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>IMPLEMENTATION GAP ANALYSIS</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/IMPLEMENTATION_GAP_ANALYSIS.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Implementation Gap Analysis</h1>
+<p><strong>Version:</strong> 1.0<br><strong>Status:</strong> INFORMATIONAL<br><strong>Last Updated:</strong> 2026-02-02</p>
+<h2>Executive Summary</h2>
+<p>This document analyzes gaps between the ICN Federation Interoperability Contract specification and the current implementation in the <code>icn</code> Rust workspace. It identifies specific code locations requiring changes, prioritizes work items, and provides actionable recommendations for achieving full specification compliance.</p>
+<hr>
+<h2>1. Critical Gaps (Security/Correctness Issues)</h2>
+<p>These gaps represent security vulnerabilities or correctness issues that MUST be addressed before federation interoperability can be considered production-ready.</p>
+<h3>1.1 HashMap Usage in Signed/Hashed Structures</h3>
+<p><strong>Specification Requirement:</strong><br>All data structures that are signed or hashed MUST use <code>BTreeMap&lt;K, V&gt;</code> instead of <code>HashMap&lt;K, V&gt;</code> to ensure deterministic serialization (CANONICAL_ENCODING.md §3.1).</p>
+<p><strong>Current State:</strong><br>Multiple crates use <code>HashMap</code> in structures that may be signed or hashed:</p>
+<p><strong>Affected Files:</strong></p>
+<ol>
+<li><p><strong>icn-governance</strong> (8 files):</p>
+<ul>
+<li><code>src/tally.rs</code> - Vote tallies use HashMap</li>
+<li><code>src/discussion.rs</code> - Comment tracking uses HashMap</li>
+<li><code>src/delegation.rs</code> - Delegation tracking uses HashMap</li>
+<li><code>src/store.rs</code> - Proposal storage uses HashMap</li>
+<li><code>src/steward_store.rs</code> - Steward data uses HashMap</li>
+<li><code>src/action_item.rs</code> - Action item tracking uses HashMap</li>
+<li><code>src/charter_store.rs</code> - Charter storage uses HashMap</li>
+<li><code>src/protocol_store/state.rs</code> - Protocol state uses HashMap</li>
+</ul>
+</li>
+<li><p><strong>icn-ledger</strong> (13 files):</p>
+<ul>
+<li><code>src/balance.rs</code> - Account balances use HashMap</li>
+<li><code>src/types.rs</code> - Journal entry types use HashMap</li>
+<li><code>src/ledger.rs</code> - Ledger state uses HashMap</li>
+<li><code>src/entry.rs</code> - Entry metadata uses HashMap</li>
+<li><code>src/progressive_limits.rs</code> - Limit tracking uses HashMap</li>
+<li><code>src/dispute.rs</code> - Dispute tracking uses HashMap</li>
+<li><code>src/treasury.rs</code> - Treasury state uses HashMap</li>
+<li><code>src/commons_credits.rs</code> - Commons credit tracking uses HashMap</li>
+<li><code>src/fork_resolution.rs</code> - Fork state uses HashMap</li>
+<li><code>src/ledger_impl/balances.rs</code> - Balance implementation uses HashMap</li>
+<li><code>src/oracle/price_feed.rs</code> - Price data uses HashMap</li>
+<li><code>src/oracle/types.rs</code> - Oracle types use HashMap</li>
+<li><code>src/freeze.rs</code> - Freeze state uses HashMap</li>
+</ul>
+</li>
+<li><p><strong>icn-federation</strong> (6 files):</p>
+<ul>
+<li><code>src/clearing.rs</code> - Clearing state uses HashMap</li>
+<li><code>src/netting.rs</code> - Netting state uses HashMap</li>
+<li><code>src/clearing_manager.rs</code> - Manager state uses HashMap</li>
+<li><code>src/router.rs</code> - Routing tables use HashMap</li>
+<li><code>src/registry.rs</code> - Registry uses HashMap</li>
+<li><code>src/agreement/store.rs</code> - Agreement storage uses HashMap</li>
+</ul>
+</li>
+</ol>
+<p><strong>Required Changes:</strong></p>
+<pre><code class="language-rust">// BEFORE (non-deterministic)
+use std::collections::HashMap;
+
+#[derive(Serialize, Deserialize)]
+pub struct VoteTally {
+    pub votes: HashMap&lt;Did, VoteChoice&gt;,  // ❌ Non-deterministic
+}
+
+// AFTER (deterministic)
+use std::collections::BTreeMap;
+
+#[derive(Serialize, Deserialize)]
+pub struct VoteTally {
+    pub votes: BTreeMap&lt;Did, VoteChoice&gt;,  // ✅ Deterministic
+}
+</code></pre>
+<p><strong>Priority:</strong> CRITICAL<br><strong>Effort:</strong> Medium (requires careful refactoring and testing)<br><strong>Risk:</strong> High (breaking change to serialization format)</p>
+<p><strong>Recommendation:</strong></p>
+<ol>
+<li>Create migration path for existing data</li>
+<li>Update all affected structs in one coordinated change</li>
+<li>Add compile-time checks to prevent future HashMap usage in signed contexts</li>
+<li>Add tests verifying deterministic serialization</li>
+</ol>
+<hr>
+<h3>1.2 Missing GovernanceProof Structure</h3>
+<p><strong>Specification Requirement:</strong><br>Federations MUST use a <code>GovernanceProof</code> structure with specific fields (FEDERATION_INTEROP_CONTRACT.md §3).</p>
+<p><strong>Current State:</strong><br>No <code>GovernanceProof</code> struct exists in the codebase. The governance system uses <code>Proposal</code> and <code>Vote</code> structures but lacks the cryptographic attestation layer.</p>
+<p><strong>Required Changes:</strong></p>
+<p>Create new file: <code>icn/crates/icn-federation/src/governance_proof.rs</code></p>
+<pre><code class="language-rust">use serde::{Serialize, Deserialize};
+use std::collections::BTreeMap;
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct GovernanceProof {
+    pub federation_id: String,
+    pub action_type: ActionType,
+    pub action_hash: [u8; 32],
+    pub state_root: [u8; 32],
+    pub prev_state_root: [u8; 32],
+    pub sequence: u64,
+    pub timestamp: u64,
+    pub confirmations: Vec&lt;String&gt;,  // Sorted DIDs
+    pub decision_records: BTreeMap&lt;String, Vec&lt;u8&gt;&gt;,
+    pub signature: [u8; 64],
+}
+
+impl GovernanceProof {
+    pub fn verify(&amp;self, action: &amp;FederationAction, state: &amp;GovernanceState) -&gt; Result&lt;()&gt; {
+        // Implement full verification algorithm (FEDERATION_INTEROP_CONTRACT.md §11)
+        todo!()
+    }
+}
+</code></pre>
+<p><strong>Priority:</strong> CRITICAL<br><strong>Effort:</strong> High (new component, requires integration with existing governance)<br><strong>Risk:</strong> High (fundamental architectural change)</p>
+<p><strong>Recommendation:</strong></p>
+<ol>
+<li>Implement <code>GovernanceProof</code> structure first</li>
+<li>Integrate with existing <code>Proposal</code> system</li>
+<li>Add verification logic</li>
+<li>Update gossip protocol to support proof distribution</li>
+</ol>
+<hr>
+<h3>1.3 Missing Typed Hashing with Domain Separation</h3>
+<p><strong>Specification Requirement:</strong><br>All hashes MUST use domain separation: <code>BLAKE3(domain || 0x00 || data)</code> (CANONICAL_ENCODING.md §4.1.2).</p>
+<p><strong>Current State:</strong><br>Only partial domain separation exists:</p>
+<ul>
+<li><code>icn-ledger/src/settlement.rs</code> line 15-16: Uses <code>b&quot;icn-ledger:settlement:v1:&quot;</code> prefix for deduplication</li>
+<li>No systematic typed hashing infrastructure</li>
+</ul>
+<p><strong>Required Changes:</strong></p>
+<p>Create new file: <code>icn/crates/icn-encoding/src/typed_hash.rs</code></p>
+<pre><code class="language-rust">use blake3;
+
+/// Compute a typed hash with domain separation
+pub fn typed_hash(domain: &amp;str, data: &amp;[u8]) -&gt; [u8; 32] {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(domain.as_bytes());
+    hasher.update(&amp;[0x00]);  // Null separator
+    hasher.update(data);
+    (*hasher.finalize().as_bytes()).into()
+}
+
+/// Domain strings for federation protocol
+pub mod domains {
+    pub const GOVERNANCE_PROOF: &amp;str = &quot;icn-federation:governance-proof:v1&quot;;
+    pub const FEDERATION_ACTION: &amp;str = &quot;icn-federation:action:v1&quot;;
+    pub const STATE_ROOT: &amp;str = &quot;icn-federation:state-root:v1&quot;;
+    pub const CONSTITUTION: &amp;str = &quot;icn-federation:constitution:v1&quot;;
+    pub const PROPOSAL: &amp;str = &quot;icn-governance:proposal:v1&quot;;
+    pub const VOTE: &amp;str = &quot;icn-governance:vote:v1&quot;;
+    pub const SETTLEMENT: &amp;str = &quot;icn-ledger:settlement:v1&quot;;
+    pub const JOURNAL_ENTRY: &amp;str = &quot;icn-ledger:journal-entry:v1&quot;;
+}
+</code></pre>
+<p>Update <code>icn-ledger/src/settlement.rs</code>:</p>
+<pre><code class="language-rust">// BEFORE
+const DEDUP_PREFIX: &amp;[u8] = b&quot;icn-ledger:settlement:v1:&quot;;
+let dedup_key = sha256(DEDUP_PREFIX || receipt_hash);
+
+// AFTER
+use icn_encoding::typed_hash;
+use icn_encoding::typed_hash::domains;
+
+let dedup_key = typed_hash(domains::SETTLEMENT, &amp;receipt_hash);
+</code></pre>
+<p><strong>Priority:</strong> CRITICAL<br><strong>Effort:</strong> Medium<br><strong>Risk:</strong> Medium (changes hash values, requires migration)</p>
+<p><strong>Recommendation:</strong></p>
+<ol>
+<li>Create <code>typed_hash</code> infrastructure in <code>icn-encoding</code></li>
+<li>Migrate existing ad-hoc domain separation</li>
+<li>Add domain constants for all federation/governance operations</li>
+<li>Update tests with new hash values</li>
+</ol>
+<hr>
+<h3>1.4 Missing Canonical CBOR Encoding</h3>
+<p><strong>Specification Requirement:</strong><br>All signed/hashed objects MUST use canonical CBOR encoding with sorted keys (CANONICAL_ENCODING.md §2).</p>
+<p><strong>Current State:</strong>  </p>
+<ul>
+<li><code>icn-encoding</code> crate provides Postcard encoding (not canonical)</li>
+<li>Some structs use JSON serialization (e.g., <code>CooperativeInfo</code> in <code>icn-federation/src/types.rs</code> line 88)</li>
+<li>No canonical CBOR infrastructure</li>
+</ul>
+<p><strong>Required Changes:</strong></p>
+<p>Update <code>icn/crates/icn-encoding/Cargo.toml</code>:</p>
+<pre><code class="language-toml">[dependencies]
+ciborium = &quot;0.2&quot;  # Add CBOR support
+</code></pre>
+<p>Add to <code>icn/crates/icn-encoding/src/lib.rs</code>:</p>
+<pre><code class="language-rust">/// Trait for objects requiring canonical encoding
+pub trait Canonicalize {
+    fn canonicalize(&amp;mut self);
+    fn is_canonical(&amp;self) -&gt; bool;
+}
+
+/// Trait for canonical CBOR encoding
+pub trait CanonicalEncode: Canonicalize + Serialize {
+    fn encode_canonical(&amp;mut self) -&gt; Result&lt;Vec&lt;u8&gt;&gt; {
+        self.canonicalize();
+        let mut buf = Vec::new();
+        ciborium::ser::into_writer(self, &amp;mut buf)?;
+        Ok(buf)
+    }
+    
+    fn hash_canonical(&amp;mut self, domain: &amp;str) -&gt; Result&lt;[u8; 32]&gt; {
+        let encoded = self.encode_canonical()?;
+        Ok(typed_hash(domain, &amp;encoded))
+    }
+}
+</code></pre>
+<p><strong>Priority:</strong> CRITICAL<br><strong>Effort:</strong> High (affects many structures)<br><strong>Risk:</strong> High (breaking change to serialization)</p>
+<p><strong>Recommendation:</strong></p>
+<ol>
+<li>Add CBOR dependency</li>
+<li>Implement <code>Canonicalize</code> and <code>CanonicalEncode</code> traits</li>
+<li>Migrate existing signed structures to CBOR</li>
+<li>Maintain JSON for human-readable formats (configuration, logging)</li>
+</ol>
+<hr>
+<h3>1.5 Missing Settlement Conservation Validation</h3>
+<p><strong>Specification Requirement:</strong><br>Cross-cooperative settlements MUST sum to zero per currency (FEDERATION_INTEROP_CONTRACT.md §2.3).</p>
+<p><strong>Current State:</strong><br><code>icn-ledger/src/settlement.rs</code> does NOT validate conservation. It only checks:</p>
+<ul>
+<li>Positive amount (line 72)</li>
+<li>Executor verification (line 79)</li>
+<li>Deduplication (line 132)</li>
+</ul>
+<p><strong>Required Changes:</strong></p>
+<p>Update <code>icn/crates/icn-ledger/src/settlement.rs</code>:</p>
+<pre><code class="language-rust">/// Validate settlement conservation for cross-coop settlements
+pub fn validate_conservation(settlements: &amp;[SettlementRequest]) -&gt; Result&lt;()&gt; {
+    let mut balances: BTreeMap&lt;String, i64&gt; = BTreeMap::new();
+    
+    for settlement in settlements {
+        // Debit from_coop
+        let from_balance = balances.entry(settlement.currency.clone()).or_insert(0);
+        *from_balance = from_balance.checked_sub(settlement.amount)
+            .ok_or(LedgerError::IntegerOverflow)?;
+        
+        // Credit to_coop
+        let to_balance = balances.entry(settlement.currency.clone()).or_insert(0);
+        *to_balance = to_balance.checked_add(settlement.amount)
+            .ok_or(LedgerError::IntegerOverflow)?;
+    }
+    
+    // Verify sum-to-zero per currency
+    for (currency, balance) in balances {
+        if balance != 0 {
+            return Err(LedgerError::ConservationViolation {
+                currency,
+                imbalance: balance,
+            });
+        }
+    }
+    
+    Ok(())
+}
+</code></pre>
+<p><strong>Priority:</strong> CRITICAL<br><strong>Effort:</strong> Low<br><strong>Risk:</strong> Low (new validation, doesn&#39;t break existing code)</p>
+<p><strong>Recommendation:</strong></p>
+<ol>
+<li>Add conservation validation function</li>
+<li>Call from <code>SettlementEngine::settle</code></li>
+<li>Add comprehensive tests (including overflow cases)</li>
+</ol>
+<hr>
+<h3>1.6 Missing Checked Arithmetic in Settlement</h3>
+<p><strong>Specification Requirement:</strong><br>All arithmetic MUST use checked operations (CANONICAL_ENCODING.md §6.1).</p>
+<p><strong>Current State:</strong><br><code>icn-ledger/src/settlement.rs</code> uses <code>i64</code> but doesn&#39;t explicitly use checked arithmetic for all operations.</p>
+<p><strong>Required Changes:</strong></p>
+<p>Audit all arithmetic in ledger crate:</p>
+<pre><code class="language-rust">// BEFORE (potential overflow)
+balance = balance + amount;
+
+// AFTER (checked arithmetic)
+balance = balance.checked_add(amount)
+    .ok_or(LedgerError::IntegerOverflow)?;
+</code></pre>
+<p><strong>Priority:</strong> CRITICAL<br><strong>Effort:</strong> Medium (requires audit of all arithmetic operations)<br><strong>Risk:</strong> Medium (could expose existing overflow bugs)</p>
+<p><strong>Recommendation:</strong></p>
+<ol>
+<li>Enable Clippy lint: <code>arithmetic_overflow</code> (already in workspace config)</li>
+<li>Audit all arithmetic in <code>icn-ledger</code>, <code>icn-governance</code>, <code>icn-federation</code></li>
+<li>Replace <code>+</code>, <code>-</code>, <code>*</code> with checked variants in consensus-critical code</li>
+<li>Add overflow tests</li>
+</ol>
+<hr>
+<h2>2. High-Priority Gaps (Required for Interoperability)</h2>
+<p>These gaps prevent cross-implementation interoperability but don&#39;t represent immediate security risks.</p>
+<h3>2.1 Missing State Root Computation</h3>
+<p><strong>Specification Requirement:</strong><br>Governance state MUST have a Merkle root (GOVERNANCE_STATE_MACHINE.md §4).</p>
+<p><strong>Current State:</strong><br>No state root computation exists. Governance uses <code>Proposal</code> and <code>Vote</code> structures without state commitment.</p>
+<p><strong>Required Changes:</strong></p>
+<p>Create new file: <code>icn/crates/icn-governance/src/state_root.rs</code></p>
+<pre><code class="language-rust">use blake3;
+use std::collections::BTreeMap;
+
+pub fn compute_state_root(state: &amp;GovernanceState) -&gt; [u8; 32] {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b&quot;icn-federation:state-root:v1&quot;);
+    hasher.update(&amp;[0x00]);
+    
+    // Hash federation ID
+    hasher.update(state.federation_id.as_bytes());
+    
+    // Hash members (sorted)
+    for (did, member) in &amp;state.members {
+        hasher.update(did.as_bytes());
+        hasher.update(&amp;member.governance_weight.to_le_bytes());
+        hasher.update(&amp;member.constitution_hash);
+    }
+    
+    // Hash balances (sorted)
+    for ((did, currency), balance) in &amp;state.balances {
+        hasher.update(did.as_bytes());
+        hasher.update(currency.as_bytes());
+        hasher.update(&amp;balance.to_le_bytes());
+    }
+    
+    // Hash constitution
+    hasher.update(&amp;state.constitution.hash);
+    
+    // Hash proposals (sorted)
+    for (id, proposal) in &amp;state.proposals {
+        hasher.update(id.as_bytes());
+        hasher.update(&amp;(proposal.state as u8).to_le_bytes());
+    }
+    
+    // Hash sequence metadata
+    hasher.update(&amp;state.sequence.to_le_bytes());
+    hasher.update(&amp;state.timestamp.to_le_bytes());
+    
+    (*hasher.finalize().as_bytes()).into()
+}
+</code></pre>
+<p><strong>Priority:</strong> HIGH<br><strong>Effort:</strong> High (requires designing state representation)<br><strong>Risk:</strong> Medium</p>
+<p><strong>Recommendation:</strong></p>
+<ol>
+<li>Design <code>GovernanceState</code> structure</li>
+<li>Implement state root computation</li>
+<li>Integrate with <code>GovernanceProof</code></li>
+<li>Add state transition function</li>
+</ol>
+<hr>
+<h3>2.2 Missing Sequence Number System</h3>
+<p><strong>Specification Requirement:</strong><br>Governance proofs MUST have monotonically increasing sequence numbers (FEDERATION_INTEROP_CONTRACT.md §5).</p>
+<p><strong>Current State:</strong><br>No sequence number system exists. Proposals have UUIDs but no global ordering.</p>
+<p><strong>Required Changes:</strong></p>
+<p>Add to <code>GovernanceState</code>:</p>
+<pre><code class="language-rust">pub struct GovernanceState {
+    pub sequence: u64,
+    pub prev_state_root: [u8; 32],
+    // ... other fields
+}
+
+impl GovernanceState {
+    pub fn next_sequence(&amp;self) -&gt; u64 {
+        self.sequence + 1
+    }
+    
+    pub fn validate_sequence(&amp;self, proof: &amp;GovernanceProof) -&gt; Result&lt;()&gt; {
+        if proof.sequence &lt;= self.sequence {
+            return Err(Error::NonMonotonicSequence {
+                current: self.sequence,
+                proof: proof.sequence,
+            });
+        }
+        Ok(())
+    }
+}
+</code></pre>
+<p><strong>Priority:</strong> HIGH<br><strong>Effort:</strong> Medium<br><strong>Risk:</strong> Low</p>
+<p><strong>Recommendation:</strong></p>
+<ol>
+<li>Add sequence field to governance state</li>
+<li>Initialize to 1 at genesis</li>
+<li>Increment on each state transition</li>
+<li>Validate monotonicity in proof verification</li>
+</ol>
+<hr>
+<h3>2.3 Missing FederationAction Enum</h3>
+<p><strong>Specification Requirement:</strong><br>Federation actions MUST use specific enum variants (FEDERATION_ACTIONS.md §2).</p>
+<p><strong>Current State:</strong><br>No <code>FederationAction</code> enum exists. Federation operations are ad-hoc.</p>
+<p><strong>Required Changes:</strong></p>
+<p>Create new file: <code>icn/crates/icn-federation/src/action.rs</code></p>
+<pre><code class="language-rust">use serde::{Serialize, Deserialize};
+use std::collections::BTreeMap;
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(tag = &quot;type&quot;, rename_all = &quot;snake_case&quot;)]
+pub enum FederationAction {
+    SettleCrossCoop {
+        settlements: Vec&lt;Settlement&gt;,
+    },
+    AdmitMember {
+        coop_did: String,
+        coop_name: String,
+        constitution_hash: [u8; 32],
+        initial_credit_limit: i64,
+        currency: String,
+        governance_weight: u64,
+        confirmations: Vec&lt;String&gt;,
+    },
+    ExpelMember {
+        coop_did: String,
+        reason: String,
+        final_settlement: Option&lt;Settlement&gt;,
+        confirmations: Vec&lt;String&gt;,
+    },
+    // ... other variants (see FEDERATION_ACTIONS.md §2.1)
+}
+
+impl FederationAction {
+    pub fn action_type(&amp;self) -&gt; ActionType {
+        match self {
+            FederationAction::SettleCrossCoop { .. } =&gt; ActionType::SettleCrossCoop,
+            FederationAction::AdmitMember { .. } =&gt; ActionType::AdmitMember,
+            // ... other variants
+        }
+    }
+}
+</code></pre>
+<p><strong>Priority:</strong> HIGH<br><strong>Effort:</strong> High<br><strong>Risk:</strong> Medium</p>
+<p><strong>Recommendation:</strong></p>
+<ol>
+<li>Define all action variants per spec</li>
+<li>Implement action-specific validation</li>
+<li>Integrate with governance proof system</li>
+</ol>
+<hr>
+<h3>2.4 Missing Constitution Binding</h3>
+<p><strong>Specification Requirement:</strong><br>Proposals MUST lock constitution hash at submission (FEDERATION_INTEROP_CONTRACT.md §7).</p>
+<p><strong>Current State:</strong><br><code>Proposal</code> structure in <code>icn-governance/src/proposal.rs</code> doesn&#39;t include constitution hash.</p>
+<p><strong>Required Changes:</strong></p>
+<p>Update <code>icn/crates/icn-governance/src/proposal.rs</code>:</p>
+<pre><code class="language-rust">pub struct Proposal {
+    pub id: ProposalId,
+    pub domain_id: GovernanceDomainId,
+    pub proposer: Did,
+    pub title: String,
+    pub description: String,
+    pub payload: ProposalPayload,
+    pub state: ProposalState,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
+    
+    // NEW: Constitution hash locked at submission
+    pub constitution_hash: [u8; 32],
+}
+
+impl Proposal {
+    pub fn validate_constitution(&amp;self, current_constitution_hash: [u8; 32]) -&gt; Result&lt;()&gt; {
+        if self.constitution_hash != current_constitution_hash {
+            return Err(Error::ConstitutionMismatch {
+                locked: self.constitution_hash,
+                current: current_constitution_hash,
+            });
+        }
+        Ok(())
+    }
+}
+</code></pre>
+<p><strong>Priority:</strong> HIGH<br><strong>Effort:</strong> Low<br><strong>Risk:</strong> Low</p>
+<p><strong>Recommendation:</strong></p>
+<ol>
+<li>Add <code>constitution_hash</code> field to <code>Proposal</code></li>
+<li>Lock at proposal creation</li>
+<li>Validate before applying governance proof</li>
+</ol>
+<hr>
+<h2>3. Medium-Priority Gaps (Correctness/Robustness)</h2>
+<p>These gaps affect correctness but don&#39;t prevent basic functionality.</p>
+<h3>3.1 Missing Identifier Normalization</h3>
+<p><strong>Specification Requirement:</strong><br>DIDs and currency IDs MUST be normalized (CANONICAL_ENCODING.md §5).</p>
+<p><strong>Current State:</strong><br>No normalization logic exists. DIDs are used as-is.</p>
+<p><strong>Required Changes:</strong></p>
+<p>Add to <code>icn/crates/icn-identity/src/did.rs</code>:</p>
+<pre><code class="language-rust">impl Did {
+    pub fn normalize(&amp;self) -&gt; Result&lt;Did&gt; {
+        let s = self.0.as_str();
+        if !s.starts_with(&quot;did:icn:&quot;) {
+            return Err(Error::InvalidDidPrefix);
+        }
+        
+        let identifier = &amp;s[8..];
+        
+        // Verify Base58btc encoding
+        let decoded = bs58::decode(identifier).into_vec()?;
+        if decoded.len() != 32 {
+            return Err(Error::InvalidDidLength);
+        }
+        
+        Ok(Did(s.to_string()))
+    }
+}
+</code></pre>
+<p><strong>Priority:</strong> MEDIUM<br><strong>Effort:</strong> Low<br><strong>Risk:</strong> Low</p>
+<p><strong>Recommendation:</strong></p>
+<ol>
+<li>Implement normalization for Did, CurrencyId, CellId</li>
+<li>Normalize on construction/parsing</li>
+<li>Add validation tests</li>
+</ol>
+<hr>
+<h3>3.2 Missing Equivocation Detection</h3>
+<p><strong>Specification Requirement:</strong><br>Automatic equivocation detection and penalty (FEDERATION_INTEROP_CONTRACT.md §2.4).</p>
+<p><strong>Current State:</strong><br>No equivocation detection exists.</p>
+<p><strong>Required Changes:</strong></p>
+<p>Create new file: <code>icn/crates/icn-federation/src/equivocation.rs</code></p>
+<pre><code class="language-rust">pub fn detect_equivocation(
+    proof_a: &amp;GovernanceProof,
+    proof_b: &amp;GovernanceProof,
+) -&gt; Option&lt;Did&gt; {
+    if proof_a.sequence != proof_b.sequence {
+        return None;
+    }
+    
+    if proof_a.action_hash == proof_b.action_hash {
+        return None;
+    }
+    
+    // Find common signer
+    for did in &amp;proof_a.confirmations {
+        if proof_b.confirmations.contains(did) {
+            return Some(did.clone());
+        }
+    }
+    
+    None
+}
+
+pub fn penalize_equivocator(state: &amp;mut GovernanceState, equivocator: &amp;Did) {
+    if let Some(member) = state.members.get_mut(equivocator.as_str()) {
+        member.governance_weight = 0;
+        member.status = MemberStatus::Paused;
+    }
+}
+</code></pre>
+<p><strong>Priority:</strong> MEDIUM<br><strong>Effort:</strong> Medium<br><strong>Risk:</strong> Low</p>
+<p><strong>Recommendation:</strong></p>
+<ol>
+<li>Implement equivocation detection</li>
+<li>Track proof history for comparison</li>
+<li>Add automatic penalty mechanism</li>
+<li>Add manual override for false positives</li>
+</ol>
+<hr>
+<h3>3.3 Missing Decision Record Handling</h3>
+<p><strong>Specification Requirement:</strong><br>Decision records with size limits (FEDERATION_INTEROP_CONTRACT.md §8).</p>
+<p><strong>Current State:</strong><br><code>GovernanceProof</code> doesn&#39;t exist, so decision records aren&#39;t implemented.</p>
+<p><strong>Required Changes:</strong></p>
+<p>Add to <code>GovernanceProof</code>:</p>
+<pre><code class="language-rust">pub struct GovernanceProof {
+    // ...
+    pub decision_records: BTreeMap&lt;String, Vec&lt;u8&gt;&gt;,  // proposal_id -&gt; decision_hash
+}
+
+impl GovernanceProof {
+    pub fn validate_decision_records(&amp;self) -&gt; Result&lt;()&gt; {
+        let total_size: usize = self.decision_records.iter()
+            .map(|(k, v)| k.len() + v.len())
+            .sum();
+        
+        if total_size &gt; 10 * 1024 * 1024 {
+            return Err(Error::DecisionRecordsTooLarge {
+                size: total_size,
+                max: 10 * 1024 * 1024,
+            });
+        }
+        
+        if self.decision_records.len() &gt; 100 {
+            return Err(Error::TooManyDecisionRecords {
+                count: self.decision_records.len(),
+                max: 100,
+            });
+        }
+        
+        Ok(())
+    }
+}
+</code></pre>
+<p><strong>Priority:</strong> MEDIUM<br><strong>Effort:</strong> Low<br><strong>Risk:</strong> Low</p>
+<p><strong>Recommendation:</strong></p>
+<ol>
+<li>Implement decision record validation</li>
+<li>Add size limits (10MB total, 100 decisions max)</li>
+<li>Add tests for boundary conditions</li>
+</ol>
+<hr>
+<h2>4. Low-Priority Gaps (Optimizations/Future Work)</h2>
+<p>These gaps are non-essential for initial interoperability.</p>
+<h3>4.1 Missing Incremental State Root</h3>
+<p><strong>Specification Requirement:</strong><br>Implementations MAY use incremental Merkle trees (GOVERNANCE_STATE_MACHINE.md §4.2).</p>
+<p><strong>Current State:</strong><br>Not applicable (state root doesn&#39;t exist yet).</p>
+<p><strong>Priority:</strong> LOW<br><strong>Effort:</strong> High<br><strong>Risk:</strong> Low</p>
+<p><strong>Recommendation:</strong><br>Implement after basic state root is working. Use standard Merkle tree library.</p>
+<hr>
+<h3>4.2 Missing ZkProof Verification Mode</h3>
+<p><strong>Specification Requirement:</strong><br>Future support for zero-knowledge proofs (FEDERATION_INTEROP_CONTRACT.md §10.4).</p>
+<p><strong>Current State:</strong><br>Not applicable (future feature).</p>
+<p><strong>Priority:</strong> LOW<br><strong>Effort:</strong> Very High<br><strong>Risk:</strong> Medium</p>
+<p><strong>Recommendation:</strong><br>Defer until replay and attested verification modes are stable.</p>
+<hr>
+<h3>4.3 Missing State Snapshot Format</h3>
+<p><strong>Specification Requirement:</strong><br>Signed state snapshots for bootstrapping (GOVERNANCE_STATE_MACHINE.md §7).</p>
+<p><strong>Current State:</strong><br><code>icn-snapshot</code> crate exists but doesn&#39;t implement federation state snapshots.</p>
+<p><strong>Priority:</strong> LOW<br><strong>Effort:</strong> Medium<br><strong>Risk:</strong> Low</p>
+<p><strong>Recommendation:</strong><br>Implement after governance state machine is stable. Use existing snapshot infrastructure.</p>
+<hr>
+<h2>5. Summary of Required Work</h2>
+<h3>5.1 By Priority</h3>
+<table>
+<thead>
+<tr>
+<th>Priority</th>
+<th>Items</th>
+<th>Total Effort</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>CRITICAL</td>
+<td>6</td>
+<td>~25 weeks</td>
+</tr>
+<tr>
+<td>HIGH</td>
+<td>4</td>
+<td>~12 weeks</td>
+</tr>
+<tr>
+<td>MEDIUM</td>
+<td>3</td>
+<td>~6 weeks</td>
+</tr>
+<tr>
+<td>LOW</td>
+<td>3</td>
+<td>~10 weeks (future)</td>
+</tr>
+</tbody></table>
+<h3>5.2 By Crate</h3>
+<table>
+<thead>
+<tr>
+<th>Crate</th>
+<th>Changes Required</th>
+<th>Priority</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icn-federation</code></td>
+<td>GovernanceProof, FederationAction, equivocation</td>
+<td>CRITICAL/HIGH</td>
+</tr>
+<tr>
+<td><code>icn-governance</code></td>
+<td>BTreeMap migration, state root, sequence</td>
+<td>CRITICAL/HIGH</td>
+</tr>
+<tr>
+<td><code>icn-ledger</code></td>
+<td>BTreeMap migration, conservation, checked arithmetic</td>
+<td>CRITICAL</td>
+</tr>
+<tr>
+<td><code>icn-encoding</code></td>
+<td>Canonical CBOR, typed hashing</td>
+<td>CRITICAL</td>
+</tr>
+<tr>
+<td><code>icn-identity</code></td>
+<td>Normalization</td>
+<td>MEDIUM</td>
+</tr>
+<tr>
+<td><code>icn-snapshot</code></td>
+<td>State snapshots</td>
+<td>LOW</td>
+</tr>
+</tbody></table>
+<h3>5.3 Recommended Implementation Order</h3>
+<ol>
+<li><p><strong>Phase 1: Foundation (CRITICAL)</strong></p>
+<ul>
+<li>Typed hashing infrastructure (<code>icn-encoding</code>)</li>
+<li>Canonical CBOR encoding (<code>icn-encoding</code>)</li>
+<li>BTreeMap migration (<code>icn-governance</code>, <code>icn-ledger</code>, <code>icn-federation</code>)</li>
+<li>Checked arithmetic audit (<code>icn-ledger</code>)</li>
+</ul>
+</li>
+<li><p><strong>Phase 2: Core Protocol (CRITICAL/HIGH)</strong></p>
+<ul>
+<li><code>GovernanceProof</code> structure (<code>icn-federation</code>)</li>
+<li><code>FederationAction</code> enum (<code>icn-federation</code>)</li>
+<li>State root computation (<code>icn-governance</code>)</li>
+<li>Sequence number system (<code>icn-governance</code>)</li>
+</ul>
+</li>
+<li><p><strong>Phase 3: Validation (CRITICAL/HIGH)</strong></p>
+<ul>
+<li>Settlement conservation (<code>icn-ledger</code>)</li>
+<li>Constitution binding (<code>icn-governance</code>)</li>
+<li>Proof verification algorithm (<code>icn-federation</code>)</li>
+</ul>
+</li>
+<li><p><strong>Phase 4: Robustness (MEDIUM)</strong></p>
+<ul>
+<li>Identifier normalization (<code>icn-identity</code>)</li>
+<li>Equivocation detection (<code>icn-federation</code>)</li>
+<li>Decision record handling (<code>icn-federation</code>)</li>
+</ul>
+</li>
+<li><p><strong>Phase 5: Optimization (LOW, future)</strong></p>
+<ul>
+<li>Incremental state roots</li>
+<li>State snapshots</li>
+<li>ZkProof support</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h2>6. Migration Strategy</h2>
+<h3>6.1 Backward Compatibility</h3>
+<p>Many changes are breaking. Recommend:</p>
+<ol>
+<li>Version federation protocol: <code>v1</code> (current) → <code>v2</code> (spec-compliant)</li>
+<li>Support both versions during transition period</li>
+<li>Deprecate <code>v1</code> after 6 months</li>
+<li>Remove <code>v1</code> support after 12 months</li>
+</ol>
+<h3>6.2 Data Migration</h3>
+<p>For existing deployments:</p>
+<ol>
+<li>Export current state to JSON</li>
+<li>Transform to spec-compliant format:<ul>
+<li>HashMap → BTreeMap</li>
+<li>Add missing fields (sequence, state_root, constitution_hash)</li>
+<li>Normalize identifiers</li>
+</ul>
+</li>
+<li>Recompute hashes with typed hashing</li>
+<li>Import transformed state</li>
+</ol>
+<h3>6.3 Testing Strategy</h3>
+<ol>
+<li><strong>Unit Tests:</strong> Test each component in isolation</li>
+<li><strong>Integration Tests:</strong> Test full verification algorithm</li>
+<li><strong>Compatibility Tests:</strong> Test cross-implementation compatibility</li>
+<li><strong>Property Tests:</strong> Use QuickCheck/proptest for invariants</li>
+<li><strong>Fuzz Tests:</strong> Fuzz proof verification for edge cases</li>
+</ol>
+<hr>
+<h2>7. Compliance Tracking</h2>
+<h3>7.1 Checklist</h3>
+<p>Use this checklist to track compliance progress:</p>
+<p><strong>Encoding (CANONICAL_ENCODING.md):</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> CBOR encoding implemented</li>
+<li><input disabled="" type="checkbox"> BTreeMap used in all signed/hashed structs</li>
+<li><input disabled="" type="checkbox"> Typed hashing with domain separation</li>
+<li><input disabled="" type="checkbox"> Identifier normalization (Did, CurrencyId, CellId)</li>
+<li><input disabled="" type="checkbox"> Checked arithmetic everywhere</li>
+</ul>
+<p><strong>Actions (FEDERATION_ACTIONS.md):</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> FederationAction enum defined</li>
+<li><input disabled="" type="checkbox"> All action variants implemented</li>
+<li><input disabled="" type="checkbox"> Canonicalize trait implemented</li>
+<li><input disabled="" type="checkbox"> Action-specific validation implemented</li>
+<li><input disabled="" type="checkbox"> Settlement conservation validated</li>
+</ul>
+<p><strong>Protocol (FEDERATION_INTEROP_CONTRACT.md):</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> GovernanceProof structure defined</li>
+<li><input disabled="" type="checkbox"> Signature payload canonical</li>
+<li><input disabled="" type="checkbox"> Sequence number system implemented</li>
+<li><input disabled="" type="checkbox"> State root chain implemented</li>
+<li><input disabled="" type="checkbox"> Constitution binding implemented</li>
+<li><input disabled="" type="checkbox"> Decision records implemented</li>
+<li><input disabled="" type="checkbox"> Action type derivation implemented</li>
+<li><input disabled="" type="checkbox"> Complete verifier algorithm implemented</li>
+<li><input disabled="" type="checkbox"> Equivocation detection implemented</li>
+</ul>
+<p><strong>State Machine (GOVERNANCE_STATE_MACHINE.md):</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> GovernanceState structure defined</li>
+<li><input disabled="" type="checkbox"> State root computation implemented</li>
+<li><input disabled="" type="checkbox"> State transition function implemented</li>
+<li><input disabled="" type="checkbox"> Genesis state validation implemented</li>
+<li><input disabled="" type="checkbox"> State queries implemented</li>
+</ul>
+<h3>7.2 Test Coverage</h3>
+<p>Target test coverage by component:</p>
+<ul>
+<li>Core structures (GovernanceProof, FederationAction): 100%</li>
+<li>Verification algorithm: 100%</li>
+<li>State transitions: 90%</li>
+<li>Utilities (normalization, hashing): 95%</li>
+</ul>
+<hr>
+<h2>8. Open Questions</h2>
+<ol>
+<li><strong>Migration Timeline:</strong> What&#39;s the target date for spec compliance?</li>
+<li><strong>Breaking Changes:</strong> Can we accept breaking changes for existing deployments?</li>
+<li><strong>Performance:</strong> What&#39;s the performance impact of BTreeMap vs HashMap?</li>
+<li><strong>Tooling:</strong> Do we need migration tools for existing data?</li>
+<li><strong>Coordination:</strong> How do we coordinate changes across multiple crates?</li>
+</ol>
+<hr>
+<h2>9. References</h2>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/FEDERATION_INTEROP_CONTRACT">FEDERATION_INTEROP_CONTRACT.md</a> - Protocol specification</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CANONICAL_ENCODING">CANONICAL_ENCODING.md</a> - Encoding rules</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/FEDERATION_ACTIONS">FEDERATION_ACTIONS.md</a> - Action specification</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/GOVERNANCE_STATE_MACHINE">GOVERNANCE_STATE_MACHINE.md</a> - State machine specification</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/development/sessions/">ICN Codebase Exploration</a> - Development session notes</li>
+</ul>
+<hr>
+<p><strong>Document Status:</strong> INFORMATIONAL - This document tracks implementation gaps and is not normative.</p>
+<p><strong>Change History:</strong></p>
+<ul>
+<li>2026-02-02: Initial version 1.0 (based on codebase exploration 2026-02-02)</li>
+</ul>
+<hr>
+<h2>Appendix A: Quick Reference - Files Requiring Changes</h2>
+<p><strong>Critical Changes:</strong></p>
+<pre><code>icn/crates/icn-encoding/
+  ├── src/typed_hash.rs          [NEW] Typed hashing infrastructure
+  ├── src/canonical.rs            [NEW] Canonical CBOR traits
+  └── Cargo.toml                  [UPDATE] Add ciborium dependency
+
+icn/crates/icn-federation/
+  ├── src/governance_proof.rs     [NEW] GovernanceProof structure
+  ├── src/action.rs               [NEW] FederationAction enum
+  ├── src/equivocation.rs         [NEW] Equivocation detection
+  ├── src/clearing.rs             [UPDATE] HashMap → BTreeMap
+  ├── src/netting.rs              [UPDATE] HashMap → BTreeMap
+  ├── src/clearing_manager.rs     [UPDATE] HashMap → BTreeMap
+  ├── src/router.rs               [UPDATE] HashMap → BTreeMap
+  ├── src/registry.rs             [UPDATE] HashMap → BTreeMap
+  └── src/agreement/store.rs      [UPDATE] HashMap → BTreeMap
+
+icn/crates/icn-governance/
+  ├── src/state_root.rs           [NEW] State root computation
+  ├── src/state.rs                [NEW] GovernanceState structure
+  ├── src/proposal.rs             [UPDATE] Add constitution_hash field
+  ├── src/tally.rs                [UPDATE] HashMap → BTreeMap
+  ├── src/discussion.rs           [UPDATE] HashMap → BTreeMap
+  ├── src/delegation.rs           [UPDATE] HashMap → BTreeMap
+  ├── src/store.rs                [UPDATE] HashMap → BTreeMap
+  ├── src/steward_store.rs        [UPDATE] HashMap → BTreeMap
+  ├── src/action_item.rs          [UPDATE] HashMap → BTreeMap
+  ├── src/charter_store.rs        [UPDATE] HashMap → BTreeMap
+  └── src/protocol_store/state.rs [UPDATE] HashMap → BTreeMap
+
+icn/crates/icn-ledger/
+  ├── src/settlement.rs           [UPDATE] Add conservation validation
+  ├── src/balance.rs              [UPDATE] HashMap → BTreeMap, checked arithmetic
+  ├── src/types.rs                [UPDATE] HashMap → BTreeMap
+  ├── src/ledger.rs               [UPDATE] HashMap → BTreeMap, checked arithmetic
+  ├── src/entry.rs                [UPDATE] HashMap → BTreeMap
+  ├── src/progressive_limits.rs   [UPDATE] HashMap → BTreeMap
+  ├── src/dispute.rs              [UPDATE] HashMap → BTreeMap
+  ├── src/treasury.rs             [UPDATE] HashMap → BTreeMap
+  ├── src/commons_credits.rs      [UPDATE] HashMap → BTreeMap
+  ├── src/fork_resolution.rs      [UPDATE] HashMap → BTreeMap
+  ├── src/ledger_impl/balances.rs [UPDATE] HashMap → BTreeMap
+  ├── src/oracle/price_feed.rs    [UPDATE] HashMap → BTreeMap
+  ├── src/oracle/types.rs         [UPDATE] HashMap → BTreeMap
+  └── src/freeze.rs               [UPDATE] HashMap → BTreeMap
+
+icn/crates/icn-identity/
+  └── src/did.rs                  [UPDATE] Add normalization
+</code></pre>
+<p><strong>Total Files:</strong> ~40 files requiring changes</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

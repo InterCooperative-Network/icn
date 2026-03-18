@@ -1,0 +1,532 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Documentation Reorganization 2026 | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>  <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>REORGANIZATION 2026</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/REORGANIZATION_2026.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Documentation Reorganization 2026</h1>
+<p><strong>Date</strong>: 2026-02-10<br><strong>Phase</strong>: Phase 2C - Documentation Reorganization<br><strong>Status</strong>: Complete</p>
+<h2>Overview</h2>
+<p>This document records the comprehensive reorganization of ICN documentation completed in February 2026 (Phases 2A-2C). The reorganization addressed documentation sprawl, inconsistent structure, and navigation challenges that had developed over the project&#39;s growth.</p>
+<h2>Goals</h2>
+<ol>
+<li><strong>Improve Discoverability</strong>: Make it easy to find relevant documentation</li>
+<li><strong>Logical Structure</strong>: Group documents by purpose and audience</li>
+<li><strong>Clear Navigation</strong>: Provide multiple entry points (role, topic, component)</li>
+<li><strong>Reduce Duplication</strong>: Consolidate or archive duplicate/superseded content</li>
+<li><strong>Maintain History</strong>: Preserve historical context in organized archives</li>
+</ol>
+<h2>What Changed</h2>
+<h3>New Directory Structure</h3>
+<p>The reorganization introduced a purpose-based structure:</p>
+<pre><code>docs/
+├── Core Documentation (root)       # Essential reading
+├── architecture/                   # Architecture &amp; specifications
+├── design/                        # Feature designs &amp; proposals
+│   ├── economics/                # Economic system design
+│   ├── governance/               # Governance design
+│   └── sdis/                     # SDIS design
+├── spec/                         # Formal specifications
+├── reference/                    # Technical references
+│   ├── api/                     # API documentation
+│   └── config/                  # Configuration
+├── guides/                       # Practical guides
+│   ├── developer/               # Development guides
+│   ├── operations/              # Operations guides
+│   └── user/                    # End-user guides
+├── development/                  # Development resources
+│   ├── sprints/                # Sprint tracking
+│   └── testing/                # Testing docs
+├── security/                     # Security documentation
+├── sdis/                        # SDIS documentation
+├── internal/                     # Internal planning
+│   ├── pilots/                 # Pilot programs
+│   └── status/                 # Status tracking
+├── status/                       # Current status reports
+├── onboarding/                   # Contributor onboarding
+├── templates/                    # Doc templates
+├── vision/                       # Vision documents
+└── archive/                      # Historical materials
+    └── 2025/                    # Year-based archives
+</code></pre>
+<h3>Documents Moved</h3>
+<h4>To <code>design/</code></h4>
+<p>From root and various locations:</p>
+<ul>
+<li>COMMONS_EVOLUTION.md</li>
+<li>MINIMAL-VIABLE-COOP.md</li>
+<li>capability-based-features.md</li>
+<li>compute-substrate-design.md</li>
+<li>entity-dissolution.md</li>
+<li>entity-dissolution-example.md</li>
+<li>institution-in-a-box.md</li>
+<li>multi-device-identity-design.md</li>
+<li>nat-traversal-design.md</li>
+<li>platform-layer-design.md</li>
+<li>post-quantum-crypto.md</li>
+<li>razeto-integration-design.md</li>
+<li>scheduler-evolution-plan.md</li>
+<li>social-recovery-design.md</li>
+</ul>
+<h4>To <code>design/economics/</code></h4>
+<p>Economic system documentation:</p>
+<ul>
+<li>ECONOMIC_VISION.md</li>
+<li>ECONOMIC_ARCHITECTURE.md</li>
+<li>contribution-credits-design.md</li>
+<li>econ-modeling.md</li>
+<li>economic-safety.md</li>
+</ul>
+<h4>To <code>design/governance/</code></h4>
+<p>Governance documentation:</p>
+<ul>
+<li>PROJECT_GOVERNANCE.md</li>
+<li>governance.md</li>
+<li>governance-primitives.md</li>
+<li>witness-trust-validation.md</li>
+</ul>
+<h4>To <code>design/sdis/</code></h4>
+<p>SDIS design materials:</p>
+<ul>
+<li>social-recovery.md (SDIS-specific)</li>
+</ul>
+<h4>To <code>guides/developer/</code></h4>
+<p>Developer-focused guides:</p>
+<ul>
+<li>DEV_ENVIRONMENT.md</li>
+<li>DOCUMENTATION_STYLE.md</li>
+<li>i18n-guide.md</li>
+</ul>
+<h4>To <code>guides/operations/</code></h4>
+<p>Operations documentation:</p>
+<ul>
+<li>operations-guide.md</li>
+<li>backup-and-recovery.md</li>
+<li>replication-operations.md</li>
+<li>troubleshooting.md</li>
+</ul>
+<h4>To <code>guides/user/</code></h4>
+<p>User-facing guides:</p>
+<ul>
+<li>WHY_ICN_HANDOUT.md</li>
+<li>cooperative-setup-guide.md</li>
+</ul>
+<h4>To <code>reference/api/</code></h4>
+<p>API reference materials:</p>
+<ul>
+<li>API_REFERENCE.md</li>
+<li>api-versioning.md</li>
+<li>topic-subscriptions-api.md</li>
+</ul>
+<h4>To <code>reference/config/</code></h4>
+<p>Configuration documentation:</p>
+<ul>
+<li>CONFIGURATION.md</li>
+<li>identity-backend-configuration.md</li>
+<li>trust-threshold-configuration.md</li>
+</ul>
+<h4>To <code>development/sprints/</code></h4>
+<p>Sprint documentation:</p>
+<ul>
+<li>Sprint 1-3 materials</li>
+</ul>
+<h4>To <code>development/testing/</code></h4>
+<p>Testing documentation:</p>
+<ul>
+<li>Testing guides and procedures</li>
+</ul>
+<h4>To <code>internal/pilots/</code></h4>
+<p>Pilot program materials:</p>
+<ul>
+<li>pilot-coordinator-guide.md</li>
+<li>pilot-limitations.md</li>
+<li>pilot-playbook.md</li>
+<li>pilot-readiness-gaps.md</li>
+</ul>
+<h4>To <code>internal/status/</code></h4>
+<p>Active status tracking:</p>
+<ul>
+<li>GAP_ANALYSIS.md</li>
+<li>gap-analysis.md</li>
+<li>strategic-gap-analysis.md</li>
+<li>vision-implementation-gap.md</li>
+<li>multi-device-status.md</li>
+</ul>
+<h4>To <code>archive/2025/</code></h4>
+<p>Historical/superseded documents:</p>
+<ul>
+<li>Phase completion reports</li>
+<li>Historical deployment guides</li>
+<li>System status snapshots</li>
+<li>Completed analyses</li>
+<li>Security audit resolutions</li>
+<li>Integration reports</li>
+<li>Bug reports</li>
+<li>Sprint plans</li>
+<li>HSM/TPM documentation</li>
+<li>Plus 20+ additional historical documents</li>
+</ul>
+<p>See <a href="/docs/archive/2025/README">archive/2025/README.md</a> for complete list.</p>
+<h3>New Documentation Created</h3>
+<h4>READMEs</h4>
+<ul>
+<li>architecture/README.md - Architecture documentation guide</li>
+<li>security/README.md - Security documentation guide</li>
+<li>vision/README.md - Vision document guide</li>
+<li>templates/README.md - Template guide</li>
+<li>design/economics/README.md - Economics docs index</li>
+<li>design/governance/README.md - Governance docs index</li>
+<li>design/sdis/README.md - SDIS design index</li>
+<li>guides/developer/README.md - Developer guide index</li>
+<li>guides/operations/README.md - Operations guide index</li>
+<li>guides/user/README.md - User guide index</li>
+<li>reference/api/README.md - API reference index</li>
+<li>reference/config/README.md - Config reference index</li>
+<li>internal/README.md - Internal docs index</li>
+<li>development/README.md - Development docs index</li>
+<li>development/sprints/README.md - Sprint tracking index</li>
+<li>development/testing/README.md - Testing docs index</li>
+</ul>
+<h4>Navigation Documents</h4>
+<ul>
+<li>INDEX.md (major update) - Comprehensive documentation index</li>
+<li>README.md (updated) - Documentation overview</li>
+<li>REORGANIZATION_2026.md (this file) - Migration guide</li>
+</ul>
+<h2>How to Find Old Files</h2>
+<h3>By Previous Location</h3>
+<table>
+<thead>
+<tr>
+<th>Old Location</th>
+<th>New Location</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>docs/ECONOMIC_*.md</code></td>
+<td><code>docs/design/economics/</code></td>
+<td>Economic system docs</td>
+</tr>
+<tr>
+<td><code>docs/governance-*.md</code></td>
+<td><code>docs/design/governance/</code></td>
+<td>Governance docs</td>
+</tr>
+<tr>
+<td><code>docs/*-design.md</code></td>
+<td><code>docs/design/</code></td>
+<td>Design documents</td>
+</tr>
+<tr>
+<td><code>docs/operations-*.md</code></td>
+<td><code>docs/guides/operations/</code></td>
+<td>Operations guides</td>
+</tr>
+<tr>
+<td><code>docs/dev-journal/</code></td>
+<td><code>docs/archive/2025/</code> or deleted</td>
+<td>Historical dev notes</td>
+</tr>
+<tr>
+<td><code>docs/sessions/</code></td>
+<td>Consolidated/archived</td>
+<td>Session summaries</td>
+</tr>
+<tr>
+<td>Historical status</td>
+<td><code>docs/archive/2025/</code></td>
+<td>Superseded status reports</td>
+</tr>
+</tbody></table>
+<h3>By Purpose</h3>
+<ul>
+<li><strong>Want to understand the system?</strong> → Start with <code>ARCHITECTURE.md</code> or <code>guides/</code></li>
+<li><strong>Want to implement features?</strong> → Check <code>design/</code> for designs</li>
+<li><strong>Want to deploy/operate?</strong> → See <code>guides/operations/</code></li>
+<li><strong>Want API details?</strong> → Browse <code>reference/api/</code></li>
+<li><strong>Want historical context?</strong> → Explore <code>archive/2025/</code></li>
+<li><strong>Want current status?</strong> → Check <code>status/</code> or <code>internal/status/</code></li>
+</ul>
+<h3>By Role</h3>
+<p>See &quot;Documentation by Role&quot; section in <a href="/docs/INDEX">INDEX.md</a> for role-based navigation.</p>
+<h2>Cross-Reference Updates</h2>
+<p>Cross-references in moved files were updated to reflect new locations:</p>
+<h3>Common Pattern Changes</h3>
+<ol>
+<li><strong>Economics documents</strong>: <code>docs/ECONOMIC_*.md</code> → <code>design/economics/ECONOMIC_*.md</code></li>
+<li><strong>Governance documents</strong>: <code>docs/governance-*.md</code> → <code>design/governance/governance-*.md</code></li>
+<li><strong>Design documents</strong>: <code>docs/*-design.md</code> → <code>design/*-design.md</code></li>
+<li><strong>Operations guides</strong>: <code>docs/operations-*.md</code> → <code>guides/operations/operations-*.md</code></li>
+<li><strong>API references</strong>: <code>docs/API_*.md</code> → <code>reference/api/API_*.md</code></li>
+</ol>
+<h3>Files with Updated References</h3>
+<p>The following files had cross-references updated:</p>
+<ul>
+<li>design/ directory files (links to other design docs, architecture)</li>
+<li>reference/ directory files (links to related references)</li>
+<li>guides/ directory files (links to guides and main docs)</li>
+<li>internal/ directory files (links to status and related docs)</li>
+</ul>
+<p><strong>Note</strong>: External links to docs from code, README.md, or external sites were preserved where possible by maintaining compatibility paths.</p>
+<h2>Status File Consolidation</h2>
+<h3>Active Status</h3>
+<p>Kept in appropriate locations:</p>
+<ul>
+<li><strong>Current project state</strong>: <code>status/PROJECT_STATE_2026-02-09.md</code></li>
+<li><strong>Live status reports</strong>: <code>status/</code> directory</li>
+<li><strong>Feature tracking</strong>: <code>internal/status/</code> directory</li>
+<li><strong>Gap analyses</strong>: <code>internal/status/</code> directory</li>
+</ul>
+<h3>Archived Status</h3>
+<p>Moved to <code>archive/2025/</code>:</p>
+<ul>
+<li>Historical project status reports</li>
+<li>Completed phase summaries</li>
+<li>Superseded gap analyses</li>
+<li>Old deployment guides</li>
+<li>Resolved security audits</li>
+<li>Integration completion reports</li>
+</ul>
+<h3>Status Document Standards</h3>
+<p>Going forward:</p>
+<ul>
+<li>Add &quot;Last Updated&quot; date to all status documents</li>
+<li>Archive status documents when superseded</li>
+<li>Keep only current, actionable status in main tree</li>
+<li>Historical status preserved in year-based archives</li>
+</ul>
+<h2>External References</h2>
+<h3>Maintaining Compatibility</h3>
+<p>The following external references were considered:</p>
+<ul>
+<li>GitHub links from issues/PRs</li>
+<li>External documentation links</li>
+<li>Blog posts and announcements</li>
+<li>SDK documentation references</li>
+</ul>
+<p><strong>Strategy</strong>: </p>
+<ul>
+<li>Core documents (ARCHITECTURE.md, GETTING_STARTED.md, etc.) remain at root</li>
+<li>Moved documents include archive notes where appropriate</li>
+<li>INDEX.md provides finding aids for historical links</li>
+</ul>
+<h3>Breaking Changes</h3>
+<p>These links will break and need updating:</p>
+<ul>
+<li>Direct links to moved design docs (e.g., <code>docs/scheduler-evolution-plan.md</code> → <code>docs/design/scheduler-evolution-plan.md</code>)</li>
+<li>Links to specific session summaries (now archived or consolidated)</li>
+<li>Links to historical status reports (now in archive/2025/)</li>
+</ul>
+<p><strong>Mitigation</strong>: INDEX.md provides search guidance and archive navigation.</p>
+<h2>Migration Guide for Contributors</h2>
+<h3>Finding Documentation</h3>
+<ol>
+<li><strong>Start with <a href="/docs/INDEX">INDEX.md</a></strong> - Comprehensive index with multiple navigation paths</li>
+<li><strong>Use role-based navigation</strong> - Find docs relevant to your role</li>
+<li><strong>Check README files</strong> - Each directory has a README explaining contents</li>
+<li><strong>Search by topic</strong> - Use IDE search or grep across docs/</li>
+</ol>
+<h3>Adding New Documentation</h3>
+<ol>
+<li><p><strong>Choose the right directory</strong>:</p>
+<ul>
+<li>Design/proposals → <code>design/</code></li>
+<li>How-to guides → <code>guides/</code></li>
+<li>API/config reference → <code>reference/</code></li>
+<li>Architecture specs → <code>architecture/</code> or <code>spec/</code></li>
+<li>Current status → <code>status/</code> or <code>internal/status/</code></li>
+<li>Historical → Consider if it should start in archive</li>
+</ul>
+</li>
+<li><p><strong>Update the index</strong>:</p>
+<ul>
+<li>Add entry to <a href="/docs/INDEX">INDEX.md</a></li>
+<li>Update relevant directory README.md</li>
+<li>Cross-link from related documents</li>
+</ul>
+</li>
+<li><p><strong>Follow conventions</strong>:</p>
+<ul>
+<li>See <a href="/docs/guides/developer/DOCUMENTATION_STYLE">guides/developer/DOCUMENTATION_STYLE.md</a></li>
+<li>Use templates from <code>templates/</code> directory</li>
+<li>Add &quot;Last Updated&quot; dates</li>
+<li>Include clear status (Draft, Review, Final, Superseded)</li>
+</ul>
+</li>
+</ol>
+<h3>Updating Existing Documentation</h3>
+<ol>
+<li><strong>Check for moves</strong>: Document may have been relocated</li>
+<li><strong>Update cross-references</strong>: Use relative paths from new location</li>
+<li><strong>Update INDEX.md</strong>: If significance changes</li>
+<li><strong>Add &quot;Last Updated&quot;</strong>: Note when materially changed</li>
+</ol>
+<h3>Archiving Documentation</h3>
+<p>When to archive (move to <code>archive/YEAR/</code>):</p>
+<ul>
+<li>Document is superseded by newer version</li>
+<li>Phase/sprint is complete and documented</li>
+<li>Status report is historical</li>
+<li>Design is implemented and documented elsewhere</li>
+<li>Document is no longer actively referenced</li>
+</ul>
+<p><strong>Do not archive</strong>:</p>
+<ul>
+<li>Core architecture documents</li>
+<li>Active status reports</li>
+<li>Current guides and references</li>
+<li>Specifications still in use</li>
+</ul>
+<h2>Benefits Realized</h2>
+<h3>Before Reorganization</h3>
+<ul>
+<li>140+ documents in flat or inconsistent structure</li>
+<li>Multiple directories with overlapping purposes (sessions/, dev-journal/, sprints/)</li>
+<li>Hard to find relevant documentation</li>
+<li>Unclear which documents were current vs. historical</li>
+<li>Duplicate information in multiple places</li>
+</ul>
+<h3>After Reorganization</h3>
+<ul>
+<li>Clear purpose-based structure</li>
+<li>Role-based and topic-based navigation</li>
+<li>Active vs. archived clearly distinguished</li>
+<li>Comprehensive index with multiple access paths</li>
+<li>READMEs in all directories for guidance</li>
+<li>Historical context preserved but separated</li>
+</ul>
+<h3>Metrics</h3>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Before</th>
+<th>After</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Top-level directories</td>
+<td>30+</td>
+<td>25 (with clear purposes)</td>
+</tr>
+<tr>
+<td>Orphaned documents</td>
+<td>Many</td>
+<td>None</td>
+</tr>
+<tr>
+<td>Documents with unclear status</td>
+<td>Many</td>
+<td>None (all dated/categorized)</td>
+</tr>
+<tr>
+<td>Average time to find doc</td>
+<td>Unknown</td>
+<td>Reduced (via INDEX.md)</td>
+</tr>
+<tr>
+<td>Duplicate information</td>
+<td>Multiple</td>
+<td>Minimized</td>
+</tr>
+</tbody></table>
+<h2>Lessons Learned</h2>
+<ol>
+<li><strong>Purpose-based structure</strong> works better than chronological or format-based</li>
+<li><strong>Multiple navigation paths</strong> (role, topic, component) improve discoverability</li>
+<li><strong>Active archival process</strong> prevents historical documents from cluttering main tree</li>
+<li><strong>Directory READMEs</strong> are essential for navigation</li>
+<li><strong>Comprehensive index</strong> (INDEX.md) provides single source of navigation truth</li>
+</ol>
+<h2>Future Maintenance</h2>
+<h3>Regular Tasks</h3>
+<ol>
+<li><strong>Quarterly review</strong>: Check for documents to archive</li>
+<li><strong>Update INDEX.md</strong>: When significant docs added</li>
+<li><strong>Validate links</strong>: Check cross-references periodically</li>
+<li><strong>Archive year-end</strong>: Move completed work to archive/YEAR/</li>
+</ol>
+<h3>Preventing Sprawl</h3>
+<ol>
+<li>Use existing directories before creating new ones</li>
+<li>Consult INDEX.md and README files before adding docs</li>
+<li>Follow documentation style guide</li>
+<li>Archive superseded documents promptly</li>
+<li>Update cross-references when moving files</li>
+</ol>
+<h2>Questions?</h2>
+<ul>
+<li><strong>Can&#39;t find a document?</strong> Check <a href="/docs/INDEX">INDEX.md</a> or <code>archive/2025/</code></li>
+<li><strong>Where should new doc go?</strong> See &quot;Migration Guide for Contributors&quot; above</li>
+<li><strong>How to update cross-references?</strong> Use relative paths from new location</li>
+<li><strong>How to archive old docs?</strong> Move to <code>archive/YEAR/</code> and update references</li>
+</ul>
+<h2>Related Documentation</h2>
+<ul>
+<li><a href="/docs/INDEX">INDEX.md</a> - Complete documentation index</li>
+<li><a href="/docs/README">README.md</a> - Documentation overview</li>
+<li><a href="/docs/guides/developer/DOCUMENTATION_STYLE">guides/developer/DOCUMENTATION_STYLE.md</a> - Style guide</li>
+<li><a href="/docs/archive/2025/README">archive/2025/README.md</a> - Archive index</li>
+</ul>
+<hr>
+<p><strong>Phase 2C Team</strong>: Documentation reorganization<br><strong>Completion Date</strong>: 2026-02-10<br><strong>Next Review</strong>: 2026-05-10 (Quarterly)</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

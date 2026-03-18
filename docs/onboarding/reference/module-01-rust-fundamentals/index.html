@@ -1,0 +1,612 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Module 1: Rust Fundamentals | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>onboarding</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>reference</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>module 01 rust fundamentals</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/onboarding/reference/module-01-rust-fundamentals.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Module 1: Rust Fundamentals</h1>
+<h2>Overview</h2>
+<p>This module teaches the Rust concepts essential for understanding ICN code. Even
+if you know Rust, review this module to understand ICN&#39;s specific patterns and
+conventions.</p>
+<h2>Objectives</h2>
+<ul>
+<li>Understand ownership, borrowing, and lifetimes</li>
+<li>Master error handling with <code>Result</code>, <code>Option</code>, and the <code>?</code> operator</li>
+<li>Read and write async Rust code using Tokio</li>
+<li>Understand smart pointers (<code>Arc</code>, <code>Mutex</code>, <code>RwLock</code>) for shared state</li>
+</ul>
+<h2>Prerequisites</h2>
+<ul>
+<li>Module 0 (Setup)</li>
+<li>Basic programming knowledge (variables, functions, control flow)</li>
+</ul>
+<h2>Key Reading</h2>
+<ul>
+<li><code>icn/bins/icnd/src/main.rs</code> - Entry point with error handling</li>
+<li><code>icn/crates/icn-core/src/runtime.rs</code> - Async runtime patterns</li>
+<li><code>icn/crates/icn-core/src/supervisor/mod.rs</code> - Shared ownership patterns</li>
+</ul>
+<hr>
+<h2>Core Concepts</h2>
+<h3>1. Ownership: Rust&#39;s Memory Safety Foundation</h3>
+<p><strong>What is ownership?</strong></p>
+<p>In most languages, you either manage memory manually (C/C++) or rely on garbage
+collection (Java, Go, Python). Rust takes a third approach: <strong>ownership</strong>.</p>
+<p>Every value in Rust has exactly one owner. When the owner goes out of scope,
+the value is automatically dropped (freed).</p>
+<pre><code class="language-rust">fn main() {
+    let s1 = String::from(&quot;hello&quot;);  // s1 owns the string
+    let s2 = s1;                      // ownership MOVES to s2
+    // println!(&quot;{}&quot;, s1);            // ERROR! s1 no longer owns anything
+    println!(&quot;{}&quot;, s2);               // OK, s2 is the owner
+}
+</code></pre>
+<p><strong>Why does ICN care?</strong></p>
+<p>Ownership prevents data races at compile time. In a distributed system like ICN,
+where multiple actors process messages concurrently, ownership rules guarantee
+that two actors can&#39;t accidentally corrupt shared data.</p>
+<h3>2. Borrowing: Temporary Access Without Ownership</h3>
+<p><strong>What is borrowing?</strong></p>
+<p>Instead of transferring ownership, you can <strong>borrow</strong> a reference to data:</p>
+<pre><code class="language-rust">fn calculate_length(s: &amp;String) -&gt; usize {  // &amp;String is a reference (borrow)
+    s.len()
+}
+
+fn main() {
+    let s = String::from(&quot;hello&quot;);
+    let len = calculate_length(&amp;s);  // borrow s, don&#39;t take ownership
+    println!(&quot;Length of &#39;{}&#39; is {}&quot;, s, len);  // s is still valid!
+}
+</code></pre>
+<p><strong>Two types of borrows:</strong></p>
+<ul>
+<li><code>&amp;T</code> - Immutable borrow (read-only, many allowed simultaneously)</li>
+<li><code>&amp;mut T</code> - Mutable borrow (read-write, only ONE allowed at a time)</li>
+</ul>
+<pre><code class="language-rust">let mut s = String::from(&quot;hello&quot;);
+
+// Many immutable borrows OK
+let r1 = &amp;s;
+let r2 = &amp;s;
+println!(&quot;{} and {}&quot;, r1, r2);
+
+// Mutable borrow (exclusive)
+let r3 = &amp;mut s;
+r3.push_str(&quot; world&quot;);
+</code></pre>
+<p><strong>The borrowing rule:</strong></p>
+<blockquote>
+<p>You can have EITHER multiple immutable references OR exactly one mutable
+reference, but never both at the same time.</p>
+</blockquote>
+<p>This rule prevents data races at compile time!</p>
+<h3>3. Lifetimes: How Long References Are Valid</h3>
+<p><strong>What are lifetimes?</strong></p>
+<p>Lifetimes tell the compiler how long a reference is valid. Usually, the compiler
+infers them automatically (lifetime elision).</p>
+<pre><code class="language-rust">// Compiler infers: the returned &amp;str lives as long as input s
+fn first_word(s: &amp;str) -&gt; &amp;str {
+    &amp;s[..s.find(&#39; &#39;).unwrap_or(s.len())]
+}
+</code></pre>
+<p>Sometimes you need explicit lifetime annotations:</p>
+<pre><code class="language-rust">// &#39;a says: the returned reference lives as long as BOTH inputs
+fn longest&lt;&#39;a&gt;(x: &amp;&#39;a str, y: &amp;&#39;a str) -&gt; &amp;&#39;a str {
+    if x.len() &gt; y.len() { x } else { y }
+}
+</code></pre>
+<p><strong>In ICN:</strong> Most lifetime complexity is hidden behind smart pointers (<code>Arc</code>).
+You&#39;ll rarely write explicit lifetime annotations.</p>
+<hr>
+<h2>Error Handling</h2>
+<h3>4. Result: Recoverable Errors</h3>
+<p><strong>What is Result?</strong></p>
+<p><code>Result&lt;T, E&gt;</code> represents an operation that can succeed (<code>Ok(T)</code>) or fail (<code>Err(E)</code>):</p>
+<pre><code class="language-rust">enum Result&lt;T, E&gt; {
+    Ok(T),   // Success, contains value of type T
+    Err(E),  // Failure, contains error of type E
+}
+</code></pre>
+<p><strong>Using Result:</strong></p>
+<pre><code class="language-rust">use std::fs::File;
+
+fn open_config() -&gt; Result&lt;File, std::io::Error&gt; {
+    File::open(&quot;config.toml&quot;)
+}
+
+fn main() {
+    match open_config() {
+        Ok(file) =&gt; println!(&quot;Opened file: {:?}&quot;, file),
+        Err(e) =&gt; println!(&quot;Failed to open: {}&quot;, e),
+    }
+}
+</code></pre>
+<h3>5. The <code>?</code> Operator: Error Propagation</h3>
+<p><strong>What does <code>?</code> do?</strong></p>
+<p>The <code>?</code> operator propagates errors up the call stack. It&#39;s syntactic sugar for:</p>
+<pre><code class="language-rust">// This:
+let file = File::open(&quot;config.toml&quot;)?;
+
+// Is equivalent to:
+let file = match File::open(&quot;config.toml&quot;) {
+    Ok(f) =&gt; f,
+    Err(e) =&gt; return Err(e.into()),
+};
+</code></pre>
+<p><strong>Chaining with <code>?</code>:</strong></p>
+<pre><code class="language-rust">fn read_config() -&gt; Result&lt;String, std::io::Error&gt; {
+    let mut file = File::open(&quot;config.toml&quot;)?;  // propagate if error
+    let mut contents = String::new();
+    file.read_to_string(&amp;mut contents)?;         // propagate if error
+    Ok(contents)
+}
+</code></pre>
+<h3>6. Option: Nullable Values</h3>
+<p><strong>What is Option?</strong></p>
+<p><code>Option&lt;T&gt;</code> represents a value that might be absent:</p>
+<pre><code class="language-rust">enum Option&lt;T&gt; {
+    Some(T),  // Value is present
+    None,     // Value is absent
+}
+</code></pre>
+<p><strong>Using Option:</strong></p>
+<pre><code class="language-rust">fn find_user(id: u64) -&gt; Option&lt;User&gt; {
+    // Returns Some(user) if found, None if not
+}
+
+// Using match
+match find_user(42) {
+    Some(user) =&gt; println!(&quot;Found: {}&quot;, user.name),
+    None =&gt; println!(&quot;User not found&quot;),
+}
+
+// Using if let (concise)
+if let Some(user) = find_user(42) {
+    println!(&quot;Found: {}&quot;, user.name);
+}
+
+// Using unwrap_or (default value)
+let user = find_user(42).unwrap_or(default_user);
+</code></pre>
+<h3>7. anyhow and thiserror: ICN&#39;s Error Strategy</h3>
+<p><strong>thiserror: Domain-Specific Errors</strong></p>
+<p>ICN uses <code>thiserror</code> to define structured errors for each subsystem:</p>
+<pre><code class="language-rust">use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum LedgerError {
+    #[error(&quot;Insufficient balance: needed {needed}, have {available}&quot;)]
+    InsufficientBalance { needed: i64, available: i64 },
+
+    #[error(&quot;Account not found: {0}&quot;)]
+    AccountNotFound(String),
+
+    #[error(&quot;Storage error: {0}&quot;)]
+    Storage(#[from] StorageError),  // Automatic conversion
+}
+</code></pre>
+<p><strong>anyhow: Application-Level Errors</strong></p>
+<p>At application boundaries (CLI, main), ICN uses <code>anyhow</code> for flexible error handling:</p>
+<pre><code class="language-rust">use anyhow::{Context, Result};
+
+fn load_config(path: &amp;Path) -&gt; Result&lt;Config&gt; {
+    let data = std::fs::read_to_string(path)
+        .context(&quot;Failed to read config file&quot;)?;  // Add context
+
+    let config: Config = toml::from_str(&amp;data)
+        .context(&quot;Failed to parse config&quot;)?;
+
+    Ok(config)
+}
+</code></pre>
+<p><strong>When to use which:</strong></p>
+<ul>
+<li><code>thiserror</code> - Library code with specific error types</li>
+<li><code>anyhow</code> - Application code, CLI, test helpers</li>
+</ul>
+<hr>
+<h2>Async Programming</h2>
+<h3>8. What is Async?</h3>
+<p><strong>The problem:</strong> In network applications, most time is spent waiting for I/O
+(network, disk). Blocking threads is wasteful.</p>
+<p><strong>The solution:</strong> Async programming lets a single thread handle many tasks by
+switching between them while waiting.</p>
+<pre><code class="language-rust">// Synchronous (blocking)
+let response = client.get(url).send();  // Thread blocked until response
+
+// Asynchronous (non-blocking)
+let response = client.get(url).send().await;  // Task yields while waiting
+</code></pre>
+<h3>9. Futures and <code>async</code>/<code>await</code></h3>
+<p><strong>What is a Future?</strong></p>
+<p>A Future represents a value that will be available later. It&#39;s like a promise
+or deferred value.</p>
+<pre><code class="language-rust">// async fn returns a Future
+async fn fetch_data(url: &amp;str) -&gt; Result&lt;String&gt; {
+    let response = reqwest::get(url).await?;
+    let text = response.text().await?;
+    Ok(text)
+}
+</code></pre>
+<p><strong>What does <code>await</code> do?</strong></p>
+<p><code>.await</code> pauses the current task until the Future completes. While paused,
+other tasks can run on the same thread.</p>
+<pre><code class="language-rust">async fn process_messages() {
+    let msg1 = receive_message().await;  // Pause here until message arrives
+    process(msg1);
+    let msg2 = receive_message().await;  // Pause here for next message
+    process(msg2);
+}
+</code></pre>
+<h3>10. Tokio: ICN&#39;s Async Runtime</h3>
+<p><strong>What is Tokio?</strong></p>
+<p>Tokio is an async runtime that provides:</p>
+<ul>
+<li>Task scheduler (runs async tasks efficiently)</li>
+<li>I/O primitives (async networking, file I/O)</li>
+<li>Synchronization (channels, mutexes)</li>
+<li>Timers and utilities</li>
+</ul>
+<p><strong>Starting the runtime:</strong></p>
+<pre><code class="language-rust">#[tokio::main]
+async fn main() -&gt; Result&lt;()&gt; {
+    // This is now an async context
+    let result = do_async_work().await?;
+    Ok(())
+}
+</code></pre>
+<p><strong>Spawning tasks:</strong></p>
+<pre><code class="language-rust">// Spawn a task that runs concurrently
+let handle = tokio::spawn(async {
+    // This runs in the background
+    process_messages().await
+});
+
+// Later, wait for it to complete
+let result = handle.await?;
+</code></pre>
+<p><strong>ICN uses <code>tokio::spawn</code> for:</strong></p>
+<ul>
+<li>Background message processing</li>
+<li>Periodic maintenance tasks</li>
+<li>Parallel I/O operations</li>
+</ul>
+<hr>
+<h2>Smart Pointers for Shared State</h2>
+<h3>11. Arc: Shared Ownership Across Threads</h3>
+<p><strong>What is Arc?</strong></p>
+<p><code>Arc</code> (Atomic Reference Counted) allows multiple owners of the same data across
+threads. It keeps a count of references and drops the data when count reaches zero.</p>
+<pre><code class="language-rust">use std::sync::Arc;
+
+let data = Arc::new(vec![1, 2, 3]);
+
+let data_clone = Arc::clone(&amp;data);  // Increment reference count
+
+// Both data and data_clone point to the same vector
+// Vector is dropped when BOTH go out of scope
+</code></pre>
+<p><strong>Why &quot;Atomic&quot;?</strong></p>
+<p>The reference count is updated atomically (thread-safe), so <code>Arc</code> is safe to
+share across threads. Regular <code>Rc</code> is NOT thread-safe.</p>
+<h3>12. Mutex: Exclusive Access</h3>
+<p><strong>What is Mutex?</strong></p>
+<p><code>Mutex</code> (Mutual Exclusion) ensures only one thread can access data at a time:</p>
+<pre><code class="language-rust">use std::sync::Mutex;
+
+let counter = Mutex::new(0);
+
+// Lock to get exclusive access
+let mut num = counter.lock().unwrap();
+*num += 1;
+// Lock is automatically released when `num` goes out of scope
+</code></pre>
+<p><strong>In async code, use <code>tokio::sync::Mutex</code>:</strong></p>
+<pre><code class="language-rust">use tokio::sync::Mutex;
+
+let counter = Arc::new(Mutex::new(0));
+
+async fn increment(counter: Arc&lt;Mutex&lt;i32&gt;&gt;) {
+    let mut num = counter.lock().await;  // async lock
+    *num += 1;
+}
+</code></pre>
+<h3>13. RwLock: Multiple Readers OR One Writer</h3>
+<p><strong>What is RwLock?</strong></p>
+<p><code>RwLock</code> allows either:</p>
+<ul>
+<li>Multiple simultaneous readers (shared read access)</li>
+<li>One exclusive writer (no readers while writing)</li>
+</ul>
+<pre><code class="language-rust">use tokio::sync::RwLock;
+
+let data = Arc::new(RwLock::new(HashMap::new()));
+
+// Multiple readers OK
+let read_guard = data.read().await;
+println!(&quot;Value: {:?}&quot;, read_guard.get(&quot;key&quot;));
+
+// Exclusive writer
+let mut write_guard = data.write().await;
+write_guard.insert(&quot;key&quot;, &quot;value&quot;);
+</code></pre>
+<p><strong>When to use which:</strong></p>
+<ul>
+<li><code>Mutex</code> - When all access is read-write</li>
+<li><code>RwLock</code> - When reads are much more common than writes</li>
+</ul>
+<h3>14. ICN&#39;s Pattern: <code>Arc&lt;RwLock&lt;T&gt;&gt;</code></h3>
+<p>ICN actors share state using <code>Arc&lt;RwLock&lt;T&gt;&gt;</code>:</p>
+<pre><code class="language-rust">// In supervisor
+let trust_graph: Arc&lt;RwLock&lt;TrustGraph&gt;&gt; = Arc::new(RwLock::new(
+    TrustGraph::new(store)
+));
+
+// Share with multiple actors
+let gossip_actor = GossipActor::new(
+    Arc::clone(&amp;trust_graph),  // Gossip can read/write trust
+);
+
+let network_actor = NetworkActor::new(
+    Arc::clone(&amp;trust_graph),  // Network can read/write trust
+);
+</code></pre>
+<p><strong>Why this pattern?</strong></p>
+<ul>
+<li><code>Arc</code> - Multiple actors can hold references</li>
+<li><code>RwLock</code> - Safe concurrent access with read preference</li>
+<li>Interior mutability - Can modify through shared reference</li>
+</ul>
+<hr>
+<h2>Putting It Together: ICN Startup Flow</h2>
+<pre><code class="language-rust">// icn/bins/icnd/src/main.rs
+#[tokio::main]  // Start Tokio runtime
+async fn main() -&gt; Result&lt;()&gt; {  // anyhow::Result for error handling
+    // Load config (ownership: main owns config)
+    let config = Config::from_file(&amp;args.config)
+        .context(&quot;Failed to load config&quot;)?;  // ? propagates errors
+
+    // Open keystore (Result propagation)
+    let identity = open_keystore(&amp;config).await?;
+
+    // Create runtime (ownership transfer)
+    let runtime = Runtime::new(config, identity);
+
+    // Run until shutdown (async/await)
+    runtime.run().await?;
+
+    Ok(())
+}
+</code></pre>
+<hr>
+<h2>Diagrams</h2>
+<h3>Ownership Flow</h3>
+<pre><code class="language-mermaid">flowchart LR
+    main[main] --&gt;|owns| config[Config]
+    main --&gt;|owns| runtime[Runtime]
+    runtime --&gt;|owns| supervisor[Supervisor]
+    supervisor --&gt;|Arc| trust[TrustGraph]
+    supervisor --&gt;|Arc| gossip[GossipActor]
+    gossip --&gt;|Arc| trust
+</code></pre>
+<h3>Error Propagation</h3>
+<pre><code class="language-mermaid">flowchart TD
+    main[main] --&gt;|calls| load_config
+    load_config --&gt;|?| read_file[read_file]
+    load_config --&gt;|?| parse[parse_toml]
+    read_file --&gt;|Err| load_config
+    parse --&gt;|Err| load_config
+    load_config --&gt;|Err| main
+    main --&gt;|prints error| exit[exit 1]
+</code></pre>
+<h3>Async Task Flow</h3>
+<pre><code class="language-mermaid">flowchart TD
+    main[main] --&gt; runtime[tokio::main]
+    runtime --&gt; supervisor[supervisor.run]
+    supervisor --&gt;|spawn| gossip[GossipTask]
+    supervisor --&gt;|spawn| network[NetworkTask]
+    supervisor --&gt;|spawn| ledger[LedgerTask]
+    gossip -.-&gt;|await| io1[Network I/O]
+    network -.-&gt;|await| io2[Socket I/O]
+    ledger -.-&gt;|await| io3[Storage I/O]
+</code></pre>
+<hr>
+<h2>Code Examples from ICN</h2>
+<h3>Error Handling Pattern</h3>
+<pre><code class="language-rust">// From icn/bins/icnd/src/main.rs
+let config = if let Some(config_path) = &amp;args.config {
+    Config::from_file(config_path)
+        .context(&quot;Failed to load config file&quot;)?
+} else {
+    Config::default()
+};
+</code></pre>
+<h3>Shared State Pattern</h3>
+<pre><code class="language-rust">// From icn/crates/icn-core/src/supervisor/mod.rs
+let trust_graph: Arc&lt;RwLock&lt;TrustGraph&gt;&gt; = Arc::new(RwLock::new(
+    TrustGraph::new(trust_store.clone())
+        .map_err(|e| anyhow::anyhow!(&quot;Failed to create trust graph: {e}&quot;))?
+));
+</code></pre>
+<h3>Async Actor Pattern</h3>
+<pre><code class="language-rust">// From icn/crates/icn-core/src/runtime.rs
+pub async fn run(self) -&gt; Result&lt;()&gt; {
+    info!(&quot;ICNd runtime starting&quot;);
+
+    let supervisor = Supervisor::new(
+        self.config.clone(),
+        self.identity_bundle,
+        self.shutdown_tx.clone(),
+    );
+
+    supervisor.run().await?;
+
+    info!(&quot;ICNd runtime stopped&quot;);
+    Ok(())
+}
+</code></pre>
+<hr>
+<h2>Exercises</h2>
+<ol>
+<li><p><strong>Error Propagation</strong>: Find all uses of <code>?</code> in <code>icnd/src/main.rs</code>. For each,
+explain what error type is being propagated.</p>
+</li>
+<li><p><strong>Ownership Analysis</strong>: In <code>supervisor/mod.rs</code>, find a struct that uses <code>Arc</code>.
+Explain why <code>Arc</code> is needed instead of a regular reference.</p>
+</li>
+<li><p><strong>Async Understanding</strong>: Find a <code>tokio::spawn</code> call in the codebase. Explain
+why the task is spawned rather than awaited directly.</p>
+</li>
+<li><p><strong>Write Code</strong>: Write a function that:</p>
+<ul>
+<li>Takes a file path</li>
+<li>Reads the file contents</li>
+<li>Returns <code>Result&lt;String&gt;</code></li>
+<li>Uses <code>?</code> for error propagation</li>
+<li>Adds context with <code>.context()</code></li>
+</ul>
+</li>
+</ol>
+<hr>
+<h2>Checkpoints</h2>
+<ul>
+<li><input disabled="" type="checkbox"> You can explain ownership vs borrowing with an example</li>
+<li><input disabled="" type="checkbox"> You understand when to use <code>&amp;T</code> vs <code>&amp;mut T</code></li>
+<li><input disabled="" type="checkbox"> You can read code using <code>?</code> and explain the error flow</li>
+<li><input disabled="" type="checkbox"> You know the difference between <code>Result</code> and <code>Option</code></li>
+<li><input disabled="" type="checkbox"> You understand what <code>async</code>/<code>await</code> does</li>
+<li><input disabled="" type="checkbox"> You can explain why ICN uses <code>Arc&lt;RwLock&lt;T&gt;&gt;</code> for shared state</li>
+<li><input disabled="" type="checkbox"> You know when to use <code>Mutex</code> vs <code>RwLock</code></li>
+</ul>
+<hr>
+<h2>Quick Reference</h2>
+<table>
+<thead>
+<tr>
+<th>Concept</th>
+<th>Purpose</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Ownership</td>
+<td>Memory safety</td>
+<td><code>let s2 = s1;</code> (move)</td>
+</tr>
+<tr>
+<td><code>&amp;T</code></td>
+<td>Immutable borrow</td>
+<td><code>fn f(s: &amp;String)</code></td>
+</tr>
+<tr>
+<td><code>&amp;mut T</code></td>
+<td>Mutable borrow</td>
+<td><code>fn f(s: &amp;mut String)</code></td>
+</tr>
+<tr>
+<td><code>Result&lt;T,E&gt;</code></td>
+<td>Fallible operation</td>
+<td><code>File::open(path)</code></td>
+</tr>
+<tr>
+<td><code>Option&lt;T&gt;</code></td>
+<td>Nullable value</td>
+<td><code>map.get(key)</code></td>
+</tr>
+<tr>
+<td><code>?</code></td>
+<td>Propagate error</td>
+<td><code>file.read()?</code></td>
+</tr>
+<tr>
+<td><code>async fn</code></td>
+<td>Async function</td>
+<td><code>async fn fetch()</code></td>
+</tr>
+<tr>
+<td><code>.await</code></td>
+<td>Wait for future</td>
+<td><code>response.await</code></td>
+</tr>
+<tr>
+<td><code>Arc&lt;T&gt;</code></td>
+<td>Shared ownership</td>
+<td><code>Arc::new(data)</code></td>
+</tr>
+<tr>
+<td><code>Mutex&lt;T&gt;</code></td>
+<td>Exclusive access</td>
+<td><code>mutex.lock()</code></td>
+</tr>
+<tr>
+<td><code>RwLock&lt;T&gt;</code></td>
+<td>Read/write lock</td>
+<td><code>rwlock.read()</code></td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Next Steps</h2>
+<p>Proceed to <strong>Module 2: Architecture Overview</strong> to understand how these Rust
+patterns fit into ICN&#39;s layered system design.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

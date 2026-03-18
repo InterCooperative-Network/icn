@@ -1,0 +1,1159 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Razeto&#39;s Four Intercooperative Bodies: ICN Integration Design | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>razeto integration design</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/razeto-integration-design.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Razeto&#39;s Four Intercooperative Bodies: ICN Integration Design</h1>
+<p>This document describes the integration of Luis Razeto&#39;s four intercooperative bodies from &quot;Cooperative Enterprise and Market Economy&quot; (Chapter 14) into ICN&#39;s infrastructure.</p>
+<h2>Background</h2>
+<p>Razeto identifies four key institutions that enable cooperatives to transcend individual limitations while preserving their cooperative character:</p>
+<ol>
+<li><strong>Cooperative Share Exchange</strong> - Labor shares representing accumulated value</li>
+<li><strong>Cooperative Labor Exchange</strong> - Worker mobility between cooperatives</li>
+<li><strong>Cooperative Financial Entity</strong> - Inter-coop capital market</li>
+<li><strong>Technology/R&amp;D Service</strong> - Shared technology development</li>
+</ol>
+<p>These institutions allow cooperatives to achieve economies of scale, efficient capital allocation, and labor mobility without sacrificing worker ownership or democratic control.</p>
+<h2>Design Principles</h2>
+<p>From Razeto&#39;s analysis, these principles guide our implementation:</p>
+<ol>
+<li><strong>No severance of capital from labor</strong> - Labor shares remain tied to membership</li>
+<li><strong>Worker control preserved</strong> - All major operations require governance approval</li>
+<li><strong>Cooperative autonomy</strong> - Each cooperative decides its participation level</li>
+<li><strong>Anti-speculation</strong> - Demurrage and contribution-locked exchange maintained</li>
+<li><strong>Solidarity over profit</strong> - CFE operates at cost-recovery, not profit</li>
+<li><strong>Technology as commons</strong> - R&amp;D outputs default to cooperative licensing</li>
+</ol>
+<h2>Current State Analysis</h2>
+<h3>ICN Strengths (Already Aligned with Razeto)</h3>
+<table>
+<thead>
+<tr>
+<th>Capability</th>
+<th>ICN Implementation</th>
+<th>Razeto Alignment</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Mutual credit</td>
+<td><code>icn-ledger</code> double-entry</td>
+<td>Foundation for labor shares</td>
+</tr>
+<tr>
+<td>Treasury</td>
+<td>Budgets, spending rules, governance</td>
+<td>Foundation for CFE</td>
+</tr>
+<tr>
+<td>Bilateral clearing</td>
+<td><code>icn-federation/clearing.rs</code></td>
+<td>Foundation for multilateral</td>
+</tr>
+<tr>
+<td>Entity model</td>
+<td>Recursive individuals→coops→federations</td>
+<td>Matches Razeto hierarchy</td>
+</tr>
+<tr>
+<td>Governance</td>
+<td>Proposals, voting, domains</td>
+<td>Democratic control preserved</td>
+</tr>
+<tr>
+<td>Demurrage</td>
+<td>Designed in economics/contribution-credits-design.md</td>
+<td>Anti-speculation</td>
+</tr>
+</tbody></table>
+<h3>Gaps to Fill</h3>
+<table>
+<thead>
+<tr>
+<th>Gap</th>
+<th>Impact</th>
+<th>Priority</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>No labor shares</td>
+<td>Can&#39;t track accumulated surplus per worker</td>
+<td>HIGH</td>
+</tr>
+<tr>
+<td>No bonds/debt securities</td>
+<td>Can&#39;t issue cooperative financing instruments</td>
+<td>HIGH</td>
+</tr>
+<tr>
+<td>No temporal membership</td>
+<td>Can&#39;t track worker assignments between coops</td>
+<td>HIGH</td>
+</tr>
+<tr>
+<td>No labor credit routing</td>
+<td>Credits don&#39;t flow through home coop</td>
+<td>MEDIUM</td>
+</tr>
+<tr>
+<td>Only bilateral clearing</td>
+<td>No multi-party netting</td>
+<td>MEDIUM</td>
+</tr>
+<tr>
+<td>No shared service primitives</td>
+<td>No R&amp;D coordination</td>
+<td>MEDIUM</td>
+</tr>
+<tr>
+<td>No scheduled triggers</td>
+<td>CCL has Trigger AST but no executor</td>
+<td>HIGH</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Part 1: Cooperative Share Exchange</h2>
+<p>Labor shares represent accumulated value from worker contributions. Unlike traditional equity, labor shares:</p>
+<ul>
+<li>Are earned through labor, not purchased</li>
+<li>Cannot be traded speculatively</li>
+<li>Are redeemed at unit value when leaving</li>
+<li>Accumulate allocated surplus proportionally</li>
+</ul>
+<h3>New Types</h3>
+<p><strong>Location:</strong> <code>icn-ledger/src/labor_shares.rs</code></p>
+<pre><code class="language-rust">use serde::{Deserialize, Serialize};
+use icn_identity::Did;
+
+/// Unique identifier for a labor share
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ShareId(pub String);
+
+/// Unique identifier for a bond
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct BondId(pub String);
+
+/// Labor share status
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ShareStatus {
+    /// Actively accumulating value
+    Active,
+    /// Redemption in progress (governance approved)
+    Redeeming { approved_at: u64, payout_schedule: Vec&lt;ScheduledPayout&gt; },
+    /// Fully redeemed
+    Redeemed { completed_at: u64, total_payout: i64 },
+}
+
+/// Event in share lifecycle for audit trail
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ShareEvent {
+    Created { at: u64 },
+    LaborContributed { at: u64, days: u64 },
+    SurplusAllocated { at: u64, amount: i64, period: String },
+    RedemptionStarted { at: u64, proposal_id: String },
+    PayoutCompleted { at: u64, amount: i64 },
+}
+
+/// Labor share - accumulated cooperative value
+/// Unit value = (total surplus) / (total labor-days)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LaborShare {
+    /// Unique identifier
+    pub id: ShareId,
+    /// Member holding this share (must be active member)
+    pub holder: Did,
+    /// Cooperative issuing this share
+    pub cooperative_id: String,
+    /// Accumulated labor contribution in days
+    pub labor_days: u64,
+    /// Allocated surplus in cooperative currency
+    pub accumulated_surplus: i64,
+    /// Currency denomination
+    pub currency: String,
+    /// Current status
+    pub status: ShareStatus,
+    /// Audit trail of all events
+    pub provenance: Vec&lt;ShareEvent&gt;,
+}
+
+/// Bond status
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum BondStatus {
+    /// Offered but not fully subscribed
+    Offering { subscribed: i64 },
+    /// Fully subscribed and active
+    Active,
+    /// Interest/principal payments in progress
+    Maturing,
+    /// Fully repaid
+    Matured { completed_at: u64 },
+    /// Defaulted (governance intervention needed)
+    Defaulted { at: u64, reason: String },
+}
+
+/// Payment schedule for bonds
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum PaymentSchedule {
+    /// All at maturity
+    Bullet,
+    /// Regular interest, principal at maturity
+    InterestOnly { interval_days: u32 },
+    /// Equal periodic payments
+    Amortizing { interval_days: u32 },
+}
+
+/// Cooperative bond (debt security)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CooperativeBond {
+    /// Unique identifier
+    pub id: BondId,
+    /// Issuing cooperative
+    pub issuer_id: String,
+    /// Current holder (can be individual or cooperative)
+    pub holder: Did,
+    /// Principal amount
+    pub principal: i64,
+    /// Annual interest rate in basis points (100 = 1%)
+    pub interest_rate_bps: u16,
+    /// Maturity date (unix timestamp)
+    pub maturity_date: u64,
+    /// Payment schedule
+    pub payment_schedule: PaymentSchedule,
+    /// Currency denomination
+    pub currency: String,
+    /// Current status
+    pub status: BondStatus,
+    /// Governance proposal that approved issuance
+    pub approval_proposal: String,
+}
+
+/// Scheduled payout for share redemption
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScheduledPayout {
+    pub due_date: u64,
+    pub amount: i64,
+    pub paid: bool,
+}
+
+/// Periodic surplus allocation to shareholders
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SurplusAllocation {
+    /// Unique identifier
+    pub id: String,
+    /// Cooperative performing allocation
+    pub cooperative_id: String,
+    /// Total surplus being allocated
+    pub total_surplus: i64,
+    /// Period identifier (e.g., &quot;2025-Q4&quot;)
+    pub period: String,
+    /// Calculated unit value: surplus / total_labor_days
+    pub share_unit_value: f64,
+    /// Individual allocations: (share_id, amount)
+    pub allocations: Vec&lt;(ShareId, i64)&gt;,
+    /// Governance proposal that approved this allocation
+    pub proposal_id: String,
+    /// Timestamp of allocation
+    pub allocated_at: u64,
+}
+</code></pre>
+<h3>Treasury Integration</h3>
+<p>Extend <code>TreasuryOperation</code> in <code>icn-ledger/src/treasury.rs</code>:</p>
+<pre><code class="language-rust">pub enum TreasuryOperation {
+    // ... existing variants ...
+
+    /// Allocate surplus to labor shareholders
+    AllocateSurplus {
+        allocation: SurplusAllocation,
+    },
+
+    /// Redeem labor share (payout to departing member)
+    RedeemShare {
+        share_id: ShareId,
+        payout_amount: i64,
+        recipient: Did,
+    },
+
+    /// Issue cooperative bond
+    IssueBond {
+        bond: CooperativeBond,
+    },
+
+    /// Make bond payment (interest or principal)
+    BondPayment {
+        bond_id: BondId,
+        payment_type: BondPaymentType,
+        amount: i64,
+    },
+}
+
+pub enum BondPaymentType {
+    Interest,
+    Principal,
+    Combined,
+}
+</code></pre>
+<h3>Governance Integration</h3>
+<p>Add to <code>ProposalPayload</code> in <code>icn-governance/src/proposal.rs</code>:</p>
+<pre><code class="language-rust">pub enum ProposalPayload {
+    // ... existing variants ...
+
+    /// Approve periodic surplus allocation
+    SurplusAllocation {
+        allocation: SurplusAllocation,
+    },
+
+    /// Approve share redemption for departing member
+    ShareRedemption {
+        member: Did,
+        share_ids: Vec&lt;ShareId&gt;,
+        payout_schedule: Vec&lt;ScheduledPayout&gt;,
+    },
+
+    /// Approve bond issuance
+    BondIssuance {
+        bond_offering: BondOffering,
+    },
+}
+
+/// Bond offering for governance approval
+pub struct BondOffering {
+    pub issuer_id: String,
+    pub principal_requested: i64,
+    pub interest_rate_bps: u16,
+    pub term_days: u32,
+    pub purpose: String,
+    pub payment_schedule: PaymentSchedule,
+}
+</code></pre>
+<h3>Gossip Topics</h3>
+<ul>
+<li><code>labor-shares:allocations</code> - Surplus allocation announcements</li>
+<li><code>bonds:issuance</code> - New bond offerings</li>
+<li><code>bonds:payments</code> - Bond payment notifications</li>
+</ul>
+<hr>
+<h2>Part 2: Cooperative Labor Exchange</h2>
+<p>Enables worker mobility between cooperatives while preserving membership ties and ensuring credits flow appropriately.</p>
+<h3>New Types</h3>
+<p><strong>Location:</strong> <code>icn-entity/src/labor_exchange.rs</code></p>
+<pre><code class="language-rust">use serde::{Deserialize, Serialize};
+
+/// Unique identifier for an assignment
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct AssignmentId(pub String);
+
+/// Type of labor assignment
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AssignmentType {
+    /// Fixed-term project work
+    Project { project_id: String },
+    /// Seasonal or cyclical work
+    Seasonal { season: String },
+    /// Trial period before potential membership
+    Trial { duration_days: u32 },
+    /// Dual membership arrangement
+    DualMembership,
+}
+
+/// Assignment status
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AssignmentStatus {
+    /// Proposed, awaiting governance approval
+    Proposed,
+    /// Active assignment
+    Active,
+    /// Completed normally
+    Completed { completed_at: u64 },
+    /// Terminated early
+    Terminated { at: u64, reason: String },
+}
+
+/// How credits earned at host flow to worker/home coop
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum RoutingMode {
+    /// All credits go through home coop, which pays worker
+    ThroughHomeCoop,
+    /// Credits go directly to worker, home coop gets fee
+    DirectToWorker,
+    /// Split between worker (direct) and home coop
+    Split { worker_pct: u8 },
+}
+
+/// Credit routing configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreditRouting {
+    /// How credits flow
+    pub routing_mode: RoutingMode,
+    /// Home coop&#39;s coordination fee in basis points
+    pub admin_fee_bps: u16,
+    /// Does host contribute to worker&#39;s home coop shares?
+    pub share_contribution: bool,
+}
+
+/// Worker assignment to host cooperative
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LaborAssignment {
+    /// Unique identifier
+    pub id: AssignmentId,
+    /// Worker being assigned (individual entity)
+    pub worker: String,
+    /// Cooperative holding worker&#39;s primary membership
+    pub home_coop: String,
+    /// Cooperative where work happens
+    pub host_coop: String,
+    /// Type of assignment
+    pub assignment_type: AssignmentType,
+    /// Start date (unix timestamp)
+    pub start_date: u64,
+    /// End date (None for open-ended)
+    pub end_date: Option&lt;u64&gt;,
+    /// Credit routing configuration
+    pub credit_routing: CreditRouting,
+    /// Current status
+    pub status: AssignmentStatus,
+    /// Governance proposals (from both coops)
+    pub approvals: AssignmentApprovals,
+}
+
+/// Required approvals for assignment
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AssignmentApprovals {
+    pub home_coop_proposal: Option&lt;String&gt;,
+    pub host_coop_proposal: Option&lt;String&gt;,
+}
+
+/// Worker registration in labor pool
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PoolRegistration {
+    pub worker: String,
+    pub home_coop: String,
+    pub skills: Vec&lt;String&gt;,
+    pub availability: Availability,
+    pub registered_at: u64,
+}
+
+/// Availability specification
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Availability {
+    Immediate,
+    FromDate(u64),
+    Seasonal { seasons: Vec&lt;String&gt; },
+    PartTime { hours_per_week: u32 },
+}
+
+/// Open position in labor pool
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LaborNeed {
+    pub id: String,
+    pub requesting_coop: String,
+    pub role: String,
+    pub skills_required: Vec&lt;String&gt;,
+    pub duration: Option&lt;u32&gt;,
+    pub posted_at: u64,
+}
+
+/// Labor pool for federation-wide coordination
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LaborPool {
+    /// Unique identifier
+    pub id: String,
+    /// Federation managing this pool
+    pub manager: String,
+    /// Available workers
+    pub available_workers: Vec&lt;PoolRegistration&gt;,
+    /// Open positions
+    pub open_needs: Vec&lt;LaborNeed&gt;,
+}
+</code></pre>
+<h3>Membership Integration</h3>
+<p>Extend <code>Membership</code> in <code>icn-entity/src/membership.rs</code>:</p>
+<pre><code class="language-rust">pub struct Membership {
+    // ... existing fields ...
+
+    /// Labor share IDs held by this member
+    pub labor_shares: Vec&lt;ShareId&gt;,
+
+    /// Active assignments (working at other coops)
+    pub assignments: Vec&lt;AssignmentId&gt;,
+
+    /// Is this the primary membership?
+    pub is_primary: bool,
+}
+</code></pre>
+<h3>Federation Clearing Integration</h3>
+<p>Extend <code>CrossCoopTransfer</code> in <code>icn-federation/src/clearing.rs</code>:</p>
+<pre><code class="language-rust">pub enum TransferType {
+    // ... existing variants ...
+
+    /// Labor credit for assigned worker
+    LaborCredit {
+        assignment_id: AssignmentId,
+        period: String,
+    },
+
+    /// Admin fee for labor coordination
+    LaborAdminFee {
+        assignment_id: AssignmentId,
+    },
+}
+</code></pre>
+<h3>Gossip Topics</h3>
+<ul>
+<li><code>labor-pool:registrations</code> - Worker availability announcements</li>
+<li><code>labor-pool:needs</code> - Open position postings</li>
+<li><code>assignments:status</code> - Assignment updates (trust-gated)</li>
+</ul>
+<hr>
+<h2>Part 3: Cooperative Financial Entity (CFE)</h2>
+<p>A cooperative of cooperatives providing capital market functions without profit motive.</p>
+<h3>Key Characteristics</h3>
+<ul>
+<li><strong>Not a bank</strong> - No fractional reserve, no profit extraction</li>
+<li><strong>Member-owned</strong> - Each cooperative has governance rights</li>
+<li><strong>Cost-recovery</strong> - Interest rates cover admin costs only</li>
+<li><strong>Solidarity-based</strong> - Stronger coops support developing ones</li>
+</ul>
+<h3>New Types</h3>
+<p><strong>Location:</strong> <code>icn-federation/src/financial_entity.rs</code></p>
+<pre><code class="language-rust">use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+
+/// Deposit term
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DepositTerm {
+    /// Withdrawable anytime
+    Demand,
+    /// Up to 90 days
+    Short,
+    /// 90 days to 1 year
+    Medium,
+    /// Over 1 year
+    Long { months: u32 },
+}
+
+/// Term deposit from member cooperative
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TermDeposit {
+    pub id: String,
+    pub depositor: String,
+    pub principal: i64,
+    pub term: DepositTerm,
+    pub interest_rate_bps: u16,
+    pub maturity_date: u64,
+    pub currency: String,
+}
+
+/// Loan purpose categories
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum LoanPurpose {
+    WorkingCapital,
+    Equipment,
+    Expansion,
+    ShareBuyout,
+    Emergency,
+    Other(String),
+}
+
+/// Collateral types
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Collateral {
+    LaborShares { share_ids: Vec&lt;String&gt;, value: i64 },
+    Bonds { bond_ids: Vec&lt;String&gt;, value: i64 },
+    CoopGuarantee { guarantor: String, amount: i64 },
+    Equipment { description: String, value: i64 },
+}
+
+/// Loan to member cooperative
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CooperativeLoan {
+    pub id: String,
+    pub borrower: String,
+    pub principal: i64,
+    pub interest_rate_bps: u16,
+    pub purpose: LoanPurpose,
+    pub collateral: Vec&lt;Collateral&gt;,
+    pub disbursed_at: u64,
+    pub maturity_date: u64,
+    pub approval_proposal: String,
+    pub currency: String,
+}
+
+/// Clearing cycle status
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ClearingCycleStatus {
+    Proposed,
+    CollectingPositions,
+    Computing,
+    AwaitingSettlement,
+    Settled { settled_at: u64 },
+    Failed { reason: String },
+}
+
+/// Multilateral clearing
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MultilateralClearing {
+    pub cycle_id: String,
+    pub participants: Vec&lt;String&gt;,
+    /// Gross positions: (from, to) -&gt; amount
+    pub gross_positions: HashMap&lt;(String, String), i64&gt;,
+    /// Net positions after netting: entity -&gt; net amount (positive = receive)
+    pub net_positions: HashMap&lt;String, i64&gt;,
+    /// Netting efficiency: 1 - (sum of net / sum of gross)
+    pub netting_efficiency: f64,
+    pub status: ClearingCycleStatus,
+    pub initiated_at: u64,
+}
+
+/// Rate policy (administered, not market)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RatePolicy {
+    /// Base deposit rate by term
+    pub deposit_rates: HashMap&lt;String, u16&gt;,
+    /// Base lending rate by purpose
+    pub lending_rates: HashMap&lt;String, u16&gt;,
+    /// Solidarity adjustment for developing coops
+    pub solidarity_discount_bps: u16,
+    /// Last updated
+    pub updated_at: u64,
+    /// Governance proposal that set this policy
+    pub proposal_id: String,
+}
+
+/// Cooperative Financial Entity
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CooperativeFinancialEntity {
+    /// Entity ID (as federation member)
+    pub id: String,
+    /// Member cooperatives
+    pub member_coops: Vec&lt;String&gt;,
+    /// Active deposits
+    pub deposits: Vec&lt;TermDeposit&gt;,
+    /// Active loans
+    pub loans: Vec&lt;CooperativeLoan&gt;,
+    /// Current clearing cycle
+    pub clearing: Option&lt;MultilateralClearing&gt;,
+    /// Reserve ratio in basis points
+    pub reserve_ratio_bps: u16,
+    /// Current rate policy
+    pub rate_policy: RatePolicy,
+    /// Governance domain for CFE decisions
+    pub governance_domain: String,
+}
+</code></pre>
+<h3>Governance Integration</h3>
+<pre><code class="language-rust">pub enum ProposalPayload {
+    // ... existing variants ...
+
+    /// Add/remove cooperative from CFE
+    CFEMembership {
+        coop: String,
+        action: MembershipAction,
+    },
+
+    /// Approve loan request
+    LoanApproval {
+        loan_request: LoanRequest,
+    },
+
+    /// Change rate policy
+    RatePolicyChange {
+        new_policy: RatePolicy,
+    },
+
+    /// Initiate multilateral clearing cycle
+    ClearingCycleInitiate {
+        participants: Vec&lt;String&gt;,
+        cycle_end: u64,
+    },
+}
+
+pub enum MembershipAction {
+    Add,
+    Remove { reason: String },
+    Suspend { until: u64 },
+}
+
+pub struct LoanRequest {
+    pub borrower: String,
+    pub amount: i64,
+    pub purpose: LoanPurpose,
+    pub term_days: u32,
+    pub collateral_offered: Vec&lt;Collateral&gt;,
+}
+</code></pre>
+<h3>Gossip Topics</h3>
+<ul>
+<li><code>cfe:deposits</code> - Deposit availability</li>
+<li><code>cfe:loans</code> - Loan requests/approvals (trust-gated)</li>
+<li><code>cfe:clearing</code> - Multilateral clearing cycles</li>
+<li><code>cfe:rates</code> - Rate policy updates</li>
+</ul>
+<hr>
+<h2>Part 4: Technology/R&amp;D Service</h2>
+<p>Shared technology development and service provision across cooperatives.</p>
+<h3>New Types</h3>
+<p><strong>Location:</strong> <code>icn-federation/src/shared_services.rs</code></p>
+<pre><code class="language-rust">use serde::{Deserialize, Serialize};
+
+/// Service type categories
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ServiceType {
+    Compute,
+    Storage,
+    Expertise { domain: String },
+    TechDev,
+    Training,
+    Other(String),
+}
+
+/// Service pricing model
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ServicePricing {
+    /// No charge (commons)
+    Free,
+    /// Cover costs only
+    CostRecovery { rate: i64, unit: String },
+    /// Scaled by cooperative size/resources
+    SlidingScale { base_rate: i64, scale_factor: String },
+    /// Exchanged for labor
+    LaborExchange { hours_per_unit: f32 },
+}
+
+/// Service access control
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ServiceAccess {
+    /// Open to all federation members
+    FederationOpen,
+    /// Requires minimum trust score
+    TrustGated { min_score: f64 },
+    /// Subscription required
+    Subscription { members: Vec&lt;String&gt; },
+    /// Invitation only
+    InviteOnly,
+}
+
+/// Shared service through federation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SharedService {
+    pub id: String,
+    pub provider: String,
+    pub name: String,
+    pub description: String,
+    pub service_type: ServiceType,
+    pub pricing: ServicePricing,
+    pub access_control: ServiceAccess,
+    pub created_at: u64,
+}
+
+/// R&amp;D participant
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RDParticipant {
+    pub coop: String,
+    pub contribution_type: ContributionType,
+    pub commitment: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ContributionType {
+    Funding { amount: i64 },
+    Labor { hours: u32 },
+    Equipment { description: String },
+    Expertise { domain: String },
+}
+
+/// Project budget
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectBudget {
+    pub total: i64,
+    pub contributions: Vec&lt;(String, i64)&gt;,
+    pub spent: i64,
+    pub currency: String,
+}
+
+/// Project deliverable
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Deliverable {
+    pub id: String,
+    pub description: String,
+    pub due_date: u64,
+    pub status: DeliverableStatus,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DeliverableStatus {
+    Planned,
+    InProgress,
+    Completed { at: u64 },
+    Delayed { new_date: u64 },
+}
+
+/// Technology licensing
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum TechLicensing {
+    /// Free for all cooperatives
+    CooperativeCommons,
+    /// Free with attribution
+    CoopPermissive,
+    /// Tiered by cooperative type
+    Tiered { rates: Vec&lt;(String, i64)&gt; },
+    /// Revenue sharing
+    RevenueShare { percentage: u8 },
+}
+
+/// Project governance
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectGovernance {
+    pub decision_method: DecisionMethod,
+    pub steering_committee: Vec&lt;String&gt;,
+    pub governance_domain: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum DecisionMethod {
+    Consensus,
+    Majority,
+    WeightedByContribution,
+}
+
+/// R&amp;D project coordinated across cooperatives
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RDProject {
+    pub id: String,
+    pub title: String,
+    pub description: String,
+    pub participants: Vec&lt;RDParticipant&gt;,
+    pub budget: ProjectBudget,
+    pub deliverables: Vec&lt;Deliverable&gt;,
+    pub licensing: TechLicensing,
+    pub governance: ProjectGovernance,
+    pub started_at: u64,
+}
+
+/// Technology registry entry
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TechEntry {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub source_project: Option&lt;String&gt;,
+    pub licensing: TechLicensing,
+    pub maintainer: String,
+    pub registered_at: u64,
+}
+
+/// Technology registry (commons catalog)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TechRegistry {
+    pub id: String,
+    pub manager: String,
+    pub technologies: Vec&lt;TechEntry&gt;,
+}
+</code></pre>
+<h3>Integration with icn-compute</h3>
+<p><code>SharedService::Compute</code> integrates with <code>icn-compute</code> scheduler:</p>
+<pre><code class="language-rust">impl SharedService {
+    pub fn as_compute_provider(&amp;self) -&gt; Option&lt;ComputeProvider&gt; {
+        match &amp;self.service_type {
+            ServiceType::Compute =&gt; Some(ComputeProvider {
+                id: self.id.clone(),
+                provider_entity: self.provider.clone(),
+                pricing: self.pricing.clone(),
+                access: self.access_control.clone(),
+            }),
+            _ =&gt; None,
+        }
+    }
+}
+</code></pre>
+<h3>Governance Integration</h3>
+<pre><code class="language-rust">pub enum ProposalPayload {
+    // ... existing variants ...
+
+    /// Propose R&amp;D project
+    RDProjectProposal {
+        project: RDProject,
+    },
+
+    /// Offer shared service
+    ServiceOffering {
+        service: SharedService,
+    },
+
+    /// Change technology licensing
+    TechLicensingChange {
+        tech_id: String,
+        new_licensing: TechLicensing,
+    },
+}
+</code></pre>
+<h3>Gossip Topics</h3>
+<ul>
+<li><code>services:catalog</code> - Shared service announcements</li>
+<li><code>rd:projects</code> - R&amp;D project coordination</li>
+<li><code>tech:registry</code> - Technology registry updates</li>
+</ul>
+<hr>
+<h2>Part 5: Scheduler (Cross-Cutting)</h2>
+<p>All four bodies require scheduled operations. CCL has <code>Trigger</code> AST but no executor.</p>
+<h3>New Crate: <code>icn-scheduler</code></h3>
+<pre><code class="language-rust">use serde::{Deserialize, Serialize};
+
+/// Schedule specification
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Schedule {
+    /// Cron-style expression
+    Cron(String),
+    /// Fixed interval
+    Interval { seconds: u64 },
+    /// One-time execution
+    OneTime { at: u64 },
+    /// After another task completes
+    AfterTask { task_id: String },
+}
+
+/// Task status
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TaskStatus {
+    Pending,
+    Running,
+    Completed { at: u64 },
+    Failed { at: u64, error: String },
+    Disabled,
+}
+
+/// Scheduled task
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScheduledTask {
+    pub id: String,
+    /// CCL contract reference
+    pub contract_ref: String,
+    /// Rule to execute
+    pub rule_name: String,
+    /// Schedule
+    pub schedule: Schedule,
+    /// Next scheduled run
+    pub next_run: u64,
+    /// Last run result
+    pub last_run: Option&lt;TaskRun&gt;,
+    /// Current status
+    pub status: TaskStatus,
+    /// Created by (entity)
+    pub owner: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskRun {
+    pub started_at: u64,
+    pub completed_at: u64,
+    pub success: bool,
+    pub fuel_used: u64,
+    pub output: Option&lt;String&gt;,
+}
+</code></pre>
+<h3>Use Cases</h3>
+<table>
+<thead>
+<tr>
+<th>Body</th>
+<th>Scheduled Operation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Labor Shares</td>
+<td>Periodic surplus allocation (quarterly)</td>
+</tr>
+<tr>
+<td>Labor Shares</td>
+<td>Bond interest/principal payments</td>
+</tr>
+<tr>
+<td>Labor Exchange</td>
+<td>Assignment end notifications</td>
+</tr>
+<tr>
+<td>Labor Exchange</td>
+<td>Trial period expiry checks</td>
+</tr>
+<tr>
+<td>CFE</td>
+<td>Interest calculations</td>
+</tr>
+<tr>
+<td>CFE</td>
+<td>Clearing cycle initiation</td>
+</tr>
+<tr>
+<td>R&amp;D</td>
+<td>Milestone deadline reminders</td>
+</tr>
+</tbody></table>
+<h3>Supervisor Integration</h3>
+<p>Add to <code>icn-core/src/supervisor.rs</code>:</p>
+<pre><code class="language-rust">impl Supervisor {
+    pub async fn spawn_scheduler(&amp;self, config: SchedulerConfig) -&gt; Result&lt;SchedulerHandle&gt; {
+        let scheduler = Scheduler::new(config, self.store.clone());
+        let handle = scheduler.spawn().await?;
+        // Wire to CCL executor
+        // ...
+        Ok(handle)
+    }
+}
+</code></pre>
+<hr>
+<h2>Implementation Roadmap</h2>
+<h3>Phase 1: Labor Shares Foundation (4-6 weeks)</h3>
+<ol>
+<li>Add <code>LaborShare</code>, <code>CooperativeBond</code> types to <code>icn-ledger</code></li>
+<li>Add <code>TreasuryOperation::AllocateSurplus</code>, <code>RedeemShare</code>, <code>IssueBond</code></li>
+<li>Add <code>ProposalPayload::SurplusAllocation</code> to <code>icn-governance</code></li>
+<li>Link shares to <code>Membership</code> tracking</li>
+<li>Create gossip topics</li>
+<li>Unit tests</li>
+</ol>
+<h3>Phase 2: Labor Exchange (4-6 weeks)</h3>
+<ol>
+<li>Add <code>LaborAssignment</code>, <code>CreditRouting</code> to <code>icn-entity</code></li>
+<li>Extend <code>Membership</code> with assignments</li>
+<li>Add <code>TransferType::LaborCredit</code> to federation clearing</li>
+<li>Add <code>ProposalPayload::LaborAssignment</code></li>
+<li>Create labor pool primitives</li>
+<li>Integration tests</li>
+</ol>
+<h3>Phase 3: CFE Core (6-8 weeks)</h3>
+<ol>
+<li>Add CFE types to <code>icn-federation</code></li>
+<li>Implement deposit/loan lifecycle</li>
+<li>Implement multilateral clearing algorithm</li>
+<li>Add governance proposals</li>
+<li>Wire to treasury for settlements</li>
+<li>End-to-end tests</li>
+</ol>
+<h3>Phase 4: Scheduler (3-4 weeks, parallel with Phase 2-3)</h3>
+<ol>
+<li>Create <code>icn-scheduler</code> crate</li>
+<li>Implement cron-style scheduling</li>
+<li>Wire to CCL trigger execution</li>
+<li>Add to supervisor spawn</li>
+<li>Tests for scheduling edge cases</li>
+</ol>
+<h3>Phase 5: Shared Services (4-6 weeks)</h3>
+<ol>
+<li>Add service types to <code>icn-federation</code></li>
+<li>Link <code>ServiceType::Compute</code> to <code>icn-compute</code></li>
+<li>Implement service catalog</li>
+<li>Add governance proposals</li>
+<li>Tests</li>
+</ol>
+<h3>Phase 6: R&amp;D Coordination (4-6 weeks)</h3>
+<ol>
+<li>Add R&amp;D project types</li>
+<li>Implement technology registry</li>
+<li>Add licensing enforcement</li>
+<li>Wire to scheduler for milestones</li>
+<li>Integration tests</li>
+</ol>
+<hr>
+<h2>Critical Files Reference</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icn-ledger/src/treasury.rs</code></td>
+<td>Pattern for labor shares/bonds; extend TreasuryOperation</td>
+</tr>
+<tr>
+<td><code>icn-entity/src/membership.rs</code></td>
+<td>Extend with assignments, share links</td>
+</tr>
+<tr>
+<td><code>icn-federation/src/clearing.rs</code></td>
+<td>Extend bilateral to multilateral; base for CFE</td>
+</tr>
+<tr>
+<td><code>icn-governance/src/proposal.rs</code></td>
+<td>Add ProposalPayload variants</td>
+</tr>
+<tr>
+<td><code>icn-ccl/src/ast.rs</code></td>
+<td>Trigger type exists; needs executor</td>
+</tr>
+<tr>
+<td><code>icn-core/src/supervisor.rs</code></td>
+<td>Actor spawning for scheduler</td>
+</tr>
+<tr>
+<td><code>docs/design/economics/contribution-credits-design.md</code></td>
+<td>Maintain economic principles</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Related Documents</h2>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/economics/contribution-credits-design">contribution-credits-design.md</a> - Mutual credit and demurrage design</li>
+<li><a href="/docs/ARCHITECTURE">ARCHITECTURE.md</a> - System architecture overview</li>
+<li><a href="/docs/PHASE_HISTORY">PHASE_HISTORY.md</a> - Development phase history</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

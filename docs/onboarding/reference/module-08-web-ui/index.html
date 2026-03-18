@@ -1,0 +1,1053 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Module 8: Web UI Integration | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>onboarding</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>reference</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>module 08 web ui</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/onboarding/reference/module-08-web-ui.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Module 8: Web UI Integration</h1>
+<h2>Learning Objectives</h2>
+<p>By the end of this module, you will:</p>
+<ul>
+<li>Understand the thin-client architecture pattern</li>
+<li>Trace user actions through the UI to gateway API calls</li>
+<li>Implement session management with JWT tokens</li>
+<li>Handle real-time updates via WebSocket</li>
+<li>Design responsive, accessible interfaces for cooperatives</li>
+<li>Debug common UI integration issues</li>
+</ul>
+<h2>Prerequisites</h2>
+<ul>
+<li>Module 7 (Gateway API and SDK)</li>
+<li>Basic JavaScript and DOM manipulation</li>
+<li>Understanding of REST APIs and WebSockets</li>
+</ul>
+<h2>Key Reading</h2>
+<ul>
+<li><code>web/pilot-ui/README.md</code></li>
+<li><code>web/pilot-ui/app.js</code></li>
+<li><code>web/pilot-ui/index.html</code></li>
+<li><code>web/pilot-ui/style.css</code></li>
+</ul>
+<hr>
+<h2>Concepts (Textbook Style)</h2>
+<h3>The Thin-Client Architecture</h3>
+<p>The Pilot UI follows a <strong>thin-client</strong> architecture where the UI contains no ICN business logic.
+Instead, it serves purely as a presentation layer that renders data from the gateway.</p>
+<pre><code>┌──────────────────────────────────────────────────────────────────┐
+│                           Thin Client                            │
+│                                                                  │
+│  ┌─────────────┐    ┌─────────────┐    ┌──────────────────────┐ │
+│  │  index.html │    │  style.css  │    │       app.js         │ │
+│  │             │    │             │    │                      │ │
+│  │  Structure  │    │  Styling    │    │  - API calls         │ │
+│  │  Layout     │    │  Responsive │    │  - State management  │ │
+│  │  Semantics  │    │  Themes     │    │  - Event handlers    │ │
+│  └─────────────┘    └─────────────┘    │  - DOM updates       │ │
+│                                        │  - WebSocket client  │ │
+│                                        └──────────────────────┘ │
+└──────────────────────────────────────────────────────────────────┘
+                            │
+                            │ HTTP/JSON + WebSocket
+                            ▼
+┌──────────────────────────────────────────────────────────────────┐
+│                         Gateway API                              │
+│                                                                  │
+│    Auth │ Ledger │ Governance │ Members │ Real-time Events      │
+│                                                                  │
+└──────────────────────────────────────────────────────────────────┘
+</code></pre>
+<p><strong>Why thin-client?</strong></p>
+<ol>
+<li><p><strong>Single Source of Truth</strong>: The ICN daemon is authoritative. The UI never computes
+balances, validates transactions, or enforces rules - it displays what the gateway tells it.</p>
+</li>
+<li><p><strong>Simplicity</strong>: No build pipeline, no framework. Just HTML, CSS, and vanilla JavaScript
+that can be served by any static file server.</p>
+</li>
+<li><p><strong>Flexibility</strong>: Different cooperatives can customize the UI without understanding ICN internals.
+They only need to know the API contract.</p>
+</li>
+<li><p><strong>Security</strong>: Business logic in the UI can be bypassed. Keeping it server-side ensures
+consistent enforcement.</p>
+</li>
+</ol>
+<h3>Application State</h3>
+<p>The UI maintains minimal client-side state:</p>
+<pre><code class="language-javascript">const state = {
+    // Connection state
+    gatewayUrl: &#39;&#39;,      // Gateway API base URL
+    coopId: &#39;&#39;,          // Current cooperative
+    did: &#39;&#39;,             // Authenticated user&#39;s DID
+    token: &#39;&#39;,           // JWT token
+    tokenExpiry: null,   // When token expires (for warnings)
+
+    // User context
+    userRole: null,      // &#39;owner&#39;, &#39;admin&#39;, or &#39;member&#39;
+
+    // Data caches (refreshed from API)
+    members: [],         // Member list
+    transactions: [],    // Transaction history
+    proposals: [],       // Governance proposals
+
+    // WebSocket state
+    ws: null,            // WebSocket connection
+    wsConnected: false,  // Connection status
+};
+</code></pre>
+<p><strong>State management principles</strong>:</p>
+<ol>
+<li><p><strong>Server is authoritative</strong>: Cached data is refreshed from the API; never modified locally
+except through API calls</p>
+</li>
+<li><p><strong>Minimal state</strong>: Only store what&#39;s needed for rendering; don&#39;t duplicate gateway state</p>
+</li>
+<li><p><strong>Persistence</strong>: Session data persists to <code>localStorage</code> for reload recovery</p>
+</li>
+</ol>
+<h3>UI Data Flow</h3>
+<p>Every user action follows the same pattern:</p>
+<pre><code>┌──────────┐     ┌──────────┐     ┌─────────┐     ┌──────────┐
+│  User    │────▶│  Event   │────▶│  API    │────▶│  Update  │
+│  Action  │     │ Handler  │     │  Call   │     │   DOM    │
+└──────────┘     └──────────┘     └─────────┘     └──────────┘
+     │                                                  │
+     │                                                  │
+     ▼                                                  ▼
+┌──────────────────────────────────────────────────────────────┐
+│                    Gateway API                               │
+└──────────────────────────────────────────────────────────────┘
+</code></pre>
+<p><strong>Example: Logging Hours</strong></p>
+<pre><code class="language-javascript">// 1. User clicks &quot;Log Hours&quot; button
+elements.logHoursForm.addEventListener(&#39;submit&#39;, async (e) =&gt; {
+    e.preventDefault();
+
+    // 2. Event handler collects form data
+    const paymentData = {
+        from: state.did,
+        to: elements.recipient.value,
+        amount: parseFloat(elements.hours.value),
+        currency: &#39;hours&#39;,
+        memo: elements.memo.value,
+    };
+
+    // 3. API call to gateway
+    try {
+        const payment = await apiRequest(
+            &#39;POST&#39;,
+            `/ledger/${state.coopId}/payment`,
+            paymentData
+        );
+
+        // 4. Update DOM on success
+        showToast(&#39;Hours logged successfully!&#39;, &#39;success&#39;);
+        elements.logHoursForm.reset();
+
+        // Data refresh happens via WebSocket event
+    } catch (error) {
+        showToast(getUserFriendlyError(error), &#39;error&#39;);
+    }
+});
+</code></pre>
+<hr>
+<h2>Authentication and Session Management</h2>
+<h3>Login Flow</h3>
+<p>The UI authenticates by validating a pre-obtained JWT token:</p>
+<pre><code>┌────────────────────────────────────────────────────────────────┐
+│                        Login Flow                              │
+│                                                                │
+│  1. User enters:         2. Validate:          3. Persist:    │
+│     - Gateway URL           - /health             - localStorage │
+│     - Coop ID               - /balance            - state      │
+│     - DID                                                       │
+│     - JWT Token                                                 │
+└────────────────────────────────────────────────────────────────┘
+</code></pre>
+<pre><code class="language-javascript">async function login() {
+    // 1. Collect and validate inputs
+    state.gatewayUrl = elements.gatewayUrl.value.trim().replace(/\/$/, &#39;&#39;);
+    state.coopId = elements.coopId.value.trim();
+    state.did = elements.did.value.trim();
+    state.token = elements.token.value.trim();
+
+    if (!state.gatewayUrl || !state.coopId || !state.did || !state.token) {
+        showError(elements.loginError, &#39;Please fill in all fields&#39;);
+        return;
+    }
+
+    try {
+        // 2. Validate connectivity and authentication
+        await apiRequest(&#39;GET&#39;, &#39;/health&#39;);  // Gateway reachable?
+        await apiRequest(&#39;GET&#39;, `/ledger/${state.coopId}/balance/${encodeURIComponent(state.did)}`);  // Token valid?
+
+        // 3. Persist session
+        state.tokenExpiry = Date.now() + (24 * 60 * 60 * 1000);  // Assume 24h
+        localStorage.setItem(&#39;icn-gateway&#39;, state.gatewayUrl);
+        localStorage.setItem(&#39;icn-coop&#39;, state.coopId);
+        localStorage.setItem(&#39;icn-did&#39;, state.did);
+        localStorage.setItem(&#39;icn-token&#39;, state.token);
+        localStorage.setItem(&#39;icn-token-expiry&#39;, state.tokenExpiry.toString());
+
+        // 4. Load data and connect WebSocket
+        showScreen(&#39;main&#39;);
+        await loadAllData();
+        connectWebSocket();
+
+    } catch (error) {
+        showError(elements.loginError, getUserFriendlyError(error));
+    }
+}
+</code></pre>
+<h3>Token Expiration Handling</h3>
+<p>The UI tracks token expiration and warns users:</p>
+<pre><code class="language-javascript">// Check token expiry every minute
+setInterval(checkTokenExpiry, 60000);
+
+function checkTokenExpiry() {
+    if (!state.tokenExpiry) return;
+
+    const remaining = state.tokenExpiry - Date.now();
+    const minutes = Math.floor(remaining / 60000);
+
+    // Update visual indicator
+    updateTokenBadge(minutes);
+
+    // Warn at key thresholds
+    if (minutes === 15) {
+        showToast(&#39;Token expires in 15 minutes&#39;, &#39;warning&#39;);
+    } else if (minutes === 5) {
+        showToast(&#39;Token expires in 5 minutes! Get a new token soon.&#39;, &#39;warning&#39;);
+    } else if (minutes &lt;= 0) {
+        showToast(&#39;Token expired! Please sign in again.&#39;, &#39;error&#39;);
+        logout();
+    }
+}
+
+function updateTokenBadge(minutes) {
+    const badge = elements.tokenExpires;
+
+    if (minutes &gt; 60) {
+        badge.className = &#39;token-badge green&#39;;
+        badge.textContent = `${Math.floor(minutes / 60)}h remaining`;
+    } else if (minutes &gt; 15) {
+        badge.className = &#39;token-badge yellow&#39;;
+        badge.textContent = `${minutes}m remaining`;
+    } else {
+        badge.className = &#39;token-badge red&#39;;
+        badge.textContent = `${minutes}m remaining`;
+    }
+}
+</code></pre>
+<h3>Session Restoration</h3>
+<p>On page load, attempt to restore the previous session:</p>
+<pre><code class="language-javascript">function restoreSession() {
+    const gateway = localStorage.getItem(&#39;icn-gateway&#39;);
+    const coopId = localStorage.getItem(&#39;icn-coop&#39;);
+    const did = localStorage.getItem(&#39;icn-did&#39;);
+    const token = localStorage.getItem(&#39;icn-token&#39;);
+    const expiry = localStorage.getItem(&#39;icn-token-expiry&#39;);
+
+    if (gateway &amp;&amp; coopId &amp;&amp; did &amp;&amp; token &amp;&amp; expiry) {
+        const expiryTime = parseInt(expiry, 10);
+
+        // Check if token is still valid
+        if (expiryTime &gt; Date.now()) {
+            state.gatewayUrl = gateway;
+            state.coopId = coopId;
+            state.did = did;
+            state.token = token;
+            state.tokenExpiry = expiryTime;
+
+            // Pre-fill form and auto-login
+            elements.gatewayUrl.value = gateway;
+            elements.coopId.value = coopId;
+            elements.did.value = did;
+            elements.token.value = token;
+
+            login();  // Auto-reconnect
+            return true;
+        }
+    }
+
+    return false;  // Show login screen
+}
+</code></pre>
+<hr>
+<h2>API Integration</h2>
+<h3>The apiRequest Function</h3>
+<p>All API calls go through a single function:</p>
+<pre><code class="language-javascript">async function apiRequest(method, path, body = null) {
+    const url = `${state.gatewayUrl}/v1${path}`;
+
+    const options = {
+        method,
+        headers: {
+            &#39;Content-Type&#39;: &#39;application/json&#39;,
+        },
+    };
+
+    // Add auth token for protected endpoints
+    if (state.token) {
+        options.headers[&#39;Authorization&#39;] = `Bearer ${state.token}`;
+    }
+
+    if (body) {
+        options.body = JSON.stringify(body);
+    }
+
+    const response = await fetch(url, options);
+
+    if (!response.ok) {
+        // Parse error response
+        const error = await response.json().catch(() =&gt; ({}));
+        throw new Error(error.error || `HTTP ${response.status}`);
+    }
+
+    // Return parsed JSON (or null for 204 No Content)
+    if (response.status === 204) {
+        return null;
+    }
+
+    return response.json();
+}
+</code></pre>
+<h3>User-Friendly Error Messages</h3>
+<p>Technical errors are translated to user-friendly messages:</p>
+<pre><code class="language-javascript">function getUserFriendlyError(error) {
+    const message = error.message || String(error);
+
+    // Network errors
+    if (message.includes(&#39;Failed to fetch&#39;)) {
+        return &#39;Cannot connect to the server. Please check your internet connection.&#39;;
+    }
+
+    // HTTP status errors
+    const errorMap = {
+        &#39;401&#39;: &#39;Your session has expired. Please sign in again.&#39;,
+        &#39;403&#39;: &quot;You don&#39;t have permission to do that.&quot;,
+        &#39;404&#39;: &#39;The requested resource was not found.&#39;,
+        &#39;429&#39;: &#39;Too many requests. Please wait a moment.&#39;,
+        &#39;500&#39;: &#39;Server error. Please try again later.&#39;,
+    };
+
+    for (const [code, friendly] of Object.entries(errorMap)) {
+        if (message.includes(code)) {
+            return friendly;
+        }
+    }
+
+    // Specific error patterns
+    if (message.includes(&#39;INSUFFICIENT_BALANCE&#39;)) {
+        return &#39;Insufficient balance for this transaction.&#39;;
+    }
+
+    if (message.includes(&#39;MEMBER_NOT_FOUND&#39;)) {
+        return &#39;Member not found. Please check the recipient.&#39;;
+    }
+
+    return message;  // Fall back to raw message
+}
+</code></pre>
+<hr>
+<h2>WebSocket Integration</h2>
+<h3>Connection Lifecycle</h3>
+<pre><code>┌─────────────────────────────────────────────────────────────────┐
+│                   WebSocket Lifecycle                           │
+│                                                                 │
+│  Connect ──▶ Authenticate ──▶ Receive Events ──▶ Handle Events │
+│      │                              │                    │      │
+│      │                              ▼                    ▼      │
+│      │                         ┌────────┐          ┌────────┐  │
+│      │                         │ Event  │          │ Update │  │
+│      │                         │ Queue  │──────────│  UI    │  │
+│      │                         └────────┘          └────────┘  │
+│      │                                                         │
+│      │  On Disconnect: Auto-reconnect with exponential backoff │
+└─────────────────────────────────────────────────────────────────┘
+</code></pre>
+<pre><code class="language-javascript">function connectWebSocket() {
+    if (state.ws) {
+        state.ws.close();
+    }
+
+    // Convert HTTP URL to WebSocket URL
+    const wsUrl = state.gatewayUrl
+        .replace(&#39;http://&#39;, &#39;ws://&#39;)
+        .replace(&#39;https://&#39;, &#39;wss://&#39;);
+
+    const ws = new WebSocket(`${wsUrl}/v1/ws/${state.coopId}`);
+
+    ws.onopen = () =&gt; {
+        console.log(&#39;WebSocket connected&#39;);
+        state.wsConnected = true;
+        updateConnectionStatus(true);
+
+        // Authenticate with token
+        ws.send(JSON.stringify({
+            type: &#39;Auth&#39;,
+            token: state.token,
+        }));
+    };
+
+    ws.onmessage = (event) =&gt; {
+        try {
+            const message = JSON.parse(event.data);
+            handleWebSocketMessage(message);
+        } catch (e) {
+            console.error(&#39;Failed to parse WebSocket message:&#39;, e);
+        }
+    };
+
+    ws.onerror = (error) =&gt; {
+        console.error(&#39;WebSocket error:&#39;, error);
+    };
+
+    ws.onclose = () =&gt; {
+        console.log(&#39;WebSocket closed&#39;);
+        state.wsConnected = false;
+        updateConnectionStatus(false);
+
+        // Auto-reconnect after delay
+        setTimeout(() =&gt; {
+            if (state.token) {  // Only if still logged in
+                connectWebSocket();
+            }
+        }, 5000);
+    };
+
+    state.ws = ws;
+}
+</code></pre>
+<h3>Message Handling</h3>
+<pre><code class="language-javascript">function handleWebSocketMessage(message) {
+    switch (message.type) {
+        case &#39;AuthOk&#39;:
+            console.log(&#39;WebSocket authenticated:&#39;, message.did);
+            // Can request backfill if needed
+            break;
+
+        case &#39;Error&#39;:
+            console.error(&#39;WebSocket error:&#39;, message.message);
+            showToast(message.message, &#39;error&#39;);
+            break;
+
+        case &#39;Event&#39;:
+            handleWebSocketEvent(message);
+            break;
+
+        case &#39;Shutdown&#39;:
+            showToast(`Server shutting down: ${message.reason}`, &#39;warning&#39;);
+            break;
+    }
+}
+
+function handleWebSocketEvent(message) {
+    const event = message.event;
+
+    switch (event.type) {
+        case &#39;PaymentCreated&#39;:
+            // Refresh balance and transactions
+            loadBalance();
+            loadTransactions();
+
+            // Show notification
+            if (event.to === state.did) {
+                showToast(`Received ${event.amount} hours from ${shortenDid(event.from)}`, &#39;success&#39;);
+            }
+            break;
+
+        case &#39;MemberAdded&#39;:
+            loadMembers();
+            showToast(`New member joined: ${shortenDid(event.did)}`, &#39;info&#39;);
+            break;
+
+        case &#39;MemberRemoved&#39;:
+            loadMembers();
+            break;
+
+        case &#39;GovernanceProposalCreated&#39;:
+            loadProposals();
+            showToast(`New proposal: ${event.title}`, &#39;info&#39;);
+            break;
+
+        case &#39;GovernanceVoteCast&#39;:
+            // Refresh vote counts
+            loadProposals();
+            break;
+    }
+}
+</code></pre>
+<h3>Connection Status Indicator</h3>
+<pre><code class="language-javascript">function updateConnectionStatus(connected) {
+    const indicator = elements.connectionStatus;
+
+    if (connected) {
+        indicator.className = &#39;status-indicator connected&#39;;
+        indicator.title = &#39;Connected to real-time updates&#39;;
+    } else {
+        indicator.className = &#39;status-indicator disconnected&#39;;
+        indicator.title = &#39;Disconnected - reconnecting...&#39;;
+    }
+}
+</code></pre>
+<hr>
+<h2>UI Patterns</h2>
+<h3>Toast Notifications</h3>
+<p>Non-blocking notifications for user feedback:</p>
+<pre><code class="language-javascript">function showToast(message, type = &#39;info&#39;, duration = 5000) {
+    const toast = document.createElement(&#39;div&#39;);
+    toast.className = `toast ${type}`;
+
+    const icons = {
+        success: &#39;✓&#39;,
+        error: &#39;✕&#39;,
+        warning: &#39;⚠&#39;,
+        info: &#39;ℹ&#39;
+    };
+
+    // Build toast content using DOM methods for safety
+    const icon = document.createElement(&#39;span&#39;);
+    icon.className = &#39;toast-icon&#39;;
+    icon.textContent = icons[type];
+
+    const msg = document.createElement(&#39;span&#39;);
+    msg.className = &#39;toast-message&#39;;
+    msg.textContent = message;
+
+    const closeBtn = document.createElement(&#39;button&#39;);
+    closeBtn.className = &#39;toast-close&#39;;
+    closeBtn.textContent = &#39;×&#39;;
+    closeBtn.onclick = () =&gt; toast.remove();
+
+    toast.appendChild(icon);
+    toast.appendChild(msg);
+    toast.appendChild(closeBtn);
+
+    elements.toastContainer.appendChild(toast);
+
+    // Auto-remove
+    if (duration &gt; 0) {
+        setTimeout(() =&gt; toast.remove(), duration);
+    }
+}
+</code></pre>
+<p><strong>CSS for toasts</strong>:</p>
+<pre><code class="language-css">.toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+}
+
+.toast {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    margin-bottom: 10px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    animation: slideIn 0.3s ease;
+}
+
+.toast.success { border-left: 4px solid #22c55e; }
+.toast.error { border-left: 4px solid #ef4444; }
+.toast.warning { border-left: 4px solid #f59e0b; }
+.toast.info { border-left: 4px solid #3b82f6; }
+
+@keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+</code></pre>
+<h3>Tab Navigation</h3>
+<pre><code class="language-javascript">function setupNavigation() {
+    elements.navBtns.forEach(btn =&gt; {
+        btn.addEventListener(&#39;click&#39;, () =&gt; {
+            const tabId = btn.dataset.tab;
+            switchTab(tabId);
+        });
+    });
+}
+
+function switchTab(tabId) {
+    // Update button states
+    elements.navBtns.forEach(btn =&gt; {
+        btn.classList.toggle(&#39;active&#39;, btn.dataset.tab === tabId);
+    });
+
+    // Show selected tab content
+    elements.tabContents.forEach(content =&gt; {
+        content.classList.toggle(&#39;active&#39;, content.id === `${tabId}-tab`);
+    });
+
+    // Refresh data for tab if needed
+    switch (tabId) {
+        case &#39;dashboard&#39;:
+            loadBalance();
+            break;
+        case &#39;history&#39;:
+            loadTransactions();
+            break;
+        case &#39;members&#39;:
+            loadMembers();
+            break;
+        case &#39;governance&#39;:
+            loadProposals();
+            break;
+    }
+}
+</code></pre>
+<h3>Keyboard Shortcuts</h3>
+<pre><code class="language-javascript">function setupKeyboardShortcuts() {
+    document.addEventListener(&#39;keydown&#39;, (e) =&gt; {
+        // Ctrl/Cmd + number for tab switching
+        if ((e.ctrlKey || e.metaKey) &amp;&amp; !e.shiftKey &amp;&amp; !e.altKey) {
+            const tabMap = {
+                &#39;1&#39;: &#39;dashboard&#39;,
+                &#39;2&#39;: &#39;log-hours&#39;,
+                &#39;3&#39;: &#39;history&#39;,
+                &#39;4&#39;: &#39;members&#39;,
+                &#39;5&#39;: &#39;governance&#39;,
+            };
+
+            if (tabMap[e.key]) {
+                e.preventDefault();
+                switchTab(tabMap[e.key]);
+            }
+        }
+    });
+}
+</code></pre>
+<hr>
+<h2>Responsive Design</h2>
+<h3>Mobile-First Approach</h3>
+<p>The UI adapts to different screen sizes:</p>
+<pre><code class="language-css">/* Base styles (mobile) */
+.card {
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.nav {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Tablet and up */
+@media (min-width: 768px) {
+    .nav {
+        flex-direction: row;
+    }
+
+    .dashboard-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 20px;
+    }
+}
+
+/* Desktop */
+@media (min-width: 1024px) {
+    .dashboard-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+</code></pre>
+<h3>Touch-Friendly Targets</h3>
+<pre><code class="language-css">/* Minimum 44px touch target */
+.btn, .nav-btn {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 12px 24px;
+}
+
+/* Prevent iOS zoom on input focus */
+input, select, textarea {
+    font-size: 16px;  /* iOS zooms if &lt; 16px */
+}
+</code></pre>
+<hr>
+<h2>Feature Implementation Examples</h2>
+<h3>Balance Display with Trend</h3>
+<pre><code class="language-javascript">async function loadBalance() {
+    try {
+        const response = await apiRequest(
+            &#39;GET&#39;,
+            `/ledger/${state.coopId}/balance/${encodeURIComponent(state.did)}`
+        );
+
+        const balance = response.balance;
+        const previousBalance = state.previousBalance || balance;
+
+        // Update display
+        elements.myBalance.textContent = formatBalance(balance);
+        elements.myBalance.className = balance &gt;= 0 ? &#39;positive&#39; : &#39;negative&#39;;
+
+        // Show trend indicator
+        const trend = balance &gt; previousBalance ? &#39;↑&#39; :
+                      balance &lt; previousBalance ? &#39;↓&#39; : &#39;→&#39;;
+        elements.balanceTrend.textContent = trend;
+
+        state.previousBalance = balance;
+
+    } catch (error) {
+        showToast(getUserFriendlyError(error), &#39;error&#39;);
+    }
+}
+
+function formatBalance(balance) {
+    const sign = balance &gt;= 0 ? &#39;+&#39; : &#39;&#39;;
+    return `${sign}${balance.toFixed(1)} hours`;
+}
+</code></pre>
+<h3>Transaction History with Filtering</h3>
+<pre><code class="language-javascript">async function loadTransactions(filter = &#39;month&#39;) {
+    try {
+        const params = new URLSearchParams();
+
+        // Apply time filter
+        const now = new Date();
+        switch (filter) {
+            case &#39;today&#39;:
+                params.set(&#39;since&#39;, startOfDay(now).toISOString());
+                break;
+            case &#39;week&#39;:
+                params.set(&#39;since&#39;, startOfWeek(now).toISOString());
+                break;
+            case &#39;month&#39;:
+                params.set(&#39;since&#39;, startOfMonth(now).toISOString());
+                break;
+            // &#39;all&#39; - no filter
+        }
+
+        const history = await apiRequest(
+            &#39;GET&#39;,
+            `/ledger/${state.coopId}/history?${params}`
+        );
+
+        state.transactions = history.transactions;
+        renderTransactions();
+
+    } catch (error) {
+        showToast(getUserFriendlyError(error), &#39;error&#39;);
+    }
+}
+
+function renderTransactions() {
+    const container = elements.transactionList;
+
+    // Clear existing content
+    while (container.firstChild) {
+        container.removeChild(container.firstChild);
+    }
+
+    if (state.transactions.length === 0) {
+        const emptyState = document.createElement(&#39;p&#39;);
+        emptyState.className = &#39;empty-state&#39;;
+        emptyState.textContent = &#39;No transactions found&#39;;
+        container.appendChild(emptyState);
+        return;
+    }
+
+    for (const tx of state.transactions) {
+        const row = createTransactionRow(tx);
+        container.appendChild(row);
+    }
+}
+
+function createTransactionRow(tx) {
+    const row = document.createElement(&#39;div&#39;);
+    row.className = &#39;transaction-row&#39;;
+
+    const isIncoming = tx.to === state.did;
+
+    // Icon
+    const icon = document.createElement(&#39;div&#39;);
+    icon.className = `tx-icon ${isIncoming ? &#39;incoming&#39; : &#39;outgoing&#39;}`;
+    icon.textContent = isIncoming ? &#39;↓&#39; : &#39;↑&#39;;
+
+    // Details
+    const details = document.createElement(&#39;div&#39;);
+    details.className = &#39;tx-details&#39;;
+
+    const party = document.createElement(&#39;div&#39;);
+    party.className = &#39;tx-party&#39;;
+    party.textContent = `${isIncoming ? &#39;From&#39; : &#39;To&#39;}: ${shortenDid(isIncoming ? tx.from : tx.to)}`;
+
+    const memo = document.createElement(&#39;div&#39;);
+    memo.className = &#39;tx-memo&#39;;
+    memo.textContent = tx.memo || &#39;No memo&#39;;
+
+    details.appendChild(party);
+    details.appendChild(memo);
+
+    // Amount
+    const amount = document.createElement(&#39;div&#39;);
+    amount.className = `tx-amount ${isIncoming ? &#39;positive&#39; : &#39;negative&#39;}`;
+    amount.textContent = `${isIncoming ? &#39;+&#39; : &#39;-&#39;}${tx.amount} ${tx.currency}`;
+
+    // Date
+    const date = document.createElement(&#39;div&#39;);
+    date.className = &#39;tx-date&#39;;
+    date.textContent = formatDate(tx.timestamp);
+
+    row.appendChild(icon);
+    row.appendChild(details);
+    row.appendChild(amount);
+    row.appendChild(date);
+
+    return row;
+}
+</code></pre>
+<h3>CSV Export</h3>
+<pre><code class="language-javascript">function exportToCsv() {
+    const rows = [
+        [&#39;Date&#39;, &#39;Time&#39;, &#39;From&#39;, &#39;To&#39;, &#39;Amount&#39;, &#39;Currency&#39;, &#39;Memo&#39;]
+    ];
+
+    for (const tx of state.transactions) {
+        const date = new Date(tx.timestamp * 1000);
+        rows.push([
+            date.toLocaleDateString(),
+            date.toLocaleTimeString(),
+            tx.from,
+            tx.to,
+            tx.amount.toString(),
+            tx.currency,
+            `&quot;${(tx.memo || &#39;&#39;).replace(/&quot;/g, &#39;&quot;&quot;&#39;)}&quot;`,  // Escape quotes
+        ]);
+    }
+
+    const csv = rows.map(row =&gt; row.join(&#39;,&#39;)).join(&#39;\n&#39;);
+    const blob = new Blob([csv], { type: &#39;text/csv&#39; });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement(&#39;a&#39;);
+    a.href = url;
+    a.download = `icn-transactions-${state.coopId}.csv`;
+    a.click();
+
+    URL.revokeObjectURL(url);
+}
+</code></pre>
+<hr>
+<h2>Debugging and Troubleshooting</h2>
+<h3>Common Issues</h3>
+<table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Likely Cause</th>
+<th>Solution</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>&quot;Cannot connect to server&quot;</td>
+<td>Gateway not running</td>
+<td>Start gateway with <code>icnd --gateway-enable</code></td>
+</tr>
+<tr>
+<td>&quot;Your session has expired&quot;</td>
+<td>JWT token expired</td>
+<td>Get new token with <code>icnctl auth login</code></td>
+</tr>
+<tr>
+<td>No real-time updates</td>
+<td>WebSocket disconnected</td>
+<td>Check connection indicator, refresh page</td>
+</tr>
+<tr>
+<td>Balance not updating</td>
+<td>Event not processed</td>
+<td>Check browser console for errors</td>
+</tr>
+<tr>
+<td>Members list empty</td>
+<td>Wrong coop ID</td>
+<td>Verify coop ID matches gateway</td>
+</tr>
+</tbody></table>
+<h3>Browser Console Debugging</h3>
+<pre><code class="language-javascript">// Add to app.js for debugging
+window.DEBUG = {
+    state: () =&gt; console.log(state),
+    ws: () =&gt; console.log(&#39;WS state:&#39;, state.ws?.readyState),
+    api: async (path) =&gt; {
+        const result = await apiRequest(&#39;GET&#39;, path);
+        console.log(result);
+        return result;
+    },
+};
+
+// Usage in console:
+// DEBUG.state()
+// DEBUG.ws()
+// DEBUG.api(&#39;/health&#39;)
+</code></pre>
+<h3>Network Tab Inspection</h3>
+<p>When debugging API issues:</p>
+<ol>
+<li>Open DevTools → Network tab</li>
+<li>Filter by &quot;Fetch/XHR&quot;</li>
+<li>Look for:<ul>
+<li>Red entries (failed requests)</li>
+<li>4xx/5xx status codes</li>
+<li>Request/response headers</li>
+<li>Response body for error details</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h2>Code Map</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>web/pilot-ui/index.html</code></td>
+<td>Page structure, semantic HTML</td>
+</tr>
+<tr>
+<td><code>web/pilot-ui/style.css</code></td>
+<td>Styling, responsive design, themes</td>
+</tr>
+<tr>
+<td><code>web/pilot-ui/app.js</code></td>
+<td>Application logic, API calls, state</td>
+</tr>
+<tr>
+<td><code>web/pilot-ui/tests/e2e/</code></td>
+<td>Playwright end-to-end tests</td>
+</tr>
+<tr>
+<td><code>web/pilot-ui/README.md</code></td>
+<td>Setup and usage documentation</td>
+</tr>
+<tr>
+<td><code>web/pilot-ui/QUICK-START.md</code></td>
+<td>User onboarding guide</td>
+</tr>
+<tr>
+<td><code>web/pilot-ui/TREASURER-GUIDE.md</code></td>
+<td>Financial management guide</td>
+</tr>
+<tr>
+<td><code>web/pilot-ui/ADMIN-GUIDE.md</code></td>
+<td>Administration reference</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Exercises</h2>
+<h3>Exercise 1: Add a Refresh Button</h3>
+<p>Add a manual refresh button that reloads all data:</p>
+<pre><code class="language-javascript">// Implement this function
+async function refreshAllData() {
+    // Show loading indicator
+    // Reload balance, members, transactions, proposals
+    // Show success toast
+}
+</code></pre>
+<h3>Exercise 2: Implement Dark Mode</h3>
+<p>Add a theme toggle that persists to localStorage:</p>
+<pre><code class="language-css">/* Add dark mode styles */
+[data-theme=&quot;dark&quot;] {
+    --bg-color: #1a1a2e;
+    --text-color: #eaeaea;
+    /* ... */
+}
+</code></pre>
+<h3>Exercise 3: Add Proposal Creation</h3>
+<p>Implement the UI for creating new governance proposals using DOM methods:</p>
+<pre><code class="language-javascript">function createProposalForm() {
+    const form = document.createElement(&#39;form&#39;);
+    form.id = &#39;create-proposal-form&#39;;
+
+    // Add title input, description textarea, type select
+    // Handle form submission
+    // Call apiRequest(&#39;POST&#39;, &#39;/gov/proposals&#39;, data)
+}
+</code></pre>
+<hr>
+<h2>Checkpoints</h2>
+<p>Before proceeding to Module 9, verify you can:</p>
+<ul>
+<li><input disabled="" type="checkbox"> Explain the thin-client architecture and its benefits</li>
+<li><input disabled="" type="checkbox"> Trace a user action from button click to API response</li>
+<li><input disabled="" type="checkbox"> Implement session management with JWT tokens</li>
+<li><input disabled="" type="checkbox"> Handle WebSocket events to update the UI</li>
+<li><input disabled="" type="checkbox"> Debug common connection and authentication issues</li>
+<li><input disabled="" type="checkbox"> Create responsive layouts that work on mobile</li>
+<li><input disabled="" type="checkbox"> Use toast notifications for user feedback</li>
+<li><input disabled="" type="checkbox"> Export data to CSV format</li>
+</ul>
+<hr>
+<h2>Next Steps</h2>
+<p>In <strong>Module 9: Operations and Deployment</strong>, you&#39;ll learn how to deploy the ICN daemon
+and web UI to production environments, configure monitoring, and manage the system
+in a live cooperative setting.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

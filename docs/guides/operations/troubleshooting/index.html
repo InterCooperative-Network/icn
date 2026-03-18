@@ -1,0 +1,812 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Troubleshooting Runbooks | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>guides</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>operations</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>troubleshooting</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/guides/operations/troubleshooting.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Troubleshooting Runbooks</h1>
+<p>This document provides step-by-step procedures for diagnosing and resolving common operational issues in ICN deployments.</p>
+<p><strong>Audience</strong>: ICN node operators, system administrators, SRE teams</p>
+<p><strong>Related Documents</strong>:</p>
+<ul>
+<li><a href="/docs/operations/deployment/incident-response">Incident Response Playbook</a> - For security incidents and critical failures</li>
+<li><a href="/docs/security/production-hardening">Production Hardening</a> - Security configuration reference</li>
+</ul>
+<blockquote>
+<p><strong>Note</strong>: Commands marked with &quot;(future feature)&quot; are planned but not yet implemented.
+These are included for completeness and will be available in future ICN releases.</p>
+</blockquote>
+<hr>
+<h2>Table of Contents</h2>
+<ol>
+<li><a href="#runbook-template">Runbook Template</a></li>
+<li><a href="#high-memory-usage">High Memory Usage</a></li>
+<li><a href="#gossip-convergence-failure">Gossip Convergence Failure</a></li>
+<li><a href="#ledger-sync-lag">Ledger Sync Lag</a></li>
+<li><a href="#trust-computation-errors">Trust Computation Errors</a></li>
+<li><a href="#gateway-rate-limiting">Gateway Rate Limiting</a></li>
+<li><a href="#node-wont-start">Node Won't Start</a></li>
+<li><a href="#quick-reference-key-metrics">Quick Reference: Key Metrics</a></li>
+<li><a href="#escalation-paths">Escalation Paths</a></li>
+</ol>
+<hr>
+<h2>Runbook Template</h2>
+<p>Each runbook follows this standard structure:</p>
+<pre><code>## [Issue Name]
+
+**Severity**: P1-P3
+**Typical Duration**: Time to resolve
+**Skills Required**: What expertise is needed
+
+### Symptoms
+- Observable indicators of the problem
+
+### Detection
+- How to identify this issue (metrics, logs, alerts)
+
+### Diagnosis Steps
+1. Step-by-step investigation
+2. Decision tree for root cause
+
+### Resolution Actions
+- Specific commands and procedures
+
+### Prevention
+- How to avoid recurrence
+
+### Escalation
+- When and how to escalate
+</code></pre>
+<hr>
+<h2>High Memory Usage</h2>
+<p><strong>Severity</strong>: P2 (can escalate to P1 if OOM)
+<strong>Typical Duration</strong>: 15-60 minutes
+<strong>Skills Required</strong>: Linux administration, Kubernetes basics</p>
+<h3>Symptoms</h3>
+<ul>
+<li>Pod approaching memory limits</li>
+<li>Slow response times</li>
+<li>OOMKilled container restarts</li>
+<li>Alertmanager: <code>ICNHighMemory</code> alert firing</li>
+<li>Grafana: Memory usage graph trending upward</li>
+</ul>
+<h3>Detection</h3>
+<pre><code class="language-bash"># Check current memory usage (K3s)
+sudo kubectl -n icn top pods
+
+# Check container limits vs usage
+sudo kubectl -n icn describe pod -l app=icn | grep -A 5 &quot;Limits:&quot;
+
+# Check for OOMKilled events
+sudo kubectl -n icn get events --field-selector reason=OOMKilled
+
+# Prometheus query
+container_memory_working_set_bytes{namespace=&quot;icn&quot;, container=&quot;icnd&quot;} / container_spec_memory_limit_bytes{namespace=&quot;icn&quot;, container=&quot;icnd&quot;}
+</code></pre>
+<h3>Diagnosis Steps</h3>
+<ol>
+<li><p><strong>Identify memory consumers</strong>:</p>
+<pre><code class="language-bash"># SSH to pod and check memory breakdown
+sudo kubectl -n icn exec deploy/icn-daemon -- sh -c &quot;cat /proc/meminfo&quot;
+
+# Check Sled database cache size
+sudo kubectl -n icn exec deploy/icn-daemon -- ls -lh /data/
+</code></pre>
+</li>
+<li><p><strong>Check for memory leaks</strong> (sustained growth over time):</p>
+<ul>
+<li>Review Grafana memory dashboard for trends</li>
+<li>Check if memory grows without corresponding workload increase</li>
+<li>Look for task/thread count growth</li>
+</ul>
+</li>
+<li><p><strong>Identify workload patterns</strong>:</p>
+<pre><code class="language-bash"># Check gossip message rate
+curl -s http://10.8.10.40:30100/metrics | grep icn_gossip_messages
+
+# Check active connections
+curl -s http://10.8.10.40:30100/metrics | grep icn_network_connections
+</code></pre>
+</li>
+<li><p><strong>Decision tree</strong>:</p>
+<pre><code>Memory growing steadily?
+├── Yes → Possible memory leak → Collect heap profile, restart pod
+└── No → Memory spikes?
+    ├── Yes → Workload spike → Check gossip/ledger activity
+    └── No → Normal operation → Consider increasing limits
+</code></pre>
+</li>
+</ol>
+<h3>Resolution Actions</h3>
+<p><strong>Immediate relief</strong> (buy time):</p>
+<pre><code class="language-bash"># Restart pod to reclaim memory
+sudo kubectl -n icn rollout restart deployment/icn-daemon
+</code></pre>
+<p><strong>If Sled cache is too large</strong>:</p>
+<pre><code class="language-bash"># Check data directory size
+ssh atlas &quot;du -sh /mnt/storage/k8s/icn-data/*&quot;
+
+# Sled will auto-compact, but can trigger compaction via restart
+</code></pre>
+<p><strong>If limits are insufficient</strong>:</p>
+<pre><code class="language-bash"># Edit deployment to increase memory limit
+sudo kubectl -n icn edit deployment icn-daemon
+# Change: resources.limits.memory: 2Gi → 4Gi
+</code></pre>
+<p><strong>If suspected memory leak</strong>:</p>
+<ol>
+<li>Collect memory diagnostics from the host:<pre><code class="language-bash"># Capture memory map of the process
+sudo kubectl -n icn exec deploy/icn-daemon -- cat /proc/1/smaps &gt; smaps.txt
+
+# Capture current metrics
+curl -s http://10.8.10.40:30100/metrics &gt; metrics-snapshot.txt
+</code></pre>
+</li>
+<li>Report to ICN developers with:<ul>
+<li>Memory diagnostics (smaps, metrics snapshot)</li>
+<li>Memory growth timeline from Grafana</li>
+<li>Workload characteristics</li>
+<li>ICN version</li>
+</ul>
+</li>
+</ol>
+<h3>Prevention</h3>
+<ul>
+<li><strong>Set appropriate limits</strong>: Base on observed peak + 20% buffer</li>
+<li><strong>Enable memory alerting</strong>: Alert at 80% to catch before OOM</li>
+<li><strong>Regular monitoring</strong>: Check weekly memory trends</li>
+<li><strong>Keep ICN updated</strong>: Memory optimizations in new releases</li>
+</ul>
+<h3>Escalation</h3>
+<ul>
+<li><strong>P1 escalation</strong> if: OOM restarts &gt; 3 in 1 hour</li>
+<li><strong>Contact</strong>: ICN development team via GitHub issue</li>
+<li><strong>Provide</strong>: Memory profiles, Prometheus data export, container logs</li>
+</ul>
+<hr>
+<h2>Gossip Convergence Failure</h2>
+<p><strong>Severity</strong>: P2
+<strong>Typical Duration</strong>: 30-90 minutes
+<strong>Skills Required</strong>: Distributed systems understanding, networking basics</p>
+<h3>Symptoms</h3>
+<ul>
+<li>Nodes have divergent views of the network</li>
+<li>Messages not propagating to all nodes</li>
+<li>Entry counts differ significantly between nodes</li>
+<li>Dashboard shows uneven topic coverage</li>
+<li>Inconsistent data across cooperative members</li>
+</ul>
+<h3>Detection</h3>
+<pre><code class="language-bash"># Check gossip metrics
+curl -s http://10.8.10.40:30100/metrics | grep icn_gossip
+
+# Key metrics to watch:
+# - icn_gossip_entries_received_total (incoming entries)
+# - icn_gossip_entries_published_total (outgoing entries)
+# - icn_gossip_entries_total (total stored entries)
+# - icn_gossip_subscriptions_total (active subscriptions)
+# - icn_gossip_subscriptions_rejected_total (rejected subscriptions)
+</code></pre>
+<h3>Diagnosis Steps</h3>
+<ol>
+<li><p><strong>Check network connectivity</strong>:</p>
+<pre><code class="language-bash"># Verify peer count
+curl http://10.8.10.40:30080/v1/health | jq &#39;.active_connections&#39;
+
+# Check if peers are reachable
+sudo kubectl -n icn exec deploy/icn-daemon -- curl -s localhost:9100/metrics | grep icn_network
+</code></pre>
+</li>
+<li><p><strong>Check topic subscriptions</strong>:</p>
+<pre><code class="language-bash"># List subscribed topics
+curl -s http://10.8.10.40:30100/metrics | grep icn_gossip_subscriptions
+
+# Compare subscription counts across nodes (if multi-node)
+</code></pre>
+</li>
+<li><p><strong>Check message flow balance</strong>:</p>
+<ul>
+<li>Compare sent vs received message counts</li>
+<li>Large imbalance indicates sync issues</li>
+</ul>
+<pre><code class="language-bash"># Check message flow balance
+curl -s http://10.8.10.40:30100/metrics | grep -E &quot;icn_gossip_(entries_received|entries_published)_total&quot;
+</code></pre>
+</li>
+<li><p><strong>Check for rejected messages</strong>:</p>
+<pre><code class="language-bash"># High rejection rate indicates trust or rate limiting issues
+curl -s http://10.8.10.40:30100/metrics | grep rejected
+</code></pre>
+</li>
+<li><p><strong>Decision tree</strong>:</p>
+<pre><code>Peers connected?
+├── No → Network issue → Check network policies, firewall
+└── Yes → Messages flowing?
+    ├── No → Check subscriptions, topic configuration
+    └── Yes → Convergence slow?
+        ├── Yes → Compare entry counts across nodes, check anti-entropy
+        └── No → False alarm, verify with manual check
+</code></pre>
+</li>
+</ol>
+<h3>Resolution Actions</h3>
+<p><strong>If network connectivity issue</strong>:</p>
+<pre><code class="language-bash"># Check network policies
+sudo kubectl -n icn get networkpolicies
+
+# Verify QUIC port is accessible (default 7777)
+sudo kubectl -n icn get svc
+
+# Test peer reachability from pod
+sudo kubectl -n icn exec deploy/icn-daemon -- nc -zvu &lt;peer-ip&gt; 7777
+</code></pre>
+<p><strong>If subscription issue</strong>:</p>
+<pre><code class="language-bash"># Restart to re-establish subscriptions
+sudo kubectl -n icn rollout restart deployment/icn-daemon
+</code></pre>
+<p><strong>If clock drift</strong>:</p>
+<pre><code class="language-bash"># Check system time on nodes
+sudo kubectl -n icn exec deploy/icn-daemon -- date
+date
+
+# Ensure NTP is configured on host
+timedatectl status
+</code></pre>
+<p><strong>Trigger anti-entropy</strong> (automatic):
+Gossip anti-entropy runs automatically. To accelerate sync, restart the daemon:</p>
+<pre><code class="language-bash">sudo kubectl -n icn rollout restart deployment/icn-daemon
+</code></pre>
+<h3>Prevention</h3>
+<ul>
+<li><strong>Monitor entry flow</strong>: Alert on <code>icn_gossip_entries_received_total</code> stagnating</li>
+<li><strong>Multiple peers</strong>: Ensure at least 3 peers for redundancy</li>
+<li><strong>NTP configured</strong>: System clocks synchronized</li>
+<li><strong>Network monitoring</strong>: Watch for packet loss or latency spikes</li>
+</ul>
+<h3>Escalation</h3>
+<ul>
+<li><strong>P1 escalation</strong> if: No convergence after 2 hours</li>
+<li><strong>Contact</strong>: ICN development team</li>
+<li><strong>Provide</strong>: Gossip metrics from all nodes, network topology</li>
+</ul>
+<hr>
+<h2>Ledger Sync Lag</h2>
+<p><strong>Severity</strong>: P2
+<strong>Typical Duration</strong>: 30-120 minutes
+<strong>Skills Required</strong>: Understanding of distributed ledgers, database basics</p>
+<h3>Symptoms</h3>
+<ul>
+<li>Balance queries return stale data</li>
+<li>New transactions not appearing</li>
+<li><code>icn_ledger_sync_lag_seconds &gt; 300</code> alert</li>
+<li>Dashboard shows growing sync lag</li>
+<li>Members report transaction visibility delays</li>
+</ul>
+<h3>Detection</h3>
+<pre><code class="language-bash"># Check ledger metrics
+curl -s http://10.8.10.40:30100/metrics | grep icn_ledger
+
+# Key metrics:
+# - icn_ledger_sync_lag_seconds
+# - icn_ledger_entries_total
+# - icn_ledger_quarantine_size
+# - icn_ledger_merge_conflicts_total
+</code></pre>
+<h3>Diagnosis Steps</h3>
+<ol>
+<li><p><strong>Check peer connectivity</strong>:</p>
+<pre><code class="language-bash">curl http://10.8.10.40:30080/v1/health | jq &#39;.active_connections&#39;
+</code></pre>
+</li>
+<li><p><strong>Check quarantine size</strong> (indicates problematic entries):</p>
+<pre><code class="language-bash">curl -s http://10.8.10.40:30100/metrics | grep quarantine
+</code></pre>
+</li>
+<li><p><strong>Verify entry propagation</strong>:</p>
+<pre><code class="language-bash"># Compare entry counts across nodes
+# Node 1:
+curl -s http://node1:9100/metrics | grep icn_ledger_entries_total
+# Node 2:
+curl -s http://node2:9100/metrics | grep icn_ledger_entries_total
+</code></pre>
+</li>
+<li><p><strong>Check for forks</strong>:</p>
+<ul>
+<li>Different entry counts on different nodes</li>
+<li>Conflicting entries for same account</li>
+</ul>
+</li>
+<li><p><strong>Decision tree</strong>:</p>
+<pre><code>Quarantine growing?
+├── Yes → Conflicting entries → See Incident Response for quarantine handling
+└── No → Entries propagating?
+    ├── No → Check gossip → See Gossip Convergence runbook
+    └── Yes → Just slow?
+        ├── Yes → High volume → Normal during catch-up
+        └── No → Check for network issues
+</code></pre>
+</li>
+</ol>
+<h3>Resolution Actions</h3>
+<p><strong>If slow propagation</strong> (high volume):</p>
+<pre><code class="language-bash"># Monitor progress - should improve over time
+watch -n 5 &quot;curl -s http://10.8.10.40:30100/metrics | grep icn_ledger_entries_total&quot;
+</code></pre>
+<p><strong>If quarantine issues</strong>:</p>
+<pre><code class="language-bash"># List quarantined entries
+icnctl ledger quarantine list
+
+# Get details on specific entry
+icnctl ledger quarantine get &lt;entry-hash&gt;
+
+# See incident-response.md for quarantine resolution
+</code></pre>
+<p><strong>Ledger sync is automatic</strong> via gossip protocol. To accelerate sync after
+network partition, restart the daemon to reinitialize gossip connections.</p>
+<p><strong>If persistent lag with no progress</strong>:</p>
+<pre><code class="language-bash"># Restart to reinitialize sync state
+sudo kubectl -n icn rollout restart deployment/icn-daemon
+</code></pre>
+<h3>Prevention</h3>
+<ul>
+<li><strong>Monitor sync lag</strong>: Alert on &gt; 5 minutes</li>
+<li><strong>Regular health checks</strong>: Compare entry counts weekly</li>
+<li><strong>Backup before upgrades</strong>: Ensure restore capability</li>
+<li><strong>Test recovery</strong>: Monthly sync recovery drill</li>
+</ul>
+<h3>Escalation</h3>
+<ul>
+<li><strong>P1 escalation</strong> if: Sync lag &gt; 1 hour or balances incorrect</li>
+<li><strong>Contact</strong>: ICN development team and cooperative coordinators</li>
+<li><strong>Provide</strong>: Ledger metrics, entry counts from all nodes</li>
+</ul>
+<hr>
+<h2>Trust Computation Errors</h2>
+<p><strong>Severity</strong>: P2
+<strong>Typical Duration</strong>: 30-60 minutes
+<strong>Skills Required</strong>: Graph algorithms understanding, database basics</p>
+<h3>Symptoms</h3>
+<ul>
+<li>Trust scores returning errors or unexpected values</li>
+<li>Rate limiting affecting legitimate users</li>
+<li><code>icn_trust_computation_errors_total</code> incrementing</li>
+<li>Access control decisions failing</li>
+<li>Users reporting permission issues</li>
+</ul>
+<h3>Detection</h3>
+<pre><code class="language-bash"># Check trust metrics
+curl -s http://10.8.10.40:30100/metrics | grep icn_trust
+
+# Key metrics:
+# - icn_trust_computation_errors_total
+# - icn_trust_cache_hits_total / icn_trust_cache_misses_total
+# - icn_trust_edges_total
+# - icn_trust_computation_duration_seconds
+</code></pre>
+<h3>Diagnosis Steps</h3>
+<ol>
+<li><p><strong>Check error types</strong>:</p>
+<pre><code class="language-bash">sudo kubectl -n icn logs deployment/icn-daemon | grep -i &quot;trust.*error&quot; | tail -20
+</code></pre>
+</li>
+<li><p><strong>Verify graph consistency</strong>:</p>
+<pre><code class="language-bash"># Check edge count
+curl -s http://10.8.10.40:30100/metrics | grep icn_trust_edges
+
+# Check for cycles or invalid edges in logs
+sudo kubectl -n icn logs deployment/icn-daemon | grep -i &quot;trust.*cycle\|invalid.*edge&quot;
+</code></pre>
+</li>
+<li><p><strong>Check computation performance</strong>:</p>
+<pre><code class="language-bash"># High computation time indicates graph issues
+curl -s http://10.8.10.40:30100/metrics | grep icn_trust_computation_duration
+</code></pre>
+</li>
+<li><p><strong>Decision tree</strong>:</p>
+<pre><code>Errors in logs?
+├── Yes → What type?
+│   ├── &quot;invalid edge&quot; → Check edge data integrity
+│   ├── &quot;cycle detected&quot; → Graph has loops → May need cleanup
+│   └── &quot;computation timeout&quot; → Graph too large → Check cache
+└── No → Cache issues?
+    ├── High cache miss rate → Cache not warming → Check config
+    └── Normal → Transient issue → Monitor
+</code></pre>
+</li>
+</ol>
+<h3>Resolution Actions</h3>
+<p><strong>Clear computation cache</strong> (force recalculation):</p>
+<pre><code class="language-bash"># Restart pod to clear in-memory cache
+sudo kubectl -n icn rollout restart deployment/icn-daemon
+</code></pre>
+<p><strong>Verify edge data</strong> via metrics:</p>
+<pre><code class="language-bash"># Check edge count from Prometheus metrics
+curl -s http://10.8.10.40:30100/metrics | grep icn_trust_edges
+</code></pre>
+<p><strong>If graph corruption suspected</strong>:</p>
+<ol>
+<li>Check trust-related logs:<pre><code class="language-bash">sudo kubectl -n icn logs deployment/icn-daemon | grep -i &quot;trust.*error\|graph&quot;
+</code></pre>
+</li>
+<li>Contact ICN team with log excerpts and metrics</li>
+<li>May need to restart daemon to rebuild from persisted edges</li>
+</ol>
+<p><strong>Note</strong>: Direct trust edge management via CLI is planned for a future release.
+Currently, trust edges are managed through the RPC API or gossip protocol.</p>
+<h3>Prevention</h3>
+<ul>
+<li><strong>Monitor error rate</strong>: Alert on &gt; 1 error/minute</li>
+<li><strong>Cache tuning</strong>: Ensure cache is properly sized</li>
+<li><strong>Edge validation</strong>: Validate edges on creation</li>
+<li><strong>Regular audits</strong>: Weekly trust graph consistency check</li>
+</ul>
+<h3>Escalation</h3>
+<ul>
+<li><strong>P1 escalation</strong> if: Trust computation affecting access control</li>
+<li><strong>Contact</strong>: ICN development team</li>
+<li><strong>Provide</strong>: Trust graph export, error logs, computation metrics</li>
+</ul>
+<hr>
+<h2>Gateway Rate Limiting</h2>
+<p><strong>Severity</strong>: P3
+<strong>Typical Duration</strong>: 15-30 minutes
+<strong>Skills Required</strong>: HTTP/API understanding, rate limiting concepts</p>
+<h3>Symptoms</h3>
+<ul>
+<li>Clients receiving 429 Too Many Requests</li>
+<li>Legitimate operations being blocked</li>
+<li><code>icn_gateway_rate_limit_exceeded_total</code> incrementing</li>
+<li>User complaints about &quot;too many requests&quot; errors</li>
+<li>API latency spikes due to queuing</li>
+</ul>
+<h3>Detection</h3>
+<pre><code class="language-bash"># Check rate limiting metrics
+curl -s http://10.8.10.40:30100/metrics | grep rate_limit
+
+# Check gateway response codes
+curl -s http://10.8.10.40:30100/metrics | grep icn_gateway_requests | grep 429
+</code></pre>
+<h3>Diagnosis Steps</h3>
+<ol>
+<li><p><strong>Identify rate-limited clients</strong>:</p>
+<pre><code class="language-bash"># Check logs for rate limit events
+sudo kubectl -n icn logs deployment/icn-daemon | grep -i &quot;rate.limit\|429&quot; | tail -20
+</code></pre>
+</li>
+<li><p><strong>Check client trust scores</strong>:</p>
+<pre><code class="language-bash"># Low trust = lower rate limits
+# Check trust metrics for affected DIDs
+</code></pre>
+</li>
+<li><p><strong>Analyze request patterns</strong>:</p>
+<pre><code class="language-bash"># Check request rate by endpoint
+curl -s http://10.8.10.40:30100/metrics | grep icn_gateway_requests_total
+</code></pre>
+</li>
+<li><p><strong>Decision tree</strong>:</p>
+<pre><code>Single client rate limited?
+├── Yes → Check if legitimate
+│   ├── Legitimate → Consider whitelist or trust boost
+│   └── Abuse → Keep limits, consider block
+└── No → Multiple clients affected?
+    ├── Yes → Rate limits too aggressive → Adjust globally
+    └── No → Spike in traffic → Normal protection working
+</code></pre>
+</li>
+</ol>
+<h3>Resolution Actions</h3>
+<p><strong>Adjust rate limits</strong> (if too aggressive):</p>
+<pre><code class="language-bash"># Edit gateway configuration
+sudo kubectl -n icn edit configmap icn-config
+# Find rate_limit section and adjust values
+
+# Restart to apply
+sudo kubectl -n icn rollout restart deployment/icn-daemon
+</code></pre>
+<p><strong>Whitelist trusted client</strong> (future feature):</p>
+<pre><code class="language-bash">icnctl gateway whitelist add did:icn:&lt;client-did&gt;
+</code></pre>
+<p><strong>If abuse detected</strong>:</p>
+<pre><code class="language-bash"># Block abusive client (future feature)
+icnctl gateway block did:icn:&lt;abusive-did&gt;
+
+# Or reduce trust to minimize rate limit
+icnctl trust set did:icn:&lt;client-did&gt; --score 0.1
+</code></pre>
+<p><strong>Temporary rate limit increase</strong>:</p>
+<pre><code class="language-bash"># Environment variable override
+sudo kubectl -n icn set env deployment/icn-daemon ICN_RATE_LIMIT_MULTIPLIER=2.0
+</code></pre>
+<h3>Prevention</h3>
+<ul>
+<li><strong>Monitor rate limiting</strong>: Alert on sustained high rate limit events</li>
+<li><strong>Trust-based limits</strong>: Ensure trust scores correctly reflect client reliability</li>
+<li><strong>Capacity planning</strong>: Ensure adequate resources for expected load</li>
+<li><strong>Client education</strong>: Document rate limits for API consumers</li>
+</ul>
+<h3>Escalation</h3>
+<ul>
+<li><strong>P1 escalation</strong> if: Rate limiting affecting critical cooperative operations</li>
+<li><strong>Contact</strong>: ICN operations team, then development if config changes needed</li>
+<li><strong>Provide</strong>: Rate limit metrics, affected client DIDs, traffic patterns</li>
+</ul>
+<hr>
+<h2>Node Won&#39;t Start</h2>
+<p><strong>Severity</strong>: P1
+<strong>Typical Duration</strong>: 15-60 minutes
+<strong>Skills Required</strong>: Linux administration, Kubernetes debugging</p>
+<h3>Symptoms</h3>
+<ul>
+<li>Pod stuck in CrashLoopBackOff or Error state</li>
+<li>Container exits immediately after start</li>
+<li>No health endpoint response</li>
+<li>Startup logs show errors</li>
+<li>Previous container logs show crash</li>
+</ul>
+<h3>Detection</h3>
+<pre><code class="language-bash"># Check pod status
+sudo kubectl -n icn get pods
+
+# Check pod events
+sudo kubectl -n icn describe pod -l app=icn
+
+# Check container logs
+sudo kubectl -n icn logs deployment/icn-daemon --previous
+</code></pre>
+<h3>Diagnosis Steps</h3>
+<ol>
+<li><p><strong>Check container status</strong>:</p>
+<pre><code class="language-bash">sudo kubectl -n icn get pods -o jsonpath=&#39;{.items[0].status.containerStatuses[0]}&#39;
+</code></pre>
+</li>
+<li><p><strong>Review startup logs</strong>:</p>
+<pre><code class="language-bash">sudo kubectl -n icn logs deployment/icn-daemon --previous | head -50
+</code></pre>
+</li>
+<li><p><strong>Check configuration</strong>:</p>
+<pre><code class="language-bash"># View current config
+sudo kubectl -n icn get configmap icn-config -o yaml
+</code></pre>
+</li>
+<li><p><strong>Verify keystore</strong>:</p>
+<pre><code class="language-bash"># Check if keystore file exists
+sudo kubectl -n icn exec deploy/icn-daemon -- ls -la /data/keystore* 2&gt;/dev/null || echo &quot;No keystore&quot;
+</code></pre>
+</li>
+<li><p><strong>Check port availability</strong>:</p>
+<pre><code class="language-bash"># Ensure ports aren&#39;t already bound
+sudo kubectl -n icn exec deploy/icn-daemon -- ss -tlnp
+</code></pre>
+</li>
+<li><p><strong>Decision tree</strong>:</p>
+<pre><code>Container starting?
+├── No → Exit code?
+│   ├── 1 → Config error → Check config syntax
+│   ├── 137 → OOMKilled → Increase memory
+│   └── Other → Check logs for error
+└── Yes → Crashing after start?
+    ├── Yes → Runtime error
+    │   ├── &quot;keystore&quot; error → Keystore issue
+    │   ├── &quot;bind&quot; error → Port conflict
+    │   └── &quot;permission&quot; error → File permissions
+    └── No → Health check failing?
+        ├── Yes → Slow startup → Increase probe delays
+        └── No → Should be working → Verify service routing
+</code></pre>
+</li>
+</ol>
+<h3>Resolution Actions</h3>
+<p><strong>If configuration error</strong>:</p>
+<pre><code class="language-bash"># Validate config syntax
+sudo kubectl -n icn get configmap icn-config -o jsonpath=&#39;{.data.config\.toml}&#39; | head -20
+
+# Fix and reapply
+sudo kubectl -n icn edit configmap icn-config
+sudo kubectl -n icn rollout restart deployment/icn-daemon
+</code></pre>
+<p><strong>If keystore issue</strong>:</p>
+<pre><code class="language-bash"># Check keystore accessibility
+ssh atlas &quot;ls -la /mnt/storage/k8s/icn-data/&quot;
+
+# If missing, restore from backup
+# See incident-response.md for restore procedure
+</code></pre>
+<p><strong>If port conflict</strong>:</p>
+<pre><code class="language-bash"># Check what&#39;s using the port
+sudo kubectl -n icn exec deploy/icn-daemon -- ss -ulnp | grep 7777
+
+# May need to kill stuck process or wait for cleanup
+</code></pre>
+<p><strong>If permission error</strong>:</p>
+<pre><code class="language-bash"># Check data directory permissions
+ssh atlas &quot;ls -la /mnt/storage/k8s/icn-data/&quot;
+
+# Fix permissions if needed
+ssh atlas &quot;sudo chown -R 1000:1000 /mnt/storage/k8s/icn-data/&quot;
+</code></pre>
+<p><strong>If OOMKilled</strong>:</p>
+<pre><code class="language-bash"># Increase memory limit
+sudo kubectl -n icn patch deployment icn-daemon -p &#39;{&quot;spec&quot;:{&quot;template&quot;:{&quot;spec&quot;:{&quot;containers&quot;:[{&quot;name&quot;:&quot;icnd&quot;,&quot;resources&quot;:{&quot;limits&quot;:{&quot;memory&quot;:&quot;4Gi&quot;}}}]}}}}&#39;
+</code></pre>
+<p><strong>If slow startup</strong> (health check timeout):</p>
+<pre><code class="language-bash"># Increase probe delays
+sudo kubectl -n icn edit deployment icn-daemon
+# Adjust: initialDelaySeconds, periodSeconds, failureThreshold
+</code></pre>
+<h3>Prevention</h3>
+<ul>
+<li><strong>Config validation</strong>: Validate config before deployment</li>
+<li><strong>Backup keystore</strong>: Regular encrypted backups</li>
+<li><strong>Resource monitoring</strong>: Track resource usage trends</li>
+<li><strong>Staged rollouts</strong>: Deploy changes incrementally</li>
+</ul>
+<h3>Escalation</h3>
+<ul>
+<li><strong>Immediate escalation</strong> if: Cannot start after 30 minutes</li>
+<li><strong>Contact</strong>: ICN development team</li>
+<li><strong>Provide</strong>: Full pod logs, describe output, config dump (sanitized)</li>
+</ul>
+<hr>
+<h2>Quick Reference: Key Metrics</h2>
+<table>
+<thead>
+<tr>
+<th>Issue</th>
+<th>Key Metric</th>
+<th>Alert Threshold</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>High Memory</td>
+<td><code>container_memory_working_set_bytes</code></td>
+<td>&gt; 85% limit</td>
+</tr>
+<tr>
+<td>Gossip Issues</td>
+<td><code>icn_gossip_subscriptions_rejected_total</code></td>
+<td>increasing rate</td>
+</tr>
+<tr>
+<td>Ledger Lag</td>
+<td><code>icn_ledger_sync_lag_seconds</code></td>
+<td>&gt; 300 seconds</td>
+</tr>
+<tr>
+<td>Trust Errors</td>
+<td><code>icn_trust_computation_errors_total</code></td>
+<td>&gt; 10/minute</td>
+</tr>
+<tr>
+<td>Rate Limiting</td>
+<td><code>icn_gateway_rate_limit_exceeded_total</code></td>
+<td>&gt; 100/minute</td>
+</tr>
+<tr>
+<td>Restarts</td>
+<td><code>kube_pod_container_status_restarts_total</code></td>
+<td>&gt; 3/hour</td>
+</tr>
+</tbody></table>
+<h3>Quick Prometheus Queries</h3>
+<pre><code class="language-promql"># Memory usage percentage
+container_memory_working_set_bytes{namespace=&quot;icn&quot;} / container_spec_memory_limit_bytes{namespace=&quot;icn&quot;}
+
+# Request error rate
+rate(icn_gateway_requests_total{status=~&quot;5..&quot;}[5m]) / rate(icn_gateway_requests_total[5m])
+
+# Gossip entry receive rate
+rate(icn_gossip_entries_received_total[5m])
+
+# Rate limit events per minute
+rate(icn_gateway_rate_limit_exceeded_total[5m]) * 60
+
+# Gossip message latency p99
+histogram_quantile(0.99, rate(icn_gossip_message_latency_seconds_bucket[5m]))
+</code></pre>
+<hr>
+<h2>Escalation Paths</h2>
+<h3>When to Escalate</h3>
+<table>
+<thead>
+<tr>
+<th>Severity</th>
+<th>Criteria</th>
+<th>Response Time</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>P1</td>
+<td>Service down, data loss risk</td>
+<td>Immediate</td>
+</tr>
+<tr>
+<td>P2</td>
+<td>Degraded service, user impact</td>
+<td>1 hour</td>
+</tr>
+<tr>
+<td>P3</td>
+<td>Minor issues, no user impact</td>
+<td>Next business day</td>
+</tr>
+</tbody></table>
+<h3>Escalation Contacts</h3>
+<ol>
+<li><strong>On-call operator</strong>: First responder for all issues</li>
+<li><strong>ICN development team</strong>: GitHub issues for bugs/features</li>
+<li><strong>Cooperative coordinators</strong>: For user-facing impact</li>
+</ol>
+<h3>Information to Gather Before Escalating</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Pod status and recent logs</li>
+<li><input disabled="" type="checkbox"> Relevant Prometheus metrics</li>
+<li><input disabled="" type="checkbox"> Timeline of events</li>
+<li><input disabled="" type="checkbox"> Actions already taken</li>
+<li><input disabled="" type="checkbox"> Current impact assessment</li>
+</ul>
+<hr>
+<h2>Version History</h2>
+<ul>
+<li><strong>2026-01-04</strong>: Initial version with 6 runbooks (#221)</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

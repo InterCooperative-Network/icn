@@ -1,0 +1,595 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>SDIS &amp; Steward System - Completion Roadmap | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>sdis</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>SDIS STEWARD ROADMAP</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/sdis/SDIS_STEWARD_ROADMAP.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>SDIS &amp; Steward System - Completion Roadmap</h1>
+<p><strong>Date:</strong> 2025-12-12<br><strong>Status Snapshot:</strong> Foundation complete ✅<br><strong>Next Phase:</strong> Integration &amp; User-Facing Features</p>
+<hr>
+<h2>🎯 Current State Assessment</h2>
+<h3>✅ What&#39;s Complete (Phases S1-S3)</h3>
+<h4>Cryptographic Foundations (Phase S1)</h4>
+<ul>
+<li>✅ <strong>icn-crypto-pq</strong> crate (51 tests passing)<ul>
+<li>Hybrid signatures (Ed25519 + ML-DSA)</li>
+<li>ML-KEM key encapsulation</li>
+<li>Threshold secret sharing for VUI computation</li>
+<li>Blind signatures for unlinkable credentials</li>
+<li>KDF for hybrid key derivation</li>
+</ul>
+</li>
+</ul>
+<h4>Identity Extensions (Phase S2)</h4>
+<ul>
+<li>✅ <strong>Anchor/KeyBundle</strong> separation in icn-identity<ul>
+<li>Permanent anchor IDs</li>
+<li>Rotatable key bundles</li>
+<li>VUI (Verifiable Unique Identifier) support</li>
+<li>Multi-device identity support</li>
+<li>Recovery mechanisms</li>
+</ul>
+</li>
+</ul>
+<h4>Steward Network (Phase S3)</h4>
+<ul>
+<li>✅ <strong>icn-steward</strong> crate (66 tests passing)<ul>
+<li>StewardActor for ceremony coordination</li>
+<li>Token issuance and verification</li>
+<li>VUI registry with Bloom filters</li>
+<li>Enrollment ceremonies</li>
+<li>Recovery ceremonies</li>
+<li>Threshold VUI computation</li>
+</ul>
+</li>
+</ul>
+<h4>Zero-Knowledge Proofs (Phase S4 - Partial)</h4>
+<ul>
+<li>✅ <strong>icn-zkp</strong> crate (42 tests passing)<ul>
+<li>Age proofs (prove &gt; 18 without revealing age)</li>
+<li>Non-revocation proofs</li>
+<li>Cryptographic accumulators</li>
+<li>Proof verification</li>
+<li>Nonce-based replay protection</li>
+</ul>
+</li>
+</ul>
+<hr>
+<h2>🚧 What Needs Completion</h2>
+<h3>Priority 1: Integration with Gateway API (2-3 weeks)</h3>
+<p>SDIS components are now exposed through gateway route wiring, but this roadmap tracks productization hardening and user-facing completion work.</p>
+<h4>Tasks:</h4>
+<p><strong>1. Gateway SDIS Endpoints</strong></p>
+<pre><code>POST /v1/sdis/enrollment/start            - Start enrollment ceremony
+GET  /v1/sdis/status/{enrollment_id}      - Check enrollment status
+POST /v1/sdis/vouch/{enrollment_id}       - Steward vouch action
+POST /v1/sdis/reject/{enrollment_id}      - Steward reject action
+POST /v1/sdis/enrollment/complete         - Complete enrollment
+
+GET  /v1/sdis/anchor/{anchor_id}          - Get anchor info
+POST /v1/sdis/anchor/rotate-keys          - Rotate keys (keep anchor)
+POST /v1/sdis/anchor/devices/add          - Add trusted anchor device
+GET  /v1/sdis/anchor/{anchor_id}/devices  - List anchor devices
+
+POST /v1/sdis/recovery/start              - Start recovery ceremony
+GET  /v1/sdis/recovery/{id}               - Check recovery status
+POST /v1/sdis/recovery/{id}/approve       - Steward recovery approval (admin-gated)
+POST /v1/sdis/recovery/{id}/complete      - Complete recovery
+
+POST /v1/sdis/verify/level1               - Level-1 verification
+POST /v1/sdis/verify/level2               - Level-2 verification
+POST /v1/sdis/ephemeral/generate          - Generate ephemeral proof
+</code></pre>
+<p><strong>2. Steward Discovery</strong></p>
+<ul>
+<li>Gossip topic: <code>sdis:steward:discovery</code></li>
+<li>Allow nodes to find stewards in their region</li>
+<li>Trust-weighted steward selection</li>
+</ul>
+<p><strong>3. SDIS Storage</strong></p>
+<ul>
+<li>Add anchor → DID mapping to ledger</li>
+<li>Store VUI registry checkpoints</li>
+<li>Persist enrollment/recovery ceremonies</li>
+</ul>
+<hr>
+<h3>Priority 2: User-Facing Features (3-4 weeks)</h3>
+<p>Make SDIS usable by end users.</p>
+<h4>Tasks:</h4>
+<p><strong>1. Enrollment Wizard (Pilot UI)</strong></p>
+<pre><code>Screens:
+- Choose pathway (gov ID, org sponsor, web of trust)
+- Submit verification documents
+- Wait for steward verification
+- Receive anchor + initial keybundle
+- Backup recovery codes
+</code></pre>
+<p><strong>2. Recovery Flow (Pilot UI)</strong></p>
+<pre><code>Screens:
+- Enter anchor ID or VUI
+- Submit identity verification
+- Wait for steward threshold
+- Receive new keybundle
+- Update all devices
+</code></pre>
+<p><strong>3. Identity Viewer</strong></p>
+<pre><code>Show:
+- Your anchor ID (permanent)
+- Current keybundle version
+- Enrollment pathway
+- Recovery stewards
+- Trusted devices
+- Attestations received
+</code></pre>
+<p><strong>4. Steward Dashboard (Admin UI)</strong></p>
+<pre><code>Features:
+- Pending enrollment requests
+- Verification workflows
+- Recovery ceremonies in progress
+- VUI registry stats
+- Steward performance metrics
+</code></pre>
+<hr>
+<h3>Priority 3: Mobile Integration (2-3 weeks)</h3>
+<p>Add SDIS to CoopWallet mobile app.</p>
+<h4>Tasks:</h4>
+<p><strong>1. Enrollment Screen</strong></p>
+<ul>
+<li>Camera for ID scanning</li>
+<li>Document upload</li>
+<li>Selfie verification</li>
+<li>Biometric (Face ID / fingerprint)</li>
+</ul>
+<p><strong>2. Credential Presentation</strong></p>
+<ul>
+<li>QR code generation (tier 1)</li>
+<li>NFC presentation (tier 2)  </li>
+<li>Network verification (tier 3)</li>
+</ul>
+<p><strong>3. Proof Generation UI</strong></p>
+<ul>
+<li>&quot;Prove I&#39;m over 18&quot;</li>
+<li>&quot;Prove I&#39;m a member&quot;</li>
+<li>&quot;Prove I&#39;m from [region]&quot;</li>
+<li>Selective attribute disclosure</li>
+</ul>
+<p><strong>4. Recovery Backup</strong></p>
+<ul>
+<li>Export recovery shares</li>
+<li>Print recovery codes</li>
+<li>Secure share distribution</li>
+</ul>
+<hr>
+<h3>Priority 4: Advanced Features (4-6 weeks)</h3>
+<p>Enhanced SDIS capabilities.</p>
+<h4>Tasks:</h4>
+<p><strong>1. Credential Issuance</strong></p>
+<pre><code class="language-rust">// Gateway issues verifiable credentials
+POST /v1/sdis/credentials/issue
+{
+  &quot;holder_anchor&quot;: &quot;anchor_abc123&quot;,
+  &quot;credential_type&quot;: &quot;membership&quot;,
+  &quot;attributes&quot;: {
+    &quot;coop_id&quot;: &quot;test-coop&quot;,
+    &quot;role&quot;: &quot;member&quot;,
+    &quot;since&quot;: 1702425600
+  },
+  &quot;validity_period&quot;: 31536000  // 1 year
+}
+</code></pre>
+<p><strong>2. Revocation</strong></p>
+<pre><code class="language-rust">// Revoke compromised credentials
+POST /v1/sdis/credentials/revoke
+{
+  &quot;credential_id&quot;: &quot;cred_xyz789&quot;,
+  &quot;reason&quot;: &quot;key_compromise&quot;
+}
+
+// Add to cryptographic accumulator
+// ZK proofs can prove non-revocation
+</code></pre>
+<p><strong>3. Tiered Presentation</strong></p>
+<p><strong>Tier 1: QR Code (Low Security)</strong></p>
+<ul>
+<li>Static QR with anchor + proof</li>
+<li>No network required</li>
+<li>For low-value transactions</li>
+</ul>
+<p><strong>Tier 2: NFC (Medium Security)</strong></p>
+<ul>
+<li>Challenge-response protocol</li>
+<li>Proximity verification</li>
+<li>For physical access control</li>
+</ul>
+<p><strong>Tier 3: Network (High Security)</strong></p>
+<ul>
+<li>Full SDIS verification</li>
+<li>Real-time revocation checks</li>
+<li>For financial transactions</li>
+</ul>
+<p><strong>4. Steward Governance</strong></p>
+<pre><code class="language-rust">// Cooperative votes on steward appointments
+POST /v1/governance/proposals
+{
+  &quot;type&quot;: &quot;appoint_steward&quot;,
+  &quot;nominee_did&quot;: &quot;did:icn:...&quot;,
+  &quot;region&quot;: &quot;North America&quot;,
+  &quot;duration_days&quot;: 365
+}
+
+// Steward performance tracking
+GET /v1/sdis/stewards/:did/metrics
+{
+  &quot;enrollments_processed&quot;: 142,
+  &quot;recovery_ceremonies&quot;: 23,
+  &quot;avg_response_time_hours&quot;: 8.5,
+  &quot;trust_score&quot;: 0.92
+}
+</code></pre>
+<hr>
+<h2>📋 Detailed Task Breakdown</h2>
+<h3>Phase 1: Gateway Integration (Weeks 1-3)</h3>
+<h4>Week 1: Basic Endpoints</h4>
+<ul>
+<li><input disabled="" type="checkbox"> Create <code>icn-gateway/src/api/sdis.rs</code></li>
+<li><input disabled="" type="checkbox"> Add enrollment initiation endpoint</li>
+<li><input disabled="" type="checkbox"> Add enrollment status endpoint</li>
+<li><input disabled="" type="checkbox"> Wire StewardActor to Gateway</li>
+<li><input disabled="" type="checkbox"> Add anchor info endpoint</li>
+<li><input disabled="" type="checkbox"> Write integration tests</li>
+</ul>
+<h4>Week 2: Recovery &amp; Key Rotation</h4>
+<ul>
+<li><input disabled="" type="checkbox"> Add recovery ceremony endpoints</li>
+<li><input disabled="" type="checkbox"> Add key rotation endpoint</li>
+<li><input disabled="" type="checkbox"> Implement anchor → DID mapping</li>
+<li><input disabled="" type="checkbox"> Add VUI registry persistence</li>
+<li><input disabled="" type="checkbox"> Add ceremony state persistence</li>
+</ul>
+<h4>Week 3: ZK Proofs</h4>
+<ul>
+<li><input disabled="" type="checkbox"> Add proof generation endpoint</li>
+<li><input disabled="" type="checkbox"> Add proof verification endpoint</li>
+<li><input disabled="" type="checkbox"> Implement proof caching</li>
+<li><input disabled="" type="checkbox"> Add proof types (age, membership, location)</li>
+<li><input disabled="" type="checkbox"> Add rate limiting for proofs</li>
+</ul>
+<hr>
+<h3>Phase 2: Pilot UI Features (Weeks 4-7)</h3>
+<h4>Week 4: Enrollment Wizard</h4>
+<ul>
+<li><input disabled="" type="checkbox"> Create EnrollmentWizard component</li>
+<li><input disabled="" type="checkbox"> Add pathway selection screen</li>
+<li><input disabled="" type="checkbox"> Add document upload</li>
+<li><input disabled="" type="checkbox"> Add progress tracker</li>
+<li><input disabled="" type="checkbox"> Add backup generation</li>
+</ul>
+<h4>Week 5: Recovery Flow</h4>
+<ul>
+<li><input disabled="" type="checkbox"> Create RecoveryFlow component</li>
+<li><input disabled="" type="checkbox"> Add anchor/VUI input</li>
+<li><input disabled="" type="checkbox"> Add verification submission</li>
+<li><input disabled="" type="checkbox"> Add steward coordination UI</li>
+<li><input disabled="" type="checkbox"> Add success/failure handling</li>
+</ul>
+<h4>Week 6: Identity Viewer</h4>
+<ul>
+<li><input disabled="" type="checkbox"> Create IdentityViewer component</li>
+<li><input disabled="" type="checkbox"> Display anchor info</li>
+<li><input disabled="" type="checkbox"> Display current keybundle</li>
+<li><input disabled="" type="checkbox"> Display enrollment pathway</li>
+<li><input disabled="" type="checkbox"> Display trusted devices</li>
+<li><input disabled="" type="checkbox"> Display attestations</li>
+</ul>
+<h4>Week 7: Steward Dashboard</h4>
+<ul>
+<li><input disabled="" type="checkbox"> Create StewardDashboard component</li>
+<li><input disabled="" type="checkbox"> Add enrollment queue</li>
+<li><input disabled="" type="checkbox"> Add verification workflows</li>
+<li><input disabled="" type="checkbox"> Add recovery management</li>
+<li><input disabled="" type="checkbox"> Add metrics dashboard</li>
+</ul>
+<hr>
+<h3>Phase 3: Mobile Integration (Weeks 8-10)</h3>
+<h4>Week 8: Enrollment</h4>
+<ul>
+<li><input disabled="" type="checkbox"> Create EnrollmentScreen.tsx</li>
+<li><input disabled="" type="checkbox"> Add camera integration</li>
+<li><input disabled="" type="checkbox"> Add biometric auth</li>
+<li><input disabled="" type="checkbox"> Add document upload</li>
+<li><input disabled="" type="checkbox"> Add API integration</li>
+</ul>
+<h4>Week 9: Credential Presentation</h4>
+<ul>
+<li><input disabled="" type="checkbox"> Create PresentationScreen.tsx</li>
+<li><input disabled="" type="checkbox"> Add QR code generation</li>
+<li><input disabled="" type="checkbox"> Add NFC support (Android/iOS)</li>
+<li><input disabled="" type="checkbox"> Add network verification</li>
+<li><input disabled="" type="checkbox"> Add proof selection UI</li>
+</ul>
+<h4>Week 10: Recovery &amp; Backup</h4>
+<ul>
+<li><input disabled="" type="checkbox"> Create RecoveryScreen.tsx</li>
+<li><input disabled="" type="checkbox"> Add backup export</li>
+<li><input disabled="" type="checkbox"> Add recovery share generation</li>
+<li><input disabled="" type="checkbox"> Add secure storage integration</li>
+<li><input disabled="" type="checkbox"> Add recovery testing</li>
+</ul>
+<hr>
+<h3>Phase 4: Advanced Features (Weeks 11-16)</h3>
+<h4>Week 11-12: Credential Issuance</h4>
+<ul>
+<li><input disabled="" type="checkbox"> Design credential schema</li>
+<li><input disabled="" type="checkbox"> Implement issuer role</li>
+<li><input disabled="" type="checkbox"> Add credential storage</li>
+<li><input disabled="" type="checkbox"> Add verification logic</li>
+<li><input disabled="" type="checkbox"> Add expiration handling</li>
+</ul>
+<h4>Week 13-14: Revocation</h4>
+<ul>
+<li><input disabled="" type="checkbox"> Implement accumulator integration</li>
+<li><input disabled="" type="checkbox"> Add revocation endpoint</li>
+<li><input disabled="" type="checkbox"> Add revocation gossip</li>
+<li><input disabled="" type="checkbox"> Add non-revocation proofs</li>
+<li><input disabled="" type="checkbox"> Add revocation UI</li>
+</ul>
+<h4>Week 15-16: Steward Governance</h4>
+<ul>
+<li><input disabled="" type="checkbox"> Add steward proposal types</li>
+<li><input disabled="" type="checkbox"> Add steward voting</li>
+<li><input disabled="" type="checkbox"> Add performance tracking</li>
+<li><input disabled="" type="checkbox"> Add steward rotation</li>
+<li><input disabled="" type="checkbox"> Add regional coordination</li>
+</ul>
+<hr>
+<h2>🎯 Success Criteria</h2>
+<h3>Minimum Viable SDIS (MVP)</h3>
+<p><strong>User Can:</strong></p>
+<ul>
+<li>✅ Enroll through web UI</li>
+<li>✅ Choose enrollment pathway</li>
+<li>✅ Receive permanent anchor</li>
+<li>✅ View their anchor info</li>
+<li>✅ Generate basic ZK proofs</li>
+<li>✅ Recover lost keys</li>
+</ul>
+<p><strong>Admin Can:</strong></p>
+<ul>
+<li>✅ Process enrollment requests</li>
+<li>✅ Verify documents</li>
+<li>✅ Coordinate recovery ceremonies</li>
+<li>✅ Monitor steward performance</li>
+<li>✅ Revoke compromised credentials</li>
+</ul>
+<p><strong>System Can:</strong></p>
+<ul>
+<li>✅ Compute VUI via threshold</li>
+<li>✅ Store anchors securely</li>
+<li>✅ Rotate keys without changing anchor</li>
+<li>✅ Verify ZK proofs</li>
+<li>✅ Check revocation status</li>
+<li>✅ Gossip steward updates</li>
+</ul>
+<hr>
+<h2>🔧 Technical Considerations</h2>
+<h3>Architecture</h3>
+<pre><code>┌─────────────────────────────────────────────────────────────┐
+│                      Gateway API                            │
+│  ┌───────────────────────────────────────────────────────┐ │
+│  │  /v1/sdis/*  endpoints                                │ │
+│  │  - Enrollment, Recovery, Proofs, Credentials          │ │
+│  └───────────────┬───────────────────────────────────────┘ │
+└──────────────────┼─────────────────────────────────────────┘
+                   │
+         ┌─────────┼─────────┐
+         │         │         │
+         ▼         ▼         ▼
+    ┌────────┐ ┌────────┐ ┌────────┐
+    │Steward │ │  ZKP   │ │ Ledger │
+    │ Actor  │ │ Verify │ │ Store  │
+    └────────┘ └────────┘ └────────┘
+         │
+         ▼
+    ┌────────────────────────────────┐
+    │     Gossip Protocol            │
+    │  - steward:discovery           │
+    │  - sdis:enrollment             │
+    │  - sdis:recovery               │
+    │  - sdis:revocation             │
+    └────────────────────────────────┘
+</code></pre>
+<h3>Storage Requirements</h3>
+<p><strong>New Collections:</strong></p>
+<ul>
+<li><code>anchors</code> - Anchor ID → Anchor data</li>
+<li><code>anchor_did_map</code> - Anchor ID → current DID</li>
+<li><code>vui_registry</code> - VUI → Anchor ID (privacy-preserving)</li>
+<li><code>ceremonies</code> - Enrollment/recovery ceremony state</li>
+<li><code>credentials</code> - Issued credentials</li>
+<li><code>revocations</code> - Revoked credential IDs</li>
+</ul>
+<p><strong>Estimated Storage:</strong></p>
+<ul>
+<li>Anchor: ~200 bytes</li>
+<li>Ceremony: ~2KB</li>
+<li>Credential: ~500 bytes</li>
+<li>Revocation: ~32 bytes</li>
+</ul>
+<p>For 10,000 users: ~25MB</p>
+<hr>
+<h2>📊 Metrics to Track</h2>
+<h3>Enrollment Metrics</h3>
+<ul>
+<li>Enrollment requests per day</li>
+<li>Avg time to complete enrollment</li>
+<li>Enrollment success rate by pathway</li>
+<li>Documents rejected (by reason)</li>
+</ul>
+<h3>Recovery Metrics</h3>
+<ul>
+<li>Recovery ceremonies initiated</li>
+<li>Recovery success rate</li>
+<li>Avg steward response time</li>
+<li>Failed recovery attempts</li>
+</ul>
+<h3>Proof Metrics</h3>
+<ul>
+<li>Proofs generated per day (by type)</li>
+<li>Proof verification success rate</li>
+<li>Avg proof generation time</li>
+<li>Avg proof verification time</li>
+</ul>
+<h3>Steward Metrics</h3>
+<ul>
+<li>Active stewards by region</li>
+<li>Enrollments per steward</li>
+<li>Steward response times</li>
+<li>Trust scores over time</li>
+</ul>
+<hr>
+<h2>🚀 Quick Start: What to Build First?</h2>
+<h3>Option 1: End-to-End Enrollment (Recommended)</h3>
+<p><strong>Priority:</strong> Make it possible for a user to enroll and get an anchor.</p>
+<p><strong>Tasks:</strong></p>
+<ol>
+<li>Add Gateway endpoints for enrollment</li>
+<li>Create enrollment wizard in Pilot UI</li>
+<li>Wire up steward actor</li>
+<li>Test full flow</li>
+</ol>
+<p><strong>Time:</strong> 1-2 weeks<br><strong>Impact:</strong> High (enables all other features)</p>
+<hr>
+<h3>Option 2: Proof Generation UI</h3>
+<p><strong>Priority:</strong> Let users generate and verify ZK proofs.</p>
+<p><strong>Tasks:</strong></p>
+<ol>
+<li>Add proof endpoints to Gateway</li>
+<li>Create proof generation UI</li>
+<li>Add verification UI</li>
+<li>Add common proof types</li>
+</ol>
+<p><strong>Time:</strong> 1 week<br><strong>Impact:</strong> Medium (demos SDIS capability)</p>
+<hr>
+<h3>Option 3: Mobile Enrollment</h3>
+<p><strong>Priority:</strong> Enable mobile enrollment with camera/biometrics.</p>
+<p><strong>Tasks:</strong></p>
+<ol>
+<li>Create EnrollmentScreen in CoopWallet</li>
+<li>Add camera integration</li>
+<li>Add biometric auth</li>
+<li>Wire to Gateway API</li>
+</ol>
+<p><strong>Time:</strong> 1-2 weeks<br><strong>Impact:</strong> High (mobile-first users)</p>
+<hr>
+<h2>🎯 Recommended Next Steps</h2>
+<p><strong>Immediate (This Week):</strong></p>
+<ol>
+<li>Add Gateway SDIS endpoints (enrollment + proof generation)</li>
+<li>Create basic enrollment wizard in Pilot UI</li>
+<li>Wire up existing StewardActor</li>
+</ol>
+<p><strong>Short-term (Next 2 Weeks):</strong></p>
+<ol>
+<li>Add recovery flow</li>
+<li>Create identity viewer</li>
+<li>Add proof generation UI</li>
+</ol>
+<p><strong>Medium-term (Next Month):</strong></p>
+<ol>
+<li>Mobile enrollment screen</li>
+<li>Credential issuance</li>
+<li>Steward dashboard</li>
+</ol>
+<p><strong>Long-term (Next Quarter):</strong></p>
+<ol>
+<li>Advanced credential types</li>
+<li>Multi-region stewards</li>
+<li>Governance integration</li>
+</ol>
+<hr>
+<h2>📖 Documentation Needed</h2>
+<ul>
+<li><input disabled="" type="checkbox"> SDIS User Guide (end-user perspective)</li>
+<li><input disabled="" type="checkbox"> Steward Handbook (how to be a steward)</li>
+<li><input disabled="" type="checkbox"> API Documentation (all SDIS endpoints)</li>
+<li><input disabled="" type="checkbox"> Integration Guide (for developers)</li>
+<li><input disabled="" type="checkbox"> Security Audit Report (before production)</li>
+</ul>
+<hr>
+<h2>✅ Definition of Done</h2>
+<p>SDIS is &quot;complete&quot; when:</p>
+<ol>
+<li>✅ User can enroll through web/mobile UI</li>
+<li>✅ User receives permanent anchor</li>
+<li>✅ User can recover lost keys</li>
+<li>✅ User can generate ZK proofs</li>
+<li>✅ Credentials can be issued</li>
+<li>✅ Credentials can be revoked</li>
+<li>✅ Stewards can process enrollments</li>
+<li>✅ System passes security audit</li>
+<li>✅ Documentation is complete</li>
+<li>✅ Integration tests pass</li>
+</ol>
+<hr>
+<p><strong>Status:</strong> Ready to begin Gateway integration! 🚀</p>
+<p>Which component would you like to work on first?</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

@@ -1,0 +1,219 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Technical Whitepaper: Architecture of a P2P Constraint Engine for Democratic Organizations | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>strategy</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ICN Technical Whitepaper</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/strategy/ICN-Technical-Whitepaper.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Technical Whitepaper: Architecture of a P2P Constraint Engine for Democratic Organizations</h1>
+<p><strong>Version 0.1 | March 17, 2026</strong>
+<strong>Author: Matt Faherty</strong>
+<strong>Status: Working Draft</strong></p>
+<hr>
+<h2>Abstract</h2>
+<p>ICN (InterCooperative Network) is a peer-to-peer daemon that provides verifiable decision infrastructure for democratic organizations. This paper describes the architectural design of ICN&#39;s constraint engine, the Meaning Firewall pattern that separates mechanical enforcement from semantic interpretation, the cryptographic receipt chain that enables provable governance, and the threat model that governs the system&#39;s security posture. We compare ICN to related systems (Holochain, Secure Scuttlebutt, ActivityPub, blockchain-based DAOs) and articulate the specific design trade-offs that differentiate ICN from each.</p>
+<hr>
+<h2>1. Design Motivation</h2>
+<p>Democratic organizations — cooperatives, community land trusts, mutual aid networks, civic federations — share a structural problem: they make collective decisions, but they cannot produce independently verifiable proof that those decisions occurred.</p>
+<p>Existing tools (Loomio, Google Workspace, custom web applications) record decisions but do not prove them. The distinction is critical. A record is a document someone produced. A proof is a cryptographic artifact that anyone can verify without trusting the producer. The difference between &quot;someone wrote it down&quot; and &quot;the math confirms it&quot; is the difference between trust-dependent and trust-independent institutions.</p>
+<p>ICN provides the infrastructure layer that makes provable collective decisions possible. It does not interpret what decisions mean. It enforces the constraints that make decisions verifiable.</p>
+<hr>
+<h2>2. The Meaning Firewall</h2>
+<p>The Meaning Firewall is ICN&#39;s load-bearing architectural decision. It establishes a hard boundary between two layers:</p>
+<p><strong>The Kernel</strong> enforces constraints mechanically. It processes rate limits, capability checks, fuel budgets, quorum thresholds, and state transitions. It does not interpret the semantic content of any operation. The kernel does not know what a &quot;vote&quot; is, what a &quot;cooperative&quot; is, or what &quot;governance&quot; means. It sees entities, capabilities, signed state transitions, and numerical constraints.</p>
+<p><strong>Applications</strong> sit above the Meaning Firewall and assign semantic meaning. A governance application translates &quot;consent-based decision with 72-hour discussion period and 75% approval threshold&quot; into a <code>ConstraintSet</code> that the kernel enforces blindly. A mutual credit application translates &quot;bilateral obligation between two cooperatives&quot; into state transitions the kernel processes without understanding their economic meaning.</p>
+<p>The interface between layers is the <code>PolicyOracle</code> trait:</p>
+<pre><code class="language-rust">pub trait PolicyOracle: Send + Sync {
+    fn evaluate(&amp;self, request: &amp;PolicyRequest) -&gt; PolicyDecision;
+}
+</code></pre>
+<p>Applications implement <code>PolicyOracle</code>. The kernel calls it. The kernel never inspects the internal logic of the oracle. It receives a <code>PolicyDecision</code> containing a <code>ConstraintSet</code> and enforces it.</p>
+<p><strong>Enforcement mechanism.</strong> The Meaning Firewall is not aspirational. It is structurally enforced through the Rust crate dependency graph. Kernel crates cannot import application crates. CI checks this invariant on every pull request. The <code>kernel_surface.toml</code> audit file tracks 29 crates and their classification (kernel, application, or support). As of March 2026, 9 crates are clean, 11 contain residual semantic leakage being extracted, and 9 require review.</p>
+<p><strong>Regulatory significance.</strong> If the kernel interprets meaning, ICN is classifiable as a product — a governance platform, a payment processor, a voting system — each a regulated category with specific legal obligations. If the kernel is mechanical infrastructure (analogous to TCP/IP, the Linux kernel, or an electrical grid), it functions as a public utility. Applications carry their own regulatory obligations. The infrastructure itself is neutral. This is not clever framing; it is an architectural property enforced by the dependency graph.</p>
+<hr>
+<h2>3. The Eight Kernel Primitives</h2>
+<p>ICN&#39;s kernel exposes eight primitives. All system behavior is composed from these:</p>
+<p><strong>Identity.</strong> Create, sign, verify, and resolve decentralized identifiers (DIDs). Format: <code>did:icn:&lt;base58-ed25519-pubkey&gt;</code>. Key management uses Age-encrypted keystores with automatic version migration (v1 → v2 → v2.1 adding TLS binding and X25519 key agreement).</p>
+<p><strong>Authorization.</strong> Issue and check unforgeable capability tokens following an object-capability security model. Capabilities are scoped (e.g., <code>governance:vote</code>, <code>federation:admin</code>), delegatable, and revocable. No ambient authority exists — every action requires an explicit capability grant.</p>
+<p><strong>State.</strong> Append-only logs, blob storage, and key-value storage. All entries are content-addressed (CID-based) and tamper-evident. State is the substrate for the receipt chain — every decision, allocation, and execution is a state entry linked by hash references.</p>
+<p><strong>Compute.</strong> Execute deterministic sandboxed programs with fuel metering. The compute substrate targets WASM with NaN canonicalization, seeded RNG, and canonical serialization. Programs that exhaust their fuel budget halt deterministically. Two nodes processing the same input produce bit-identical output.</p>
+<p><strong>Communication.</strong> Pub/sub, request/response, and streaming over QUIC/TLS with DID-based mutual authentication. Messages are signed envelopes with replay protection (sequence tracking per sender). Discovery uses mDNS (local network) and gossip (wide-area).</p>
+<p><strong>Time.</strong> Logical clocks, scheduling, and leases. ICN does not depend on wall-clock synchronization. Causal ordering is established through vector clocks. Scheduling uses logical time with configurable duration semantics.</p>
+<p><strong>Coordination.</strong> Consensus groups, CRDTs, and deterministic conflict resolution. Local-first by default — entities agree on their own state and resolve conflicts without global consensus. Cross-entity coordination uses bilateral or multilateral agreement protocols with signed settlement.</p>
+<p><strong>Naming.</strong> Hierarchical name resolution and service discovery. Entities and services are addressable by name (e.g., <code>nycn/ithaca-solar/governance</code>) with resolution backed by the identity and communication primitives.</p>
+<hr>
+<h2>4. The Receipt Chain</h2>
+<p>The receipt chain is ICN&#39;s primary value artifact. It provides cryptographic proof that a sequence of institutional actions occurred.</p>
+<p>A complete receipt chain for a governance decision contains:</p>
+<pre><code>Proposal (content-addressed, signed by proposer)
+  → Discussion (comment hashes, signed by participants)
+    → Votes (individual vote attestations, signed by each voter)
+      → Decision Receipt (tally + quorum check + outcome + hash chain)
+        → Allocation Receipt (resource allocation authorized by decision)
+          → Execution Receipt (action taken, linked to allocation)
+</code></pre>
+<p>Each link in the chain is:</p>
+<ol>
+<li>Content-addressed (the hash of the entry is its identifier)</li>
+<li>Signed (the producer&#39;s DID signature is attached)</li>
+<li>Linked (references the hash of its predecessor)</li>
+<li>Deterministic (any node processing the same inputs produces the same receipt)</li>
+</ol>
+<p><strong>Verification is peer-to-peer.</strong> Anyone with a receipt can verify it without contacting the producing organization, without trusting a platform, and without access to the original network. The receipt is self-contained proof.</p>
+<p><strong>The ExecutionReceiptGate</strong> (implemented in PR #1327) enforces Invariant 7: governance decisions must produce execution receipts that close the loop. An allocation cannot be executed without a Decision Receipt authorizing it. An execution cannot be recorded without linking to its authorization. This closes the audit chain mechanically.</p>
+<hr>
+<h2>5. Entity Model</h2>
+<p>ICN recognizes four entity types. All interact with the same eight primitives. The kernel is agnostic about what type an entity is — the distinction is app-level meaning.</p>
+<p><strong>Person.</strong> A self-sovereign identity holding keys in a local wallet. Participates via daemon, mobile client (React Native SDK), or web client (TypeScript SDK).</p>
+<p><strong>Cooperative.</strong> A group of people with shared economic activity. Represented as an entity ID, member DID set, state log, and capability graph.</p>
+<p><strong>Community.</strong> A group of people with shared civic interests. Kernel-identical to a cooperative. Different app-level meaning. Communities and cooperatives are co-equal.</p>
+<p><strong>Federation.</strong> A group of cooperatives and communities coordinating across organizational boundaries. Kernel-identical representation. Federations bridge organizations without owning them.</p>
+<p>Membership is recursive. Cooperatives contain cooperatives. Federations contain federations. Communities contain cooperatives. The kernel sees entities containing entities, each with independent capability graphs.</p>
+<hr>
+<h2>6. Network Architecture</h2>
+<p>ICN daemons communicate over QUIC/TLS with DID-based mutual authentication (DID-TLS binding). The transport layer provides:</p>
+<p><strong>Session establishment.</strong> QUIC connection with TLS 1.3. Server and client authenticate by proving ownership of their respective DIDs via Ed25519 signature challenge.</p>
+<p><strong>Message format.</strong> <code>SignedEnvelope</code> containing payload, sender DID, Ed25519 signature, and <code>ReplayGuard</code> (per-sender sequence number). Payload types: Gossip, Rpc, Subscribe, Hello, Signed.</p>
+<p><strong>Gossip protocol.</strong> Topic-based pub/sub with push announcements, pull requests, and anti-entropy sweeps. Causal ordering via vector clocks. Deduplication via Bloom filters. This is the primary mechanism for state replication across organizational boundaries.</p>
+<p><strong>Discovery.</strong> mDNS for local network discovery. Gossip-based peer exchange for wide-area discovery. Federation registry (<code>/v1/federation/coops</code>) for organizational discovery.</p>
+<p><strong>Trust-gated rate limiting.</strong> The trust graph (web-of-participation trust scores from 0.0 to 1.0) gates communication rates per trust class: Isolated (&lt;0.1): 10 msg/sec, Known (0.1-0.4): 20 msg/sec, Partner (0.4-0.7): 100 msg/sec, Federated (0.7+): 200 msg/sec.</p>
+<hr>
+<h2>7. Security Model</h2>
+<h3>7.1 Threat Model</h3>
+<p>ICN assumes an adversarial-by-default posture. Every peer is untrusted until trust is established through verifiable participation. The system is designed to operate correctly in the presence of:</p>
+<ul>
+<li><strong>Byzantine nodes</strong> that send malformed, replayed, or fabricated messages</li>
+<li><strong>Sybil attacks</strong> where a single actor operates multiple identities to gain disproportionate influence</li>
+<li><strong>Network partitions</strong> where groups of nodes cannot communicate for extended periods</li>
+<li><strong>Compromised keys</strong> where an attacker gains access to a legitimate identity&#39;s signing key</li>
+</ul>
+<h3>7.2 Defense Layers</h3>
+<p><strong>Transport security.</strong> QUIC/TLS 1.3 with DID-TLS binding. All communication is encrypted. Identity is verified at the transport layer before any application messages are exchanged.</p>
+<p><strong>Message integrity.</strong> Every message is a <code>SignedEnvelope</code>. Ed25519 signatures provide authentication and non-repudiation. Replay protection via per-sender sequence tracking prevents message reuse.</p>
+<p><strong>Application-layer encryption.</strong> <code>EncryptedEnvelope</code> provides end-to-end encryption for sensitive payloads. Only intended recipients can decrypt. The transport layer and relay nodes see ciphertext.</p>
+<p><strong>Capability-based authorization.</strong> Object-capability security model. No ambient authority. Every action requires an explicit, unforgeable capability token. Capabilities are scoped, delegatable, and revocable. Delegation is tracked and auditable.</p>
+<p><strong>Sybil resistance.</strong> MeritRank reputation system based on verifiable participation. Trust scores are computed from: honoring obligations, participating in governance, vouching accuracy, and uptime. Creating a fake identity is free. Making it useful is expensive — each identity must independently build reputation through sustained participation.</p>
+<h3>7.3 Invariants</h3>
+<p>Five non-negotiable properties enforced across the system:</p>
+<ol>
+<li><strong>Adversarial-by-default.</strong> No trust assumption anywhere in the protocol. Security comes from architecture, not faith.</li>
+<li><strong>Determinism.</strong> Same inputs produce same outputs. No floating point. Seeded RNG. Canonical serialization. Two nodes processing the same log arrive at identical state.</li>
+<li><strong>Canonical encodings.</strong> One valid byte representation per value. No ambiguity in wire format, proof format, or storage format.</li>
+<li><strong>No panics in protocol paths.</strong> All failures are handled. The daemon does not crash on malformed input. No <code>.unwrap()</code> or <code>.expect()</code> in network/protocol/actor code paths.</li>
+<li><strong>Kernel/app boundary inviolable.</strong> Enforced by dependency graph. Checked by CI. Structural, not aspirational.</li>
+</ol>
+<hr>
+<h2>8. Comparison to Related Systems</h2>
+<h3>8.1 Holochain</h3>
+<p>Holochain and ICN share a philosophical commitment to agent-centric, local-first architecture without global consensus. Both use content-addressed data and signed entries.</p>
+<p><strong>Key difference: the Meaning Firewall.</strong> Holochain DNAs (distributed apps) contain their validation rules directly — the DNA is the application and the enforcement layer simultaneously. ICN separates these concerns. The kernel enforces constraints without semantic interpretation. Applications implement <code>PolicyOracle</code> to translate domain meaning into generic constraints. This separation gives ICN regulatory neutrality that Holochain DNAs do not inherently possess.</p>
+<p><strong>Key difference: receipt chain.</strong> Holochain provides tamper-evident records through DHT validation. ICN provides a complete governance receipt chain — proposal → discussion → votes → decision → allocation → execution — where each link is independently verifiable and the chain itself constitutes proof of democratic process. This specific chain structure is designed for institutional proof, not general-purpose data validation.</p>
+<h3>8.2 Secure Scuttlebutt (SSB)</h3>
+<p>SSB and ICN share the local-first, no-server architecture. Both use append-only logs and gossip for replication.</p>
+<p><strong>Key difference: institutional vs. social.</strong> SSB is designed for social relationships between individuals. ICN is designed for institutional relationships between organizations. The entity model (Person, Cooperative, Community, Federation), the receipt chain, and the trust-gated federation protocol have no SSB equivalent. SSB does not provide organizational governance primitives.</p>
+<p><strong>Key difference: trust model.</strong> SSB trust is social (follows and blocks). ICN trust is participatory (verifiable actions that build reputation over time with decay). SSB trust is binary. ICN trust is scored and class-gated.</p>
+<h3>8.3 ActivityPub / Fediverse</h3>
+<p>ActivityPub federates social content. ICN federates institutional decisions.</p>
+<p><strong>Key difference: the receipt.</strong> When a Mastodon post federates, nobody needs cryptographic proof that it was democratically authorized. When a cooperative&#39;s budget allocation federates to a partner cooperative, proof of authorization is the entire point. ActivityPub has no concept of governance receipts, quorum verification, or decision audit chains.</p>
+<p><strong>Key difference: identity model.</strong> ActivityPub identities are server-bound (@user@server). ICN identities are self-sovereign DIDs that survive server changes. An organization&#39;s identity in ICN is not tied to any infrastructure operator.</p>
+<h3>8.4 Blockchain-based DAOs</h3>
+<p>DAOs and ICN both aim to provide verifiable collective governance. Both produce cryptographic proofs of decisions.</p>
+<p><strong>Key difference: consensus scope.</strong> DAOs require global consensus — every node validates every transaction. ICN is local-first. A three-person cooperative validates its own decisions. Outsiders can verify the proof without participating in consensus. This eliminates gas fees, mining, chain congestion, and the absurd computational overhead of proving a small cooperative&#39;s vote to the entire planet.</p>
+<p><strong>Key difference: the Meaning Firewall.</strong> DAO smart contracts encode domain semantics directly — a governance contract knows what a &quot;vote&quot; is. ICN&#39;s kernel does not. This is not a limitation; it is a regulatory design decision. Smart contracts that encode financial semantics are financial instruments. ICN&#39;s kernel is infrastructure.</p>
+<p><strong>Key difference: exit cost.</strong> Leaving a DAO means leaving a chain. Leaving ICN means stopping your daemon. Your data is local. Your identity is portable. Your records are yours. Exit is free.</p>
+<hr>
+<h2>9. Current Implementation Status</h2>
+<p>As of March 2026:</p>
+<ul>
+<li><strong>Codebase:</strong> 38 Rust workspace crates, ~414K LOC, 2,287 tests</li>
+<li><strong>Binaries:</strong> <code>icnd</code> (daemon), <code>icnctl</code> (CLI), <code>icn-console</code> (TUI)</li>
+<li><strong>API:</strong> 70+ REST endpoints via actix-web gateway, all with real handler logic, zero stubs</li>
+<li><strong>SDKs:</strong> TypeScript (npm), React Native (mobile)</li>
+<li><strong>Deployment:</strong> K3s cluster (3 nodes, 4 federated cooperative pods, Prometheus + Grafana monitoring)</li>
+<li><strong>Demo:</strong> 4 working flows (governance, patronage, federation, reporting) with presenter mode</li>
+<li><strong>Completion:</strong> ~75% toward first external deployment</li>
+<li><strong>Phase:</strong> 0+1 complete, Phase 2 (demo-ready vertical slice) in progress</li>
+</ul>
+<p><strong>Known technical debt:</strong></p>
+<ul>
+<li>11 kernel crates with residual semantic leakage (Meaning Firewall cleanup in progress)</li>
+<li>Compliance epic #1302 at ~60% (terminology rename, CI linter, structural attestation remaining)</li>
+<li>Federation settlement finality not yet formally specified</li>
+<li>Post-quantum cryptography (<code>icn-crypto-pq</code> crate) not yet integrated into transport</li>
+</ul>
+<hr>
+<h2>10. Conclusion</h2>
+<p>ICN is not a governance platform, a ledger, a blockchain, or a payment system. It is a constraint engine that provides eight mechanical primitives, a cryptographic receipt chain, and a structural separation between enforcement and meaning. Organizations that govern themselves democratically can use ICN to prove their decisions, own their infrastructure, and coordinate with each other without trusting a platform.</p>
+<p>The Meaning Firewall is the core architectural contribution. By ensuring that the kernel never interprets the semantic content of the operations it processes, ICN achieves regulatory neutrality, application flexibility, and the structural property that makes it infrastructure rather than a product.</p>
+<p>The receipt chain is the core value proposition. By linking proposals, votes, decisions, allocations, and executions in a tamper-evident, independently verifiable chain, ICN provides something that no existing tool in the cooperative ecosystem provides: cryptographic proof that democratic governance happened.</p>
+<hr>
+<h2>References</h2>
+<ul>
+<li>ICN Source: github.com/InterCooperative-Network/icn</li>
+<li>Holochain: holochain.org</li>
+<li>Secure Scuttlebutt: scuttlebutt.nz</li>
+<li>ActivityPub: w3.org/TR/activitypub</li>
+<li>MeritRank: Research domain B (Sybil resistance)</li>
+<li>Object-Capability Model: Research domain F</li>
+<li>Elinor Ostrom, &quot;Governing the Commons&quot; (1990)</li>
+<li>NY Cooperative Corporations Law, Article 5-A, §82-§93</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

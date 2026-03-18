@@ -1,0 +1,1023 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Economics / Treasury — Repo State &amp; Gap Analysis | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>plans</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>.scratch</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>economics treasury</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/plans/.scratch/economics-treasury.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Economics / Treasury — Repo State &amp; Gap Analysis</h1>
+<blockquote>
+<p>Generated 2026-02-14 by economics analyst agent</p>
+</blockquote>
+<h2>1. Current State</h2>
+<h3>1.1 Ledger Model</h3>
+<p>ICN uses <strong>double-entry accounting</strong> where every transaction must balance: <code>Σ debits == Σ credits</code> per currency.</p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Location</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>JournalEntry</code></td>
+<td><code>icn-ledger/src/types.rs:41</code></td>
+<td>Core entry: author, accounts[], parents[], nonce, decision provenance</td>
+</tr>
+<tr>
+<td><code>AccountDelta</code></td>
+<td><code>icn-ledger/src/types.rs:103</code></td>
+<td>Per-account debit/credit in a single currency</td>
+</tr>
+<tr>
+<td><code>ContentHash</code></td>
+<td><code>icn-ledger/src/types.rs:9</code></td>
+<td>SHA-256 hash for Merkle-DAG addressing</td>
+</tr>
+<tr>
+<td><code>AccountBalances</code></td>
+<td><code>icn-ledger/src/types.rs:209</code></td>
+<td>Cached balance map per account (HashMap&lt;String, i64&gt;)</td>
+</tr>
+<tr>
+<td><code>Balance</code></td>
+<td><code>icn-ledger/src/types.rs:199</code></td>
+<td>Single-currency balance</td>
+</tr>
+<tr>
+<td><code>CreditLimit</code></td>
+<td><code>icn-ledger/src/types.rs:255</code></td>
+<td>Max negative balance allowed per participant</td>
+</tr>
+<tr>
+<td><code>Currency</code></td>
+<td><code>icn-ledger/src/types.rs:166</code></td>
+<td>Currency definition: symbol, decimals, optional issuer</td>
+</tr>
+<tr>
+<td><code>JournalEntryBuilder</code></td>
+<td><code>icn-ledger/src/entry.rs:9</code></td>
+<td>Builder with validation (double-entry invariant, positive amounts)</td>
+</tr>
+<tr>
+<td><code>WitnessPolicy</code></td>
+<td><code>icn-ledger/src/types.rs:435</code></td>
+<td>BFT: None / Counterparty / Quorum / AllParties</td>
+</tr>
+<tr>
+<td><code>WitnessedEntry</code></td>
+<td><code>icn-ledger/src/types.rs:607</code></td>
+<td>Entry + collected witness signatures</td>
+</tr>
+</tbody></table>
+<p><strong>Key invariants enforced:</strong></p>
+<ul>
+<li>Double-entry balance: <code>validate_double_entry()</code> at <code>entry.rs:127</code></li>
+<li>Positive amounts: <code>validate_positive_amounts()</code> at <code>entry.rs:153</code></li>
+<li>Content hash computation via SHA-256 of canonical serialization</li>
+<li>Merkle-DAG linking via <code>parents: Vec&lt;ContentHash&gt;</code></li>
+<li>Decision provenance: <code>decision_receipt_id</code> + <code>decision_hash</code> fields on JournalEntry</li>
+</ul>
+<p><strong>Dispute system</strong>: Complete model at <code>types.rs:332-420</code> with <code>DisputeStatus</code> (Normal→Contested→Resolved/Escalated), <code>DisputeOutcome</code> (Upheld/Reversed/Settlement/WriteOff), mediator assignment, and evidence tracking.</p>
+<p><strong>Fork detection</strong>: <code>QuarantineReason::ForkConflict</code> at <code>types.rs:286</code> handles lost fork resolution from Phase 18 Week 5. <code>QuarantinedEntry</code> struct at <code>types.rs:304</code> holds conflicting entries pending resolution.</p>
+<h3>1.2 Asset Types</h3>
+<p>6 asset types defined in <code>icn-kernel-api/src/economics.rs:17-53</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Variant</th>
+<th>Description</th>
+<th>Used in SettlementIntent→TreasuryEntryRequest?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Fungible</code></td>
+<td>Standard mutual credit / currency</td>
+<td>→ <code>Spend</code> operation</td>
+</tr>
+<tr>
+<td><code>Consumable { expires_at }</code></td>
+<td>One-time use (compute hours, vouchers)</td>
+<td>→ <code>Spend</code> operation</td>
+</tr>
+<tr>
+<td><code>Depreciating { schedule }</code></td>
+<td>Equipment, licenses (Linear/Percentage/Custom)</td>
+<td>→ <code>Allocate</code> operation</td>
+</tr>
+<tr>
+<td><code>Transformable { outputs }</code></td>
+<td>Raw materials → products</td>
+<td>→ <code>Allocate</code> operation</td>
+</tr>
+<tr>
+<td><code>Service { duration_secs }</code></td>
+<td>Labor hours, non-storable</td>
+<td>→ <code>Spend</code> operation</td>
+</tr>
+<tr>
+<td><code>Claim { due_by, conditions }</code></td>
+<td>IOUs, bonds, receivables</td>
+<td>→ <code>IssueBond</code> operation</td>
+</tr>
+</tbody></table>
+<p><strong>Default</strong>: <code>AssetType::Fungible</code> (economics.rs:55-58).</p>
+<p><strong>Conversion mapping</strong> at <code>services.rs:694-701</code> deterministically maps AssetType → TreasuryOperationType.</p>
+<p><strong>DepreciationSchedule</strong> (economics.rs:62-78): <code>Linear { lifespan_secs }</code>, <code>Percentage { rate_bps, period_secs }</code>, <code>Custom(String)</code>.</p>
+<p><strong>Hash stability</strong>: All asset types have extensive canonical hash stability tests ensuring cross-node equality (20+ tests).</p>
+<h3>1.3 Settlement System</h3>
+<p>Two settlement paths:</p>
+<h4>Path 1: Local/Cell/Org Settlement (SettlementEngine)</h4>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Location</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>SettlementEngine</code></td>
+<td><code>icn-ledger/src/settlement.rs:86</code></td>
+<td>Converts verified receipts → balanced journal entries</td>
+</tr>
+<tr>
+<td><code>SettlementRequest</code></td>
+<td><code>icn-ledger/src/settlement.rs:48</code></td>
+<td>DTO from compute layer (receipt_hash, executor, submitter, scope, amount)</td>
+</tr>
+</tbody></table>
+<p><strong>Flow</strong>: <code>SettlementRequest → SettlementEngine::settle_receipt() → JournalEntry</code></p>
+<p><strong>Validations</strong> (settlement.rs:110-186):</p>
+<ol>
+<li><code>executor_verified</code> must be true</li>
+<li>Scope must be Local/Cell/Org (Federation/Commons → rejected, must use clearing)</li>
+<li>Amount must be positive</li>
+<li>No self-dealing (executor ≠ submitter)</li>
+<li>Dedup via <code>sha256(&quot;icn-ledger:settlement:v1:&quot; || receipt_hash)</code> in-memory HashSet</li>
+</ol>
+<p><strong>Creates balanced entry</strong>: debit submitter, credit executor.</p>
+<p><strong>Limitation</strong>: Dedup set is in-memory only (<code>RwLock&lt;HashSet&gt;</code>) — NOT persisted to sled. Restart loses dedup state.</p>
+<h4>Path 2: Federation/Commons Settlement (ReceiptClearing)</h4>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Location</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ReceiptClearingManager</code></td>
+<td><code>icn-federation/src/receipt_clearing.rs:109</code></td>
+<td>Batches cross-scope receipts</td>
+</tr>
+<tr>
+<td><code>ClearingReceipt</code></td>
+<td><code>icn-federation/src/receipt_clearing.rs:42</code></td>
+<td>DTO for cross-scope settlement</td>
+</tr>
+<tr>
+<td><code>BatchClearingConfig</code></td>
+<td><code>icn-federation/src/receipt_clearing.rs:78</code></td>
+<td>max_batch_size=100, max_batch_age=3600s</td>
+</tr>
+</tbody></table>
+<p><strong>Flow</strong>: <code>ClearingReceipt → ReceiptClearingManager → ClearingManager → CrossCoopTransfer</code></p>
+<p><strong>Federation</strong>: Converts to <code>CrossCoopTransfer</code>, routed to bilateral <code>ClearingManager</code>.
+<strong>Commons</strong>: <strong>STUB</strong> — logged but not processed, pending Epic 6 (#925).</p>
+<p><strong>Validations</strong>: scope must be Federation/Commons, different coops, cost &gt; 0, no duplicate hashes in batch.</p>
+<h3>1.4 Treasury Operations</h3>
+<h4>Treasury Struct (<code>icn-ledger/src/treasury.rs:115</code>)</h4>
+<pre><code>Treasury {
+  treasury_did: Did,              // Cooperative-owned account
+  entity_id: Option&lt;EntityId&gt;,    // Type-safe entity reference (new)
+  coop_id: String,                // Legacy cooperative identifier
+  currency: String,               // Primary currency
+  created_at: u64,                // Unix timestamp
+  created_by: Did,                // Authorizing DID
+  description: Option&lt;String&gt;,
+  is_active: bool,
+}
+</code></pre>
+<h4>TreasuryManager (<code>icn-ledger/src/treasury.rs:210</code>)</h4>
+<p>Full-featured manager with persistent storage (sled-backed):</p>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Register treasury</td>
+<td>✅ <code>register_treasury()</code> at treasury.rs:314</td>
+</tr>
+<tr>
+<td>Budget lifecycle</td>
+<td>✅ <code>create_budget()</code>, <code>spend_from_budget()</code>, <code>cancel_budget()</code> etc. in budgets.rs</td>
+</tr>
+<tr>
+<td>Spending rules</td>
+<td>✅ <code>add_spending_rule()</code>, <code>requires_approval()</code> in approvals.rs</td>
+</tr>
+<tr>
+<td>Velocity limits</td>
+<td>✅ <code>add_velocity_limit()</code>, <code>check_velocity_limit()</code> in approvals.rs</td>
+</tr>
+<tr>
+<td>Audit trail</td>
+<td>✅ <code>record_operation()</code>, <code>get_audit_trail()</code> with pagination in audit.rs</td>
+</tr>
+<tr>
+<td>Labor shares (Razeto)</td>
+<td>✅ <code>LaborShare</code>, <code>CooperativeBond</code>, <code>SurplusAllocation</code> types in labor_shares.rs</td>
+</tr>
+<tr>
+<td>Sled persistence</td>
+<td>✅ <code>with_store()</code> + <code>load_from_store()</code></td>
+</tr>
+</tbody></table>
+<h4>TreasuryOperationType (<code>icn-kernel-api/src/services.rs:647</code>)</h4>
+<p>7 operation types: <code>Spend</code>, <code>Allocate</code>, <code>Transfer</code>, <code>CreateBudget</code>, <code>DistributeSurplus</code>, <code>RedeemShares</code>, <code>IssueBond</code></p>
+<h4>Governance Treasury Operations (<code>icn-governance/src/proposal.rs:712</code>)</h4>
+<p><code>TreasuryProposalOperation</code> enum with 7 variants:</p>
+<ul>
+<li><code>CreateBudget</code> — create budget from treasury</li>
+<li><code>ModifySpendingRule</code> — change spending thresholds</li>
+<li><code>Withdraw</code> — withdraw with governance approval</li>
+<li><code>TransferBetweenBudgets</code> — move between budget categories</li>
+<li><code>CancelBudget</code> — cancel + optionally return funds</li>
+<li><code>ReclaimBudget</code> — reclaim unspent amounts</li>
+<li><code>Spend</code> — direct treasury disbursement with <strong>nonce-based replay protection</strong> (proposal.rs:807-822)</li>
+</ul>
+<h3>1.5 Allocation → Settlement → Ledger Chain</h3>
+<p><strong>The full receipt chain is defined</strong> (<code>icn-kernel-api/src/receipts.rs:119</code>):</p>
+<pre><code>DecisionReceipt → AllocationReceipt → SettlementIntent(s) → TreasuryEntryRequest → JournalEntry
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Link</th>
+<th>Type</th>
+<th>Location</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Decision → Allocation</td>
+<td><code>AllocationReceipt.decision_hash</code></td>
+<td>receipts.rs:127</td>
+<td>✅ Defined</td>
+</tr>
+<tr>
+<td>Allocation → Intent</td>
+<td><code>AllocationReceipt.intents: Vec&lt;SettlementIntent&gt;</code></td>
+<td>receipts.rs:130</td>
+<td>✅ Defined</td>
+</tr>
+<tr>
+<td>Intent → TreasuryEntry</td>
+<td><code>TreasuryEntryRequest::from_settlement_intent()</code></td>
+<td>services.rs:690</td>
+<td>✅ Deterministic conversion</td>
+</tr>
+<tr>
+<td>Intent+Allocation → TreasuryEntry</td>
+<td><code>TreasuryEntryRequest::from_settlement_with_allocation()</code></td>
+<td>services.rs:728</td>
+<td>✅ Includes allocation hash in memo</td>
+</tr>
+<tr>
+<td>TreasuryEntry → JournalEntry</td>
+<td><code>LedgerService::submit_treasury_entry()</code></td>
+<td>services.rs:566</td>
+<td>✅ Trait defined, default returns error</td>
+</tr>
+<tr>
+<td>JournalEntry carries provenance</td>
+<td><code>decision_receipt_id</code> + <code>decision_hash</code> fields</td>
+<td>types.rs:90-99</td>
+<td>✅</td>
+</tr>
+</tbody></table>
+<p><strong>Canonical hash invariants</strong> (receipts.rs:70-95):</p>
+<ol>
+<li><code>canonical_hash()</code> MUST NOT depend on <code>receipt_id()</code> (node-local)</li>
+<li><code>canonical_hash()</code> MUST be deterministic (same content → same hash)</li>
+<li>Two nodes with identical inputs MUST compute identical hashes</li>
+<li>AllocationReceipt sorts intent hashes for order-independence (receipts.rs:160-164)</li>
+</ol>
+<p><strong>CanonicalReceipt trait</strong> at receipts.rs:77 — implemented by <code>AllocationReceipt</code>, <code>SettlementIntent</code>.</p>
+<p><strong>Hash algorithm</strong>: Blake3 over bincode serialization (<code>compute_canonical_hash()</code> at receipts.rs:100).</p>
+<p><strong>Gateway receipt store</strong>: <code>icn-gateway/src/receipt_store.rs</code> — sled-backed storage for <code>AllocationReceipt</code> and <code>SettlementIntent</code> with put/get/list_by_decision operations. Persistence test exists in <code>icn-core/tests/receipt_persistence_e2e.rs</code>.</p>
+<h3>1.6 Federation Clearing</h3>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Location</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ClearingManager</code></td>
+<td><code>icn-federation/src/clearing_manager.rs</code></td>
+<td>Bilateral clearing engine</td>
+</tr>
+<tr>
+<td><code>BilateralAgreement</code></td>
+<td><code>icn-federation/src/clearing.rs</code></td>
+<td>Clearing terms between two coops</td>
+</tr>
+<tr>
+<td><code>ClearingTerms</code></td>
+<td><code>icn-federation/src/clearing.rs</code></td>
+<td>Settlement intervals, currencies, limits</td>
+</tr>
+<tr>
+<td><code>CrossCoopTransfer</code></td>
+<td><code>icn-federation/src/clearing.rs</code></td>
+<td>Individual transfer in clearing batch</td>
+</tr>
+<tr>
+<td><code>NettingResult</code></td>
+<td><code>icn-federation/src/clearing.rs</code></td>
+<td>Circular obligation detection result</td>
+</tr>
+<tr>
+<td><code>ReceiptClearingManager</code></td>
+<td><code>icn-federation/src/receipt_clearing.rs:109</code></td>
+<td>Receipt → clearing bridge</td>
+</tr>
+</tbody></table>
+<p><strong>Flow</strong>:</p>
+<ol>
+<li>Cross-scope receipts submitted to <code>ReceiptClearingManager</code></li>
+<li>Batched by config (max 100 receipts or 1 hour)</li>
+<li>Flush converts to <code>CrossCoopTransfer</code>s</li>
+<li><code>ClearingManager</code> handles bilateral netting</li>
+<li>Net positions settled via agreed mechanism</li>
+</ol>
+<p><strong>Netting engine</strong>: Detects circular obligations (A→B→C→A) for multilateral netting.</p>
+<p><strong>Commons</strong>: <strong>STUBBED</strong> — Commons scope receipts are logged but not cleared (pending Epic 6 #925).</p>
+<h3>1.7 Gateway Endpoints</h3>
+<h4>Treasury API (<code>icn-gateway/src/api/treasury.rs</code>)</h4>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Handler</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GET</td>
+<td><code>/v1/coops/{coop_id}/treasury</code></td>
+<td><code>get_treasury_status</code> (line ~280)</td>
+<td>Treasury status + balance</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/v1/coops/{coop_id}/treasury/balance</code></td>
+<td><code>get_treasury_balance</code> (line ~344)</td>
+<td>Currency balances</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/v1/coops/{coop_id}/treasury/budgets</code></td>
+<td><code>list_budgets</code> (line ~395)</td>
+<td>List budgets</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/v1/coops/{coop_id}/treasury/budgets/{id}</code></td>
+<td><code>get_budget</code> (line ~454)</td>
+<td>Budget detail</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/v1/coops/{coop_id}/treasury/rules</code></td>
+<td><code>list_spending_rules</code> (line ~506)</td>
+<td>Spending rules</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/v1/coops/{coop_id}/treasury/proposals/spend</code></td>
+<td><code>propose_spend</code> (line ~635)</td>
+<td>Submit spend proposal</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/v1/coops/{coop_id}/treasury/proposals/budget</code></td>
+<td><code>propose_budget</code> (line ~692)</td>
+<td>Submit budget proposal</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/v1/coops/{coop_id}/treasury/audit</code></td>
+<td><code>get_audit_trail</code> (line ~771)</td>
+<td>Paginated audit trail</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/v1/coops/{coop_id}/treasury/proposals/{id}/execute</code></td>
+<td><code>execute_approved</code> (line ~893)</td>
+<td>Execute approved proposal</td>
+</tr>
+</tbody></table>
+<h4>Receipts API (<code>icn-gateway/src/api/receipts.rs</code>)</h4>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GET</td>
+<td><code>/v1/receipts/allocations/{hash}</code></td>
+<td>Get allocation receipt by hash</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/v1/receipts/intents/{hash}</code></td>
+<td>Get settlement intent by hash</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/v1/receipts/decision/{hash}</code></td>
+<td>Get all receipts for a decision</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/v1/receipts/chain/{hash}</code></td>
+<td>Get full receipt chain (allocation + intents)</td>
+</tr>
+</tbody></table>
+<h4>Ledger endpoints (general)</h4>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GET</td>
+<td><code>/v1/ledger/balances/{did}</code></td>
+<td>Account balance query</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/v1/ledger/transfer</code></td>
+<td>Basic transfer</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/v1/ledger/entries</code></td>
+<td>Transaction history</td>
+</tr>
+</tbody></table>
+<h3>1.8 Treasury-Coop Integration</h3>
+<p><strong>Current state</strong>: Partially wired.</p>
+<ul>
+<li><code>CoopActor</code> at <code>icn-coop/src/actor.rs:29</code> holds <code>treasury_manager: Option&lt;TreasuryManagerHandle&gt;</code></li>
+<li><code>TreasuryManagerHandle</code> = <code>Arc&lt;RwLock&lt;TreasuryManager&gt;&gt;</code> at actor.rs:20</li>
+<li>Supervisor creates treasury manager at <code>icn-core/src/supervisor/actors.rs:72</code></li>
+<li>Supervisor passes it to CoopActor via <code>init_coop.rs:55</code></li>
+<li>Treasury creation during coop activation: <strong>EXISTS</strong> but test at actor.rs:1495 shows it registers the treasury in TreasuryManager</li>
+</ul>
+<p><strong>Treasury DID derivation</strong>: <code>lifecycle.rs:7-26</code> derives deterministic treasury DID via <code>blake3(&quot;icn:treasury:{coop_id}&quot;)</code> → <code>did:icn:treasury:{base58}</code>. Keypair generated via <code>OsRng</code> (production) or deterministic (test feature gate). Cooperative struct stores DID string only, never the keypair.</p>
+<p><strong>Double-spend protection</strong>: <code>CoopStore::check_and_increment_treasury_nonce()</code> at <code>store.rs:108-206</code> uses <strong>sled transaction</strong> for atomic check-and-increment. Treasury spend proposals carry <code>expected_nonce</code> which must match stored nonce. <code>NonceMismatch</code> aborts if concurrent proposal executed first.</p>
+<p><strong>Capital tracking</strong>: <code>Cooperative.capital_pool: u64</code> with <code>add_capital()/remove_capital()</code> (saturating arithmetic). Members have <code>capital_contribution: u64</code> and <code>shares: u64</code>. Membership tiers define <code>profit_share_weight</code> for surplus distribution.</p>
+<p><strong>Surplus distribution types</strong>: <code>AssetDistributionPlan</code> at <code>types.rs:126-181</code> with <code>BalanceAction</code> (ReturnToMember/TransferToFederation/DonateToCommons), <code>DebtAction</code> (WriteOff/RequireSettlement/Transfer), and <code>CapitalReturnMethod</code> (ProRata/Equal/NoReturn).</p>
+<p><strong>Community vs Cooperative</strong>: <code>icn-community</code> has NO treasury primitives — only <code>ResourcePool</code> (compute/storage/credits as units, not financial). Clear architectural boundary: coops handle value, communities handle capacity.</p>
+<p><strong>Gap</strong>: Coop creation via <code>icnctl coop create</code> does NOT automatically derive and create a treasury DID (issue #1139). The <code>handle_create_treasury()</code> method exists at <code>actor.rs:442-511</code> and registers with TreasuryManager, but it&#39;s not called in the standard coop creation flow.</p>
+<p><strong>Governance integration</strong>:</p>
+<ul>
+<li><code>GatewayTreasuryManager</code> at <code>icn-gateway/src/treasury_mgr.rs:49</code> wraps daemon&#39;s TreasuryManager</li>
+<li>Two modes: standalone (in-memory) or actor-backed (delegates to daemon)</li>
+<li>Treasury proposals flow through governance: <code>propose_spend()</code> → creates proposal → voting → <code>execute_approved()</code> → treasury effect</li>
+</ul>
+<h2>2. Money Flow Audit</h2>
+<h3>Scenario A: Simple transfer between members</h3>
+<pre><code>POST /v1/ledger/transfer {from, to, amount, currency}
+  → Gateway validates auth (JWT claims)
+  → JournalEntryBuilder::new(from)
+      .debit(from, currency, amount)
+      .credit(to, currency, amount)
+      .build()
+  → validate_double_entry() ✅
+  → validate_positive_amounts() ✅
+  → compute_hash() → ContentHash
+  → Ledger stores entry
+  → Gossip replicates to peers
+</code></pre>
+<p><strong>What works</strong>: Entry creation, validation, Merkle-DAG storage, gossip sync.
+<strong>What&#39;s missing</strong>:</p>
+<ul>
+<li>❌ No credit limit enforcement during transfer (CreditLimit type exists but not enforced in transfer path)</li>
+<li>❌ No &quot;why did this fail?&quot; explainer — errors are generic LedgerError strings</li>
+<li>⚠️ No transaction receipt returned to caller (just content hash)</li>
+</ul>
+<h3>Scenario B: Governance-approved budget spend</h3>
+<pre><code>POST /v1/coops/{id}/treasury/proposals/spend {amount, recipient, memo, nonce}
+  → Create governance proposal with TreasuryProposalOperation::Spend
+  → Members vote on proposal
+  → Proposal reaches quorum → Decision
+  → POST /v1/coops/{id}/treasury/proposals/{id}/execute
+  → Translate ProposalPayload → KernelEffect::Treasury(TreasuryEffect::Spend{...})
+  → KernelGovernanceExecutor::execute_effect()             ← governance_executor.rs:112
+  → KernelTreasuryExecutor::execute_treasury_operation()   ← governance_executor.rs:233
+  → LedgerService::submit_treasury_entry(TreasuryEntryRequest)  ← governance_executor.rs:265
+  → JournalEntry with decision_receipt_id + decision_hash ← entry.rs:83-91
+  → ✅ Provenance chain preserved
+</code></pre>
+<p><strong>What works</strong>:</p>
+<ul>
+<li>✅ Proposal creation, voting, decision</li>
+<li>✅ Effect translation (TreasuryProposalOperation → KernelEffect → TreasuryOperation)</li>
+<li>✅ Treasury executor with ledger integration (governance_executor.rs:252-289)</li>
+<li>✅ Nonce-based replay protection for Spend operations</li>
+<li>✅ Decision provenance preserved on JournalEntry</li>
+<li>✅ Audit trail recorded</li>
+</ul>
+<p><strong>What&#39;s BROKEN / incomplete</strong>:</p>
+<ul>
+<li>⚠️ <code>LedgerService::submit_treasury_entry()</code> default impl returns <code>Err(&quot;not supported&quot;)</code> (services.rs:570). Must be overridden by concrete implementation — <strong>needs verification that Ledger actor actually implements this</strong>.</li>
+<li>❌ No AllocationReceipt created in the spend path — Decision goes directly to TreasuryEntryRequest, skipping the AllocationReceipt intermediate step</li>
+<li>❌ No SettlementIntent created in the governance spend path — the conversion (services.rs:690) exists but isn&#39;t called from the governance executor</li>
+</ul>
+<h3>Scenario C: Cross-org federation clearing</h3>
+<pre><code>ExecutionReceipt (Federation scope)
+  → Caller converts to ClearingReceipt
+  → ReceiptClearingManager::submit_receipt()
+  → Batch accumulates (max 100 or 1 hour)
+  → ReceiptClearingManager::flush_to_clearing()
+  → Each receipt → CrossCoopTransfer
+  → ClearingManager processes via bilateral agreement
+  → NettingEngine detects circular obligations
+  → Net positions calculated
+  → Settlement via agreed mechanism
+</code></pre>
+<p><strong>What works</strong>:</p>
+<ul>
+<li>✅ Receipt batching with dedup</li>
+<li>✅ Scope routing (Local/Cell/Org → SettlementEngine, Federation/Commons → clearing)</li>
+<li>✅ Bilateral agreement management</li>
+<li>✅ Netting engine (circular obligation detection)</li>
+</ul>
+<p><strong>What&#39;s BROKEN / incomplete</strong>:</p>
+<ul>
+<li>❌ <strong>No auto-flush</strong> — requires caller to poll <code>should_flush()</code> + call <code>flush_to_clearing()</code>. No background task.</li>
+<li>❌ <strong>Commons clearing stubbed</strong> — logged but not processed</li>
+<li>❌ No receipt chain (no AllocationReceipt in cross-org path)</li>
+<li>❌ No gateway endpoint for triggering clearing flush</li>
+<li>❌ No UX for bilateral agreement management</li>
+</ul>
+<h2>3. Gap Analysis</h2>
+<h3>Critical Gaps (Phase 0 - Legibility)</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Gap</th>
+<th>User Story Blocked</th>
+<th>Missing</th>
+<th>Where</th>
+<th>Receipt?</th>
+<th>Phase</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>G1</td>
+<td><strong>No &quot;why did this fail?&quot; explainer</strong></td>
+<td>&quot;I transferred 100 hours and got an error. Why?&quot;</td>
+<td>Error context enrichment on transfer failure</td>
+<td><code>icn-gateway/src/api/ledger.rs</code></td>
+<td>N/A</td>
+<td>0</td>
+</tr>
+<tr>
+<td>G2</td>
+<td><strong>Transaction history lacks receipts</strong></td>
+<td>&quot;Show me my last 10 transactions with provenance&quot;</td>
+<td>Transaction list endpoint doesn&#39;t return decision provenance</td>
+<td><code>icn-gateway/src/api/ledger.rs</code></td>
+<td>❌</td>
+<td>0</td>
+</tr>
+<tr>
+<td>G3</td>
+<td><strong>Balance display missing credit limits</strong></td>
+<td>&quot;What&#39;s my balance and how much can I spend?&quot;</td>
+<td>Credit limit not returned with balance query</td>
+<td><code>icn-gateway/src/api/ledger.rs</code></td>
+<td>N/A</td>
+<td>0</td>
+</tr>
+</tbody></table>
+<h3>Important Gaps (Phase 1 - Functional Treasury)</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Gap</th>
+<th>User Story Blocked</th>
+<th>Missing</th>
+<th>Where</th>
+<th>Receipt?</th>
+<th>Phase</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>G4</td>
+<td><strong>Treasury not auto-created with coop</strong></td>
+<td>&quot;Create a coop with a treasury&quot;</td>
+<td>Treasury DID derivation + creation in coop lifecycle</td>
+<td><code>icn-coop/src/actor.rs</code></td>
+<td>N/A</td>
+<td>1</td>
+</tr>
+<tr>
+<td>G5</td>
+<td><strong>AllocationReceipt not in spend path</strong></td>
+<td>&quot;Audit the receipt chain for this spend&quot;</td>
+<td>Governance spend skips AllocationReceipt creation</td>
+<td><code>icn-core/src/supervisor/governance_executor.rs</code></td>
+<td>❌ Missing</td>
+<td>1</td>
+</tr>
+<tr>
+<td>G6</td>
+<td><strong>submit_treasury_entry() default is no-op</strong></td>
+<td>&quot;Execute an approved treasury spend&quot;</td>
+<td>Concrete Ledger implementation of submit_treasury_entry()</td>
+<td><code>icn-ledger/src/ledger.rs</code></td>
+<td>❌</td>
+<td>1</td>
+</tr>
+<tr>
+<td>G7</td>
+<td><strong>Surplus distribution not executable</strong></td>
+<td>&quot;Distribute year-end surplus to members&quot;</td>
+<td>TreasuryEffect::DistributeSurplus executor not wired to ledger</td>
+<td><code>governance_executor.rs</code></td>
+<td>❌</td>
+<td>1</td>
+</tr>
+<tr>
+<td>G8</td>
+<td><strong>SettlementEngine dedup not persisted</strong></td>
+<td>&quot;Restart node without duplicate settlements&quot;</td>
+<td>In-memory HashSet lost on restart</td>
+<td><code>icn-ledger/src/settlement.rs:89</code></td>
+<td>N/A</td>
+<td>1</td>
+</tr>
+</tbody></table>
+<h3>Federation Gaps (Phase 3)</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Gap</th>
+<th>User Story Blocked</th>
+<th>Missing</th>
+<th>Where</th>
+<th>Receipt?</th>
+<th>Phase</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>G9</td>
+<td><strong>Commons clearing stubbed</strong></td>
+<td>&quot;Bill compute hours to commons pool&quot;</td>
+<td>Commons scope settlement engine</td>
+<td><code>icn-federation/src/receipt_clearing.rs</code></td>
+<td>❌</td>
+<td>3</td>
+</tr>
+<tr>
+<td>G10</td>
+<td><strong>No auto-flush for clearing</strong></td>
+<td>&quot;Cross-org receipts settle automatically&quot;</td>
+<td>Background task for periodic flush</td>
+<td><code>icn-federation/src/receipt_clearing.rs</code></td>
+<td>N/A</td>
+<td>3</td>
+</tr>
+<tr>
+<td>G11</td>
+<td><strong>No bilateral agreement UX</strong></td>
+<td>&quot;Set up clearing with partner coop&quot;</td>
+<td>Gateway endpoints for agreement CRUD</td>
+<td><code>icn-gateway/src/api/</code></td>
+<td>N/A</td>
+<td>3</td>
+</tr>
+</tbody></table>
+<h2>4. Phase 0 Tasks (Legibility)</h2>
+<h3>P0-E1: Transaction history with decision provenance</h3>
+<ul>
+<li><strong>What</strong>: Extend <code>GET /v1/ledger/entries</code> to include <code>decision_receipt_id</code>, <code>decision_hash</code> in response</li>
+<li><strong>Where</strong>: <code>icn-gateway/src/api/ledger.rs</code></li>
+<li><strong>Receipt expectation</strong>: Each transaction shows its governance origin if applicable</li>
+<li><strong>LOC</strong>: ~50</li>
+</ul>
+<h3>P0-E2: Balance + credit limit display</h3>
+<ul>
+<li><strong>What</strong>: Extend <code>GET /v1/ledger/balances/{did}</code> to include credit limit info</li>
+<li><strong>Where</strong>: <code>icn-gateway/src/api/ledger.rs</code>, need to query <code>CreditLimit</code> data</li>
+<li><strong>LOC</strong>: ~40</li>
+</ul>
+<h3>P0-E3: Transfer failure explainer</h3>
+<ul>
+<li><strong>What</strong>: Return structured error responses with machine-readable codes and human explanations</li>
+<li><strong>Where</strong>: <code>icn-gateway/src/error.rs</code> (GatewayError already has machine-readable codes), enrich ledger error mapping</li>
+<li><strong>Example</strong>: <code>{ &quot;code&quot;: &quot;credit_limit_exceeded&quot;, &quot;explanation&quot;: &quot;Transfer of 500 hours exceeds your credit limit of 200 hours&quot; }</code></li>
+<li><strong>LOC</strong>: ~80</li>
+</ul>
+<h2>5. Phase 1 Tasks (Functional Treasury)</h2>
+<h3>P1-E1: Treasury-Coop auto-creation (#1139)</h3>
+<ul>
+<li><strong>What</strong>: Derive treasury DID from coop identity during coop activation</li>
+<li><strong>Where</strong>: <code>icn-coop/src/actor.rs</code>, supervisor init_coop.rs</li>
+<li><strong>Receipt expectation</strong>: Treasury creation produces audit trail entry</li>
+<li><strong>Issues</strong>: #1139 [B1]</li>
+<li><strong>LOC</strong>: ~150</li>
+</ul>
+<h3>P1-E2: AllocationReceipt in governance spend path</h3>
+<ul>
+<li><strong>What</strong>: Create AllocationReceipt + SettlementIntents when executing treasury effects</li>
+<li><strong>Where</strong>: <code>icn-core/src/supervisor/governance_executor.rs:233-289</code></li>
+<li><strong>Receipt expectation</strong>: Complete chain: Decision → AllocationReceipt → SettlementIntent → JournalEntry</li>
+<li><strong>Issues</strong>: #1141 [B3]</li>
+<li><strong>LOC</strong>: ~100</li>
+</ul>
+<h3>P1-E3: Concrete submit_treasury_entry() implementation</h3>
+<ul>
+<li><strong>What</strong>: Implement <code>LedgerService::submit_treasury_entry()</code> on concrete Ledger actor</li>
+<li><strong>Where</strong>: <code>icn-ledger/src/ledger.rs</code> (wherever Ledger implements LedgerService trait)</li>
+<li><strong>Receipt expectation</strong>: Returns entry_hash, decision_receipt_id, decision_hash echoed back</li>
+<li><strong>Issues</strong>: Part of #1092 [PR9a]</li>
+<li><strong>LOC</strong>: ~80</li>
+</ul>
+<h3>P1-E4: Surplus distribution execution</h3>
+<ul>
+<li><strong>What</strong>: Wire <code>TreasuryEffect::DistributeSurplus</code> to create N journal entries (one per member)</li>
+<li><strong>Where</strong>: <code>icn-core/src/supervisor/governance_executor.rs</code></li>
+<li><strong>Receipt expectation</strong>: Each distribution creates a provenance-linked JournalEntry</li>
+<li><strong>LOC</strong>: ~120</li>
+</ul>
+<h3>P1-E5: Persistent settlement dedup (#992)</h3>
+<ul>
+<li><strong>What</strong>: Persist SettlementEngine dedup set to sled, reload on startup</li>
+<li><strong>Where</strong>: <code>icn-ledger/src/settlement.rs</code></li>
+<li><strong>Receipt expectation</strong>: N/A (infrastructure)</li>
+<li><strong>LOC</strong>: ~60</li>
+</ul>
+<h2>6. Phase 3 Tasks (Federation Economics)</h2>
+<h3>P3-E1: Commons clearing engine</h3>
+<ul>
+<li><strong>What</strong>: Implement commons credit pool settlement (replace stub)</li>
+<li><strong>Where</strong>: <code>icn-federation/src/receipt_clearing.rs</code> (currently logged + discarded)</li>
+<li><strong>Receipt expectation</strong>: Commons receipts produce clearing entries with provenance</li>
+<li><strong>Issues</strong>: Epic 6 #925</li>
+<li><strong>LOC</strong>: ~200</li>
+</ul>
+<h3>P3-E2: Auto-flush background task</h3>
+<ul>
+<li><strong>What</strong>: Actor/task that polls <code>should_flush()</code> and triggers <code>flush_to_clearing()</code></li>
+<li><strong>Where</strong>: <code>icn-core/src/supervisor/</code> (new actor or periodic task)</li>
+<li><strong>LOC</strong>: ~80</li>
+</ul>
+<h3>P3-E3: Bilateral agreement management UX</h3>
+<ul>
+<li><strong>What</strong>: Gateway endpoints for CRUD on bilateral clearing agreements</li>
+<li><strong>Where</strong>: <code>icn-gateway/src/api/federation.rs</code> (new)</li>
+<li><strong>Endpoints</strong>: <code>POST /v1/federations/{id}/agreements</code>, <code>GET /v1/federations/{id}/agreements</code>, etc.</li>
+<li><strong>LOC</strong>: ~200</li>
+</ul>
+<h2>7. Relevant Open Issues</h2>
+<table>
+<thead>
+<tr>
+<th>Issue</th>
+<th>Title</th>
+<th>Labels</th>
+<th>Relevance</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>#1139</td>
+<td>[B1] Treasury-Coop Integration</td>
+<td>P0, flow:C-treasury</td>
+<td><strong>CRITICAL</strong> — coops can&#39;t hold funds</td>
+</tr>
+<tr>
+<td>#1140</td>
+<td>[B2] Asset Type Foundation</td>
+<td>P1, flow:C-treasury</td>
+<td>Asset metadata on JournalEntry</td>
+</tr>
+<tr>
+<td>#1141</td>
+<td>[B3] Allocation Receipt Chain</td>
+<td>P1, flow:C-treasury</td>
+<td>Receipt chain completeness</td>
+</tr>
+<tr>
+<td>#1092</td>
+<td>[PR9a] Gateway treasury + governance endpoints</td>
+<td>P1, area:gateway</td>
+<td>API surface for treasury</td>
+</tr>
+<tr>
+<td>#1093</td>
+<td>[PR9b] TypeScript SDK treasury methods</td>
+<td>P1, area:sdk</td>
+<td>SDK coverage</td>
+</tr>
+<tr>
+<td>#1094</td>
+<td>[PR9c] Flow C demo script</td>
+<td>P1, type:doc</td>
+<td>Treasury demo</td>
+</tr>
+<tr>
+<td>#1090</td>
+<td>[PR8c] Fallback atomicity via CoopActor</td>
+<td>P1, area:governance</td>
+<td>Single-writer for treasury</td>
+</tr>
+<tr>
+<td>#948</td>
+<td>Commons credit earning/spending</td>
+<td>epic:commons-compute</td>
+<td>Commons credit flow</td>
+</tr>
+<tr>
+<td>#992</td>
+<td>Settlement receipt_hash in errors</td>
+<td>epic:commons-compute</td>
+<td>Error enrichment</td>
+</tr>
+<tr>
+<td>#957</td>
+<td>Receipt settlement metrics</td>
+<td>epic:commons-compute</td>
+<td>Observability</td>
+</tr>
+<tr>
+<td>#965</td>
+<td>Configurable credit formula via CCL</td>
+<td>epic:commons-compute</td>
+<td>Credit weights</td>
+</tr>
+<tr>
+<td>#1134</td>
+<td>[E7] Commons compute governance hardening</td>
+<td>epic:commons-compute</td>
+<td>Governance+compute</td>
+</tr>
+<tr>
+<td>#1147</td>
+<td>[EPIC] Vertical Slice</td>
+<td>type:impl, P0</td>
+<td>End-to-end integration</td>
+</tr>
+<tr>
+<td>#1145</td>
+<td>[D1] Vertical Slice Integration Test</td>
+<td>type:test, P0</td>
+<td>Integration verification</td>
+</tr>
+</tbody></table>
+<h2>8. Summary: Money Flow Completeness</h2>
+<table>
+<thead>
+<tr>
+<th>Flow</th>
+<th>Types ✅</th>
+<th>Conversion ✅</th>
+<th>Execution</th>
+<th>Receipt Chain</th>
+<th>Gateway</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Simple transfer</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅ Works</td>
+<td>❌ No provenance</td>
+<td>⚠️ Basic</td>
+</tr>
+<tr>
+<td>Treasury spend</td>
+<td>✅</td>
+<td>✅</td>
+<td>⚠️ Depends on concrete impl</td>
+<td>❌ Skips AllocationReceipt</td>
+<td>✅ Endpoints exist</td>
+</tr>
+<tr>
+<td>Budget spend</td>
+<td>✅</td>
+<td>✅</td>
+<td>⚠️ Same</td>
+<td>❌ Same</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>Surplus distribution</td>
+<td>✅</td>
+<td>✅</td>
+<td>❌ Not wired</td>
+<td>❌</td>
+<td>❌</td>
+</tr>
+<tr>
+<td>Federation clearing</td>
+<td>✅</td>
+<td>✅</td>
+<td>⚠️ No auto-flush</td>
+<td>❌</td>
+<td>❌ No API</td>
+</tr>
+<tr>
+<td>Commons clearing</td>
+<td>✅</td>
+<td>❌ Stub</td>
+<td>❌ Stub</td>
+<td>❌</td>
+<td>❌</td>
+</tr>
+</tbody></table>
+<p><strong>Bottom line</strong>: The <strong>type system and data model are ~90% complete</strong>. All 6 asset types, canonical hashing, receipt chain types, and settlement engines exist. The <strong>execution paths are ~60% complete</strong> — governance → effect → treasury is wired, but the AllocationReceipt intermediate step is skipped and some concrete implementations need verification. The <strong>UX surface is ~40% complete</strong> — treasury endpoints exist but transfer/balance endpoints lack provenance and credit limit data.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

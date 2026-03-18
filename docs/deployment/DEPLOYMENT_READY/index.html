@@ -1,0 +1,484 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Deployment Ready - December 12, 2025 | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>deployment</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>DEPLOYMENT READY</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/deployment/DEPLOYMENT_READY.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Deployment Ready - December 12, 2025</h1>
+<blockquote>
+<p>Historical readiness snapshot from December 12, 2025.
+Treat this as archival context, not current deployment truth.
+For current readiness, rely on live CI/runtime verification and <code>docs/ci/CI_CURRENT_STATUS.md</code>.</p>
+</blockquote>
+<h2>🎉 Status at Snapshot Date: Deployment-ready assessment</h2>
+<p>All systems operational and tested. Backend has <strong>1134+ passing tests</strong>. Mobile app fully integrated with offline mode, real-time updates, and trust graph.</p>
+<hr>
+<h2>What We&#39;ve Built</h2>
+<h3>Backend Infrastructure (Rust)</h3>
+<ul>
+<li>✅ <strong>ICN Daemon (icnd)</strong>: Complete P2P coordination with all actors</li>
+<li>✅ <strong>Gateway API</strong>: REST + WebSocket with JWT auth</li>
+<li>✅ <strong>Trust Graph</strong>: Transitive trust computation with attestation management</li>
+<li>✅ <strong>Ledger</strong>: Double-entry accounting with gossip sync</li>
+<li>✅ <strong>Governance</strong>: Proposals, voting, domain-based permissions</li>
+<li>✅ <strong>Compute</strong>: Distributed CCL execution with intelligent scheduling</li>
+<li>✅ <strong>Security</strong>: Multi-layer protection with Byzantine detection</li>
+<li>✅ <strong>Monitoring</strong>: Prometheus metrics + Grafana dashboards</li>
+</ul>
+<h3>Mobile App (React Native)</h3>
+<ul>
+<li>✅ <strong>Authentication</strong>: DID-based with JWT tokens</li>
+<li>✅ <strong>Wallet UI</strong>: Balance display, transaction history, send/receive</li>
+<li>✅ <strong>Trust Graph</strong>: Visual network with attestation UI component</li>
+<li>✅ <strong>Notifications</strong>: Local push with WebSocket live updates</li>
+<li>✅ <strong>Offline Mode</strong>: AsyncStorage caching with auto-sync on reconnect</li>
+<li>✅ <strong>Real-time</strong>: WebSocket integration for balance/transaction updates</li>
+<li>✅ <strong>Event Listeners</strong>: Automatic notification dispatch on events</li>
+</ul>
+<h3>Client SDK (TypeScript)</h3>
+<ul>
+<li>✅ <strong>Authentication</strong>: Login, register, identity management</li>
+<li>✅ <strong>Wallet</strong>: Balance queries, transaction history, payments</li>
+<li>✅ <strong>Trust</strong>: Query trust scores, manage attestations</li>
+<li>✅ <strong>Notifications</strong>: Fetch notifications, mark as read</li>
+<li>✅ <strong>Real-time</strong>: WebSocket connection manager with auto-reconnect</li>
+<li>✅ <strong>Offline Support</strong>: Storage abstraction for caching</li>
+</ul>
+<h3>Deployment Infrastructure</h3>
+<ul>
+<li>✅ <strong>Docker Compose</strong>: Complete stack with monitoring</li>
+<li>✅ <strong>Kubernetes</strong>: Production-grade manifests with health checks</li>
+<li>✅ <strong>Native Install</strong>: Systemd service for bare metal/VPS</li>
+<li>✅ <strong>Health Checks</strong>: Automated health monitoring</li>
+<li>✅ <strong>SSL/HTTPS</strong>: Nginx reverse proxy configuration</li>
+<li>✅ <strong>Backup/Restore</strong>: Automated backup scripts</li>
+</ul>
+<hr>
+<h2>🚀 Deployment Options</h2>
+<h3>Option 1: Quick Start with Docker Compose (Recommended)</h3>
+<p><strong>Best for:</strong> Initial testing, development, small pilots</p>
+<pre><code class="language-bash">cd deploy
+./quickstart.sh &quot;My Coop Name&quot;
+</code></pre>
+<p>This starts:</p>
+<ul>
+<li>ICN Gateway API: <a href="http://localhost:8080" target="_blank" rel="noopener">http://localhost:8080</a></li>
+<li>Web UI: <a href="http://localhost:3000" target="_blank" rel="noopener">http://localhost:3000</a></li>
+<li>Grafana Dashboard: <a href="http://localhost:3001" target="_blank" rel="noopener">http://localhost:3001</a> (admin/admin)</li>
+<li>Prometheus: <a href="http://localhost:9091" target="_blank" rel="noopener">http://localhost:9091</a></li>
+</ul>
+<p><strong>Time to deploy:</strong> ~5 minutes</p>
+<h3>Option 2: Production Kubernetes (Scalable)</h3>
+<p><strong>Best for:</strong> Multi-node production deployments</p>
+<pre><code class="language-bash">cd deploy/k8s
+
+# Create secrets
+kubectl create secret generic icn-secrets \
+  --namespace=icn \
+  --from-literal=passphrase=&#39;secure-passphrase&#39; \
+  --from-literal=jwt-secret=&quot;$(openssl rand -hex 32)&quot;
+
+# Deploy
+kubectl apply -k .
+
+# Check status
+kubectl get pods -n icn
+</code></pre>
+<p><strong>Features:</strong></p>
+<ul>
+<li>High availability with multiple replicas</li>
+<li>Automated health checks and restarts</li>
+<li>Persistent storage with PVCs</li>
+<li>ServiceMonitor for Prometheus integration</li>
+</ul>
+<h3>Option 3: Native Installation (Best Performance)</h3>
+<p><strong>Best for:</strong> Production on VPS/bare metal</p>
+<pre><code class="language-bash"># Build
+cd icn
+cargo build --release
+
+# Install
+cd ../deploy
+sudo ./install.sh
+
+# Configure
+sudo cp /etc/icn/icnd.env.example /etc/icn/icnd.env
+sudo nano /etc/icn/icnd.env  # Set JWT_SECRET
+
+# Initialize
+sudo -u icn icnctl --data-dir /var/lib/icn id init
+
+# Start
+sudo systemctl enable icnd
+sudo systemctl start icnd
+</code></pre>
+<p><strong>Time to deploy:</strong> ~15 minutes (including build)</p>
+<hr>
+<h2>📱 Mobile App Configuration</h2>
+<h3>1. Update API Endpoint</h3>
+<p>Edit <code>sdk/react-native/examples/CoopWallet/src/client.ts</code>:</p>
+<pre><code class="language-typescript">const client = createMobileClient({
+  baseUrl: &#39;https://api.your-coop.org&#39;,  // Your production domain
+  wallet,
+  storage,
+});
+</code></pre>
+<h3>2. Build Mobile App</h3>
+<p><strong>iOS:</strong></p>
+<pre><code class="language-bash">cd sdk/react-native/examples/CoopWallet
+npm install
+cd ios &amp;&amp; pod install &amp;&amp; cd ..
+npx react-native run-ios --configuration Release
+</code></pre>
+<p><strong>Android:</strong></p>
+<pre><code class="language-bash">cd sdk/react-native/examples/CoopWallet
+npm install
+cd android
+./gradlew assembleRelease
+# APK at: android/app/build/outputs/apk/release/app-release.apk
+</code></pre>
+<h3>3. Deploy to Stores</h3>
+<p><strong>TestFlight (iOS):</strong></p>
+<ol>
+<li>Open in Xcode</li>
+<li>Product → Archive</li>
+<li>Distribute → App Store Connect</li>
+<li>Upload to TestFlight</li>
+</ol>
+<p><strong>Google Play (Android):</strong></p>
+<ol>
+<li>Sign APK with keystore</li>
+<li>Upload to Play Console</li>
+<li>Create internal test track</li>
+<li>Add beta testers</li>
+</ol>
+<hr>
+<h2>🔒 Production Security Checklist</h2>
+<h3>Before Going Live</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Change <code>JWT_SECRET</code> to random value: <code>openssl rand -hex 32</code></li>
+<li><input disabled="" type="checkbox"> Configure HTTPS with Let&#39;s Encrypt</li>
+<li><input disabled="" type="checkbox"> Change Grafana admin password</li>
+<li><input disabled="" type="checkbox"> Enable firewall (allow 80/443, block 8080 from internet)</li>
+<li><input disabled="" type="checkbox"> Set up automated backups</li>
+<li><input disabled="" type="checkbox"> Configure log rotation</li>
+<li><input disabled="" type="checkbox"> Update all default passwords</li>
+<li><input disabled="" type="checkbox"> Test disaster recovery procedure</li>
+</ul>
+<h3>Network Security</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Configure DNS: <code>api.your-coop.org</code> → Server IP</li>
+<li><input disabled="" type="checkbox"> Install SSL certificate</li>
+<li><input disabled="" type="checkbox"> Set up nginx reverse proxy</li>
+<li><input disabled="" type="checkbox"> Test from mobile network (not just localhost)</li>
+<li><input disabled="" type="checkbox"> Verify WebSocket connections work over HTTPS</li>
+</ul>
+<h3>Monitoring</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Access Grafana dashboards</li>
+<li><input disabled="" type="checkbox"> Set up alerting rules</li>
+<li><input disabled="" type="checkbox"> Test health checks</li>
+<li><input disabled="" type="checkbox"> Monitor error rates</li>
+</ul>
+<hr>
+<h2>🧪 Testing Checklist</h2>
+<h3>Backend Testing</h3>
+<pre><code class="language-bash"># Health check
+curl http://localhost:8080/v1/health
+
+# Should return:
+# {&quot;status&quot;:&quot;healthy&quot;,&quot;version&quot;:&quot;0.1.0&quot;,&quot;uptime_secs&quot;:...}
+</code></pre>
+<h3>Mobile App Testing</h3>
+<ul>
+<li><input disabled="" type="checkbox"> User can create identity</li>
+<li><input disabled="" type="checkbox"> Balance displays correctly</li>
+<li><input disabled="" type="checkbox"> Can send payment</li>
+<li><input disabled="" type="checkbox"> Can receive payment</li>
+<li><input disabled="" type="checkbox"> Transaction history loads</li>
+<li><input disabled="" type="checkbox"> Offline mode works (airplane mode)</li>
+<li><input disabled="" type="checkbox"> WebSocket reconnects automatically</li>
+<li><input disabled="" type="checkbox"> Notifications appear in real-time</li>
+<li><input disabled="" type="checkbox"> Trust graph displays</li>
+<li><input disabled="" type="checkbox"> Trust attestation form works</li>
+</ul>
+<h3>WebSocket Testing</h3>
+<pre><code class="language-bash"># Install websocat
+cargo install websocat
+
+# Connect
+websocat ws://localhost:8080/v1/ws
+
+# Should see connection established
+</code></pre>
+<hr>
+<h2>📊 Monitoring &amp; Observability</h2>
+<h3>Grafana Dashboards</h3>
+<p>Access: <a href="http://localhost:3001" target="_blank" rel="noopener">http://localhost:3001</a> (change port if modified)</p>
+<p><strong>Default credentials:</strong> admin / admin (CHANGE IMMEDIATELY!)</p>
+<p><strong>Available Metrics:</strong></p>
+<ul>
+<li>Request rate and latency</li>
+<li>Payment volume</li>
+<li>Trust graph size</li>
+<li>Notification delivery rate</li>
+<li>Error rates</li>
+<li>WebSocket connections</li>
+<li>System uptime</li>
+</ul>
+<h3>Prometheus Metrics</h3>
+<p>Access: <a href="http://localhost:9091" target="_blank" rel="noopener">http://localhost:9091</a></p>
+<p><strong>Key Metrics:</strong></p>
+<ul>
+<li><code>gateway_requests_total</code> - Total API requests</li>
+<li><code>gateway_request_duration_seconds</code> - Request latency</li>
+<li><code>gateway_balance_queries</code> - Balance lookups</li>
+<li><code>gateway_payments_created</code> - Payments created</li>
+<li><code>gateway_notifications_sent</code> - Notifications sent</li>
+<li><code>gateway_websocket_connections</code> - Active WebSocket connections</li>
+</ul>
+<h3>Log Monitoring</h3>
+<pre><code class="language-bash"># Docker
+docker logs -f icn-daemon
+
+# Systemd
+journalctl -u icnd -f
+
+# Filter for errors
+journalctl -u icnd -p err -f
+</code></pre>
+<hr>
+<h2>🗄️ Backup &amp; Disaster Recovery</h2>
+<h3>Manual Backup</h3>
+<pre><code class="language-bash">sudo systemctl stop icnd
+sudo tar -czf icn-backup-$(date +%Y%m%d).tar.gz /var/lib/icn
+sudo systemctl start icnd
+</code></pre>
+<h3>Automated Backups</h3>
+<pre><code class="language-bash"># Add to crontab
+sudo crontab -e
+
+# Daily backup at 2 AM
+0 2 * * * systemctl stop icnd &amp;&amp; \
+  tar -czf /backups/icn-$(date +\%Y\%m\%d).tar.gz /var/lib/icn &amp;&amp; \
+  systemctl start icnd
+
+# Keep only last 30 days
+0 3 * * * find /backups -name &quot;icn-*.tar.gz&quot; -mtime +30 -delete
+</code></pre>
+<h3>Restore</h3>
+<pre><code class="language-bash">sudo systemctl stop icnd
+sudo tar -xzf icn-backup-20251212.tar.gz -C /
+sudo chown -R icn:icn /var/lib/icn
+sudo systemctl start icnd
+</code></pre>
+<hr>
+<h2>🔧 Troubleshooting</h2>
+<h3>Gateway Won&#39;t Start</h3>
+<pre><code class="language-bash"># Check logs
+journalctl -u icnd -n 50
+
+# Common issues:
+# 1. Port 8080 already in use
+sudo lsof -i :8080
+
+# 2. JWT_SECRET not set
+sudo nano /etc/icn/icnd.env
+
+# 3. Permission errors
+sudo chown -R icn:icn /var/lib/icn
+</code></pre>
+<h3>Mobile App Can&#39;t Connect</h3>
+<pre><code class="language-bash"># Test from mobile network
+curl -v http://YOUR_SERVER_IP:8080/v1/health
+
+# Common issues:
+# 1. Firewall blocking - open port or use nginx proxy
+# 2. Using localhost instead of server IP
+# 3. CORS errors - check ICN_GATEWAY_CORS_ORIGINS
+</code></pre>
+<h3>WebSocket Disconnects</h3>
+<pre><code class="language-bash"># Increase nginx timeout (if using nginx)
+proxy_read_timeout 3600s;
+
+# Check connections in Grafana
+# Look for gateway_websocket_connections metric
+</code></pre>
+<hr>
+<h2>🌐 SSL/HTTPS Setup (Production)</h2>
+<h3>Install Certbot</h3>
+<pre><code class="language-bash">sudo apt-get install certbot python3-certbot-nginx
+</code></pre>
+<h3>Configure Nginx</h3>
+<p>Create <code>/etc/nginx/sites-available/icn</code>:</p>
+<pre><code class="language-nginx">server {
+    listen 80;
+    server_name api.your-coop.org;
+    return 301 https://$server_name$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name api.your-coop.org;
+    
+    ssl_certificate /etc/letsencrypt/live/api.your-coop.org/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/api.your-coop.org/privkey.pem;
+    
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        
+        # WebSocket support
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection &quot;upgrade&quot;;
+        proxy_read_timeout 3600s;
+    }
+}
+</code></pre>
+<p>Enable and get certificate:</p>
+<pre><code class="language-bash">sudo ln -s /etc/nginx/sites-available/icn /etc/nginx/sites-enabled/
+sudo certbot --nginx -d api.your-coop.org
+sudo systemctl reload nginx
+</code></pre>
+<hr>
+<h2>📈 Performance Benchmarks</h2>
+<p><strong>Test Environment:</strong> 4 CPU, 8GB RAM, SSD storage</p>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>API Requests/sec</td>
+<td>1000+</td>
+</tr>
+<tr>
+<td>Average Latency</td>
+<td>&lt;50ms</td>
+</tr>
+<tr>
+<td>WebSocket Connections</td>
+<td>1000+ concurrent</td>
+</tr>
+<tr>
+<td>Trust Graph Query</td>
+<td>&lt;10ms</td>
+</tr>
+<tr>
+<td>Payment Creation</td>
+<td>&lt;100ms</td>
+</tr>
+<tr>
+<td>Notification Delivery</td>
+<td>&lt;5s</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>🎯 Success Criteria</h2>
+<p>After deployment, verify:</p>
+<ul>
+<li><input disabled="" type="checkbox"> Backend health check returns 200 OK</li>
+<li><input disabled="" type="checkbox"> Grafana shows all metrics</li>
+<li><input disabled="" type="checkbox"> Mobile app can register new user</li>
+<li><input disabled="" type="checkbox"> Mobile app can send/receive payments</li>
+<li><input disabled="" type="checkbox"> WebSocket real-time updates work</li>
+<li><input disabled="" type="checkbox"> Offline mode works correctly</li>
+<li><input disabled="" type="checkbox"> Trust graph displays</li>
+<li><input disabled="" type="checkbox"> No errors in logs</li>
+<li><input disabled="" type="checkbox"> All 1134+ tests passing</li>
+</ul>
+<hr>
+<h2>📚 Additional Documentation</h2>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/DEPLOYMENT_GUIDE">DEPLOYMENT_GUIDE.md</a> - Comprehensive deployment guide</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/DEPLOY_TEST_NETWORK">DEPLOY_TEST_NETWORK.md</a> - Test network setup</li>
+<li><a href="/docs/mobile/MOBILE_APP_STATUS">MOBILE_APP_STATUS.md</a> - Mobile integration status</li>
+<li><a href="/docs/ARCHITECTURE">ARCHITECTURE.md</a> - System architecture</li>
+<li><a href="/docs/security/production-hardening">production-hardening.md</a> - Security hardening</li>
+</ul>
+<hr>
+<h2>🚀 Next Steps</h2>
+<ol>
+<li><strong>Choose deployment method</strong> (Docker Compose recommended for start)</li>
+<li><strong>Deploy backend</strong> using quickstart.sh</li>
+<li><strong>Configure mobile app</strong> with production URL</li>
+<li><strong>Test thoroughly</strong> with pilot users</li>
+<li><strong>Monitor metrics</strong> in Grafana</li>
+<li><strong>Collect feedback</strong> and iterate</li>
+<li><strong>Scale as needed</strong> (add nodes, load balancer)</li>
+</ol>
+<hr>
+<h2>🆘 Support</h2>
+<ul>
+<li><strong>Documentation:</strong> <code>/docs</code> directory</li>
+<li><strong>GitHub Issues:</strong> <a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">https://github.com/InterCooperative-Network/icn/issues</a></li>
+<li><strong>Community:</strong> [Add your community channels]</li>
+</ul>
+<hr>
+<p><strong>Deployment Status: ✅ READY</strong></p>
+<p>All systems tested and operational. Backend: 1134+ passing tests. Mobile app fully integrated. Infrastructure ready for production.</p>
+<p><strong>Start deploying now with <code>cd deploy &amp;&amp; ./quickstart.sh</code>!</strong></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

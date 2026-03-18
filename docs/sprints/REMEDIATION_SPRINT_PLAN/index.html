@@ -1,0 +1,953 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Gap Remediation Sprint Plan | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>sprints</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>REMEDIATION SPRINT PLAN</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/sprints/REMEDIATION_SPRINT_PLAN.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Gap Remediation Sprint Plan</h1>
+<p><strong>Date:</strong> 2025-12-17<br><strong>Status:</strong> ACTIVE - Sprint 1 Starting<br><strong>Goal:</strong> Close HIGH-priority gaps for production readiness<br><strong>Timeline:</strong> 4 weeks (Sprint 1), then ongoing  </p>
+<hr>
+<h2>Sprint 1: Quick Wins &amp; Critical Path (Week 1-4)</h2>
+<h3>Priority Order (Impact × Effort)</h3>
+<ol>
+<li><strong>Ledger Replay Attack Fix</strong> ⚡ HIGH IMPACT, LOW EFFORT (1-2 days)</li>
+<li><strong>Upgrade Coordination Foundation</strong> 🎯 HIGH IMPACT, MEDIUM EFFORT (1 week)  </li>
+<li><strong>Trust Graph Gaming - Basic Detection</strong> 🎯 HIGH IMPACT, MEDIUM EFFORT (1 week)</li>
+<li><strong>Gossip Amplification Protection</strong> ⚡ MEDIUM IMPACT, LOW EFFORT (2-3 days)</li>
+<li><strong>Scalability Testing Setup</strong> 📊 HIGH IMPACT, MEDIUM EFFORT (3-4 days)</li>
+</ol>
+<h3>Why This Order?</h3>
+<ul>
+<li><strong>Replay Attack</strong>: Security vulnerability, easy fix, immediate value</li>
+<li><strong>Upgrade Coordination</strong>: Foundational for all future protocol changes</li>
+<li><strong>Trust Gaming</strong>: Prevents abuse, essential for pilot scaling</li>
+<li><strong>Gossip Protection</strong>: Network stability, prevents DoS</li>
+<li><strong>Scalability Testing</strong>: Parallel track, informs all other work</li>
+</ul>
+<hr>
+<h2>Task Breakdown</h2>
+<h3>1. Ledger Replay Attack Fix ⚡</h3>
+<p><strong>File:</strong> <code>icn/crates/icn-net/src/envelope.rs</code>, <code>icn-ledger/src/ledger.rs</code><br><strong>Duration:</strong> 1-2 days<br><strong>Priority:</strong> CRITICAL  </p>
+<p><strong>Current Vulnerability:</strong></p>
+<pre><code>Time 0:00: Transaction submitted (nonce: 0xABC)
+Time 0:01: Transaction processed
+Time 0:04: Attacker replays (still within 5min window)
+Result: Duplicate processing possible
+</code></pre>
+<p><strong>Fix Strategy:</strong></p>
+<pre><code class="language-rust">// Phase 1: Nonce finalization in ReplayGuard
+pub struct NonceClaim {
+    nonce: [u8; 16],
+    claimed_at: u64,
+    finalized_at: Option&lt;u64&gt;,
+    purpose: NonceUsage,
+}
+
+pub enum NonceUsage {
+    LedgerTransaction { entry_hash: ContentHash },
+    NetworkMessage { msg_hash: ContentHash },
+    ContractExecution { task_hash: ContentHash },
+}
+
+impl ReplayGuard {
+    /// Claim nonce (returns false if already claimed)
+    pub fn claim_nonce(&amp;mut self, nonce: &amp;[u8; 16], purpose: NonceUsage) -&gt; bool;
+    
+    /// Finalize nonce (permanent, non-replayable)
+    pub fn finalize_nonce(&amp;mut self, nonce: &amp;[u8; 16]) -&gt; Result&lt;()&gt;;
+    
+    /// Check allows only unclaimed or unfinalizedنonces
+    pub fn check_nonce(&amp;self, nonce: &amp;[u8; 16]) -&gt; bool {
+        match self.nonces.get(nonce) {
+            None =&gt; true,  // New nonce
+            Some(claim) =&gt; claim.finalized_at.is_none(),  // Not finalized yet
+        }
+    }
+}
+
+// Phase 2: Ledger integration
+impl Ledger {
+    pub fn append_entry(&amp;mut self, entry: JournalEntry) -&gt; Result&lt;()&gt; {
+        // Validate entry...
+        
+        // Finalize nonces from all transactions
+        for tx in &amp;entry.transactions {
+            if let Some(nonce) = tx.extract_nonce() {
+                self.replay_guard.finalize_nonce(&amp;nonce)?;
+            }
+        }
+        
+        // Append to journal...
+    }
+}
+</code></pre>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Add <code>finalized_at</code> field to <code>ReplayGuard</code></li>
+<li><input disabled="" type="checkbox"> Implement <code>finalize_nonce()</code> method</li>
+<li><input disabled="" type="checkbox"> Update ledger to finalize on append</li>
+<li><input disabled="" type="checkbox"> Add tests for replay within window</li>
+<li><input disabled="" type="checkbox"> Update documentation</li>
+</ul>
+<p><strong>Test Cases:</strong></p>
+<pre><code class="language-rust">#[test]
+fn test_replay_after_finalization() {
+    // Submit transaction at T=0
+    // Finalize nonce at T=1
+    // Attempt replay at T=2 (should fail even within 5min)
+    // Assert: Rejected
+}
+
+#[test]
+fn test_replay_before_finalization() {
+    // Submit transaction at T=0
+    // Attempt replay at T=1 (before finalization)
+    // Assert: Allowed (for idempotency during processing)
+}
+</code></pre>
+<hr>
+<h3>2. Upgrade Coordination Foundation 🎯</h3>
+<p><strong>Files:</strong> <code>icn/crates/icn-governance/src/proposal.rs</code>, <code>icn-core/src/supervisor.rs</code><br><strong>Duration:</strong> 1 week<br><strong>Priority:</strong> HIGH  </p>
+<p><strong>Goal:</strong> Enable governance-driven protocol upgrades</p>
+<p><strong>Implementation Plan:</strong></p>
+<h4>Step 1: New Proposal Type (Day 1-2)</h4>
+<pre><code class="language-rust">// icn-governance/src/proposal.rs
+
+pub enum ProposalPayload {
+    // ... existing variants
+    
+    /// Protocol upgrade proposal
+    ProtocolUpgrade {
+        /// New version (e.g., &quot;1.2.0&quot;)
+        version: Version,
+        
+        /// Breaking changes description
+        breaking_changes: Vec&lt;String&gt;,
+        
+        /// Migration guide URL
+        migration_guide: Option&lt;String&gt;,
+        
+        /// Upgrade deadline (Unix timestamp)
+        deadline: u64,
+        
+        /// Minimum version required (nodes below this rejected)
+        min_required_version: Option&lt;Version&gt;,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Version {
+    pub major: u32,
+    pub minor: u32,
+    pub patch: u32,
+}
+
+impl Version {
+    pub fn parse(s: &amp;str) -&gt; Result&lt;Self&gt;;
+    pub fn is_compatible_with(&amp;self, other: &amp;Version) -&gt; bool;
+}
+</code></pre>
+<h4>Step 2: Version Tracking (Day 2-3)</h4>
+<pre><code class="language-rust">// icn-core/src/supervisor.rs
+
+pub struct Supervisor {
+    // ... existing fields
+    
+    /// Current protocol version
+    protocol_version: Version,
+    
+    /// Pending upgrade (if governance approved)
+    pending_upgrade: Option&lt;PendingUpgrade&gt;,
+    
+    /// Version adoption tracker
+    version_tracker: VersionTracker,
+}
+
+pub struct PendingUpgrade {
+    pub proposal_id: ProposalId,
+    pub target_version: Version,
+    pub approved_at: u64,
+    pub deadline: u64,
+    pub migration_applied: bool,
+}
+
+pub struct VersionTracker {
+    /// Peer versions (DID -&gt; Version)
+    peer_versions: HashMap&lt;Did, Version&gt;,
+    
+    /// Update timestamp
+    last_updated: HashMap&lt;Did, u64&gt;,
+}
+
+impl VersionTracker {
+    /// Record peer version from Hello message
+    pub fn record_peer_version(&amp;mut self, peer: Did, version: Version);
+    
+    /// Get adoption rate for a version
+    pub fn adoption_rate(&amp;self, version: &amp;Version) -&gt; f64;
+    
+    /// Get peers below minimum version
+    pub fn peers_below_version(&amp;self, min: &amp;Version) -&gt; Vec&lt;Did&gt;;
+}
+</code></pre>
+<h4>Step 3: Hello Message Update (Day 3-4)</h4>
+<pre><code class="language-rust">// icn-net/src/protocol.rs
+
+pub struct NetworkMessage {
+    // ... existing variants
+    
+    Hello {
+        did: Did,
+        version: u32,  // &lt;- Already exists, rename to protocol_version
+        capabilities: CapabilityFlags,
+        x25519_key: [u8; 32],
+        
+        // NEW: Semantic version
+        protocol_semver: Version,
+    },
+}
+
+// Version negotiation
+impl NetworkActor {
+    fn handle_hello(&amp;mut self, peer: Did, hello: HelloMsg) -&gt; Result&lt;()&gt; {
+        // Record peer version
+        self.version_tracker.record_peer_version(peer.clone(), hello.protocol_semver);
+        
+        // Check compatibility
+        if !self.protocol_version.is_compatible_with(&amp;hello.protocol_semver) {
+            warn!(&quot;Peer {} has incompatible version: {}&quot;, peer, hello.protocol_semver);
+            
+            // If below minimum required, reject connection
+            if let Some(min) = &amp;self.min_required_version {
+                if hello.protocol_semver &lt; *min {
+                    return Err(anyhow!(&quot;Version too old: {} &lt; {}&quot;, hello.protocol_semver, min));
+                }
+            }
+        }
+        
+        // Continue with connection...
+    }
+}
+</code></pre>
+<h4>Step 4: Metrics &amp; Monitoring (Day 4-5)</h4>
+<pre><code class="language-rust">// icn-obs/src/metrics.rs
+
+pub fn init_upgrade_metrics() {
+    gauge!(
+        &quot;icn_upgrade_adoption_rate&quot;,
+        &quot;Percentage of peers on target version&quot;
+    );
+    
+    gauge!(
+        &quot;icn_upgrade_deadline_remaining_seconds&quot;,
+        &quot;Seconds until upgrade deadline&quot;
+    );
+    
+    counter!(
+        &quot;icn_upgrade_rejected_connections_total&quot;,
+        &quot;Connections rejected due to old version&quot;
+    );
+}
+</code></pre>
+<h4>Step 5: Governance Integration (Day 5-7)</h4>
+<pre><code class="language-rust">// icn-governance/src/execution.rs
+
+impl GovernanceActor {
+    async fn execute_protocol_upgrade(&amp;mut self, proposal: ProtocolUpgradeProposal) -&gt; Result&lt;()&gt; {
+        info!(&quot;Executing protocol upgrade to version {}&quot;, proposal.version);
+        
+        // Store pending upgrade
+        let pending = PendingUpgrade {
+            proposal_id: proposal.id.clone(),
+            target_version: proposal.version.clone(),
+            approved_at: now_ms(),
+            deadline: proposal.deadline,
+            migration_applied: false,
+        };
+        
+        // Notify supervisor
+        self.supervisor_tx.send(SupervisorMsg::UpgradeApproved(pending)).await?;
+        
+        // Announce via gossip
+        self.gossip.announce(
+            &quot;governance:upgrade&quot;,
+            bincode::serialize(&amp;pending)?,
+        ).await?;
+        
+        Ok(())
+    }
+}
+</code></pre>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Add <code>ProtocolUpgrade</code> proposal type</li>
+<li><input disabled="" type="checkbox"> Implement <code>Version</code> struct with parsing</li>
+<li><input disabled="" type="checkbox"> Add <code>VersionTracker</code> to supervisor</li>
+<li><input disabled="" type="checkbox"> Update Hello message with semver</li>
+<li><input disabled="" type="checkbox"> Add version compatibility checks</li>
+<li><input disabled="" type="checkbox"> Add metrics (adoption rate, deadline)</li>
+<li><input disabled="" type="checkbox"> Integrate with governance execution</li>
+<li><input disabled="" type="checkbox"> Write tests (version negotiation, rejection)</li>
+<li><input disabled="" type="checkbox"> Document upgrade workflow</li>
+</ul>
+<hr>
+<h3>3. Trust Graph Gaming - Basic Detection 🎯</h3>
+<p><strong>Files:</strong> <code>icn/crates/icn-trust/src/</code>, new file <code>anomaly.rs</code><br><strong>Duration:</strong> 1 week<br><strong>Priority:</strong> HIGH  </p>
+<p><strong>Goal:</strong> Detect and flag suspicious trust patterns</p>
+<h4>Step 1: Anomaly Detector Skeleton (Day 1)</h4>
+<pre><code class="language-rust">// icn-trust/src/anomaly.rs
+
+pub struct TrustGraphAnalyzer {
+    trust_graph: Arc&lt;RwLock&lt;TrustGraph&gt;&gt;,
+    config: AnomalyConfig,
+}
+
+pub struct AnomalyConfig {
+    /// Circular vouch cycle length threshold
+    pub max_cycle_length: usize,  // 5
+    
+    /// Minimum cycle strength to flag
+    pub min_cycle_strength: f64,  // 0.8
+    
+    /// Sybil cluster detection ratio
+    pub sybil_density_ratio: f64,  // 5.0 (internal/external)
+    
+    /// Rapid growth threshold (% per week)
+    pub rapid_growth_threshold: f64,  // 0.5 (50%)
+}
+
+pub enum TrustAnomaly {
+    CircularVouching {
+        cycle: Vec&lt;Did&gt;,
+        cycle_strength: f64,
+        detected_at: u64,
+    },
+    SybilCluster {
+        cluster: Vec&lt;Did&gt;,
+        internal_density: f64,
+        external_density: f64,
+        detected_at: u64,
+    },
+    RapidTrustGrowth {
+        did: Did,
+        growth_rate: f64,
+        baseline: f64,
+        current: f64,
+        detected_at: u64,
+    },
+}
+</code></pre>
+<h4>Step 2: Circular Vouch Detection (Day 2-3)</h4>
+<pre><code class="language-rust">impl TrustGraphAnalyzer {
+    /// Detect circular vouching using DFS cycle detection
+    pub fn detect_circular_vouching(&amp;self) -&gt; Vec&lt;TrustAnomaly&gt; {
+        let graph = self.trust_graph.read().unwrap();
+        let mut anomalies = vec![];
+        
+        // Tarjan&#39;s SCC algorithm for cycle detection
+        let sccs = self.find_strongly_connected_components(&amp;graph);
+        
+        for scc in sccs {
+            if scc.len() &gt; 1 &amp;&amp; scc.len() &lt;= self.config.max_cycle_length {
+                // Calculate cycle strength
+                let strength = self.calculate_cycle_strength(&amp;scc, &amp;graph);
+                
+                if strength &gt;= self.config.min_cycle_strength {
+                    anomalies.push(TrustAnomaly::CircularVouching {
+                        cycle: scc,
+                        cycle_strength: strength,
+                        detected_at: now_ms(),
+                    });
+                }
+            }
+        }
+        
+        anomalies
+    }
+    
+    fn find_strongly_connected_components(&amp;self, graph: &amp;TrustGraph) -&gt; Vec&lt;Vec&lt;Did&gt;&gt; {
+        // Tarjan&#39;s algorithm implementation
+        // Returns: Vec of SCCs (each SCC is a Vec of DIDs)
+        todo!(&quot;Implement Tarjan&#39;s SCC&quot;)
+    }
+    
+    fn calculate_cycle_strength(&amp;self, cycle: &amp;[Did], graph: &amp;TrustGraph) -&gt; f64 {
+        let mut total_strength = 0.0;
+        let mut edge_count = 0;
+        
+        for i in 0..cycle.len() {
+            let from = &amp;cycle[i];
+            let to = &amp;cycle[(i + 1) % cycle.len()];
+            
+            if let Some(edge) = graph.get_edge(from, to) {
+                total_strength += edge.weight;
+                edge_count += 1;
+            }
+        }
+        
+        if edge_count &gt; 0 {
+            total_strength / edge_count as f64
+        } else {
+            0.0
+        }
+    }
+}
+</code></pre>
+<h4>Step 3: Sybil Cluster Detection (Day 3-4)</h4>
+<pre><code class="language-rust">impl TrustGraphAnalyzer {
+    /// Detect Sybil clusters (high internal, low external trust)
+    pub fn detect_sybil_clusters(&amp;self) -&gt; Vec&lt;TrustAnomaly&gt; {
+        let graph = self.trust_graph.read().unwrap();
+        let mut anomalies = vec![];
+        
+        // Use community detection (Louvain algorithm)
+        let communities = self.detect_communities(&amp;graph);
+        
+        for community in communities {
+            let internal = self.calculate_internal_density(&amp;community, &amp;graph);
+            let external = self.calculate_external_density(&amp;community, &amp;graph);
+            
+            let ratio = if external &gt; 0.0 {
+                internal / external
+            } else {
+                f64::INFINITY
+            };
+            
+            if ratio &gt;= self.config.sybil_density_ratio {
+                anomalies.push(TrustAnomaly::SybilCluster {
+                    cluster: community,
+                    internal_density: internal,
+                    external_density: external,
+                    detected_at: now_ms(),
+                });
+            }
+        }
+        
+        anomalies
+    }
+    
+    fn calculate_internal_density(&amp;self, community: &amp;[Did], graph: &amp;TrustGraph) -&gt; f64 {
+        let mut edge_count = 0;
+        let max_edges = community.len() * (community.len() - 1);
+        
+        for from in community {
+            for to in community {
+                if from != to &amp;&amp; graph.has_edge(from, to) {
+                    edge_count += 1;
+                }
+            }
+        }
+        
+        edge_count as f64 / max_edges as f64
+    }
+    
+    fn calculate_external_density(&amp;self, community: &amp;[Did], graph: &amp;TrustGraph) -&gt; f64 {
+        let all_dids: Vec&lt;Did&gt; = graph.all_dids().collect();
+        let external: Vec&lt;_&gt; = all_dids.iter()
+            .filter(|did| !community.contains(did))
+            .collect();
+        
+        if external.is_empty() {
+            return 0.0;
+        }
+        
+        let mut edge_count = 0;
+        let max_edges = community.len() * external.len();
+        
+        for from in community {
+            for to in &amp;external {
+                if graph.has_edge(from, to) {
+                    edge_count += 1;
+                }
+            }
+        }
+        
+        edge_count as f64 / max_edges as f64
+    }
+}
+</code></pre>
+<h4>Step 4: Rapid Growth Detection (Day 4-5)</h4>
+<pre><code class="language-rust">// icn-trust/src/history.rs (new file)
+
+pub struct TrustScoreHistory {
+    /// (DID, timestamp) -&gt; trust score
+    history: BTreeMap&lt;(Did, u64), f64&gt;,
+}
+
+impl TrustScoreHistory {
+    /// Record current trust score
+    pub fn record(&amp;mut self, did: Did, score: f64) {
+        let timestamp = now_ms();
+        self.history.insert((did, timestamp), score);
+        
+        // Prune old entries (&gt;90 days)
+        self.prune_old_entries();
+    }
+    
+    /// Get trust score N days ago
+    pub fn get_historical(&amp;self, did: &amp;Did, days_ago: u64) -&gt; Option&lt;f64&gt; {
+        let target_ts = now_ms() - (days_ago * 24 * 60 * 60 * 1000);
+        
+        // Find closest entry
+        self.history.range(..(did.clone(), target_ts))
+            .rev()
+            .find(|((d, _), _)| d == did)
+            .map(|(_, &amp;score)| score)
+    }
+    
+    /// Calculate growth rate over period
+    pub fn growth_rate(&amp;self, did: &amp;Did, days: u64) -&gt; Option&lt;f64&gt; {
+        let current = self.get_historical(did, 0)?;
+        let baseline = self.get_historical(did, days)?;
+        
+        if baseline &gt; 0.0 {
+            Some((current - baseline) / baseline)
+        } else {
+            None
+        }
+    }
+}
+
+// icn-trust/src/anomaly.rs (continued)
+
+impl TrustGraphAnalyzer {
+    /// Detect rapid trust growth
+    pub fn detect_rapid_growth(&amp;self, history: &amp;TrustScoreHistory) -&gt; Vec&lt;TrustAnomaly&gt; {
+        let graph = self.trust_graph.read().unwrap();
+        let mut anomalies = vec![];
+        
+        for did in graph.all_dids() {
+            if let Some(growth_rate) = history.growth_rate(&amp;did, 7) {  // 7-day window
+                if growth_rate &gt;= self.config.rapid_growth_threshold {
+                    let baseline = history.get_historical(&amp;did, 7).unwrap_or(0.0);
+                    let current = history.get_historical(&amp;did, 0).unwrap_or(0.0);
+                    
+                    anomalies.push(TrustAnomaly::RapidTrustGrowth {
+                        did,
+                        growth_rate,
+                        baseline,
+                        current,
+                        detected_at: now_ms(),
+                    });
+                }
+            }
+        }
+        
+        anomalies
+    }
+}
+</code></pre>
+<h4>Step 5: Integration &amp; Reporting (Day 5-7)</h4>
+<pre><code class="language-rust">// icn-core/src/supervisor.rs
+
+pub struct Supervisor {
+    // ... existing fields
+    
+    /// Trust anomaly detector
+    trust_analyzer: Option&lt;TrustGraphAnalyzer&gt;,
+    
+    /// Detected anomalies (for operator review)
+    trust_anomalies: Vec&lt;TrustAnomaly&gt;,
+}
+
+impl Supervisor {
+    /// Run anomaly detection (periodic task, every 24 hours)
+    async fn run_trust_anomaly_detection(&amp;mut self) {
+        if let Some(analyzer) = &amp;self.trust_analyzer {
+            let circular = analyzer.detect_circular_vouching();
+            let sybil = analyzer.detect_sybil_clusters();
+            let rapid = analyzer.detect_rapid_growth(&amp;self.trust_history);
+            
+            let mut new_anomalies = Vec::new();
+            new_anomalies.extend(circular);
+            new_anomalies.extend(sybil);
+            new_anomalies.extend(rapid);
+            
+            if !new_anomalies.is_empty() {
+                warn!(&quot;Detected {} trust anomalies&quot;, new_anomalies.len());
+                
+                // Store for operator review
+                self.trust_anomalies.extend(new_anomalies.clone());
+                
+                // Publish to governance for community review
+                for anomaly in &amp;new_anomalies {
+                    self.publish_anomaly_report(anomaly).await;
+                }
+                
+                // Update metrics
+                metrics::trust::anomalies_detected_inc(new_anomalies.len());
+            }
+        }
+    }
+    
+    async fn publish_anomaly_report(&amp;self, anomaly: &amp;TrustAnomaly) {
+        // Create governance proposal for community review
+        // (Optional, can be manual for now)
+    }
+}
+</code></pre>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Create <code>anomaly.rs</code> module</li>
+<li><input disabled="" type="checkbox"> Implement Tarjan&#39;s SCC algorithm</li>
+<li><input disabled="" type="checkbox"> Implement circular vouch detection</li>
+<li><input disabled="" type="checkbox"> Implement Sybil cluster detection</li>
+<li><input disabled="" type="checkbox"> Create <code>TrustScoreHistory</code> for tracking</li>
+<li><input disabled="" type="checkbox"> Implement rapid growth detection</li>
+<li><input disabled="" type="checkbox"> Add periodic detection task (24h)</li>
+<li><input disabled="" type="checkbox"> Add metrics (anomalies detected, types)</li>
+<li><input disabled="" type="checkbox"> Write tests (each detection type)</li>
+<li><input disabled="" type="checkbox"> Document anomaly types &amp; thresholds</li>
+</ul>
+<hr>
+<h3>4. Gossip Amplification Protection ⚡</h3>
+<p><strong>Files:</strong> <code>icn/crates/icn-gossip/src/actor.rs</code>, <code>icn-net/src/rate_limit.rs</code><br><strong>Duration:</strong> 2-3 days<br><strong>Priority:</strong> MEDIUM-HIGH  </p>
+<p><strong>Goal:</strong> Prevent Sybil attack via gossip spam</p>
+<h4>Global Rate Limiter (Day 1-2)</h4>
+<pre><code class="language-rust">// icn-gossip/src/rate_limit.rs (new file)
+
+pub struct GlobalRateLimiter {
+    /// Time window for rate limiting
+    window: Duration,  // 60 seconds
+    
+    /// Maximum messages per window (across all peers)
+    max_messages_per_window: usize,  // 1000
+    
+    /// Current count (resets every window)
+    current_count: AtomicUsize,
+    
+    /// Window start time
+    window_start: AtomicU64,
+    
+    /// Trust-weighted allocation enabled
+    trust_weighted: bool,
+}
+
+impl GlobalRateLimiter {
+    /// Allocate message budget based on peer trust
+    pub fn allocate_budget(&amp;self, peer_trust: f64, total_peers: usize) -&gt; usize {
+        if !self.trust_weighted {
+            return self.max_messages_per_window / total_peers;
+        }
+        
+        // Trust-weighted allocation
+        // Higher trust = more budget
+        let base = self.max_messages_per_window as f64 / total_peers as f64;
+        let multiplier = 1.0 + peer_trust;  // 1.0-2.0x based on trust
+        
+        (base * multiplier).round() as usize
+    }
+    
+    /// Check if message should be accepted (global limit)
+    pub fn check_global_limit(&amp;self) -&gt; bool {
+        let now = now_ms();
+        let window_start = self.window_start.load(Ordering::Relaxed);
+        
+        // Reset window if expired
+        if now - window_start &gt; self.window.as_millis() as u64 {
+            self.current_count.store(0, Ordering::Relaxed);
+            self.window_start.store(now, Ordering::Relaxed);
+        }
+        
+        // Check limit
+        let count = self.current_count.fetch_add(1, Ordering::Relaxed);
+        count &lt; self.max_messages_per_window
+    }
+}
+
+// icn-gossip/src/actor.rs
+
+impl GossipActor {
+    fn handle_incoming_message(&amp;mut self, from: Did, msg: GossipMessage) -&gt; Result&lt;()&gt; {
+        // Check per-peer rate limit (existing)
+        if !self.rate_limiter.check_and_consume(&amp;from, 1.0)? {
+            warn!(&quot;Rate limit exceeded for peer {}&quot;, from);
+            return Err(anyhow!(&quot;Rate limit exceeded&quot;));
+        }
+        
+        // NEW: Check global rate limit
+        if !self.global_rate_limiter.check_global_limit() {
+            warn!(&quot;Global rate limit exceeded (total messages)&quot;);
+            metrics::gossip::global_rate_limit_exceeded_inc();
+            return Err(anyhow!(&quot;Global rate limit exceeded&quot;));
+        }
+        
+        // Process message...
+    }
+}
+</code></pre>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Create <code>GlobalRateLimiter</code></li>
+<li><input disabled="" type="checkbox"> Add trust-weighted budget allocation</li>
+<li><input disabled="" type="checkbox"> Integrate with GossipActor</li>
+<li><input disabled="" type="checkbox"> Add metrics (global limit exceeded)</li>
+<li><input disabled="" type="checkbox"> Add config options (window, max)</li>
+<li><input disabled="" type="checkbox"> Write tests (Sybil spam scenario)</li>
+</ul>
+<hr>
+<h3>5. Scalability Testing Setup 📊</h3>
+<p><strong>Files:</strong> New <code>icn/loadtest/</code> directory<br><strong>Duration:</strong> 3-4 days<br><strong>Priority:</strong> HIGH (parallel track)  </p>
+<p><strong>Goal:</strong> Automated load testing to find breaking points</p>
+<h4>Setup (Day 1)</h4>
+<pre><code class="language-bash"># Create loadtest directory
+mkdir -p icn/loadtest
+cd icn/loadtest
+
+# Setup Python virtual environment
+python3 -m venv venv
+source venv/bin/activate
+
+# Install locust
+pip install locust requests websocket-client
+
+# Create locustfile.py
+</code></pre>
+<h4>Locust Test Script (Day 1-2)</h4>
+<pre><code class="language-python"># icn/loadtest/locustfile.py
+
+from locust import HttpUser, task, between
+import random
+import time
+
+class ICNUser(HttpUser):
+    wait_time = between(1, 3)
+    
+    def on_start(self):
+        &quot;&quot;&quot;Initialize user (create DID, connect)&quot;&quot;&quot;
+        # Generate test DID
+        self.did = f&quot;did:icn:test{random.randint(1000, 9999)}&quot;
+        
+        # Connect to gateway
+        response = self.client.post(&quot;/api/v1/auth/connect&quot;, json={
+            &quot;did&quot;: self.did
+        })
+        
+        if response.status_code == 200:
+            self.token = response.json()[&quot;token&quot;]
+    
+    @task(5)
+    def create_trust_edge(self):
+        &quot;&quot;&quot;Create trust edge (common operation)&quot;&quot;&quot;
+        target = f&quot;did:icn:test{random.randint(1000, 9999)}&quot;
+        
+        self.client.post(&quot;/api/v1/trust&quot;, json={
+            &quot;target&quot;: target,
+            &quot;weight&quot;: random.uniform(0.5, 1.0)
+        }, headers={&quot;Authorization&quot;: f&quot;Bearer {self.token}&quot;})
+    
+    @task(3)
+    def ledger_transaction(self):
+        &quot;&quot;&quot;Submit ledger transaction&quot;&quot;&quot;
+        recipient = f&quot;did:icn:test{random.randint(1000, 9999)}&quot;
+        
+        self.client.post(&quot;/api/v1/ledger/transfer&quot;, json={
+            &quot;to&quot;: recipient,
+            &quot;amount&quot;: random.randint(1, 100),
+            &quot;currency&quot;: &quot;hours&quot;
+        }, headers={&quot;Authorization&quot;: f&quot;Bearer {self.token}&quot;})
+    
+    @task(2)
+    def query_balance(self):
+        &quot;&quot;&quot;Query ledger balance&quot;&quot;&quot;
+        self.client.get(
+            f&quot;/api/v1/ledger/balance/{self.did}&quot;,
+            headers={&quot;Authorization&quot;: f&quot;Bearer {self.token}&quot;}
+        )
+    
+    @task(1)
+    def submit_compute_task(self):
+        &quot;&quot;&quot;Submit compute task&quot;&quot;&quot;
+        self.client.post(&quot;/api/v1/compute/tasks&quot;, json={
+            &quot;wasm_hash&quot;: &quot;0x1234...&quot;,
+            &quot;args&quot;: {&quot;input&quot;: &quot;test&quot;}
+        }, headers={&quot;Authorization&quot;: f&quot;Bearer {self.token}&quot;})
+
+
+class StressTest(HttpUser):
+    &quot;&quot;&quot;High-load stress test&quot;&quot;&quot;
+    wait_time = between(0.1, 0.5)  # Faster
+    
+    @task
+    def rapid_transactions(self):
+        # Burst of transactions
+        for _ in range(10):
+            self.client.post(&quot;/api/v1/ledger/transfer&quot;, json={
+                &quot;to&quot;: &quot;did:icn:stress_target&quot;,
+                &quot;amount&quot;: 1,
+                &quot;currency&quot;: &quot;hours&quot;
+            })
+</code></pre>
+<h4>Test Scenarios (Day 2-3)</h4>
+<pre><code class="language-bash"># Scenario 1: Baseline (10 users, 5 minutes)
+locust -f locustfile.py --host=http://localhost:8080 \
+    --users=10 --spawn-rate=2 --run-time=5m --headless
+
+# Scenario 2: Medium load (100 users, 10 minutes)
+locust -f locustfile.py --host=http://localhost:8080 \
+    --users=100 --spawn-rate=10 --run-time=10m --headless
+
+# Scenario 3: High load (500 users, 15 minutes)
+locust -f locustfile.py --host=http://localhost:8080 \
+    --users=500 --spawn-rate=50 --run-time=15m --headless
+
+# Scenario 4: Stress test (1000 users, 20 minutes)
+locust -f locustfile.py --host=http://localhost:8080 \
+    --users=1000 --spawn-rate=100 --run-time=20m --headless
+
+# Scenario 5: Spike test (0→500→0 users)
+# Run manually with web UI: http://localhost:8089
+</code></pre>
+<h4>Analysis Script (Day 3-4)</h4>
+<pre><code class="language-python"># icn/loadtest/analyze.py
+
+import pandas as pd
+import matplotlib.pyplot as plt
+
+def analyze_loadtest_results(csv_file):
+    &quot;&quot;&quot;Analyze locust CSV results&quot;&quot;&quot;
+    df = pd.read_csv(csv_file)
+    
+    # Calculate metrics
+    print(&quot;=== Load Test Results ===&quot;)
+    print(f&quot;Total Requests: {len(df)}&quot;)
+    print(f&quot;Success Rate: {(df[&#39;success&#39;] == True).mean() * 100:.2f}%&quot;)
+    print(f&quot;Mean Response Time: {df[&#39;response_time&#39;].mean():.2f}ms&quot;)
+    print(f&quot;P50 Response Time: {df[&#39;response_time&#39;].quantile(0.50):.2f}ms&quot;)
+    print(f&quot;P95 Response Time: {df[&#39;response_time&#39;].quantile(0.95):.2f}ms&quot;)
+    print(f&quot;P99 Response Time: {df[&#39;response_time&#39;].quantile(0.99):.2f}ms&quot;)
+    print(f&quot;Requests/sec: {len(df) / df[&#39;timestamp&#39;].max():.2f}&quot;)
+    
+    # Plot response time distribution
+    plt.figure(figsize=(12, 6))
+    plt.subplot(1, 2, 1)
+    plt.hist(df[&#39;response_time&#39;], bins=50)
+    plt.xlabel(&#39;Response Time (ms)&#39;)
+    plt.ylabel(&#39;Count&#39;)
+    plt.title(&#39;Response Time Distribution&#39;)
+    
+    # Plot over time
+    plt.subplot(1, 2, 2)
+    df[&#39;timestamp&#39;] = pd.to_datetime(df[&#39;timestamp&#39;], unit=&#39;s&#39;)
+    df.set_index(&#39;timestamp&#39;)[&#39;response_time&#39;].plot()
+    plt.xlabel(&#39;Time&#39;)
+    plt.ylabel(&#39;Response Time (ms)&#39;)
+    plt.title(&#39;Response Time Over Time&#39;)
+    
+    plt.tight_layout()
+    plt.savefig(&#39;loadtest_results.png&#39;)
+    print(&quot;\nPlot saved to loadtest_results.png&quot;)
+
+if __name__ == &quot;__main__&quot;:
+    import sys
+    if len(sys.argv) &lt; 2:
+        print(&quot;Usage: python analyze.py &lt;results.csv&gt;&quot;)
+        sys.exit(1)
+    
+    analyze_loadtest_results(sys.argv[1])
+</code></pre>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Create loadtest directory structure</li>
+<li><input disabled="" type="checkbox"> Write locustfile.py with scenarios</li>
+<li><input disabled="" type="checkbox"> Create analysis script</li>
+<li><input disabled="" type="checkbox"> Run baseline tests (10, 100, 500 users)</li>
+<li><input disabled="" type="checkbox"> Document breaking points</li>
+<li><input disabled="" type="checkbox"> Create loadtest README</li>
+</ul>
+<hr>
+<h2>Success Criteria</h2>
+<h3>Week 1 Complete When:</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Replay attack fix merged &amp; tested</li>
+<li><input disabled="" type="checkbox"> Upgrade coordination foundation implemented</li>
+<li><input disabled="" type="checkbox"> Trust anomaly detection running</li>
+<li><input disabled="" type="checkbox"> Global rate limiter deployed</li>
+<li><input disabled="" type="checkbox"> Load testing framework operational</li>
+</ul>
+<h3>Metrics to Track:</h3>
+<ul>
+<li>Zero replay attacks in testing</li>
+<li>Upgrade proposals can be created</li>
+<li>Anomalies detected in test data</li>
+<li>Global rate limit triggers under load</li>
+<li>Performance baselines established</li>
+</ul>
+<hr>
+<h2>Next Sprint Preview (Week 5-8)</h2>
+<h3>Sprint 2: Scalability Fixes</h3>
+<ul>
+<li>Bottleneck fixes from load testing</li>
+<li>Vector clock optimization</li>
+<li>Trust graph caching</li>
+<li>Gossip fan-out optimization</li>
+</ul>
+<h3>Sprint 3: Operational Maturity</h3>
+<ul>
+<li>Disk monitoring</li>
+<li>Split-brain detection</li>
+<li>Fork mediation workflow</li>
+<li>TURN relay deployment</li>
+</ul>
+<hr>
+<p><strong>Status:</strong> Ready to begin ✅<br><strong>Start Date:</strong> 2025-12-17<br><strong>Team:</strong> Open for contributors  </p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

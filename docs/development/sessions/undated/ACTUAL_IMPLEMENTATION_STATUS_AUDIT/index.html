@@ -1,0 +1,338 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Actual Implementation Status Audit | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>development</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>sessions</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>undated</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ACTUAL IMPLEMENTATION STATUS AUDIT</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/development/sessions/undated/ACTUAL_IMPLEMENTATION_STATUS_AUDIT.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Actual Implementation Status Audit</h1>
+<h2>Date: 2025-12-17</h2>
+<p>This document represents a <strong>ground truth audit</strong> of what&#39;s actually implemented vs what&#39;s documented.</p>
+<h2>Summary</h2>
+<p><strong>Status</strong>: Many features are documented but NOT fully implemented or wired through the stack.</p>
+<h2>Core Backend (Rust)</h2>
+<h3>✅ FULLY IMPLEMENTED</h3>
+<ul>
+<li><code>icn-identity</code>: DID generation, Ed25519 signing, X25519 encryption, keystores</li>
+<li><code>icn-trust</code>: Trust graph computation, attestations, score calculation</li>
+<li><code>icn-net</code>: QUIC/TLS networking, mDNS discovery, secure sessions</li>
+<li><code>icn-gossip</code>: Topic-based gossip, anti-entropy, vector clocks</li>
+<li><code>icn-ledger</code>: Double-entry accounting, mutual credit, merkle-DAG</li>
+<li><code>icn-ccl</code>: Contract language interpreter, capability system</li>
+<li><code>icn-store</code>: Sled-based persistence</li>
+<li><code>icn-obs</code>: Prometheus metrics</li>
+<li><code>icn-core</code>: Actor runtime, supervisor pattern</li>
+<li><code>icn-rpc</code>: gRPC API server</li>
+</ul>
+<h3>✅ PARTIALLY IMPLEMENTED</h3>
+<ul>
+<li><p><code>icn-governance</code>: </p>
+<ul>
+<li>✅ Proposals, voting, domains, profiles</li>
+<li>✅ Steward system (basic)</li>
+<li>✅ Charter/amendment structures</li>
+<li>❌ <strong>Missing</strong>: Amendment voting API endpoints</li>
+<li>❌ <strong>Missing</strong>: Full charter ratification flow</li>
+<li>❌ <strong>Missing</strong>: Appeal resolution workflow</li>
+</ul>
+</li>
+<li><p><code>icn-compute</code>:</p>
+<ul>
+<li>✅ Task execution, trust-gated scheduling</li>
+<li>✅ ComputeActor with handle</li>
+<li>❌ <strong>Missing</strong>: Economic incentive integration</li>
+<li>❌ <strong>Missing</strong>: Dispute resolution for failed tasks</li>
+</ul>
+</li>
+<li><p><code>icn-crypto-pq</code>:</p>
+<ul>
+<li>✅ ML-DSA (Dilithium) signing</li>
+<li>✅ ML-KEM (Kyber) encryption</li>
+<li>❌ <strong>Not integrated into core icn-identity yet</strong></li>
+<li>❌ <strong>Not used by default for all DIDs</strong></li>
+</ul>
+</li>
+</ul>
+<h3>❌ NOT IMPLEMENTED</h3>
+<ul>
+<li><p><strong>Cooperative Lifecycle</strong>: No <code>icn-cooperative</code> crate</p>
+<ul>
+<li>No formation/dissolution logic</li>
+<li>No member admission/removal workflows</li>
+<li>No cooperative-specific governance hooks</li>
+</ul>
+</li>
+<li><p><strong>Federation Layer</strong>: No <code>icn-federation</code> crate</p>
+<ul>
+<li>No inter-cooperative protocols</li>
+<li>No resource sharing contracts</li>
+<li>No federated identity resolution</li>
+</ul>
+</li>
+<li><p><strong>Dispute Resolution</strong>: No dedicated system</p>
+<ul>
+<li>Economic disputes not fully handled</li>
+<li>Quarantine mechanism exists in ledger but no resolution flow</li>
+</ul>
+</li>
+<li><p><strong>Economic Safety Rails</strong>: Partially in docs, not enforced</p>
+<ul>
+<li>Credit limits documented but not enforced in gateway</li>
+<li>Velocity limits mentioned but not implemented</li>
+<li>Budget enforcement exists in SDK but not validated server-side</li>
+</ul>
+</li>
+</ul>
+<h2>Gateway API (icn-gateway)</h2>
+<h3>✅ IMPLEMENTED</h3>
+<ul>
+<li><code>/v1/auth/*</code>: Authentication, session management</li>
+<li><code>/v1/identity/*</code>: DID, device management</li>
+<li><code>/v1/ledger/*</code>: Payments, balances, history</li>
+<li><code>/v1/trust/*</code>: Trust scores, attestations</li>
+<li><code>/v1/governance/*</code>: Proposals, voting, domains</li>
+<li><code>/v1/compute/*</code>: Task submission, status</li>
+<li><code>/v1/coops/*</code>: Basic cooperative info</li>
+<li><code>/v1/members/*</code>: Member listing, profiles</li>
+<li><code>/v1/recurring-payments/*</code>: Recurring payment CRUD</li>
+<li><code>/v1/escrow/*</code>: Escrow CRUD and lifecycle</li>
+<li><code>/v1/budgets/*</code>: Budget tracking</li>
+<li>WebSocket endpoint for real-time events</li>
+</ul>
+<h3>❌ MISSING API ENDPOINTS</h3>
+<ul>
+<li><code>/v1/amendments/*</code>: Amendment-specific endpoints (separate from proposals)<ul>
+<li><code>GET /v1/amendments/:id</code></li>
+<li><code>POST /v1/amendments/:id/vote</code></li>
+<li><code>GET /v1/amendments/:id/results</code></li>
+</ul>
+</li>
+<li><code>/v1/charters/*</code>: Charter management<ul>
+<li><code>GET /v1/charters/:coop_id</code></li>
+<li><code>POST /v1/charters/:coop_id/ratify</code></li>
+</ul>
+</li>
+<li><code>/v1/appeals/*</code>: Full appeal workflow</li>
+<li><code>/v1/federations/*</code>: Federation management</li>
+<li><code>/v1/coops/:id/lifecycle</code>: Formation, dissolution APIs</li>
+<li>Economic safety enforcement in payment endpoints</li>
+</ul>
+<h2>SDK (TypeScript/React Native)</h2>
+<h3>✅ IMPLEMENTED (<code>sdk/react-native/src/</code>)</h3>
+<ul>
+<li><code>hooks.ts</code>: Auth, balance, transactions, proposals, trust</li>
+<li><code>economic-hooks.ts</code>: Recurring payments, escrow, budgets (full CRUD)</li>
+<li><code>membership-hooks.ts</code>: Member management</li>
+<li><code>constitutional-hooks.ts</code>: Amendments, appeals (data structures)</li>
+<li><code>steward-hooks.ts</code>: Steward SDIS integration</li>
+<li><code>sdis-hooks.ts</code>: SDIS key management</li>
+<li><code>charter-types.ts</code>: Charter data structures</li>
+<li><code>client.ts</code>: HTTP/WebSocket client</li>
+</ul>
+<h3>❌ MISSING HOOKS</h3>
+<p>The mobile app examples reference hooks that don&#39;t exist:</p>
+<ul>
+<li><code>useAmendmentVoting(amendmentId)</code>: For casting votes on amendments</li>
+<li><code>useAmendmentResults(amendmentId)</code>: For fetching vote results</li>
+<li>These are different from <code>useProposals()</code> which is generic</li>
+</ul>
+<h3>⚠️ SDK IMPLEMENTATION GAPS</h3>
+<ul>
+<li><strong>Amendment hooks incomplete</strong>: Data types exist but no actual API calls</li>
+<li><strong>Budget monitoring</strong>: Client-side only, no server-side enforcement</li>
+<li><strong>Offline queue</strong>: Mentioned in code but not fully tested</li>
+<li><strong>Push notifications</strong>: Types exist, integration incomplete</li>
+</ul>
+<h2>Mobile App Examples (<code>examples/mobile-app/</code>)</h2>
+<h3>✅ REFERENCE IMPLEMENTATIONS</h3>
+<ul>
+<li><code>NotificationCenter.tsx</code>: In-app notifications</li>
+<li><code>RecurringPaymentSetup.tsx</code>: Payment scheduling</li>
+<li><code>VotingScreen.tsx</code>: Amendment voting UI</li>
+<li><code>BudgetManager.tsx</code>: Budget tracking UI</li>
+</ul>
+<h3>⚠️ PROBLEMS</h3>
+<ul>
+<li><p><strong>VotingScreen.tsx uses hooks that don&#39;t exist</strong>:</p>
+<pre><code class="language-tsx">import { useAmendmentVoting, useAmendmentResults } from &#39;@icn/react-native&#39;;
+</code></pre>
+<p>These hooks are not in the SDK!</p>
+</li>
+<li><p><strong>BudgetManager.tsx works</strong> because <code>useBudgets</code> is fully implemented</p>
+</li>
+</ul>
+<h2>Dashboard (<code>web/pilot-ui/</code>)</h2>
+<p>Did not audit in detail, but likely has similar gaps.</p>
+<h2>Testing Status</h2>
+<h3>✅ WELL-TESTED</h3>
+<ul>
+<li>Core protocol (gossip, trust, ledger): 1134+ tests passing</li>
+<li>Integration tests for multi-node scenarios</li>
+<li>Actor lifecycle tests</li>
+</ul>
+<h3>❌ NOT TESTED</h3>
+<ul>
+<li>Amendment voting workflow end-to-end</li>
+<li>Cooperative formation/dissolution</li>
+<li>Federation protocols</li>
+<li>Economic dispute resolution</li>
+<li>Server-side budget enforcement</li>
+</ul>
+<h2>Documentation vs Reality</h2>
+<h3>📚 OVER-DOCUMENTED</h3>
+<p>Many features are described in <code>docs/</code> but not implemented:</p>
+<ul>
+<li><code>docs/governance-primitives.md</code>: Describes appeal system that&#39;s incomplete</li>
+<li><code>ARCHITECTURE.md</code>: References cooperative lifecycle system that doesn&#39;t exist</li>
+<li><code>ROADMAP.md</code>: Lists federation as &quot;Phase 20&quot; but not started</li>
+</ul>
+<h3>📝 UNDER-DOCUMENTED</h3>
+<p>Some implemented features lack docs:</p>
+<ul>
+<li>Economic hooks in SDK are fully implemented but barely mentioned</li>
+<li>SDIS steward system is working but not in main architecture docs</li>
+<li>Post-quantum crypto exists but not in security docs</li>
+</ul>
+<h2>Critical Gaps to Fix</h2>
+<h3>Priority 1: Complete Amendment Voting</h3>
+<ol>
+<li>Add amendment voting endpoints to gateway</li>
+<li>Implement <code>useAmendmentVoting</code> and <code>useAmendmentResults</code> hooks in SDK</li>
+<li>Wire through from governance actor → gateway → SDK → mobile app</li>
+<li>Test end-to-end</li>
+</ol>
+<h3>Priority 2: Server-Side Economic Safety</h3>
+<ol>
+<li>Enforce credit limits in gateway payment endpoints</li>
+<li>Validate budget constraints server-side</li>
+<li>Implement velocity limits</li>
+<li>Add dispute resolution API</li>
+</ol>
+<h3>Priority 3: Cooperative Lifecycle</h3>
+<ol>
+<li>Create <code>icn-cooperative</code> crate</li>
+<li>Implement formation/dissolution logic</li>
+<li>Add governance hooks for member admission</li>
+<li>Wire through API</li>
+</ol>
+<h3>Priority 4: Federation Foundation</h3>
+<ol>
+<li>Create <code>icn-federation</code> crate</li>
+<li>Implement inter-coop protocols</li>
+<li>Add resource sharing contracts</li>
+<li>Federated identity resolution</li>
+</ol>
+<h3>Priority 5: Integrate PQ Crypto</h3>
+<ol>
+<li>Make ML-DSA/ML-KEM default for new identities</li>
+<li>Add hybrid signing to SignedEnvelope</li>
+<li>Add hybrid encryption to EncryptedEnvelope</li>
+<li>Implement key rotation for existing users</li>
+</ol>
+<h2>What Actually Works Right Now</h2>
+<p>If you run <code>icnd</code> and connect a client:</p>
+<ul>
+<li>✅ Create DID, manage devices</li>
+<li>✅ Send/receive mutual credit payments</li>
+<li>✅ Attest trust, compute trust scores</li>
+<li>✅ Create proposals, vote (generic proposals, not amendments)</li>
+<li>✅ Subscribe to gossip topics</li>
+<li>✅ Submit compute tasks</li>
+<li>✅ Set up recurring payments (via SDK)</li>
+<li>✅ Create escrow accounts (via SDK)</li>
+<li>✅ Track budgets (client-side)</li>
+<li>⚠️ Amendments: Can create but can&#39;t vote via proper API</li>
+<li>⚠️ Appeals: Data structures exist but no workflow</li>
+<li>⚠️ Cooperatives: Can create but no lifecycle management</li>
+<li>❌ Federation: Not implemented</li>
+<li>❌ Economic disputes: Not resolved automatically</li>
+</ul>
+<h2>Conclusion</h2>
+<p><strong>ICN is a solid P2P foundation</strong> with:</p>
+<ul>
+<li>Excellent protocol layer (gossip, trust, ledger)</li>
+<li>Working actor runtime</li>
+<li>Strong cryptographic primitives</li>
+<li>Good test coverage of core features</li>
+</ul>
+<p>But it&#39;s <strong>not yet a complete cooperative management system</strong> because:</p>
+<ul>
+<li>Amendment voting is incomplete</li>
+<li>Cooperative lifecycle is missing</li>
+<li>Federation doesn&#39;t exist</li>
+<li>Economic safety is client-side only</li>
+<li>Dispute resolution is manual</li>
+</ul>
+<p>The gap is between <strong>infrastructure (done)</strong> and <strong>application features (partial)</strong>.</p>
+<h2>Recommendations</h2>
+<ol>
+<li><strong>Stop claiming things work that don&#39;t</strong>: Update README and docs to reflect actual status</li>
+<li><strong>Finish amendment voting</strong>: It&#39;s 90% done, just needs API wiring</li>
+<li><strong>Implement server-side economic controls</strong>: Security critical</li>
+<li><strong>Build cooperative lifecycle</strong>: Core value proposition</li>
+<li><strong>Don&#39;t document future features as if they exist</strong>: Use &quot;Planned&quot; or &quot;Roadmap&quot; sections</li>
+</ol>
+<hr>
+<p><strong>This audit performed by</strong>: Comprehensive codebase analysis on 2025-12-17
+<strong>Next audit</strong>: After Priority 1 &amp; 2 gaps are closed</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

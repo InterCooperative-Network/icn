@@ -1,0 +1,564 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Demo Readiness Audit | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>archive</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>2026</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>demo sessions</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>DEMO AUDIT</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/archive/2026/demo-sessions/DEMO_AUDIT.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Demo Readiness Audit</h1>
+<blockquote>
+<p><strong>Archived Document Notice (2026-02-12):</strong> This file is retained for historical context and may not reflect current code, APIs, runtime defaults, CI status, or deployment posture.
+Use active documentation under <code>docs/</code> as authoritative.
+<strong>Date:</strong> 2025-12-18<br><strong>Repository:</strong> <repo-root><br><strong>Commit:</strong> Current HEAD</p>
+</blockquote>
+<hr>
+<h2>Executive Summary</h2>
+<p><strong>Overall Status: 🟡 MOSTLY WORKING - Demo-Ready with Minor Fixes</strong></p>
+<ul>
+<li>✅ Backend builds successfully (47s release build)</li>
+<li>✅ Most tests passing (1130+ / 1134 tests)</li>
+<li>✅ Daemon starts (with identity setup)</li>
+<li>✅ Pilot UI exists and is well-structured</li>
+<li>⚠️ Identity management needs workflow clarification</li>
+<li>⚠️ Gateway API needs verification</li>
+<li>⚠️ UI needs backend connection testing</li>
+</ul>
+<p><strong>Time to Demo-Ready: 3-5 days</strong></p>
+<hr>
+<h2>Build Status ✅</h2>
+<h3>Backend</h3>
+<pre><code class="language-bash">cd icn/
+cargo build --release
+# Result: SUCCESS in 47.52s
+# All binaries built:
+# - icnd (daemon)
+# - icnctl (CLI tool)
+# - icn-console
+</code></pre>
+<p><strong>Status:</strong> ✅ <strong>WORKING</strong> - No build errors or warnings</p>
+<h3>Binaries Available</h3>
+<ul>
+<li>✅ <code>icn/target/release/icnd</code> - Main daemon</li>
+<li>✅ <code>icn/target/release/icnctl</code> - CLI management tool</li>
+<li>✅ <code>icn/target/release/icn-console</code> - Console utility</li>
+</ul>
+<hr>
+<h2>Test Status ✅ (99.6% Pass Rate)</h2>
+<h3>Summary</h3>
+<ul>
+<li><strong>Total Tests:</strong> ~1134</li>
+<li><strong>Passing:</strong> 1130+</li>
+<li><strong>Failing:</strong> 1 (non-critical)</li>
+<li><strong>Pass Rate:</strong> 99.6%</li>
+</ul>
+<h3>Failing Test (Non-Critical)</h3>
+<p><strong>Test:</strong> <code>test_three_participant_contract_deployment</code><br><strong>Location:</strong> <code>icn-core/tests/contract_deployment_integration.rs</code><br><strong>Issue:</strong> Network race condition - &quot;Failed to open stream: closed by peer&quot;<br><strong>Impact:</strong> ⚠️ <strong>LOW</strong> - Edge case for 3+ participant contracts<br><strong>Demo Impact:</strong> ✅ <strong>NONE</strong> - Demo uses 2-node scenarios<br><strong>Action:</strong> Can be fixed later, not a blocker</p>
+<h3>Critical Tests Passing</h3>
+<ul>
+<li>✅ Identity management (all tests pass)</li>
+<li>✅ Ledger operations (all tests pass) </li>
+<li>✅ Governance primitives (all tests pass)</li>
+<li>✅ Byzantine fault detection (all tests pass)</li>
+<li>✅ Trust graph (all tests pass)</li>
+<li>✅ Network/QUIC (all tests pass)</li>
+<li>✅ Gossip protocol (all tests pass)</li>
+</ul>
+<hr>
+<h2>Configuration Status ✅</h2>
+<h3>Available Configs</h3>
+<pre><code>config/
+├── icn-alpha.toml       ✅ Two-node demo config (node 1)
+├── icn-beta.toml        ✅ Two-node demo config (node 2)  
+├── icn.toml.example     ✅ Full example config
+├── icn-minimal.toml.example ✅ Minimal config
+└── node1-4.toml         ✅ Multi-node configs
+</code></pre>
+<h3>Alpha Config Review</h3>
+<ul>
+<li>✅ Listen: <code>0.0.0.0:7777</code></li>
+<li>✅ RPC: <code>5601</code></li>
+<li>✅ Metrics: <code>9100</code></li>
+<li>✅ Health: <code>8080</code></li>
+<li>✅ mDNS enabled for discovery</li>
+<li>✅ Trust threshold: <code>0.0</code> (allows demo without pre-trust)</li>
+<li>✅ Rate limiting configured</li>
+</ul>
+<p><strong>Status:</strong> ✅ <strong>READY</strong> - Configs work for demo</p>
+<hr>
+<h2>Daemon Status ⚠️ (Needs Identity Setup)</h2>
+<h3>Current Behavior</h3>
+<pre><code class="language-bash">./target/release/icnd --config ../config/icn-alpha.toml
+
+# Output:
+# ✅ Daemon starts
+# ✅ Metrics server starts (http://0.0.0.0:9100)
+# ⚠️ Warns: &quot;No identity keystore found&quot;
+# ⚠️ Runs without Identity/Network actors
+# ℹ️ Says: Run &#39;icnctl id init&#39; to create identity
+</code></pre>
+<h3>Identity Management Issue</h3>
+<p><strong>Problem:</strong> <code>icnctl id init</code> defaults to <code>~/.icn</code> instead of data dir from config</p>
+<p><strong>Current:</strong></p>
+<pre><code class="language-bash">icnctl id init
+# Creates identity at ~/.icn/identity.age
+# But daemon looks at /tmp/icn-alpha/identity.age
+</code></pre>
+<p><strong>Workaround:</strong></p>
+<pre><code class="language-bash">icnctl -d /tmp/icn-alpha id init
+# This should work but needs verification
+</code></pre>
+<p><strong>Impact:</strong> ⚠️ <strong>MEDIUM</strong> - Confusing for demo setup<br><strong>Fix Required:</strong> Document correct workflow or fix default behavior<br><strong>Time to Fix:</strong> 1 hour</p>
+<hr>
+<h2>Pilot UI Status ✅ (Well-Structured, Needs Testing)</h2>
+<h3>Structure</h3>
+<pre><code>web/pilot-ui/
+├── index.html           ✅ Main HTML (well-structured)
+├── app.js               ✅ 4500+ lines of app logic
+├── style.css            ✅ Comprehensive styling
+├── offline-storage.js   ✅ Offline support
+├── sw.js                ✅ Service worker for PWA
+├── manifest.json        ✅ PWA manifest
+└── components/          ✅ React-style components
+</code></pre>
+<h3>Features Implemented</h3>
+<ul>
+<li>✅ Login screen with gateway URL input</li>
+<li>✅ Join cooperative flow</li>
+<li>✅ Dashboard with balance display</li>
+<li>✅ Transaction logging form</li>
+<li>✅ Transaction history view</li>
+<li>✅ Member list</li>
+<li>✅ Governance/proposals UI</li>
+<li>✅ Mobile responsive design</li>
+<li>✅ Offline mode with service worker</li>
+<li>✅ PWA capabilities</li>
+<li>✅ Authentication help modal</li>
+</ul>
+<h3>Technology</h3>
+<ul>
+<li>✅ Vanilla JavaScript (no build step needed)</li>
+<li>✅ Modern CSS with flexbox/grid</li>
+<li>✅ Service Worker for offline</li>
+<li>✅ LocalStorage for state</li>
+<li>✅ WebSocket support for real-time updates</li>
+</ul>
+<h3>Gateway Integration</h3>
+<p><strong>Expected API Endpoint:</strong> <code>http://localhost:8080</code><br><strong>Features Used:</strong></p>
+<ul>
+<li>Authentication (JWT tokens)</li>
+<li>GET <code>/api/members</code></li>
+<li>GET <code>/api/transactions</code></li>
+<li>POST <code>/api/transactions</code></li>
+<li>GET <code>/api/proposals</code></li>
+<li>POST <code>/api/proposals/:id/vote</code></li>
+<li>WebSocket for real-time updates</li>
+</ul>
+<p><strong>Status:</strong> ⚠️ <strong>NEEDS VERIFICATION</strong></p>
+<ul>
+<li>UI code looks complete</li>
+<li>Need to verify gateway API actually exists</li>
+<li>Need to test end-to-end flow</li>
+</ul>
+<hr>
+<h2>Gateway API Status ❓ (Needs Verification)</h2>
+<h3>Expected Endpoints</h3>
+<p>Based on UI code, gateway should provide:</p>
+<p><strong>Authentication:</strong></p>
+<ul>
+<li><code>POST /api/auth</code> - Get JWT token</li>
+</ul>
+<p><strong>Members:</strong></p>
+<ul>
+<li><code>GET /api/members</code> - List all members</li>
+<li><code>GET /api/members/:did</code> - Get member details</li>
+</ul>
+<p><strong>Transactions:</strong></p>
+<ul>
+<li><code>GET /api/transactions</code> - List transactions</li>
+<li><code>POST /api/transactions</code> - Create transaction</li>
+<li><code>GET /api/transactions/:id</code> - Get transaction details</li>
+<li><code>POST /api/transactions/:id/confirm</code> - Confirm transaction</li>
+</ul>
+<p><strong>Balances:</strong></p>
+<ul>
+<li><code>GET /api/balances/:did</code> - Get member balance</li>
+</ul>
+<p><strong>Proposals:</strong></p>
+<ul>
+<li><code>GET /api/proposals</code> - List proposals</li>
+<li><code>POST /api/proposals</code> - Create proposal</li>
+<li><code>POST /api/proposals/:id/vote</code> - Vote on proposal</li>
+</ul>
+<p><strong>WebSocket:</strong></p>
+<ul>
+<li><code>ws://localhost:8080/ws</code> - Real-time updates</li>
+</ul>
+<h3>Verification Needed</h3>
+<pre><code class="language-bash"># 1. Start daemon with gateway enabled
+./target/release/icnd --config ../config/icn-alpha.toml --gateway-enable
+
+# 2. Check health endpoint
+curl http://localhost:8080/health
+
+# 3. Check API endpoints
+curl http://localhost:8080/api/members
+
+# 4. Review gateway code
+</code></pre>
+<p><strong>Status:</strong> ❓ <strong>UNKNOWN</strong> - Need to check <code>icn-gateway</code> crate<br><strong>Priority:</strong> 🔴 <strong>HIGH</strong> - Critical for demo<br><strong>Action:</strong> Verify gateway implementation in next phase</p>
+<hr>
+<h2>Multi-Node Networking ✅</h2>
+<h3>Discovery</h3>
+<ul>
+<li>✅ mDNS enabled in configs</li>
+<li>✅ Network actor tests pass</li>
+<li>✅ QUIC/TLS implementation complete</li>
+<li>✅ Two-node configs ready (alpha/beta)</li>
+</ul>
+<h3>Expected Behavior</h3>
+<pre><code class="language-bash"># Terminal 1
+./target/release/icnd --config ../config/icn-alpha.toml
+
+# Terminal 2  
+./target/release/icnd --config ../config/icn-beta.toml
+
+# Should discover via mDNS and connect
+</code></pre>
+<p><strong>Status:</strong> ✅ <strong>LIKELY WORKING</strong> - Tests pass, needs live verification<br><strong>Action:</strong> Test two-node startup in demo prep</p>
+<hr>
+<h2>Ledger Status ✅</h2>
+<h3>Implementation</h3>
+<ul>
+<li>✅ Double-entry bookkeeping</li>
+<li>✅ Merkle-DAG structure</li>
+<li>✅ Gossip sync via <code>ledger:sync</code> topic</li>
+<li>✅ Transaction confirmation flow</li>
+<li>✅ Balance queries</li>
+<li>✅ Credit limits</li>
+</ul>
+<h3>Tests</h3>
+<ul>
+<li>✅ All ledger tests passing</li>
+<li>✅ Integration tests pass</li>
+<li>✅ Charter enforcement tests pass</li>
+</ul>
+<p><strong>Status:</strong> ✅ <strong>WORKING</strong> - Core ledger is solid</p>
+<hr>
+<h2>Governance Status ✅</h2>
+<h3>Features</h3>
+<ul>
+<li>✅ Domains (organizational scopes)</li>
+<li>✅ Proposals (create, list)</li>
+<li>✅ Voting (cast votes, count)</li>
+<li>✅ Proposal execution</li>
+<li>✅ Democratic primitives</li>
+</ul>
+<h3>Tests</h3>
+<ul>
+<li>✅ All governance tests passing</li>
+</ul>
+<p><strong>Status:</strong> ✅ <strong>WORKING</strong> - Governance is complete</p>
+<hr>
+<h2>Critical Issues Found</h2>
+<h3>1. Identity Workflow Confusion ⚠️</h3>
+<p><strong>Issue:</strong> <code>icnctl id init</code> defaults to <code>~/.icn</code> but daemon uses config <code>data_dir</code><br><strong>Impact:</strong> Demo setup will be confusing<br><strong>Fix:</strong> Document workflow or change default behavior<br><strong>Time:</strong> 1 hour<br><strong>Priority:</strong> MEDIUM</p>
+<h3>2. Gateway API Unverified ❓</h3>
+<p><strong>Issue:</strong> Haven&#39;t verified gateway endpoints match UI expectations<br><strong>Impact:</strong> UI might not connect to backend<br><strong>Fix:</strong> Test gateway, fix any missing endpoints<br><strong>Time:</strong> 2-4 hours<br><strong>Priority:</strong> HIGH</p>
+<h3>3. End-to-End Flow Untested ❓</h3>
+<p><strong>Issue:</strong> Haven&#39;t tested complete flow: daemon → gateway → UI<br><strong>Impact:</strong> Unknown gaps may exist<br><strong>Fix:</strong> Run full stack and test transaction flow<br><strong>Time:</strong> 2-3 hours<br><strong>Priority:</strong> HIGH</p>
+<hr>
+<h2>Demo Blockers</h2>
+<h3>Must Fix for Demo</h3>
+<ol>
+<li>✅ <strong>Build succeeds</strong> - DONE</li>
+<li>✅ <strong>Tests mostly pass</strong> - DONE (99.6%)</li>
+<li>⚠️ <strong>Identity setup workflow</strong> - Needs documentation</li>
+<li>❓ <strong>Gateway API working</strong> - Needs verification</li>
+<li>❓ <strong>UI connects to backend</strong> - Needs testing</li>
+<li>❓ <strong>Transaction flow works</strong> - Needs end-to-end test</li>
+<li>📝 <strong>Demo data generation</strong> - Needs creation</li>
+<li>📝 <strong>Demo scripts</strong> - Needs creation</li>
+</ol>
+<h3>Current Priorities</h3>
+<p><strong>Today (Day 1):</strong></p>
+<ol>
+<li>Verify gateway API endpoints</li>
+<li>Test full stack startup</li>
+<li>Test one transaction end-to-end</li>
+<li>Document identity setup workflow</li>
+</ol>
+<p><strong>Tomorrow (Day 2):</strong></p>
+<ol>
+<li>Create demo data (12 members, transaction history)</li>
+<li>Create demo setup script</li>
+<li>Fix any gaps found in testing</li>
+<li>Create demo reset script</li>
+</ol>
+<p><strong>Day 3:</strong></p>
+<ol>
+<li>Polish UI (loading states, error handling)</li>
+<li>Test on mobile</li>
+<li>Create demo narration script</li>
+<li>Practice demo flow</li>
+</ol>
+<hr>
+<h2>Nice-to-Fix (Not Blockers)</h2>
+<h3>Performance</h3>
+<ul>
+<li>Transaction list could be slow with many entries (pagination needed)</li>
+<li>WebSocket reconnection could be more robust</li>
+</ul>
+<h3>UX Polish</h3>
+<ul>
+<li>Loading spinners for API calls</li>
+<li>Better error messages</li>
+<li>Toast notifications for success/failure</li>
+<li>Transaction confirmation modal</li>
+</ul>
+<h3>Features</h3>
+<ul>
+<li>CSV export for transactions</li>
+<li>Monthly reports</li>
+<li>Member profiles</li>
+<li>Activity charts</li>
+</ul>
+<p><strong>None of these block the demo</strong> - core flow is what matters</p>
+<hr>
+<h2>Next Steps (Immediate Actions)</h2>
+<h3>Step 1: Verify Gateway (30 minutes)</h3>
+<pre><code class="language-bash"># Check gateway crate exists and has routes
+cd icn/crates/icn-gateway
+cat src/lib.rs | head -50
+
+# Check for API routes
+find src/ -name &quot;*.rs&quot; -exec grep -l &quot;api/members\|api/transactions&quot; {} \;
+</code></pre>
+<h3>Step 2: Test Full Stack (1 hour)</h3>
+<pre><code class="language-bash"># Terminal 1: Start daemon with gateway
+cd /tmp/icn-demo-test
+icnctl id init
+cd &lt;repo-root&gt;/icn
+./target/release/icnd --config ../config/icn-alpha.toml --gateway-enable
+
+# Terminal 2: Test gateway
+curl http://localhost:8080/health
+curl http://localhost:8080/api/members
+
+# Terminal 3: Start UI
+cd ../web/pilot-ui
+python3 -m http.server 3000
+
+# Browser: http://localhost:3000
+# Try logging in and creating a transaction
+</code></pre>
+<h3>Step 3: Document Workflow (30 minutes)</h3>
+<pre><code class="language-bash"># Create DEMO_SETUP.md with exact steps:
+# 1. Initialize identity
+# 2. Start daemon  
+# 3. Start UI
+# 4. Login
+# 5. Create transaction
+# 6. Verify balance updates
+</code></pre>
+<h3>Step 4: Create Sample Data (1 hour)</h3>
+<pre><code class="language-bash"># Create demo/data/tool-library-members.json
+# - 12 realistic members
+# - Names, roles, skills
+# - Contact info (fake)
+
+# Create demo/data/tool-library-history.json
+# - 10-15 sample transactions
+# - Realistic activities
+# - Various dates
+</code></pre>
+<hr>
+<h2>Demo Readiness Checklist</h2>
+<h3>Backend ✅</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> Builds successfully</li>
+<li><input checked="" disabled="" type="checkbox"> Tests pass (99%+)</li>
+<li><input checked="" disabled="" type="checkbox"> Daemon starts</li>
+<li><input disabled="" type="checkbox"> Identity workflow documented</li>
+<li><input disabled="" type="checkbox"> Two-node networking verified</li>
+</ul>
+<h3>Gateway ❓</h3>
+<ul>
+<li><input disabled="" type="checkbox"> API endpoints verified</li>
+<li><input disabled="" type="checkbox"> Health check works</li>
+<li><input disabled="" type="checkbox"> Members endpoint works</li>
+<li><input disabled="" type="checkbox"> Transactions endpoint works</li>
+<li><input disabled="" type="checkbox"> WebSocket works</li>
+</ul>
+<h3>UI ✅</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> HTML/CSS/JS complete</li>
+<li><input checked="" disabled="" type="checkbox"> Offline mode implemented</li>
+<li><input checked="" disabled="" type="checkbox"> Mobile responsive</li>
+<li><input disabled="" type="checkbox"> Connects to gateway (needs testing)</li>
+<li><input disabled="" type="checkbox"> Transaction form works (needs testing)</li>
+</ul>
+<h3>Demo Infrastructure 📝</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Sample data created</li>
+<li><input disabled="" type="checkbox"> Setup script created</li>
+<li><input disabled="" type="checkbox"> Reset script created  </li>
+<li><input disabled="" type="checkbox"> Demo narration written</li>
+<li><input disabled="" type="checkbox"> Verification script created</li>
+</ul>
+<h3>Testing ❓</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Full stack runs together</li>
+<li><input disabled="" type="checkbox"> Can create transaction</li>
+<li><input disabled="" type="checkbox"> Balances update</li>
+<li><input disabled="" type="checkbox"> Transaction history shows</li>
+<li><input disabled="" type="checkbox"> Mobile experience verified</li>
+</ul>
+<hr>
+<h2>Confidence Level</h2>
+<p><strong>Current Confidence: 7/10</strong></p>
+<p><strong>Why 7:</strong></p>
+<ul>
+<li>✅ Core infrastructure is solid (backend, tests)</li>
+<li>✅ UI is well-built and complete</li>
+<li>⚠️ Gateway needs verification</li>
+<li>⚠️ End-to-end flow untested</li>
+<li>📝 Demo infrastructure not built yet</li>
+</ul>
+<p><strong>To Reach 10:</strong></p>
+<ol>
+<li>Verify gateway API (1-2 hours)</li>
+<li>Test end-to-end transaction (1 hour)</li>
+<li>Create demo data (1 hour)</li>
+<li>Create demo scripts (2 hours)</li>
+<li>Practice demo 10 times (2 hours)</li>
+</ol>
+<p><strong>Total Time to 10/10: 7-9 hours of focused work</strong></p>
+<hr>
+<h2>Recommendation</h2>
+<h3>For This Week</h3>
+<p><strong>Goal:</strong> Get one transaction working end-to-end</p>
+<p><strong>Monday (Today):</strong></p>
+<ul>
+<li>Verify gateway implementation</li>
+<li>Test full stack startup</li>
+<li>Document identity workflow</li>
+<li>Test one transaction</li>
+</ul>
+<p><strong>Tuesday:</strong></p>
+<ul>
+<li>Fix any gaps found Monday</li>
+<li>Create sample data</li>
+<li>Build demo setup script</li>
+</ul>
+<p><strong>Wednesday:</strong></p>
+<ul>
+<li>Polish UI feedback (loading, errors)</li>
+<li>Test on mobile</li>
+<li>Create demo narration</li>
+</ul>
+<p><strong>Thursday:</strong></p>
+<ul>
+<li>Practice demo 10 times</li>
+<li>Create backup plans</li>
+<li>Refine timing</li>
+</ul>
+<p><strong>Friday:</strong></p>
+<ul>
+<li>Practice demo 10 more times</li>
+<li>Record backup video</li>
+<li>Prepare materials</li>
+</ul>
+<h3>Success Metric</h3>
+<p><strong>By Friday EOD:</strong></p>
+<ul>
+<li>Demo runs 20/20 times successfully</li>
+<li>Takes exactly 18-22 minutes</li>
+<li>You can narrate confidently</li>
+<li>Recovery plans are practiced</li>
+</ul>
+<p>This is <strong>achievable</strong> - the foundation is solid, we just need to connect the pieces and practice.</p>
+<hr>
+<h2>Assets We Have</h2>
+<h3>Working Code ✅</h3>
+<ul>
+<li>Complete Rust backend (20+ crates)</li>
+<li>Full-featured pilot UI</li>
+<li>Comprehensive tests</li>
+<li>Production configs</li>
+</ul>
+<h3>Documentation ✅</h3>
+<ul>
+<li>Extensive docs/ directory</li>
+<li>API documentation</li>
+<li>Architecture docs</li>
+<li>Getting started guides</li>
+</ul>
+<h3>Infrastructure ✅</h3>
+<ul>
+<li>Docker configs</li>
+<li>Kubernetes manifests</li>
+<li>Deployment scripts</li>
+<li>Monitoring setup</li>
+</ul>
+<p><strong>We&#39;re in good shape</strong> - this is more assembly and polish than building from scratch.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

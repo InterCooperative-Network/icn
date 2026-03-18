@@ -1,0 +1,1067 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Module 2: ICN Architecture Overview | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>onboarding</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>reference</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>module 02 architecture overview</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/onboarding/reference/module-02-architecture-overview.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Module 2: ICN Architecture Overview</h1>
+<h2>Overview</h2>
+<p>This module teaches you ICN&#39;s constraint engine architecture—how the system separates policy decisions (apps) from enforcement mechanisms (kernel). Understanding this architecture is essential for contributing to any part of the codebase.</p>
+<h2>Objectives</h2>
+<ul>
+<li>Understand ICN&#39;s design principles and how they shape the system</li>
+<li>Learn the constraint engine model: apps decide → kernel enforces</li>
+<li>Map components to their role as Policy Oracle or Kernel enforcement</li>
+<li>Understand how components communicate via actor model</li>
+<li>Know where to look when implementing or debugging features</li>
+</ul>
+<h2>Prerequisites</h2>
+<ul>
+<li>Module 0 (Setup)</li>
+<li>Module 1 (Rust Fundamentals) - especially async and smart pointers</li>
+</ul>
+<h2>Key Reading</h2>
+<ul>
+<li><code>docs/ARCHITECTURE.md</code> - Complete architectural reference</li>
+<li><code>icn/Cargo.toml</code> - Workspace members list</li>
+<li><code>icn/crates/icn-core/src/supervisor/mod.rs</code> - Actor wiring</li>
+</ul>
+<hr>
+<h2>Core Concepts</h2>
+<h3>1. What is ICN?</h3>
+<p><strong>ICN is a decentralized coordination substrate for cooperative organizations.</strong></p>
+<p>Unlike blockchains that focus on trustless consensus, ICN is designed for:</p>
+<table>
+<thead>
+<tr>
+<th>ICN Approach</th>
+<th>Blockchain Approach</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Trust-native</strong>: Social relationships inform behavior</td>
+<td>Trustless: Assumes all actors are adversaries</td>
+</tr>
+<tr>
+<td><strong>Local-first</strong>: Nodes operate independently, sync via gossip</td>
+<td>Global consensus: All nodes agree on state</td>
+</tr>
+<tr>
+<td><strong>Cooperative economics</strong>: Mutual credit, clearing, fair exchange</td>
+<td>Token economics: Cryptocurrencies, gas fees</td>
+</tr>
+<tr>
+<td><strong>Human-governed</strong>: Democratic policy changes</td>
+<td>Code-governed: Hard forks for changes</td>
+</tr>
+</tbody></table>
+<p><strong>What &quot;substrate&quot; means:</strong></p>
+<p>ICN provides foundational capabilities that applications build on:</p>
+<ul>
+<li><strong>Identity</strong>: Who are you? (cryptographic proof)</li>
+<li><strong>Trust</strong>: How much should we trust them? (social graph)</li>
+<li><strong>Communication</strong>: How do we talk? (encrypted P2P)</li>
+<li><strong>Coordination</strong>: How do we agree? (gossip + contracts)</li>
+<li><strong>Economics</strong>: How do we exchange value? (mutual credit)</li>
+</ul>
+<p>Think of ICN as the enforcement substrate for cooperative applications: it provides mechanisms; governance decides how to use them.</p>
+<h3>2. ICN&#39;s Major Subsystems</h3>
+<p>Before understanding ICN&#39;s architectural boundaries, you need to know what the system does as a whole:</p>
+<h4>Identity</h4>
+<p>Decentralized identifiers (DIDs) with Ed25519 signatures, X25519 encryption, Age-encrypted keystore. Establishes &quot;who said this&quot; and &quot;who can do what.&quot;</p>
+<h4>Network Transport</h4>
+<p>QUIC/TLS secure sessions, mDNS discovery, NAT traversal, message authentication. Moves signed messages between nodes with DID-TLS binding.</p>
+<h4>Replication &amp; Gossip</h4>
+<p>Eventual consistency through push/pull protocols, anti-entropy with Bloom filters, causal ordering via vector clocks, topic-based dissemination. Ensures shared state converges across the network.</p>
+<h4>Trust Computation</h4>
+<p>Web-of-participation scoring, transitive trust propagation, multi-graph support for different trust contexts. This is semantic and community-defined—trust scores inform access control and resource allocation.</p>
+<h4>Ledger &amp; Economics</h4>
+<p>Mutual-credit accounting with double-entry bookkeeping, Merkle-DAG journal, credit limits and safety rails, fork detection and resolution. Enables value exchange without central currency.</p>
+<h4>Contracts &amp; Capabilities</h4>
+<p>CCL (Cooperative Contract Language) interpreter with fuel metering, capability-based security model defining who can invoke what actions under which constraints.</p>
+<h4>Governance</h4>
+<p>Democratic policy-making through proposals and voting, domain-specific rules, membership criteria. Determines <em>what constraints should be enforced</em>.</p>
+<h4>Distributed Compute</h4>
+<p>Trust-gated task execution, intelligent scheduling based on trust/resources/economics, result verification. Enables cooperative task distribution.</p>
+<h4>Runtime &amp; Supervision</h4>
+<p>Actor-based services using Tokio, lifecycle management, orchestration of startup/shutdown, inter-actor communication.</p>
+<h3>3. How ICN Works: Typical Flow</h3>
+<p>Here&#39;s how these subsystems work together:</p>
+<ol>
+<li>A node receives a <strong>signed message</strong> over QUIC/TLS transport</li>
+<li>The <strong>kernel validates invariants</strong>: authentication, replay protection, rate limits, capability gates, credit gates</li>
+<li><strong>State replication</strong> through gossip moves validated events across the network</li>
+<li><strong>Policy subsystems</strong> (trust, governance, ledger) compute semantic meanings from events</li>
+<li>Those meanings are expressed as <strong>constraints</strong> (rate limits, credit ceilings, capability grants)</li>
+<li>The <strong>kernel enforces those constraints</strong> on subsequent actions without understanding their semantic origin</li>
+</ol>
+<h3>4. Design Principles</h3>
+<p>ICN&#39;s architecture follows five foundational principles:</p>
+<h4>Local-First</h4>
+<p>Nodes operate independently and reconcile via gossip. This means:</p>
+<ul>
+<li><strong>Offline operation</strong>: Your node works even without network</li>
+<li><strong>No single point of failure</strong>: No central server to go down</li>
+<li><strong>Eventually consistent</strong>: Changes propagate through the network</li>
+<li><strong>Resilience</strong>: Network partitions don&#39;t break the system</li>
+</ul>
+<h4>Trust-Native</h4>
+<p>Security and coordination derive from social trust, not global consensus:</p>
+<ul>
+<li><strong>Web-of-participation</strong>: Trust spreads through relationships</li>
+<li><strong>Reputation matters</strong>: Behavior affects future interactions</li>
+<li><strong>Graduated access</strong>: More trusted peers get more capabilities</li>
+<li><strong>Human relationships</strong>: Mirrors real-world cooperative dynamics</li>
+</ul>
+<h4>Deterministic Compute</h4>
+<p>Same inputs always produce same outputs:</p>
+<ul>
+<li><strong>Reproducible state</strong>: Any node can verify results</li>
+<li><strong>Contract execution</strong>: Deterministic interpretation</li>
+<li><strong>No randomness in core</strong>: Predictable behavior</li>
+</ul>
+<h4>Capability-Based Security</h4>
+<p>Contracts can only do what they&#39;re explicitly permitted:</p>
+<ul>
+<li><strong>Principle of least privilege</strong>: Minimal access by default</li>
+<li><strong>Explicit grants</strong>: Capabilities must be given</li>
+<li><strong>Revocable</strong>: Capabilities can be withdrawn</li>
+<li><strong>Auditable</strong>: Clear record of what can do what</li>
+</ul>
+<h4>Human-Governed</h4>
+<p>Cooperative governance makes policy democratic:</p>
+<ul>
+<li><strong>Proposals and voting</strong>: Changes require community approval</li>
+<li><strong>Transparent process</strong>: All governance on the record</li>
+<li><strong>Configurable</strong>: Each cooperative sets its own rules</li>
+</ul>
+<hr>
+<h2>The ICN Constraint Engine Model</h2>
+<p>Now that you understand what ICN does as a complete system, we can examine its <strong>architectural invariant</strong>: the separation between policy decisions and enforcement mechanisms.</p>
+<blockquote>
+<p><strong>ICN is a constraint engine: apps translate meaning into constraints; the kernel enforces constraints without understanding meaning.</strong></p>
+</blockquote>
+<p>ICN implements a <strong>constraint enforcement architecture</strong> where applications and governance systems (Policy Oracles) translate domain semantics (trust relationships, governance rules, membership criteria) into generic constraints that the kernel enforces blindly.</p>
+<pre><code>┌─────────────────────────────────────────────────────────────────────┐
+│                    CONSTRAINT ENFORCEMENT (Kernel)                   │
+│  ┌─────────────────────────────────────────────────────────────────┐│
+│  │  Transport  │  Replay  │  Rate     │  Capability │  Credit    │ ││
+│  │   Auth      │  Guard   │  Limiter  │   Gate      │  Gate      │ ││
+│  │  (verify)   │ (reject) │  (apply)  │  (enforce)  │  (enforce) │ ││
+│  └─────────────────────────────────────────────────────────────────┘│
+│                                                                      │
+│   Kernel enforces ConstraintSet values. Kernel does NOT decide them. │
+└─────────────────────────────────────────────────────────────────────┘
+         ▲              ▲           ▲            ▲           ▲
+         │              │           │            │           │
+    ConstraintSet {                              // Illustrative example
+      rate_limit: 20/s,      // ← value from Policy Oracle
+      credit_ceiling: 1000,  // ← value from Policy Oracle
+      capabilities: [...]    // ← value from Policy Oracle
+    }
+         │              │           │            │           │
+┌────────┴──────────────┴───────────┴────────────┴───────────┴────────┐
+│                      POLICY ORACLES (Apps)                           │
+│                                                                      │
+│   Apps/Governance DECIDE constraint values.                          │
+│   Kernel ENFORCES them without knowing why.                          │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐            │
+│  │  Trust   │  │  Ledger  │  │Governance│  │Membership│            │
+│  │  Oracle  │  │  Oracle  │  │  Oracle  │  │  Oracle  │            │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘            │
+└─────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<h3>Key Distinction: Mechanism vs. Policy</h3>
+<p>The constraint engine model distinguishes between <strong>enforcement mechanisms</strong> (kernel) and <strong>constraint values</strong> (apps/governance):</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Kernel (Hard)</th>
+<th>Apps/Governance (Meta)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Rate limiting</strong></td>
+<td>Mechanism exists</td>
+<td>Values decided (20/s vs 100/s)</td>
+</tr>
+<tr>
+<td><strong>Credit gating</strong></td>
+<td>Mechanism exists</td>
+<td>Ceiling decided (1000 vs 5000)</td>
+</tr>
+<tr>
+<td><strong>Capability gating</strong></td>
+<td>Mechanism exists</td>
+<td>Grants decided</td>
+</tr>
+<tr>
+<td><strong>Replay guard</strong></td>
+<td>Mechanism exists</td>
+<td>Typically fixed</td>
+</tr>
+<tr>
+<td><strong>Transport auth</strong></td>
+<td>Mechanism exists</td>
+<td>Typically fixed</td>
+</tr>
+</tbody></table>
+<p><strong>Critical Property:</strong></p>
+<ul>
+<li>Governance can change <strong>what</strong> the rate limit is (e.g., from 20/s to 100/s)</li>
+<li>Governance <strong>cannot</strong> remove <strong>that</strong> rate limiting exists (enforcement mechanism is fixed)</li>
+</ul>
+<p><strong>Boundary rule:</strong> Anything that outputs constraint values is a Policy Oracle; anything that validates or enforces constraints is kernel (even if they live near each other in code). Many subsystems have both mechanism and policy surfaces—the boundary is determined by the data flow, not the crate structure.</p>
+<p>This separation ensures the kernel remains predictable and auditable while allowing cooperative governance to adapt policies to changing needs.</p>
+<hr>
+<h2>Component Organization</h2>
+<p><strong>Note:</strong> The following sections describe functional components of ICN. You may see &quot;layer&quot; used descriptively (e.g., &quot;transport layer security&quot;), which is legitimate technical terminology. However, ICN is <strong>not</strong> an OSI-like strictly layered stack where higher layers only access lower layers through defined interfaces. Instead, ICN uses the constraint engine model where policy oracles translate domain semantics into constraints the kernel enforces.</p>
+<h3>Component Mapping</h3>
+<p>The implementation organizes ICN&#39;s subsystems into functional areas:</p>
+<ul>
+<li><strong>Identity</strong> (<code>icn-identity</code>): DID, Ed25519, keystore</li>
+<li><strong>Trust Graph</strong> (<code>icn-trust</code>): Web-of-participation scores → <strong>Policy Oracle</strong></li>
+<li><strong>Transport</strong> (<code>icn-net</code>): QUIC/TLS, mDNS, NAT traversal → <strong>Kernel</strong></li>
+<li><strong>Ledger</strong> (<code>icn-ledger</code>): Mutual credit, double-entry → <strong>Policy Oracle</strong></li>
+<li><strong>Contracts</strong> (<code>icn-ccl</code>): CCL interpreter, capabilities → <strong>Policy Oracle</strong></li>
+<li><strong>Gossip</strong> (<code>icn-gossip</code>): Causal sync, anti-entropy → <strong>Kernel</strong></li>
+<li><strong>Distributed Compute</strong> (<code>icn-compute</code>): Trust-gated task execution → <strong>Policy Oracle</strong></li>
+</ul>
+<hr>
+<h2>Detailed Component Reference</h2>
+<p>The sections below provide details on each component. Remember: this is functional organization showing how subsystems work together, not a strictly layered stack where higher components can only access lower ones through defined interfaces.</p>
+<pre><code>┌────────────────────────────────────────────────────────┐
+│               DISTRIBUTED COMPUTE                       │
+│        Trust-gated task execution (icn-compute)        │
+├────────────────────────────────────────────────────────┤
+│                   CONTRACTS                             │
+│        CCL interpreter, capabilities (icn-ccl)         │
+├────────────────────────────────────────────────────────┤
+│                    LEDGER                               │
+│     Mutual credit, double-entry (icn-ledger)           │
+├────────────────────────────────────────────────────────┤
+│                    GOSSIP                               │
+│      Causal sync, anti-entropy (icn-gossip)            │
+├────────────────────────────────────────────────────────┤
+│                 TRUST GRAPH                             │
+│     Web-of-participation scores (icn-trust)            │
+├────────────────────────────────────────────────────────┤
+│                   IDENTITY                              │
+│      DID, Ed25519, keystore (icn-identity)             │
+├────────────────────────────────────────────────────────┤
+│                  TRANSPORT                              │
+│     QUIC/TLS, mDNS, NAT traversal (icn-net)            │
+├────────────────────────────────────────────────────────┤
+│          STORAGE  +  SECURITY                           │
+│   Sled persistence    Production hardening             │
+│    (icn-store)         (icn-security)                  │
+└────────────────────────────────────────────────────────┘
+</code></pre>
+<p><strong>Each layer provides guarantees to the layer above:</strong></p>
+<ol>
+<li><strong>Transport</strong> → &quot;I can establish secure connections&quot;</li>
+<li><strong>Identity</strong> → &quot;I can prove who I am&quot;</li>
+<li><strong>Trust</strong> → &quot;I know how much to trust you&quot;</li>
+<li><strong>Gossip</strong> → &quot;I can synchronize state with peers&quot;</li>
+<li><strong>Ledger</strong> → &quot;I can record transactions&quot;</li>
+<li><strong>Contracts</strong> → &quot;I can execute programmatic rules&quot;</li>
+<li><strong>Compute</strong> → &quot;I can distribute work across nodes&quot;</li>
+</ol>
+<hr>
+<h2>Layer Details</h2>
+<h3>3. Transport Layer (icn-net)</h3>
+<p><strong>What it does:</strong> Establishes secure, encrypted connections between nodes.</p>
+<p><strong>Key components:</strong></p>
+<ul>
+<li><strong>QUIC protocol</strong>: Modern transport with built-in encryption</li>
+<li><strong>TLS 1.3</strong>: Certificate-based authentication</li>
+<li><strong>mDNS discovery</strong>: Find peers on local network</li>
+<li><strong>NAT traversal</strong>: Connect through firewalls</li>
+</ul>
+<p><strong>Why QUIC instead of TCP?</strong></p>
+<ul>
+<li>Multiplexed streams (multiple conversations on one connection)</li>
+<li>Built-in encryption (no separate TLS handshake)</li>
+<li>Connection migration (survives IP changes)</li>
+<li>Faster connection establishment (0-RTT)</li>
+</ul>
+<pre><code class="language-rust">// From icn-net: Connection establishment
+pub struct NetworkActor {
+    // QUIC endpoint for connections
+    endpoint: quinn::Endpoint,
+    // Active peer sessions
+    sessions: HashMap&lt;Did, PeerSession&gt;,
+    // Message routing
+    router: MessageRouter,
+}
+</code></pre>
+<p><strong>DID-TLS Binding:</strong>
+Every TLS connection proves the peer&#39;s DID ownership:</p>
+<ol>
+<li>TLS certificate contains DID</li>
+<li>Node signs challenge with DID private key</li>
+<li>Verifier checks signature matches certificate</li>
+<li>Connection is now authenticated</li>
+</ol>
+<h3>4. Identity Layer (icn-identity)</h3>
+<p><strong>What it does:</strong> Manages cryptographic identities (DIDs) and key material.</p>
+<p><strong>DID Format:</strong></p>
+<pre><code>did:icn:5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP
+        ├─ Scheme: &quot;icn&quot;
+        └─ Base58-encoded Ed25519 public key
+</code></pre>
+<p><strong>Why this format?</strong></p>
+<ul>
+<li><strong>Self-certifying</strong>: No registry lookup needed</li>
+<li><strong>Verifiable</strong>: Anyone can verify signatures</li>
+<li><strong>Simple</strong>: DID = public key (direct mapping)</li>
+</ul>
+<p><strong>Key components:</strong></p>
+<ul>
+<li><strong>KeyPair</strong>: Ed25519 signing key + X25519 encryption key</li>
+<li><strong>KeyStore</strong>: Age-encrypted file storage</li>
+<li><strong>Key Rotation</strong>: Protocol for changing keys safely</li>
+</ul>
+<pre><code class="language-rust">// From icn-identity: Keystore interface
+pub trait KeyStore: Send + Sync {
+    fn unlock(&amp;mut self, passphrase: &amp;[u8]) -&gt; Result&lt;()&gt;;
+    fn lock(&amp;mut self);
+    fn get_keypair(&amp;self) -&gt; Result&lt;&amp;KeyPair&gt;;
+    fn sign(&amp;self, message: &amp;[u8]) -&gt; Result&lt;Signature&gt;;
+}
+</code></pre>
+<p><strong>Keystore security:</strong></p>
+<ol>
+<li>Private keys never leave keystore</li>
+<li>Age encryption (passphrase or YubiKey)</li>
+<li>Locked by default (requires unlock)</li>
+<li>Rotation creates signed transition record</li>
+</ol>
+<h3>5. Trust Layer (icn-trust)</h3>
+<p><strong>What it does:</strong> Computes trust scores based on social relationships.</p>
+<p><strong>The trust graph:</strong></p>
+<pre><code>       Alice ─────0.8────── Bob
+         │                   │
+        0.6                 0.5
+         │                   │
+         └──── Charlie ─────┘
+                  │
+                 0.3
+                  │
+                David
+</code></pre>
+<p>Edges represent direct trust (0.0 to 1.0). Trust propagates transitively.</p>
+<p><strong>Trust computation:</strong></p>
+<ul>
+<li><strong>Direct trust</strong>: You vouch for someone (Alice trusts Bob 0.8)</li>
+<li><strong>Transitive trust</strong>: Trust through intermediaries (Alice → Bob → David)</li>
+<li><strong>Decay</strong>: Trust decreases with distance</li>
+<li><strong>Multiple paths</strong>: Combines trust from different routes</li>
+</ul>
+<pre><code class="language-rust">// Trust score computation
+pub fn compute_trust(&amp;self, from: &amp;Did, to: &amp;Did) -&gt; f64 {
+    // Direct trust if exists
+    if let Some(direct) = self.get_direct_trust(from, to) {
+        return direct;
+    }
+
+    // Transitive trust through graph traversal
+    // Uses decay factor and path combination
+    self.compute_transitive_trust(from, to, MAX_DEPTH)
+}
+</code></pre>
+<p><strong>Trust classes:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Class</th>
+<th>Score Range</th>
+<th>Rate Limit</th>
+<th>Use Case</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Isolated</td>
+<td>&lt; 0.1</td>
+<td>10/sec</td>
+<td>Unknown peers</td>
+</tr>
+<tr>
+<td>Known</td>
+<td>0.1 - 0.4</td>
+<td>50/sec</td>
+<td>Casual contacts</td>
+</tr>
+<tr>
+<td>Partner</td>
+<td>0.4 - 0.7</td>
+<td>100/sec</td>
+<td>Regular collaborators</td>
+</tr>
+<tr>
+<td>Federated</td>
+<td>&gt; 0.7</td>
+<td>200/sec</td>
+<td>Trusted federation</td>
+</tr>
+</tbody></table>
+<h3>6. Gossip Layer (icn-gossip)</h3>
+<p><strong>What it does:</strong> Synchronizes state across nodes without central coordination.</p>
+<p><strong>How gossip works:</strong></p>
+<ol>
+<li><strong>Push</strong>: Node announces &quot;I have new data&quot;</li>
+<li><strong>Pull</strong>: Other nodes request data they don&#39;t have</li>
+<li><strong>Anti-entropy</strong>: Periodic sync to catch missed updates</li>
+</ol>
+<p><strong>Key concepts:</strong></p>
+<p><strong>Topics</strong>: Namespaced channels for different data types</p>
+<pre><code>ledger:entries      # Ledger transactions
+trust:edges         # Trust graph updates
+governance:votes    # Voting events
+</code></pre>
+<p><strong>Vector clocks</strong>: Track causality (what happened before what)</p>
+<pre><code class="language-rust">pub struct VectorClock {
+    // Each peer&#39;s logical time
+    clock: HashMap&lt;Did, u64&gt;,
+}
+
+impl VectorClock {
+    pub fn happened_before(&amp;self, other: &amp;VectorClock) -&gt; bool {
+        // All our entries ≤ theirs, at least one &lt;
+    }
+}
+</code></pre>
+<p><strong>Bloom filters</strong>: Efficiently check &quot;do you have this?&quot;</p>
+<ul>
+<li>Compact representation of what a node has</li>
+<li>False positives possible (might re-send)</li>
+<li>False negatives impossible (won&#39;t miss data)</li>
+</ul>
+<pre><code class="language-rust">// From icn-gossip: Message handling
+pub struct GossipActor {
+    subscriptions: HashMap&lt;Topic, Vec&lt;Subscription&gt;&gt;,
+    vector_clock: VectorClock,
+    pending_announcements: Vec&lt;Announcement&gt;,
+}
+</code></pre>
+<h3>7. Ledger Layer (icn-ledger)</h3>
+<p><strong>What it does:</strong> Records economic transactions using mutual credit.</p>
+<p><strong>Mutual credit explained:</strong></p>
+<p>Unlike currency, mutual credit creates money through transactions:</p>
+<pre><code>Before: Alice: 0, Bob: 0, Carol: 0
+
+Alice buys from Bob (10 units):
+After: Alice: -10, Bob: +10, Carol: 0
+
+Bob buys from Carol (5 units):
+After: Alice: -10, Bob: +5, Carol: +5
+
+Carol buys from Alice (10 units):
+After: Alice: 0, Bob: +5, Carol: -5
+</code></pre>
+<p><strong>The system always sums to zero.</strong> No external money supply needed.</p>
+<p><strong>Double-entry accounting:</strong>
+Every transaction creates two entries:</p>
+<pre><code class="language-rust">pub struct LedgerEntry {
+    debit_account: Did,   // Money leaves here
+    credit_account: Did,  // Money arrives here
+    amount: i64,
+    timestamp: u64,
+    signature: Signature,
+}
+</code></pre>
+<p><strong>Merkle-DAG structure:</strong>
+Entries form a directed acyclic graph where each entry references its parents:</p>
+<pre><code>    Entry A
+       │
+       ▼
+    Entry B ◄── Entry C
+       │         │
+       ▼         ▼
+    Entry D ────►┘
+</code></pre>
+<p>This enables:</p>
+<ul>
+<li><strong>Cryptographic integrity</strong>: Can&#39;t modify without detection</li>
+<li><strong>Efficient sync</strong>: Request missing branches</li>
+<li><strong>Parallel entries</strong>: Multiple valid orderings</li>
+</ul>
+<h3>8. Contract Layer (icn-ccl)</h3>
+<p><strong>What it does:</strong> Executes programmable rules for cooperative agreements.</p>
+<p><strong>CCL (Cooperative Contract Language):</strong></p>
+<ul>
+<li>Domain-specific, not Turing-complete</li>
+<li>Deterministic execution</li>
+<li>Capability-based security</li>
+<li>Fuel metering (prevents infinite loops)</li>
+</ul>
+<p><strong>Contract structure:</strong></p>
+<pre><code class="language-rust">pub struct Contract {
+    name: String,
+    parties: Vec&lt;Did&gt;,
+    rules: Vec&lt;Rule&gt;,
+    state: ContractState,
+}
+
+pub struct Rule {
+    name: String,
+    conditions: Vec&lt;Expr&gt;,  // When this rule applies
+    effects: Vec&lt;Stmt&gt;,     // What happens
+}
+</code></pre>
+<p><strong>Capability system:</strong></p>
+<pre><code class="language-rust">pub enum Capability {
+    ReadLedger,           // Can query balances
+    WriteLedger(i64),     // Can transfer up to N
+    ReadTrust,            // Can check trust scores
+    SendMessage(Topic),   // Can publish to topic
+}
+</code></pre>
+<p>Contracts declare required capabilities. The runtime grants them based on
+authorization rules.</p>
+<h3>9. Distributed Compute Layer (icn-compute)</h3>
+<p><strong>What it does:</strong> Distributes computational tasks across trusted nodes.</p>
+<p><strong>Trust-gated execution:</strong></p>
+<ul>
+<li>Tasks specify minimum trust requirements</li>
+<li>Scheduler assigns to qualifying nodes</li>
+<li>Results are verified by trust threshold</li>
+</ul>
+<pre><code class="language-rust">pub struct ComputeTask {
+    function: ComputeFunction,
+    inputs: Vec&lt;Input&gt;,
+    trust_threshold: f64,     // Minimum executor trust
+    timeout: Duration,
+}
+</code></pre>
+<p><strong>Scheduling policies:</strong></p>
+<ul>
+<li><strong>RoundRobin</strong>: Distribute evenly across nodes</li>
+<li><strong>LowestLoad</strong>: Prefer nodes with capacity</li>
+<li><strong>TrustWeighted</strong>: Prefer higher-trust nodes</li>
+<li><strong>Locality</strong>: Prefer nodes near data</li>
+</ul>
+<hr>
+<h2>Supporting Layers</h2>
+<h3>10. Storage Layer (icn-store)</h3>
+<p><strong>What it does:</strong> Provides persistent key-value storage.</p>
+<p><strong>Implementation:</strong> Sled embedded database</p>
+<ul>
+<li>Embedded (no separate process)</li>
+<li>ACID transactions</li>
+<li>Concurrent reads</li>
+<li>Automatic compaction</li>
+</ul>
+<pre><code class="language-rust">pub trait Store: Send + Sync {
+    fn get(&amp;self, key: &amp;[u8]) -&gt; Result&lt;Option&lt;Vec&lt;u8&gt;&gt;&gt;;
+    fn put(&amp;self, key: &amp;[u8], value: &amp;[u8]) -&gt; Result&lt;()&gt;;
+    fn delete(&amp;self, key: &amp;[u8]) -&gt; Result&lt;()&gt;;
+    fn scan_prefix(&amp;self, prefix: &amp;[u8]) -&gt; Result&lt;Vec&lt;(Vec&lt;u8&gt;, Vec&lt;u8&gt;)&gt;&gt;;
+}
+</code></pre>
+<p><strong>Namespaced keys:</strong> Each subsystem uses a prefix:</p>
+<pre><code>trust:edge:{from}:{to}    # Trust edges
+ledger:entry:{hash}       # Ledger entries
+gossip:state:{topic}      # Gossip metadata
+</code></pre>
+<h3>11. Security Layer</h3>
+<p><strong>Three-tier security model:</strong></p>
+<ol>
+<li><strong>Transport security</strong>: QUIC/TLS with DID binding</li>
+<li><strong>Message security</strong>: Signed envelopes with replay protection</li>
+<li><strong>Application security</strong>: E2E encryption for sensitive data</li>
+</ol>
+<p><strong>Signed messages:</strong></p>
+<pre><code class="language-rust">pub struct SignedEnvelope {
+    payload: Vec&lt;u8&gt;,
+    sender: Did,
+    signature: Signature,
+    sequence: u64,  // Replay protection
+}
+</code></pre>
+<p><strong>Replay guard:</strong></p>
+<ul>
+<li>Each sender has a sequence counter</li>
+<li>Receivers track last seen sequence</li>
+<li>Reject messages with old or duplicate sequences</li>
+</ul>
+<hr>
+<h2>Integration Architecture</h2>
+<h3>12. The Actor Model</h3>
+<p>ICN uses actors for concurrent subsystems:</p>
+<pre><code>┌──────────────────────────────────────────────────────────┐
+│                     SUPERVISOR                            │
+│  Creates and manages actors, handles shutdown             │
+├──────────────────────────────────────────────────────────┤
+│                                                          │
+│  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐    │
+│  │ NetworkActor│   │ GossipActor │   │   Ledger    │    │
+│  │   (icn-net) │   │(icn-gossip) │   │(icn-ledger) │    │
+│  └──────┬──────┘   └──────┬──────┘   └──────┬──────┘    │
+│         │                 │                 │            │
+│         │    callbacks    │                 │            │
+│         └────────────────►│◄────────────────┘            │
+│                           │                              │
+│         ┌─────────────────┼─────────────────┐            │
+│         │                 │                 │            │
+│  ┌──────▼──────┐   ┌──────▼──────┐   ┌──────▼──────┐    │
+│  │ TrustGraph  │   │   Gateway   │   │ Governance  │    │
+│  │ (icn-trust) │   │(icn-gateway)│   │  (icn-gov)  │    │
+│  └─────────────┘   └─────────────┘   └─────────────┘    │
+│                                                          │
+└──────────────────────────────────────────────────────────┘
+</code></pre>
+<p><strong>Actor characteristics:</strong></p>
+<ul>
+<li>Encapsulates state (no shared mutable state)</li>
+<li>Communicates via messages (channels, callbacks)</li>
+<li>Has a handle for external interaction</li>
+<li>Managed lifecycle (spawn, run, shutdown)</li>
+</ul>
+<h3>13. Actor Communication Patterns</h3>
+<p><strong>Message passing via channels:</strong></p>
+<pre><code class="language-rust">// Actor receives commands via channel
+pub struct MyActorHandle {
+    tx: mpsc::Sender&lt;MyCommand&gt;,
+}
+
+enum MyCommand {
+    DoSomething { data: Vec&lt;u8&gt;, reply: oneshot::Sender&lt;Result&lt;()&gt;&gt; },
+    Shutdown,
+}
+</code></pre>
+<p><strong>Callbacks for cross-actor communication:</strong></p>
+<pre><code class="language-rust">// Network → Gossip: When message arrives
+let incoming_handler: IncomingHandler = Arc::new(move |msg| {
+    gossip_handle.handle_incoming(msg)
+});
+
+// Gossip → Network: When message needs sending
+let send_callback: SendCallback = Arc::new(move |peer, msg| {
+    network_handle.send_to(peer, msg)
+});
+</code></pre>
+<p><strong>Why callbacks instead of direct references?</strong></p>
+<ul>
+<li>Avoids circular dependencies</li>
+<li>Actors remain independent</li>
+<li>Easy to mock for testing</li>
+<li>Allows late binding</li>
+</ul>
+<h3>14. The Supervisor</h3>
+<p>The Supervisor (<code>icn-core</code>) orchestrates all actors:</p>
+<pre><code class="language-rust">// From icn-core/src/supervisor/mod.rs
+pub struct Supervisor {
+    config: Config,
+    identity: IdentityBundle,
+    shutdown_tx: broadcast::Sender&lt;()&gt;,
+
+    // Actor handles
+    network: Arc&lt;RwLock&lt;NetworkActor&gt;&gt;,
+    gossip: Arc&lt;RwLock&lt;GossipActor&gt;&gt;,
+    ledger: Arc&lt;RwLock&lt;Ledger&gt;&gt;,
+    trust_graph: Arc&lt;RwLock&lt;TrustGraph&gt;&gt;,
+    // ... more actors
+}
+
+impl Supervisor {
+    pub async fn run(self) -&gt; Result&lt;()&gt; {
+        // 1. Initialize actors
+        self.init_network().await?;
+        self.init_gossip().await?;
+        self.init_ledger().await?;
+
+        // 2. Wire up callbacks
+        self.wire_network_to_gossip().await?;
+        self.wire_gossip_to_ledger().await?;
+
+        // 3. Start actor loops
+        self.start_all().await?;
+
+        // 4. Wait for shutdown
+        self.wait_for_shutdown().await
+    }
+}
+</code></pre>
+<p><strong>Initialization order matters:</strong></p>
+<ol>
+<li>Storage (foundation)</li>
+<li>Identity (needed by everyone)</li>
+<li>Trust (needed for access control)</li>
+<li>Network (needed for gossip)</li>
+<li>Gossip (needed for sync)</li>
+<li>Ledger (needs gossip sync)</li>
+<li>Gateway (exposes everything)</li>
+</ol>
+<hr>
+<h2>Crate Map</h2>
+<h3>15. Mapping Layers to Crates</h3>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Crate</th>
+<th>Primary Responsibility</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Transport</td>
+<td><code>icn-net</code></td>
+<td>QUIC connections, mDNS, message routing</td>
+</tr>
+<tr>
+<td>Identity</td>
+<td><code>icn-identity</code></td>
+<td>DID management, keystore, signatures</td>
+</tr>
+<tr>
+<td>Trust</td>
+<td><code>icn-trust</code></td>
+<td>Trust graph storage, score computation</td>
+</tr>
+<tr>
+<td>Gossip</td>
+<td><code>icn-gossip</code></td>
+<td>Topic sync, vector clocks, anti-entropy</td>
+</tr>
+<tr>
+<td>Ledger</td>
+<td><code>icn-ledger</code></td>
+<td>Double-entry accounting, Merkle-DAG</td>
+</tr>
+<tr>
+<td>Contracts</td>
+<td><code>icn-ccl</code></td>
+<td>CCL parser, interpreter, capabilities</td>
+</tr>
+<tr>
+<td>Compute</td>
+<td><code>icn-compute</code></td>
+<td>Task scheduling, executor selection</td>
+</tr>
+<tr>
+<td>Storage</td>
+<td><code>icn-store</code></td>
+<td>Sled wrapper, namespaced access</td>
+</tr>
+<tr>
+<td>Security</td>
+<td><code>icn-security</code></td>
+<td>Rate limiting, access control</td>
+</tr>
+<tr>
+<td>Runtime</td>
+<td><code>icn-core</code></td>
+<td>Supervisor, actor lifecycle</td>
+</tr>
+<tr>
+<td>API</td>
+<td><code>icn-gateway</code></td>
+<td>REST/WebSocket, JWT auth</td>
+</tr>
+<tr>
+<td>API Types</td>
+<td><code>icn-api</code></td>
+<td>Shared service layer, API definitions</td>
+</tr>
+<tr>
+<td>Encoding</td>
+<td><code>icn-encoding</code></td>
+<td>Postcard serialization, wire format</td>
+</tr>
+<tr>
+<td>Metrics</td>
+<td><code>icn-obs</code></td>
+<td>Prometheus, tracing, logging</td>
+</tr>
+<tr>
+<td>Governance</td>
+<td><code>icn-governance</code></td>
+<td>Proposals, voting, policy</td>
+</tr>
+<tr>
+<td>Federation</td>
+<td><code>icn-federation</code></td>
+<td>Inter-coop agreements</td>
+</tr>
+<tr>
+<td>Testing</td>
+<td><code>icn-testkit</code></td>
+<td>Multi-node test helpers</td>
+</tr>
+</tbody></table>
+<h3>16. Binary Crates</h3>
+<table>
+<thead>
+<tr>
+<th>Binary</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icnd</code></td>
+<td>The daemon - runs a network node</td>
+</tr>
+<tr>
+<td><code>icnctl</code></td>
+<td>CLI - manage identity, interact with node</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Data Flow Examples</h2>
+<h3>17. Incoming Message Flow</h3>
+<pre><code>External Peer
+     │
+     │ QUIC packet
+     ▼
+┌────────────────┐
+│  NetworkActor  │ ─── Decrypt, verify TLS
+└───────┬────────┘
+        │ NetworkMessage
+        ▼
+┌────────────────┐
+│ IncomingHandler│ ─── Route by payload type
+└───────┬────────┘
+        │ GossipMessage
+        ▼
+┌────────────────┐
+│  GossipActor   │ ─── Process announcement
+└───────┬────────┘
+        │ LedgerEntry (if ledger topic)
+        ▼
+┌────────────────┐
+│    Ledger      │ ─── Validate, store entry
+└────────────────┘
+</code></pre>
+<h3>18. Outgoing Transaction Flow</h3>
+<pre><code>Client (SDK/UI)
+     │
+     │ HTTP POST /transactions
+     ▼
+┌────────────────┐
+│    Gateway     │ ─── Auth, validate
+└───────┬────────┘
+        │ CreateTransaction
+        ▼
+┌────────────────┐
+│    Ledger      │ ─── Create entry, sign
+└───────┬────────┘
+        │ LedgerEntry
+        ▼
+┌────────────────┐
+│  GossipActor   │ ─── Announce to peers
+└───────┬────────┘
+        │ GossipMessage
+        ▼
+┌────────────────┐
+│  NetworkActor  │ ─── Send to subscribed peers
+└───────┬────────┘
+        │
+        ▼
+    Other Nodes
+</code></pre>
+<hr>
+<h2>Diagrams</h2>
+<h3>ICN Component Interaction</h3>
+<pre><code class="language-mermaid">flowchart TB
+    subgraph External
+        Client[Client Application]
+        Peer[Peer Node]
+    end
+
+    subgraph Gateway
+        REST[REST API]
+        WS[WebSocket]
+    end
+
+    subgraph Core
+        Supervisor[Supervisor]
+        Network[NetworkActor]
+        Gossip[GossipActor]
+        Ledger[Ledger]
+        Trust[TrustGraph]
+        Compute[ComputeScheduler]
+    end
+
+    subgraph Storage
+        Store[(Sled DB)]
+    end
+
+    Client --&gt;|HTTP| REST
+    Client --&gt;|WS| WS
+    Peer --&gt;|QUIC| Network
+
+    REST --&gt; Supervisor
+    WS --&gt; Supervisor
+
+    Supervisor --&gt; Network
+    Supervisor --&gt; Gossip
+    Supervisor --&gt; Ledger
+    Supervisor --&gt; Trust
+    Supervisor --&gt; Compute
+
+    Network &lt;--&gt;|callbacks| Gossip
+    Gossip &lt;--&gt;|callbacks| Ledger
+    Ledger --&gt; Trust
+    Compute --&gt; Trust
+
+    Ledger --&gt; Store
+    Trust --&gt; Store
+    Gossip --&gt; Store
+</code></pre>
+<h3>Request Lifecycle</h3>
+<pre><code class="language-mermaid">sequenceDiagram
+    participant C as Client
+    participant G as Gateway
+    participant L as Ledger
+    participant Go as Gossip
+    participant N as Network
+    participant P as Peer
+
+    C-&gt;&gt;G: POST /transactions
+    G-&gt;&gt;L: create_entry()
+    L-&gt;&gt;L: validate &amp; sign
+    L-&gt;&gt;Go: announce()
+    Go-&gt;&gt;N: broadcast()
+    N-&gt;&gt;P: QUIC message
+    L--&gt;&gt;G: entry_id
+    G--&gt;&gt;C: 201 Created
+</code></pre>
+<hr>
+<h2>Exercises</h2>
+<ol>
+<li><p><strong>Layer Stack</strong>: Draw the ICN layer stack from memory, labeling each layer
+with its crate name and primary responsibility.</p>
+</li>
+<li><p><strong>Data Flow</strong>: Trace what happens when a node receives a gossip message
+containing a new ledger entry. List each component touched.</p>
+</li>
+<li><p><strong>Crate Mapping</strong>: Given a feature request &quot;add rate limiting to the gossip
+layer,&quot; identify which crates would need changes.</p>
+</li>
+<li><p><strong>Trust Propagation</strong>: If Alice trusts Bob at 0.8, Bob trusts Carol at 0.6,
+and decay per hop is 0.5, what is Alice&#39;s transitive trust of Carol?</p>
+</li>
+<li><p><strong>Actor Communication</strong>: Find a callback definition in the codebase
+(<code>icn/crates/icn-core/src/supervisor/</code>) and explain what two actors it connects.</p>
+</li>
+</ol>
+<hr>
+<h2>Checkpoints</h2>
+<ul>
+<li><input disabled="" type="checkbox"> You can explain ICN&#39;s five design principles</li>
+<li><input disabled="" type="checkbox"> You can draw the layer stack and name each layer&#39;s crate</li>
+<li><input disabled="" type="checkbox"> You understand why ICN uses gossip instead of consensus</li>
+<li><input disabled="" type="checkbox"> You can trace a message from network to ledger</li>
+<li><input disabled="" type="checkbox"> You know the difference between transport and gossip layers</li>
+<li><input disabled="" type="checkbox"> You understand why actors use callbacks for communication</li>
+<li><input disabled="" type="checkbox"> You can map a feature to the appropriate crate(s)</li>
+</ul>
+<hr>
+<h2>Quick Reference</h2>
+<table>
+<thead>
+<tr>
+<th>Concept</th>
+<th>Definition</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>DID</td>
+<td>Decentralized Identifier - cryptographic identity</td>
+</tr>
+<tr>
+<td>Trust Graph</td>
+<td>Network of trust relationships between DIDs</td>
+</tr>
+<tr>
+<td>Gossip</td>
+<td>Peer-to-peer state synchronization protocol</td>
+</tr>
+<tr>
+<td>Mutual Credit</td>
+<td>Economic system where transactions create money</td>
+</tr>
+<tr>
+<td>CCL</td>
+<td>Cooperative Contract Language</td>
+</tr>
+<tr>
+<td>Actor</td>
+<td>Concurrent component with encapsulated state</td>
+</tr>
+<tr>
+<td>Supervisor</td>
+<td>Orchestrates actor lifecycle</td>
+</tr>
+<tr>
+<td>Capability</td>
+<td>Permission grant for specific action</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Next Steps</h2>
+<p>Proceed to <strong>Module 3: Runtime &amp; Actors</strong> to understand how the Supervisor
+initializes actors, manages their lifecycle, and coordinates shutdown.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

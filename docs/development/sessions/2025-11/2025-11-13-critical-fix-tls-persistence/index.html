@@ -1,0 +1,297 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Critical Fix: TLS Certificate Persistence in Keystore Migration | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>development</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>sessions</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>2025 11</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>2025 11 13 critical fix tls persistence</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/development/sessions/2025-11/2025-11-13-critical-fix-tls-persistence.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Critical Fix: TLS Certificate Persistence in Keystore Migration</h1>
+<p><strong>Date:</strong> 2025-01-13
+<strong>Type:</strong> Bug Fix (CRITICAL)
+<strong>Related Phase:</strong> Phase 8 - DID-TLS Binding &amp; Keystore Integration
+<strong>Severity:</strong> HIGH - Security requirement violation</p>
+<h2>Summary</h2>
+<p>Fixed a critical bug in the v1-to-v2 keystore migration where TLS certificates were not being persisted to disk. This caused TLS certificates to regenerate on every daemon restart for v1 keystores, violating Phase 8&#39;s core requirement that &quot;TLS certificates persist across restarts.&quot;</p>
+<h2>Problem Statement</h2>
+<h3>What Was Broken</h3>
+<p>When unlocking a v1 keystore (containing only an Ed25519 keypair), the system would:</p>
+<ol>
+<li>Generate an <code>IdentityBundle</code> with a new TLS certificate and DID-TLS binding</li>
+<li>Store the bundle in memory: <code>self.identity_bundle = Some(bundle)</code></li>
+<li>Return the bundle for use by the daemon</li>
+<li><strong>NEVER persist the upgraded keystore to disk</strong></li>
+</ol>
+<p>The keystore file on disk remained in v1 format. On the next daemon restart, the unlock process would:</p>
+<ol>
+<li>Read the v1 keystore from disk (still no TLS binding)</li>
+<li>Generate a <strong>different</strong> TLS certificate with new cryptographic material</li>
+<li>Store it in memory (again)</li>
+<li>Never persist to disk (again)</li>
+</ol>
+<p>This created a vicious cycle where every restart generated different TLS certificates.</p>
+<h3>Impact</h3>
+<p><strong>Security Impact:</strong> HIGH</p>
+<ul>
+<li><strong>TLS session instability</strong>: Peers would see different certificates on each restart</li>
+<li><strong>Trust establishment broken</strong>: Peers couldn&#39;t maintain stable trust relationships</li>
+<li><strong>Phase 8 requirement violation</strong>: &quot;TLS certificates persist across restarts&quot; was false</li>
+<li><strong>DID-TLS binding integrity compromised</strong>: The binding changed on every restart</li>
+</ul>
+<p><strong>User Impact:</strong></p>
+<ul>
+<li>Daemon restarts would break all existing peer connections</li>
+<li>Peers would need to re-verify identity after every restart</li>
+<li>Trust graphs would accumulate stale TLS bindings</li>
+<li>No stability in production deployments</li>
+</ul>
+<h3>Root Cause</h3>
+<p>The TODO comment at line 245 in <code>icn-identity/src/keystore.rs</code> was never implemented:</p>
+<pre><code class="language-rust">// TODO: Auto-save the upgraded keystore with TLS binding
+// For now, we just log the migration - the next write will save the new format
+</code></pre>
+<p>The assumption that &quot;the next write will save the new format&quot; was incorrect. For read-only operations (like querying ledger, viewing trust graph, etc.), there would never be a &quot;next write&quot;, and the keystore would remain in v1 format indefinitely.</p>
+<h2>Solution</h2>
+<h3>Implementation</h3>
+<p>Modified the <code>unlock()</code> method in <code>icn-identity/src/keystore.rs</code> (lines 245-260) to immediately persist the upgraded keystore after generating the TLS binding:</p>
+<pre><code class="language-rust">} else {
+    // V1 keystore: generate new TLS certificate and binding
+    info!(&quot;Unlocked v1 keystore: {} (generating DID-TLS binding)&quot;, keypair.did());
+    warn!(&quot;⚠️  Migrating v1 keystore to v2 format with DID-TLS binding&quot;);
+
+    // Generate new IdentityBundle from the keypair
+    let bundle = IdentityBundle::from_keypair(keypair.clone())?;
+
+    // Auto-save the upgraded keystore with TLS binding
+    // This ensures TLS certificates persist across restarts
+    let stored_v2 = StoredKey {
+        secret_bytes: *keypair.secret_bytes(),
+        public_bytes: keypair.verifying_key().to_bytes(),
+        did: bundle.did().as_str().to_string(),
+        tls_cert_der: Some(bundle.tls_cert().as_ref().to_vec()),
+        tls_key_der: Some(bundle.tls_key_der_bytes().to_vec()),
+        tls_binding_sig: Some(bundle.binding_info().tls_binding_sig.clone()),
+        created_at: Some(bundle.binding_info().created_at),
+    };
+
+    Self::encrypt_and_save(&amp;self.path, &amp;stored_v2, passphrase)
+        .context(&quot;Failed to save upgraded v2 keystore&quot;)?;
+
+    info!(&quot;✅ Successfully migrated and saved v2 keystore with persistent TLS binding&quot;);
+
+    bundle
+};
+</code></pre>
+<h3>Key Changes</h3>
+<ol>
+<li><strong>Clone the keypair</strong>: Changed from <code>keypair</code> to <code>keypair.clone()</code> to allow reuse</li>
+<li><strong>Create complete <code>StoredKey</code></strong>: Populated all v2 fields (cert, key, signature, timestamp)</li>
+<li><strong>Call <code>encrypt_and_save()</code></strong>: Immediately persist to disk with Age encryption</li>
+<li><strong>Success logging</strong>: Confirm migration completed successfully</li>
+</ol>
+<h3>Migration Flow</h3>
+<p><strong>Before (Buggy):</strong></p>
+<pre><code>v1 keystore unlock → Generate TLS → Store in memory → Use → Exit
+                                                         ↓
+                                   (keystore file still v1 on disk)
+</code></pre>
+<p><strong>After (Fixed):</strong></p>
+<pre><code>v1 keystore unlock → Generate TLS → Persist to disk → Store in memory → Use
+                                           ↓
+                              (keystore file now v2 on disk)
+</code></pre>
+<h2>Testing</h2>
+<h3>Comprehensive Test Added</h3>
+<p>Created <code>test_v1_to_v2_migration_persists_tls()</code> to verify the fix:</p>
+<pre><code class="language-rust">#[test]
+fn test_v1_to_v2_migration_persists_tls() {
+    // 1. Create a v1 keystore manually (no TLS fields)
+    let keypair = KeyPair::generate().unwrap();
+    let stored_v1 = StoredKey {
+        secret_bytes: *keypair.secret_bytes(),
+        public_bytes: keypair.verifying_key().to_bytes(),
+        did: keypair.did().as_str().to_string(),
+        tls_cert_der: None,
+        tls_key_der: None,
+        tls_binding_sig: None,
+        created_at: None,
+    };
+    AgeKeyStore::encrypt_and_save(&amp;path, &amp;stored_v1, passphrase).unwrap();
+
+    // 2. First unlock: should trigger v1-&gt;v2 migration
+    let mut ks = AgeKeyStore::open(&amp;path).unwrap();
+    ks.unlock(passphrase).unwrap();
+    let bundle1 = ks.get_identity_bundle().unwrap();
+    let cert1_der = bundle1.tls_cert().as_ref().to_vec();
+
+    // 3. Lock and unlock again: should use persisted cert
+    ks.lock();
+    ks.unlock(passphrase).unwrap();
+    let bundle2 = ks.get_identity_bundle().unwrap();
+    let cert2_der = bundle2.tls_cert().as_ref().to_vec();
+
+    // 4. Verify certificates are IDENTICAL (not regenerated)
+    assert_eq!(cert1_der, cert2_der, &quot;TLS certificate should persist across unlocks&quot;);
+
+    // 5. Open new keystore instance: verify disk persistence
+    let mut ks3 = AgeKeyStore::open(&amp;path).unwrap();
+    ks3.unlock(passphrase).unwrap();
+    let bundle3 = ks3.get_identity_bundle().unwrap();
+    let cert3_der = bundle3.tls_cert().as_ref().to_vec();
+
+    assert_eq!(cert1_der, cert3_der, &quot;TLS certificate should persist to disk&quot;);
+}
+</code></pre>
+<h3>Test Results</h3>
+<pre><code>✅ All 19 icn-identity tests pass
+✅ test_v1_to_v2_migration_persists_tls passes
+✅ No regressions in existing tests
+</code></pre>
+<h3>Test Coverage</h3>
+<p>The test verifies:</p>
+<ul>
+<li>✅ v1 keystore successfully migrates on first unlock</li>
+<li>✅ TLS certificate is identical on second unlock (not regenerated)</li>
+<li>✅ TLS binding signature persists across unlocks</li>
+<li>✅ TLS certificate persists to disk (verified by new keystore instance)</li>
+<li>✅ Migration happens exactly once (idempotent)</li>
+</ul>
+<h2>Security Properties Restored</h2>
+<h3>Phase 8 Requirements</h3>
+<p>✅ <strong>TLS certificates persist across daemon restarts</strong></p>
+<ul>
+<li>v1 keystores now upgrade to v2 on first unlock</li>
+<li>Subsequent unlocks use persisted TLS certificate</li>
+<li>No regeneration of cryptographic material</li>
+</ul>
+<p>✅ <strong>DID-TLS binding integrity maintained</strong></p>
+<ul>
+<li>Binding signature is persisted with certificate</li>
+<li>Created timestamp is preserved</li>
+<li>Binding remains cryptographically valid</li>
+</ul>
+<p>✅ <strong>Peers see consistent TLS certificates</strong></p>
+<ul>
+<li>TLS certificate hash is stable across restarts</li>
+<li>Peers can maintain long-lived trust relationships</li>
+<li>No spurious &quot;new peer&quot; events on restart</li>
+</ul>
+<p>✅ <strong>Trust establishment stability ensured</strong></p>
+<ul>
+<li>Trust edges reference stable TLS bindings</li>
+<li>Trust graph doesn&#39;t accumulate stale entries</li>
+<li>Trust scores remain valid across restarts</li>
+</ul>
+<h2>Lessons Learned</h2>
+<h3>Code Review Gaps</h3>
+<ol>
+<li><strong>TODO comments as technical debt</strong>: The TODO at line 245 was added during Phase 8 implementation but never tracked as a task</li>
+<li><strong>Integration test coverage</strong>: The original Phase 8 tests verified TLS binding generation but not persistence</li>
+<li><strong>Manual verification</strong>: Should have tested daemon restart scenarios during Phase 8</li>
+</ol>
+<h3>Best Practices Going Forward</h3>
+<ol>
+<li><strong>Never leave TODOs in critical paths</strong>: Especially for security-related features</li>
+<li><strong>Test persistence, not just generation</strong>: File I/O tests should verify disk state</li>
+<li><strong>Restart scenarios in integration tests</strong>: Add tests that simulate daemon restarts</li>
+<li><strong>Track all TODOs</strong>: Use task tracking system (GitHub issues, etc.) for TODOs</li>
+</ol>
+<h3>Why This Wasn&#39;t Caught Earlier</h3>
+<ul>
+<li>Phase 8 implementation focused on generating TLS bindings correctly</li>
+<li>Tests verified binding creation and verification, not persistence</li>
+<li>No integration tests with daemon restart scenarios</li>
+<li>The code &quot;worked&quot; in the sense that it generated valid TLS certificates</li>
+<li>The bug only manifested on restart (not immediately visible)</li>
+</ul>
+<h2>Related Changes</h2>
+<h3>Documentation Updates</h3>
+<ol>
+<li><strong>CHANGELOG.md</strong>: Added detailed entry under &quot;Fixed - Critical: TLS Certificate Persistence&quot;</li>
+<li><strong>CLAUDE.md</strong>: Updated &quot;Identity &amp; Keystore&quot; section with migration behavior</li>
+<li><strong>CLAUDE.md</strong>: Updated &quot;Current Phase&quot; to track this fix</li>
+<li><strong>This dev journal</strong>: Comprehensive documentation of bug and fix</li>
+</ol>
+<h3>Commits</h3>
+<ul>
+<li><code>842a895</code> - fix: Persist TLS certificates during v1-to-v2 keystore migration</li>
+</ul>
+<h2>Next Steps</h2>
+<h3>Immediate</h3>
+<p>✅ Fix implemented and tested
+✅ Documentation updated
+✅ Changes committed</p>
+<h3>Future Hardening</h3>
+<p>Consider adding:</p>
+<ol>
+<li><strong>Restart integration tests</strong>: Test full daemon restart scenarios</li>
+<li><strong>Keystore fsync</strong>: Ensure writes are durable before returning</li>
+<li><strong>Backup before migration</strong>: Keep v1 keystore copy during upgrade</li>
+<li><strong>Migration metrics</strong>: Track migration success/failure rates</li>
+<li><strong>Keystore version checks</strong>: Verify v2 format after migration</li>
+</ol>
+<h2>Conclusion</h2>
+<p>This critical fix restores Phase 8&#39;s security guarantees. TLS certificates now persist correctly across daemon restarts for both v1 (migrated) and v2 keystores. The comprehensive test ensures this behavior remains stable going forward.</p>
+<p><strong>Security Impact</strong>: HIGH - Required for production deployment
+<strong>Fix Quality</strong>: Complete with thorough testing
+<strong>Risk</strong>: Low - No breaking changes, only fixes broken behavior</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

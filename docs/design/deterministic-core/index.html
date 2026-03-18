@@ -1,0 +1,516 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Deterministic Core (ICN-DC) Specification | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>deterministic core</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/deterministic-core.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Deterministic Core (ICN-DC) Specification</h1>
+<p><strong>Status</strong>: Specification<br><strong>Version</strong>: 1.0<br><strong>Date</strong>: 2026-02-11<br><strong>Applies To</strong>: Legitimacy Compute (LC) execution paths</p>
+<hr>
+<h2>Overview</h2>
+<p>The ICN Deterministic Core (ICN-DC) is a hardened WASM execution environment that guarantees bit-exact reproducibility across supported architectures (x86_64, aarch64).</p>
+<p>ICN-DC is required for all <strong>Legitimacy Compute (LC)</strong> - any computation that can affect authoritative shared state.</p>
+<hr>
+<h2>Design Goals</h2>
+<ol>
+<li><strong>Bit-exact reproducibility</strong> - Same inputs → same outputs on any compliant node</li>
+<li><strong>Verifiable execution</strong> - Any node can replay and verify any LC execution</li>
+<li><strong>Bounded resources</strong> - Guaranteed termination, predictable costs</li>
+<li><strong>Defense in depth</strong> - Multiple layers prevent non-determinism</li>
+</ol>
+<hr>
+<h2>Wasmtime Configuration</h2>
+<h3>Version Pin</h3>
+<pre><code class="language-rust">/// Pinned Wasmtime version. Upgrading is a HARD FORK.
+pub const WASMTIME_VERSION_PIN: &amp;str = &quot;24.0.5&quot;;
+</code></pre>
+<p><strong>Policy</strong>: All configuration flags are defined against this version. Upgrading requires:</p>
+<ol>
+<li>Cross-architecture determinism re-certification</li>
+<li>&quot;Nondeterministic Nasties&quot; test suite pass on both archs</li>
+<li>Protocol-level coordination (all nodes upgrade together)</li>
+</ol>
+<p><strong>Fail-Closed Rule</strong>: If a config knob specified below is not available in Wasmtime 24.0.5, we DO NOT approximate it. LC execution is forbidden until the knob is available or we redesign. This prevents &quot;imaginary determinism&quot; where we claim a guarantee we can&#39;t deliver.</p>
+<h3>Engine Configuration</h3>
+<pre><code class="language-rust">pub fn create_deterministic_engine() -&gt; anyhow::Result&lt;(Engine, DeterminismManifest)&gt; {
+    let mut config = Config::new();
+    
+    // 1. NaN Canonicalization
+    // Forces all NaNs to canonical bit pattern 0x7fc00000
+    // Critical for x86 vs ARM consistency
+    config.cranelift_nan_canonicalization(true);
+    
+    // 2. Fuel Consumption
+    // Replaces wall-clock timeouts with instruction counting
+    // Guarantees same fuel consumption regardless of CPU speed
+    config.consume_fuel(true);
+    
+    // 3. Sequential Compilation
+    // Reduces nondeterministic build variance and simplifies audit.
+    // NOTE: Determinism must not depend on JIT artifact identity.
+    config.parallel_compilation(false);
+    
+    // 4. Memory Configuration
+    // Static limits prevent OOM-dependent behavior
+    // VERIFIED: All these APIs exist in Wasmtime 24.0.5 (config.rs:1356, 1427, 1498)
+    let max_memory_bytes = 128 * 1024 * 1024; // 128 MiB
+    config.static_memory_maximum_size(max_memory_bytes);
+    config.static_memory_guard_size(2 * 1024 * 1024);
+    config.dynamic_memory_reserved_for_growth(max_memory_bytes);
+    
+    Ok((Engine::new(&amp;config)?, manifest))
+}
+</code></pre>
+<h3>Configuration Rationale</h3>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Value</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>cranelift_nan_canonicalization</code></td>
+<td><code>true</code></td>
+<td>Different CPUs produce different NaN bit patterns</td>
+</tr>
+<tr>
+<td><code>consume_fuel</code></td>
+<td><code>true</code></td>
+<td>Wall-clock timeouts are non-deterministic</td>
+</tr>
+<tr>
+<td><code>parallel_compilation</code></td>
+<td><code>false</code></td>
+<td>Reduces build variance, simplifies audit (determinism must not depend on JIT identity)</td>
+</tr>
+<tr>
+<td><code>static_memory_maximum_size</code></td>
+<td>128 MiB</td>
+<td>Prevents OOM-dependent behavior</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>WASM Subset Restrictions</h2>
+<h3>Overview</h3>
+<p>LC WASM modules are validated against a restricted subset. Modules violating the subset are rejected at load time.</p>
+<h3>Import Allowlist</h3>
+<p>Only these imports are allowed for LC modules:</p>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Function</th>
+<th>Signature</th>
+<th>Behavior</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icn</code></td>
+<td><code>log</code></td>
+<td><code>(ptr: i32, len: i32)</code></td>
+<td>Log message (no side effects)</td>
+</tr>
+<tr>
+<td><code>icn</code></td>
+<td><code>timestamp</code></td>
+<td><code>() -&gt; i64</code></td>
+<td>Returns <code>task.created_at</code> (deterministic)</td>
+</tr>
+<tr>
+<td><code>icn</code></td>
+<td><code>entropy_seed</code></td>
+<td><code>(ptr: i32)</code></td>
+<td>Writes 32-byte seed to ptr (optional)</td>
+</tr>
+</tbody></table>
+<p><strong>Canonical naming</strong>: All host functions use module <code>&quot;icn&quot;</code> with function names like <code>&quot;log&quot;</code>, <code>&quot;timestamp&quot;</code>. In WASM: <code>(import &quot;icn&quot; &quot;log&quot; ...)</code>. In Rust linker: <code>icn::log</code>.</p>
+<h3>Forbidden Imports</h3>
+<p>Any import not on the allowlist is forbidden:</p>
+<ul>
+<li><code>wasi_*</code> - WASI filesystem, network, clock</li>
+<li><code>env::*</code> - Environment variables</li>
+<li>Custom host functions returning non-deterministic values</li>
+</ul>
+<h3>Opcode Restrictions</h3>
+<p><strong>Forbidden in LC v1</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Category</th>
+<th>Opcodes</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Floats</strong></td>
+<td><code>f32.*</code>, <code>f64.*</code></td>
+<td>NaN handling varies by architecture</td>
+</tr>
+<tr>
+<td><strong>SIMD</strong></td>
+<td><code>v128.*</code>, <code>*.relaxed_*</code></td>
+<td>Hardware-specific optimizations</td>
+</tr>
+</tbody></table>
+<p><strong>Rationale</strong>: Integer-only LC massively reduces the fork surface. Floats can be allowed in v2 with proven NaN canonicalization.</p>
+<h3>Control Flow Limits</h3>
+<table>
+<thead>
+<tr>
+<th>Limit</th>
+<th>Value</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Max control depth</td>
+<td>100</td>
+<td>Prevents stack exhaustion attacks</td>
+</tr>
+<tr>
+<td>Max call depth</td>
+<td>100</td>
+<td>Prevents unbounded recursion</td>
+</tr>
+</tbody></table>
+<h3>Memory Limits</h3>
+<table>
+<thead>
+<tr>
+<th>Limit</th>
+<th>Value</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Max <code>memory.grow</code></td>
+<td>2048 pages (128 MiB)</td>
+<td>Protocol-governed limit</td>
+</tr>
+<tr>
+<td>Max <code>memory.copy</code></td>
+<td>1 MiB</td>
+<td>Prevents witness bloat</td>
+</tr>
+<tr>
+<td>Max <code>memory.fill</code></td>
+<td>1 MiB</td>
+<td>Prevents witness bloat</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Deterministic Entropy</h2>
+<h3>The Problem</h3>
+<p>WASM contracts may need randomness (e.g., shuffling, sampling). Host <code>/dev/urandom</code> is non-deterministic.</p>
+<h3>The Solution: Deterministic Seed Injection</h3>
+<pre><code class="language-rust">/// Derive deterministic seed from execution context
+/// 
+/// ICN-native anchors (not blockchain terminology):
+/// - scope_root: The Merkle root of the scope&#39;s ledger at task creation
+/// - decision_hash: The canonical hash of the decision/receipt that triggered this task
+pub fn derive_seed(scope_root: &amp;[u8; 32], decision_hash: &amp;[u8; 32]) -&gt; [u8; 32] {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b&quot;icn:entropy:v1&quot;);
+    hasher.update(scope_root);
+    hasher.update(decision_hash);
+    *hasher.finalize().as_bytes()
+}
+</code></pre>
+<p><strong>Where these values come from</strong>:</p>
+<ul>
+<li><code>scope_root</code>: Obtained from <code>Ledger::current_root()</code> at task creation time</li>
+<li><code>decision_hash</code>: Obtained from <code>GovernanceDecisionReceipt::canonical_hash()</code> (for governance LC) or <code>Task::decision_hash</code> field (for compute LC)</li>
+</ul>
+<p><strong>Policy</strong>: </p>
+<ul>
+<li>Host entropy is BANNED</li>
+<li>Contracts receive deterministic seed derived from context</li>
+<li>Seed is reproducible by any verifier</li>
+</ul>
+<hr>
+<h2>Memory Growth Policy</h2>
+<h3>The Problem</h3>
+<p>OOM (Out of Memory) errors dependent on host OS pressure cause consensus forks.</p>
+<h3>The Solution</h3>
+<ol>
+<li><strong>Deterministic Address Space</strong>: Nodes reserve full protocol-max (128 MiB) for LC instances</li>
+<li><strong>Protocol-Governed Failure</strong>: <code>memory.grow</code> success determined solely by protocol limit</li>
+<li><strong>Non-Compliance Handling</strong>: If host OS refuses allocation, host is faulty and must crash rather than fork</li>
+</ol>
+<h3>Implementation</h3>
+<pre><code class="language-rust">impl ResourceLimiter for LcContext {
+    fn memory_growing(&amp;mut self, current: usize, desired: usize, max: Option&lt;usize&gt;) -&gt; bool {
+        // Success determined by protocol limit, not host RAM
+        let protocol_limit = 128 * 1024 * 1024; // 128 MiB
+        (current + desired) &lt;= protocol_limit
+    }
+}
+</code></pre>
+<hr>
+<h2>Container Ordering Policy</h2>
+<h3>The Problem</h3>
+<p><code>HashMap</code>/<code>HashSet</code> use randomized seeding (SipHash), causing non-deterministic iteration order.</p>
+<h3>The Solution</h3>
+<p><strong>Policy</strong>: <code>HashMap</code> is PROHIBITED for state-impacting logic in LC paths.</p>
+<p><strong>Allowed Alternatives</strong>:</p>
+<ul>
+<li><code>BTreeMap</code> - Key-sorted, deterministic</li>
+<li><code>IndexMap</code> - Insertion-sorted, deterministic</li>
+<li><code>Vec</code> - Index-based, deterministic</li>
+</ul>
+<h3>CI Enforcement</h3>
+<pre><code class="language-bash"># Detect HashMap in LC-relevant crates
+rg &quot;HashMap&quot; icn/crates/icn-compute/src/deterministic_engine.rs
+# Should return 0 matches
+</code></pre>
+<hr>
+<h2>Fuel Metering</h2>
+<h3>Overview</h3>
+<p>Fuel replaces wall-clock timeouts for deterministic execution bounds.</p>
+<h3>Fuel Allocation</h3>
+<pre><code class="language-rust">// Convert task fuel_limit to Wasmtime fuel
+let wasmtime_fuel = task.fuel_limit.0;
+store.set_fuel(wasmtime_fuel)?;
+</code></pre>
+<h3>Fuel Consumption Tracking</h3>
+<pre><code class="language-rust">// After execution
+let fuel_used = initial_fuel - store.get_fuel()?;
+result.fuel_used = fuel_used;
+</code></pre>
+<h3>Fuel Exhaustion</h3>
+<p>If fuel runs out mid-execution:</p>
+<ul>
+<li>WASM traps with <code>FuelExhausted</code></li>
+<li>Execution result is <code>Err(ComputeError::FuelExhausted)</code></li>
+<li>No state changes applied</li>
+<li>Task marked as failed (not misbehavior)</li>
+</ul>
+<hr>
+<h2>Verification Protocol</h2>
+<h3>For Deterministic Replay</h3>
+<p>Any node can verify an LC execution:</p>
+<pre><code>1. Obtain canonical inputs (by inputs_hash)
+2. Obtain WASM module (by wasm_hash)
+3. Create deterministic engine with ICN-DC config
+4. Execute with same fuel_limit
+5. Compare output_hash with claimed output_hash
+6. If mismatch → Proof of Misbehavior
+</code></pre>
+<h3>Canonical Inputs</h3>
+<pre><code class="language-rust">pub struct CanonicalInputs {
+    pub wasm_hash: [u8; 32],
+    pub input_data: Vec&lt;u8&gt;,
+    pub fuel_limit: u64,
+    pub timestamp: u64,  // task.created_at
+    pub entropy_seed: [u8; 32],  // derived from context
+}
+
+impl CanonicalInputs {
+    pub fn content_hash(&amp;self) -&gt; [u8; 32] {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b&quot;icn:inputs:v1&quot;);
+        hasher.update(&amp;self.wasm_hash);
+        hasher.update(&amp;self.input_data);
+        hasher.update(&amp;self.fuel_limit.to_le_bytes());
+        hasher.update(&amp;self.timestamp.to_le_bytes());
+        hasher.update(&amp;self.entropy_seed);
+        *hasher.finalize().as_bytes()
+    }
+}
+</code></pre>
+<hr>
+<h2>Test Suite: Nondeterministic Nasties</h2>
+<h3>Overview</h3>
+<p>The &quot;Nasties&quot; test suite verifies ICN-DC normalizes hardware differences.</p>
+<h3>Test Cases</h3>
+<table>
+<thead>
+<tr>
+<th>Test</th>
+<th>Vulnerability</th>
+<th>Success Condition</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>nan_payload_miner</code></td>
+<td>NaN bit patterns</td>
+<td><code>i32.reinterpret_f32(0.0/0.0) == 0x7fc00000</code> on x86 and ARM</td>
+</tr>
+<tr>
+<td><code>simd_fma_diff</code></td>
+<td>FMA rounding</td>
+<td>Bit-exact vector results</td>
+</tr>
+<tr>
+<td><code>mem_grow_boundary</code></td>
+<td>OOM consensus</td>
+<td><code>memory.grow</code> fails at exactly page 2048</td>
+</tr>
+<tr>
+<td><code>hashmap_chaos</code></td>
+<td>Iteration order</td>
+<td>Output hash constant across 1000 runs</td>
+</tr>
+</tbody></table>
+<h3>Cross-Architecture CI</h3>
+<pre><code class="language-yaml"># .github/workflows/determinism.yml
+jobs:
+  determinism-x86:
+    runs-on: ubuntu-latest
+    # ... run nasties, upload hashes
+  
+  determinism-aarch64:
+    runs-on: [self-hosted, aarch64]
+    # ... run nasties, upload hashes
+  
+  compare:
+    needs: [determinism-x86, determinism-aarch64]
+    # diff hashes, fail if mismatch
+</code></pre>
+<hr>
+<h2>Error Handling</h2>
+<h3>Deterministic Errors</h3>
+<p>These errors are deterministic and should produce identical results:</p>
+<table>
+<thead>
+<tr>
+<th>Error</th>
+<th>Handling</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>FuelExhausted</code></td>
+<td>Trap, return error</td>
+</tr>
+<tr>
+<td><code>MemoryGrowFailed</code></td>
+<td>Trap, return error</td>
+</tr>
+<tr>
+<td><code>DivisionByZero</code></td>
+<td>Trap, return error</td>
+</tr>
+<tr>
+<td><code>SubsetViolation</code></td>
+<td>Reject at load time</td>
+</tr>
+</tbody></table>
+<h3>Non-Deterministic Errors</h3>
+<p>These errors must NOT occur in LC paths:</p>
+<table>
+<thead>
+<tr>
+<th>Error</th>
+<th>Prevention</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>HostOOM</code></td>
+<td>Reserve full address space upfront</td>
+</tr>
+<tr>
+<td><code>Timeout</code></td>
+<td>Use fuel, not wall-clock</td>
+</tr>
+<tr>
+<td><code>IOError</code></td>
+<td>No IO allowed in LC</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Security Considerations</h2>
+<h3>Attack Vectors Mitigated</h3>
+<ol>
+<li><strong>Subjectivity attacks</strong>: Exploiting hardware variance → Mitigated by ICN-DC config</li>
+<li><strong>Resource exhaustion</strong>: Infinite loops → Mitigated by fuel metering</li>
+<li><strong>Memory bombs</strong>: Excessive allocation → Mitigated by static limits</li>
+<li><strong>Witness bloat</strong>: Large memory access → Mitigated by copy/fill limits</li>
+</ol>
+<h3>Defense in Depth</h3>
+<pre><code>Layer 1: WASM subset validation (reject bad modules)
+Layer 2: Deterministic engine config (normalize execution)
+Layer 3: Fuel metering (bound execution)
+Layer 4: Verification capability (detect misbehavior)
+</code></pre>
+<hr>
+<h2>Implementation Checklist</h2>
+<ul>
+<li><input disabled="" type="checkbox"> Create <code>deterministic_engine.rs</code> with <code>create_deterministic_engine()</code></li>
+<li><input disabled="" type="checkbox"> Create <code>subset.rs</code> with <code>WasmSubsetValidator</code></li>
+<li><input disabled="" type="checkbox"> Modify <code>wasm_executor.rs</code> to use deterministic engine for LC</li>
+<li><input disabled="" type="checkbox"> Add CI guard for <code>Engine::default()</code> in LC paths</li>
+<li><input disabled="" type="checkbox"> Implement &quot;Nasties&quot; test suite</li>
+<li><input disabled="" type="checkbox"> Set up cross-architecture CI</li>
+<li><input disabled="" type="checkbox"> Document in <code>docs/spec/wasm-subset.md</code></li>
+</ul>
+<hr>
+<h2>References</h2>
+<ul>
+<li>Research Sprint #3 (Security &amp; Determinism Spec v1.1)</li>
+<li><code>docs/design/compute-classes.md</code> - LC/UC specification</li>
+<li><code>docs/design/scope-scheduling.md</code> - Scope and priority model</li>
+<li><code>docs/design/DETERMINISTIC_COMPUTE_SPRINT.md</code> - Implementation plan</li>
+<li>Wasmtime documentation: <a href="https://docs.wasmtime.dev/" target="_blank" rel="noopener">https://docs.wasmtime.dev/</a></li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

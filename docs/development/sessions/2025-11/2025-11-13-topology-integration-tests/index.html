@@ -1,0 +1,300 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>2025-11-13: Topology Integration Tests &amp; Bidirectional Handshake | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>development</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>sessions</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>2025 11</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>2025 11 13 topology integration tests</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/development/sessions/2025-11/2025-11-13-topology-integration-tests.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>2025-11-13: Topology Integration Tests &amp; Bidirectional Handshake</h1>
+<h2>Overview</h2>
+<p>Completed comprehensive topology integration test suite and fixed critical issues with the bidirectional handshake protocol. All 6 topology integration tests now pass consistently, validating topology-aware peer categorization, LRU eviction, and scope-aware peer sampling.</p>
+<h2>Context</h2>
+<p>This work builds on Phase 1E-1F (topology-aware networking integration) to provide thorough test coverage for:</p>
+<ul>
+<li>Peer categorization based on region/cluster/trust</li>
+<li>NeighborSets with LRU eviction</li>
+<li>Scope-aware peer sampling for gossip fanout</li>
+<li>Bidirectional handshake protocol for topology exchange</li>
+</ul>
+<h2>Changes Made</h2>
+<h3>1. Bidirectional Handshake Protocol (<code>icn-net/src/actor.rs</code>)</h3>
+<p><strong>Problem:</strong> Outbound connections created by <code>dial()</code> couldn&#39;t receive messages because no connection handler was spawned. This prevented peers from receiving handshake responses, leaving NeighborSets empty on the initiating peer.</p>
+<p><strong>Solution:</strong></p>
+<ul>
+<li>Spawn connection handler for outbound connections after successful dial</li>
+<li>Open new bidirectional stream for handshake response (can&#39;t reuse read stream)</li>
+<li>Always send handshake response (either full handshake or HandshakeAck)</li>
+</ul>
+<p><strong>Code Changes:</strong></p>
+<pre><code class="language-rust">// In NetworkMsg::Dial handler (lines 368-391)
+.map(|connection| {
+    // ... existing metrics code ...
+
+    // Spawn connection handler for outbound connection if handler is available
+    if let Some(handler) = self.incoming_handler.clone() {
+        tokio::spawn(async move {
+            if let Err(e) = Self::handle_connection(
+                connection.clone(),
+                handler,
+                rate_limiter,
+                neighbor_sets,
+                topology_config,
+                trust_graph,
+                session_manager,
+                own_did,
+            ).await {
+                warn!(&quot;Outbound connection handler error: {}&quot;, e);
+            }
+        });
+    }
+</code></pre>
+<pre><code class="language-rust">// In handshake message handler (lines 725-763)
+// Send our own handshake back (bidirectional exchange)
+// Open a new stream since the original stream is finished
+let connection_clone = connection.clone();
+tokio::spawn(async move {
+    match connection_clone.open_bi().await {
+        Ok((mut new_send, _new_recv)) =&gt; {
+            let response_msg = if let Some(ref topo_cfg) = topo_cfg_clone {
+                // Send full handshake if topology is enabled
+                NetworkMessage::handshake(...)
+            } else {
+                // Send ack if topology is disabled
+                NetworkMessage::handshake_ack(...)
+            };
+            write_message(&amp;mut new_send, &amp;response_msg).await?;
+        }
+    }
+});
+</code></pre>
+<h3>2. Test Infrastructure Improvements (<code>icn-core/tests/topology_integration.rs</code>)</h3>
+<p><strong>Problem:</strong> The <code>test_neighbor_set_lru_eviction</code> test was creating a <code>TopologyConfig</code> with <code>max_local_cluster: 2</code> but never using it. Node A was spawned with default limits (10), so connecting to 3 peers didn&#39;t trigger LRU eviction.</p>
+<p><strong>Solution:</strong></p>
+<ul>
+<li>Added <code>TestNode::spawn_with_limits()</code> method accepting <code>Option&lt;NeighborLimitsConfig&gt;</code></li>
+<li>Made original <code>spawn()</code> method call <code>spawn_with_limits(None)</code> for backward compatibility</li>
+<li>Updated <code>test_neighbor_set_lru_eviction</code> to use custom limits</li>
+</ul>
+<p><strong>Code Changes:</strong></p>
+<pre><code class="language-rust">impl TestNode {
+    async fn spawn(
+        port: u16,
+        region: String,
+        cluster_id: String,
+    ) -&gt; Result&lt;Self&gt; {
+        Self::spawn_with_limits(port, region, cluster_id, None).await
+    }
+
+    async fn spawn_with_limits(
+        port: u16,
+        region: String,
+        cluster_id: String,
+        custom_limits: Option&lt;NeighborLimitsConfig&gt;,
+    ) -&gt; Result&lt;Self&gt; {
+        // Use custom_limits if provided, otherwise defaults
+        let neighbor_limits = custom_limits.unwrap_or(NeighborLimitsConfig {
+            max_local_cluster: 10,
+            max_regional: 10,
+            max_backbone: 5,
+            max_trusted: 20,
+        });
+        // ... rest of spawn logic
+    }
+}
+</code></pre>
+<h3>3. Comprehensive Test Suite</h3>
+<p>Created 6 integration tests covering all topology scenarios:</p>
+<ol>
+<li><strong>test_local_cluster_categorization</strong> - Same region/cluster → LocalCluster</li>
+<li><strong>test_regional_categorization</strong> - Same region, different cluster → Regional</li>
+<li><strong>test_backbone_categorization</strong> - Different regions → Backbone</li>
+<li><strong>test_multi_region_topology</strong> - Mixed 4-node topology with all categories</li>
+<li><strong>test_scope_aware_peer_sampling</strong> - Scope-based peer selection for fanout</li>
+<li><strong>test_neighbor_set_lru_eviction</strong> - LRU eviction with strict limits</li>
+</ol>
+<h2>Test Results</h2>
+<p>All 6 topology integration tests pass consistently:</p>
+<pre><code>test test_backbone_categorization ... ok
+test test_local_cluster_categorization ... ok
+test test_regional_categorization ... ok
+test test_neighbor_set_lru_eviction ... ok
+test test_multi_region_topology ... ok
+test test_scope_aware_peer_sampling ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+</code></pre>
+<p>Full workspace: <strong>270+ tests passing</strong></p>
+<h2>Debugging Journey</h2>
+<h3>Issue 1: Handshake Response Write Failure</h3>
+<ul>
+<li><strong>Error:</strong> &quot;Failed to write message length&quot; when sending handshake response</li>
+<li><strong>Cause:</strong> Attempting to write to a stream already used for reading</li>
+<li><strong>Fix:</strong> Open new bidirectional stream using <code>connection.open_bi()</code> for response</li>
+</ul>
+<h3>Issue 2: Node A Not Receiving Handshake Response</h3>
+<ul>
+<li><strong>Error:</strong> Node A sends handshake, Node B receives and adds Node A to NeighborSets, but Node A&#39;s neighbor count stays at 0</li>
+<li><strong>Cause:</strong> Outbound connections from <code>dial()</code> didn&#39;t spawn connection handlers</li>
+<li><strong>Fix:</strong> Spawn connection handler for outbound connections in <code>NetworkMsg::Dial</code> handler</li>
+</ul>
+<h3>Issue 3: Protocol Compatibility with Mixed Topology Settings</h3>
+<ul>
+<li><strong>User Feedback:</strong> Handshake response must always acknowledge, regardless of topology config</li>
+<li><strong>Cause:</strong> Response was conditional on <code>topology_config.is_some()</code></li>
+<li><strong>Fix:</strong> Always send response - either full handshake or HandshakeAck</li>
+</ul>
+<h3>Issue 4: LRU Eviction Test Not Enforcing Limits</h3>
+<ul>
+<li><strong>Error:</strong> Test showed 3 neighbors when limit was 2</li>
+<li><strong>Cause:</strong> <code>TopologyConfig</code> with strict limits was created but never applied to node</li>
+<li><strong>Fix:</strong> Added <code>spawn_with_limits()</code> and updated test to pass custom limits</li>
+</ul>
+<h3>Issue 5: Test Failure in Parallel Execution</h3>
+<ul>
+<li><strong>Symptom:</strong> Test passed alone but failed with &quot;aborted by peer&quot; when run with others</li>
+<li><strong>Resolution:</strong> After fixing custom limits, test passes consistently in parallel</li>
+</ul>
+<h2>Technical Insights</h2>
+<h3>Rate Limiting During Handshake</h3>
+<p>Bidirectional handshake (both peers send handshakes + responses) triggers rate limiting warnings:</p>
+<pre><code>WARN icn_net::actor: Rate limited message from did:icn:z24DH... (exceeded limit)
+</code></pre>
+<p>This is <strong>expected and correct</strong> - the rate limiter is protecting against handshake floods. With trust score 0.0, peers default to &quot;isolated&quot; tier (10 msg/sec, burst 2), which can be exceeded during rapid bidirectional handshake exchange.</p>
+<h3>LRU Eviction Behavior</h3>
+<p>When connecting to 3 peers with <code>max_local_cluster: 2</code>:</p>
+<ul>
+<li>First connection: Added to LocalCluster (count: 1)</li>
+<li>Second connection: Added to LocalCluster (count: 2)</li>
+<li>Third connection: Added to LocalCluster, oldest evicted (count: 2)</li>
+</ul>
+<p>Log output confirms proper eviction:</p>
+<pre><code>INFO Node A neighbor counts after connecting to 3 peers:
+  NeighborCounts { local_cluster: 2, regional: 0, backbone: 0, trusted: 0 }
+</code></pre>
+<h3>Handshake Flow</h3>
+<pre><code>1. Node A dials Node B
+2. Node A sends handshake to Node B (on new outbound connection)
+3. Node A spawns connection handler to receive messages on this connection
+4. Node B receives handshake, adds Node A to NeighborSets
+5. Node B opens new bidirectional stream
+6. Node B sends handshake response to Node A (full handshake or ack)
+7. Node A&#39;s connection handler receives handshake response
+8. Node A adds Node B to NeighborSets
+9. Both peers now have each other in their NeighborSets ✅
+</code></pre>
+<h2>Integration Points</h2>
+<h3>NeighborSets API (<code>icn-net/src/topology.rs</code>)</h3>
+<p>Provides count methods for test inspection:</p>
+<ul>
+<li><code>local_cluster_count()</code> - Count of LocalCluster neighbors</li>
+<li><code>regional_count()</code> - Count of Regional neighbors</li>
+<li><code>backbone_count()</code> - Count of Backbone neighbors</li>
+<li><code>trusted_count()</code> - Count of explicitly trusted neighbors</li>
+</ul>
+<h3>Peer Categorization Logic</h3>
+<p>Uses region/cluster/trust for categorization:</p>
+<ul>
+<li><strong>LocalCluster:</strong> Same region + same cluster + trust ≥ 0.1</li>
+<li><strong>Regional:</strong> Same region + different cluster + trust ≥ 0.1</li>
+<li><strong>Backbone:</strong> Different region + trust ≥ 0.4</li>
+<li><strong>Trusted:</strong> Explicitly trusted regardless of topology</li>
+</ul>
+<h3>Scope-Aware Peer Sampling</h3>
+<p>Gossip actor can request peers by scope:</p>
+<ul>
+<li><code>Scope::LocalCluster</code> - Samples from LocalCluster neighbors</li>
+<li><code>Scope::Regional</code> - Samples from LocalCluster + Regional neighbors</li>
+<li><code>Scope::Global</code> - Samples from all neighbors</li>
+</ul>
+<h2>Next Steps</h2>
+<p>The topology-aware networking foundation is now complete with comprehensive test coverage. Remaining federation work:</p>
+<ol>
+<li><strong>Trust-gated gossip topics</strong> - Integrate topology with access control</li>
+<li><strong>Multi-region gossip fanout</strong> - Use scope-aware sampling in anti-entropy</li>
+<li><strong>Federation handshake</strong> - Negotiate capabilities and protocol versions</li>
+<li><strong>Cross-region optimizations</strong> - Adaptive fanout based on RTT and reliability</li>
+</ol>
+<h2>References</h2>
+<ul>
+<li>Commit: <code>3330942</code> - Fix topology integration tests and handshake protocol</li>
+<li>Related: Phase 1E-1F topology configuration (commits <code>1f966a7</code>, <code>67e268b</code>)</li>
+<li>Tests: <code>icn/crates/icn-core/tests/topology_integration.rs</code></li>
+<li>Implementation: <code>icn/crates/icn-net/src/actor.rs</code></li>
+<li>API: <code>icn/crates/icn-net/src/topology.rs</code></li>
+</ul>
+<h2>Lessons Learned</h2>
+<ol>
+<li><p><strong>Outbound connections need handlers too</strong> - Easy to forget that <code>dial()</code> creates connections that need to receive messages, not just send them</p>
+</li>
+<li><p><strong>Stream lifecycle matters</strong> - Can&#39;t reuse a stream for both reading and writing; must open new stream for bidirectional exchange</p>
+</li>
+<li><p><strong>Test infrastructure pays off</strong> - Investing in <code>spawn_with_limits()</code> makes testing edge cases much easier</p>
+</li>
+<li><p><strong>Rate limiting needs tuning for handshakes</strong> - May need special handling or trust bootstrapping to avoid limiting legitimate handshakes</p>
+</li>
+<li><p><strong>Parallel test execution reveals issues</strong> - Resource contention and timing issues only appear when tests run together</p>
+</li>
+<li><p><strong>Always acknowledge protocol messages</strong> - Handshake protocol must work regardless of feature flags or config, otherwise it breaks mixed deployments</p>
+</li>
+</ol>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

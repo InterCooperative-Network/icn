@@ -1,0 +1,776 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Commons Evolution Implementation Summary | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>archive</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>2025</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>COMMONS EVOLUTION SUMMARY</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/archive/2025/COMMONS_EVOLUTION_SUMMARY.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><p>⚠️ <strong>ARCHIVED</strong> - This summary document from 2025 has been archived.</p>
+<p>For current information, see:</p>
+<ul>
+<li><a href="/docs/STATE">STATE.md</a> - Current project state</li>
+<li><a href="/docs/ARCHITECTURE">ARCHITECTURE.md</a> - Current architecture</li>
+</ul>
+<hr>
+<h1>Commons Evolution Implementation Summary</h1>
+<p><strong>Document ID</strong>: ICN-DEV-COMMONS-SUMMARY
+<strong>Version</strong>: 0.8.1
+<strong>Date</strong>: 2025-12-15
+<strong>Author</strong>: ICN Development Team</p>
+<hr>
+<h2>Overview</h2>
+<p>The Commons Evolution transforms ICN from a &quot;cooperative coordination tool&quot; into a &quot;global commons infrastructure.&quot; This document summarizes the implementation completed over versions 0.3.0 through 0.8.x.</p>
+<p><strong>Core Insight</strong>: Commons Holder is the root identity; membership is scoped capability grants under that identity.</p>
+<hr>
+<h2>Implementation Timeline</h2>
+<table>
+<thead>
+<tr>
+<th>Version</th>
+<th>Milestone</th>
+<th>Commits</th>
+<th>Lines Added</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>v0.3.0</td>
+<td>Commons Foundation</td>
+<td>7</td>
+<td>~2,500</td>
+</tr>
+<tr>
+<td>v0.4.0</td>
+<td>Stewardship</td>
+<td>1</td>
+<td>~1,200</td>
+</tr>
+<tr>
+<td>v0.5.0</td>
+<td>Membership &amp; Rights</td>
+<td>1</td>
+<td>~2,400</td>
+</tr>
+<tr>
+<td>v0.6.0</td>
+<td>Constitutional Governance</td>
+<td>1</td>
+<td>~3,800</td>
+</tr>
+<tr>
+<td>v0.7.x</td>
+<td>Integration &amp; Testing</td>
+<td>1</td>
+<td>~500</td>
+</tr>
+<tr>
+<td>v0.8.x</td>
+<td>Production Hardening &amp; UX</td>
+<td>7</td>
+<td>~1,900</td>
+</tr>
+<tr>
+<td><strong>Total</strong></td>
+<td></td>
+<td><strong>18</strong></td>
+<td><strong>~12,300</strong></td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Layer Architecture</h2>
+<h3>Layer 0: PersonhoodAnchor (v0.3.0)</h3>
+<p><strong>Purpose</strong>: Cryptographic proof that a unique human exists behind the keys.</p>
+<p><strong>Files</strong>:</p>
+<ul>
+<li><code>icn-identity/src/personhood.rs</code> - Core types</li>
+<li><code>icn-identity/src/personhood_store.rs</code> - Storage layer</li>
+</ul>
+<p><strong>Key Types</strong>:</p>
+<pre><code class="language-rust">PersonhoodAnchor {
+    id: [u8; 32],              // Unique anchor ID
+    underlying_anchor: Anchor,  // SDIS anchor with VUI
+    status: AnchorStatus,       // Active/Suspended/Revoked
+    attestations: Vec&lt;POPAttestation&gt;,
+    current_key: PublicKey,
+    key_history: Vec&lt;KeyRotationRecord&gt;,
+}
+
+POPAttestation {
+    method: POPMethod,          // InPerson/Sponsored/Biometric/Ceremony/VideoCall
+    level: POPLevel,            // Weak/Strong/Verified
+    attester_did: Did,
+    timestamp: u64,
+}
+</code></pre>
+<p><strong>Capabilities</strong>:</p>
+<ul>
+<li>Create anchor from enrollment</li>
+<li>Add POP attestations (multiple methods strengthen identity)</li>
+<li>Track key rotations with full audit trail</li>
+<li>Status lifecycle (Active → Suspended → Revoked)</li>
+<li>Query by DID or public key</li>
+</ul>
+<h3>Layer 1: CommonsHolderRecord (v0.3.0)</h3>
+<p><strong>Purpose</strong>: A human participant&#39;s record in the global commons with baseline rights.</p>
+<p><strong>Files</strong>:</p>
+<ul>
+<li><code>icn-identity/src/commons.rs</code> - Core types</li>
+<li><code>icn-identity/src/commons_store.rs</code> - Storage layer</li>
+</ul>
+<p><strong>Key Types</strong>:</p>
+<pre><code class="language-rust">CommonsHolderRecord {
+    id: [u8; 32],
+    anchor_id: [u8; 32],        // Links to PersonhoodAnchor
+    holder_did: Did,
+    status: HolderStatus,
+    personhood_level: POPLevel,
+    affiliations: Vec&lt;Affiliation&gt;,
+    baseline_rights: CommonsRights,
+}
+
+CommonsRights {
+    vote_in_commons: bool,      // Network-level governance
+    petition: bool,             // Constitutional changes
+    minimal_fuel_floor: bool,   // Civic participation
+    due_process: bool,          // Before suspension/revocation
+    exit_freely: bool,          // Leave any jurisdiction
+    audit_access: bool,         // Public records
+}
+
+Affiliation {
+    jurisdiction_id: JurisdictionId,
+    membership_status: MembershipStatus,  // Candidate→Provisional→Member→Suspended→Exited→Banned
+    roles: Vec&lt;String&gt;,
+    capabilities: Vec&lt;MembershipCapability&gt;,
+    joined_at: u64,
+}
+</code></pre>
+<p><strong>Key Principle</strong>: &quot;A cooperative can revoke your membership. A cooperative cannot revoke your personhood.&quot;</p>
+<h3>Layer 2: Charter (v0.3.0)</h3>
+<p><strong>Purpose</strong>: Founding document that creates a jurisdiction (coop, community, federation).</p>
+<p><strong>Files</strong>:</p>
+<ul>
+<li><code>icn-governance/src/charter.rs</code> - Core types</li>
+<li><code>icn-governance/src/charter_store.rs</code> - Storage layer</li>
+</ul>
+<p><strong>Key Types</strong>:</p>
+<pre><code class="language-rust">Charter {
+    charter_id: CharterId,
+    org_type: OrgType,          // Cooperative/Community/Federation
+    domain_id: String,          // e.g., &quot;coop:food-portland&quot;
+    name: String,
+    founders: Vec&lt;FounderSignature&gt;,
+    governance: GovernanceConfig,
+    membership_policy: MembershipPolicy,
+    economic_policy: Option&lt;EconomicPolicy&gt;,
+    dispute_policy: DisputePolicy,
+    status: CharterStatus,      // Draft→Active→Suspended→Dissolved
+    amendments: Vec&lt;AmendmentRef&gt;,
+}
+</code></pre>
+<hr>
+<h2>Stewardship Layer (v0.4.0)</h2>
+<p><strong>Purpose</strong>: Trusted operators who verify personhood and maintain network integrity.</p>
+<p><strong>Files</strong>:</p>
+<ul>
+<li><code>icn-governance/src/steward.rs</code> - Core types</li>
+<li><code>icn-governance/src/steward_store.rs</code> - Storage layer</li>
+</ul>
+<p><strong>Key Types</strong>:</p>
+<pre><code class="language-rust">StewardRecord {
+    id: StewardId,
+    holder_did: Did,
+    anchor_id: [u8; 32],
+    status: StewardStatus,      // Candidate→Active→Suspended→Retired→Revoked
+    jurisdiction: Option&lt;JurisdictionId&gt;,
+    term_start: u64,
+    term_end: Option&lt;u64&gt;,
+    bond_amount: u64,
+    attestations_issued: u64,
+    disputes_against: u64,
+    disputes_won: u64,
+}
+</code></pre>
+<p><strong>Capabilities</strong>:</p>
+<ul>
+<li>Register as steward (requires Strong POP level)</li>
+<li>Issue POP attestations</li>
+<li>Track reputation (attestations, disputes, wins)</li>
+<li>Manage term and bond</li>
+<li>Suspend/reinstate/retire/revoke lifecycle</li>
+</ul>
+<p><strong>Gateway API</strong>: 13 endpoints at <code>/v1/steward/*</code></p>
+<hr>
+<h2>Membership &amp; Rights (v0.5.0)</h2>
+<p><strong>Purpose</strong>: Full membership lifecycle with capabilities, roles, and revocation with due process.</p>
+<p><strong>Files</strong>:</p>
+<ul>
+<li><code>icn-identity/src/revocation.rs</code> - Revocation types</li>
+<li><code>icn-identity/src/revocation_store.rs</code> - Revocation registry</li>
+<li><code>icn-gateway/src/api/membership/mod.rs</code> - API endpoints</li>
+</ul>
+<p><strong>Key Types</strong>:</p>
+<pre><code class="language-rust">RevocationRecord {
+    revocation_id: [u8; 32],
+    target_type: RevocationType,  // Anchor/Holder/Membership/Credential
+    target_id: String,
+    scope: RevocationScope,       // Global/Federation/Jurisdiction
+    authority: Did,
+    reason: CommonsRevocationReason,
+    evidence_refs: Vec&lt;[u8; 32]&gt;,
+    appeal_deadline: u64,
+    appeal_status: AppealStatus,
+    effective_at: u64,
+}
+
+MembershipCapability {
+    Vote, Propose, Transact, HoldOffice, AccessPrivate, Sponsor
+}
+</code></pre>
+<p><strong>Membership Lifecycle</strong>:</p>
+<pre><code>Apply → Candidate → Approved → Provisional → Promoted → Member
+                                    ↓
+                              Suspend ↔ Reinstate
+                                    ↓
+                         Exit / Ban (with appeal window)
+</code></pre>
+<p><strong>Gateway API</strong>: 15 endpoints at <code>/v1/membership/*</code></p>
+<hr>
+<h2>Constitutional Governance (v0.6.0)</h2>
+<p><strong>Purpose</strong>: Amendment process with multi-level ratification and appeal mechanisms.</p>
+<p><strong>Files</strong>:</p>
+<ul>
+<li><code>icn-governance/src/amendment.rs</code> - Amendment types</li>
+<li><code>icn-governance/src/appeal.rs</code> - Appeal types</li>
+<li><code>icn-gateway/src/api/constitutional/mod.rs</code> - API endpoints</li>
+</ul>
+<h3>Amendment System</h3>
+<pre><code class="language-rust">Amendment {
+    id: AmendmentId,
+    amendment_type: AmendmentType,  // Charter/Constitutional/Policy/Economic/Governance
+    scope: AmendmentScope,          // Jurisdiction/Federation/Network
+    status: AmendmentStatus,
+    title: String,
+    description: String,
+    changes: Vec&lt;AmendmentChange&gt;,
+    proposer: Did,
+    sponsors: Vec&lt;Did&gt;,
+    requirements: RatificationRequirements,
+    ratifications: Vec&lt;Ratification&gt;,
+}
+</code></pre>
+<p><strong>Amendment Lifecycle</strong>:</p>
+<pre><code>Draft → Submitted → UnderReview → Voting → Ratified/Rejected/Withdrawn/Expired
+</code></pre>
+<p><strong>Ratification Requirements by Scope</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Scope</th>
+<th>Quorum</th>
+<th>Approval</th>
+<th>Review</th>
+<th>Voting</th>
+<th>Min Jurisdictions</th>
+<th>Min Federations</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Jurisdiction</td>
+<td>50%</td>
+<td>67%</td>
+<td>7 days</td>
+<td>14 days</td>
+<td>-</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Federation</td>
+<td>60%</td>
+<td>67%</td>
+<td>14 days</td>
+<td>21 days</td>
+<td>3</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Network</td>
+<td>75%</td>
+<td>80%</td>
+<td>21 days</td>
+<td>30 days</td>
+<td>10</td>
+<td>3</td>
+</tr>
+<tr>
+<td>Critical</td>
+<td>80%</td>
+<td>90%</td>
+<td>30 days</td>
+<td>45 days</td>
+<td>20</td>
+<td>5</td>
+</tr>
+</tbody></table>
+<h3>Appeal System</h3>
+<pre><code class="language-rust">Appeal {
+    id: AppealId,
+    appeal_type: AppealType,        // Revocation/Suspension/GovernanceDecision/etc.
+    scope: AppealScope,
+    status: AppealStatus,
+    appellant: Did,
+    respondent: Option&lt;Did&gt;,
+    grounds: Vec&lt;AppealGrounds&gt;,
+    statement: String,
+    requested_remedy: AppealRemedy,
+    evidence: Vec&lt;AppealEvidence&gt;,
+    responses: Vec&lt;AppealResponse&gt;,
+}
+</code></pre>
+<p><strong>Appeal Lifecycle</strong>:</p>
+<pre><code>Filed → UnderReview → Hearing → Resolved/Dismissed/Withdrawn
+</code></pre>
+<p><strong>Appeal Outcomes</strong>:</p>
+<ul>
+<li><strong>Upheld</strong>: Original decision overturned + remedy</li>
+<li><strong>Denied</strong>: Original decision stands</li>
+<li><strong>PartiallyUpheld</strong>: Modified remedy</li>
+<li><strong>Remanded</strong>: Sent back for reconsideration</li>
+</ul>
+<p><strong>Gateway API</strong>: 15 endpoints at <code>/v1/constitutional/*</code></p>
+<hr>
+<h2>Gateway API Summary</h2>
+<h3>Commons Endpoints (<code>/v1/commons/*</code>)</h3>
+<ul>
+<li>Anchor CRUD and attestations</li>
+<li>Holder CRUD and affiliations</li>
+<li>Status management</li>
+</ul>
+<h3>Charter Endpoints (<code>/v1/charter/*</code>)</h3>
+<ul>
+<li>Charter CRUD</li>
+<li>Founder signatures</li>
+<li>Ratification and status changes</li>
+</ul>
+<h3>Steward Endpoints (<code>/v1/steward/*</code>)</h3>
+<ul>
+<li>Registration and lifecycle</li>
+<li>Reputation tracking</li>
+<li>Term and bond management</li>
+</ul>
+<h3>Membership Endpoints (<code>/v1/membership/*</code>)</h3>
+<ul>
+<li>Application and approval workflow</li>
+<li>Capability and role management</li>
+<li>Ban/revoke with appeals</li>
+</ul>
+<h3>Constitutional Endpoints (<code>/v1/constitutional/*</code>)</h3>
+<ul>
+<li>Amendment CRUD and ratification</li>
+<li>Appeal CRUD and resolution</li>
+<li>Evidence and response management</li>
+</ul>
+<hr>
+<h2>Test Coverage</h2>
+<table>
+<thead>
+<tr>
+<th>Crate</th>
+<th>Module</th>
+<th>Tests</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>icn-identity</td>
+<td>personhood</td>
+<td>19</td>
+</tr>
+<tr>
+<td>icn-identity</td>
+<td>personhood_store</td>
+<td>15</td>
+</tr>
+<tr>
+<td>icn-identity</td>
+<td>commons</td>
+<td>24</td>
+</tr>
+<tr>
+<td>icn-identity</td>
+<td>commons_store</td>
+<td>14</td>
+</tr>
+<tr>
+<td>icn-identity</td>
+<td>revocation</td>
+<td>10</td>
+</tr>
+<tr>
+<td>icn-identity</td>
+<td>revocation_store</td>
+<td>10</td>
+</tr>
+<tr>
+<td>icn-governance</td>
+<td>charter</td>
+<td>15</td>
+</tr>
+<tr>
+<td>icn-governance</td>
+<td>charter_store</td>
+<td>10</td>
+</tr>
+<tr>
+<td>icn-governance</td>
+<td>steward</td>
+<td>12</td>
+</tr>
+<tr>
+<td>icn-governance</td>
+<td>steward_store</td>
+<td>12</td>
+</tr>
+<tr>
+<td>icn-governance</td>
+<td>amendment</td>
+<td>17</td>
+</tr>
+<tr>
+<td>icn-governance</td>
+<td>appeal</td>
+<td>18</td>
+</tr>
+<tr>
+<td><strong>Total</strong></td>
+<td></td>
+<td><strong>~176</strong></td>
+</tr>
+</tbody></table>
+<hr>
+<h2>CommonsManager</h2>
+<p>Central coordinator in <code>icn-gateway/src/commons_mgr.rs</code> providing:</p>
+<p><strong>Storage</strong> (in-memory with indexes):</p>
+<ul>
+<li>PersonhoodAnchors (by ID, by DID, by key)</li>
+<li>CommonsHolderRecords (by ID, by DID, by anchor)</li>
+<li>Charters (by ID, by domain)</li>
+<li>Stewards (by ID, by DID)</li>
+<li>RevocationRegistry</li>
+<li>Amendments (by ID)</li>
+<li>Appeals (by ID)</li>
+</ul>
+<p><strong>Operations</strong>:</p>
+<ul>
+<li>Anchor creation from enrollment</li>
+<li>Holder creation from anchor</li>
+<li>POP attestation workflow</li>
+<li>Membership lifecycle</li>
+<li>Capability/role management</li>
+<li>Revocation with appeals</li>
+<li>Amendment lifecycle</li>
+<li>Constitutional appeals</li>
+</ul>
+<hr>
+<h2>Integration Points</h2>
+<h3>SDIS Integration</h3>
+<ul>
+<li>Enrollment completion creates PersonhoodAnchor + CommonsHolderRecord</li>
+<li>Steward validation for POP attestations</li>
+<li>Device proof verification</li>
+</ul>
+<h3>Governance Integration</h3>
+<ul>
+<li>Charter creates governance domain</li>
+<li>Amendments link to governance proposals</li>
+<li>Appeals can challenge governance decisions</li>
+</ul>
+<h3>Ledger Integration (Future)</h3>
+<ul>
+<li>Membership status affects transaction permissions</li>
+<li>Capability <code>Transact</code> required for ledger operations</li>
+<li>Revocation can freeze accounts</li>
+</ul>
+<hr>
+<h2>What&#39;s NOT Included (v1.0.0 Scope)</h2>
+<ol>
+<li><strong>Persistent Storage</strong>: Currently in-memory; needs Sled backend</li>
+<li><strong>Full Steward Network</strong>: Multi-steward ceremonies, steward discovery</li>
+<li><strong>Multiple POP Pathways</strong>: Only Sponsored implemented; need InPerson, Biometric, Ceremony</li>
+<li><strong>Economic Layer</strong>: Fuel system, contribution credits, demurrage</li>
+<li><strong>CLI Commands</strong>: Constitutional commands not yet wired</li>
+<li><strong>Integration Tests</strong>: End-to-end flows not yet tested</li>
+<li><strong>Production Hardening</strong>: Rate limiting, caching, monitoring for Commons endpoints</li>
+</ol>
+<hr>
+<h2>Next Steps: Prioritized Roadmap</h2>
+<h3>Immediate (v0.7.x) - Integration &amp; Testing ✅ COMPLETE</h3>
+<p><strong>1. CLI Commands for Constitutional Governance</strong> ✅</p>
+<ul>
+<li>✅ <code>icnctl amendment propose/list/vote/ratify</code> commands wired</li>
+<li>✅ <code>icnctl appeal file/list/respond/resolve</code> commands wired</li>
+<li>✅ Gateway authentication fixed (<code>get_gateway_token</code> uses correct endpoints)</li>
+<li>Files: <code>icnctl/src/main.rs</code></li>
+</ul>
+<p><strong>2. Integration Tests</strong> ✅</p>
+<ul>
+<li>✅ End-to-end enrollment → anchor → holder flow</li>
+<li>✅ Charter creation → activation flow</li>
+<li>✅ Membership lifecycle (Candidate → Provisional → Member → Suspended → Exited)</li>
+<li>✅ E2E coop formation test</li>
+<li>Files: <code>icn-gateway/tests/governance_flows_integration.rs</code></li>
+</ul>
+<p><strong>3. SDIS-Commons Bridge Completion</strong> ✅</p>
+<ul>
+<li>✅ <code>complete_enrollment</code> creates PersonhoodAnchor + CommonsHolderRecord</li>
+<li>✅ Auto-affiliation with enrollment coop_id</li>
+<li>✅ Auto-approve to Provisional if steward vouched</li>
+<li>✅ Response includes <code>coop_id</code> and <code>membership_status</code></li>
+<li>Files: <code>icn-gateway/src/api/sdis/simple_enrollment.rs</code></li>
+</ul>
+<h3>Near-term (v0.8.x) - Production Readiness ✅ COMPLETE</h3>
+<p><strong>4. Persistent Storage Migration</strong> ✅</p>
+<ul>
+<li>✅ <code>CommonsStoreBackend</code> trait with pluggable backends</li>
+<li>✅ <code>InMemoryCommonsStore</code> for development/testing</li>
+<li>✅ <code>SledCommonsStore</code> for production (feature: <code>sled-storage</code>)</li>
+<li>✅ LRU caching for all entity types</li>
+<li>✅ Proper indexes (by_did, by_anchor, by_domain)</li>
+<li>Files: <code>icn-gateway/src/commons_store.rs</code>, <code>icn-gateway/src/commons_mgr.rs</code></li>
+</ul>
+<p><strong>5. Production Hardening</strong> ✅</p>
+<ul>
+<li>✅ <strong>Per-category rate limiting</strong>: Different limits for Read/Write/Governance/Compute endpoints<ul>
+<li>Read: 200 burst, 20 req/sec (high limits for queries)</li>
+<li>Write: 60 burst, 6 req/sec (moderate for mutations)</li>
+<li>Governance: 30 burst, 3 req/sec (lower for voting/proposals)</li>
+<li>Compute: 10 burst, 1 req/sec (strictest for resource-intensive operations)</li>
+</ul>
+</li>
+<li>✅ <strong>Audit logging for governance actions</strong>: Structured tracing with target <code>commons_audit</code><ul>
+<li>Covers: anchor/holder creation, membership lifecycle, charter operations, steward operations, amendments, appeals</li>
+<li>Uses <code>warn!</code> for adverse actions (suspensions, revocations), <code>info!</code> for normal operations</li>
+</ul>
+</li>
+<li>✅ <strong>Metrics for Commons operations</strong>: 50+ metrics in <code>icn-obs/src/metrics.rs</code><ul>
+<li>Counters: anchors created, holders created, memberships joined/exited/approved/promoted/suspended/banned</li>
+<li>Counters: charters created/activated/suspended/dissolved, amendments, appeals</li>
+<li>Histograms: operation durations, store operation latency</li>
+</ul>
+</li>
+<li>Files: <code>icn-gateway/src/rate_limit.rs</code>, <code>icn-gateway/src/commons_mgr.rs</code>, <code>icn-obs/src/metrics.rs</code></li>
+</ul>
+<p><strong>6. Multiple POP Pathways</strong></p>
+<ul>
+<li>InPerson verification flow (steward + applicant co-located)</li>
+<li>VideoCall verification flow (WebRTC or similar)</li>
+<li>Ceremony flow (group verification events)</li>
+<li>Files: <code>icn-identity/src/personhood.rs</code>, <code>icn-gateway/src/api/sdis/</code></li>
+</ul>
+<h3>Medium-term (v0.9.x) - Ecosystem</h3>
+<p><strong>7. Full Steward Network</strong></p>
+<ul>
+<li>Steward discovery protocol</li>
+<li>Multi-steward ceremonies for higher POP levels</li>
+<li>Steward reputation and dispute resolution</li>
+<li>Geographic distribution requirements</li>
+<li>Files: <code>icn-gossip/src/topics/steward.rs</code>, <code>icn-governance/src/steward.rs</code></li>
+</ul>
+<p><strong>8. Economic Layer Integration</strong></p>
+<ul>
+<li>Link CommonsRights to fuel allocation</li>
+<li>Capability-gated transaction permissions</li>
+<li>Membership status affects ledger access</li>
+<li>Files: <code>icn-ledger/src/</code>, <code>icn-gateway/src/api/ledger/</code></li>
+</ul>
+<p><strong>9. Federation Support</strong></p>
+<ul>
+<li>Federation charter creation</li>
+<li>Cross-jurisdiction membership</li>
+<li>Federation-level amendments</li>
+<li>Files: <code>icn-governance/src/federation.rs</code></li>
+</ul>
+<h3>Long-term (v1.0.0) - Full Commons</h3>
+<p><strong>10. Network-level Governance</strong></p>
+<ul>
+<li>Network amendments requiring 80% approval</li>
+<li>Global steward council</li>
+<li>Protocol upgrade voting</li>
+<li>Economic parameter changes</li>
+</ul>
+<p><strong>11. Advanced Appeal Mechanisms</strong></p>
+<ul>
+<li>Arbitration panels</li>
+<li>Precedent system</li>
+<li>Cross-jurisdiction appeals</li>
+<li>Automated remedy enforcement</li>
+</ul>
+<p><strong>12. Sybil Resistance at Scale</strong></p>
+<ul>
+<li>Multiple uniqueness proof methods</li>
+<li>Trust graph-based duplicate detection</li>
+<li>Economic stake requirements</li>
+<li>Social graph analysis</li>
+</ul>
+<hr>
+<h2>Recommended Implementation Order</h2>
+<pre><code>v0.7.0: CLI Commands + Basic Integration Tests
+        ├── icnctl amendment commands
+        ├── icnctl appeal commands
+        └── End-to-end test: enrollment → holder
+
+v0.7.1: SDIS-Commons Bridge
+        ├── PersonhoodAnchor on enrollment completion
+        ├── Mobile SDK updates
+        └── QR code updates
+
+v0.8.0: Persistent Storage
+        ├── Sled backend for CommonsManager
+        ├── Migration tooling
+        └── Performance testing
+
+v0.8.1: Production Hardening
+        ├── Rate limiting
+        ├── Audit logging
+        ├── Metrics
+        └── Security review
+
+v0.9.0: Multiple POP Pathways
+        ├── InPerson verification
+        ├── VideoCall verification
+        └── Ceremony flows
+
+v0.9.1: Economic Integration
+        ├── Fuel allocation
+        ├── Capability-gated transactions
+        └── Membership-ledger link
+
+v1.0.0: Full Commons Release
+        └── Network governance + Sybil resistance
+</code></pre>
+<hr>
+<h2>Pilot Integration Notes</h2>
+<p>For the pilot community (Track C), the minimum required functionality:</p>
+<ol>
+<li><p><strong>Working Today</strong> ✅:</p>
+<ul>
+<li>Enrollment via SDIS (steward-sponsored)</li>
+<li>CommonsHolderRecord with baseline rights</li>
+<li>Charter creation for pilot cooperative</li>
+<li>Membership lifecycle management</li>
+<li>CLI commands for daily operations (<code>icnctl amendment</code>, <code>icnctl appeal</code>)</li>
+<li>Persistent storage via Sled (data survives restarts)</li>
+<li>Basic monitoring/observability (50+ Commons metrics)</li>
+<li>Audit logging for governance compliance</li>
+<li>Per-category rate limiting for API protection</li>
+<li>20+ integration tests for governance flows</li>
+<li>Improved CLI error messages with troubleshooting hints</li>
+</ul>
+</li>
+<li><p><strong>Can Wait Until Post-Pilot</strong>:</p>
+<ul>
+<li>Multiple POP pathways (InPerson, VideoCall, Ceremony)</li>
+<li>Federation support</li>
+<li>Economic layer integration</li>
+<li>Advanced appeal mechanisms</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h2>Commit History</h2>
+<pre><code># v0.8.x - Production Hardening &amp; UX
+a7931b6 improve(cli): enhance error messages with actionable hints
+1fff804 test(gateway): add constitutional governance integration tests
+e0ed173 fix(rpc): make integration tests resilient to port collisions
+6ac5f30 feat(gateway): add per-category rate limiting for endpoint protection
+b407042 feat(gateway): add comprehensive audit logging for governance actions
+0ea62b6 feat(obs): add Commons Evolution metrics for monitoring
+9d1c3a5 feat(gateway): add Sled persistent storage backend for CommonsManager
+
+# v0.7.x - Integration &amp; Testing
+b313562 feat(gateway): complete Commons Evolution integration (CLI, storage, enrollment)
+
+# v0.6.x - Constitutional Governance
+69c5674 feat(governance): implement Constitutional Governance (v0.6.0)
+8d4e57a feat(gateway): implement Membership &amp; Rights (v0.5.0)
+b990ef9 feat(gateway): implement Steward Layer (v0.4.0)
+
+# v0.3.x-0.5.x - Foundation
+6c0931f docs: update COMMONS_EVOLUTION RFC with implementation status
+00d8e95 feat(gateway): implement Commons Evolution API endpoints
+90d250a feat(cli): add commons and charter commands to icnctl
+e0f9a36 feat(governance): add Charter and Steward storage layers
+3d92c1f feat(governance): add Charter for Commons Evolution organization genesis
+959e295 feat(identity): add CommonsHolderStore for persistent storage
+cd61058 feat(identity): add CommonsHolderRecord for Commons Evolution Layer 1
+31a3955 feat(identity): add PersonhoodAnchorStore for persistent storage
+fffe0c4 feat(identity): add PersonhoodAnchor for Commons Evolution Layer 0
+</code></pre>
+<hr>
+<h2>Conclusion</h2>
+<p>The Commons Evolution core infrastructure is complete. The system provides:</p>
+<ol>
+<li><strong>Portable Identity</strong>: PersonhoodAnchor survives key rotation and organizational changes</li>
+<li><strong>Baseline Rights</strong>: CommonsRights cannot be revoked by individual jurisdictions</li>
+<li><strong>Democratic Governance</strong>: Multi-level amendment process with due process</li>
+<li><strong>Due Process</strong>: Appeal mechanisms for challenging decisions</li>
+</ol>
+<p>The next phase is integration with pilot workflows and production hardening based on real-world usage.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

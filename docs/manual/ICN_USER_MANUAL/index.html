@@ -1,0 +1,1931 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN User Manual | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>manual</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ICN USER MANUAL</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/manual/ICN_USER_MANUAL.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN User Manual</h1>
+<p><strong>Intercooperative Network</strong>
+<em>Infrastructure for the Cooperative Economy</em></p>
+<hr>
+<p><strong>Manual Version:</strong> 1.1.1
+<strong>Target Software:</strong> ICN v0.2.x
+<strong>Last Updated:</strong> December 2025
+<strong>Status:</strong> Pilot Ready</p>
+<hr>
+<h2>Role Labels</h2>
+<table>
+<thead>
+<tr>
+<th>Icon</th>
+<th>Role</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Member</strong></td>
+<td>Cooperative member</td>
+<td>Day-to-day participation</td>
+</tr>
+<tr>
+<td><strong>Admin</strong></td>
+<td>Cooperative administrator</td>
+<td>Organizational management</td>
+</tr>
+<tr>
+<td><strong>Operator</strong></td>
+<td>Node operator</td>
+<td>Infrastructure management</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Quick Start: 15 Minutes</h2>
+<p>Get running with ICN in under 15 minutes:</p>
+<h3>1. Install (2 min)</h3>
+<pre><code class="language-bash"># Docker (recommended)
+git clone https://github.com/InterCooperative-Network/icn.git
+cd icn
+cp .env.example .env
+docker compose up -d
+
+# Or from source
+cd icn/icn &amp;&amp; cargo build --release
+sudo cp target/release/{icnd,icnctl} /usr/local/bin/
+</code></pre>
+<h3>2. Create Identity (1 min)</h3>
+<pre><code class="language-bash">icnctl id init
+# Enter passphrase when prompted
+icnctl id show
+</code></pre>
+<h3>3. Configure &amp; Start (2 min)</h3>
+<pre><code class="language-bash"># Prepare config from repo example
+mkdir -p ~/.icn
+cp icn/config/icn.toml.example ~/.icn/config.toml
+nano ~/.icn/config.toml
+
+# Add bootstrap peer
+# bootstrap_peers = [&quot;icn://did:icn:BOOTSTRAP_DID@IP:7777&quot;]
+
+# Start daemon
+icnd --config ~/.icn/config.toml --data-dir ~/.icn
+</code></pre>
+<h3>4. Join Network (5 min)</h3>
+<pre><code class="language-bash"># Check network status
+icnctl network status
+
+# Request trust from existing member
+# They run: icnctl trust add did:icn:YOUR_DID 0.5
+</code></pre>
+<h3>5. First Transaction (2 min)</h3>
+<pre><code class="language-bash"># Check balance
+icnctl ledger balance
+
+# Send credits
+icnctl ledger pay did:icn:RECIPIENT_DID 2.0 hours &quot;Helped with garden&quot;
+
+# View history
+icnctl ledger history
+</code></pre>
+<p>You&#39;re now participating in the cooperative economy.</p>
+<hr>
+<h2>Conceptual Model</h2>
+<pre><code>┌─────────────────────────────────────────────────────────────┐
+│                        ICN Node                             │
+├─────────────────────────────────────────────────────────────┤
+│  User Interfaces                                            │
+│  ┌──────────┐  ┌──────────────┐  ┌─────────────────────┐   │
+│  │  icnctl  │  │  Gateway API │  │  Web UI (Pilot)     │   │
+│  │  (CLI)   │  │  (REST/WS)   │  │  (Browser)          │   │
+│  └────┬─────┘  └──────┬───────┘  └──────────┬──────────┘   │
+│       │               │                      │              │
+├───────┴───────────────┴──────────────────────┴──────────────┤
+│  icnd (Daemon)                                              │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
+│  │ Identity │  │  Trust   │  │  Ledger  │  │Governance│   │
+│  │  Layer   │  │  Graph   │  │  (Mutual │  │  Engine  │   │
+│  │          │  │          │  │  Credit) │  │          │   │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘   │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
+│  │  Gossip  │  │ Contract │  │  Store   │  │ Compute  │   │
+│  │  Sync    │  │   (CCL)  │  │  (Sled)  │  │  Layer   │   │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘   │
+├─────────────────────────────────────────────────────────────┤
+│  Network: QUIC/TLS + mDNS Discovery                         │
+└─────────────────────────────────────────────────────────────┘
+</code></pre>
+<hr>
+<h1>Part I: Introduction</h1>
+<h2>Chapter 1: What is ICN?</h2>
+<h3>Vision and Purpose</h3>
+<p>ICN (Intercooperative Network) is a <strong>peer-to-peer coordination substrate</strong> for cooperatives and community organizations. It provides the infrastructure for:</p>
+<ul>
+<li><strong>Decentralized Identity</strong>: Self-sovereign identifiers (DIDs) with Ed25519 cryptography</li>
+<li><strong>Trust Graph</strong>: Web-of-participation based reputation</li>
+<li><strong>Mutual Credit</strong>: Community currency without external backing</li>
+<li><strong>Gossip Protocol</strong>: Resilient P2P communication</li>
+<li><strong>Cooperative Contracts</strong>: Programmable agreements (CCL)</li>
+<li><strong>Governance Primitives</strong>: Democratic decision-making tools</li>
+</ul>
+<blockquote>
+<p><em>&quot;The goal isn&#39;t finance. The goal is cooperation you can audit.&quot;</em></p>
+</blockquote>
+<h3>How ICN Differs from Blockchain</h3>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>ICN</th>
+<th>Blockchain</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Consensus</strong></td>
+<td>Local autonomy, eventual consistency</td>
+<td>Global consensus</td>
+</tr>
+<tr>
+<td><strong>Trust Model</strong></td>
+<td>Assumes relationship</td>
+<td>Assumes hostility</td>
+</tr>
+<tr>
+<td><strong>Tokens</strong></td>
+<td>Mutual credit (internal accounting)</td>
+<td>Tradeable assets</td>
+</tr>
+<tr>
+<td><strong>Speculation</strong></td>
+<td>Impossible by design</td>
+<td>Common</td>
+</tr>
+<tr>
+<td><strong>Energy</strong></td>
+<td>Minimal (no mining)</td>
+<td>Often significant</td>
+</tr>
+<tr>
+<td><strong>Governance</strong></td>
+<td>Democratic, cooperative</td>
+<td>Token-weighted</td>
+</tr>
+</tbody></table>
+<p>ICN is infrastructure for people who already trust each other to coordinate better—not for strangers to transact without trust.</p>
+<h3>Who ICN is For</h3>
+<p><strong>Primary audiences:</strong></p>
+<ul>
+<li><strong>Timebanks</strong>: Hour-based mutual credit communities</li>
+<li><strong>Worker cooperatives</strong>: Democratic workplaces</li>
+<li><strong>Food cooperatives</strong>: Member-owned grocery/buying clubs</li>
+<li><strong>Housing cooperatives</strong>: Resident-owned housing</li>
+<li><strong>Mutual aid networks</strong>: Community support systems</li>
+<li><strong>Credit unions</strong>: Member-owned financial cooperatives</li>
+</ul>
+<p><strong>ICN is not for:</strong></p>
+<ul>
+<li>Speculative trading</li>
+<li>Anonymous transactions</li>
+<li>Replacing government currencies</li>
+<li>&quot;Disrupting&quot; existing cooperatives</li>
+</ul>
+<hr>
+<h2>Chapter 2: Core Concepts</h2>
+<h3>Decentralized Identity (DIDs)</h3>
+<p>Every participant has a <strong>DID</strong> (Decentralized Identifier):</p>
+<pre><code>did:icn:5Xk8Y2rQm7...
+</code></pre>
+<ul>
+<li><strong>Self-sovereign</strong>: You control your keys, not a central authority</li>
+<li><strong>Cryptographic</strong>: Based on Ed25519 public key</li>
+<li><strong>Portable</strong>: Works across all cooperatives</li>
+<li><strong>Recoverable</strong>: Multi-device and social recovery options</li>
+</ul>
+<h3>Trust Graph</h3>
+<p>Trust is the foundation of ICN. The trust graph tracks:</p>
+<ul>
+<li><strong>Direct trust</strong>: &quot;I trust Alice with score 0.8&quot;</li>
+<li><strong>Transitive trust</strong>: Trust flows through connections</li>
+<li><strong>Trust decay</strong>: Indirect trust weakens with distance</li>
+</ul>
+<p><strong>Trust Classes:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Class</th>
+<th>Score Range</th>
+<th>Access Level</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Isolated</td>
+<td>&lt; 0.1</td>
+<td>Very limited</td>
+</tr>
+<tr>
+<td>Known</td>
+<td>0.1 - 0.4</td>
+<td>Basic</td>
+</tr>
+<tr>
+<td>Partner</td>
+<td>0.4 - 0.7</td>
+<td>Standard</td>
+</tr>
+<tr>
+<td>Federated</td>
+<td>0.7+</td>
+<td>Full</td>
+</tr>
+</tbody></table>
+<p><strong>Trust decay</strong>: By default, trust decays by factor <code>d = 0.7</code> per hop. A 1-hop path contributes <code>d</code>, 2-hop contributes <code>d²</code>, etc. The default decay factor reflects empirical social distance assumptions and is configurable per cooperative.</p>
+<h3>Mutual Credit</h3>
+<p>ICN uses <strong>mutual credit</strong> instead of tokens:</p>
+<pre><code>Alice helps Bob for 2 hours:
+  Alice: +2 hours
+  Bob:   -2 hours
+  Total:  0 hours (always zero-sum)
+</code></pre>
+<p><strong>Key properties:</strong></p>
+<ul>
+<li>Credits are internal accounting, not tradeable assets</li>
+<li>Balances can be negative (you owe) or positive (you&#39;re owed)</li>
+<li>No external backing required</li>
+<li>Value comes from reciprocity, not scarcity</li>
+</ul>
+<p><strong>Currency scopes:</strong></p>
+<ul>
+<li><code>hours</code> - Local default</li>
+<li><code>coop:food-portland:hours</code> - Coop-scoped</li>
+<li><code>federation:pacific-nw:hours</code> - Federation-scoped</li>
+</ul>
+<h3>Fuel System</h3>
+<p><strong>Fuel</strong> is permission to perform network operations:</p>
+<ul>
+<li><strong>Regenerative</strong>: Refills over time (24-hour full regen)</li>
+<li><strong>Non-transferable</strong>: Cannot be bought or sold</li>
+<li><strong>Contribution-based</strong>: More contribution = higher capacity</li>
+</ul>
+<p><strong>Fuel costs:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>Cost</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Publish message</td>
+<td>1</td>
+</tr>
+<tr>
+<td>Ledger transaction</td>
+<td>10</td>
+</tr>
+<tr>
+<td>Create proposal</td>
+<td>50</td>
+</tr>
+<tr>
+<td>Submit compute job</td>
+<td>Variable</td>
+</tr>
+</tbody></table>
+<p><strong>Guaranteed minimum</strong>: 50 fuel units ensure everyone can participate in governance regardless of contribution level.</p>
+<h3>Governance</h3>
+<p>ICN provides democratic decision-making primitives:</p>
+<ul>
+<li><strong>Domains</strong>: Governance contexts (e.g., <code>coop:food-collective</code>)</li>
+<li><strong>Proposals</strong>: Motions to be voted on</li>
+<li><strong>Voting</strong>: For/Against/Abstain with configurable thresholds</li>
+<li><strong>Profiles</strong>: Decision rules (consensus, majority, consent)</li>
+</ul>
+<hr>
+<h2>Chapter 3: Glossary</h2>
+<p>See <a href="/docs/glossary">docs/glossary.md</a> for the complete, authoritative terminology reference.</p>
+<p><strong>Quick reference:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Definition</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>DID</strong></td>
+<td>Decentralized Identifier (<code>did:icn:&lt;pubkey&gt;</code>)</td>
+</tr>
+<tr>
+<td><strong>Trust Score</strong></td>
+<td>Computed reputation (0.0 to 1.0)</td>
+</tr>
+<tr>
+<td><strong>Credit</strong></td>
+<td>Internal accounting unit (not a token)</td>
+</tr>
+<tr>
+<td><strong>Fuel</strong></td>
+<td>Rate-limiting permission (regenerates)</td>
+</tr>
+<tr>
+<td><strong>Cooperative</strong></td>
+<td>Economic organization with ledger</td>
+</tr>
+<tr>
+<td><strong>Community</strong></td>
+<td>Civic organization (mutual aid, advocacy)</td>
+</tr>
+<tr>
+<td><strong>Federation</strong></td>
+<td>Group of cooperatives with shared agreements</td>
+</tr>
+<tr>
+<td><strong>Gateway API</strong></td>
+<td>REST/WebSocket interface for applications</td>
+</tr>
+</tbody></table>
+<hr>
+<h1>Part II: Getting Started</h1>
+<h2>Chapter 4: Installation</h2>
+<p><strong>Operator</strong></p>
+<h3>System Requirements</h3>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Minimum</th>
+<th>Recommended</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>CPU</td>
+<td>2 cores</td>
+<td>4+ cores</td>
+</tr>
+<tr>
+<td>RAM</td>
+<td>2 GB</td>
+<td>4+ GB</td>
+</tr>
+<tr>
+<td>Storage</td>
+<td>10 GB SSD</td>
+<td>50+ GB SSD</td>
+</tr>
+<tr>
+<td>Network</td>
+<td>10 Mbps</td>
+<td>100+ Mbps</td>
+</tr>
+<tr>
+<td>OS</td>
+<td>Linux (kernel 5.4+)</td>
+<td>Ubuntu 22.04 LTS</td>
+</tr>
+</tbody></table>
+<h3>Installing from Source</h3>
+<pre><code class="language-bash"># Prerequisites
+sudo apt install build-essential pkg-config libssl-dev
+
+# Clone and build
+git clone https://github.com/InterCooperative-Network/icn.git
+cd icn/icn
+cargo build --release
+
+# Install binaries
+sudo cp target/release/icnd /usr/local/bin/
+sudo cp target/release/icnctl /usr/local/bin/
+
+# Verify
+icnctl --version
+icnd --version
+</code></pre>
+<h3>Docker Installation</h3>
+<pre><code class="language-bash"># Clone repository
+git clone https://github.com/InterCooperative-Network/icn.git
+cd icn
+
+# Configure environment
+cp .env.example .env
+nano .env  # Edit as needed
+
+# Build and run
+docker compose up -d
+
+# Verify
+docker compose ps
+docker compose logs icnd
+</code></pre>
+<h3>Verifying Installation</h3>
+<pre><code class="language-bash"># Check versions
+icnctl --version
+icnd --version
+
+# Validate configuration
+icnd --config ~/.icn/config.toml --validate-config
+</code></pre>
+<hr>
+<h2>Chapter 5: Creating Your Identity</h2>
+<p><strong>Member</strong></p>
+<h3>Generating Keys</h3>
+<pre><code class="language-bash"># Initialize identity
+icnctl id init
+
+# You&#39;ll be prompted for:
+# 1. Passphrase (encrypts your private key)
+# 2. Passphrase confirmation
+
+# View your identity
+icnctl id show
+</code></pre>
+<p>Output:</p>
+<pre><code>DID: did:icn:5Xk8Y2rQm7nPqKjL...
+Public Key: 5Xk8Y2rQm7nPqKjL...
+Keystore: ~/.icn/identity.age
+Created: 2025-12-14T10:30:00Z
+</code></pre>
+<h3>Understanding Your DID</h3>
+<p>Your DID is derived from your public key:</p>
+<ul>
+<li>Format: <code>did:icn:&lt;base58-encoded-pubkey&gt;</code></li>
+<li>Permanent: Changing keys requires rotation (see below)</li>
+<li>Portable: Works across all ICN networks</li>
+</ul>
+<h3>Backing Up Your Identity</h3>
+<p><strong>Critical</strong>: Your keystore is your identity. Back it up immediately.</p>
+<pre><code class="language-bash"># Create encrypted backup
+icnctl backup ~/icn-backup-$(date +%Y%m%d).tar.gz.age
+
+# Store backups:
+# - Off-site (cloud storage, different physical location)
+# - Multiple copies (at least 2)
+# - Test restoration periodically
+</code></pre>
+<h3>Multi-Device Setup</h3>
+<p>Use your identity on multiple devices:</p>
+<pre><code class="language-bash"># On primary device: add new device
+icnctl device add --name &quot;laptop&quot; --capabilities sign
+
+# On new device: import device key
+icnctl device import --from ~/device-key.age
+
+# List devices
+icnctl device list
+</code></pre>
+<hr>
+<h2>Chapter 6: Joining a Cooperative</h2>
+<p><strong>Member</strong></p>
+<h3>Finding a Cooperative</h3>
+<p>Cooperatives share bootstrap information through:</p>
+<ul>
+<li>Invitation links from existing members</li>
+<li>Community registries (if available)</li>
+<li>Direct peer addresses</li>
+</ul>
+<h3>The Trust Onboarding Process</h3>
+<ol>
+<li><p><strong>Connect to bootstrap node</strong>:</p>
+<pre><code class="language-bash"># Add to config or run directly
+icnctl network add-peer 192.168.1.100:7777 did:icn:BOOTSTRAP_DID
+</code></pre>
+</li>
+<li><p><strong>Request trust attestation</strong>:
+Contact an existing member. They run:</p>
+<pre><code class="language-bash">icnctl trust add did:icn:YOUR_DID 0.5 &quot;Knows from community garden&quot;
+</code></pre>
+</li>
+<li><p><strong>Verify trust receipt</strong>:</p>
+<pre><code class="language-bash">icnctl trust score did:icn:YOUR_DID
+</code></pre>
+</li>
+<li><p><strong>Join governance domain</strong> (if required):</p>
+<pre><code class="language-bash">icnctl gov domain join --domain-id coop:food-collective
+</code></pre>
+</li>
+</ol>
+<h3>Your First Transaction</h3>
+<p>Once trusted, you can participate:</p>
+<pre><code class="language-bash"># Check your balance
+icnctl ledger balance
+
+# Check your credit limit
+icnctl ledger limit
+
+# Send credits
+icnctl ledger pay did:icn:RECIPIENT_DID 2.0 hours &quot;Helped with inventory&quot;
+
+# View transaction history
+icnctl ledger history --limit 10
+</code></pre>
+<hr>
+<h2>Chapter 7: Using the Web Interface</h2>
+<p><strong>Member</strong></p>
+<h3>Dashboard Overview</h3>
+<p>Access the Web UI at <code>http://localhost:8080</code> (or your gateway address).</p>
+<p><strong>Dashboard shows:</strong></p>
+<ul>
+<li>Current balance across currencies</li>
+<li>Recent transactions</li>
+<li>Active proposals</li>
+<li>Trust score and network status</li>
+</ul>
+<h3>Logging Time/Credits</h3>
+<ol>
+<li>Navigate to <strong>Log Entry</strong></li>
+<li>Select recipient (or use DID)</li>
+<li>Enter amount and currency</li>
+<li>Add description</li>
+<li>Submit</li>
+</ol>
+<h3>Viewing Balances</h3>
+<p>The <strong>Balances</strong> page shows:</p>
+<ul>
+<li>Current balance per currency</li>
+<li>Credit limit and available credit</li>
+<li>Transaction history with filters</li>
+<li>Export options (CSV)</li>
+</ul>
+<h3>Governance Participation</h3>
+<ol>
+<li>Navigate to <strong>Governance</strong></li>
+<li>View active proposals</li>
+<li>Click proposal to see details</li>
+<li>Cast vote (For / Against / Abstain)</li>
+<li>View results after voting period</li>
+</ol>
+<hr>
+<h1>Part III: Daily Usage</h1>
+<h2>Chapter 8: Transactions</h2>
+<p><strong>Member</strong></p>
+<h3>Sending Credits</h3>
+<pre><code class="language-bash"># Basic transfer
+icnctl ledger pay did:icn:RECIPIENT_DID 5.0 hours &quot;Weekly tutoring session&quot;
+
+# With specific currency
+icnctl ledger pay did:icn:RECIPIENT_DID 100.0 coop:food-coop:credits &quot;Produce order&quot;
+</code></pre>
+<h3>Receiving Credits</h3>
+<p>Credits appear automatically when someone pays you:</p>
+<pre><code class="language-bash"># Check for new transactions
+icnctl ledger history --since &quot;1 hour ago&quot;
+
+# View current balance
+icnctl ledger balance
+</code></pre>
+<h3>Transaction History</h3>
+<pre><code class="language-bash"># Recent transactions
+icnctl ledger history --limit 20
+
+# Filter by date range
+icnctl ledger history --from 2025-01-01 --to 2025-12-31
+
+# Export to CSV
+icnctl ledger history --format csv &gt; transactions.csv
+</code></pre>
+<h3>Credit Limits and How They Work</h3>
+<p>Your credit limit determines how negative your balance can go:</p>
+<pre><code>Base Limit + Trust Bonus + History Bonus = Your Limit
+</code></pre>
+<ul>
+<li><strong>Base Limit</strong>: Everyone starts with a baseline (e.g., 10 hours)</li>
+<li><strong>Trust Bonus</strong>: Higher trust score = higher limit</li>
+<li><strong>History Bonus</strong>: Cleared obligations increase limit over time</li>
+</ul>
+<p><strong>New member throttling</strong>: New members have reduced limits during probation period. These are example parameters; each cooperative configures credit policy per currency.</p>
+<hr>
+<h2>Chapter 9: Trust Management</h2>
+<p><strong>Member</strong></p>
+<h3>Adding Trust</h3>
+<pre><code class="language-bash"># Add trust to someone you know
+icnctl trust add did:icn:THEIR_DID 0.7 &quot;Known from housing coop&quot;
+
+# Trust scores range from 0.0 to 1.0
+# 0.3-0.5: Casual acquaintance
+# 0.5-0.7: Regular collaborator
+# 0.7-0.9: Trusted partner
+# 0.9-1.0: Deep trust (use sparingly)
+</code></pre>
+<h3>Understanding Trust Scores</h3>
+<p>Trust is computed from the trust graph:</p>
+<pre><code class="language-bash"># View your trust score
+icnctl trust score did:icn:YOUR_DID
+
+# View trust graph around a DID
+icnctl trust graph did:icn:SOME_DID --depth 2
+</code></pre>
+<p><strong>Trust decay</strong>: Indirect trust decays by hop distance. The default decay factor reflects empirical social distance assumptions and is configurable per cooperative.</p>
+<h3>Trust Classes</h3>
+<p>Your trust class determines rate limits and access:</p>
+<table>
+<thead>
+<tr>
+<th>Class</th>
+<th>Score</th>
+<th>Rate Limit</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Isolated</td>
+<td>&lt; 0.1</td>
+<td>10 msg/sec</td>
+</tr>
+<tr>
+<td>Known</td>
+<td>0.1-0.4</td>
+<td>50 msg/sec</td>
+</tr>
+<tr>
+<td>Partner</td>
+<td>0.4-0.7</td>
+<td>100 msg/sec</td>
+</tr>
+<tr>
+<td>Federated</td>
+<td>0.7+</td>
+<td>200 msg/sec</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Chapter 10: Governance</h2>
+<p><strong>Member</strong></p>
+<h3>Creating Proposals</h3>
+<pre><code class="language-bash"># Create a text proposal
+icnctl gov proposal create \
+  --domain-id coop:food-collective \
+  --title &quot;Approve new produce supplier&quot; \
+  --body &quot;Proposal to add Sunny Farms as approved supplier...&quot; \
+  --kind text
+
+# Create a parameter change proposal
+icnctl gov proposal create \
+  --domain-id coop:food-collective \
+  --title &quot;Increase credit limit baseline&quot; \
+  --kind parameter \
+  --parameter credit_baseline \
+  --value 20
+</code></pre>
+<h3>Voting</h3>
+<pre><code class="language-bash"># List active proposals
+icnctl gov proposal list --domain-id coop:food-collective --status active
+
+# View proposal details
+icnctl gov proposal show PROPOSAL_ID
+
+# Cast vote
+icnctl gov vote cast --proposal-id PROPOSAL_ID --choice for
+# Choices: for, against, abstain
+</code></pre>
+<h3>Governance Templates</h3>
+<p>ICN includes pre-built governance profiles:</p>
+<table>
+<thead>
+<tr>
+<th>Template</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>consensus-with-fallback</code></td>
+<td>Seek consensus, fall back to 2/3 vote</td>
+</tr>
+<tr>
+<td><code>sociocracy-consent</code></td>
+<td>Consent-based (no paramount objections)</td>
+</tr>
+<tr>
+<td><code>council-delegation</code></td>
+<td>Elected council makes decisions</td>
+</tr>
+<tr>
+<td><code>direct-democracy</code></td>
+<td>All members vote on everything</td>
+</tr>
+</tbody></table>
+<h3>Understanding Decision Rules</h3>
+<p>Each domain has configured thresholds:</p>
+<ul>
+<li><strong>Quorum</strong>: Minimum participation (e.g., 50% of members)</li>
+<li><strong>Threshold</strong>: Approval percentage (e.g., 66% for major decisions)</li>
+<li><strong>Voting period</strong>: Time window for votes (e.g., 7 days)</li>
+</ul>
+<hr>
+<h2>Chapter 11: Disputes</h2>
+<p><strong>Member</strong></p>
+<h3>When to File a Dispute</h3>
+<p>File a dispute when:</p>
+<ul>
+<li>Transaction was recorded incorrectly</li>
+<li>Service wasn&#39;t delivered as agreed</li>
+<li>You suspect fraudulent activity</li>
+</ul>
+<p>Do not file disputes for:</p>
+<ul>
+<li>Disagreements about value (negotiate first)</li>
+<li>Technical errors (contact support)</li>
+</ul>
+<h3>The Dispute Process</h3>
+<pre><code class="language-bash"># File a dispute
+icnctl ledger dispute \
+  --entry-id ENTRY_ID \
+  --reason &quot;Service not delivered as described&quot;
+
+# View dispute status
+icnctl ledger dispute show DISPUTE_ID
+</code></pre>
+<p><strong>Process:</strong></p>
+<ol>
+<li><strong>Filing</strong>: Dispute recorded, entry marked as contested</li>
+<li><strong>Response</strong>: Other party has time to respond</li>
+<li><strong>Mediation</strong>: If unresolved, mediator assigned</li>
+<li><strong>Resolution</strong>: Mediator decides outcome</li>
+</ol>
+<h3>Resolution Outcomes</h3>
+<p>ICN never deletes history. Resolutions create new entries:</p>
+<ul>
+<li><strong>Reversed</strong>: A corrective entry is appended that nets out the original</li>
+<li><strong>Settlement</strong>: A follow-up entry adjusts the obligation per mediator decision</li>
+<li><strong>Write-off</strong>: Governance records the obligation as forgiven; balances may be adjusted by a compensating entry depending on policy</li>
+<li><strong>Upheld</strong>: Original entry stands, dispute closed</li>
+</ul>
+<hr>
+<h1>Part IV: Administration</h1>
+<h2>Chapter 12: Starting a New Cooperative</h2>
+<p><strong>Admin</strong></p>
+<h3>Planning Your Cooperative</h3>
+<p>Before creating a cooperative, decide:</p>
+<ol>
+<li><strong>Type</strong>: Economic (coop) or civic (community)?</li>
+<li><strong>Governance</strong>: Which decision-making model?</li>
+<li><strong>Currency</strong>: What units? (hours, credits, custom)</li>
+<li><strong>Membership</strong>: Open or invite-only?</li>
+<li><strong>Founding members</strong>: Minimum 3 recommended</li>
+</ol>
+<h3>Initial Setup</h3>
+<pre><code class="language-bash"># Create governance domain
+icnctl gov domain create \
+  --domain-id coop:my-food-coop \
+  --name &quot;My Food Cooperative&quot; \
+  --profile consensus-with-fallback
+
+# Initialize ledger currency
+icnctl ledger currency create \
+  --domain-id coop:my-food-coop \
+  --currency hours \
+  --description &quot;Labor hours&quot;
+</code></pre>
+<h3>Configuring Credit Policies</h3>
+<pre><code class="language-bash"># Set credit policy (example parameters - configure per your needs)
+icnctl ledger policy set \
+  --domain-id coop:my-food-coop \
+  --baseline 10 \
+  --trust-multiplier 2.0 \
+  --new-member-limit 5 \
+  --probation-days 30
+</code></pre>
+<h3>Inviting Members</h3>
+<pre><code class="language-bash"># Generate invite link
+icnctl invite create \
+  --domain-id coop:my-food-coop \
+  --expires &quot;7 days&quot; \
+  --max-uses 10
+
+# Or add member directly (if already trusted)
+icnctl gov member add \
+  --domain-id coop:my-food-coop \
+  --did did:icn:NEW_MEMBER_DID
+</code></pre>
+<hr>
+<h2>Chapter 13: Cooperative Treasurer Guide</h2>
+<p><strong>Admin</strong></p>
+<h3>Financial Overview</h3>
+<pre><code class="language-bash"># View cooperative treasury balance
+icnctl ledger balance --domain-id coop:my-food-coop --treasury
+
+# View all member balances
+icnctl ledger balances --domain-id coop:my-food-coop
+
+# View circulation metrics
+icnctl ledger stats --domain-id coop:my-food-coop
+</code></pre>
+<h3>Reports and Exports</h3>
+<pre><code class="language-bash"># Export transactions for period
+icnctl ledger history \
+  --domain-id coop:my-food-coop \
+  --from 2025-01-01 \
+  --to 2025-12-31 \
+  --format csv &gt; annual.csv
+
+# Export member balances
+icnctl ledger balances \
+  --domain-id coop:my-food-coop \
+  --format csv &gt; balances.csv
+</code></pre>
+<h3>Handling Defaults</h3>
+<p>When a member cannot repay their negative balance:</p>
+<pre><code class="language-bash"># View member&#39;s history
+icnctl ledger history --did did:icn:MEMBER_DID
+
+# Options:
+# 1. Payment plan (governance decision)
+# 2. Write-off (governance decision)
+# 3. Membership suspension
+
+# Initiate write-off proposal
+icnctl gov proposal create \
+  --domain-id coop:my-food-coop \
+  --title &quot;Write off debt for Member X&quot; \
+  --kind economic \
+  --amount 50.0
+</code></pre>
+<h3>Audit Procedures</h3>
+<ol>
+<li><strong>Monthly reconciliation</strong>: Compare ledger totals (should net to zero)</li>
+<li><strong>Quarterly review</strong>: Check unusual patterns</li>
+<li><strong>Annual audit</strong>: Full transaction review</li>
+</ol>
+<pre><code class="language-bash"># Verify ledger integrity
+icnctl ledger verify --domain-id coop:my-food-coop
+
+# Check total should be zero
+icnctl ledger stats --domain-id coop:my-food-coop | grep &quot;Net Balance&quot;
+</code></pre>
+<hr>
+<h2>Chapter 14: Governance Administration</h2>
+<p><strong>Admin</strong></p>
+<h3>Setting Up Domains</h3>
+<pre><code class="language-bash"># Create main governance domain
+icnctl gov domain create \
+  --domain-id coop:my-coop \
+  --name &quot;My Cooperative&quot; \
+  --profile consensus-with-fallback
+
+# Create sub-domain for specific decisions
+icnctl gov domain create \
+  --domain-id coop:my-coop:membership \
+  --name &quot;Membership Committee&quot; \
+  --parent coop:my-coop \
+  --profile council-delegation
+</code></pre>
+<h3>Configuring Voting Rules</h3>
+<pre><code class="language-bash"># Set quorum and threshold
+icnctl gov config set \
+  --domain-id coop:my-coop \
+  --quorum 0.5 \
+  --threshold 0.66 \
+  --voting-period &quot;7 days&quot;
+
+# Set different rules for different proposal types
+icnctl gov config set \
+  --domain-id coop:my-coop \
+  --proposal-type constitutional \
+  --threshold 0.75 \
+  --voting-period &quot;14 days&quot;
+</code></pre>
+<h3>Managing Facilitators</h3>
+<pre><code class="language-bash"># Assign facilitator role
+icnctl gov role assign \
+  --domain-id coop:my-coop \
+  --did did:icn:FACILITATOR_DID \
+  --role facilitator
+
+# List current roles
+icnctl gov role list --domain-id coop:my-coop
+</code></pre>
+<hr>
+<h1>Part V: Operations</h1>
+<h2>Chapter 15: Running a Node</h2>
+<p><strong>Operator</strong></p>
+<h3>Node Setup</h3>
+<pre><code class="language-bash"># Create configuration directory
+mkdir -p ~/.icn
+
+# Copy default config template from the repository
+cp icn/config/icn.toml.example ~/.icn/config.toml
+
+# Edit configuration
+nano ~/.icn/config.toml
+</code></pre>
+<h3>Configuration Options</h3>
+<p>Key configuration sections in <code>~/.icn/config.toml</code>:</p>
+<pre><code class="language-toml">data_dir = &quot;~/.icn&quot;
+
+[network]
+listen_addr = &quot;0.0.0.0:7777&quot;
+bootstrap_peers = [
+  &quot;icn://did:icn:PEER1_DID@192.168.1.100:7777&quot;,
+  &quot;icn://did:icn:PEER2_DID@192.168.1.101:7777&quot;
+]
+
+[gateway]
+enabled = true
+bind_addr = &quot;127.0.0.1:8080&quot;
+jwt_secret = &quot;your-secret-here&quot;
+
+[observability]
+metrics_port = 9100
+health_port = 8080
+log_level = &quot;info&quot;
+</code></pre>
+<h3>Port Reference</h3>
+<table>
+<thead>
+<tr>
+<th>Service</th>
+<th>Port</th>
+<th>Protocol</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>P2P Network</td>
+<td>7777</td>
+<td>UDP (QUIC)</td>
+<td>Node-to-node communication</td>
+</tr>
+<tr>
+<td>Gateway API</td>
+<td>8080</td>
+<td>HTTP/WS</td>
+<td>REST API and WebSocket events</td>
+</tr>
+<tr>
+<td>Metrics</td>
+<td>9100</td>
+<td>HTTP</td>
+<td>Prometheus metrics endpoint</td>
+</tr>
+<tr>
+<td>RPC (local)</td>
+<td>5050</td>
+<td>TCP</td>
+<td>Local JSON-RPC endpoint used by <code>icnctl</code></td>
+</tr>
+</tbody></table>
+<h3>Monitoring</h3>
+<pre><code class="language-bash"># Check daemon status
+icnctl status
+
+# View connected peers
+icnctl network peers
+
+# Check gossip sync status
+icnctl network gossip status
+</code></pre>
+<p><strong>Prometheus metrics</strong> available at <code>http://localhost:9100/metrics</code>:</p>
+<pre><code class="language-bash"># Key metrics to monitor
+icn_network_connections_active
+icn_gossip_entries_total
+icn_ledger_quarantine_size
+icn_fuel_consumed_total
+</code></pre>
+<h3>Health Checks</h3>
+<pre><code class="language-bash"># API health endpoint
+curl http://localhost:8080/v1/health
+
+# Detailed health
+curl http://localhost:8080/v1/health/detailed
+</code></pre>
+<hr>
+<h2>Chapter 16: Backup and Recovery</h2>
+<p><strong>Operator</strong></p>
+<h3>Backup Procedures</h3>
+<pre><code class="language-bash"># Full backup (recommended)
+icnctl backup ~/backups/icn-$(date +%Y%m%d).tar.gz.age
+
+# What&#39;s included:
+# - Keystore (encrypted)
+# - Ledger data
+# - Trust graph
+# - Gossip store
+# - Configuration
+</code></pre>
+<h3>Restore Procedures</h3>
+<pre><code class="language-bash"># Stop daemon first
+sudo systemctl stop icnd
+
+# Restore from backup
+icnctl restore ~/backups/icn-20251214.tar.gz.age --force
+
+# Restart daemon
+sudo systemctl start icnd
+
+# Verify
+icnctl status
+icnctl ledger balance
+</code></pre>
+<h3>Disaster Recovery</h3>
+<p>If keystore is lost without backup:</p>
+<ol>
+<li><strong>Your identity is permanently lost</strong></li>
+<li>Create new identity: <code>icnctl id init</code></li>
+<li>Request trust re-attestation from cooperative members</li>
+<li>Previous balances are not recoverable (coordinate with cooperative)</li>
+</ol>
+<p><strong>Prevention</strong>: Always maintain multiple backup copies in different locations.</p>
+<hr>
+<h2>Chapter 17: Upgrades</h2>
+<p><strong>Operator</strong></p>
+<h3>Version Checking</h3>
+<pre><code class="language-bash"># Check current version
+icnctl --version
+icnd --version
+
+# Check for updates (if configured)
+icnctl update check
+</code></pre>
+<h3>Upgrade Procedures</h3>
+<pre><code class="language-bash"># 1. Backup first (always!)
+icnctl backup ~/backups/pre-upgrade-$(date +%Y%m%d).tar.gz.age
+
+# 2. Stop daemon
+sudo systemctl stop icnd
+
+# 3. Update binaries
+cd ~/icn/icn
+git fetch origin
+git checkout v0.2.1
+cargo build --release
+sudo cp target/release/{icnd,icnctl} /usr/local/bin/
+
+# 4. Run migrations (if needed)
+icnctl migrate --from v0.2.0 --to v0.2.1
+
+# 5. Start daemon
+sudo systemctl start icnd
+
+# 6. Verify
+icnctl status
+</code></pre>
+<h3>Rollback</h3>
+<p>If upgrade fails:</p>
+<pre><code class="language-bash"># Stop daemon
+sudo systemctl stop icnd
+
+# Restore backup
+icnctl restore ~/backups/pre-upgrade-20251214.tar.gz.age --force
+
+# Reinstall previous version
+git checkout v0.2.0
+cargo build --release
+sudo cp target/release/{icnd,icnctl} /usr/local/bin/
+
+# Start daemon
+sudo systemctl start icnd
+</code></pre>
+<hr>
+<h2>Chapter 18: Troubleshooting</h2>
+<p><strong>Operator</strong></p>
+<h3>Common Issues</h3>
+<h4>&quot;Identity not initialized&quot;</h4>
+<pre><code class="language-bash">icnctl id init
+</code></pre>
+<h4>&quot;Failed to unlock keystore&quot;</h4>
+<p>Wrong passphrase. Try again or restore from backup.</p>
+<h4>&quot;No peers connected&quot;</h4>
+<pre><code class="language-bash"># Check firewall
+sudo ufw allow 7777/udp
+
+# Verify bootstrap peers in config
+grep bootstrap ~/.icn/config.toml
+
+# Manually add peer
+icnctl network add-peer 192.168.1.100:7777 did:icn:PEER_DID
+</code></pre>
+<h4>&quot;Transaction rejected: insufficient credit&quot;</h4>
+<p>You&#39;ve hit your credit limit. Options:</p>
+<ul>
+<li>Receive credits from others</li>
+<li>Build more trust (increases limit)</li>
+<li>Wait for probation period to end</li>
+</ul>
+<h4>&quot;Rate limited&quot;</h4>
+<p>You&#39;ve exhausted fuel. Wait for regeneration (up to 24 hours for full refill).</p>
+<h3>Network Problems</h3>
+<pre><code class="language-bash"># Check connectivity
+icnctl network status
+
+# View peer connections
+icnctl network peers
+
+# Test specific peer
+icnctl network ping did:icn:PEER_DID
+
+# Check logs for errors
+journalctl -u icnd -f
+</code></pre>
+<h3>Identity Issues</h3>
+<pre><code class="language-bash"># View keystore status
+icnctl id show
+
+# Rotate keys (if compromised)
+icnctl id rotate
+
+# Export identity for backup
+icnctl id export --output ~/identity-backup.age
+</code></pre>
+<h3>Getting Help</h3>
+<ol>
+<li><strong>Logs</strong>: <code>journalctl -u icnd -f</code> or <code>RUST_LOG=debug icnd</code></li>
+<li><strong>Documentation</strong>: All docs in <code>docs/</code> directory</li>
+<li><strong>GitHub Issues</strong>: <a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">https://github.com/InterCooperative-Network/icn/issues</a></li>
+</ol>
+<h3>Common First-Week Questions</h3>
+<p><strong>Q: Why is my trust score 0?</strong>
+A: You need attestations from existing members. Ask someone to run <code>icnctl trust add YOUR_DID 0.5</code>.</p>
+<p><strong>Q: Why can&#39;t I send more credits?</strong>
+A: New members have throttled limits during probation. Build trust and history.</p>
+<p><strong>Q: How do I see who trusts me?</strong>
+A: <code>icnctl trust graph did:icn:YOUR_DID --incoming</code></p>
+<p><strong>Q: My transaction is stuck?</strong>
+A: Gossip propagation can take 10-30 seconds. Check <code>icnctl ledger history</code>.</p>
+<hr>
+<h1>Part VI: Advanced Topics</h1>
+<h2>Chapter 19: CCL Contracts</h2>
+<p><strong>Admin</strong></p>
+<h3>Contract Language Overview</h3>
+<p>CCL (Cooperative Contract Language) is a domain-specific language for agreements:</p>
+<ul>
+<li><strong>Deterministic</strong>: Same inputs always produce same outputs</li>
+<li><strong>Fuel-metered</strong>: Execution has bounded cost</li>
+<li><strong>Capability-based</strong>: Contracts request specific permissions</li>
+<li><strong>Not Turing-complete</strong>: No infinite loops</li>
+</ul>
+<p>Determinism applies to <strong>state transitions</strong> (ledger/governance/contract execution). Network delivery is eventually consistent; nodes converge on the same result once they receive the same signed inputs.</p>
+<h3>Governance Templates</h3>
+<p>Pre-built contracts in <code>contracts/governance/</code>:</p>
+<pre><code>contracts/governance/
+├── consensus-with-fallback.ccl
+├── sociocracy-consent.ccl
+├── council-delegation.ccl
+├── direct-democracy.ccl
+└── emergency-lock.ccl
+</code></pre>
+<h3>Writing Custom Contracts</h3>
+<pre><code>contract MembershipApproval {
+    capability ReadLedger;
+    capability ReadTrust;
+
+    rule approve_member(applicant: DID, sponsors: List&lt;DID&gt;) {
+        require sponsors.len() &gt;= 2;
+        require all(sponsors, |s| trust_score(s) &gt; 0.5);
+        require all(sponsors, |s| member_age(s) &gt; 90 days);
+
+        create_membership(applicant);
+    }
+}
+</code></pre>
+<p>Deploy:</p>
+<pre><code class="language-bash">icnctl contract deploy \
+  --domain-id coop:my-coop \
+  --file ./membership-approval.ccl
+</code></pre>
+<hr>
+<h2>Chapter 20: Federation</h2>
+<p><strong>Admin</strong></p>
+<h3>Multi-Coop Networks</h3>
+<p>Federations enable cooperation between cooperatives:</p>
+<pre><code class="language-bash"># Create federation
+icnctl federation create \
+  --federation-id federation:pacific-nw \
+  --name &quot;Pacific Northwest Federation&quot;
+
+# Join federation
+icnctl federation join \
+  --federation-id federation:pacific-nw \
+  --coop-id coop:my-coop
+</code></pre>
+<h3>Trust Bridging</h3>
+<p>Trust flows across federation boundaries with decay. These are default federation policies; federations may override them:</p>
+<table>
+<thead>
+<tr>
+<th>Scope</th>
+<th>Trust Multiplier</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Within coop</td>
+<td>100%</td>
+</tr>
+<tr>
+<td>Across federation</td>
+<td>70%</td>
+</tr>
+<tr>
+<td>External</td>
+<td>50%</td>
+</tr>
+</tbody></table>
+<h3>Credit Exchange</h3>
+<p>Federation members can exchange credits:</p>
+<pre><code class="language-bash"># View exchange rates
+icnctl federation exchange rates
+
+# Swap credits
+icnctl federation exchange \
+  --from coop:my-coop:hours \
+  --to federation:pacific-nw:credits \
+  --amount 10
+</code></pre>
+<hr>
+<h2>Chapter 21: Security</h2>
+<p><strong>Operator</strong></p>
+<h3>Threat Model Overview</h3>
+<p>ICN&#39;s security model addresses:</p>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Key compromise</td>
+<td>Multi-device, rotation, social recovery</td>
+</tr>
+<tr>
+<td>Sybil attacks</td>
+<td>Trust graph, attestation requirements</td>
+</tr>
+<tr>
+<td>Network attacks</td>
+<td>QUIC/TLS, signed messages</td>
+</tr>
+<tr>
+<td>Economic attacks</td>
+<td>Credit limits, dispute resolution</td>
+</tr>
+</tbody></table>
+<h3>Security Features Status</h3>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Status</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Signed envelopes (Ed25519)</td>
+<td>Implemented</td>
+<td>Integrity + authenticity</td>
+</tr>
+<tr>
+<td>QUIC + TLS transport</td>
+<td>Implemented</td>
+<td>Link encryption</td>
+</tr>
+<tr>
+<td>DID-TLS binding</td>
+<td>Implemented</td>
+<td>Identity verification</td>
+</tr>
+<tr>
+<td>Replay protection</td>
+<td>Implemented</td>
+<td>Sequence-based</td>
+</tr>
+<tr>
+<td>Optional payload encryption</td>
+<td>Experimental</td>
+<td>Depends on channel/topic</td>
+</tr>
+<tr>
+<td>Onion routing / obfuscation</td>
+<td>Experimental</td>
+<td>Privacy enhancement</td>
+</tr>
+</tbody></table>
+<p>Note: Onion routing and traffic obfuscation protect against <strong>casual and passive observers</strong>, not nation-state global adversaries.</p>
+<h3>Key Management Best Practices</h3>
+<ol>
+<li><strong>Use strong passphrases</strong>: 20+ characters recommended</li>
+<li><strong>Backup immediately</strong>: Multiple copies, different locations</li>
+<li><strong>Rotate periodically</strong>: Annual rotation recommended</li>
+<li><strong>Enable multi-device</strong>: Reduces single point of failure</li>
+</ol>
+<h3>Incident Response</h3>
+<p>If you suspect key compromise:</p>
+<pre><code class="language-bash"># 1. Rotate keys immediately
+icnctl id rotate
+
+# 2. Notify cooperative
+# (Use out-of-band communication)
+
+# 3. Revoke old devices
+icnctl device revoke --device-id OLD_DEVICE
+
+# 4. Request trust re-attestation
+# (Old attestations may be suspect)
+</code></pre>
+<p>See <code>docs/incident-response.md</code> for complete playbook.</p>
+<hr>
+<h2>Chapter 22: Building on ICN</h2>
+<p><strong>Operator</strong></p>
+<h3>Gateway API</h3>
+<p>The Gateway provides REST and WebSocket APIs:</p>
+<p><strong>Base URL</strong>: <code>http://localhost:8080</code></p>
+<p><strong>Authentication</strong>:</p>
+<pre><code class="language-bash"># Get challenge
+curl -X POST http://localhost:8080/v1/auth/challenge \
+  -d &#39;{&quot;did&quot;: &quot;did:icn:YOUR_DID&quot;}&#39;
+
+# Sign challenge and get token
+curl -X POST http://localhost:8080/v1/auth/verify \
+  -d &#39;{&quot;did&quot;: &quot;did:icn:YOUR_DID&quot;, &quot;signature&quot;: &quot;...&quot;, &quot;challenge&quot;: &quot;...&quot;}&#39;
+
+# Use token
+curl -H &quot;Authorization: Bearer TOKEN&quot; \
+  http://localhost:8080/v1/coops/YOUR_COOP_ID
+</code></pre>
+<h3>TypeScript SDK</h3>
+<pre><code class="language-typescript">import { ICNClient } from &#39;@icn/client&#39;;
+
+const client = new ICNClient({ baseUrl: &#39;http://localhost:8080&#39; });
+
+// Authenticate
+await client.authenticate(did, signer, &#39;my-coop&#39;, [&#39;ledger:read&#39;]);
+
+// Make payment
+await client.pay(&#39;my-coop&#39;, {
+  from: &#39;did:icn:alice&#39;,
+  to: &#39;did:icn:bob&#39;,
+  amount: 5,
+  currency: &#39;hours&#39;,
+});
+
+// Submit compute task
+const task = await client.submitTask({
+  code: JSON.stringify(cclContract),
+  fuel_limit: 10000,
+});
+</code></pre>
+<h3>WebSocket Events</h3>
+<pre><code class="language-javascript">const ws = new WebSocket(&#39;ws://localhost:8080/v1/ws/coop:my-coop&#39;);
+
+ws.onopen = () =&gt; {
+  ws.send(JSON.stringify({ type: &#39;Auth&#39;, token: &#39;JWT_TOKEN&#39; }));
+};
+
+ws.onmessage = (event) =&gt; {
+  const data = JSON.parse(event.data);
+  switch (data.type) {
+    case &#39;LedgerEntry&#39;:
+      console.log(&#39;New transaction:&#39;, data.entry);
+      break;
+    case &#39;Proposal&#39;:
+      console.log(&#39;New proposal:&#39;, data.proposal);
+      break;
+    case &#39;Vote&#39;:
+      console.log(&#39;Vote cast:&#39;, data.vote);
+      break;
+  }
+};
+</code></pre>
+<hr>
+<h1>Part VII: Reference</h1>
+<h2>Appendix A: CLI Reference</h2>
+<h3>icnctl</h3>
+<pre><code class="language-bash">icnctl &lt;COMMAND&gt; [OPTIONS]
+
+COMMANDS:
+  id          Identity management
+  trust       Trust graph operations
+  ledger      Ledger transactions
+  gov         Governance operations
+  network     Network management
+  backup      Create backup
+  restore     Restore from backup
+  status      Daemon status
+  device      Multi-device management
+  contract    Contract deployment
+  federation  Federation operations
+
+GLOBAL OPTIONS:
+  -v, --verbose    Verbose output
+  -q, --quiet      Minimal output
+  --config PATH    Config file path
+  --help           Show help
+  --version        Show version
+</code></pre>
+<h3>Key Commands</h3>
+<pre><code class="language-bash"># Identity
+icnctl id init                    # Create identity
+icnctl id show                    # Show identity
+icnctl id rotate                  # Rotate keys
+icnctl id export                  # Export identity
+
+# Trust
+icnctl trust add &lt;DID&gt; &lt;SCORE&gt;    # Add trust
+icnctl trust remove &lt;DID&gt;         # Remove trust
+icnctl trust score &lt;DID&gt;          # Query score
+icnctl trust graph &lt;DID&gt;          # View graph
+
+# Ledger
+icnctl ledger balance             # Check balance
+icnctl ledger pay &lt;DID&gt; &lt;AMT&gt; &lt;CUR&gt; &lt;MEMO&gt;
+icnctl ledger history             # Transaction history
+icnctl ledger dispute             # File dispute
+
+# Governance
+icnctl gov domain create          # Create domain
+icnctl gov proposal create        # Create proposal
+icnctl gov vote cast              # Cast vote
+icnctl gov proposal list          # List proposals
+
+# Network
+icnctl network status             # Network status
+icnctl network peers              # List peers
+icnctl network add-peer           # Add peer
+
+# Operations
+icnctl backup &lt;PATH&gt;              # Create backup
+icnctl restore &lt;PATH&gt;             # Restore backup
+icnctl status                     # Daemon status
+</code></pre>
+<hr>
+<h2>Appendix B: Configuration Reference</h2>
+<h3>Complete icn.toml</h3>
+<pre><code class="language-toml"># Data directory for all persistent state
+data_dir = &quot;~/.icn&quot;
+
+[network]
+# Listen address for P2P connections (QUIC/UDP)
+listen_addr = &quot;0.0.0.0:7777&quot;
+
+# Bootstrap peers for initial network discovery
+bootstrap_peers = [
+  &quot;icn://did:icn:PEER1@192.168.1.100:7777&quot;,
+  &quot;icn://did:icn:PEER2@192.168.1.101:7777&quot;
+]
+
+# Enable mDNS for local network discovery
+mdns_enabled = true
+
+[gateway]
+# Enable Gateway API
+enabled = true
+
+# Listen address for HTTP/WebSocket
+bind_addr = &quot;127.0.0.1:8080&quot;
+
+# JWT secret for authentication (generate securely!)
+jwt_secret = &quot;your-256-bit-secret-here&quot;
+
+[observability]
+# Logging level: trace, debug, info, warn, error
+log_level = &quot;info&quot;
+# Prometheus metrics endpoint port
+metrics_port = 9100
+# Health endpoint port
+health_port = 8080
+
+[gossip]
+# Maximum entries in gossip store
+max_entries = 100000
+
+# Anti-entropy interval
+sync_interval = &quot;30s&quot;
+
+# Message TTL
+message_ttl = &quot;24h&quot;
+
+[ledger]
+# Enable quarantine for conflicting entries
+quarantine_enabled = true
+
+# Maximum quarantine size
+max_quarantine = 1000
+
+[compute]
+# Enable distributed compute
+enabled = true
+
+# Maximum fuel per job
+max_fuel_per_job = 100000
+
+# Concurrent job limit
+max_concurrent_jobs = 10
+</code></pre>
+<h3>Environment Variables</h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ICN_KEYSTORE_PASSPHRASE</code></td>
+<td>Daemon keystore passphrase (preferred)</td>
+<td>(prompt)</td>
+</tr>
+<tr>
+<td><code>ICN_PASSPHRASE</code></td>
+<td>CLI passphrase, daemon legacy fallback</td>
+<td>(prompt)</td>
+</tr>
+<tr>
+<td><code>ICN_GATEWAY_JWT_SECRET</code></td>
+<td>Gateway JWT secret</td>
+<td>(none)</td>
+</tr>
+<tr>
+<td><code>OTEL_EXPORTER_OTLP_ENDPOINT</code></td>
+<td>OpenTelemetry export endpoint</td>
+<td>(none)</td>
+</tr>
+<tr>
+<td><code>OTEL_SERVICE_NAME</code></td>
+<td>OpenTelemetry service name</td>
+<td><code>icn-node</code></td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Appendix C: API Reference</h2>
+<h3>REST Endpoints</h3>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Method</th>
+<th>Auth</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>/v1/auth/challenge</code></td>
+<td>POST</td>
+<td>No</td>
+<td>Get auth challenge</td>
+</tr>
+<tr>
+<td><code>/v1/auth/verify</code></td>
+<td>POST</td>
+<td>No</td>
+<td>Exchange signature for token</td>
+</tr>
+<tr>
+<td><code>/v1/identity/resolve/{did}</code></td>
+<td>GET</td>
+<td>No</td>
+<td>Resolve DID metadata</td>
+</tr>
+<tr>
+<td><code>/v1/ledger/{coop_id}/balance/{did}</code></td>
+<td>GET</td>
+<td>Yes</td>
+<td>Account balances</td>
+</tr>
+<tr>
+<td><code>/v1/ledger/{coop_id}/payment</code></td>
+<td>POST</td>
+<td>Yes</td>
+<td>Create transfer/payment</td>
+</tr>
+<tr>
+<td><code>/v1/ledger/{coop_id}/history</code></td>
+<td>GET</td>
+<td>Yes</td>
+<td>Transaction history</td>
+</tr>
+<tr>
+<td><code>/v1/gov/proposals</code></td>
+<td>GET</td>
+<td>Yes</td>
+<td>List proposals</td>
+</tr>
+<tr>
+<td><code>/v1/gov/proposals</code></td>
+<td>POST</td>
+<td>Yes</td>
+<td>Create proposal</td>
+</tr>
+<tr>
+<td><code>/v1/governance/vote</code></td>
+<td>POST</td>
+<td>Yes</td>
+<td>Cast vote</td>
+</tr>
+<tr>
+<td><code>/v1/trust/score</code></td>
+<td>GET</td>
+<td>Yes</td>
+<td>Query trust score</td>
+</tr>
+<tr>
+<td><code>/v1/health</code></td>
+<td>GET</td>
+<td>No</td>
+<td>Health check</td>
+</tr>
+<tr>
+<td><code>/v1/health/detailed</code></td>
+<td>GET</td>
+<td>No</td>
+<td>Detailed health</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Appendix D: Metrics Reference</h2>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icn_network_connections_active</code></td>
+<td>Gauge</td>
+<td>Current peer connections</td>
+</tr>
+<tr>
+<td><code>icn_network_bytes_sent_total</code></td>
+<td>Counter</td>
+<td>Total bytes sent</td>
+</tr>
+<tr>
+<td><code>icn_network_bytes_received_total</code></td>
+<td>Counter</td>
+<td>Total bytes received</td>
+</tr>
+<tr>
+<td><code>icn_gossip_entries_total</code></td>
+<td>Gauge</td>
+<td>Gossip store size</td>
+</tr>
+<tr>
+<td><code>icn_gossip_messages_sent_total</code></td>
+<td>Counter</td>
+<td>Gossip messages sent</td>
+</tr>
+<tr>
+<td><code>icn_ledger_entries_total</code></td>
+<td>Gauge</td>
+<td>Total ledger entries</td>
+</tr>
+<tr>
+<td><code>icn_ledger_quarantine_size</code></td>
+<td>Gauge</td>
+<td>Quarantined entries</td>
+</tr>
+<tr>
+<td><code>icn_trust_cache_hits_total</code></td>
+<td>Counter</td>
+<td>Trust cache hits</td>
+</tr>
+<tr>
+<td><code>icn_trust_cache_misses_total</code></td>
+<td>Counter</td>
+<td>Trust cache misses</td>
+</tr>
+<tr>
+<td><code>icn_fuel_consumed_total</code></td>
+<td>Counter</td>
+<td>Total fuel consumed</td>
+</tr>
+<tr>
+<td><code>icn_fuel_regenerated_total</code></td>
+<td>Counter</td>
+<td>Total fuel regenerated</td>
+</tr>
+<tr>
+<td><code>icn_compute_jobs_total</code></td>
+<td>Counter</td>
+<td>Compute jobs executed</td>
+</tr>
+<tr>
+<td><code>icn_compute_fuel_used_total</code></td>
+<td>Counter</td>
+<td>Compute fuel used</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Appendix E: Error Codes</h2>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Message</th>
+<th>Solution</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>E001</code></td>
+<td>Identity not initialized</td>
+<td>Run <code>icnctl id init</code></td>
+</tr>
+<tr>
+<td><code>E002</code></td>
+<td>Failed to unlock keystore</td>
+<td>Check passphrase</td>
+</tr>
+<tr>
+<td><code>E003</code></td>
+<td>No peers connected</td>
+<td>Check config, firewall</td>
+</tr>
+<tr>
+<td><code>E004</code></td>
+<td>Transaction rejected</td>
+<td>Check credit limit</td>
+</tr>
+<tr>
+<td><code>E005</code></td>
+<td>Proposal not found</td>
+<td>Verify proposal ID</td>
+</tr>
+<tr>
+<td><code>E006</code></td>
+<td>Not authorized</td>
+<td>Check permissions</td>
+</tr>
+<tr>
+<td><code>E007</code></td>
+<td>Rate limited</td>
+<td>Wait for fuel regeneration</td>
+</tr>
+<tr>
+<td><code>E008</code></td>
+<td>Insufficient fuel</td>
+<td>Wait or reduce operations</td>
+</tr>
+<tr>
+<td><code>E009</code></td>
+<td>Invalid signature</td>
+<td>Key mismatch or corruption</td>
+</tr>
+<tr>
+<td><code>E010</code></td>
+<td>Gossip sync failed</td>
+<td>Check network connectivity</td>
+</tr>
+<tr>
+<td><code>E011</code></td>
+<td>Quarantine full</td>
+<td>Resolve conflicts</td>
+</tr>
+<tr>
+<td><code>E012</code></td>
+<td>Contract execution failed</td>
+<td>Check CCL code</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Appendix F: Migration Guides</h2>
+<h3>v0.1.x to v0.2.x</h3>
+<p><strong>Breaking Changes:</strong></p>
+<ol>
+<li>Config key renames in TOML</li>
+<li>Metrics port moved from 9090 to 9100</li>
+<li>CLI command restructuring: <code>icnctl pay</code> → <code>icnctl ledger pay</code></li>
+</ol>
+<p><strong>Procedure:</strong></p>
+<pre><code class="language-bash"># Backup
+icnctl backup ~/pre-migration.tar.gz.age
+
+# Stop daemon
+sudo systemctl stop icnd
+
+# Build new version
+cd icn/icn
+git checkout v0.2.0
+cargo build --release
+sudo cp target/release/{icnd,icnctl} /usr/local/bin/
+
+# Run migration
+icnctl migrate --from v0.1.x --to v0.2.x
+
+# Start daemon
+sudo systemctl start icnd
+</code></pre>
+<hr>
+<h2>Appendix G: Legal and Compliance</h2>
+<h3>GDPR</h3>
+<p>ICN provides tools for GDPR compliance:</p>
+<table>
+<thead>
+<tr>
+<th>Right</th>
+<th>Support</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Access</td>
+<td><code>icnctl backup</code> exports all data</td>
+</tr>
+<tr>
+<td>Portability</td>
+<td><code>icnctl ledger history --format csv</code></td>
+</tr>
+<tr>
+<td>Rectification</td>
+<td>File dispute for corrections</td>
+</tr>
+</tbody></table>
+<p><strong>Erasure Note:</strong> ICN minimizes personal data. For erasure requests:</p>
+<ul>
+<li>Delete local mappings (names, labels)</li>
+<li>Stop re-publishing optional metadata</li>
+<li>Ledger entries are audit records and may be retained for accounting integrity</li>
+</ul>
+<h3>Tax Reporting</h3>
+<p>Cooperatives should:</p>
+<ol>
+<li>Export transaction history regularly</li>
+<li>Consult local tax regulations for mutual credit treatment</li>
+<li>Maintain records per jurisdiction requirements</li>
+</ol>
+<hr>
+<h2>Appendix H: Contributing</h2>
+<h3>Ways to Contribute</h3>
+<ul>
+<li>Report bugs via GitHub Issues</li>
+<li>Improve documentation</li>
+<li>Submit code (see CONTRIBUTING.md)</li>
+<li>Join pilot deployments</li>
+<li>Translate documentation</li>
+</ul>
+<h3>Development Setup</h3>
+<pre><code class="language-bash">git clone https://github.com/InterCooperative-Network/icn.git
+cd icn/icn
+cargo build
+cargo test
+</code></pre>
+<h3>Code Standards</h3>
+<ul>
+<li>Rust 2021 edition</li>
+<li><code>cargo fmt</code> before commits</li>
+<li><code>cargo clippy</code> warnings addressed</li>
+<li>Tests for new functionality</li>
+</ul>
+<hr>
+<h1>About This Manual</h1>
+<p><strong>ICN User Manual v1.1.1</strong>
+December 2025</p>
+<p><strong>License:</strong> CC BY-SA 4.0</p>
+<p><strong>Repository:</strong> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">https://github.com/InterCooperative-Network/icn</a></p>
+<p><strong>Feedback:</strong> File issues at the repository or contribute improvements.</p>
+<hr>
+<p><em>Welcome to the cooperative internet!</em></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

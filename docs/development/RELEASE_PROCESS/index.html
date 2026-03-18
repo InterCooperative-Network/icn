@@ -1,0 +1,460 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Release Process | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>development</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>RELEASE PROCESS</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/development/RELEASE_PROCESS.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Release Process</h1>
+<p><strong>Version</strong>: 1.0<br><strong>Last Updated</strong>: 2025-12-16<br><strong>Audience</strong>: Core maintainers</p>
+<hr>
+<h2>Release Types</h2>
+<p>ICN follows <a href="https://semver.org/" target="_blank" rel="noopener">Semantic Versioning 2.0.0</a>:</p>
+<ul>
+<li><strong>Major (x.0.0)</strong>: Breaking changes, incompatible API changes</li>
+<li><strong>Minor (0.x.0)</strong>: New features, backward compatible</li>
+<li><strong>Patch (0.0.x)</strong>: Bug fixes, backward compatible</li>
+</ul>
+<h3>Pre-release Tags</h3>
+<ul>
+<li><strong>Alpha (x.y.z-alpha.n)</strong>: Early development, unstable</li>
+<li><strong>Beta (x.y.z-beta.n)</strong>: Feature complete, testing</li>
+<li><strong>RC (x.y.z-rc.n)</strong>: Release candidate, final testing</li>
+</ul>
+<hr>
+<h2>Release Checklist</h2>
+<h3>1. Pre-Release (1 week before)</h3>
+<ul>
+<li><input disabled="" type="checkbox"> <strong>Create release branch</strong>: <code>git checkout -b release/v0.x.0</code></li>
+<li><input disabled="" type="checkbox"> <strong>Run full test suite</strong>: <code>cargo test --workspace --release</code></li>
+<li><input disabled="" type="checkbox"> <strong>Run benchmarks</strong>: <code>cargo bench --workspace</code></li>
+<li><input disabled="" type="checkbox"> <strong>Run security audit</strong>: <code>cargo audit</code></li>
+<li><input disabled="" type="checkbox"> <strong>Update dependencies</strong>: <code>cargo update</code> (review changes carefully)</li>
+<li><input disabled="" type="checkbox"> <strong>Update CHANGELOG.md</strong>: Document all changes since last release</li>
+<li><input disabled="" type="checkbox"> <strong>Update version numbers</strong>:<pre><code class="language-bash"># Update Cargo.toml workspace version
+sed -i &#39;s/version = &quot;0.1.0&quot;/version = &quot;0.2.0&quot;/&#39; icn/Cargo.toml
+</code></pre>
+</li>
+<li><input disabled="" type="checkbox"> <strong>Update documentation</strong>: Ensure all docs reflect new version</li>
+<li><input disabled="" type="checkbox"> <strong>Test deployment</strong>: Deploy to staging environment</li>
+<li><input disabled="" type="checkbox"> <strong>Notify pilot communities</strong>: Announce upcoming release</li>
+</ul>
+<h3>2. Release Candidate (3 days before)</h3>
+<ul>
+<li><input disabled="" type="checkbox"> <strong>Tag RC</strong>: <code>git tag v0.2.0-rc.1 &amp;&amp; git push origin v0.2.0-rc.1</code></li>
+<li><input disabled="" type="checkbox"> <strong>Build RC binaries</strong>:<pre><code class="language-bash">cargo build --release
+tar -czf icn-v0.2.0-rc.1-linux-x86_64.tar.gz -C target/release icnd icnctl
+sha256sum icn-v0.2.0-rc.1-linux-x86_64.tar.gz &gt; icn-v0.2.0-rc.1-linux-x86_64.tar.gz.sha256
+</code></pre>
+</li>
+<li><input disabled="" type="checkbox"> <strong>Test RC in staging</strong>: Run integration tests, load tests</li>
+<li><input disabled="" type="checkbox"> <strong>Gather feedback</strong>: Pilot communities test RC for 48 hours</li>
+<li><input disabled="" type="checkbox"> <strong>Fix critical issues</strong>: If found, create RC.2, RC.3, etc.</li>
+</ul>
+<h3>3. Release Day</h3>
+<ul>
+<li><input disabled="" type="checkbox"> <strong>Final checks</strong>: All tests pass, no critical issues</li>
+<li><input disabled="" type="checkbox"> <strong>Merge release branch</strong>: <pre><code class="language-bash">git checkout main
+git merge --no-ff release/v0.2.0
+</code></pre>
+</li>
+<li><input disabled="" type="checkbox"> <strong>Tag release</strong>: <code>git tag v0.2.0 &amp;&amp; git push origin v0.2.0</code></li>
+<li><input disabled="" type="checkbox"> <strong>Build release binaries</strong>:<pre><code class="language-bash">cargo build --release
+# Linux
+tar -czf icn-v0.2.0-linux-x86_64.tar.gz -C target/release icnd icnctl icn-console
+sha256sum icn-v0.2.0-linux-x86_64.tar.gz &gt; icn-v0.2.0-linux-x86_64.tar.gz.sha256
+
+# macOS (if cross-compiling or on macOS)
+# tar -czf icn-v0.2.0-macos-x86_64.tar.gz -C target/release icnd icnctl icn-console
+</code></pre>
+</li>
+<li><input disabled="" type="checkbox"> <strong>Create GitHub Release</strong>:<ul>
+<li>Title: <code>v0.2.0 - Release Name</code></li>
+<li>Body: Copy from CHANGELOG.md</li>
+<li>Attach: Binaries + checksums</li>
+<li>Mark as &quot;Latest Release&quot;</li>
+</ul>
+</li>
+<li><input disabled="" type="checkbox"> <strong>Publish SDKs</strong>:<pre><code class="language-bash">cd sdk/typescript
+npm version 0.2.0
+npm publish
+
+cd ../react-native
+npm version 0.2.0
+npm publish
+</code></pre>
+</li>
+<li><input disabled="" type="checkbox"> <strong>Update documentation site</strong>: Deploy updated docs</li>
+<li><input disabled="" type="checkbox"> <strong>Announce release</strong>:<ul>
+<li>GitHub Discussions</li>
+<li>Discord/Matrix</li>
+<li>Mailing list</li>
+<li>Social media</li>
+</ul>
+</li>
+</ul>
+<h3>4. Post-Release (1 day after)</h3>
+<ul>
+<li><input disabled="" type="checkbox"> <strong>Monitor for issues</strong>: Watch GitHub issues, Discord, logs</li>
+<li><input disabled="" type="checkbox"> <strong>Update pilot deployments</strong>: Coordinate upgrade with pilots</li>
+<li><input disabled="" type="checkbox"> <strong>Archive release branch</strong>: Delete release/v0.2.0 branch</li>
+<li><input disabled="" type="checkbox"> <strong>Plan next release</strong>: Create milestone for v0.3.0</li>
+</ul>
+<hr>
+<h2>CHANGELOG Format</h2>
+<p>Follow <a href="https://keepachangelog.com/" target="_blank" rel="noopener">Keep a Changelog</a>:</p>
+<pre><code class="language-markdown"># Changelog
+
+## [Unreleased]
+
+### Added
+- Feature X for Y use case
+
+### Changed
+- Improved Z performance by 20%
+
+### Deprecated
+- Legacy API endpoint /old/path
+
+### Removed
+- Support for deprecated feature W
+
+### Fixed
+- Bug causing crash on startup (#123)
+
+### Security
+- Patched CVE-2025-1234 in dependency X
+
+## [0.2.0] - 2025-12-16
+
+### Added
+- Multi-device identity support (Phase 11)
+- Economic safety rails (Phase 12)
+- Gateway REST API (Phase 14)
+
+...
+</code></pre>
+<hr>
+<h2>Version Numbering Strategy</h2>
+<h3>Current Phase: 0.x.y (Pre-1.0)</h3>
+<p><strong>Major version stays at 0</strong> until pilot-proven and API stable.</p>
+<p><strong>Minor version increments</strong> for:</p>
+<ul>
+<li>New substrate features (Phase completions)</li>
+<li>New SDK capabilities</li>
+<li>Significant architectural changes</li>
+</ul>
+<p><strong>Patch version increments</strong> for:</p>
+<ul>
+<li>Bug fixes</li>
+<li>Performance improvements</li>
+<li>Documentation updates</li>
+<li>Security patches</li>
+</ul>
+<h3>Target: 1.0.0 Release Criteria</h3>
+<p>To release 1.0.0, we need:</p>
+<ul>
+<li><input disabled="" type="checkbox"> 3+ successful pilot deployments (6+ months each)</li>
+<li><input disabled="" type="checkbox"> Complete Phase 1-20 (substrate complete)</li>
+<li><input disabled="" type="checkbox"> API stability guarantee (no breaking changes for 1 year)</li>
+<li><input disabled="" type="checkbox"> Security audit completed with no critical findings</li>
+<li><input disabled="" type="checkbox"> Production deployment guide validated</li>
+<li><input disabled="" type="checkbox"> 80%+ test coverage</li>
+<li><input disabled="" type="checkbox"> Documentation complete for all features</li>
+<li><input disabled="" type="checkbox"> SDK stability (TypeScript, React Native)</li>
+<li><input disabled="" type="checkbox"> Performance benchmarks meet SLOs</li>
+<li><input disabled="" type="checkbox"> Disaster recovery tested and verified</li>
+</ul>
+<hr>
+<h2>Breaking Change Policy</h2>
+<h3>Pre-1.0 (Current)</h3>
+<p>Breaking changes are <strong>allowed</strong> but should be:</p>
+<ul>
+<li>Documented in CHANGELOG with <code>[BREAKING]</code> tag</li>
+<li>Announced 1 release in advance (deprecation warning)</li>
+<li>Accompanied by migration guide</li>
+</ul>
+<p>Example:</p>
+<pre><code class="language-markdown">## [0.3.0] - 2025-01-15
+
+### Changed
+- [BREAKING] Gateway API authentication now requires `Bearer` token prefix (#456)
+  - Migration: Update clients to send `Authorization: Bearer &lt;token&gt;`
+  - Old format deprecated in v0.2.0, removed in v0.3.0
+</code></pre>
+<h3>Post-1.0</h3>
+<p>Breaking changes <strong>only in major versions</strong>:</p>
+<ul>
+<li>v1.x.y → v2.0.0</li>
+<li>Requires 6+ months deprecation period</li>
+<li>Must provide compatibility layer or migration tool</li>
+<li>Documented upgrade path required</li>
+</ul>
+<hr>
+<h2>Hotfix Process</h2>
+<p>For critical bugs in production:</p>
+<ol>
+<li><p><strong>Assess severity</strong>:</p>
+<ul>
+<li>Security vulnerability: Immediate hotfix</li>
+<li>Data loss risk: Immediate hotfix</li>
+<li>Service disruption: Immediate hotfix</li>
+<li>Other: Can wait for next release</li>
+</ul>
+</li>
+<li><p><strong>Create hotfix branch</strong>:</p>
+<pre><code class="language-bash">git checkout v0.2.0
+git checkout -b hotfix/v0.2.1
+</code></pre>
+</li>
+<li><p><strong>Fix and test</strong>:</p>
+<pre><code class="language-bash"># Make minimal changes to fix issue
+cargo test --workspace
+cargo clippy --workspace --all-targets -- -D warnings
+</code></pre>
+</li>
+<li><p><strong>Release hotfix</strong>:</p>
+<pre><code class="language-bash"># Update version to 0.2.1
+git commit -am &quot;Hotfix: Fix critical issue #789&quot;
+git tag v0.2.1
+git push origin v0.2.1
+
+# Merge back to main
+git checkout main
+git merge hotfix/v0.2.1
+git push origin main
+</code></pre>
+</li>
+<li><p><strong>Notify users</strong>: Urgent release announcement</p>
+</li>
+</ol>
+<hr>
+<h2>Compatibility Matrix</h2>
+<p>Document version compatibility in releases:</p>
+<table>
+<thead>
+<tr>
+<th>ICN Version</th>
+<th>TypeScript SDK</th>
+<th>React Native SDK</th>
+<th>Min Rust</th>
+<th>Min Protocol</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>0.2.0</td>
+<td>0.2.x</td>
+<td>0.2.x</td>
+<td>1.75.0</td>
+<td>v1</td>
+</tr>
+<tr>
+<td>0.1.0</td>
+<td>0.1.x</td>
+<td>0.1.x</td>
+<td>1.75.0</td>
+<td>v1</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Release Automation</h2>
+<h3>GitHub Actions Workflow (Future)</h3>
+<pre><code class="language-yaml"># .github/workflows/release.yml
+name: Release
+
+on:
+  push:
+    tags:
+      - &#39;v*&#39;
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      
+      - name: Build release binaries
+        run: |
+          cargo build --release
+          tar -czf icn-${{ github.ref_name }}-linux-x86_64.tar.gz \
+            -C target/release icnd icnctl icn-console
+          sha256sum icn-${{ github.ref_name }}-linux-x86_64.tar.gz &gt; \
+            icn-${{ github.ref_name }}-linux-x86_64.tar.gz.sha256
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            icn-${{ github.ref_name }}-linux-x86_64.tar.gz
+            icn-${{ github.ref_name }}-linux-x86_64.tar.gz.sha256
+          body_path: RELEASE_NOTES.md
+</code></pre>
+<hr>
+<h2>Communication Templates</h2>
+<h3>Release Announcement (Discord/GitHub)</h3>
+<pre><code class="language-markdown">🎉 **ICN v0.2.0 Released!**
+
+We&#39;re excited to announce ICN v0.2.0, featuring:
+
+✨ **New Features**
+- Multi-device identity support
+- Economic safety rails
+- Gateway REST API
+
+🐛 **Bug Fixes**
+- Fixed gossip convergence issue (#123)
+- Improved trust computation performance
+
+📦 **Downloads**
+- [Linux x86_64](https://github.com/icn/icn/releases/download/v0.2.0/icn-v0.2.0-linux-x86_64.tar.gz)
+- [Changelog](https://github.com/icn/icn/blob/main/CHANGELOG.md)
+
+📚 **Upgrade Guide**: See [version-upgrades.md](../migration-guides/version-upgrades.md)
+
+Questions? Ask in #support
+</code></pre>
+<h3>Security Hotfix Announcement</h3>
+<pre><code class="language-markdown">🚨 **Security Hotfix: ICN v0.2.1**
+
+A security vulnerability was discovered that could allow [brief description].
+
+**Severity**: High
+**CVE**: CVE-2025-XXXX (if assigned)
+**Affected Versions**: v0.2.0 and earlier
+**Fixed In**: v0.2.1
+
+**Action Required**: Upgrade immediately
+- Download: [v0.2.1](https://github.com/icn/icn/releases/tag/v0.2.1)
+- Upgrade guide: [version-upgrades.md](../migration-guides/version-upgrades.md)
+
+**Details**: [Security Advisory](https://github.com/icn/icn/security/advisories/GHSA-XXXX)
+
+For questions, contact security@icn.coop (PGP: 0xABCD1234)
+</code></pre>
+<hr>
+<h2>Deprecation Policy</h2>
+<ol>
+<li><strong>Announce deprecation</strong> in release notes and documentation</li>
+<li><strong>Add runtime warnings</strong> to deprecated features</li>
+<li><strong>Keep for 2 minor versions</strong> (minimum)</li>
+<li><strong>Remove in next major version</strong> (post-1.0)</li>
+</ol>
+<p>Example:</p>
+<pre><code class="language-rust">#[deprecated(since = &quot;0.2.0&quot;, note = &quot;Use new_function() instead&quot;)]
+pub fn old_function() {
+    // ...
+}
+</code></pre>
+<hr>
+<h2>Release Cadence</h2>
+<p><strong>Target Schedule</strong>:</p>
+<ul>
+<li><strong>Major releases</strong>: Annually (1.0, 2.0, ...)</li>
+<li><strong>Minor releases</strong>: Quarterly (0.1, 0.2, 0.3, 0.4)</li>
+<li><strong>Patch releases</strong>: As needed (bug fixes, security)</li>
+<li><strong>Pre-releases</strong>: 2 weeks before each release</li>
+</ul>
+<p><strong>Release Windows</strong>:</p>
+<ul>
+<li>Prefer mid-week (Tuesday/Wednesday)</li>
+<li>Avoid holidays</li>
+<li>Coordinate with pilot communities</li>
+</ul>
+<hr>
+<h2>Roll Back Procedure</h2>
+<p>If a release has critical issues:</p>
+<ol>
+<li><strong>Assess impact</strong>: Can we hotfix or must we rollback?</li>
+<li><strong>Communicate</strong>: Alert all users immediately</li>
+<li><strong>Yank release</strong> (if published to package managers):<pre><code class="language-bash">npm unpublish icn-sdk@0.2.0
+cargo yank --vers 0.2.0 icn-core
+</code></pre>
+</li>
+<li><strong>Remove GitHub release</strong>: Unmark as &quot;Latest Release&quot;</li>
+<li><strong>Document issue</strong>: Post-mortem analysis</li>
+<li><strong>Prepare fix</strong>: Either hotfix 0.2.1 or revert to 0.1.x</li>
+</ol>
+<hr>
+<h2>Tooling</h2>
+<p><strong>Required</strong>:</p>
+<ul>
+<li>Git</li>
+<li>Rust toolchain</li>
+<li>cargo (cargo-audit, cargo-outdated)</li>
+<li>GitHub CLI (gh)</li>
+<li>sha256sum</li>
+</ul>
+<p><strong>Optional</strong>:</p>
+<ul>
+<li>cargo-release (automates version bumping)</li>
+<li>conventional-changelog (generates CHANGELOG from commits)</li>
+</ul>
+<hr>
+<h2>Questions &amp; Support</h2>
+<ul>
+<li><strong>Release issues</strong>: Open issue with <code>release</code> label</li>
+<li><strong>Security concerns</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/mailto:security@icn.coop">security@icn.coop</a></li>
+<li><strong>General questions</strong>: #releases on Discord</li>
+</ul>
+<hr>
+<p><strong>Document Maintainer</strong>: Core Team<br><strong>Review Cadence</strong>: Before each major/minor release<br><strong>Last Review</strong>: 2025-12-16</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

@@ -1,0 +1,295 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Summit Decision Registry Demo | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>guides</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>user</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>summit demo</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/guides/user/summit-demo.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Summit Decision Registry Demo</h1>
+<p>This demo script demonstrates how ICN replaces Google Drive + bank statements for cooperative meeting decisions. It creates a meeting, records decisions (including a treasury spend), and shows the provenance chain.</p>
+<h2>Quick Start</h2>
+<pre><code class="language-bash"># Run in demo mode (no server required)
+./scripts/summit_demo.sh
+
+# Run against a live gateway
+export ICN_GATEWAY=&quot;http://localhost:8000&quot;
+export ICN_TOKEN=&quot;your-auth-token&quot;
+./scripts/summit_demo.sh
+</code></pre>
+<h2>What It Demonstrates</h2>
+<ol>
+<li><strong>Meeting Creation</strong> - Creates a summit planning meeting</li>
+<li><strong>Text Decisions</strong> - Records three governance decisions:<ul>
+<li>&quot;Approved: Use downtown venue for summit&quot;</li>
+<li>&quot;Approved: Catering budget cap at 500 credits&quot;</li>
+<li>&quot;Approved: Invite partner cooperatives&quot;</li>
+</ul>
+</li>
+<li><strong>Treasury Decision</strong> - Records a 200 credit disbursement with full provenance</li>
+<li><strong>Decision Registry</strong> - Displays all decisions with canonical hashes</li>
+<li><strong>Provenance Trace</strong> - Shows how treasury spend links to the decision</li>
+</ol>
+<h2>Environment Variables</h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ICN_GATEWAY</code></td>
+<td>Gateway REST API URL</td>
+<td><code>http://localhost:8000</code></td>
+</tr>
+<tr>
+<td><code>ICN_TOKEN</code></td>
+<td>JWT authentication token</td>
+<td>(none, enables demo mode)</td>
+</tr>
+<tr>
+<td><code>ICN_COOP_ID</code></td>
+<td>Cooperative DID</td>
+<td>(auto-generated demo DID)</td>
+</tr>
+</tbody></table>
+<h2>Sample Output</h2>
+<pre><code>╔═══════════════════════════════════════════════════════════════╗
+║              ICN SUMMIT DECISION REGISTRY DEMO                ║
+╚═══════════════════════════════════════════════════════════════╝
+
+▶ Setting up cooperative...
+  ✓ Using demo coop: did:icn:demo-summit-1234567890
+
+▶ Creating meeting: &quot;Summit Planning 2026-02-10&quot;...
+  ✓ Meeting ID: mtg-2026-02-10-summit-demo
+
+▶ Recording decisions...
+
+  ✓ Decision: &quot;Approved: Use downtown venue for summit&quot; (hash: abc123def456...)
+  ✓ Decision: &quot;Approved: Catering budget cap at 500 credits&quot; (hash: 789ghi012jkl...)
+  ✓ Decision: &quot;Approved: Invite partner cooperatives&quot; (hash: mno345pqr678...)
+  ✓ Decision: &quot;Disburse 200 credits to venue deposit&quot; (hash: stu901vwx234...) [TREASURY]
+
+═══════════════════════════════════════════════════════════════
+                     DECISION REGISTRY
+═══════════════════════════════════════════════════════════════
+
+┌────┬─────────────────────────────────────────┬───────────────┬──────────────┐
+│ #  │ Title                                   │ Type          │ Hash         │
+├────┼─────────────────────────────────────────┼───────────────┼──────────────┤
+│ 1  │ Approved: Use downtown venue for summit │ text          │ abc123def... │
+│ 2  │ Approved: Catering budget cap at 500 cr │ text          │ 789ghi012... │
+│ 3  │ Approved: Invite partner cooperatives   │ text          │ mno345pqr... │
+│ 4  │ Disburse 200 credits to venue deposit   │ treasury_spend│ stu901vwx... │
+└────┴─────────────────────────────────────────┴───────────────┴──────────────┘
+
+═══════════════════════════════════════════════════════════════
+                   TREASURY PROVENANCE TRACE
+═══════════════════════════════════════════════════════════════
+
+Decision: &quot;Disburse 200 credits to venue deposit&quot;
+  └─ Decision Hash: stu901vwx234...
+  └─ Decision Receipt ID: receipt-demo-stu901vwx234
+  └─ Effect: TreasuryEffect::Spend
+       ├─ Amount: 200 credits
+       ├─ From: treasury:did:icn:demo-summit-1234567890
+       └─ To: did:icn:venue-downtown-deposit
+  └─ Ledger Entry: entry-stu901vw (linked via decision_receipt_id)
+
+───────────────────────────────────────────────────────────────
+
+This is what you&#39;d have to reconstruct from:
+  - Shared Drive folder (meeting notes v3 final FINAL.docx)
+  - Email threads (&quot;did we approve this?&quot;)
+  - Bank statement (&quot;what was this $200 for?&quot;)
+
+With ICN: One query. Canonical. Cryptographically linked.
+</code></pre>
+<h2>API Endpoints Used</h2>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Endpoint</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>POST</td>
+<td><code>/v1/registry/meetings</code></td>
+<td>Create a meeting</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/v1/registry/decisions</code></td>
+<td>Index a decision</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/v1/registry/decisions</code></td>
+<td>List decisions (with filters)</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/v1/registry/decisions/{id}/trace</code></td>
+<td>Get provenance trace</td>
+</tr>
+</tbody></table>
+<h2>Running Against Live Gateway</h2>
+<ol>
+<li><p><strong>Start the ICN gateway</strong>:</p>
+<pre><code class="language-bash">cd icn &amp;&amp; cargo run --bin icnd
+</code></pre>
+</li>
+<li><p><strong>Get an authentication token</strong>:</p>
+<pre><code class="language-bash">./scripts/generate-test-token.sh
+</code></pre>
+</li>
+<li><p><strong>Run the demo</strong>:</p>
+<pre><code class="language-bash">export ICN_GATEWAY=&quot;http://localhost:8000&quot;
+export ICN_TOKEN=&quot;&lt;your-token&gt;&quot;
+./scripts/summit_demo.sh
+</code></pre>
+</li>
+</ol>
+<h2>Comparison: ICN vs Traditional Tools</h2>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Google Drive + Bank</th>
+<th>ICN</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Decision record</td>
+<td>Scattered documents</td>
+<td>Single canonical entry</td>
+</tr>
+<tr>
+<td>Treasury link</td>
+<td>Manual cross-reference</td>
+<td>Automatic provenance</td>
+</tr>
+<tr>
+<td>Audit trail</td>
+<td>Reconstruct from logs</td>
+<td>Query by hash</td>
+</tr>
+<tr>
+<td>Integrity</td>
+<td>Trust the platform</td>
+<td>Cryptographic proof</td>
+</tr>
+<tr>
+<td>Search</td>
+<td>Full-text guess</td>
+<td>Tag + filter + hash</td>
+</tr>
+</tbody></table>
+<h2>Technical Details</h2>
+<h3>Decision Index Entry Structure</h3>
+<pre><code class="language-json">{
+  &quot;decisionReceiptId&quot;: &quot;receipt-abc123&quot;,
+  &quot;decisionHash&quot;: &quot;abc123def456789...&quot;,
+  &quot;coopId&quot;: &quot;did:icn:my-coop&quot;,
+  &quot;meetingId&quot;: &quot;mtg-2026-02-10-summit&quot;,
+  &quot;title&quot;: &quot;Approved: Use downtown venue&quot;,
+  &quot;tags&quot;: [&quot;summit&quot;, &quot;approved&quot;],
+  &quot;status&quot;: &quot;approved&quot;,
+  &quot;proposalType&quot;: &quot;text&quot;,
+  &quot;createdAt&quot;: 1739203200
+}
+</code></pre>
+<h3>Treasury Effect Structure</h3>
+<pre><code class="language-json">{
+  &quot;treasuryEffect&quot;: {
+    &quot;amount&quot;: 200,
+    &quot;from&quot;: &quot;treasury:did:icn:my-coop&quot;,
+    &quot;to&quot;: &quot;did:icn:venue-account&quot;,
+    &quot;currency&quot;: &quot;credits&quot;
+  }
+}
+</code></pre>
+<h3>Provenance Trace Response</h3>
+<pre><code class="language-json">{
+  &quot;decisionHash&quot;: &quot;abc123...&quot;,
+  &quot;parentReceipts&quot;: [],
+  &quot;effects&quot;: [
+    {
+      &quot;type&quot;: &quot;treasury_disbursement&quot;,
+      &quot;details&quot;: { &quot;effectId&quot;: &quot;effect-xyz123&quot; }
+    }
+  ],
+  &quot;ledgerEntryId&quot;: &quot;entry-123&quot;,
+  &quot;provenanceChain&quot;: [&quot;receipt-abc123&quot;]
+}
+</code></pre>
+<h2>See Also</h2>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/cooperative-setup-guide">Cooperative Setup Guide</a></li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/WHY_ICN_HANDOUT">Why ICN Handout</a></li>
+<li><a href="/docs/reference/api/README">Gateway API Reference</a></li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

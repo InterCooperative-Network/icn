@@ -1,0 +1,245 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Identity Backend Configuration | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>reference</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>config</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>identity backend configuration</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/reference/config/identity-backend-configuration.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Identity Backend Configuration</h1>
+<p>This document describes how to configure ICN&#39;s identity keystore backend selection.</p>
+<h2>Overview</h2>
+<p>ICN supports multiple keystore backends for identity storage:</p>
+<ul>
+<li><strong>Age</strong> (default): Software-based encryption using the Age encryption format</li>
+<li><strong>PKCS#11</strong> (scaffolding): Hardware Security Module (HSM) support</li>
+<li><strong>TPM 2.0</strong> (scaffolding): Trusted Platform Module support</li>
+</ul>
+<h2>Configuration</h2>
+<p>Backend selection is configured in the <code>[identity]</code> section of your <code>icnd</code> config file (commonly <code>config.toml</code>):</p>
+<pre><code class="language-toml">[identity]
+backend = &quot;age&quot;  # Options: &quot;age&quot;, &quot;pkcs11&quot;, &quot;tpm&quot;
+</code></pre>
+<h3>Age Backend (Default)</h3>
+<p>The Age backend stores encrypted keys in a file at <code>{data_dir}/identity.age</code> (for default <code>data_dir</code>, typically <code>~/.local/share/icn/identity.age</code> on Linux). This is the recommended backend for most users and is the most mature backend in current ICN deployments.</p>
+<p><strong>Configuration:</strong></p>
+<pre><code class="language-toml">[identity]
+backend = &quot;age&quot;
+</code></pre>
+<p>No additional configuration required. The keystore file location is determined by the <code>data_dir</code> setting.</p>
+<p><strong>Features:</strong></p>
+<ul>
+<li>✅ Mature and widely used in current deployments</li>
+<li>✅ Cross-platform</li>
+<li>✅ Simple deployment</li>
+<li>✅ Passphrase protection</li>
+<li>✅ Key rotation support</li>
+</ul>
+<h3>PKCS#11 Backend (Scaffolding Only)</h3>
+<p><strong>⚠️ NOT PRODUCTION READY - SCAFFOLDING ONLY ⚠️</strong></p>
+<p>The PKCS#11 backend provides integration with Hardware Security Modules (HSMs) via the PKCS#11 standard. This backend is currently scaffolding only and will refuse to operate at runtime.</p>
+<p><strong>Status:</strong> Issue #744 tracks full implementation. The backend requires <code>IdentityBundle</code> refactoring to support hardware-backed keys with <code>DidKey::Hardware</code>.</p>
+<p><strong>Example Configuration (non-functional):</strong></p>
+<pre><code class="language-toml">[identity]
+backend = &quot;pkcs11&quot;
+
+[identity.pkcs11]
+library_path = &quot;/usr/lib/softhsm/libsofthsm2.so&quot;
+slot_id = 0
+key_label = &quot;icn-identity&quot;
+token_label = &quot;softhsm&quot;  # Optional
+</code></pre>
+<p><strong>Configuration Options:</strong></p>
+<ul>
+<li><code>library_path</code>: Path to PKCS#11 library (e.g., SoftHSM, YubiKey)</li>
+<li><code>slot_id</code>: HSM slot number</li>
+<li><code>key_label</code>: Label for the keypair in the HSM</li>
+<li><code>token_label</code>: Optional token label filter</li>
+</ul>
+<p><strong>Attempting to use this backend will result in:</strong></p>
+<pre><code>Error: PKCS#11 backend is scaffolding only and not yet functional.
+IdentityBundle must be hardware-keyed before enabling.
+</code></pre>
+<h3>TPM 2.0 Backend (Scaffolding Only)</h3>
+<p><strong>⚠️ NOT PRODUCTION READY - EXPERIMENTAL SCAFFOLDING ONLY ⚠️</strong></p>
+<p>The TPM backend seals keys to a Trusted Platform Module 2.0, providing hardware-based key protection and platform binding. This backend is currently scaffolding only and will refuse to operate at runtime.</p>
+<p><strong>Status:</strong> Issue #745 tracks full implementation. The backend requires key sealing/unsealing implementation and <code>IdentityBundle</code> refactoring for hardware-backed keys.</p>
+<p><strong>Example Configuration (non-functional):</strong></p>
+<pre><code class="language-toml">[identity]
+backend = &quot;tpm&quot;
+
+[identity.tpm]
+device_path = &quot;/dev/tpmrm0&quot;
+key_handle = 0x81000000
+platform_binding = true
+attestation = false
+</code></pre>
+<p><strong>Configuration Options:</strong></p>
+<ul>
+<li><code>device_path</code>: TPM device path (default: <code>/dev/tpmrm0</code>)</li>
+<li><code>key_handle</code>: Persistent handle for the key (must be in range 0x81000000-0x81FFFFFF)</li>
+<li><code>platform_binding</code>: Seal key to platform PCRs</li>
+<li><code>attestation</code>: Enable TPM attestation support</li>
+</ul>
+<p><strong>Attempting to use this backend will result in:</strong></p>
+<pre><code>Error: TPM backend is scaffolding only and not yet functional.
+Key sealing/unsealing + hardware-keyed IdentityBundle required.
+</code></pre>
+<h2>Backend Selection at Runtime</h2>
+<p>The backend is selected when <code>icnd</code> starts:</p>
+<ol>
+<li>Configuration is loaded from the file passed to <code>--config</code> (or from runtime defaults if <code>--config</code> is omitted)</li>
+<li>The <code>identity.backend</code> value is validated</li>
+<li>The appropriate backend is initialized</li>
+<li>For Age: keystore file is opened</li>
+<li>For hardware backends: clear error is returned</li>
+</ol>
+<p>Backend selection is logged during startup:</p>
+<pre><code>INFO Identity keystore found at: &quot;/home/user/.local/share/icn/identity.age&quot;
+INFO Using identity backend: age
+</code></pre>
+<h2>Migration</h2>
+<p>Currently, only the Age backend is functional, so no migration is needed. When hardware backends become available:</p>
+<ol>
+<li>The Age keystore will remain the default</li>
+<li>Users can opt-in to hardware backends by changing configuration</li>
+<li>Migration tools will be provided to transfer keys to hardware</li>
+<li>Key rotation can be used to switch backends</li>
+</ol>
+<h2>Security Considerations</h2>
+<h3>Age Backend</h3>
+<ul>
+<li><strong>Passphrase strength:</strong> Use a strong passphrase (32+ characters recommended)</li>
+<li><strong>Environment variables:</strong> Set <code>ICN_KEYSTORE_PASSPHRASE</code> for automated deployments</li>
+<li><strong>File permissions:</strong> Ensure <code>identity.age</code> is readable only by the ICN process owner</li>
+<li><strong>Backup:</strong> Securely backup the keystore file and passphrase</li>
+</ul>
+<h3>Hardware Backends (Future)</h3>
+<ul>
+<li><strong>PIN security:</strong> PINs should be strong and stored securely (not in config files)</li>
+<li><strong>Physical security:</strong> HSMs and TPMs provide tamper resistance</li>
+<li><strong>Platform binding:</strong> TPM keys are bound to specific hardware</li>
+<li><strong>Attestation:</strong> TPM attestation proves key origin and platform state</li>
+</ul>
+<h2>Validation</h2>
+<p>Configuration validation runs on startup. Common errors:</p>
+<p><strong>Unknown backend:</strong></p>
+<pre><code>Error: Unknown identity backend &#39;foo&#39; (valid: age, pkcs11, tpm)
+</code></pre>
+<p><strong>Missing hardware backend config:</strong></p>
+<pre><code>Error: identity.backend=pkcs11 requires [identity.pkcs11] config section
+</code></pre>
+<p><strong>Invalid TPM handle:</strong></p>
+<pre><code>Error: Invalid key_handle 0x1234 (must be in range 0x81000000-0x81FFFFFF)
+</code></pre>
+<p>Use <code>icnd --validate-config</code> to check configuration without starting the daemon:</p>
+<pre><code class="language-bash">$ icnd --config /path/to/config.toml --validate-config
+Validating configuration...
+
+✓ Configuration is valid
+
+Warnings:
+  ⚠ TPM backend is scaffolding only and not yet functional.
+    Key sealing/unsealing + hardware-keyed IdentityBundle required.
+</code></pre>
+<h2>Development</h2>
+<h3>Adding a New Backend</h3>
+<p>To add a new keystore backend:</p>
+<ol>
+<li>Implement the backend in <code>icn-identity/src/keystore_&lt;name&gt;.rs</code></li>
+<li>Add backend configuration to <code>icn-core/src/config/identity.rs</code></li>
+<li>Update the factory in <code>icn-identity/src/backend_factory.rs</code></li>
+<li>Add feature flag if needed</li>
+<li>Update validation logic</li>
+<li>Add tests</li>
+<li>Document the backend</li>
+</ol>
+<h3>Testing Hardware Backends</h3>
+<p>Hardware backends can be tested with:</p>
+<ul>
+<li><strong>SoftHSM:</strong> Software HSM for PKCS#11 testing</li>
+<li><strong>TPM Simulator:</strong> Software TPM 2.0 for development</li>
+</ul>
+<p>See issue #744 (PKCS#11) and #745 (TPM) for implementation details.</p>
+<h2>Future Work</h2>
+<p>Tracked in issues:</p>
+<ul>
+<li>#744: Complete PKCS#11 HSM backend implementation</li>
+<li>#745: Complete TPM 2.0 backend implementation</li>
+<li>#741: HSM/TPM Backend Implementation (parent issue)</li>
+</ul>
+<p>Key requirements:</p>
+<ul>
+<li><input disabled="" type="checkbox"> Refactor <code>IdentityBundle</code> to support <code>DidKey::Hardware</code></li>
+<li><input disabled="" type="checkbox"> Implement hardware signing delegation</li>
+<li><input disabled="" type="checkbox"> Add key migration tools</li>
+<li><input disabled="" type="checkbox"> Comprehensive hardware backend testing</li>
+<li><input disabled="" type="checkbox"> Security audit for hardware integration</li>
+<li><input disabled="" type="checkbox"> Production deployment guide</li>
+</ul>
+<h2>References</h2>
+<ul>
+<li><a href="https://age-encryption.org/" target="_blank" rel="noopener">Age encryption specification</a></li>
+<li><a href="https://docs.oasis-open.org/pkcs11/pkcs11-base/v3.0/pkcs11-base-v3.0.html" target="_blank" rel="noopener">PKCS#11 standard</a></li>
+<li><a href="https://trustedcomputinggroup.org/resource/tpm-library-specification/" target="_blank" rel="noopener">TPM 2.0 specification</a></li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/ARCHITECTURE#identity-layer#identity-layer">ICN Identity Architecture</a></li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

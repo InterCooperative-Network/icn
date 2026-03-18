@@ -1,0 +1,282 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Mobile Integration TODO | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>mobile</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>MOBILE TODO</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/mobile/MOBILE_TODO.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Mobile Integration TODO</h1>
+<h2>Completed ✅</h2>
+<h3>Phase 1: Core Infrastructure</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> ICN Context Provider with global state management</li>
+<li><input checked="" disabled="" type="checkbox"> Trust Graph Visualization (D3.js force-directed)</li>
+<li><input checked="" disabled="" type="checkbox"> Trust Attestation Form UI component</li>
+<li><input checked="" disabled="" type="checkbox"> Offline storage with IndexedDB</li>
+<li><input checked="" disabled="" type="checkbox"> Service worker with caching strategies</li>
+<li><input checked="" disabled="" type="checkbox"> Sync manager for background operations</li>
+</ul>
+<h3>Phase 2: Push Notifications</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> Notification listener methods in ICNClient</li>
+<li><input checked="" disabled="" type="checkbox"> useNotifications hook for React</li>
+<li><input checked="" disabled="" type="checkbox"> WebSocket event definitions (TrustAttested, TrustRevoked, TransactionCompleted)</li>
+<li><input checked="" disabled="" type="checkbox"> Trust API endpoints with event emission</li>
+<li><input checked="" disabled="" type="checkbox"> Trust routes registered in gateway server</li>
+</ul>
+<h3>Phase 3: Trust Graph Integration</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> Trust API backend (attest, revoke, score, edges, network)</li>
+<li><input checked="" disabled="" type="checkbox"> TrustManager with edge management</li>
+<li><input checked="" disabled="" type="checkbox"> Trust events broadcast to personal DID channels</li>
+<li><input checked="" disabled="" type="checkbox"> TrustGraph component wired to WebSocket updates</li>
+<li><input checked="" disabled="" type="checkbox"> useTrustGraph and useTrustScore hooks</li>
+</ul>
+<h2>Remaining Work 🔄</h2>
+<h3>1. Transaction Event Emission</h3>
+<p><strong>Priority: HIGH</strong>
+<strong>Effort: 2 hours</strong></p>
+<p>The ledger operations need to emit <code>TransactionCompleted</code> events:</p>
+<p><strong>Files to modify:</strong></p>
+<ul>
+<li><code>icn/crates/icn-gateway/src/api/ledger.rs</code></li>
+<li><code>icn/crates/icn-gateway/src/ledger_mgr.rs</code></li>
+</ul>
+<p><strong>Changes needed:</strong></p>
+<pre><code class="language-rust">// In create_payment endpoint
+let event = GatewayEvent::TransactionCompleted {
+    coop_id: coop_id.clone(),
+    hash: payment_hash,
+    from: from_did.to_string(),
+    to: to_did.to_string(),
+    amount,
+    currency: currency.clone(),
+};
+event_broadcaster.broadcast(&amp;coop_id, event).await;
+</code></pre>
+<h3>2. Conflict Resolution UI</h3>
+<p><strong>Priority: MEDIUM</strong>
+<strong>Effort: 4 hours</strong></p>
+<p>When offline operations sync, conflicts may arise. Need UI to handle:</p>
+<p><strong>Files to create:</strong></p>
+<ul>
+<li><code>web/app/components/ConflictResolutionDialog.tsx</code></li>
+<li><code>web/app/utils/conflictResolver.ts</code></li>
+</ul>
+<p><strong>Features:</strong></p>
+<ul>
+<li>Show conflicting operations side-by-side</li>
+<li>Allow user to choose which to keep</li>
+<li>Automatic resolution strategies (last-write-wins, merge)</li>
+<li>Undo/redo support</li>
+</ul>
+<h3>3. Error Boundaries</h3>
+<p><strong>Priority: MEDIUM</strong>
+<strong>Effort: 2 hours</strong></p>
+<p>Prevent component crashes from breaking the entire app:</p>
+<p><strong>Files to create:</strong></p>
+<ul>
+<li><code>web/app/components/ErrorBoundary.tsx</code></li>
+</ul>
+<p><strong>Features:</strong></p>
+<ul>
+<li>Catch React component errors</li>
+<li>Display friendly error message</li>
+<li>Log errors for debugging</li>
+<li>Provide reset button</li>
+</ul>
+<h3>4. Native Push Notifications</h3>
+<p><strong>Priority: MEDIUM</strong>
+<strong>Effort: 8 hours</strong></p>
+<p>For iOS/Android apps, integrate native push:</p>
+<p><strong>Files to modify:</strong></p>
+<ul>
+<li><code>web/app/utils/pushNotifications.ts</code> (create)</li>
+<li>FCM/APNs configuration</li>
+</ul>
+<p><strong>Features:</strong></p>
+<ul>
+<li>Request push permission</li>
+<li>Register device token with gateway</li>
+<li>Handle background notifications</li>
+<li>Deep linking to relevant screens</li>
+</ul>
+<h3>5. Trust Recommendations</h3>
+<p><strong>Priority: LOW</strong>
+<strong>Effort: 6 hours</strong></p>
+<p>Suggest trust attestations based on graph analysis:</p>
+<p><strong>Files to create:</strong></p>
+<ul>
+<li><code>web/app/components/TrustRecommendations.tsx</code></li>
+<li><code>icn/crates/icn-gateway/src/api/trust_recommendations.rs</code></li>
+</ul>
+<p><strong>Algorithm:</strong></p>
+<ul>
+<li>Find mutual connections</li>
+<li>Calculate trust transitivity</li>
+<li>Rank by interaction frequency</li>
+<li>Filter by trust threshold</li>
+</ul>
+<h3>6. Biometric Authentication</h3>
+<p><strong>Priority: LOW</strong>
+<strong>Effort: 4 hours</strong></p>
+<p>Add fingerprint/Face ID for sensitive operations:</p>
+<p><strong>Files to create:</strong></p>
+<ul>
+<li><code>web/app/utils/biometric.ts</code></li>
+</ul>
+<p><strong>Features:</strong></p>
+<ul>
+<li>Detect biometric availability</li>
+<li>Prompt for biometric auth before signing</li>
+<li>Fallback to PIN/password</li>
+<li>Secure keychain storage</li>
+</ul>
+<h3>7. Performance Monitoring</h3>
+<p><strong>Priority: LOW</strong>
+<strong>Effort: 3 hours</strong></p>
+<p>Add Sentry or similar for production monitoring:</p>
+<p><strong>Files to modify:</strong></p>
+<ul>
+<li><code>web/app/App.tsx</code> (add Sentry init)</li>
+<li><code>web/app/utils/analytics.ts</code> (create)</li>
+</ul>
+<p><strong>Metrics:</strong></p>
+<ul>
+<li>Error rates</li>
+<li>API latency</li>
+<li>WebSocket disconnects</li>
+<li>User journey tracking</li>
+</ul>
+<h3>8. A/B Testing Framework</h3>
+<p><strong>Priority: LOW</strong>
+<strong>Effort: 4 hours</strong></p>
+<p>Test different UI variations:</p>
+<p><strong>Files to create:</strong></p>
+<ul>
+<li><code>web/app/utils/experiments.ts</code></li>
+<li><code>web/app/hooks/useExperiment.ts</code></li>
+</ul>
+<p><strong>Features:</strong></p>
+<ul>
+<li>Feature flags</li>
+<li>Variant assignment</li>
+<li>Metrics collection</li>
+<li>Admin dashboard</li>
+</ul>
+<h2>Quick Wins (&lt; 1 hour each)</h2>
+<ol>
+<li><strong>Add loading states</strong> to all async operations</li>
+<li><strong>Add success animations</strong> for trust attestations</li>
+<li><strong>Implement pull-to-refresh</strong> on mobile screens</li>
+<li><strong>Add haptic feedback</strong> for button presses</li>
+<li><strong>Add skeleton loaders</strong> for data fetching</li>
+<li><strong>Improve accessibility</strong> (aria labels, screen reader support)</li>
+<li><strong>Add keyboard shortcuts</strong> for power users</li>
+<li><strong>Implement dark mode</strong> toggle</li>
+<li><strong>Add connection quality indicator</strong> (WebSocket status)</li>
+<li><strong>Create onboarding tutorial</strong> for first-time users</li>
+</ol>
+<h2>Testing Checklist</h2>
+<ul>
+<li><input disabled="" type="checkbox"> Test offline → online transition</li>
+<li><input disabled="" type="checkbox"> Test WebSocket reconnection</li>
+<li><input disabled="" type="checkbox"> Test trust attestation flow end-to-end</li>
+<li><input disabled="" type="checkbox"> Test with 100+ trust graph nodes</li>
+<li><input disabled="" type="checkbox"> Test on slow 3G connection</li>
+<li><input disabled="" type="checkbox"> Test with poor network (packet loss)</li>
+<li><input disabled="" type="checkbox"> Test memory usage over 24 hours</li>
+<li><input disabled="" type="checkbox"> Test battery impact</li>
+<li><input disabled="" type="checkbox"> Load test with 1000 notifications/sec</li>
+<li><input disabled="" type="checkbox"> Security audit of API endpoints</li>
+</ul>
+<h2>Documentation Needs</h2>
+<ul>
+<li><input disabled="" type="checkbox"> API reference for trust endpoints</li>
+<li><input disabled="" type="checkbox"> WebSocket event catalog</li>
+<li><input disabled="" type="checkbox"> Mobile app user guide</li>
+<li><input disabled="" type="checkbox"> Offline mode behavior documentation</li>
+<li><input disabled="" type="checkbox"> Trust graph visualization guide</li>
+<li><input disabled="" type="checkbox"> Deployment guide updates</li>
+<li><input disabled="" type="checkbox"> Troubleshooting FAQ</li>
+<li><input disabled="" type="checkbox"> Privacy policy for notifications</li>
+</ul>
+<h2>Deployment Preparation</h2>
+<ul>
+<li><input disabled="" type="checkbox"> Set up FCM project for push notifications</li>
+<li><input disabled="" type="checkbox"> Configure APNs certificates</li>
+<li><input disabled="" type="checkbox"> Set up CDN for static assets</li>
+<li><input disabled="" type="checkbox"> Configure production WebSocket server</li>
+<li><input disabled="" type="checkbox"> Set up monitoring (Sentry, Datadog)</li>
+<li><input disabled="" type="checkbox"> Create CI/CD pipeline</li>
+<li><input disabled="" type="checkbox"> Set up staging environment</li>
+<li><input disabled="" type="checkbox"> Create rollback procedure</li>
+<li><input disabled="" type="checkbox"> Load test with expected traffic</li>
+<li><input disabled="" type="checkbox"> Security penetration testing</li>
+</ul>
+<h2>Snapshot Status</h2>
+<p><strong>Lines of Code:</strong> ~5000 (mobile + backend integration)
+<strong>Test Coverage:</strong> 148 gateway tests passing
+<strong>Features Complete:</strong> ~70%
+<strong>Production Ready:</strong> ~60%</p>
+<p><strong>Estimated Time to MVP:</strong> 2-3 weeks
+<strong>Estimated Time to Production:</strong> 4-6 weeks</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

@@ -1,0 +1,1022 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Governance State Machine Specification | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>GOVERNANCE STATE MACHINE</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/GOVERNANCE_STATE_MACHINE.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Governance State Machine Specification</h1>
+<p><strong>Version:</strong> 1.0<br><strong>Status:</strong> NORMATIVE<br><strong>Last Updated:</strong> 2026-02-02</p>
+<h2>Abstract</h2>
+<p>This document specifies the governance state machine for ICN federations. It defines the state representation, state derivation rules, Merkle tree structure, state transition function, and genesis state requirements.</p>
+<h2>Keywords</h2>
+<p>The key words &quot;MUST&quot;, &quot;MUST NOT&quot;, &quot;REQUIRED&quot;, &quot;SHALL&quot;, &quot;SHALL NOT&quot;, &quot;SHOULD&quot;, &quot;SHOULD NOT&quot;, &quot;RECOMMENDED&quot;, &quot;MAY&quot;, and &quot;OPTIONAL&quot; in this document are to be interpreted as described in <a href="https://www.rfc-editor.org/rfc/rfc2119" target="_blank" rel="noopener">RFC 2119</a>.</p>
+<hr>
+<h2>1. Overview</h2>
+<h3>1.1 Purpose</h3>
+<p>The governance state machine is a deterministic finite state machine where:</p>
+<ul>
+<li><strong>State</strong> = Current federation configuration (members, balances, proposals, constitution)</li>
+<li><strong>Transitions</strong> = Governance proofs attesting to federation actions</li>
+<li><strong>Output</strong> = New state with updated configuration</li>
+</ul>
+<h3>1.2 Properties</h3>
+<p>The state machine MUST be:</p>
+<ul>
+<li><strong>Deterministic</strong>: Same inputs produce same outputs</li>
+<li><strong>Verifiable</strong>: State roots enable cryptographic verification</li>
+<li><strong>Replayable</strong>: Full history can be replayed from genesis</li>
+<li><strong>Partition-safe</strong>: Conflicting states can be detected and reconciled</li>
+</ul>
+<hr>
+<h2>2. State Representation</h2>
+<h3>2.1 GovernanceState Structure</h3>
+<pre><code class="language-rust">use std::collections::BTreeMap;
+use serde::{Serialize, Deserialize};
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct GovernanceState {
+    /// Federation identifier
+    pub federation_id: String,
+    
+    /// Current sequence number
+    pub sequence: u64,
+    
+    /// Current timestamp (Unix seconds)
+    pub timestamp: u64,
+    
+    /// Current state root (computed)
+    pub state_root: [u8; 32],
+    
+    /// Member cooperatives (DID -&gt; MemberInfo)
+    pub members: BTreeMap&lt;String, MemberInfo&gt;,
+    
+    /// Credit balances ((DID, currency) -&gt; balance)
+    pub balances: BTreeMap&lt;(String, String), i64&gt;,
+    
+    /// Constitution (current governance rules)
+    pub constitution: Constitution,
+    
+    /// Active proposals (proposal_id -&gt; Proposal)
+    pub proposals: BTreeMap&lt;String, Proposal&gt;,
+    
+    /// Historical decisions (proposal_id -&gt; Decision)
+    pub decisions: BTreeMap&lt;String, Decision&gt;,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct MemberInfo {
+    pub did: String,
+    pub name: String,
+    pub constitution_hash: [u8; 32],
+    pub joined_at: u64,
+    pub governance_weight: u64,
+    pub credit_limits: BTreeMap&lt;String, i64&gt;,  // currency -&gt; limit
+    pub public_key: [u8; 32],  // Ed25519 public key
+    pub status: MemberStatus,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = &quot;snake_case&quot;)]
+pub enum MemberStatus {
+    Active,
+    Paused,
+    Expelled,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Constitution {
+    pub version: u64,
+    pub hash: [u8; 32],
+    pub thresholds: BTreeMap&lt;ActionType, Threshold&gt;,
+    pub max_sequence_gap: u64,
+    pub proposal_duration_seconds: u64,
+    pub emergency_signatories: Vec&lt;String&gt;,  // Sorted DIDs
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
+pub struct Threshold {
+    pub numerator: u64,
+    pub denominator: u64,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Proposal {
+    pub id: String,
+    pub proposer: String,
+    pub action: FederationAction,
+    pub constitution_hash: [u8; 32],  // Locked at submission
+    pub submitted_at: u64,
+    pub voting_ends_at: u64,
+    pub state: ProposalState,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = &quot;snake_case&quot;)]
+pub enum ProposalState {
+    Open,
+    Approved,
+    Rejected,
+    NoQuorum,
+    Expired,
+    /// Emergency veto by privileged actor
+    Vetoed,
+}
+
+// Canonical numeric mapping for ProposalState
+// These values MUST be used when serializing as u8 for canonical encoding.
+// If enum declaration order differs from this mapping, this numeric mapping wins.
+impl ProposalState {
+    pub fn to_u8(&amp;self) -&gt; u8 {
+        match self {
+            ProposalState::Open =&gt; 0,
+            ProposalState::Approved =&gt; 1,
+            ProposalState::Rejected =&gt; 2,
+            ProposalState::NoQuorum =&gt; 3,
+            ProposalState::Expired =&gt; 4,
+            ProposalState::Vetoed =&gt; 5,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Decision {
+    pub proposal_id: String,
+    pub outcome: DecisionOutcome,
+    pub vote_tally: VoteTally,
+    pub decided_at: u64,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
+#[serde(rename_all = &quot;snake_case&quot;)]
+pub enum DecisionOutcome {
+    Approved,
+    Rejected,
+    NoQuorum,
+    /// Federation-specific: veto by privileged actor (e.g., emergency council)
+    Vetoed,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct VoteTally {
+    pub votes_for: u64,
+    pub votes_against: u64,
+    pub votes_abstain: u64,
+    pub eligible_voters: u64,
+    /// DIDs of voters (MUST be sorted lexicographically in canonical encoding)
+    pub signatories: Vec&lt;String&gt;,
+}
+</code></pre>
+<hr>
+<h2>3. State Derivation Rules</h2>
+<h3>3.1 Initial State (Genesis)</h3>
+<p>Genesis state MUST be constructed from:</p>
+<ol>
+<li>Federation configuration (member list, constitution)</li>
+<li>Initial sequence number (1)</li>
+<li>Initial timestamp (federation founding time)</li>
+<li>Empty balances (all balances = 0)</li>
+<li>No active proposals</li>
+</ol>
+<pre><code class="language-rust">impl GovernanceState {
+    pub fn genesis(
+        federation_id: String,
+        founding_members: Vec&lt;MemberInfo&gt;,
+        constitution: Constitution,
+        genesis_timestamp: u64,
+    ) -&gt; Result&lt;Self&gt; {
+        // Validate ≥2 members
+        if founding_members.len() &lt; 2 {
+            return Err(Error::InsufficientMembers);
+        }
+        
+        // Build member map (sorted)
+        let mut members = BTreeMap::new();
+        for member in founding_members {
+            members.insert(member.did.clone(), member);
+        }
+        
+        let state = GovernanceState {
+            federation_id,
+            sequence: 1,
+            timestamp: genesis_timestamp,
+            state_root: [0u8; 32],  // Computed below
+            members,
+            balances: BTreeMap::new(),
+            constitution,
+            proposals: BTreeMap::new(),
+            decisions: BTreeMap::new(),
+        };
+        
+        // Compute initial state root
+        let state_root = compute_state_root(&amp;state);
+        Ok(GovernanceState { state_root, ..state })
+    }
+}
+</code></pre>
+<h3>3.2 State Transition Function</h3>
+<p>Given current state <code>S_n</code> and governance proof <code>P_n+1</code>, derive new state <code>S_n+1</code>:</p>
+<pre><code class="language-rust">pub fn apply_proof(
+    mut state: GovernanceState,
+    proof: &amp;GovernanceProof,
+    action: &amp;FederationAction,
+) -&gt; Result&lt;GovernanceState&gt; {
+    // Verify proof is valid for current state
+    verify_governance_proof(proof, action, &amp;state)?;
+    
+    // Apply action to state
+    state = match action {
+        FederationAction::SettleCrossCoop { settlements } =&gt; {
+            apply_settle_cross_coop(state, settlements)?
+        }
+        
+        FederationAction::AdmitMember {
+            coop_did,
+            coop_name,
+            constitution_hash,
+            initial_credit_limit,
+            currency,
+            governance_weight,
+            ..
+        } =&gt; {
+            apply_admit_member(
+                state,
+                coop_did,
+                coop_name,
+                *constitution_hash,
+                *initial_credit_limit,
+                currency,
+                *governance_weight,
+                proof.timestamp,
+            )?
+        }
+        
+        FederationAction::ExpelMember { coop_did, final_settlement, .. } =&gt; {
+            apply_expel_member(state, coop_did, final_settlement.as_ref())?
+        }
+        
+        FederationAction::UpdateConstitution { new_constitution_hash, effective_timestamp, .. } =&gt; {
+            apply_update_constitution(state, *new_constitution_hash, *effective_timestamp)?
+        }
+        
+        FederationAction::UpdateCreditLimits { updates, .. } =&gt; {
+            apply_update_credit_limits(state, updates)?
+        }
+        
+        FederationAction::PauseMember { coop_did, .. } =&gt; {
+            apply_pause_member(state, coop_did)?
+        }
+        
+        FederationAction::ResumeMember { coop_did, .. } =&gt; {
+            apply_resume_member(state, coop_did)?
+        }
+        
+        FederationAction::RecordDecision { proposal_id, outcome, vote_tally, .. } =&gt; {
+            apply_record_decision(state, proposal_id, *outcome, vote_tally)?
+        }
+        
+        _ =&gt; state,  // Other actions don&#39;t modify state
+    };
+    
+    // Update sequence and timestamp
+    state.sequence = proof.sequence;
+    state.timestamp = proof.timestamp;
+    
+    // Recompute state root
+    state.state_root = compute_state_root(&amp;state);
+    
+    // Verify state root matches proof
+    if state.state_root != proof.state_root {
+        return Err(Error::StateRootMismatch {
+            expected: proof.state_root,
+            actual: state.state_root,
+        });
+    }
+    
+    Ok(state)
+}
+</code></pre>
+<h3>3.3 Action Application Functions</h3>
+<h4>3.3.1 SettleCrossCoop</h4>
+<pre><code class="language-rust">fn apply_settle_cross_coop(
+    mut state: GovernanceState,
+    settlements: &amp;[Settlement],
+) -&gt; Result&lt;GovernanceState&gt; {
+    for s in settlements {
+        // Update from_coop balance
+        let from_key = (s.from_coop.clone(), s.currency.clone());
+        let from_balance = state.balances.entry(from_key).or_insert(0);
+        *from_balance = from_balance.checked_sub(s.amount)
+            .ok_or(Error::IntegerOverflow)?;
+        
+        // Update to_coop balance
+        let to_key = (s.to_coop.clone(), s.currency.clone());
+        let to_balance = state.balances.entry(to_key).or_insert(0);
+        *to_balance = to_balance.checked_add(s.amount)
+            .ok_or(Error::IntegerOverflow)?;
+    }
+    
+    Ok(state)
+}
+</code></pre>
+<h4>3.3.2 Helper: DID Public Key Extraction</h4>
+<pre><code class="language-rust">/// Extracts the 32-byte Ed25519 public key from an ICN DID.
+/// 
+/// DID format: `did:icn:&lt;base58btc-encoded-pubkey&gt;`
+/// 
+/// # Errors
+/// - `InvalidDidFormat`: DID does not start with `did:icn:`
+/// - `InvalidBase58`: Identifier is not valid Base58btc
+/// - `InvalidKeyLength`: Decoded key is not exactly 32 bytes
+fn extract_public_key_from_did(did: &amp;str) -&gt; Result&lt;[u8; 32]&gt; {
+    // Validate DID prefix
+    if !did.to_lowercase().starts_with(&quot;did:icn:&quot;) {
+        return Err(Error::InvalidDidFormat);
+    }
+    
+    // Extract the identifier portion (after &quot;did:icn:&quot;)
+    let identifier = &amp;did[8..];
+    
+    // Base58btc decode
+    let decoded = bs58::decode(identifier)
+        .into_vec()
+        .map_err(|_| Error::InvalidBase58)?;
+    
+    // Validate length (Ed25519 public key = 32 bytes)
+    if decoded.len() != 32 {
+        return Err(Error::InvalidKeyLength {
+            expected: 32,
+            actual: decoded.len(),
+        });
+    }
+    
+    // Convert to fixed-size array
+    let mut pubkey = [0u8; 32];
+    pubkey.copy_from_slice(&amp;decoded);
+    Ok(pubkey)
+}
+</code></pre>
+<h4>3.3.3 AdmitMember</h4>
+<pre><code class="language-rust">fn apply_admit_member(
+    mut state: GovernanceState,
+    coop_did: &amp;str,
+    coop_name: &amp;str,
+    constitution_hash: [u8; 32],
+    initial_credit_limit: i64,
+    currency: &amp;str,
+    governance_weight: u64,
+    joined_at: u64,
+) -&gt; Result&lt;GovernanceState&gt; {
+    // Create member info
+    let mut credit_limits = BTreeMap::new();
+    credit_limits.insert(currency.to_string(), initial_credit_limit);
+    
+    let member_info = MemberInfo {
+        did: coop_did.to_string(),
+        name: coop_name.to_string(),
+        constitution_hash,
+        joined_at,
+        governance_weight,
+        credit_limits,
+        // Extract public key from DID using helper function above
+        public_key: extract_public_key_from_did(coop_did)?,
+        status: MemberStatus::Active,
+    };
+    
+    state.members.insert(coop_did.to_string(), member_info);
+    
+    // Initialize balance to 0
+    let balance_key = (coop_did.to_string(), currency.to_string());
+    state.balances.insert(balance_key, 0);
+    
+    Ok(state)
+}
+</code></pre>
+<h4>3.3.4 ExpelMember</h4>
+<pre><code class="language-rust">fn apply_expel_member(
+    mut state: GovernanceState,
+    coop_did: &amp;str,
+    final_settlement: Option&lt;&amp;Settlement&gt;,
+) -&gt; Result&lt;GovernanceState&gt; {
+    // Apply final settlement if present
+    if let Some(settlement) = final_settlement {
+        state = apply_settle_cross_coop(state, &amp;[settlement.clone()])?;
+    }
+    
+    // Update member status
+    if let Some(member) = state.members.get_mut(coop_did) {
+        member.status = MemberStatus::Expelled;
+        member.governance_weight = 0;
+    }
+    
+    Ok(state)
+}
+</code></pre>
+<h4>3.3.5 UpdateConstitution</h4>
+<pre><code class="language-rust">fn apply_update_constitution(
+    mut state: GovernanceState,
+    new_constitution_hash: [u8; 32],
+    effective_timestamp: u64,
+) -&gt; Result&lt;GovernanceState&gt; {
+    // Update constitution hash
+    state.constitution.hash = new_constitution_hash;
+    state.constitution.version += 1;
+    
+    // Note: Full constitution content is fetched separately by hash
+    
+    Ok(state)
+}
+</code></pre>
+<h4>3.3.6 UpdateCreditLimits</h4>
+<pre><code class="language-rust">fn apply_update_credit_limits(
+    mut state: GovernanceState,
+    updates: &amp;[CreditLimitUpdate],
+) -&gt; Result&lt;GovernanceState&gt; {
+    for update in updates {
+        if let Some(member) = state.members.get_mut(&amp;update.coop_did) {
+            member.credit_limits.insert(
+                update.currency.clone(),
+                update.new_limit,
+            );
+        }
+    }
+    
+    Ok(state)
+}
+</code></pre>
+<h4>3.3.7 PauseMember / ResumeMember</h4>
+<pre><code class="language-rust">fn apply_pause_member(
+    mut state: GovernanceState,
+    coop_did: &amp;str,
+) -&gt; Result&lt;GovernanceState&gt; {
+    if let Some(member) = state.members.get_mut(coop_did) {
+        member.status = MemberStatus::Paused;
+    }
+    Ok(state)
+}
+
+fn apply_resume_member(
+    mut state: GovernanceState,
+    coop_did: &amp;str,
+) -&gt; Result&lt;GovernanceState&gt; {
+    if let Some(member) = state.members.get_mut(coop_did) {
+        if member.status == MemberStatus::Paused {
+            member.status = MemberStatus::Active;
+        }
+    }
+    Ok(state)
+}
+</code></pre>
+<h4>3.3.8 RecordDecision</h4>
+<pre><code class="language-rust">fn apply_record_decision(
+    mut state: GovernanceState,
+    proposal_id: &amp;str,
+    outcome: DecisionOutcome,
+    vote_tally: &amp;VoteTally,
+) -&gt; Result&lt;GovernanceState&gt; {
+    // Update proposal state
+    if let Some(proposal) = state.proposals.get_mut(proposal_id) {
+        proposal.state = match outcome {
+            DecisionOutcome::Approved =&gt; ProposalState::Approved,
+            DecisionOutcome::Rejected =&gt; ProposalState::Rejected,
+            DecisionOutcome::NoQuorum =&gt; ProposalState::NoQuorum,
+            DecisionOutcome::Vetoed =&gt; ProposalState::Vetoed,
+        };
+    }
+    
+    // Record decision
+    let decision = Decision {
+        proposal_id: proposal_id.to_string(),
+        outcome,
+        vote_tally: vote_tally.clone(),
+        decided_at: state.timestamp,
+    };
+    
+    state.decisions.insert(proposal_id.to_string(), decision);
+    
+    Ok(state)
+}
+</code></pre>
+<hr>
+<h2>4. Merkle Tree Structure</h2>
+<h3>4.1 State Root Computation</h3>
+<p>The state root is a BLAKE3 hash over:</p>
+<ol>
+<li>Member registry (sorted by DID)</li>
+<li>Credit balances (sorted by (DID, currency))</li>
+<li>Constitution hash</li>
+<li>Proposals (sorted by ID)</li>
+<li>Decisions (sorted by ID)</li>
+<li>Sequence metadata</li>
+</ol>
+<pre><code class="language-rust">pub fn compute_state_root(state: &amp;GovernanceState) -&gt; [u8; 32] {
+    let mut hasher = blake3::Hasher::new();
+    
+    // Domain separation
+    hasher.update(b&quot;icn-federation:state-root:v1&quot;);
+    hasher.update(&amp;[0x00]);
+    
+    // Hash federation ID
+    hasher.update(state.federation_id.as_bytes());
+    
+    // Hash members (sorted by DID)
+    let mut members: Vec&lt;_&gt; = state.members.iter().collect();
+    members.sort_by_key(|(did, _)| *did);
+    
+    for (did, member_info) in members {
+        hasher.update(did.as_bytes());
+        hasher.update(&amp;member_info.governance_weight.to_le_bytes());
+        hasher.update(&amp;member_info.constitution_hash);
+        hasher.update(&amp;(member_info.status as u8).to_le_bytes());
+        
+        // Hash credit limits (sorted by currency)
+        let mut limits: Vec&lt;_&gt; = member_info.credit_limits.iter().collect();
+        limits.sort_by_key(|(currency, _)| *currency);
+        for (currency, limit) in limits {
+            hasher.update(currency.as_bytes());
+            hasher.update(&amp;limit.to_le_bytes());
+        }
+    }
+    
+    // Hash balances (sorted by (DID, currency))
+    let mut balances: Vec&lt;_&gt; = state.balances.iter().collect();
+    balances.sort_by_key(|(key, _)| *key);
+    
+    for ((did, currency), balance) in balances {
+        hasher.update(did.as_bytes());
+        hasher.update(currency.as_bytes());
+        hasher.update(&amp;balance.to_le_bytes());
+    }
+    
+    // Hash constitution
+    hasher.update(&amp;state.constitution.hash);
+    hasher.update(&amp;state.constitution.version.to_le_bytes());
+    
+    // Hash proposals (sorted by ID)
+    let mut proposals: Vec&lt;_&gt; = state.proposals.iter().collect();
+    proposals.sort_by_key(|(id, _)| *id);
+    
+    for (id, proposal) in proposals {
+        hasher.update(id.as_bytes());
+        hasher.update(&amp;proposal.constitution_hash);
+        hasher.update(&amp;proposal.state.to_u8().to_le_bytes());
+    }
+    
+    // Hash decisions (sorted by ID)
+    let mut decisions: Vec&lt;_&gt; = state.decisions.iter().collect();
+    decisions.sort_by_key(|(id, _)| *id);
+    
+    for (id, decision) in decisions {
+        hasher.update(id.as_bytes());
+        hasher.update(&amp;(decision.outcome as u8).to_le_bytes());
+    }
+    
+    // Hash sequence metadata
+    hasher.update(&amp;state.sequence.to_le_bytes());
+    hasher.update(&amp;state.timestamp.to_le_bytes());
+    
+    (*hasher.finalize().as_bytes()).into()
+}
+</code></pre>
+<h3>4.2 Incremental Updates</h3>
+<p>For efficiency, implementations MAY maintain incremental Merkle trees:</p>
+<pre><code class="language-rust">pub struct IncrementalStateRoot {
+    member_tree: MerkleTree,
+    balance_tree: MerkleTree,
+    proposal_tree: MerkleTree,
+    decision_tree: MerkleTree,
+}
+
+impl IncrementalStateRoot {
+    pub fn update_member(&amp;mut self, did: &amp;str, member_info: &amp;MemberInfo) {
+        let leaf_hash = hash_member(did, member_info);
+        self.member_tree.update(did, leaf_hash);
+    }
+    
+    pub fn root(&amp;self) -&gt; [u8; 32] {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b&quot;icn-federation:state-root:v1&quot;);
+        hasher.update(&amp;[0x00]);
+        hasher.update(&amp;self.member_tree.root());
+        hasher.update(&amp;self.balance_tree.root());
+        hasher.update(&amp;self.proposal_tree.root());
+        hasher.update(&amp;self.decision_tree.root());
+        (*hasher.finalize().as_bytes()).into()
+    }
+}
+</code></pre>
+<p><strong>Note:</strong> Incremental updates are an optimization. The canonical state root computation (§4.1) MUST be used for verification.</p>
+<hr>
+<h2>5. State Queries</h2>
+<h3>5.1 Member Queries</h3>
+<pre><code class="language-rust">impl GovernanceState {
+    pub fn get_member(&amp;self, did: &amp;str) -&gt; Option&lt;&amp;MemberInfo&gt; {
+        self.members.get(did)
+    }
+    
+    pub fn is_member(&amp;self, did: &amp;str) -&gt; bool {
+        self.members.contains_key(did)
+    }
+    
+    pub fn get_active_members(&amp;self) -&gt; Vec&lt;&amp;MemberInfo&gt; {
+        self.members.values()
+            .filter(|m| m.status == MemberStatus::Active)
+            .collect()
+    }
+    
+    pub fn get_total_governance_weight(&amp;self) -&gt; u64 {
+        self.members.values()
+            .filter(|m| m.status == MemberStatus::Active)
+            .map(|m| m.governance_weight)
+            .sum()
+    }
+}
+</code></pre>
+<h3>5.2 Balance Queries</h3>
+<pre><code class="language-rust">impl GovernanceState {
+    pub fn get_balance(&amp;self, did: &amp;str, currency: &amp;str) -&gt; i64 {
+        let key = (did.to_string(), currency.to_string());
+        *self.balances.get(&amp;key).unwrap_or(&amp;0)
+    }
+    
+    pub fn get_credit_limit(&amp;self, did: &amp;str, currency: &amp;str) -&gt; i64 {
+        self.members.get(did)
+            .and_then(|m| m.credit_limits.get(currency))
+            .copied()
+            .unwrap_or(0)
+    }
+    
+    pub fn get_all_balances(&amp;self, did: &amp;str) -&gt; BTreeMap&lt;String, i64&gt; {
+        self.balances.iter()
+            .filter_map(|((d, currency), balance)| {
+                if d == did {
+                    Some((currency.clone(), *balance))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+}
+</code></pre>
+<h3>5.3 Proposal Queries</h3>
+<pre><code class="language-rust">impl GovernanceState {
+    pub fn get_proposal(&amp;self, id: &amp;str) -&gt; Option&lt;&amp;Proposal&gt; {
+        self.proposals.get(id)
+    }
+    
+    pub fn get_open_proposals(&amp;self) -&gt; Vec&lt;&amp;Proposal&gt; {
+        self.proposals.values()
+            .filter(|p| p.state == ProposalState::Open)
+            .collect()
+    }
+    
+    pub fn get_decision(&amp;self, proposal_id: &amp;str) -&gt; Option&lt;&amp;Decision&gt; {
+        self.decisions.get(proposal_id)
+    }
+}
+</code></pre>
+<hr>
+<h2>6. Genesis State Requirements</h2>
+<h3>6.1 Founding Parameters</h3>
+<p>Genesis state MUST include:</p>
+<pre><code class="language-rust">pub struct FederationGenesis {
+    pub federation_id: String,
+    pub founding_timestamp: u64,
+    pub founding_members: Vec&lt;MemberInfo&gt;,
+    pub constitution: Constitution,
+    pub initial_balances: BTreeMap&lt;(String, String), i64&gt;,  // Optional
+}
+</code></pre>
+<h3>6.2 Validation</h3>
+<pre><code class="language-rust">impl FederationGenesis {
+    pub fn validate(&amp;self) -&gt; Result&lt;()&gt; {
+        // Require ≥2 founding members
+        if self.founding_members.len() &lt; 2 {
+            return Err(Error::InsufficientMembers {
+                required: 2,
+                actual: self.founding_members.len(),
+            });
+        }
+        
+        // Verify all members are distinct
+        let mut dids = HashSet::new();
+        for member in &amp;self.founding_members {
+            if !dids.insert(&amp;member.did) {
+                return Err(Error::DuplicateMember(member.did.clone()));
+            }
+        }
+        
+        // Verify all members have governance weight
+        for member in &amp;self.founding_members {
+            if member.governance_weight == 0 {
+                return Err(Error::ZeroGovernanceWeight);
+            }
+        }
+        
+        // Verify constitution is valid
+        self.constitution.validate()?;
+        
+        // Verify initial balances sum to zero per currency
+        let mut totals: BTreeMap&lt;String, i64&gt; = BTreeMap::new();
+        for ((_, currency), balance) in &amp;self.initial_balances {
+            let total = totals.entry(currency.clone()).or_insert(0);
+            *total = total.checked_add(*balance)
+                .ok_or(Error::IntegerOverflow)?;
+        }
+        
+        for (currency, total) in totals {
+            if total != 0 {
+                return Err(Error::GenesisBalanceViolation { currency, total });
+            }
+        }
+        
+        Ok(())
+    }
+}
+</code></pre>
+<h3>6.3 Bootstrap Process</h3>
+<pre><code class="language-rust">pub fn bootstrap_federation(genesis: FederationGenesis) -&gt; Result&lt;GovernanceState&gt; {
+    // Validate genesis parameters
+    genesis.validate()?;
+    
+    // Create genesis state
+    let mut state = GovernanceState::genesis(
+        genesis.federation_id,
+        genesis.founding_members,
+        genesis.constitution,
+        genesis.founding_timestamp,
+    )?;
+    
+    // Apply initial balances
+    for ((did, currency), balance) in genesis.initial_balances {
+        state.balances.insert((did, currency), balance);
+    }
+    
+    // Recompute state root
+    state.state_root = compute_state_root(&amp;state);
+    
+    Ok(state)
+}
+</code></pre>
+<hr>
+<h2>7. State Snapshot Format</h2>
+<h3>7.1 Snapshot Structure</h3>
+<pre><code class="language-rust">#[derive(Serialize, Deserialize)]
+pub struct StateSnapshot {
+    pub version: u32,
+    pub federation_id: String,
+    pub sequence: u64,
+    pub timestamp: u64,
+    pub state_root: [u8; 32],
+    pub state: GovernanceState,
+    pub signatures: Vec&lt;(String, [u8; 64])&gt;,  // (DID, signature)
+}
+</code></pre>
+<h3>7.2 Snapshot Verification</h3>
+<pre><code class="language-rust">pub fn verify_snapshot(snapshot: &amp;StateSnapshot) -&gt; Result&lt;()&gt; {
+    // Verify version
+    if snapshot.version != 1 {
+        return Err(Error::UnsupportedSnapshotVersion);
+    }
+    
+    // Recompute state root
+    let computed_root = compute_state_root(&amp;snapshot.state);
+    if computed_root != snapshot.state_root {
+        return Err(Error::StateRootMismatch {
+            expected: snapshot.state_root,
+            actual: computed_root,
+        });
+    }
+    
+    // Verify signatures (≥2/3 of governance weight)
+    let total_weight = snapshot.state.get_total_governance_weight();
+    let mut signed_weight = 0u64;
+    
+    let payload = snapshot_signature_payload(snapshot);
+    
+    for (did, signature) in &amp;snapshot.signatures {
+        let member = snapshot.state.get_member(did)
+            .ok_or(Error::UnknownMember(did.clone()))?;
+        
+        // Verify signature
+        let verifying_key = VerifyingKey::from_bytes(&amp;member.public_key)?;
+        let sig = Signature::from_bytes(signature)?;
+        verifying_key.verify(&amp;payload, &amp;sig)?;
+        
+        signed_weight += member.governance_weight;
+    }
+    
+    // Require ≥2/3 governance weight
+    if signed_weight * 3 &lt; total_weight * 2 {
+        return Err(Error::InsufficientSignatures {
+            signed: signed_weight,
+            total: total_weight,
+        });
+    }
+    
+    Ok(())
+}
+
+fn snapshot_signature_payload(snapshot: &amp;StateSnapshot) -&gt; Vec&lt;u8&gt; {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b&quot;icn-federation:snapshot:v1&quot;);
+    hasher.update(&amp;[0x00]);
+    hasher.update(&amp;snapshot.state_root);
+    hasher.update(&amp;snapshot.sequence.to_le_bytes());
+    hasher.update(&amp;snapshot.timestamp.to_le_bytes());
+    hasher.finalize().as_bytes().to_vec()
+}
+</code></pre>
+<hr>
+<h2>8. State Persistence</h2>
+<h3>8.1 Storage Requirements</h3>
+<p>Implementations MUST persist:</p>
+<ul>
+<li>Current state (full GovernanceState)</li>
+<li>All governance proofs (for replay verification)</li>
+<li>State snapshots (for efficient bootstrapping)</li>
+</ul>
+<p>Implementations SHOULD persist:</p>
+<ul>
+<li>Indexed queries (members, balances, proposals)</li>
+<li>State history (for auditing and dispute resolution)</li>
+</ul>
+<h3>8.2 Storage Format</h3>
+<p><strong>Recommended:</strong> Use Sled or RocksDB for persistent storage:</p>
+<pre><code class="language-rust">pub struct StateStore {
+    db: sled::Db,
+}
+
+impl StateStore {
+    pub fn save_state(&amp;self, state: &amp;GovernanceState) -&gt; Result&lt;()&gt; {
+        let key = format!(&quot;state:current:{}&quot;, state.federation_id);
+        let value = bincode::serialize(state)?;
+        self.db.insert(key.as_bytes(), value)?;
+        Ok(())
+    }
+    
+    pub fn load_state(&amp;self, federation_id: &amp;str) -&gt; Result&lt;GovernanceState&gt; {
+        let key = format!(&quot;state:current:{}&quot;, federation_id);
+        let value = self.db.get(key.as_bytes())?
+            .ok_or(Error::StateNotFound)?;
+        let state = bincode::deserialize(&amp;value)?;
+        Ok(state)
+    }
+    
+    pub fn save_proof(&amp;self, proof: &amp;GovernanceProof) -&gt; Result&lt;()&gt; {
+        let key = format!(&quot;proof:{}:{}&quot;, proof.federation_id, proof.sequence);
+        let value = bincode::serialize(proof)?;
+        self.db.insert(key.as_bytes(), value)?;
+        Ok(())
+    }
+}
+</code></pre>
+<hr>
+<h2>9. Compliance Checklist</h2>
+<p>Implementations MUST satisfy:</p>
+<h3>9.1 State Representation</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Uses <code>BTreeMap&lt;K, V&gt;</code> for all map fields</li>
+<li><input disabled="" type="checkbox"> Implements deterministic state root computation</li>
+<li><input disabled="" type="checkbox"> Maintains sequence and timestamp metadata</li>
+<li><input disabled="" type="checkbox"> Tracks member status (Active, Paused, Expelled)</li>
+</ul>
+<h3>9.2 State Transitions</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Implements deterministic state transition function</li>
+<li><input disabled="" type="checkbox"> Validates proofs before applying</li>
+<li><input disabled="" type="checkbox"> Uses checked arithmetic for balance updates</li>
+<li><input disabled="" type="checkbox"> Updates state root after each transition</li>
+<li><input disabled="" type="checkbox"> Verifies state root matches proof</li>
+</ul>
+<h3>9.3 Genesis State</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Validates ≥2 founding members</li>
+<li><input disabled="" type="checkbox"> Validates constitution</li>
+<li><input disabled="" type="checkbox"> Validates initial balances (sum to zero per currency)</li>
+<li><input disabled="" type="checkbox"> Computes genesis state root</li>
+</ul>
+<h3>9.4 Queries</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Provides member queries</li>
+<li><input disabled="" type="checkbox"> Provides balance queries</li>
+<li><input disabled="" type="checkbox"> Provides proposal queries</li>
+<li><input disabled="" type="checkbox"> Provides decision queries</li>
+</ul>
+<h3>9.5 Persistence</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Persists current state</li>
+<li><input disabled="" type="checkbox"> Persists all governance proofs</li>
+<li><input disabled="" type="checkbox"> Persists state snapshots</li>
+<li><input disabled="" type="checkbox"> Supports state replay from genesis</li>
+</ul>
+<h3>9.6 Verification</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Verifies state snapshots</li>
+<li><input disabled="" type="checkbox"> Verifies state root chain</li>
+<li><input disabled="" type="checkbox"> Detects and reports forks</li>
+</ul>
+<hr>
+<h2>10. Security Considerations</h2>
+<h3>10.1 State Manipulation</h3>
+<p><strong>Threat:</strong> Attacker modifies state outside governance protocol.</p>
+<p><strong>Mitigation:</strong></p>
+<ul>
+<li>All state changes MUST go through verified governance proofs</li>
+<li>State root chain enables detection of unauthorized changes</li>
+</ul>
+<h3>10.2 Integer Overflow</h3>
+<p><strong>Threat:</strong> Arithmetic overflow corrupts balances.</p>
+<p><strong>Mitigation:</strong></p>
+<ul>
+<li>Use checked arithmetic for all balance updates</li>
+<li>Use i64 for balances (±9 quintillion range)</li>
+</ul>
+<h3>10.3 State Root Collision</h3>
+<p><strong>Threat:</strong> Two different states produce same root.</p>
+<p><strong>Mitigation:</strong></p>
+<ul>
+<li>BLAKE3 provides 128-bit collision resistance</li>
+<li>Deterministic state root computation prevents manipulation</li>
+</ul>
+<h3>10.4 Snapshot Forgery</h3>
+<p><strong>Threat:</strong> Attacker creates fake state snapshot.</p>
+<p><strong>Mitigation:</strong></p>
+<ul>
+<li>Snapshots require ≥2/3 governance weight signatures</li>
+<li>Signatures cover state root, sequence, timestamp</li>
+</ul>
+<hr>
+<h2>11. References</h2>
+<ul>
+<li><a href="https://www.rfc-editor.org/rfc/rfc2119" target="_blank" rel="noopener">RFC 2119</a> - Key words for RFCs</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/FEDERATION_INTEROP_CONTRACT">FEDERATION_INTEROP_CONTRACT.md</a> - Protocol specification</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CANONICAL_ENCODING">CANONICAL_ENCODING.md</a> - Encoding rules</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/FEDERATION_ACTIONS">FEDERATION_ACTIONS.md</a> - Action specification</li>
+</ul>
+<hr>
+<p><strong>Document Status:</strong> NORMATIVE - Implementations MUST comply with this specification.</p>
+<p><strong>Change History:</strong></p>
+<ul>
+<li>2026-02-02: Initial version 1.0</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

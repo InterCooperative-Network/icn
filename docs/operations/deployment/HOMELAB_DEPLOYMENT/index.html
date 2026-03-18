@@ -1,0 +1,457 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Homelab Deployment | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>operations</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>deployment</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>HOMELAB DEPLOYMENT</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/operations/deployment/HOMELAB_DEPLOYMENT.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Homelab Deployment</h1>
+<p><strong>Status</strong>: ICN daemon running on K3s cluster. Rebuilt 2026-02-21 with registry-first architecture on Hyperion.</p>
+<h2>Cluster Overview</h2>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>K3s Version</strong></td>
+<td>v1.34.4+k3s1</td>
+</tr>
+<tr>
+<td><strong>K3s Control</strong></td>
+<td><code>k3s-control</code> (10.8.10.40) — 4 vCPU, 8GB RAM on Hyperion, tainted <code>NoSchedule</code></td>
+</tr>
+<tr>
+<td><strong>Worker 1</strong></td>
+<td><code>k3s-worker-1</code> (10.8.10.41) — 4 vCPU, 16GB RAM on node-2</td>
+</tr>
+<tr>
+<td><strong>Worker 2</strong></td>
+<td><code>k3s-worker-2</code> (10.8.10.42) — 4 vCPU, 16GB RAM on node-3</td>
+</tr>
+<tr>
+<td><strong>CI Runner</strong></td>
+<td><code>ci-runner</code> (10.8.10.46) — 8 vCPU, 6GB RAM on Hyperion (standalone, not in K3s)</td>
+</tr>
+<tr>
+<td><strong>Storage</strong></td>
+<td>NFS from Atlas (10.8.10.25) via <code>atlas-nfs</code> StorageClass (csi-driver-nfs v4.9.0)</td>
+</tr>
+<tr>
+<td><strong>Registry</strong></td>
+<td>In-cluster at <code>10.8.10.40:30500</code> (NFS-backed PVC)</td>
+</tr>
+<tr>
+<td><strong>Ports</strong></td>
+<td>7777/UDP (QUIC), 5601/TCP (RPC), 9100/TCP (Prometheus), 8080/TCP (Gateway)</td>
+</tr>
+</tbody></table>
+<h3>Image Strategy</h3>
+<p>All images use <code>imagePullPolicy: Always</code> and pull from the in-cluster registry at <code>10.8.10.40:30500</code>. SCP-based image sync is deprecated.</p>
+<pre><code class="language-bash"># Default deploy path (build + push to registry + rolling restart)
+cd deploy/k8s &amp;&amp; make fast-deploy
+</code></pre>
+<h2>Quick Commands</h2>
+<pre><code class="language-bash"># Deploy new version (registry-first, default path)
+cd deploy/k8s &amp;&amp; make fast-deploy
+
+# Deploy both daemon and UI
+cd deploy/k8s &amp;&amp; make fast-deploy-all
+
+# Check status
+make status
+# OR: ssh ubuntu@10.8.10.40 &quot;sudo kubectl -n icn get pods&quot;
+
+# View logs
+make logs
+# OR: ssh ubuntu@10.8.10.40 &quot;sudo kubectl -n icn logs -f deployment/icn-daemon&quot;
+</code></pre>
+<h2>Deployment Paths</h2>
+<table>
+<thead>
+<tr>
+<th>Target</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>make fast-deploy</code></td>
+<td>Build + push to registry + rolling restart (default)</td>
+</tr>
+<tr>
+<td><code>make fast-deploy-ui</code></td>
+<td>Build + push UI + restart</td>
+</tr>
+<tr>
+<td><code>make fast-deploy-all</code></td>
+<td>Both daemon and UI</td>
+</tr>
+<tr>
+<td><code>make full-deploy</code></td>
+<td>Legacy: build + SCP sync + deploy (deprecated)</td>
+</tr>
+</tbody></table>
+<h2>Monitoring Stack (rebuilt 2026-02-21)</h2>
+<p>Deployed via <code>kube-prometheus-stack</code> Helm chart in <code>monitoring</code> namespace.</p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Access</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Grafana</strong></td>
+<td><a href="http://10.8.10.40:30300" target="_blank" rel="noopener">http://10.8.10.40:30300</a></td>
+<td>Default admin/prom-operator</td>
+</tr>
+<tr>
+<td><strong>Prometheus</strong></td>
+<td><a href="http://10.8.10.40:30090" target="_blank" rel="noopener">http://10.8.10.40:30090</a></td>
+<td>Scrapes ICN metrics</td>
+</tr>
+<tr>
+<td><strong>AlertManager</strong></td>
+<td>K3s internal only</td>
+<td>Via kube-prometheus-stack</td>
+</tr>
+</tbody></table>
+<h2>CI/CD Pipeline (rebuilt 2026-02-21)</h2>
+<p><strong>Self-Hosted GitHub Actions Runner</strong> on dedicated VM (not inside K3s).</p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Runner Name</strong></td>
+<td><code>ci-runner</code></td>
+</tr>
+<tr>
+<td><strong>Runner Host</strong></td>
+<td><code>ci-runner</code> VM (10.8.10.46) on Hyperion</td>
+</tr>
+<tr>
+<td><strong>Specs</strong></td>
+<td>8 vCPU, 6GB RAM, 80GB disk</td>
+</tr>
+<tr>
+<td><strong>Labels</strong></td>
+<td><code>self-hosted, linux, x64, homelab, k3s</code></td>
+</tr>
+<tr>
+<td><strong>Rust</strong></td>
+<td>1.88.0 with sccache</td>
+</tr>
+<tr>
+<td><strong>Docker</strong></td>
+<td>Configured with insecure registry (10.8.10.40:30500)</td>
+</tr>
+<tr>
+<td><strong>kubectl</strong></td>
+<td>Has kubeconfig for cluster access</td>
+</tr>
+</tbody></table>
+<p><strong>Runner Management</strong>:</p>
+<pre><code class="language-bash">ssh ubuntu@10.8.10.46 &quot;sudo systemctl status actions.runner.InterCooperative-Network-icn.ci-runner&quot;
+ssh ubuntu@10.8.10.46 &quot;journalctl -u actions.runner.InterCooperative-Network-icn.ci-runner -f&quot;
+</code></pre>
+<h2>Pilot Testing Status (2025-12-05)</h2>
+<p><strong>5-Node Pilot Network</strong> on K3s with P2P mesh topology.</p>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Status</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Identity</strong></td>
+<td>✅ Working</td>
+<td>All 5 nodes have unique DIDs</td>
+</tr>
+<tr>
+<td><strong>Trust Graph</strong></td>
+<td>⏳ Blocked</td>
+<td>Needs image rebuild (#46)</td>
+</tr>
+<tr>
+<td><strong>Governance</strong></td>
+<td>✅ Working</td>
+<td>Domain, proposal, voting via Gateway</td>
+</tr>
+<tr>
+<td><strong>Ledger</strong></td>
+<td>✅ Working</td>
+<td>Mutual credit transactions via Gateway</td>
+</tr>
+<tr>
+<td><strong>Compute</strong></td>
+<td>✅ Fixed</td>
+<td>Gateway connected to ComputeHandle</td>
+</tr>
+<tr>
+<td><strong>Contracts</strong></td>
+<td>✅ Fixed</td>
+<td>icnctl runtime bug resolved</td>
+</tr>
+</tbody></table>
+<p><strong>Test Commands</strong> (via Gateway API):</p>
+<pre><code class="language-bash">TOKEN=$(icnctl auth token --gateway http://10.8.10.40:30080 --coop pilot-coop)
+curl -H &quot;Authorization: Bearer $TOKEN&quot; http://10.8.10.40:30080/v1/gov/domains
+</code></pre>
+<h2>SDIS &amp; Steward Dashboard (deployed 2025-12-13)</h2>
+<p><strong>Sovereign Digital Identity System</strong> with steward verification network.</p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Access</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Pilot UI</strong></td>
+<td><a href="http://10.8.10.40:30030" target="_blank" rel="noopener">http://10.8.10.40:30030</a></td>
+</tr>
+<tr>
+<td><strong>Steward Dashboard</strong></td>
+<td><a href="http://10.8.10.40:30030/steward-dashboard.html" target="_blank" rel="noopener">http://10.8.10.40:30030/steward-dashboard.html</a></td>
+</tr>
+<tr>
+<td><strong>SDIS Enrollment</strong></td>
+<td><a href="http://10.8.10.40:30030/sdis-enrollment.html" target="_blank" rel="noopener">http://10.8.10.40:30030/sdis-enrollment.html</a></td>
+</tr>
+<tr>
+<td><strong>Gateway API</strong></td>
+<td><a href="http://10.8.10.40:30080/v1/sdis/" target="_blank" rel="noopener">http://10.8.10.40:30080/v1/sdis/</a>*</td>
+</tr>
+</tbody></table>
+<h3>SDIS API Endpoints</h3>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Method</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>/v1/sdis/health</code></td>
+<td>GET</td>
+<td>Service health check</td>
+</tr>
+<tr>
+<td><code>/v1/sdis/enrollment/start</code></td>
+<td>POST</td>
+<td>Start new enrollment</td>
+</tr>
+<tr>
+<td><code>/v1/sdis/verify/level1</code></td>
+<td>POST</td>
+<td>Device proof verification</td>
+</tr>
+<tr>
+<td><code>/v1/sdis/verify/level2</code></td>
+<td>POST</td>
+<td>Steward vouch verification</td>
+</tr>
+<tr>
+<td><code>/v1/sdis/enrollment/complete</code></td>
+<td>POST</td>
+<td>Complete enrollment</td>
+</tr>
+<tr>
+<td><code>/v1/sdis/pending</code></td>
+<td>GET</td>
+<td>List pending enrollments (steward)</td>
+</tr>
+<tr>
+<td><code>/v1/sdis/status/{id}</code></td>
+<td>GET</td>
+<td>Get enrollment status</td>
+</tr>
+<tr>
+<td><code>/v1/sdis/vouch/{id}</code></td>
+<td>POST</td>
+<td>Submit steward vouch</td>
+</tr>
+<tr>
+<td><code>/v1/sdis/reject/{id}</code></td>
+<td>POST</td>
+<td>Reject enrollment</td>
+</tr>
+<tr>
+<td><code>/v1/sdis/steward/stats</code></td>
+<td>GET</td>
+<td>Steward statistics</td>
+</tr>
+<tr>
+<td><code>/v1/sdis/steward/history</code></td>
+<td>GET</td>
+<td>Vouch history</td>
+</tr>
+</tbody></table>
+<h3>Quick Test Commands</h3>
+<pre><code class="language-bash"># Check SDIS health
+curl http://10.8.10.40:30080/v1/sdis/health
+
+# List pending enrollments
+curl http://10.8.10.40:30080/v1/sdis/pending
+
+# Get steward stats
+curl http://10.8.10.40:30080/v1/sdis/steward/stats
+
+# Start an enrollment
+curl -X POST http://10.8.10.40:30080/v1/sdis/enrollment/start \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{&quot;identity_name&quot;:&quot;Test User&quot;,&quot;coop_id&quot;:&quot;pilot-coop&quot;}&#39;
+</code></pre>
+<h3>Verification Levels</h3>
+<table>
+<thead>
+<tr>
+<th>Level</th>
+<th>Description</th>
+<th>Required</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>0</strong></td>
+<td>Enrollment started</td>
+<td>Identity name, coop ID</td>
+</tr>
+<tr>
+<td><strong>1</strong></td>
+<td>Device verified</td>
+<td>Device signature proof</td>
+</tr>
+<tr>
+<td><strong>2</strong></td>
+<td>Steward vouched</td>
+<td>Steward approval + statement</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Deployment History</h2>
+<h3>Infrastructure Rebuild (2026-02-21)</h3>
+<p>Full tear-down and rebuild:</p>
+<ul>
+<li>Moved control plane from node-1 (undersized 2 vCPU/8GB) to Hyperion (4 vCPU/8GB)</li>
+<li>Workers: 16GB RAM each (up from 8GB)</li>
+<li>Dedicated CI runner VM on Hyperion (8 vCPU, not inside K3s)</li>
+<li>Registry-first image strategy (<code>imagePullPolicy: Always</code>)</li>
+<li>NFS CSI driver v4.9.0 (replaces broken csi-nfs-controller)</li>
+<li>Prometheus + Grafana via kube-prometheus-stack Helm chart</li>
+<li>4 coop instances (alpha, beta, gamma, delta)</li>
+</ul>
+<h3>Initial Deployment (2025-12-03)</h3>
+<p>Manual deployment with fixes for:</p>
+<ol>
+<li>GLIBC compatibility - Ubuntu 24.04 base image</li>
+<li>STUN port conflict - Disabled STUN</li>
+<li>Governance topic - Created before GovernanceActor spawn</li>
+<li>Memory limit - Increased to 2Gi</li>
+<li>Health probe - Port 9100 (metrics)</li>
+</ol>
+<h3>Automated System (2025-12-04)</h3>
+<ul>
+<li>Kubernetes manifests in <code>deploy/k8s/</code></li>
+<li>Build scripts with <code>.dockerignore</code> optimization</li>
+<li>Image sync automation</li>
+<li>Comprehensive documentation</li>
+</ul>
+<h2>Related Documentation</h2>
+<table>
+<thead>
+<tr>
+<th>Resource</th>
+<th>Location</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Dev Environment</strong></td>
+<td><a href="/docs/guides/developer/DEV_ENVIRONMENT">DEV_ENVIRONMENT.md</a> - icn-dev VM details</td>
+</tr>
+<tr>
+<td><strong>Homelab Inventory</strong></td>
+<td><code>/home/matt/homelab-inventory</code></td>
+</tr>
+<tr>
+<td><strong>ICN Launchpad</strong></td>
+<td><code>/home/matt/homelab-inventory/projects/icn/ICN_LAUNCHPAD.md</code></td>
+</tr>
+<tr>
+<td><strong>K3s Cluster Docs</strong></td>
+<td><code>/home/matt/homelab-inventory/projects/icn/docs/K3S_CLUSTER.md</code></td>
+</tr>
+<tr>
+<td><strong>Deployment Plans</strong></td>
+<td><code>/home/matt/homelab-inventory/projects/icn/docs/DEPLOYMENT_PLANS.md</code></td>
+</tr>
+</tbody></table>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

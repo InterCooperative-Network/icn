@@ -1,0 +1,623 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>CoopOS: ICN-Native Linux Distribution | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>vision</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>COOPOS</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/vision/COOPOS.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>CoopOS: ICN-Native Linux Distribution</h1>
+<p><strong>Version</strong>: 0.1.0
+<strong>Status</strong>: Vision/Design Phase
+<strong>Last Updated</strong>: 2025-01-25</p>
+<blockquote>
+<p><strong>Note</strong>: This document describes a long-term vision. CoopOS is not yet in development. The realistic timeline is 2-3 years after kernel stabilization.</p>
+</blockquote>
+<hr>
+<h2>Executive Summary</h2>
+<p>CoopOS is a Linux distribution purpose-built for cooperative organizations, where ICN is the native identity and coordination layer. This isn&#39;t about replacing Windows - it&#39;s about building the primary operating system for cooperative enterprise from the ground up.</p>
+<p><strong>Key insight</strong>: Every workstation becomes a node in the cooperative cloud, contributing resources when idle while prioritizing local user experience.</p>
+<hr>
+<h2>The Cooperative Cloud</h2>
+<p>ICN as a whole functions as a <strong>cooperative cloud</strong> - distributed infrastructure owned and operated by the cooperative movement, not rented from corporations.</p>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────────┐
+│                         THE COOPERATIVE CLOUD                                │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  Traditional Cloud:                                                          │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  Amazon/Google/Microsoft own the servers                             │   │
+│  │  You rent compute, storage, bandwidth                                │   │
+│  │  They extract profit, control your data                              │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                              │
+│  Cooperative Cloud:                                                          │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  Coops collectively own the infrastructure                           │   │
+│  │  Each org contributes compute, storage, bandwidth                    │   │
+│  │  Resources shared via mutual aid, not rent extraction               │   │
+│  │  Democratic governance of shared infrastructure                      │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<hr>
+<h2>Org Nodes as Centralized Services</h2>
+<p>Each cooperative runs <strong>org nodes</strong> that serve the same function as traditional enterprise servers:</p>
+<table>
+<thead>
+<tr>
+<th>Windows Server Provides</th>
+<th>ICN Org Nodes Provide</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Active Directory (identity)</td>
+<td>DID-based identity + SSO</td>
+</tr>
+<tr>
+<td>Group Policy (device mgmt)</td>
+<td>Capability-based policies</td>
+</tr>
+<tr>
+<td>File Server (shared storage)</td>
+<td>Namespaced state + sync</td>
+</tr>
+<tr>
+<td>SQL Server (databases)</td>
+<td>Event logs + KV stores</td>
+</tr>
+<tr>
+<td>Exchange (email/calendar)</td>
+<td>Comms primitives + apps</td>
+</tr>
+<tr>
+<td>WSUS (updates)</td>
+<td>App deployment via manifests</td>
+</tr>
+</tbody></table>
+<p><strong>Key difference:</strong></p>
+<ul>
+<li>Windows Server is proprietary, licensed per-seat</li>
+<li>ICN org nodes are cooperative-owned, no licensing</li>
+<li>Resources can be shared across the federation</li>
+</ul>
+<hr>
+<h2>Workstations as Network Nodes</h2>
+<p>When a workstation runs CoopOS and joins an org, it becomes a <strong>node in the network</strong> - not just a client consuming services, but a contributor to collective infrastructure.</p>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────────┐
+│                 WORKSTATION = NODE (NOT JUST CLIENT)                         │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  Traditional model:                                                          │
+│  ┌─────────────┐         ┌─────────────┐                                   │
+│  │ Workstation │────────►│   Server    │  Workstation consumes              │
+│  │  (client)   │◄────────│  (provider) │  Server provides                   │
+│  └─────────────┘         └─────────────┘  One-way dependency                │
+│                                                                              │
+│  ICN model:                                                                  │
+│  ┌─────────────┐         ┌─────────────┐                                   │
+│  │ Workstation │◄───────►│  Org Nodes  │  Workstation contributes AND       │
+│  │   (node)    │◄───────►│   (nodes)   │  consumes. Mutual aid.            │
+│  └─────────────┘         └─────────────┘                                    │
+│        │                                                                     │
+│        └──────────────────►┌─────────────┐                                  │
+│                            │  Network    │  Workstation also contributes    │
+│                            │   (cloud)   │  to broader cooperative cloud    │
+│                            └─────────────┘                                  │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<hr>
+<h2>Resource Priority Hierarchy</h2>
+<p>The core principle: <strong>minimum latency for users, maximum contribution to the collective</strong>.</p>
+<h3>Priority Levels</h3>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────────┐
+│                    RESOURCE PRIORITY HIERARCHY                               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  PRIORITY 1: LOCAL (User&#39;s workstation)                                     │
+│  ════════════════════════════════════════                                   │
+│  • Compute: User&#39;s active tasks get full local CPU/GPU                      │
+│  • Storage: Hot data cached locally for instant access                      │
+│  • Bandwidth: User&#39;s network requests prioritized                           │
+│  • Goal: Minimum latency, best UX for the person at the keyboard           │
+│                                                                              │
+│  PRIORITY 2: ORG (Cooperative&#39;s collective resources)                       │
+│  ═══════════════════════════════════════════════════                        │
+│  • Compute: Idle cycles contribute to org workloads                         │
+│  • Storage: Org data replicated across org workstations                     │
+│  • Bandwidth: Org sync traffic before external traffic                      │
+│  • Goal: Org self-sufficiency, reduce external dependencies                │
+│                                                                              │
+│  PRIORITY 3: NETWORK (Cooperative cloud)                                    │
+│  ═══════════════════════════════════════                                    │
+│  • Compute: Remaining idle cycles to federation/network                     │
+│  • Storage: Contribute to distributed storage pool                          │
+│  • Bandwidth: Assist network routing, content distribution                  │
+│  • Goal: Collective infrastructure for the movement                         │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<h3>Example: Alice&#39;s Workstation Throughout the Day</h3>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────────┐
+│                    EXAMPLE: ALICE&#39;S WORKSTATION                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  9:00 AM - Alice actively working                                           │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  CPU: 80% Alice&#39;s apps │ 15% Org background │ 5% Network            │   │
+│  │  RAM: 12GB Alice       │ 3GB Org cache      │ 1GB Network           │   │
+│  │  Net: Alice traffic prioritized, sync in background                  │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                              │
+│  12:00 PM - Alice at lunch (workstation idle)                               │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  CPU: 5% System        │ 60% Org batch jobs │ 35% Network compute   │   │
+│  │  RAM: 2GB System       │ 8GB Org tasks      │ 6GB Network cache     │   │
+│  │  Net: Org sync primary, network contribution secondary               │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                              │
+│  6:00 PM - Alice logged out (workstation on but unused)                     │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  CPU: 5% System        │ 40% Org overnight  │ 55% Network compute   │   │
+│  │  RAM: 2GB System       │ 6GB Org tasks      │ 8GB Network cache     │   │
+│  │  Net: Heavy contribution to cooperative cloud                        │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                              │
+│  Alice returns - resources INSTANTLY reprioritized to local                 │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<hr>
+<h2>CoopOS Architecture</h2>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────────┐
+│                           COOPOS WORKSTATION                                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                    PRODUCTIVITY APPLICATIONS                         │   │
+│  │  LibreOffice, GIMP, Inkscape, Firefox, Thunderbird, etc.            │   │
+│  │  + ICN-native apps: Governance, Ledger, Scheduling, Inventory...    │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                        │
+│                                    ▼                                        │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                    ICN DESKTOP INTEGRATION                           │   │
+│  │  • DID-based login (SSO everywhere)                                  │   │
+│  │  • Capability-based file/resource access                             │   │
+│  │  • Encrypted sync across devices                                     │   │
+│  │  • Org-managed app deployment                                        │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                        │
+│                                    ▼                                        │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                    ICN NODE (EMBEDDED)                               │   │
+│  │  • Full node capabilities (not just a client)                        │   │
+│  │  • Resource scheduler (Local → Org → Network priority)              │   │
+│  │  • State sync with org nodes                                         │   │
+│  │  • Compute contribution manager                                      │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                        │
+│                                    ▼                                        │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                      LINUX BASE (Debian/Fedora)                      │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<hr>
+<h2>Key Features</h2>
+<h3>1. DID-Based Login</h3>
+<pre><code>┌─────────────────────────────────────────────────────────────────┐
+│                      LOGIN EXPERIENCE                            │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  [Tap badge / Insert key]                                       │
+│  [Biometric / PIN confirm]                                      │
+│  → Logged in as did:icn:z6MkAlice...                           │
+│  → ICN verifies DID against org membership                     │
+│  → Capability tokens loaded for this session                   │
+│  → Org policies applied                                         │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+
+Login methods:
+• Hardware security key (YubiKey, etc.)
+• NFC badge tap
+• Biometric + PIN
+• Phone wallet approval (push notification)
+• Traditional password (fallback, discouraged)
+</code></pre>
+<h3>2. Capability-Based Access Control</h3>
+<pre><code class="language-rust">// Alice holds capability token granting read access to /finance/ until 2025-12-31
+
+// Benefits:
+// • Explicit, auditable grants
+// • Time-limited by default
+// • Delegable without admin intervention
+// • Revocable instantly
+// • Works offline (token is self-contained)
+</code></pre>
+<h3>3. Single Sign-On Across All Applications</h3>
+<pre><code>┌─────────────────────────────────────────────────────────────────┐
+│                    SINGLE SIGN-ON FLOW                           │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  1. User logs into CoopOS (DID authentication)                  │
+│                                                                  │
+│  2. Session established with capability tokens                  │
+│                                                                  │
+│  3. User opens any application:                                 │
+│     • LibreOffice → &quot;Save to org shared drive&quot; works           │
+│     • Firefox → Org intranet recognizes user automatically     │
+│     • Thunderbird → Email creds derived from DID               │
+│     • ICN Governance → Already logged in                        │
+│     • Third-party web apps → ICN OAuth bridge                  │
+│                                                                  │
+│  4. All access uses same capability tokens                      │
+│     • No separate passwords per application                     │
+│     • No password managers needed                               │
+│     • Unified audit log                                         │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+</code></pre>
+<h3>4. Distributed Compute Contribution</h3>
+<pre><code>┌─────────────────────────────────────────────────────────────────┐
+│                    COMPUTE CONTRIBUTION                          │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  IDLE WORKSTATION                                                │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │ While Alice is at lunch, her workstation:                │   │
+│  │ • Runs org batch jobs (report generation, backups)      │   │
+│  │ • Processes governance app reducers                      │   │
+│  │ • Contributes to federation compute pool                 │   │
+│  │ • Earns compute credits for the org                      │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                  │
+│  CONTRIBUTION TIERS                                              │
+│  ─────────────────                                               │
+│  Personal:     Contribute to own tasks only                     │
+│  Org pool:     Contribute to org&#39;s collective compute           │
+│  Federation:   Contribute to federated coop compute pool        │
+│  Network:      Contribute to global ICN network compute         │
+│                                                                  │
+│  RESOURCE LIMITS (user-configurable)                            │
+│  ─────────────────────────────────────                          │
+│  cpu_contribution: 50%  # When idle                             │
+│  memory_reserved: 4GB   # Always keep for local use             │
+│  storage_shared: 100GB  # For distributed storage               │
+│  network_hours: 9am-6pm # Only contribute during work hours     │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+</code></pre>
+<h3>5. Org-Managed App Deployment</h3>
+<pre><code class="language-yaml"># Org defines standard workstation configuration
+# Deployed via ICN, not proprietary tools
+
+# org-workstation-policy.yaml
+workstation_policy:
+  org: did:icn:food-coop
+  version: 2025.01
+
+  required_apps:
+    - name: libreoffice
+      version: &quot;&gt;=7.5&quot;
+    - name: icn-governance
+      version: &quot;&gt;=1.0&quot;
+    - name: icn-ledger-ui
+      version: &quot;&gt;=1.0&quot;
+    - name: org-inventory-app
+      source: /food-coop/apps/inventory
+
+  security:
+    screen_lock_timeout: 5m
+    require_hardware_key: true
+    allow_usb_storage: false
+
+  network:
+    dns_servers: [10.0.0.1, 10.0.0.2]  # Org DNS
+    proxy: http://proxy.foodcoop.internal:8080
+
+  sync:
+    org_shared_drive: /food-coop/shared/
+    personal_backup: /food-coop/members/{did}/backup/
+</code></pre>
+<h3>6. Encrypted Sync Across Devices</h3>
+<pre><code>┌─────────────────────────────────────────────────────────────────┐
+│                    MULTI-DEVICE SYNC                             │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Alice has:                                                      │
+│  • Desktop at work (CoopOS)                                     │
+│  • Laptop for remote work (CoopOS)                              │
+│  • Phone (ICN wallet app)                                       │
+│                                                                  │
+│  All devices sync via ICN:                                      │
+│  • Documents in personal namespace                               │
+│  • Application settings                                          │
+│  • Credentials and capabilities                                  │
+│  • Encryption keys (via secure device-to-device transfer)       │
+│                                                                  │
+│  End-to-end encrypted:                                           │
+│  • Org nodes route sync traffic                                 │
+│  • But cannot read contents (encrypted to Alice&#39;s keys)         │
+│  • Even org admins cannot access Alice&#39;s personal files         │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+</code></pre>
+<hr>
+<h2>Workstation Onboarding</h2>
+<h3>Adding Workstations to an Org</h3>
+<pre><code>┌─────────────────────────────────────────────────────────────────┐
+│                 WORKSTATION ONBOARDING FLOW                      │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  1. INSTALL COOPOS                                              │
+│     • Fresh install or existing Linux + ICN packages            │
+│     • User creates personal DID during setup                    │
+│                                                                  │
+│  2. JOIN ORG                                                     │
+│     • User authenticates to org with existing membership        │
+│     • OR requests membership (org approval flow)                │
+│     • Workstation receives org configuration                    │
+│                                                                  │
+│  3. CONFIGURE CONTRIBUTION                                       │
+│     • User sets resource limits (or accepts org defaults)       │
+│     • Local node syncs org state                                │
+│     • Workstation begins contributing to org pool               │
+│                                                                  │
+│  4. OPERATIONAL                                                  │
+│     • DID-based SSO works for all org resources                │
+│     • Org apps available locally                                │
+│     • Resources flow: Local → Org → Network                    │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+</code></pre>
+<h3>Contribution Configuration</h3>
+<pre><code class="language-yaml"># /etc/icn/contribution.yaml
+
+# User-level limits (what this workstation contributes)
+contribution:
+  # When user is ACTIVE (typing, clicking, etc.)
+  active:
+    cpu_available: 20%      # Keep 80% for user
+    memory_available: 2GB   # Keep rest for user
+    network_priority: user_first
+
+  # When user is IDLE (no input for 5+ minutes)
+  idle:
+    cpu_available: 70%      # Most CPU available
+    memory_available: 8GB   # More memory available
+    network_priority: balanced
+
+  # When user is AWAY (screen locked, logged out)
+  away:
+    cpu_available: 90%      # Almost all CPU available
+    memory_available: 12GB  # Almost all memory
+    network_priority: contribution_first
+
+# Priority order for contributed resources
+priority:
+  1: local           # Always highest - user&#39;s own tasks
+  2: org             # Second - org&#39;s collective workloads
+  3: federation      # Third - federated coops
+  4: network         # Fourth - broader cooperative cloud
+
+# Org-level policies (can override/constrain user settings)
+org_policy:
+  minimum_contribution:
+    idle_cpu: 50%           # Org requires at least 50% when idle
+  restricted_hours:
+    contribution_only: false # Don&#39;t force contribution during work hours
+  data_sovereignty:
+    keep_org_data_in_org: true  # Org data doesn&#39;t leave org nodes
+</code></pre>
+<hr>
+<h2>Technical Components</h2>
+<h3>Required Development</h3>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Description</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>PAM Module</td>
+<td><code>pam_icn.so</code> for Linux login via DID</td>
+<td>Not started</td>
+</tr>
+<tr>
+<td>FUSE Filesystem</td>
+<td>Mount ICN namespaces as regular filesystems</td>
+<td>Not started</td>
+</tr>
+<tr>
+<td>Desktop Integration</td>
+<td>GNOME/KDE widgets, file manager, notifications</td>
+<td>Not started</td>
+</tr>
+<tr>
+<td>Resource Scheduler</td>
+<td>Priority-based resource allocation</td>
+<td>Not started</td>
+</tr>
+<tr>
+<td>Compute Contribution</td>
+<td>WASM job execution for network</td>
+<td>Not started</td>
+</tr>
+</tbody></table>
+<h3>PAM Module for ICN Authentication</h3>
+<pre><code class="language-c">// pam_icn.so - Pluggable Authentication Module
+// Allows Linux login via ICN DID
+
+// Login flow:
+// 1. User presents hardware key / biometric
+// 2. PAM module contacts local ICN node
+// 3. ICN node verifies DID and org membership
+// 4. Capability tokens cached in kernel keyring
+// 5. Session established with ICN identity
+</code></pre>
+<h3>FUSE Filesystem for ICN Storage</h3>
+<pre><code class="language-bash"># Mount ICN namespaces as regular filesystems
+$ mount -t icnfs /org/food-coop/shared /mnt/shared
+$ mount -t icnfs /personal/alice /home/alice/icn
+
+# Files are automatically:
+# • Encrypted at rest (user&#39;s keys)
+# • Synced across devices
+# • Access-controlled via capabilities
+# • Versioned (ICN event log)
+</code></pre>
+<h3>Desktop Integration</h3>
+<ul>
+<li>GNOME/KDE integration for ICN wallet</li>
+<li>System tray showing connection status</li>
+<li>File manager integration (ICN namespaces appear as drives)</li>
+<li>Notification system for governance proposals, transfers</li>
+<li>Screen lock tied to ICN session</li>
+</ul>
+<hr>
+<h2>Why This Matters</h2>
+<h3>For Small Coops (5-20 people)</h3>
+<ul>
+<li>No IT department needed - identity and SSO work out of the box</li>
+<li>Computers &quot;just work&quot; with org identity</li>
+<li>Shared drives without complex setup</li>
+<li>Every workstation strengthens the org&#39;s infrastructure</li>
+</ul>
+<h3>For Larger Coops (50+ people)</h3>
+<ul>
+<li>Democratic control over IT infrastructure</li>
+<li>Compute resources shared efficiently across the org</li>
+<li>Easier onboarding (DID badge, instant access)</li>
+<li>Unified audit trail for compliance</li>
+<li>Org&#39;s workstations collectively provide server-class infrastructure</li>
+</ul>
+<h3>For the Movement</h3>
+<ul>
+<li>Cooperative cloud built from member contributions</li>
+<li>Not dependent on any corporation for infrastructure</li>
+<li>Federated across coops (shared compute, shared apps)</li>
+<li>Training materials and IT expertise shared across movement</li>
+<li>IT mutual aid between coops - help each other, not help desks</li>
+</ul>
+<h3>The Math Works</h3>
+<pre><code>Small coop: 10 workstations × 8 idle hours/day = 80 compute-hours/day for org
+Medium coop: 50 workstations × 8 idle hours = 400 compute-hours/day for org
+Federation: 10 coops × 50 workstations = 4,000 compute-hours/day shared
+
+This is serious infrastructure, owned by the movement.
+</code></pre>
+<hr>
+<h2>Development Roadmap</h2>
+<h3>Current Status</h3>
+<p><strong>Phase</strong>: Vision/design phase. Not yet in development.</p>
+<h3>Dependencies</h3>
+<p>Requires stable kernel primitives first. CoopOS builds on:</p>
+<ul>
+<li>Identity primitive (for DID login)</li>
+<li>Authorization primitive (for capability-based access)</li>
+<li>State primitive (for synced filesystems)</li>
+<li>Compute primitive (for distributed workloads)</li>
+<li>Naming primitive (for resource discovery)</li>
+</ul>
+<h3>Realistic Timeline</h3>
+<p><strong>2-3 years after kernel stabilization</strong></p>
+<h3>Incremental Path</h3>
+<pre><code>1. First: PAM module for ICN login on any Linux
+   └── Minimal integration, proves DID login works
+
+2. Then: FUSE filesystem for ICN storage
+   └── ICN namespaces accessible as files
+
+3. Then: Desktop integration packages
+   └── GNOME/KDE widgets, file manager integration
+
+4. Finally: Full distribution with everything integrated
+   └── Complete CoopOS distribution
+</code></pre>
+<hr>
+<h2>Related Documents</h2>
+<ul>
+<li><a href="/docs/spec/KERNEL_CONTRACTS">KERNEL_CONTRACTS.md</a> - Kernel primitive specifications</li>
+<li><a href="/docs/architecture/CLIENT_MODEL">CLIENT_MODEL.md</a> - Client and wallet architecture</li>
+</ul>
+<hr>
+<h2>Document History</h2>
+<table>
+<thead>
+<tr>
+<th>Version</th>
+<th>Date</th>
+<th>Changes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>0.1.0</td>
+<td>2025-01-25</td>
+<td>Initial vision document</td>
+</tr>
+</tbody></table>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

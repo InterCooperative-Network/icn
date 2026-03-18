@@ -1,0 +1,346 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Module Splitting Implementation Guide | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>development</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>module splitting implementation guide</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/development/module-splitting-implementation-guide.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Module Splitting Implementation Guide</h1>
+<p><strong>Related</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/module-splitting-analysis">Module Splitting Analysis</a><br><strong>Status</strong>: Ready for Implementation<br><strong>Priority</strong>: LOW (Tech Debt)</p>
+<h2>Quick Start</h2>
+<p>This guide provides step-by-step instructions for implementing the module splits identified in the analysis document.</p>
+<h2>Prerequisites</h2>
+<p>Before starting any module split:</p>
+<ol>
+<li>Create a feature branch: <code>git checkout -b refactor/split-&lt;module-name&gt;</code></li>
+<li>Ensure all tests pass: <code>cd icn &amp;&amp; cargo test -p &lt;crate-name&gt;</code></li>
+<li>Backup the current file: <code>cp src/file.rs src/file.rs.backup</code></li>
+</ol>
+<h2>Implementation: ledger.rs Split</h2>
+<h3>Phase 1: Extract Query Operations (Lowest Risk)</h3>
+<p><strong>Risk</strong>: 🟢 Low</p>
+<h4>Step 1.1: Create Module Directory</h4>
+<pre><code class="language-bash">cd icn/crates/icn-ledger/src
+mkdir -p ledger_impl
+</code></pre>
+<h4>Step 1.2: Create queries.rs</h4>
+<pre><code class="language-bash">touch ledger_impl/queries.rs
+</code></pre>
+<p>Add this content:</p>
+<pre><code class="language-rust">//! Query operations for ledger entries
+//!
+//! This module contains read-only operations that query the ledger
+//! without modifying state.
+
+use crate::error::Result;
+use crate::types::{ContentHash, JournalEntry};
+use anyhow::Context;
+use icn_identity::Did;
+use icn_store::Store;
+use std::sync::Arc;
+use tracing::warn;
+
+// Re-export pagination types from parent
+pub use super::PaginationCursor;
+
+// Constants (copy from ledger.rs)
+const JOURNAL_PREFIX: &amp;str = &quot;ledger:journal:&quot;;
+const JOURNAL_TS_PREFIX: &amp;str = &quot;ledger:journal_ts:&quot;;
+const ARCHIVE_PREFIX: &amp;str = &quot;ledger:archive:&quot;;
+
+/// Query operations for the ledger
+pub struct LedgerQueries {
+    store: Arc&lt;dyn Store&gt;,
+}
+
+impl LedgerQueries {
+    pub fn new(store: Arc&lt;dyn Store&gt;) -&gt; Self {
+        Self { store }
+    }
+    
+    // TODO: Move query functions here:
+    // - get_entry()
+    // - get_all_entries()
+    // - count_entries()
+    // - get_entries_paginated()
+    // - get_entries_paginated_asc()
+    // - get_entries_filtered_paginated()
+    // - get_archived_entries()
+    // - list_rollback_timestamps()
+}
+</code></pre>
+<h4>Step 1.3: Move Functions</h4>
+<p>Copy these functions from <code>ledger.rs</code> to <code>ledger/queries.rs</code>:</p>
+<ul>
+<li>Lines 2184-2195: <code>get_entry()</code></li>
+<li>Lines 2198-2212: <code>get_all_entries()</code></li>
+<li>Lines 2218-2221: <code>count_entries()</code></li>
+<li>Lines 2237-2281: <code>get_entries_paginated()</code></li>
+<li>Lines 2297-2328: <code>get_entries_paginated_asc()</code></li>
+<li>Lines 2358-2495: <code>get_entries_filtered_paginated()</code></li>
+<li>Lines 3511-3522: <code>get_archived_entries()</code></li>
+<li>Lines 3525-3545: <code>list_rollback_timestamps()</code></li>
+</ul>
+<p><strong>Important</strong>: </p>
+<ul>
+<li>Change <code>&amp;self</code> to use <code>self.store</code> for the moved functions</li>
+<li>Update function signatures to be standalone or methods on <code>LedgerQueries</code></li>
+<li>Keep doc comments</li>
+</ul>
+<h4>Step 1.4: Update ledger.rs</h4>
+<p>In <code>ledger.rs</code>, add at the top of the file (after existing module declarations):</p>
+<pre><code class="language-rust">mod ledger_impl;
+pub use ledger_impl::queries::LedgerQueries;
+</code></pre>
+<p><strong>Note</strong>: The submodule directory should be named <code>ledger_impl/</code> to avoid naming conflict with <code>ledger.rs</code>.</p>
+<p>Then in the <code>impl Ledger</code> block, replace the moved functions with delegation:</p>
+<pre><code class="language-rust">impl Ledger {
+    // ... existing code ...
+    
+    /// Get a journal entry by its hash
+    pub fn get_entry(&amp;self, hash: &amp;ContentHash) -&gt; Result&lt;Option&lt;JournalEntry&gt;&gt; {
+        let queries = LedgerQueries::new(self.store.clone());
+        queries.get_entry(hash)
+    }
+    
+    // ... repeat for all query functions ...
+}
+</code></pre>
+<h4>Step 1.5: Create ledger_impl/mod.rs</h4>
+<pre><code class="language-bash">touch ledger_impl/mod.rs
+</code></pre>
+<p>Add this content:</p>
+<pre><code class="language-rust">//! Ledger implementation submodules
+
+pub mod queries;
+
+// Re-export commonly used types
+pub use queries::LedgerQueries;
+</code></pre>
+<h4>Step 1.6: Test</h4>
+<pre><code class="language-bash">cd ../../../  # Back to icn/ directory
+cargo test -p icn-ledger
+cargo clippy -p icn-ledger
+cargo fmt -p icn-ledger
+</code></pre>
+<h4>Step 1.7: Commit</h4>
+<pre><code class="language-bash">git add .
+git commit -m &quot;refactor(ledger): Extract query operations to submodule
+
+- Move read-only query functions to ledger/queries.rs
+- Maintain backward compatibility via delegation
+- No API changes, all tests pass&quot;
+</code></pre>
+<h3>Phase 2: Extract Balance Operations</h3>
+<p><strong>Risk</strong>: 🟡 Medium</p>
+<p>Follow similar pattern as Phase 1, extracting:</p>
+<ul>
+<li><code>get_balance()</code></li>
+<li><code>get_account_balances()</code></li>
+<li><code>get_all_balances()</code></li>
+<li><code>total_cleared_by()</code></li>
+<li><code>recompute_balances()</code></li>
+<li><code>recompute_balances_with_retry()</code></li>
+<li><code>load_cached_balances()</code></li>
+<li><code>save_cached_balances()</code></li>
+<li><code>load_cleared_volume_index()</code></li>
+<li><code>save_cleared_volume_index()</code></li>
+</ul>
+<p>Create <code>ledger_impl/balances.rs</code> and follow steps 1.2-1.7.</p>
+<h3>Phase 3: Extract Fork Operations</h3>
+<p><strong>Risk</strong>: 🟢 Low</p>
+<p>Extract fork-related functions to <code>ledger_impl/fork_ops.rs</code>:</p>
+<ul>
+<li><code>detect_forks()</code></li>
+<li><code>has_fork()</code></li>
+<li><code>detect_and_resolve_forks()</code></li>
+<li><code>quarantine_forked_entry()</code></li>
+<li><code>get_fork_stats()</code></li>
+<li><code>rebuild_fork_index()</code></li>
+<li><code>ensure_timestamp_index()</code></li>
+</ul>
+<h3>Phase 4: Extract Freeze Operations</h3>
+<p><strong>Risk</strong>: 🟢 Low</p>
+<p>Extract freeze-related functions to <code>ledger_impl/freeze_ops.rs</code>:</p>
+<ul>
+<li><code>freeze_member()</code></li>
+<li><code>freeze_member_with_metadata()</code></li>
+<li><code>unfreeze_member()</code></li>
+<li><code>unfreeze_member_with_metadata()</code></li>
+<li><code>is_member_frozen()</code></li>
+<li><code>get_freeze_record()</code></li>
+<li><code>list_frozen_members()</code></li>
+<li><code>frozen_member_count()</code></li>
+<li><code>cleanup_expired_freezes()</code></li>
+</ul>
+<h3>Phase 5: Extract Witness Operations</h3>
+<p><strong>Risk</strong>: 🟡 Medium</p>
+<p>Extract witness-related functions to <code>ledger_impl/witness_ops.rs</code>:</p>
+<ul>
+<li><code>requires_witnesses()</code></li>
+<li><code>effective_witness_policy()</code></li>
+<li><code>validate_witness_signatures()</code></li>
+<li><code>store_witness_signatures()</code></li>
+<li><code>load_witness_signatures()</code></li>
+<li><code>count_entry_signers()</code></li>
+<li><code>calculate_entry_value()</code></li>
+</ul>
+<h3>Phase 6: Final Validation</h3>
+<p><strong>Risk</strong>: 🟢 Low</p>
+<ol>
+<li><p>Run full test suite:</p>
+<pre><code class="language-bash">cargo test -p icn-ledger
+cargo test --workspace  # Full integration tests
+</code></pre>
+</li>
+<li><p>Run linters:</p>
+<pre><code class="language-bash">cargo clippy --workspace -- -D warnings
+cargo fmt --all --check
+</code></pre>
+</li>
+<li><p>Check API compatibility:</p>
+<pre><code class="language-bash">cargo doc -p icn-ledger --no-deps
+# Verify all public APIs still available
+</code></pre>
+</li>
+<li><p>Performance check (optional):</p>
+<pre><code class="language-bash">cargo bench -p icn-ledger
+# Compare with baseline
+</code></pre>
+</li>
+</ol>
+<h2>Alternative Approach: Incremental PR Strategy</h2>
+<p>If preferred, each phase can be a separate PR:</p>
+<ol>
+<li><strong>PR 1</strong>: Extract queries (least risky)</li>
+<li><strong>PR 2</strong>: Extract balances</li>
+<li><strong>PR 3</strong>: Extract forks</li>
+<li><strong>PR 4</strong>: Extract freeze</li>
+<li><strong>PR 5</strong>: Extract witness</li>
+</ol>
+<p>This allows for:</p>
+<ul>
+<li>Easier code review</li>
+<li>Faster feedback cycles</li>
+<li>Incremental value delivery</li>
+<li>Reduced merge conflict risk</li>
+</ul>
+<h2>Rollback Plan</h2>
+<p>If a split causes issues:</p>
+<ol>
+<li><p><strong>Immediate Rollback</strong>:</p>
+<pre><code class="language-bash">git revert &lt;commit-hash&gt;
+</code></pre>
+</li>
+<li><p><strong>Restore from Backup</strong>:</p>
+<pre><code class="language-bash">cp src/file.rs.backup src/file.rs
+</code></pre>
+</li>
+<li><p><strong>Cherry-pick Fix</strong>:</p>
+<pre><code class="language-bash">git cherry-pick &lt;fix-commit&gt;
+</code></pre>
+</li>
+</ol>
+<h2>Success Criteria</h2>
+<p>✅ All tests pass<br>✅ No public API changes<br>✅ Code compiles without warnings<br>✅ Documentation builds successfully<br>✅ No performance regressions<br>✅ Improved code navigation (smaller files)<br>✅ Clearer module boundaries</p>
+<h2>Common Pitfalls</h2>
+<h3>Pitfall 1: Circular Dependencies</h3>
+<p><strong>Problem</strong>: New module needs to reference parent<br><strong>Solution</strong>: Use trait objects or pass dependencies explicitly</p>
+<h3>Pitfall 2: Lost Documentation</h3>
+<p><strong>Problem</strong>: Doc comments not moved with functions<br><strong>Solution</strong>: Always move complete doc blocks with functions</p>
+<h3>Pitfall 3: Broken Re-exports</h3>
+<p><strong>Problem</strong>: Public API not accessible after split<br><strong>Solution</strong>: Add <code>pub use</code> statements in parent module</p>
+<h3>Pitfall 4: Test Failures</h3>
+<p><strong>Problem</strong>: Tests can&#39;t find moved functions<br><strong>Solution</strong>: Update test imports to use new paths</p>
+<h2>Verification Checklist</h2>
+<p>Before merging each phase:</p>
+<ul>
+<li><input disabled="" type="checkbox"> All unit tests pass</li>
+<li><input disabled="" type="checkbox"> All integration tests pass</li>
+<li><input disabled="" type="checkbox"> No clippy warnings</li>
+<li><input disabled="" type="checkbox"> Code formatted with rustfmt</li>
+<li><input disabled="" type="checkbox"> Documentation builds without errors</li>
+<li><input disabled="" type="checkbox"> Public API unchanged (no breaking changes)</li>
+<li><input disabled="" type="checkbox"> PR description includes:<ul>
+<li><input disabled="" type="checkbox"> Rationale for split</li>
+<li><input disabled="" type="checkbox"> Before/after file sizes</li>
+<li><input disabled="" type="checkbox"> Test results</li>
+<li><input disabled="" type="checkbox"> Performance impact (if any)</li>
+</ul>
+</li>
+</ul>
+<h2>Getting Help</h2>
+<p>If you encounter issues:</p>
+<ol>
+<li>Check the <a href="https://github.com/InterCooperative-Network/icn/blob/main/module-splitting-analysis">Module Splitting Analysis</a> for context</li>
+<li>Review git history: <code>git log --oneline docs/</code></li>
+<li>Search for similar refactorings: <code>git log --grep=&quot;refactor.*modul&quot;</code></li>
+<li>Ask in team chat/issue tracker</li>
+</ol>
+<h2>Additional Resources</h2>
+<ul>
+<li><a href="https://rust-lang.github.io/api-guidelines/" target="_blank" rel="noopener">Rust API Guidelines</a></li>
+<li><a href="https://doc.rust-lang.org/cargo/guide/project-layout.html" target="_blank" rel="noopener">Cargo Book - Package Layout</a></li>
+<li>Prior modularization: <code>docs/dev-journal/2025-12-13-phase4-nat-traversal-supervisor-modularization.md</code></li>
+</ul>
+<hr>
+<p><strong>Last Updated</strong>: 2026-01-23<br><strong>Author</strong>: Analysis by GitHub Copilot</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

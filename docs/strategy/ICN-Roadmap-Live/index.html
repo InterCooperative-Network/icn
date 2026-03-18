@@ -1,0 +1,499 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Roadmap: Closing the Gaps | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>strategy</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ICN Roadmap Live</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/strategy/ICN-Roadmap-Live.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Roadmap: Closing the Gaps</h1>
+<p><strong>March 17, 2026 — Grounded in what&#39;s actually proven, not what the docs aspire to.</strong></p>
+<hr>
+<h2>Status Overview</h2>
+<table>
+<thead>
+<tr>
+<th>Category</th>
+<th>Count</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Proven end-to-end</strong></td>
+<td>1 flow (governance: proposal → vote → decision → cryptographic proof)</td>
+</tr>
+<tr>
+<td><strong>Endpoints exist, not demo&#39;d</strong></td>
+<td>3 flows (patronage, federation, reporting — merged from demo branch, unverified)</td>
+</tr>
+<tr>
+<td><strong>Designed, not integrated</strong></td>
+<td>2 receipt chain links (Allocation → Execution)</td>
+</tr>
+<tr>
+<td><strong>Claimed but doesn&#39;t exist</strong></td>
+<td>1 CLI command (<code>icnctl audit verify</code>)</td>
+</tr>
+<tr>
+<td><strong>Compliance epic</strong></td>
+<td>3/10 done (#1307, #1309, #1310)</td>
+</tr>
+<tr>
+<td><strong>Meaning Firewall</strong></td>
+<td>9/29 crates clean, 11 infected, 9 needs-review</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>The Roadmap</h2>
+<h3>NOW: Audit &amp; Prove What We Have (Mar 17–23)</h3>
+<p>This week answers one question: <strong>what actually works when you run it?</strong></p>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Description</th>
+<th>Status</th>
+<th>Dependencies</th>
+<th>Owner</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>N1: Verify 3 unproven demo flows</strong></td>
+<td>Run patronage, federation, reporting flows from merged demo branch end-to-end on K3s. Record what passes, what fails, what panics.</td>
+<td><strong>Not Started</strong></td>
+<td>K3s cluster running (confirmed)</td>
+<td>Matt</td>
+</tr>
+<tr>
+<td><strong>N2: Runtime-verify governance flow</strong></td>
+<td>Run the 14-call governance demo (vertical slice assessment §6) against live <code>icnd</code> on K3s. Confirm proof endpoint returns valid, verifiable receipt.</td>
+<td><strong>Not Started</strong></td>
+<td>icnd running with <code>--gateway-enable</code></td>
+<td>Matt</td>
+</tr>
+<tr>
+<td><strong>N3: Classify each flow honestly</strong></td>
+<td>For each of the 4 flows, assign: PROVEN (runs clean), FRAGILE (runs with workarounds), BROKEN (fails), MISSING (doesn&#39;t exist). Update all docs to match.</td>
+<td><strong>Not Started</strong></td>
+<td>N1, N2 complete</td>
+<td>Matt</td>
+</tr>
+<tr>
+<td><strong>N4: Write 1-page demo script</strong></td>
+<td>Pick the strongest scenario from N3. Write what the audience sees and what fires underneath. This is the demo for everything downstream.</td>
+<td><strong>Not Started</strong></td>
+<td>N3</td>
+<td>Matt</td>
+</tr>
+</tbody></table>
+<p><strong>Exit criteria:</strong> Honest classification of all 4 demo flows. One demo script for the strongest path.</p>
+<p><strong>Hard deadline:</strong> March 19 summit planning call — need to know what you can credibly promise for the May workshop proposal.</p>
+<hr>
+<h3>NEXT: Close Receipt Chain + Compliance (Mar 24 – Apr 13)</h3>
+<p>Two parallel tracks. Both must complete before any grant application or summit demo.</p>
+<h4>Track 1: Complete the 6-Link Receipt Chain</h4>
+<p>The whitepaper and scenarios claim: Proposal → Discussion → Votes → Decision → Allocation → Execution. Reality: the first four links work. The last two are designed but not wired.</p>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Description</th>
+<th>Status</th>
+<th>Est. Effort</th>
+<th>Dependencies</th>
+<th>Priority</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>X1: AllocationProposal</strong> (#1311)</td>
+<td>Governance proposal type that produces AllocationReceipt when accepted. Closes the &quot;decision authorizes allocation&quot; link.</td>
+<td><strong>Not Started</strong></td>
+<td>2-3 days</td>
+<td>None</td>
+<td>P0</td>
+</tr>
+<tr>
+<td><strong>X2: Allocation→Execution wiring</strong></td>
+<td>ExecutionReceiptGate (#1310, merged) requires an AllocationReceipt to produce an ExecutionReceipt. Wire these together so <code>icnctl audit verify</code> has a complete chain to walk.</td>
+<td><strong>Not Started</strong></td>
+<td>2 days</td>
+<td>X1</td>
+<td>P0</td>
+</tr>
+<tr>
+<td><strong>X3: <code>icnctl audit verify</code></strong></td>
+<td>CLI command that takes a receipt ID, walks the chain (Decision → Allocation → Execution), verifies every signature, and returns pass/fail. This is the demo&#39;s punchline.</td>
+<td><strong>Not Started</strong></td>
+<td>2-3 days</td>
+<td>X2</td>
+<td>P0</td>
+</tr>
+<tr>
+<td><strong>X4: Vertical slice integration test</strong> (D1)</td>
+<td><code>cargo test --test vertical_slice_integration</code> — exercises the complete 6-link chain in CI. When this passes, it&#39;s v1.0.</td>
+<td><strong>Not Started</strong></td>
+<td>2 days</td>
+<td>X3</td>
+<td>P0</td>
+</tr>
+</tbody></table>
+<p><strong>Critical path:</strong> X1 → X2 → X3 → X4. Sequential. ~8-10 days.</p>
+<h4>Track 2: Compliance Sprint (Parallel)</h4>
+<p>Required before Sovereign Tech Fund application. Closes Epic #1302.</p>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Description</th>
+<th>Status</th>
+<th>Est. Effort</th>
+<th>Priority</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>C1: Terminology rename</strong> (#1303)</td>
+<td>payment→settlement, currency→unit, balance→position. Grep-and-replace + test updates.</td>
+<td><strong>Not Started</strong></td>
+<td>1 day</td>
+<td>P0</td>
+</tr>
+<tr>
+<td><strong>C2: UX language guide</strong> (#1304)</td>
+<td>Seven Invariants PR checklist in CONTRIBUTING.md. What words ICN uses and why.</td>
+<td><strong>Not Started</strong></td>
+<td>0.5 days</td>
+<td>P0</td>
+</tr>
+<tr>
+<td><strong>C3: JournalEntry.provenance</strong> (#1305)</td>
+<td>Make ProvenanceRef required on every ledger entry. No provenance = compile error.</td>
+<td><strong>Not Started</strong></td>
+<td>1 day</td>
+<td>P1</td>
+</tr>
+<tr>
+<td><strong>C4: Obligation lifecycle</strong> (#1306)</td>
+<td>Issued→Accepted→Settled→Defaulted→Disputed. Uses AssetType::Claim.</td>
+<td><strong>Not Started</strong></td>
+<td>1-2 days</td>
+<td>P1</td>
+</tr>
+<tr>
+<td><strong>C5: CCL formula extraction</strong> (#1308)</td>
+<td>Move commons credit formula from kernel to CCL PolicyOracle parameter. Meaning Firewall hygiene.</td>
+<td><strong>Not Started</strong></td>
+<td>1 day</td>
+<td>P1</td>
+</tr>
+<tr>
+<td><strong>C6: CI compliance linter</strong> (#1312)</td>
+<td>GitHub Actions check that fails if <code>payment</code>, <code>currency</code>, <code>balance</code> appear as API-exposed terms. Self-enforcing terminology discipline.</td>
+<td><strong>Not Started</strong></td>
+<td>0.5 days</td>
+<td>P0</td>
+</tr>
+</tbody></table>
+<p><strong>Already done:</strong> #1307 (PatronageTracker), #1309 (DelegationManager), #1310 (ExecutionReceiptGate).</p>
+<p><strong>Effort:</strong> ~5-6 days total, parallelizable with Track 1.</p>
+<hr>
+<h3>NEXT: Demo-Ready Package (Apr 7–17)</h3>
+<p>Only starts after Track 1 (receipt chain) is complete. The demo must show real receipts, not simulated ones.</p>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Description</th>
+<th>Status</th>
+<th>Dependencies</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>D1: Update demo scripts to real calls</strong></td>
+<td>The four flows in <code>demo/scripts/</code> call real <code>icnctl</code> commands instead of simulated responses. <code>present.sh</code> becomes a live demo.</td>
+<td><strong>Not Started</strong></td>
+<td>X3 (audit verify exists)</td>
+</tr>
+<tr>
+<td><strong>D2: Record walkthrough</strong></td>
+<td>Screen recording with narration, 5-10 minutes. The demo scenario from N4 running live.</td>
+<td><strong>Not Started</strong></td>
+<td>D1</td>
+</tr>
+<tr>
+<td><strong>D3: Draft summit workshop proposal</strong></td>
+<td>&quot;Live Demo: Spin Up a Cooperative in 5 Minutes.&quot; Title, description, learning outcomes, format. Ready for May submission.</td>
+<td><strong>Not Started</strong></td>
+<td>N4 (demo script)</td>
+</tr>
+<tr>
+<td><strong>D4: Update the four new docs</strong></td>
+<td>Add honest status annotations to ICN-Scenarios, ICN-Pitch, ICN-Whitepaper, ICN-Roadmap-Strategy. Change &quot;produces&quot; to &quot;produces&quot; only where proven; mark others &quot;designed, integration pending.&quot;</td>
+<td><strong>Not Started</strong></td>
+<td>N3 (classification)</td>
+</tr>
+</tbody></table>
+<p><strong>Exit criteria:</strong> Recorded demo. Workshop proposal draft. All docs match reality.</p>
+<hr>
+<h3>LATER: Architecture Cleanup + Scale (Apr–Jun)</h3>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Description</th>
+<th>Est. Effort</th>
+<th>Dependencies</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>L1: Meaning Firewall cleanup</strong></td>
+<td>Extract semantic business logic from 11 infected kernel crates. Goal: 29/29 clean. The single most important technical task.</td>
+<td>2-3 weeks</td>
+<td>Compliance sprint done</td>
+</tr>
+<tr>
+<td><strong>L2: Website overhaul</strong></td>
+<td>Stats sync automation, 4 blog posts, Matrix room, mailing list, community page.</td>
+<td>1-2 weeks (parallel)</td>
+<td>Demo recording exists</td>
+</tr>
+<tr>
+<td><strong>L3: Federation settlement finality</strong></td>
+<td>Formal spec for how cross-org obligations reach finality. Currently unspecified gap.</td>
+<td>1 week</td>
+<td>L1</td>
+</tr>
+<tr>
+<td><strong>L4: Mobile SDK stabilization</strong></td>
+<td>React Native key management, push notification flow, receipt verification on device.</td>
+<td>2 weeks</td>
+<td>X4 (receipt chain)</td>
+</tr>
+<tr>
+<td><strong>L5: Sovereign Tech Fund application</strong></td>
+<td>€50K+ grant for open digital infrastructure. Requires: clean terminology, working demo, architecture doc.</td>
+<td>1 week to write</td>
+<td>C1-C6 done, D2 done</td>
+</tr>
+<tr>
+<td><strong>L6: Pilot partner recruitment</strong></td>
+<td>3-touch outreach to upstate NY co-ops. First pilot commitment. Gate B passage.</td>
+<td>Ongoing</td>
+<td>D2, D3</td>
+</tr>
+<tr>
+<td><strong>L7: NAT traversal</strong> (C3)</td>
+<td>K3s pods federate for real. Transforms demo from &quot;four pods on one cluster&quot; to &quot;four nodes actually discovering each other.&quot;</td>
+<td>2-3 days</td>
+<td>Track 1 done</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Dependencies Map</h2>
+<pre><code>N1,N2 (verify what works)
+  → N3 (classify honestly)
+    → N4 (demo script)
+      → D3 (workshop proposal)   ← Mar 19 call needs at least a verbal pitch
+      → D1 (real demo scripts)
+        → D2 (recorded walkthrough)
+          → L2 (website)
+          → L5 (STF application)
+          → L6 (pilot recruitment)
+
+X1 (AllocationProposal)
+  → X2 (Allocation→Execution wiring)
+    → X3 (icnctl audit verify)
+      → X4 (vertical slice test = v1.0.0 tag)
+        → D1 (demo scripts use real commands)
+        → L4 (mobile SDK)
+
+C1-C6 (compliance sprint) ← parallel, no dependencies on Track 1
+  → L1 (Meaning Firewall cleanup)
+  → L5 (STF application)
+</code></pre>
+<hr>
+<h2>Risks</h2>
+<table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Impact</th>
+<th>Prob.</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>N1 reveals all 3 unverified flows are broken</strong></td>
+<td>&quot;Four demo flows&quot; claim collapses to one</td>
+<td>Medium</td>
+<td>Simplify: demo the governance flow only. It&#39;s the strongest. Federation is scenery, not the punchline.</td>
+</tr>
+<tr>
+<td><strong>Receipt chain wiring (X1-X2) reveals architectural issues</strong></td>
+<td>Track 1 timeline blows out</td>
+<td>Medium</td>
+<td>ExecutionReceiptGate is already merged and tested. AllocationProposal is well-scoped (#1311). The risk is integration, not design.</td>
+</tr>
+<tr>
+<td><strong>Compliance rename (C1) breaks tests across 38 crates</strong></td>
+<td>Day turns into a week</td>
+<td>Low</td>
+<td>It&#39;s grep-and-replace on 3 terms. The Forward Plan explicitly says &quot;nothing behavioral changes.&quot;</td>
+</tr>
+<tr>
+<td><strong>Solo developer capacity</strong></td>
+<td>Everything takes 2x</td>
+<td>High</td>
+<td>Ruthless scope control. Only touch what the demo and the grant application need. Phase 2 plan already says this.</td>
+</tr>
+<tr>
+<td><strong>March 19 call arrives before N1-N3 are done</strong></td>
+<td>Can&#39;t credibly pitch a workshop</td>
+<td>High</td>
+<td>You know the governance flow works. Pitch that. &quot;Live demo of provable cooperative governance.&quot; Don&#39;t promise federation demo yet.</td>
+</tr>
+<tr>
+<td><strong>STF application needs clean codebase</strong></td>
+<td>Can&#39;t apply until compliance sprint is done</td>
+<td>Medium</td>
+<td>C1 (terminology rename) and C6 (CI linter) are the P0s. Do those first. C3-C5 can follow.</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Hard Deadlines</h2>
+<table>
+<thead>
+<tr>
+<th>Date</th>
+<th>Event</th>
+<th>What Must Be True</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Mar 19</strong></td>
+<td>Summit planning call</td>
+<td>Know what you can credibly demo. RSVP confirmed to Joe.</td>
+</tr>
+<tr>
+<td><strong>May 2026</strong></td>
+<td>Call for presenters</td>
+<td>Workshop proposal submitted. Demo script finalized.</td>
+</tr>
+<tr>
+<td><strong>Apr–May</strong></td>
+<td>STF application</td>
+<td>Compliance sprint complete. Demo recorded. Architecture doc ready.</td>
+</tr>
+<tr>
+<td><strong>Oct 2026</strong></td>
+<td>NY Coop Summit</td>
+<td>Live demo. Pilot partner recruited. Workshop delivered.</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>What Changed From Previous Roadmap</h2>
+<p>The previous roadmap (ICN-Roadmap-Strategy.md) was written before the gap analysis. This version corrects it:</p>
+<table>
+<thead>
+<tr>
+<th>Before</th>
+<th>After</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>&quot;Four working demo flows&quot; treated as fact</td>
+<td>Reclassified: 1 proven, 3 unverified</td>
+<td>Gap analysis found only governance flow is confirmed end-to-end</td>
+</tr>
+<tr>
+<td>Receipt chain described as complete</td>
+<td>Split into 4 proven links + 2 pending</td>
+<td>AllocationProposal (#1311) and Allocation→Execution wiring not yet merged</td>
+</tr>
+<tr>
+<td><code>icnctl audit verify</code> in success criteria</td>
+<td>Explicitly marked as &quot;doesn&#39;t exist yet&quot;</td>
+<td>It&#39;s a Phase 3 deliverable, not current state</td>
+</tr>
+<tr>
+<td>Phase 2 &quot;Vertical Slice&quot; and Phase 2 &quot;Demo-Ready&quot; conflated</td>
+<td>Separated: NOW (audit), NEXT (build + comply), NEXT (package)</td>
+<td>Can&#39;t package what you haven&#39;t verified</td>
+</tr>
+<tr>
+<td>Compliance sprint and receipt chain interleaved</td>
+<td>Parallelized explicitly</td>
+<td>No dependencies between them; both block STF application</td>
+</tr>
+<tr>
+<td>Track E (Compute Substrate) in Phase 2</td>
+<td>Moved to LATER</td>
+<td>Mana is descoped. Compute substrate is post-v1.0. Don&#39;t touch it now.</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>The Honest Summary</h2>
+<p><strong>1 thing is proven:</strong> The governance pipeline produces real cryptographic proofs.</p>
+<p><strong>3 things need verification this week:</strong> Patronage, federation, and reporting demo flows.</p>
+<p><strong>2 things need building in the next 2 weeks:</strong> AllocationProposal and <code>icnctl audit verify</code> to complete the receipt chain.</p>
+<p><strong>7 things need cleanup before a grant application:</strong> The compliance epic (#1302), with 3 done and 7 remaining.</p>
+<p><strong>1 thing determines v1.0:</strong> The vertical slice integration test passing in CI.</p>
+<p><strong>1 thing determines adoption:</strong> A cooperative organizer watching a demo and saying &quot;I want that.&quot;</p>
+<p>Everything else is sequencing.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

@@ -1,0 +1,667 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Pilot Deployment Playbook | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>internal</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>pilots</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>pilot playbook</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/internal/pilots/pilot-playbook.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Pilot Deployment Playbook</h1>
+<p>A step-by-step guide for deploying ICN to a pilot cooperative community.</p>
+<h2>Overview</h2>
+<p>This playbook covers the complete lifecycle of an ICN pilot deployment:</p>
+<ol>
+<li>Pre-deployment preparation</li>
+<li>Infrastructure setup</li>
+<li>Initial node deployment</li>
+<li>Member onboarding</li>
+<li>Operational validation</li>
+<li>Day-2 operations</li>
+<li>Success metrics</li>
+</ol>
+<hr>
+<h2>Quick Start (Docker)</h2>
+<p>For the fastest path to a working pilot, use Docker:</p>
+<h3>1. Clone and Configure</h3>
+<pre><code class="language-bash">git clone https://github.com/InterCooperative-Network/icn.git
+cd icn/deploy
+
+# Configure environment
+cp .env.example .env
+# Edit .env and set a strong JWT_SECRET
+</code></pre>
+<h3>2. Start Services</h3>
+<pre><code class="language-bash">docker-compose build
+docker-compose up -d
+</code></pre>
+<h3>3. Initialize Cooperative</h3>
+<pre><code class="language-bash"># Create identity
+docker-compose exec icnd icnctl id init
+
+# Show your DID (share with members)
+docker-compose exec icnd icnctl id show
+</code></pre>
+<h3>4. Access</h3>
+<table>
+<thead>
+<tr>
+<th>Service</th>
+<th>URL</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Web UI</td>
+<td><a href="http://localhost:3000" target="_blank" rel="noopener">http://localhost:3000</a></td>
+</tr>
+<tr>
+<td>API</td>
+<td><a href="http://localhost:8080" target="_blank" rel="noopener">http://localhost:8080</a></td>
+</tr>
+<tr>
+<td>Grafana</td>
+<td><a href="http://localhost:3001" target="_blank" rel="noopener">http://localhost:3001</a> (default: admin/admin - change for prod)</td>
+</tr>
+</tbody></table>
+<h3>5. Get a Token</h3>
+<p>Members need JWT tokens to use the web UI. For testing:</p>
+<pre><code class="language-bash"># Get your DID
+docker-compose exec icnd icnctl id show
+
+# Use icnctl to generate a token (implementation depends on your setup)
+# Or implement the challenge-response flow in your application
+</code></pre>
+<p><strong>That&#39;s it!</strong> Open <a href="http://localhost:3000" target="_blank" rel="noopener">http://localhost:3000</a> to use the web interface.</p>
+<p>For detailed deployment options, continue to Phase 1.</p>
+<hr>
+<h2>Phase 1: Pre-Deployment Preparation</h2>
+<h3>1.1 Community Assessment</h3>
+<p>Before deploying ICN, validate the pilot community is ready:</p>
+<p><strong>Technical Requirements:</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> At least 3-5 members with technical comfort (can follow CLI instructions)</li>
+<li><input disabled="" type="checkbox"> Stable internet connectivity for all members</li>
+<li><input disabled="" type="checkbox"> Mix of devices (Linux, macOS, or WSL on Windows)</li>
+<li><input disabled="" type="checkbox"> Backup communication channel (Signal, Matrix, etc.)</li>
+</ul>
+<p><strong>Organizational Requirements:</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Designated coordinator/champion</li>
+<li><input disabled="" type="checkbox"> Clear governance expectations (voting rules, quorum)</li>
+<li><input disabled="" type="checkbox"> Initial use case defined (timebank, mutual aid, etc.)</li>
+<li><input disabled="" type="checkbox"> Members briefed on mutual credit concepts</li>
+</ul>
+<p><strong>Checklist Questions:</strong></p>
+<pre><code>1. What is your primary use case? (timebanking, resource sharing, etc.)
+2. How many members will participate initially?
+3. What devices/platforms will members use?
+4. Who will serve as the technical coordinator?
+5. What existing governance rules should ICN mirror?
+6. What&#39;s your backup communication method if ICN has issues?
+</code></pre>
+<h3>1.2 Network Planning</h3>
+<p>Plan your network topology:</p>
+<p><strong>Small Pilot (3-10 members):</strong></p>
+<ul>
+<li>All nodes peer-to-peer via mDNS on local network</li>
+<li>Or use a central bootstrap node for geographically distributed members</li>
+</ul>
+<p><strong>Bootstrap Node Selection:</strong></p>
+<ul>
+<li>Choose most reliable connection (uptime, bandwidth)</li>
+<li>Static IP or dynamic DNS recommended</li>
+<li>Will be listed in all member configs</li>
+</ul>
+<p><strong>Example topology:</strong></p>
+<pre><code>                    ┌─────────────┐
+                    │  Bootstrap  │
+                    │   (Alice)   │
+                    └──────┬──────┘
+                           │
+           ┌───────────────┼───────────────┐
+           │               │               │
+    ┌──────┴──────┐ ┌──────┴──────┐ ┌──────┴──────┐
+    │    Bob      │ │   Carol     │ │   David     │
+    └─────────────┘ └─────────────┘ └─────────────┘
+</code></pre>
+<h3>1.3 Prepare Bootstrap Node</h3>
+<p>On the bootstrap node (most reliable member):</p>
+<pre><code class="language-bash"># Install ICN
+curl -sSL https://icn.coop/install.sh | bash
+
+# Initialize identity
+icnctl id init
+
+# Get DID for other members to connect
+icnctl id show
+# Output: did:icn:abc123...
+
+# Get IP address
+hostname -I | awk &#39;{print $1}&#39;
+# Or for public IP: curl -s ifconfig.me
+</code></pre>
+<p>Record this information:</p>
+<ul>
+<li>Bootstrap DID: <code>did:icn:...</code></li>
+<li>Bootstrap address: <code>&lt;IP&gt;:7777</code></li>
+<li>Bootstrap URI: <code>icn://did:icn:abc123@&lt;IP&gt;:7777</code></li>
+</ul>
+<h2>Phase 2: Infrastructure Setup</h2>
+<h3>2.1 Installation (All Members)</h3>
+<p>Each member runs:</p>
+<pre><code class="language-bash"># One-line install
+curl -sSL https://icn.coop/install.sh | bash
+
+# Or build from source (if binaries unavailable)
+curl -sSL https://icn.coop/install.sh | bash -s -- --build
+
+# Initialize identity
+icnctl id init
+# Enter a strong passphrase (save it securely!)
+
+# Verify installation
+icnctl id show
+</code></pre>
+<h3>2.2 Configuration</h3>
+<p>Edit <code>~/.icn/icn.toml</code> for each member:</p>
+<p><strong>Bootstrap Node:</strong></p>
+<pre><code class="language-toml">data_dir = &quot;~/.icn&quot;
+
+[network]
+mdns_enabled = true
+listen_addr = &quot;0.0.0.0:7777&quot;
+rpc_port = 5601
+
+[observability]
+metrics_port = 9090
+health_port = 8080
+log_level = &quot;info&quot;
+
+[gateway]
+enabled = true
+bind_addr = &quot;127.0.0.1:8080&quot;
+jwt_secret = &quot;&lt;generate-32-char-random-string&gt;&quot;
+token_expiry_hours = 24
+</code></pre>
+<p><strong>Member Nodes:</strong></p>
+<pre><code class="language-toml">data_dir = &quot;~/.icn&quot;
+
+[network]
+mdns_enabled = true
+listen_addr = &quot;0.0.0.0:7777&quot;
+rpc_port = 5601
+
+# Connect to bootstrap node
+bootstrap_peers = [&quot;icn://did:icn:&lt;BOOTSTRAP_DID&gt;@&lt;BOOTSTRAP_IP&gt;:7777&quot;]
+
+[observability]
+metrics_port = 9090
+health_port = 8080
+log_level = &quot;info&quot;
+
+[gateway]
+enabled = false
+</code></pre>
+<h3>2.3 Start Nodes</h3>
+<p><strong>Using systemd (Linux):</strong></p>
+<pre><code class="language-bash"># Start daemon
+systemctl --user start icnd
+
+# Enable on boot
+systemctl --user enable icnd
+
+# Check status
+systemctl --user status icnd
+
+# View logs
+journalctl --user -u icnd -f
+</code></pre>
+<p><strong>Using launchd (macOS):</strong></p>
+<pre><code class="language-bash"># Load agent
+launchctl load ~/Library/LaunchAgents/coop.icn.icnd.plist
+
+# Start service
+launchctl start coop.icn.icnd
+
+# View logs
+tail -f ~/.icn/logs/icnd.log
+</code></pre>
+<p><strong>Manual start (testing):</strong></p>
+<pre><code class="language-bash">icnd --config ~/.icn/icn.toml
+</code></pre>
+<h3>2.4 Verify Connectivity</h3>
+<p>On each node:</p>
+<pre><code class="language-bash"># Check node status
+icnctl status
+
+# Expected output:
+# Node Status
+# -----------
+# DID: did:icn:...
+# Network: 3 peers connected
+# Gossip: 5 topics subscribed
+# Ledger: 0 entries
+
+# List connected peers
+icnctl peers list
+
+# Test connectivity to specific peer
+icnctl peers ping did:icn:&lt;peer-did&gt;
+</code></pre>
+<h2>Phase 3: Initialize Cooperative</h2>
+<h3>3.1 Create the Cooperative</h3>
+<p>On the bootstrap node (as coordinator):</p>
+<pre><code class="language-bash"># Interactive wizard
+icnctl init-coop
+
+# Or with flags
+icnctl init-coop \
+  --name &quot;Our Food Coop&quot; \
+  --members &quot;did:icn:alice,did:icn:bob,did:icn:carol&quot;
+</code></pre>
+<p>The wizard will:</p>
+<ol>
+<li>Create an identity (if none exists)</li>
+<li>Initialize local storage</li>
+<li>Set up the trust graph with founding members</li>
+<li>Create governance domain</li>
+<li>Optionally start the daemon</li>
+</ol>
+<h3>3.2 Establish Initial Trust</h3>
+<p>Each member vouches for members they know:</p>
+<pre><code class="language-bash"># Alice vouches for Bob
+icnctl trust set \
+  --target did:icn:bob \
+  --score 0.8 \
+  --labels &quot;founding member&quot;
+
+# Bob vouches for Alice
+icnctl trust set \
+  --target did:icn:alice \
+  --score 0.8 \
+  --labels &quot;founding member&quot;
+
+# View trust graph
+icnctl trust list
+</code></pre>
+<p><strong>Trust Score Guidelines:</strong></p>
+<ul>
+<li>0.8-1.0: Close collaborators, founding members</li>
+<li>0.5-0.7: Regular members you know well</li>
+<li>0.3-0.4: New members or casual acquaintances</li>
+<li>&lt; 0.3: Unknown or minimal interaction</li>
+</ul>
+<h3>3.3 Create Governance Domain</h3>
+<pre><code class="language-bash"># Create domain for the cooperative
+icnctl gov domain create \
+  --domain-id &quot;coop:foodcoop&quot; \
+  --name &quot;Food Coop Governance&quot; \
+  --members &quot;did:icn:alice,did:icn:bob,did:icn:carol&quot;
+
+# Verify
+icnctl gov domain show --domain-id &quot;coop:foodcoop&quot;
+</code></pre>
+<h2>Phase 4: Member Onboarding</h2>
+<h3>4.1 Onboarding Workflow</h3>
+<p>For each new member:</p>
+<ol>
+<li><p><strong>Install &amp; Initialize:</strong></p>
+<pre><code class="language-bash">curl -sSL https://icn.coop/install.sh | bash
+icnctl id init
+icnctl id show  # Share DID with coordinator
+</code></pre>
+</li>
+<li><p><strong>Configure &amp; Connect:</strong></p>
+<ul>
+<li>Edit <code>~/.icn/icn.toml</code> with bootstrap peer</li>
+<li>Start icnd service</li>
+<li>Verify connectivity with <code>icnctl status</code></li>
+</ul>
+</li>
+<li><p><strong>Coordinator Actions:</strong></p>
+<pre><code class="language-bash"># Add to governance domain
+icnctl gov domain add-member \
+  --domain-id &quot;coop:foodcoop&quot; \
+  --member did:icn:newmember
+
+# Set initial trust
+icnctl trust set \
+  --target did:icn:newmember \
+  --score 0.3 \
+  --labels &quot;new member&quot;
+</code></pre>
+</li>
+<li><p><strong>Community Trust Building:</strong></p>
+<ul>
+<li>Existing members vouch for new member</li>
+<li>Trust scores increase with positive interactions</li>
+</ul>
+</li>
+</ol>
+<h3>4.2 First Transaction</h3>
+<p>Test mutual credit with a simple transaction:</p>
+<pre><code class="language-bash"># Alice pays Bob 1 hour for helping with setup
+icnctl ledger pay \
+  --to did:icn:bob \
+  --amount 1.0 \
+  --currency hours \
+  --memo &quot;Help with initial setup&quot;
+
+# Check balances
+icnctl ledger balance
+# Alice: -1.0 hours
+# Bob: +1.0 hours
+
+# View transaction history
+icnctl ledger history
+</code></pre>
+<h3>4.3 First Governance Vote</h3>
+<p>Create and vote on a proposal:</p>
+<pre><code class="language-bash"># Create proposal
+icnctl gov proposal create \
+  --domain-id &quot;coop:foodcoop&quot; \
+  --title &quot;Approve monthly meeting schedule&quot; \
+  --kind text
+
+# Open for voting
+icnctl gov proposal open --proposal-id &lt;id&gt;
+
+# Each member votes
+icnctl gov vote cast --proposal-id &lt;id&gt; --choice for
+
+# Check results
+icnctl gov vote show --proposal-id &lt;id&gt;
+
+# Close when ready
+icnctl gov proposal close --proposal-id &lt;id&gt;
+</code></pre>
+<h2>Phase 5: Operational Validation</h2>
+<h3>5.1 Health Checks</h3>
+<p>Run validation checklist:</p>
+<pre><code class="language-bash"># On each node
+icnctl status       # Should show connected peers
+icnctl peers list   # Should list all members
+icnctl trust list   # Should show trust graph
+
+# Test gossip propagation
+# On one node:
+icnctl ledger pay --to did:icn:peer --amount 0.1 --currency test --memo &quot;propagation test&quot;
+
+# On other nodes (within 30 seconds):
+icnctl ledger history  # Should show the transaction
+</code></pre>
+<h3>5.2 Monitoring Setup</h3>
+<p>Set up Prometheus monitoring:</p>
+<pre><code class="language-yaml"># prometheus.yml
+scrape_configs:
+  - job_name: &#39;icn-nodes&#39;
+    static_configs:
+      - targets:
+        - &#39;alice-node:9090&#39;
+        - &#39;bob-node:9090&#39;
+        - &#39;carol-node:9090&#39;
+</code></pre>
+<p>Key metrics to monitor:</p>
+<ul>
+<li><code>icn_network_connections_active</code> - Peer connectivity</li>
+<li><code>icn_gossip_announces_sent_total</code> - Message propagation</li>
+<li><code>icn_ledger_entries_total</code> - Transaction volume</li>
+<li><code>icn_ledger_entries_quarantined</code> - Conflict detection</li>
+</ul>
+<h3>5.3 Backup Verification</h3>
+<p>Test backup/restore on bootstrap node:</p>
+<pre><code class="language-bash"># Create backup
+icnctl backup create --output ~/icn-backup.tar.enc
+
+# Simulate restore (on test machine or after reset)
+icnctl backup restore --input ~/icn-backup.tar.enc
+
+# Verify restoration
+icnctl id show
+icnctl trust list
+icnctl ledger balance
+</code></pre>
+<h2>Phase 6: Day-2 Operations</h2>
+<h3>6.1 Regular Maintenance</h3>
+<p><strong>Daily:</strong></p>
+<ul>
+<li>Monitor health endpoint: <code>curl http://localhost:8080/health</code></li>
+<li>Check for warnings in logs</li>
+</ul>
+<p><strong>Weekly:</strong></p>
+<ul>
+<li>Review metrics dashboard</li>
+<li>Check disk usage</li>
+<li>Verify peer connectivity</li>
+</ul>
+<p><strong>Monthly:</strong></p>
+<ul>
+<li>Create backup: <code>icnctl backup create -o backup-$(date +%Y%m).tar.enc</code></li>
+<li>Review trust scores</li>
+<li>Archive old proposals</li>
+</ul>
+<h3>6.2 Common Operations</h3>
+<p><strong>Rotate Identity (if compromised):</strong></p>
+<pre><code class="language-bash">icnctl id rotate
+# Automatically announces new key to network
+</code></pre>
+<p><strong>Remove Unresponsive Member:</strong></p>
+<pre><code class="language-bash"># Create governance proposal first
+icnctl gov proposal create \
+  --domain-id &quot;coop:foodcoop&quot; \
+  --title &quot;Remove inactive member&quot; \
+  --kind membership
+
+# After approval
+icnctl gov domain remove-member \
+  --domain-id &quot;coop:foodcoop&quot; \
+  --member did:icn:inactive
+</code></pre>
+<p><strong>Handle Disputes:</strong></p>
+<pre><code class="language-bash"># File dispute
+icnctl dispute file \
+  --counterparty did:icn:other \
+  --amount 5.0 \
+  --currency hours \
+  --description &quot;Work not completed&quot;
+
+# Mediator resolves
+icnctl dispute resolve \
+  --dispute-id &lt;id&gt; \
+  --resolution &quot;partial_payment&quot; \
+  --amount 2.5
+</code></pre>
+<h3>6.3 Incident Response</h3>
+<p>See <a href="/docs/operations/deployment/incident-response">docs/incident-response.md</a> for detailed procedures.</p>
+<p><strong>Quick Reference:</strong></p>
+<ul>
+<li>Node down: Check systemd status, logs, disk space</li>
+<li>Sync issues: Restart node, check peer connectivity</li>
+<li>Trust issues: Review trust graph, check for expired vouches</li>
+<li>Ledger conflicts: Check quarantine, review transaction history</li>
+</ul>
+<h2>Phase 7: Success Metrics</h2>
+<h3>7.1 Technical Metrics</h3>
+<p>Track weekly:</p>
+<ul>
+<li>Network uptime (% of time all nodes connected)</li>
+<li>Message propagation time (gossip latency)</li>
+<li>Transaction success rate</li>
+<li>Conflict/quarantine rate</li>
+</ul>
+<p>Targets:</p>
+<ul>
+<li>Network uptime: &gt;95%</li>
+<li>Propagation time: &lt;5 seconds</li>
+<li>Transaction success: &gt;99%</li>
+<li>Conflict rate: &lt;1%</li>
+</ul>
+<h3>7.2 Community Metrics</h3>
+<p>Track monthly:</p>
+<ul>
+<li>Active members (made transaction in last 30 days)</li>
+<li>Transaction volume (total and per member)</li>
+<li>Proposal participation rate</li>
+<li>Trust graph density</li>
+</ul>
+<p>Targets:</p>
+<ul>
+<li>Active members: &gt;80% of total</li>
+<li>Proposals: &gt;50% participation</li>
+<li>Trust density: &gt;0.3 (avg edges per node)</li>
+</ul>
+<h3>7.3 Feedback Collection</h3>
+<p>Collect structured feedback after:</p>
+<ul>
+<li>1 week: Initial impressions, setup difficulties</li>
+<li>1 month: Usability, missing features</li>
+<li>3 months: Impact on community, recommendations</li>
+</ul>
+<h2>Appendix</h2>
+<h3>A. Quick Reference Commands</h3>
+<pre><code class="language-bash"># Identity
+icnctl id init          # Create identity
+icnctl id show          # Display DID
+icnctl id rotate        # Rotate keys
+
+# Network
+icnctl status           # Node status
+icnctl peers list       # Connected peers
+icnctl peers dial       # Connect to peer
+
+# Trust
+icnctl trust set        # Add trust edge
+icnctl trust list       # View trust graph
+icnctl trust score      # Get trust score
+
+# Ledger
+icnctl ledger pay       # Create payment
+icnctl ledger balance   # Check balance
+icnctl ledger history   # Transaction history
+
+# Governance
+icnctl gov domain create      # Create domain
+icnctl gov proposal create    # Create proposal
+icnctl gov vote cast          # Cast vote
+icnctl gov proposal close     # Close voting
+
+# Operations
+icnctl backup create    # Create backup
+icnctl backup restore   # Restore backup
+icnctl migrate          # Run migrations
+</code></pre>
+<h3>B. Troubleshooting</h3>
+<p><strong>&quot;Connection refused&quot; on dial:</strong></p>
+<ul>
+<li>Check firewall allows port 7777</li>
+<li>Verify peer is running: <code>icnctl status</code> on peer</li>
+<li>Check bootstrap URI is correct</li>
+</ul>
+<p><strong>&quot;No peers found&quot;:</strong></p>
+<ul>
+<li>If on same network: Check mDNS (port 5353 UDP)</li>
+<li>If remote: Verify bootstrap_peers in config</li>
+<li>Restart icnd to re-discover</li>
+</ul>
+<p><strong>&quot;Ledger entry quarantined&quot;:</strong></p>
+<ul>
+<li>Check for double-spending</li>
+<li>Review <code>icnctl ledger quarantine list</code></li>
+<li>May need mediator resolution</li>
+</ul>
+<p><strong>&quot;Proposal not passing&quot;:</strong></p>
+<ul>
+<li>Check quorum requirements</li>
+<li>Verify all members have voted</li>
+<li>Review <code>icnctl gov vote show --proposal-id &lt;id&gt;</code></li>
+</ul>
+<h3>C. Security Checklist</h3>
+<p>Pre-deployment:</p>
+<ul>
+<li><input disabled="" type="checkbox"> Strong passphrase for keystore (16+ chars)</li>
+<li><input disabled="" type="checkbox"> JWT secret is random and secure</li>
+<li><input disabled="" type="checkbox"> Gateway bound to localhost unless needed</li>
+</ul>
+<p>Operational:</p>
+<ul>
+<li><input disabled="" type="checkbox"> Regular backups (weekly minimum)</li>
+<li><input disabled="" type="checkbox"> Monitor for unauthorized DIDs</li>
+<li><input disabled="" type="checkbox"> Review trust graph periodically</li>
+<li><input disabled="" type="checkbox"> Rotate keys if compromise suspected</li>
+</ul>
+<p>Network:</p>
+<ul>
+<li><input disabled="" type="checkbox"> Firewall configured (7777 TCP/UDP only)</li>
+<li><input disabled="" type="checkbox"> TLS certificates valid</li>
+<li><input disabled="" type="checkbox"> No exposed RPC ports to internet</li>
+</ul>
+<h3>D. Support Resources</h3>
+<ul>
+<li>Documentation: <a href="https://icn.coop/docs" target="_blank" rel="noopener">https://icn.coop/docs</a></li>
+<li>Community: <a href="https://icn.coop/community" target="_blank" rel="noopener">https://icn.coop/community</a></li>
+<li>Issues: <a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">https://github.com/InterCooperative-Network/icn/issues</a></li>
+<li>Security: <a href="https://github.com/InterCooperative-Network/icn/blob/main/mailto:security@icn.coop">security@icn.coop</a></li>
+</ul>
+<hr>
+<h2>Changelog</h2>
+<ul>
+<li>2025-01-17: Initial playbook created</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

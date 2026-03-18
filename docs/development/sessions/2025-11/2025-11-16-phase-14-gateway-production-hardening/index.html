@@ -1,0 +1,393 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Phase 14 Gateway API - Production Hardening | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>development</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>sessions</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>2025 11</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>2025 11 16 phase 14 gateway production hardening</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/development/sessions/2025-11/2025-11-16-phase-14-gateway-production-hardening.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Phase 14 Gateway API - Production Hardening</h1>
+<p><strong>Date</strong>: 2025-11-16
+<strong>Phase</strong>: 14 (Platform Layer)
+<strong>Focus</strong>: Gateway API production hardening and security improvements</p>
+<h2>Overview</h2>
+<p>Completed production hardening for the ICN Gateway API, implementing critical security and scalability features. This work transforms the gateway from a functional prototype into a production-ready API server with comprehensive access control and abuse prevention.</p>
+<h2>Goals</h2>
+<ul>
+<li>✅ Add API versioning for future evolution</li>
+<li>✅ Implement per-DID rate limiting to prevent abuse</li>
+<li>✅ Enforce scope-based authorization on all endpoints</li>
+<li>✅ Fix cooperative ownership to use authenticated DID</li>
+</ul>
+<h2>Implementation</h2>
+<h3>1. API Versioning (<code>/v1</code> Namespacing)</h3>
+<p><strong>Commit</strong>: <code>db1bfc2</code> (partial), <code>9a12f76</code> (middleware fix)</p>
+<p><strong>Changes</strong>:</p>
+<ul>
+<li>Wrapped all endpoints under <code>/v1</code> scope</li>
+<li>Split into two <code>/v1</code> scopes: public and protected</li>
+<li>Public scope: <code>/health</code>, <code>/auth/*</code>, <code>/ws/:coop_id</code></li>
+<li>Protected scope: <code>/coops/*</code>, <code>/ledger/*</code> (with auth + rate limiting)</li>
+</ul>
+<p><strong>Architecture Decision</strong>:</p>
+<pre><code class="language-rust">// API v1 - public endpoints (no auth required)
+.service(
+    web::scope(&quot;/v1&quot;)
+        .service(api::health::health)
+        .service(api::auth::challenge)
+        .service(api::auth::verify)
+        .service(api::websocket::websocket)
+)
+
+// API v1 - protected endpoints (auth + rate limiting)
+.service(
+    web::scope(&quot;/v1&quot;)
+        // ... protected endpoints ...
+        .wrap(middleware::from_fn(rate_limit_middleware))  // Runs second
+        .wrap(auth)  // Runs first
+)
+</code></pre>
+<p><strong>Rationale</strong>:</p>
+<ul>
+<li>Enables backward-compatible API changes in future versions</li>
+<li>Clean migration path: v1 → v2 without breaking existing clients</li>
+<li>Follows REST best practices (Stripe, GitHub, etc.)</li>
+</ul>
+<p><strong>Critical Bug Fix</strong>:
+Initial implementation had incorrect middleware order - rate limiting wrapped before auth, causing rate limiting to be completely skipped (early return when TokenClaims missing). Fixed by creating separate scopes and applying middleware in correct order.</p>
+<h3>2. Per-DID Rate Limiting</h3>
+<p><strong>Commit</strong>: <code>db1bfc2</code></p>
+<p><strong>Implementation</strong>: Token bucket algorithm with configurable parameters</p>
+<ul>
+<li><strong>Capacity</strong>: 100 tokens (burst capacity)</li>
+<li><strong>Refill rate</strong>: 10 tokens/second (600 requests/minute sustained)</li>
+<li><strong>Cost per request</strong>: 1 token</li>
+<li><strong>Per-DID tracking</strong>: Independent buckets using <code>Arc&lt;RwLock&lt;HashMap&lt;String, TokenBucket&gt;&gt;&gt;</code></li>
+</ul>
+<p><strong>Code Structure</strong>:</p>
+<pre><code class="language-rust">struct TokenBucket {
+    tokens: f64,
+    capacity: f64,
+    refill_rate: f64,  // tokens per second
+    last_refill: Instant,
+}
+
+pub struct RateLimiter {
+    buckets: Arc&lt;RwLock&lt;HashMap&lt;String, TokenBucket&gt;&gt;&gt;,
+    config: RateLimitConfig,
+}
+</code></pre>
+<p><strong>Algorithm</strong>:</p>
+<ol>
+<li>Refill tokens based on elapsed time: <code>tokens = min(tokens + elapsed * refill_rate, capacity)</code></li>
+<li>Try to consume tokens: if available &gt;= cost, deduct and allow; else reject</li>
+<li>Automatic cleanup of inactive buckets prevents unbounded memory growth</li>
+</ol>
+<p><strong>Integration</strong>:</p>
+<ul>
+<li>Middleware extracts DID from TokenClaims (inserted by JWT auth middleware)</li>
+<li>Returns HTTP 429 Too Many Requests when limit exceeded</li>
+<li>Public endpoints bypass rate limiting (no TokenClaims present)</li>
+</ul>
+<p><strong>Testing</strong>: 5 comprehensive tests</p>
+<ul>
+<li><code>test_token_bucket_basic</code> - Basic consumption and rejection</li>
+<li><code>test_token_bucket_refill</code> - Time-based refill (500ms sleep)</li>
+<li><code>test_token_bucket_cap</code> - Capacity capping</li>
+<li><code>test_rate_limiter_per_did</code> - Per-DID isolation</li>
+<li><code>test_rate_limiter_cleanup</code> - Inactive bucket cleanup</li>
+</ul>
+<p><strong>Floating-Point Precision Handling</strong>:
+Tests use range checks instead of exact equality to handle automatic refill during test execution:</p>
+<pre><code class="language-rust">// Allow small variance due to refill during test execution
+assert!(after_first &gt;= 4.9 &amp;&amp; after_first &lt;= 5.1);
+</code></pre>
+<h3>3. Scope-Based Authorization</h3>
+<p><strong>Commit</strong>: <code>0119a06</code></p>
+<p><strong>Implementation</strong>: <code>require_scope()</code> helper validates JWT scopes against required permissions</p>
+<p><strong>Scope Hierarchy</strong>:</p>
+<ul>
+<li><code>ledger:read</code> - Balance queries and transaction history</li>
+<li><code>ledger:write</code> - Payment creation</li>
+<li><code>coop:read</code> - View cooperative information</li>
+<li><code>coop:write</code> - Create cooperatives</li>
+<li><code>coop:admin</code> - Member management and settings changes</li>
+</ul>
+<p><strong>Code Pattern</strong>:</p>
+<pre><code class="language-rust">pub fn require_scope(req: &amp;HttpRequest, required_scope: &amp;str) -&gt; Result&lt;(), GatewayError&gt; {
+    let claims = get_claims(req)
+        .ok_or_else(|| GatewayError::AuthenticationFailed(&quot;No claims found&quot;.to_string()))?;
+
+    if !claims.scopes.contains(&amp;required_scope.to_string()) {
+        return Err(GatewayError::AuthorizationFailed(
+            format!(&quot;Missing required scope: {}&quot;, required_scope)
+        ));
+    }
+
+    Ok(())
+}
+</code></pre>
+<p><strong>Applied to All Handlers</strong>:</p>
+<ul>
+<li><code>get_balance</code> → <code>ledger:read</code></li>
+<li><code>create_payment</code> → <code>ledger:write</code></li>
+<li><code>get_history</code> → <code>ledger:read</code></li>
+<li><code>get_coop</code> → <code>coop:read</code></li>
+<li><code>create_coop</code> → <code>coop:write</code></li>
+<li><code>update_settings</code> → <code>coop:admin</code></li>
+<li><code>delete_coop</code> → <code>coop:admin</code></li>
+<li><code>add_member</code> → <code>coop:admin</code></li>
+<li><code>remove_member</code> → <code>coop:admin</code></li>
+<li><code>update_member_role</code> → <code>coop:admin</code></li>
+</ul>
+<p><strong>Testing</strong>: 2 authorization failure tests</p>
+<ul>
+<li><code>test_authorization_scope_check</code> (ledger) - Wrong scopes rejected with 403</li>
+<li><code>test_authorization_scope_check</code> (coops) - Wrong scopes rejected with 403</li>
+</ul>
+<p><strong>Test Fixes</strong>:
+All existing tests updated to include proper scopes in TokenClaims:</p>
+<ul>
+<li>Added missing <code>iat</code> field (issued at timestamp)</li>
+<li>Added <code>HttpMessage</code> import for <code>extensions_mut()</code> access</li>
+<li>Created TokenClaims with appropriate scopes for each operation</li>
+</ul>
+<h3>4. Authenticated DID Extraction for Ownership</h3>
+<p><strong>Commit</strong>: <code>1ac1ed2</code></p>
+<p><strong>Problem</strong>: <code>create_coop</code> handler generated placeholder DIDs instead of using authenticated user&#39;s DID</p>
+<p><strong>Fix</strong>:</p>
+<pre><code class="language-rust">// Extract owner DID from authenticated token
+use crate::middleware::get_claims;
+let claims = get_claims(&amp;http_req)
+    .ok_or_else(|| GatewayError::AuthenticationFailed(&quot;No claims found&quot;.to_string()))?;
+
+let owner: icn_identity::Did = claims.sub.parse()
+    .map_err(|e| GatewayError::BadRequest(format!(&quot;Invalid DID in token: {}&quot;, e)))?;
+</code></pre>
+<p><strong>Security Benefits</strong>:</p>
+<ul>
+<li>Prevents creation of cooperatives with arbitrary/random owners</li>
+<li>Ensures cooperative owner matches authenticated user</li>
+<li>Proper authorization chain: auth → scope check → owner extraction</li>
+</ul>
+<p><strong>Testing</strong>: 1 ownership verification test</p>
+<ul>
+<li><code>test_create_coop_uses_authenticated_did</code> - Verifies Alice&#39;s DID becomes owner when she creates a coop</li>
+</ul>
+<h2>Test Results</h2>
+<p><strong>Final Stats</strong>: 38 tests passing</p>
+<ul>
+<li>5 rate limiting tests</li>
+<li>2 authorization failure tests</li>
+<li>1 ownership verification test</li>
+<li>30 existing tests (updated with proper TokenClaims)</li>
+</ul>
+<p><strong>Test Reliability</strong>:</p>
+<ul>
+<li>All tests pass consistently</li>
+<li>Floating-point precision issues resolved with range checks</li>
+<li>No flaky tests or timing dependencies (except intentional sleep in refill test)</li>
+</ul>
+<h2>Architecture Patterns</h2>
+<h3>Middleware Composition</h3>
+<p><strong>Critical Lesson</strong>: Middleware execution order matters!</p>
+<ul>
+<li>Wrapping order: last wrapped runs first</li>
+<li>Correct order: <code>.wrap(rate_limit).wrap(auth)</code> → auth runs first, then rate_limit</li>
+<li>Rate limiting requires TokenClaims from auth middleware</li>
+</ul>
+<h3>Request Extensions</h3>
+<p>Pattern for passing data between middleware and handlers:</p>
+<pre><code class="language-rust">// In middleware: insert claims
+req.extensions_mut().insert(claims);
+
+// In handler: extract claims
+let claims = req.extensions().get::&lt;TokenClaims&gt;().cloned();
+</code></pre>
+<h3>Error Handling</h3>
+<p>Consistent error types with HTTP status mapping:</p>
+<ul>
+<li><code>AuthenticationFailed</code> → 401 Unauthorized</li>
+<li><code>AuthorizationFailed</code> → 403 Forbidden</li>
+<li><code>RateLimitExceeded</code> → 429 Too Many Requests</li>
+<li><code>BadRequest</code> → 400 Bad Request</li>
+</ul>
+<h2>Security Model</h2>
+<p><strong>Three-Layer Security</strong>:</p>
+<ol>
+<li><p><strong>Authentication</strong> (JWT middleware)</p>
+<ul>
+<li>Verifies bearer token</li>
+<li>Extracts and validates claims</li>
+<li>Inserts TokenClaims into request extensions</li>
+</ul>
+</li>
+<li><p><strong>Rate Limiting</strong> (per-DID middleware)</p>
+<ul>
+<li>Prevents abuse and resource exhaustion</li>
+<li>Fair allocation across DIDs</li>
+<li>Configurable limits per deployment</li>
+</ul>
+</li>
+<li><p><strong>Authorization</strong> (handler-level)</p>
+<ul>
+<li>Scope-based access control</li>
+<li>Fine-grained permissions</li>
+<li>Prevents privilege escalation</li>
+</ul>
+</li>
+</ol>
+<p><strong>Execution Flow</strong>:</p>
+<pre><code>Request → JWT Auth → Rate Limiting → Authorization → Handler
+             ↓            ↓              ↓
+         Insert       Check DID      Check Scope
+         Claims       Limit          Requirement
+</code></pre>
+<h2>Production Readiness</h2>
+<p><strong>Abuse Prevention</strong>:</p>
+<ul>
+<li>✅ Rate limiting prevents API flooding</li>
+<li>✅ Scope checking prevents privilege escalation</li>
+<li>✅ Token expiration (1 hour TTL)</li>
+<li>✅ Challenge expiration (5 minutes TTL)</li>
+</ul>
+<p><strong>Scalability</strong>:</p>
+<ul>
+<li>Token bucket algorithm: O(1) per request</li>
+<li>Per-DID isolation prevents noisy neighbor problem</li>
+<li>Automatic cleanup prevents memory growth</li>
+<li>Arc/RwLock enables multi-threaded access</li>
+</ul>
+<p><strong>Observability</strong>:</p>
+<ul>
+<li>HTTP status codes follow standards (401, 403, 429)</li>
+<li>Error messages include context</li>
+<li>Rate limit errors include DID for debugging</li>
+</ul>
+<p><strong>Evolution Path</strong>:</p>
+<ul>
+<li><code>/v1</code> namespace enables backward-compatible changes</li>
+<li>Scope system allows adding new permissions</li>
+<li>Rate limit config allows per-deployment tuning</li>
+</ul>
+<h2>Remaining Work (Deferred)</h2>
+<p><strong>WebSocket Improvements</strong> (deferred until pilot selection):</p>
+<ul>
+<li>Reconnection handling</li>
+<li>Event backfill for missed events</li>
+</ul>
+<p><strong>TypeScript SDK</strong> (deferred until pilot selection):</p>
+<ul>
+<li><code>@icn/client</code> npm package</li>
+<li>Don&#39;t build speculatively - build what pilots need</li>
+</ul>
+<p><strong>Reference Application</strong> (deferred until pilot selection):</p>
+<ul>
+<li>Timebank or other pilot-specific app</li>
+</ul>
+<h2>Lessons Learned</h2>
+<ol>
+<li><strong>Middleware order matters</strong> - Cost us a critical bug that completely bypassed rate limiting</li>
+<li><strong>Floating-point tests need ranges</strong> - Exact equality fails due to timing variations</li>
+<li><strong>Test coverage reveals bugs</strong> - Authorization failure tests exposed missing validation</li>
+<li><strong>Phase incrementally</strong> - Each feature added separately with full testing</li>
+<li><strong>Use existing patterns</strong> - TokenClaims in request extensions works well</li>
+</ol>
+<h2>Next Steps</h2>
+<p><strong>Track C1</strong>: Pilot Community Selection &amp; Deployment</p>
+<ul>
+<li>Select pilot community for initial deployment</li>
+<li>Build TypeScript SDK for their specific workflows</li>
+<li>Deploy gateway with pilot-specific configuration</li>
+<li>Run weekly learning loop to gather feedback</li>
+</ul>
+<p><strong>Philosophy</strong>: The substrate is ready. Now we listen to communities and build what they need.</p>
+<h2>Files Modified</h2>
+<ul>
+<li><code>icn/crates/icn-gateway/src/server.rs</code> - API versioning and middleware ordering</li>
+<li><code>icn/crates/icn-gateway/src/rate_limit.rs</code> - NEW file with rate limiting</li>
+<li><code>icn/crates/icn-gateway/src/error.rs</code> - Added RateLimitExceeded error</li>
+<li><code>icn/crates/icn-gateway/src/lib.rs</code> - Exported rate_limit module</li>
+<li><code>icn/crates/icn-gateway/src/middleware.rs</code> - Added require_scope helper</li>
+<li><code>icn/crates/icn-gateway/src/api/ledger.rs</code> - Added scope checks to all handlers</li>
+<li><code>icn/crates/icn-gateway/src/api/coops.rs</code> - Added scope checks and DID extraction</li>
+<li><code>CHANGELOG.md</code> - Documented all Phase 14 improvements</li>
+<li><code>ROADMAP.md</code> - Updated Phase 14 status</li>
+</ul>
+<h2>Commits</h2>
+<ul>
+<li><code>db1bfc2</code> - feat(gateway): Add API versioning and per-DID rate limiting</li>
+<li><code>87cacf5</code> - docs: Update CHANGELOG and ROADMAP</li>
+<li><code>9a12f76</code> - fix(gateway): Correct middleware execution order</li>
+<li><code>0119a06</code> - feat(gateway): Add scope-based authorization enforcement</li>
+<li><code>1ac1ed2</code> - fix(gateway): Use authenticated DID as cooperative owner</li>
+</ul>
+<h2>Conclusion</h2>
+<p>Phase 14 production hardening is complete. The gateway is now production-ready with:</p>
+<ul>
+<li>✅ API versioning for evolution</li>
+<li>✅ Rate limiting for abuse prevention</li>
+<li>✅ Authorization for access control</li>
+<li>✅ Authenticated ownership for security</li>
+</ul>
+<p>All 38 tests passing. Ready for pilot deployment.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

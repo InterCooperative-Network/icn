@@ -1,0 +1,526 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Documentation Index | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>  <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>INDEX</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/INDEX.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Documentation Index</h1>
+<p>Welcome to the ICN (Intercooperative Network) documentation! This index provides clear navigation to all documentation.</p>
+<p><strong>Last Updated</strong>: 2026-02-18<br><strong>Version</strong>: 2.0 (Post-Phase 2C Reorganization)</p>
+<hr>
+<h2>📋 Quick Navigation</h2>
+<ul>
+<li><strong>New to ICN?</strong> → Start with <a href="/docs/GETTING_STARTED">Getting Started Guide</a></li>
+<li><strong>Understanding the system?</strong> → Read <a href="/docs/ARCHITECTURE">Architecture Overview</a></li>
+<li><strong>Building features?</strong> → Check <a href="#developer-guides">Developer Guides</a></li>
+<li><strong>Deploying ICN?</strong> → See <a href="#operations-guides">Operations Guides</a></li>
+<li><strong>Looking for APIs?</strong> → Browse <a href="#api-reference">API Reference</a></li>
+<li><strong>Historical context?</strong> → Explore <a href="#archives">Archives</a></li>
+</ul>
+<hr>
+<h2>📚 Core Documentation</h2>
+<p>Essential reading for all ICN users and contributors.</p>
+<table>
+<thead>
+<tr>
+<th>Document</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="/docs/README">README.md</a></td>
+<td>Documentation overview and structure</td>
+</tr>
+<tr>
+<td><a href="/docs/ARCHITECTURE">ARCHITECTURE.md</a></td>
+<td>Comprehensive system architecture (160KB+)</td>
+</tr>
+<tr>
+<td><a href="/docs/GETTING_STARTED">GETTING_STARTED.md</a></td>
+<td>Quick start guide for developers</td>
+</tr>
+<tr>
+<td><a href="/docs/PHASE_HISTORY">PHASE_HISTORY.md</a></td>
+<td>Development phase completion history</td>
+</tr>
+<tr>
+<td><a href="/docs/STATE">STATE.md</a></td>
+<td>Current project state snapshot</td>
+</tr>
+<tr>
+<td><a href="/docs/TODO">TODO.md</a></td>
+<td>Active work items and priorities</td>
+</tr>
+<tr>
+<td><a href="/docs/glossary">glossary.md</a></td>
+<td>ICN terminology and definitions</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>🏗️ Architecture &amp; Design</h2>
+<p>In-depth architectural documentation and design specifications.</p>
+<h3>Architecture Documentation (<code>architecture/</code>)</h3>
+<p>Comprehensive architectural reviews and design decisions:</p>
+<ul>
+<li><a href="/docs/architecture/ARCHITECTURE_INDEX">ARCHITECTURE_INDEX.md</a> - Architecture document index</li>
+<li><a href="/docs/architecture/ARCHITECTURE_MAP">ARCHITECTURE_MAP.md</a> - Visual architecture guide (197KB)</li>
+<li><a href="/docs/architecture/ARCHITECTURE_QUICK_REF">ARCHITECTURE_QUICK_REF.md</a> - Quick reference card</li>
+<li><a href="/docs/architecture/CANONICAL_ENCODING">CANONICAL_ENCODING.md</a> - Wire format specifications</li>
+<li><a href="/docs/architecture/CELLS_AND_SCOPES">CELLS_AND_SCOPES.md</a> - Cell-based federation model</li>
+<li><a href="/docs/architecture/SCOPE_BOUNDED_TRUST">SCOPE_BOUNDED_TRUST.md</a> - Trust scope architecture</li>
+<li><a href="/docs/architecture/KERNEL_APP_SEPARATION">KERNEL_APP_SEPARATION.md</a> - Kernel/app boundary design</li>
+<li><a href="/docs/architecture/FEDERATION_INTEROP_CONTRACT">FEDERATION_INTEROP_CONTRACT.md</a> - Federation protocols</li>
+<li><a href="/docs/architecture/CLIENT_MODEL">CLIENT_MODEL.md</a> - Client architecture patterns</li>
+<li><a href="/docs/architecture/GOVERNANCE_STATE_MACHINE">GOVERNANCE_STATE_MACHINE.md</a> - Governance flow design</li>
+<li><a href="/docs/architecture/IDENTITY_MEMBERSHIP_ARCHITECTURE">IDENTITY_MEMBERSHIP_ARCHITECTURE.md</a> - Identity &amp; membership</li>
+<li>Plus audit reports and gap analyses</li>
+</ul>
+<h3>Design Documents (<code>design/</code>)</h3>
+<p>Feature designs, proposals, and evolution plans:</p>
+<p><strong>Core Systems:</strong></p>
+<ul>
+<li><a href="/docs/design/COMMONS_EVOLUTION">COMMONS_EVOLUTION.md</a> - Commons-based governance evolution</li>
+<li><a href="/docs/design/MINIMAL-VIABLE-COOP">MINIMAL-VIABLE-COOP.md</a> - MVC specification</li>
+<li><a href="/docs/design/capability-based-features">capability-based-features.md</a> - Capability system design</li>
+<li><a href="/docs/design/compute-substrate-design">compute-substrate-design.md</a> - Distributed compute layer</li>
+<li><a href="/docs/design/scheduler-evolution-plan">scheduler-evolution-plan.md</a> - Task scheduler design</li>
+<li><a href="/docs/design/multi-device-identity-design">multi-device-identity-design.md</a> - Multi-device identity</li>
+<li><a href="/docs/design/nat-traversal-design">nat-traversal-design.md</a> - NAT traversal strategy</li>
+<li><a href="/docs/design/post-quantum-crypto">post-quantum-crypto.md</a> - PQ cryptography design</li>
+<li><a href="/docs/design/platform-layer-design">platform-layer-design.md</a> - Platform abstraction</li>
+<li><a href="/docs/design/razeto-integration-design">razeto-integration-design.md</a> - Razeto model integration</li>
+<li><a href="/docs/design/social-recovery-design">social-recovery-design.md</a> - Social recovery mechanisms</li>
+<li><a href="/docs/design/entity-dissolution">entity-dissolution.md</a> &amp; <a href="/docs/design/entity-dissolution-example">entity-dissolution-example.md</a> - Entity lifecycle</li>
+<li><a href="/docs/design/institution-in-a-box">institution-in-a-box.md</a> - Organizational templates</li>
+</ul>
+<p><strong>Economics (<code>design/economics/</code>):</strong></p>
+<ul>
+<li><a href="/docs/design/economics/README">README.md</a> - Economics documentation index</li>
+<li><a href="/docs/design/economics/ECONOMIC_VISION">ECONOMIC_VISION.md</a> - Strategic economic vision</li>
+<li><a href="/docs/design/economics/ECONOMIC_ARCHITECTURE">ECONOMIC_ARCHITECTURE.md</a> - Layered economy design</li>
+<li><a href="/docs/design/economics/contribution-credits-design">contribution-credits-design.md</a> - Credit system</li>
+<li><a href="/docs/design/economics/economic-safety">economic-safety.md</a> - Economic safety rails</li>
+<li><a href="/docs/design/economics/econ-modeling">econ-modeling.md</a> - Economic simulations</li>
+</ul>
+<p><strong>Governance (<code>design/governance/</code>):</strong></p>
+<ul>
+<li><a href="/docs/design/governance/README">README.md</a> - Governance documentation index</li>
+<li><a href="/docs/design/governance/PROJECT_GOVERNANCE">PROJECT_GOVERNANCE.md</a> - Project governance model</li>
+<li><a href="/docs/design/governance/governance">governance.md</a> - Governance system design</li>
+<li><a href="/docs/design/governance/governance-primitives">governance-primitives.md</a> - Governance building blocks</li>
+<li><a href="/docs/design/governance/witness-trust-validation">witness-trust-validation.md</a> - Witness validation</li>
+</ul>
+<p><strong>SDIS (<code>design/sdis/</code>):</strong></p>
+<ul>
+<li><a href="/docs/design/sdis/README">README.md</a> - SDIS design documentation index</li>
+<li><a href="/docs/design/sdis/social-recovery">social-recovery.md</a> - SDIS social recovery design</li>
+</ul>
+<h3>Specifications (<code>spec/</code>)</h3>
+<p>Formal protocol and contract specifications:</p>
+<ul>
+<li><a href="/docs/spec/KERNEL_CONTRACTS">KERNEL_CONTRACTS.md</a> - Kernel contract specifications</li>
+</ul>
+<hr>
+<h2>📖 Reference Documentation</h2>
+<p>Technical reference materials, APIs, and configuration.</p>
+<h3>API Reference (<code>reference/api/</code>)</h3>
+<p>REST API, WebSocket, and SDK documentation:</p>
+<ul>
+<li><a href="/docs/reference/api/README">README.md</a> - API documentation index</li>
+<li><a href="/docs/reference/api/API_REFERENCE">API_REFERENCE.md</a> - Complete API reference</li>
+<li><a href="/docs/reference/api/api-versioning">api-versioning.md</a> - API versioning strategy</li>
+<li><a href="/docs/reference/api/topic-subscriptions-api">topic-subscriptions-api.md</a> - Subscription API</li>
+<li>Also see: <a href="/docs/api/OPENAPI">api/OPENAPI.md</a> and <a href="/docs/api/README">api/README.md</a></li>
+</ul>
+<h3>Configuration Reference (<code>reference/config/</code>)</h3>
+<p>Configuration files and environment settings:</p>
+<ul>
+<li><a href="/docs/reference/config/README">README.md</a> - Configuration documentation index</li>
+<li><a href="/docs/reference/config/CONFIGURATION">CONFIGURATION.md</a> - Configuration guide</li>
+<li><a href="/docs/reference/config/identity-backend-configuration">identity-backend-configuration.md</a> - Identity backends</li>
+<li><a href="/docs/reference/config/trust-threshold-configuration">trust-threshold-configuration.md</a> - Trust thresholds</li>
+</ul>
+<h3>Other References</h3>
+<ul>
+<li><a href="/docs/glossary">glossary.md</a> - Terminology and definitions</li>
+<li><a href="/docs/examples/policies/README">examples/policies/README.md</a> - Policy examples</li>
+</ul>
+<hr>
+<h2>📚 User &amp; Developer Guides</h2>
+<p>Practical guides for using and building with ICN.</p>
+<h3>User Guides (<code>guides/user/</code>)</h3>
+<p>End-user documentation:</p>
+<ul>
+<li><a href="/docs/guides/user/README">README.md</a> - User guide index</li>
+<li><a href="/docs/guides/user/WHY_ICN_HANDOUT">WHY_ICN_HANDOUT.md</a> - ICN value proposition</li>
+<li><a href="/docs/guides/user/cooperative-setup-guide">cooperative-setup-guide.md</a> - Setting up a cooperative</li>
+</ul>
+<h3>Developer Guides (<code>guides/developer/</code>)</h3>
+<p>Technical guides for contributors:</p>
+<ul>
+<li><a href="/docs/guides/developer/README">README.md</a> - Developer guide index</li>
+<li><a href="/docs/guides/developer/DEV_ENVIRONMENT">DEV_ENVIRONMENT.md</a> - Development environment setup</li>
+<li><a href="/docs/guides/developer/DOCUMENTATION_STYLE">DOCUMENTATION_STYLE.md</a> - Documentation conventions</li>
+<li><a href="/docs/guides/developer/i18n-guide">i18n-guide.md</a> - Internationalization guide</li>
+</ul>
+<h3>Operations Guides (<code>guides/operations/</code>)</h3>
+<p>Deployment and operations documentation:</p>
+<ul>
+<li><a href="/docs/guides/operations/README">README.md</a> - Operations guide index</li>
+<li><a href="/docs/guides/operations/operations-guide">operations-guide.md</a> - General operations</li>
+<li><a href="/docs/guides/operations/backup-and-recovery">backup-and-recovery.md</a> - Backup procedures</li>
+<li><a href="/docs/guides/operations/replication-operations">replication-operations.md</a> - Storage replication</li>
+<li><a href="/docs/guides/operations/pilot-smoke">pilot-smoke.md</a> - Deterministic pilot linkage smoke runbook</li>
+<li><a href="/docs/guides/operations/troubleshooting">troubleshooting.md</a> - Common issues and solutions</li>
+</ul>
+<h3>Quick References</h3>
+<ul>
+<li><a href="/docs/guides/FAQ">FAQ.md</a> - Frequently asked questions</li>
+<li><a href="/docs/guides/QUICK_REFERENCE">QUICK_REFERENCE.md</a> - Command cheat sheet</li>
+</ul>
+<hr>
+<h2>🛠️ Development Documentation</h2>
+<p>Internal development resources, testing, and CI/CD.</p>
+<h3>Development Process (<code>development/</code>)</h3>
+<ul>
+<li><a href="/docs/development/README">README.md</a> - Development documentation index</li>
+</ul>
+<p><strong>Sprints (<code>development/sprints/</code>):</strong></p>
+<ul>
+<li><a href="/docs/development/sprints/README">README.md</a> - Sprint planning and tracking</li>
+<li>Sprint completion records</li>
+</ul>
+<p><strong>Testing (<code>development/testing/</code>):</strong></p>
+<ul>
+<li><a href="/docs/development/testing/README">README.md</a> - Testing documentation index</li>
+<li>Integration and E2E testing guides</li>
+<li>Mobile app testing procedures</li>
+</ul>
+<h3>CI/CD &amp; Automation (<code>ci/</code>)</h3>
+<p>Continuous integration and delivery:</p>
+<ul>
+<li><a href="/docs/ci/GATE_RATCHET_PLAN">GATE_RATCHET_PLAN.md</a> - CI check graduation schedule</li>
+<li>CI configuration and status reports</li>
+</ul>
+<h3>Performance (<code>performance/</code>)</h3>
+<ul>
+<li><a href="/docs/performance/README">README.md</a> - Performance documentation index</li>
+<li>Benchmarks and optimization guides</li>
+</ul>
+<hr>
+<h2>🔒 Security &amp; Compliance</h2>
+<p>Security documentation, threat models, and audit reports.</p>
+<h3>Security Documentation (<code>security/</code>)</h3>
+<p><strong>Production Security:</strong></p>
+<ul>
+<li><a href="/docs/security/FINAL_SECURITY_STATUS">FINAL_SECURITY_STATUS.md</a> - Production readiness assessment ✅</li>
+<li><a href="/docs/security/COMPREHENSIVE_SECURITY_IMPROVEMENTS">COMPREHENSIVE_SECURITY_IMPROVEMENTS.md</a> - Security overview</li>
+<li><a href="/docs/security/SECURITY_FIXES_2025-12-18">SECURITY_FIXES_2025-12-18.md</a> - Detailed vulnerability fixes</li>
+<li><a href="/docs/security/SECURITY_TESTING_GUIDE">SECURITY_TESTING_GUIDE.md</a> - Testing procedures</li>
+<li><a href="/docs/security/production-hardening">production-hardening.md</a> - Production hardening measures</li>
+</ul>
+<p><strong>Threat Models &amp; Audits:</strong></p>
+<ul>
+<li><a href="/docs/security/threat-model">threat-model.md</a> - Comprehensive threat analysis</li>
+<li><a href="/docs/security/security-roadmap">security-roadmap.md</a> - Security roadmap</li>
+<li><a href="/docs/security/SECURITY_AUDIT_REPORT">SECURITY_AUDIT_REPORT.md</a> - Audit findings</li>
+<li><a href="/docs/security/SECURITY_AUDIT_RESULTS">SECURITY_AUDIT_RESULTS.md</a> - Audit results</li>
+</ul>
+<p><strong>SDIS Security:</strong></p>
+<ul>
+<li><a href="/docs/security/SDIS_THREAT_MODEL">SDIS_THREAT_MODEL.md</a> - SDIS-specific threats</li>
+<li><a href="/docs/security/SDIS_CRYPTO_REVIEW">SDIS_CRYPTO_REVIEW.md</a> - Cryptographic review</li>
+<li><a href="/docs/security/SDIS_AUDIT_CHECKLIST">SDIS_AUDIT_CHECKLIST.md</a> - SDIS audit checklist</li>
+</ul>
+<p><strong>Specialized Topics:</strong></p>
+<ul>
+<li><a href="/docs/security/TOFU_SECURITY_MODEL">TOFU_SECURITY_MODEL.md</a> - Trust-On-First-Use model</li>
+<li><a href="/docs/security/GATEWAY_CSP">GATEWAY_CSP.md</a> - Content Security Policy</li>
+<li><a href="/docs/security/SECRET_MANAGEMENT">SECRET_MANAGEMENT.md</a> - Secret management practices</li>
+<li><a href="/docs/security/EDUCATIONAL_GUIDE_SECURITY_FIXES">EDUCATIONAL_GUIDE_SECURITY_FIXES.md</a> - Learning resource</li>
+</ul>
+<h3>SDIS Documentation (<code>sdis/</code>)</h3>
+<p>Sovereign Digital Identity System:</p>
+<ul>
+<li><a href="/docs/sdis/SDIS_SYSTEM">SDIS_SYSTEM.md</a> - System overview</li>
+<li><a href="/docs/sdis/SDIS_STATUS">SDIS_STATUS.md</a> - Implementation status</li>
+<li><a href="/docs/sdis/SDIS_IMPLEMENTATION_PLAN">SDIS_IMPLEMENTATION_PLAN.md</a> - Implementation roadmap</li>
+<li><a href="/docs/sdis/SDIS_IMPLEMENTATION_COMPLETE">SDIS_IMPLEMENTATION_COMPLETE.md</a> - Completion report</li>
+<li><a href="/docs/sdis/SDIS_QUICK_START">SDIS_QUICK_START.md</a> - Quick start guide</li>
+<li><a href="/docs/sdis/SDIS_USER_GUIDE">SDIS_USER_GUIDE.md</a> - User guide</li>
+<li><a href="/docs/sdis/SDIS_API_GUIDE">SDIS_API_GUIDE.md</a> - API documentation</li>
+<li><a href="/docs/sdis/SDIS_BUILD_PLAN">SDIS_BUILD_PLAN.md</a> - Build planning</li>
+<li><a href="/docs/sdis/SDIS_STEWARD_ROADMAP">SDIS_STEWARD_ROADMAP.md</a> - Steward network roadmap</li>
+<li><a href="/docs/sdis/SDIS_DEPLOYMENT_STATUS">SDIS_DEPLOYMENT_STATUS.md</a> - Deployment status</li>
+</ul>
+<hr>
+<h2>🎯 Specialized Topics</h2>
+<h3>Onboarding (<code>onboarding/</code>)</h3>
+<p>Contributor onboarding materials:</p>
+<ul>
+<li><a href="/docs/onboarding/README">README.md</a> - Onboarding program overview</li>
+<li><a href="/docs/onboarding/manual">manual.md</a> - Complete onboarding manual</li>
+<li><a href="/docs/onboarding/syllabus">syllabus.md</a> - Learning syllabus</li>
+<li><a href="/docs/onboarding/reading-map">reading-map.md</a> - Documentation reading order</li>
+<li><a href="/docs/onboarding/patterns">patterns.md</a> - Code patterns guide</li>
+<li>Plus modules, tracks, and workshops</li>
+</ul>
+<h3>Deployment &amp; Operations</h3>
+<p><strong>Deployment Guides (<code>deployment/</code>):</strong></p>
+<ul>
+<li>Deployment configuration and guides</li>
+</ul>
+<p><strong>Operations (<code>operations/</code>):</strong></p>
+<ul>
+<li><a href="/docs/operations/README">README.md</a> - Operations documentation</li>
+<li>Monitoring, runbooks, and operational procedures</li>
+</ul>
+<p><strong>Ops Runbooks (<code>ops/runbooks/</code>):</strong></p>
+<ul>
+<li><a href="/docs/ops/runbooks/README">README.md</a> - Runbook index</li>
+<li>Incident response procedures</li>
+</ul>
+<h3>Mobile &amp; Observability</h3>
+<p><strong>Mobile (<code>mobile/</code>):</strong></p>
+<ul>
+<li>Mobile app documentation</li>
+</ul>
+<p><strong>Observability (<code>observability/</code>):</strong></p>
+<ul>
+<li>Metrics, logging, and tracing</li>
+</ul>
+<h3>Pilot Programs (<code>internal/pilots/</code>)</h3>
+<p>Real-world pilot deployment documentation:</p>
+<ul>
+<li><a href="/docs/internal/pilots/pilot-playbook">pilot-playbook.md</a> - Pilot deployment guide</li>
+<li><a href="/docs/internal/pilots/pilot-coordinator-guide">pilot-coordinator-guide.md</a> - Coordinator handbook</li>
+<li><a href="/docs/internal/pilots/pilot-readiness-gaps">pilot-readiness-gaps.md</a> - Readiness assessment</li>
+<li><a href="/docs/internal/pilots/pilot-limitations">pilot-limitations.md</a> - Known limitations</li>
+</ul>
+<hr>
+<h2>🔬 Internal Documentation</h2>
+<p>Internal planning, status tracking, and project management.</p>
+<h3>Internal Overview (<code>internal/</code>)</h3>
+<ul>
+<li><a href="/docs/internal/README">README.md</a> - Internal documentation index</li>
+<li><a href="/docs/internal/legal-considerations">legal-considerations.md</a> - Legal notes</li>
+</ul>
+<h3>Status Tracking (<code>internal/status/</code>)</h3>
+<p>Active project status and gap analyses:</p>
+<ul>
+<li><a href="/docs/internal/status/GAP_ANALYSIS">GAP_ANALYSIS.md</a> - Current gaps</li>
+<li><a href="/docs/internal/status/gap-analysis">gap-analysis.md</a> - Gap tracking</li>
+<li><a href="/docs/internal/status/strategic-gap-analysis">strategic-gap-analysis.md</a> - Strategic gaps</li>
+<li><a href="/docs/internal/status/vision-implementation-gap">vision-implementation-gap.md</a> - Vision gaps</li>
+<li><a href="/docs/internal/status/multi-device-status">multi-device-status.md</a> - Multi-device status</li>
+</ul>
+<h3>Current Status Reports (<code>status/</code>)</h3>
+<p>Live status reports and deployment verification:</p>
+<ul>
+<li><a href="/docs/status/PROJECT_STATE_2026-02-09">PROJECT_STATE_2026-02-09.md</a> - Current project state ⭐</li>
+<li><a href="/docs/status/CURRENT_SYSTEM_STATUS">CURRENT_SYSTEM_STATUS.md</a> - System status</li>
+<li><a href="/docs/status/DEPLOYMENT_VERIFICATION">DEPLOYMENT_VERIFICATION.md</a> - Deployment verification</li>
+<li><a href="/docs/status/FINAL_CI_RESOLUTION">FINAL_CI_RESOLUTION.md</a> - CI resolution status</li>
+<li><a href="/docs/status/FINAL_DEMO_SUCCESS">FINAL_DEMO_SUCCESS.md</a> - Demo success report</li>
+<li><a href="/docs/status/FINAL_SESSION_STATUS">FINAL_SESSION_STATUS.md</a> - Session status</li>
+<li><a href="/docs/status/MOBILE_APP_DEMO">MOBILE_APP_DEMO.md</a> - Mobile app demo</li>
+<li><a href="/docs/status/TESTS_FIXED_STATUS">TESTS_FIXED_STATUS.md</a> - Test fix status</li>
+<li><a href="/docs/status/2025-12-25-sprint-status">2025-12-25-sprint-status.md</a> - Sprint status</li>
+</ul>
+<h3>Architecture Decision Records (<code>adr/</code>)</h3>
+<p>Formal architectural decisions:</p>
+<ul>
+<li><a href="/docs/adr/ADR-0010-app-topology">ADR-0010-app-topology.md</a> - App topology decision</li>
+<li>Additional ADRs as numbered documents</li>
+</ul>
+<h3>Templates (<code>templates/</code>)</h3>
+<p>Documentation and code templates for consistency.</p>
+<h3>Vision Documents (<code>vision/</code>)</h3>
+<p>High-level vision and strategic direction.</p>
+<h3>AI &amp; Automation (<code>ai/</code>)</h3>
+<ul>
+<li><a href="/docs/ai/CODEX_WORKFLOW">CODEX_WORKFLOW.md</a> - AI workflow and agent rules</li>
+</ul>
+<hr>
+<h2>📦 Archives</h2>
+<p>Historical documentation, completed phases, and superseded materials.</p>
+<h3>Archive Structure (<code>archive/2025/</code>)</h3>
+<p>Organized by year, containing completed work and historical records:</p>
+<ul>
+<li><a href="/docs/archive/2025/README">README.md</a> - Archive index</li>
+<li><a href="/docs/archive/2025/SUMMARY">SUMMARY.md</a> - Year summary</li>
+</ul>
+<p><strong>Key Archived Documents:</strong></p>
+<ul>
+<li>Phase completion reports (PHASE_18_COMPLETE.md, etc.)</li>
+<li>Historical deployment guides (KUBERNETES_DEPLOYMENT.md, PRODUCTION_DEPLOYMENT_GUIDE.md)</li>
+<li>System status snapshots (PROJECT_STATUS_2025-12-06.md, SYSTEM_GAPS_2025-12-06.md)</li>
+<li>Completed analyses (FOUNDATIONAL_REVIEW_2025-12-16.md, CODE_REVIEW_COMPLETE.md)</li>
+<li>Security audit resolutions (security-audit-resolution-2025-12-18.md, security-hardening-2025-12-18.md)</li>
+<li>Integration reports (GOVERNANCE-LEDGER-INTEGRATION-COMPLETE.md, GOVERNANCE-LEDGER-BUGS-FOUND.md)</li>
+<li>Evolution documents (COMMONS_EVOLUTION_SUMMARY.md, ICN_COMPLETE_ARCHITECTURE_SYNTHESIS.md)</li>
+<li>HSM/TPM documentation (hsm-tpm-roadmap.md, tpm-setup.md, tpm-implementation-plan.md)</li>
+<li>Bug reports and sprint plans</li>
+<li>Plus 20+ additional historical documents</li>
+</ul>
+<p><strong>Migration Notes:</strong> Documents are moved to archives when superseded, completed, or no longer actively referenced. See <a href="/docs/REORGANIZATION_2026">REORGANIZATION_2026.md</a> for migration details.</p>
+<hr>
+<h2>🗂️ Documentation by Role</h2>
+<h3>For New Contributors</h3>
+<ol>
+<li><a href="/docs/GETTING_STARTED">GETTING_STARTED.md</a> - Quick start</li>
+<li><a href="/docs/onboarding/README">onboarding/README.md</a> - Onboarding program</li>
+<li><a href="/docs/guides/developer/README">guides/developer/README.md</a> - Developer guides</li>
+<li><a href="/docs/ARCHITECTURE">ARCHITECTURE.md</a> - Architecture overview</li>
+</ol>
+<h3>For Core Developers</h3>
+<ol>
+<li><a href="/docs/ARCHITECTURE">ARCHITECTURE.md</a> - Full architecture</li>
+<li><a href="/docs/architecture/ARCHITECTURE_MAP">architecture/ARCHITECTURE_MAP.md</a> - Visual guide</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/">design/</a> - Design documents</li>
+<li><a href="/docs/development/testing/README">development/testing/README.md</a> - Testing guides</li>
+</ol>
+<h3>For Operations Engineers</h3>
+<ol>
+<li><a href="/docs/guides/operations/README">guides/operations/README.md</a> - Operations guides</li>
+<li><a href="/docs/security/FINAL_SECURITY_STATUS">security/FINAL_SECURITY_STATUS.md</a> - Security status</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/deployment/">deployment/</a> - Deployment configs</li>
+<li><a href="/docs/operations/README">operations/README.md</a> - Operational procedures</li>
+</ol>
+<h3>For Security Engineers</h3>
+<ol>
+<li><a href="/docs/security/FINAL_SECURITY_STATUS">security/FINAL_SECURITY_STATUS.md</a> - Security overview</li>
+<li><a href="/docs/security/threat-model">security/threat-model.md</a> - Threat analysis</li>
+<li><a href="/docs/security/SECURITY_TESTING_GUIDE">security/SECURITY_TESTING_GUIDE.md</a> - Testing</li>
+<li><a href="/docs/security/production-hardening">security/production-hardening.md</a> - Hardening</li>
+</ol>
+<h3>For Product/Community</h3>
+<ol>
+<li><a href="/docs/guides/user/WHY_ICN_HANDOUT">guides/user/WHY_ICN_HANDOUT.md</a> - Value proposition</li>
+<li><a href="/docs/design/economics/ECONOMIC_VISION">design/economics/ECONOMIC_VISION.md</a> - Economic vision</li>
+<li><a href="/docs/design/MINIMAL-VIABLE-COOP">design/MINIMAL-VIABLE-COOP.md</a> - MVC specification</li>
+<li><a href="/docs/internal/pilots/pilot-playbook">internal/pilots/pilot-playbook.md</a> - Pilot guide</li>
+</ol>
+<hr>
+<h2>📊 Documentation Statistics</h2>
+<ul>
+<li><strong>Total Markdown Files</strong>: 200+</li>
+<li><strong>Core Documentation</strong>: 7 files</li>
+<li><strong>Architecture Docs</strong>: 25+ files</li>
+<li><strong>Design Documents</strong>: 35+ files</li>
+<li><strong>Reference Materials</strong>: 15+ files</li>
+<li><strong>Guides</strong>: 20+ files</li>
+<li><strong>Security Documents</strong>: 20+ files</li>
+<li><strong>Internal/Status</strong>: 15+ files</li>
+<li><strong>Archived Documents</strong>: 30+ files</li>
+<li><strong>Total Documentation Size</strong>: ~2MB+ of structured knowledge</li>
+</ul>
+<hr>
+<h2>🔍 Search Tips</h2>
+<h3>Find by Topic</h3>
+<ul>
+<li>Use your IDE&#39;s search (Ctrl/Cmd+Shift+F) across <code>docs/</code> directory</li>
+<li>Check specific subdirectories for focused results</li>
+<li>Search <a href="/docs/glossary">glossary.md</a> for terminology</li>
+</ul>
+<h3>Find by Date</h3>
+<ul>
+<li>Recent work: Check <code>status/</code> directory</li>
+<li>Historical: Browse <code>archive/2025/</code></li>
+<li>Development timeline: See <a href="/docs/PHASE_HISTORY">PHASE_HISTORY.md</a></li>
+</ul>
+<h3>Find by Component</h3>
+<ul>
+<li><strong>Identity</strong>: Search <code>identity</code> in architecture/ and design/</li>
+<li><strong>Trust</strong>: Check <code>trust</code> in architecture/ and security/</li>
+<li><strong>Ledger</strong>: Search <code>ledger</code> or <code>economic</code> in design/economics/</li>
+<li><strong>Governance</strong>: Browse design/governance/</li>
+<li><strong>Federation</strong>: Search <code>federation</code> in architecture/</li>
+<li><strong>SDIS</strong>: Check sdis/ directory</li>
+</ul>
+<hr>
+<h2>📞 Getting Help</h2>
+<ul>
+<li><strong>Documentation Issues</strong>: File an issue on GitHub</li>
+<li><strong>Architecture Questions</strong>: Check architecture/ or ask in dev channels</li>
+<li><strong>Operations Support</strong>: See guides/operations/troubleshooting.md</li>
+<li><strong>Contributing</strong>: Read CONTRIBUTING.md in project root</li>
+<li><strong>Security Issues</strong>: Follow responsible disclosure process</li>
+</ul>
+<hr>
+<h2>🔄 Documentation Maintenance</h2>
+<h3>Keeping This Index Current</h3>
+<p>This index should be updated when:</p>
+<ul>
+<li>New major documents are added</li>
+<li>Directory structure changes</li>
+<li>Documents are archived</li>
+<li>Significant reorganizations occur</li>
+</ul>
+<h3>Last Major Updates</h3>
+<ul>
+<li><strong>2026-02-10</strong>: Phase 2C reorganization (this version)</li>
+<li><strong>2026-01-17</strong>: Previous organization</li>
+<li>See <a href="/docs/REORGANIZATION_2026">REORGANIZATION_2026.md</a> for detailed change history</li>
+</ul>
+<hr>
+<p><strong>Navigation</strong>: <a href="#icn-documentation-index">Top</a> | <a href="#-core-documentation">Core Docs</a> | <a href="#️-architecture--design">Architecture</a> | <a href="#-reference-documentation">Reference</a> | <a href="#-user--developer-guides">Guides</a> | <a href="#-archives">Archives</a></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

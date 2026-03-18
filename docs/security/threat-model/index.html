@@ -1,0 +1,2466 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Threat Model | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>security</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>threat model</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/security/threat-model.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Threat Model</h1>
+<p><strong>Version</strong>: 1.2
+<strong>Date</strong>: 2026-02-01
+<strong>Status</strong>: Updated for Trust Score Timing Analysis
+<strong>Authors</strong>: Security Review Team</p>
+<h2>Executive Summary</h2>
+<p>This document provides a formal threat model for the InterCooperative Network (ICN) using the STRIDE framework. It identifies adversary classes, maps attack surfaces by system layer, analyzes threats for each component, and documents mitigations.</p>
+<p><strong>Security Posture Summary</strong>:</p>
+<ul>
+<li><strong>1134 tests</strong> covering security-critical paths</li>
+<li><strong>Three-layer security architecture</strong> (Transport, Message, Application)</li>
+<li><strong>8 critical vulnerabilities fixed</strong> during production hardening</li>
+<li><strong>Known gaps documented</strong> with priority rankings</li>
+</ul>
+<hr>
+<h2>Table of Contents</h2>
+<ol>
+<li><a href="#1-adversary-classes">Adversary Classes</a></li>
+<li><a href="#2-system-architecture-overview">System Architecture Overview</a></li>
+<li><a href="#3-attack-surface-by-layer">Attack Surface by Layer</a></li>
+<li><a href="#4-stride-analysis-by-component">STRIDE Analysis by Component</a></li>
+<li><a href="#5-mitigations-reference">Mitigations Reference</a></li>
+<li><a href="#6-gap-analysis">Gap Analysis</a></li>
+<li><a href="#7-security-assumptions">Security Assumptions</a></li>
+<li><a href="#8-references">References</a></li>
+</ol>
+<hr>
+<h2>1. Adversary Classes</h2>
+<h3>1.1 Outsider (Network Attacker)</h3>
+<p><strong>Capabilities</strong>:</p>
+<ul>
+<li>No ICN identity (no DID)</li>
+<li>Can observe network traffic</li>
+<li>Can inject network packets</li>
+<li>Can perform DoS attacks at network level</li>
+<li>Cannot decrypt QUIC/TLS traffic</li>
+</ul>
+<p><strong>Goals</strong>:</p>
+<ul>
+<li>Disrupt service availability</li>
+<li>Intercept communications (fails due to TLS)</li>
+<li>Impersonate legitimate peers (fails due to DID-TLS binding)</li>
+</ul>
+<p><strong>Example Attacks</strong>:</p>
+<ul>
+<li>Connection flooding</li>
+<li>TCP/UDP amplification</li>
+<li>DNS hijacking of discovery endpoints</li>
+</ul>
+<h3>1.2 Malicious Peer (Byzantine Node)</h3>
+<p><strong>Capabilities</strong>:</p>
+<ul>
+<li>Valid ICN identity (DID with keypair)</li>
+<li>Can establish authenticated connections</li>
+<li>Can participate in gossip protocol</li>
+<li>Can submit transactions and proposals</li>
+<li>Subject to trust-based rate limiting</li>
+</ul>
+<p><strong>Goals</strong>:</p>
+<ul>
+<li>Manipulate trust graph for elevated access</li>
+<li>Spam gossip network</li>
+<li>Create ledger inconsistencies</li>
+<li>Influence governance outcomes</li>
+<li>Exhaust resources of legitimate nodes</li>
+</ul>
+<p><strong>Example Attacks</strong>:</p>
+<ul>
+<li>Sybil attacks (create multiple identities)</li>
+<li>Gossip flooding</li>
+<li>Vote manipulation</li>
+<li>Trust inflation via collusion</li>
+</ul>
+<h3>1.3 Compromised Node (Stolen Keys)</h3>
+<p><strong>Capabilities</strong>:</p>
+<ul>
+<li>Full access to legitimate user&#39;s identity</li>
+<li>All capabilities of Malicious Peer</li>
+<li>Historical transaction and trust relationships</li>
+<li>Possibly access to multiple devices (multi-device scenario)</li>
+</ul>
+<p><strong>Goals</strong>:</p>
+<ul>
+<li>Drain victim&#39;s credit balance</li>
+<li>Vote on victim&#39;s behalf</li>
+<li>Damage victim&#39;s reputation</li>
+<li>Access victim&#39;s private communications</li>
+</ul>
+<p><strong>Example Attacks</strong>:</p>
+<ul>
+<li>Balance theft</li>
+<li>Governance takeover</li>
+<li>Trust relationship manipulation</li>
+<li>Identity destruction</li>
+</ul>
+<h3>1.4 Economic Attacker</h3>
+<p><strong>Capabilities</strong>:</p>
+<ul>
+<li>One or more valid ICN identities</li>
+<li>Understanding of mutual credit mechanics</li>
+<li>Potentially multiple colluding accounts</li>
+</ul>
+<p><strong>Goals</strong>:</p>
+<ul>
+<li>Extract value from the credit system</li>
+<li>Create unbacked credit</li>
+<li>Default on credit obligations</li>
+<li>Game dynamic credit limits</li>
+</ul>
+<p><strong>Example Attacks</strong>:</p>
+<ul>
+<li>&quot;Grab and run&quot; (exhaust credit limit, leave network)</li>
+<li>Credit cycling (inflate limits via circular transactions)</li>
+<li>Social recovery abuse (fake recoveries to duplicate balances)</li>
+<li>Demurrage avoidance schemes</li>
+</ul>
+<h3>1.5 Governance Attacker</h3>
+<p><strong>Capabilities</strong>:</p>
+<ul>
+<li>Valid ICN identity with voting rights</li>
+<li>Understanding of governance mechanics</li>
+<li>Potentially colluding voters</li>
+</ul>
+<p><strong>Goals</strong>:</p>
+<ul>
+<li>Pass malicious proposals</li>
+<li>Block legitimate proposals</li>
+<li>Manipulate cooperative policies</li>
+<li>Gain unauthorized access/roles</li>
+</ul>
+<p><strong>Example Attacks</strong>:</p>
+<ul>
+<li>Vote buying/coordination</li>
+<li>Proposal spam (resource exhaustion)</li>
+<li>Quorum manipulation (prevent voting)</li>
+<li>Emergency mechanism abuse</li>
+</ul>
+<h3>1.6 Contract Attacker</h3>
+<p><strong>Capabilities</strong>:</p>
+<ul>
+<li>Ability to deploy CCL contracts</li>
+<li>Understanding of interpreter mechanics</li>
+<li>Knowledge of capability system</li>
+</ul>
+<p><strong>Goals</strong>:</p>
+<ul>
+<li>Execute unauthorized operations</li>
+<li>Exhaust compute resources (fuel bombing)</li>
+<li>Extract data via side channels</li>
+<li>Bypass capability restrictions</li>
+</ul>
+<p><strong>Example Attacks</strong>:</p>
+<ul>
+<li>Fuel exhaustion attacks</li>
+<li>Deeply nested expression stack overflow</li>
+<li>Capability escalation attempts</li>
+<li>Non-deterministic execution exploitation</li>
+</ul>
+<hr>
+<h2>2. System Architecture Overview</h2>
+<pre><code>┌─────────────────────────────────────────────────────────────────────┐
+│                        APPLICATION LAYER                             │
+│  ┌─────────┐  ┌───────────┐  ┌──────────┐  ┌─────────┐  ┌─────────┐ │
+│  │ Gateway │  │Governance │  │ Compute  │  │ Ledger  │  │   CCL   │ │
+│  │  REST   │  │  Domains  │  │  Tasks   │  │ Mutual  │  │Contracts│ │
+│  │   API   │  │ Proposals │  │ Priority │  │ Credit  │  │  Rules  │ │
+│  └────┬────┘  └─────┬─────┘  └────┬─────┘  └────┬────┘  └────┬────┘ │
+│       │             │             │             │             │      │
+├───────┴─────────────┴─────────────┴─────────────┴─────────────┴──────┤
+│                         MESSAGE LAYER                                │
+│  ┌──────────────────────────────────────────────────────────────┐   │
+│  │  SignedEnvelope (Ed25519) │ ReplayGuard │ EncryptedEnvelope  │   │
+│  └──────────────────────────────────────────────────────────────┘   │
+├─────────────────────────────────────────────────────────────────────┤
+│                        TRANSPORT LAYER                               │
+│  ┌──────────────────────────────────────────────────────────────┐   │
+│  │   QUIC/TLS 1.3  │  DID-TLS Binding  │  Certificate Verify    │   │
+│  └──────────────────────────────────────────────────────────────┘   │
+├─────────────────────────────────────────────────────────────────────┤
+│                          DATA LAYER                                  │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────────┐  │
+│  │  Trust      │  │   Gossip    │  │       Sled Store            │  │
+│  │  Graph      │  │   Topics    │  │   (Encrypted Keystore)      │  │
+│  └─────────────┘  └─────────────┘  └─────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<h3>Security Boundaries</h3>
+<ol>
+<li><strong>Network Boundary</strong>: QUIC/TLS separates untrusted network from authenticated peers</li>
+<li><strong>Trust Boundary</strong>: Trust graph determines access levels within authenticated peers</li>
+<li><strong>Cooperative Boundary</strong>: Per-coop isolation of ledgers and governance</li>
+<li><strong>Capability Boundary</strong>: CCL capabilities constrain contract operations</li>
+</ol>
+<hr>
+<h2>3. Attack Surface by Layer</h2>
+<h3>3.1 Identity Layer</h3>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Entry Points</th>
+<th>Attack Vectors</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Keystore</td>
+<td>File system, CLI</td>
+<td>Key theft, passphrase brute force</td>
+</tr>
+<tr>
+<td>DID</td>
+<td>Network protocol</td>
+<td>Format injection, malformed DIDs</td>
+</tr>
+<tr>
+<td>TLS Cert</td>
+<td>TLS handshake</td>
+<td>Cert forgery, binding bypass</td>
+</tr>
+<tr>
+<td>Multi-device</td>
+<td>Gossip sync</td>
+<td>Unauthorized device addition</td>
+</tr>
+<tr>
+<td>Key rotation</td>
+<td>Gossip broadcast</td>
+<td>Chain hijacking, replay</td>
+</tr>
+</tbody></table>
+<p><strong>Files</strong>: <code>icn-identity/</code>, <code>icn-net/src/tls.rs</code></p>
+<h3>3.2 Network Layer</h3>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Entry Points</th>
+<th>Attack Vectors</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>QUIC endpoint</td>
+<td>UDP socket</td>
+<td>Connection flooding</td>
+</tr>
+<tr>
+<td>TLS handshake</td>
+<td>Connection establishment</td>
+<td>Resource exhaustion</td>
+</tr>
+<tr>
+<td>mDNS discovery</td>
+<td>Local network</td>
+<td>Spoofed announcements</td>
+</tr>
+<tr>
+<td>Message framing</td>
+<td>Stream data</td>
+<td>Length prefix attacks</td>
+</tr>
+</tbody></table>
+<p><strong>Files</strong>: <code>icn-net/src/actor.rs</code>, <code>icn-net/src/protocol.rs</code></p>
+<h3>3.3 Trust Layer</h3>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Entry Points</th>
+<th>Attack Vectors</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Trust edges</td>
+<td>Gossip messages</td>
+<td>Inflation, collusion</td>
+</tr>
+<tr>
+<td>Trust computation</td>
+<td>Query path</td>
+<td>Loops, amplification</td>
+</tr>
+<tr>
+<td>Trust thresholds</td>
+<td>Access control</td>
+<td>Threshold bypass</td>
+</tr>
+<tr>
+<td>Decay mechanism</td>
+<td>Time-based</td>
+<td>Clock manipulation</td>
+</tr>
+</tbody></table>
+<p><strong>Files</strong>: <code>icn-trust/src/lib.rs</code>, <code>icn-trust/src/compute.rs</code></p>
+<h3>3.4 Gossip Layer</h3>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Entry Points</th>
+<th>Attack Vectors</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Topic subscriptions</td>
+<td>Protocol messages</td>
+<td>Unauthorized access</td>
+</tr>
+<tr>
+<td>Announcements</td>
+<td>Push messages</td>
+<td>Spam, flooding</td>
+</tr>
+<tr>
+<td>Anti-entropy</td>
+<td>Bloom filters</td>
+<td>Index overflow</td>
+</tr>
+<tr>
+<td>Vector clocks</td>
+<td>Causal ordering</td>
+<td>Clock manipulation</td>
+</tr>
+</tbody></table>
+<p><strong>Files</strong>: <code>icn-gossip/src/gossip.rs</code>, <code>icn-gossip/src/bloom.rs</code></p>
+<h3>3.5 Ledger Layer</h3>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Entry Points</th>
+<th>Attack Vectors</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Transactions</td>
+<td>Gateway API, RPC</td>
+<td>Double-spend, forgery</td>
+</tr>
+<tr>
+<td>Balances</td>
+<td>Query API</td>
+<td>Information disclosure</td>
+</tr>
+<tr>
+<td>Credit limits</td>
+<td>Policy engine</td>
+<td>Limit bypass</td>
+</tr>
+<tr>
+<td>Disputes</td>
+<td>Dispute manager</td>
+<td>False claims</td>
+</tr>
+<tr>
+<td>Recovery</td>
+<td>Social recovery</td>
+<td>Balance duplication</td>
+</tr>
+</tbody></table>
+<p><strong>Files</strong>: <code>icn-ledger/src/ledger.rs</code>, <code>icn-ledger/src/credit_policy.rs</code></p>
+<h3>3.6 Governance Layer</h3>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Entry Points</th>
+<th>Attack Vectors</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Domains</td>
+<td>Gateway API</td>
+<td>Unauthorized creation</td>
+</tr>
+<tr>
+<td>Proposals</td>
+<td>Create/open API</td>
+<td>Spam, manipulation</td>
+</tr>
+<tr>
+<td>Votes</td>
+<td>Cast API</td>
+<td>Vote stuffing, replay</td>
+</tr>
+<tr>
+<td>Membership</td>
+<td>Resolution</td>
+<td>Threshold bypass</td>
+</tr>
+</tbody></table>
+<p><strong>Files</strong>: <code>icn-governance/src/</code>, <code>icn-gateway/src/api/governance.rs</code></p>
+<h3>3.7 Compute Layer</h3>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Entry Points</th>
+<th>Attack Vectors</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Task submission</td>
+<td>Gateway API, RPC</td>
+<td>Fuel bomb, code injection</td>
+</tr>
+<tr>
+<td>Executor selection</td>
+<td>Scheduler</td>
+<td>Trust threshold bypass</td>
+</tr>
+<tr>
+<td>Result verification</td>
+<td>Gossip</td>
+<td>Fake results</td>
+</tr>
+<tr>
+<td>Payment settlement</td>
+<td>Ledger callback</td>
+<td>Payment fraud</td>
+</tr>
+</tbody></table>
+<p><strong>Files</strong>: <code>icn-compute/src/actor.rs</code>, <code>icn-compute/src/executor.rs</code></p>
+<h3>3.8 Gateway Layer</h3>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Entry Points</th>
+<th>Attack Vectors</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Challenge-response</td>
+<td>Auth endpoints</td>
+<td>Replay, timing attacks</td>
+</tr>
+<tr>
+<td>JWT tokens</td>
+<td>Bearer header</td>
+<td>Token theft, forgery</td>
+</tr>
+<tr>
+<td>Rate limiting</td>
+<td>All endpoints</td>
+<td>Bypass, exhaustion</td>
+</tr>
+<tr>
+<td>WebSocket</td>
+<td>Event stream</td>
+<td>Connection exhaustion</td>
+</tr>
+</tbody></table>
+<p><strong>Files</strong>: <code>icn-gateway/src/auth.rs</code>, <code>icn-gateway/src/rate_limit.rs</code></p>
+<hr>
+<h2>4. STRIDE Analysis by Component</h2>
+<h3>4.1 Identity System</h3>
+<h4>Spoofing</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ID-S1</td>
+<td>Claim another user&#39;s DID</td>
+<td>DID-TLS binding verification</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>ID-S2</td>
+<td>Generate colliding DIDs</td>
+<td>Ed25519 256-bit key space</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>ID-S3</td>
+<td>Forge DID document</td>
+<td>Ed25519 signature verification</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>ID-S4</td>
+<td>Impersonate via compromised device</td>
+<td>Device revocation mechanism</td>
+<td>✅ Mitigated</td>
+</tr>
+</tbody></table>
+<h4>Tampering</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ID-T1</td>
+<td>Modify keystore file</td>
+<td>Age encryption (ChaCha20-Poly1305)</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>ID-T2</td>
+<td>Alter rotation chain</td>
+<td>Dual-signature verification</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>ID-T3</td>
+<td>Modify TLS certificate</td>
+<td>Certificate hash in DID binding</td>
+<td>✅ Mitigated</td>
+</tr>
+</tbody></table>
+<h4>Repudiation</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ID-R1</td>
+<td>Deny signing a message</td>
+<td>SignedEnvelope with Ed25519</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>ID-R2</td>
+<td>Deny key rotation</td>
+<td>Rotation chain with timestamps</td>
+<td>✅ Mitigated</td>
+</tr>
+</tbody></table>
+<h4>Information Disclosure</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ID-I1</td>
+<td>Extract private key from keystore</td>
+<td>Age encryption + passphrase</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>ID-I2</td>
+<td>Memory dump key extraction</td>
+<td>Zeroizing&lt;Vec<u8>&gt; for passphrase</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>ID-I3</td>
+<td>Derive key from DID</td>
+<td>Ed25519 one-way derivation</td>
+<td>✅ Mitigated</td>
+</tr>
+</tbody></table>
+<h4>Denial of Service</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ID-D1</td>
+<td>Lock user out of keystore</td>
+<td>No remote lockout possible</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>ID-D2</td>
+<td>Flood DID resolution</td>
+<td>Local keystore, no remote</td>
+<td>✅ Mitigated</td>
+</tr>
+</tbody></table>
+<h4>Elevation of Privilege</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ID-E1</td>
+<td>Add unauthorized device</td>
+<td>Owner approval required</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>ID-E2</td>
+<td>Elevate device capabilities</td>
+<td>Capability system per device</td>
+<td>✅ Mitigated</td>
+</tr>
+</tbody></table>
+<h3>4.2 Network System</h3>
+<h4>Spoofing</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>NET-S1</td>
+<td>Spoof source DID</td>
+<td>TLS client cert verification</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>NET-S2</td>
+<td>mDNS spoofing</td>
+<td>DID verification on connect</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>NET-S3</td>
+<td>Spoof peer in messages</td>
+<td>SignedEnvelope verification</td>
+<td>✅ Mitigated</td>
+</tr>
+</tbody></table>
+<h4>Tampering</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>NET-T1</td>
+<td>Modify message in transit</td>
+<td>TLS 1.3 encryption</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>NET-T2</td>
+<td>Inject messages</td>
+<td>SignedEnvelope verification</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>NET-T3</td>
+<td>Replay messages</td>
+<td>ReplayGuard + sequence numbers</td>
+<td>✅ Mitigated</td>
+</tr>
+</tbody></table>
+<h4>Repudiation</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>NET-R1</td>
+<td>Deny sending message</td>
+<td>SignedEnvelope includes sender DID</td>
+<td>✅ Mitigated</td>
+</tr>
+</tbody></table>
+<h4>Information Disclosure</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>NET-I1</td>
+<td>Eavesdrop network traffic</td>
+<td>QUIC/TLS 1.3 encryption</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>NET-I2</td>
+<td>Traffic analysis</td>
+<td>⚠️ Not addressed</td>
+<td>🔴 Gap</td>
+</tr>
+<tr>
+<td>NET-I3</td>
+<td>Connection metadata leakage</td>
+<td>⚠️ mDNS exposes local presence</td>
+<td>🟡 Partial</td>
+</tr>
+</tbody></table>
+<h4>Denial of Service</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>NET-D1</td>
+<td>Connection flooding</td>
+<td>Max 100 peers, eviction policy</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>NET-D2</td>
+<td>Message flooding</td>
+<td>Trust-gated rate limiting</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>NET-D3</td>
+<td>Stream exhaustion</td>
+<td>QUIC 10 stream limit</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>NET-D4</td>
+<td>Memory exhaustion via messages</td>
+<td>10MB max message, validate before alloc</td>
+<td>✅ Mitigated</td>
+</tr>
+</tbody></table>
+<h4>Elevation of Privilege</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>NET-E1</td>
+<td>Bypass trust-gated rate limits</td>
+<td>Trust score from graph</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>NET-E2</td>
+<td>Access without DID-TLS binding</td>
+<td>Reject invalid bindings</td>
+<td>✅ Mitigated</td>
+</tr>
+</tbody></table>
+<h3>4.3 Trust System</h3>
+<h4>Spoofing</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>TR-S1</td>
+<td>Create fake trust edges</td>
+<td>SignedEnvelope verification</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>TR-S2</td>
+<td>Sybil attack (many identities)</td>
+<td>⚠️ Requires external identity</td>
+<td>🔴 Gap</td>
+</tr>
+</tbody></table>
+<h4>Tampering</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>TR-T1</td>
+<td>Modify trust edge weight</td>
+<td>Signature on edge data</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>TR-T2</td>
+<td>Manipulate decay timestamps</td>
+<td>Timestamp in signed data</td>
+<td>✅ Mitigated</td>
+</tr>
+</tbody></table>
+<h4>Repudiation</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>TR-R1</td>
+<td>Deny trust attestation</td>
+<td>Signed edges with timestamp</td>
+<td>✅ Mitigated</td>
+</tr>
+</tbody></table>
+<h4>Information Disclosure</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>TR-I1</td>
+<td>Enumerate trust relationships</td>
+<td>⚠️ Trust graph queryable</td>
+<td>🟡 By Design</td>
+</tr>
+<tr>
+<td>TR-I2</td>
+<td><code>inputs_hash</code> timing attack</td>
+<td>Raw timestamps in hash leak attestation arrival patterns</td>
+<td>🟡 Documented</td>
+</tr>
+</tbody></table>
+<p><strong>TR-I2 Details</strong>: The <code>inputs_hash</code> field in <code>TrustScoreResult</code> (see <code>icn/crates/icn-trust/src/attestation.rs</code>, where <code>created_at.to_le_bytes()</code> is incorporated into signing payloads)
+includes raw <code>created_at</code> timestamps (Unix seconds) from trust attestations. When nodes exchange 
+<code>inputs_hash</code> values in P2P queries or gossip, an attacker can:</p>
+<ol>
+<li><strong>Temporal inference</strong>: Observe hash changes to infer when new attestations arrive</li>
+<li><strong>Relationship correlation</strong>: Correlate hash values across nodes to detect shared trust relationships</li>
+<li><strong>Network mapping</strong>: Build a temporal map of trust network formation</li>
+</ol>
+<p><strong>Attack Scenario</strong>: Alice attests trust for Bob at t=1000. Eve queries Alice&#39;s trust score for Bob 
+repeatedly. The <code>inputs_hash</code> changes at t=1000, revealing to Eve the exact moment Alice&#39;s attestation 
+arrived. If Eve queries multiple nodes and sees the same hash change pattern, Eve can infer Bob received 
+attestations from multiple parties simultaneously (coordination event).</p>
+<p><strong>Current Mitigation</strong>: None. Timestamp precision is preserved for cache invalidation and deduplication.</p>
+<p><strong>Recommended Mitigations</strong> (see GAP-M5):</p>
+<ul>
+<li><strong>Option A</strong>: Truncate <code>created_at</code> to hourly/daily buckets (e.g., <code>created_at - (created_at % 3600)</code>)<ul>
+<li>Pros: Simple, maintains relative ordering for deduplication</li>
+<li>Cons: Reduces cache invalidation precision, may cause false deduplication within window</li>
+</ul>
+</li>
+<li><strong>Option B</strong>: Hash only non-temporal fields, track timestamps separately<ul>
+<li>Pros: Eliminates timing leak entirely</li>
+<li>Cons: Breaks determinism guarantee (same attestations → different hashes if arrival times differ)</li>
+</ul>
+</li>
+<li><strong>Option C</strong>: Add random delay to hash propagation (traffic obfuscation)<ul>
+<li>Pros: Preserves determinism, mitigates correlation attacks</li>
+<li>Cons: Adds latency, complex implementation</li>
+</ul>
+</li>
+</ul>
+<p><strong>Existing Baseline Protection</strong>: Current trust-gated rate limits (10–200 msg/sec by trust class) apply to all messages, including trust score queries, providing baseline protection against polling attacks.</p>
+<p><strong>Cross-References</strong>:</p>
+<ul>
+<li><code>icn-privacy</code> traffic obfuscation primitives (random delay, padding, cover traffic) — implemented but not yet wired into trust score query paths</li>
+<li>Planned trust score caching layer in the trust service (forward-looking; implementation location TBD)</li>
+<li><code>TrustScoreResult</code> definition in <code>icn/crates/icn-kernel-api/src/services.rs:116-144</code></li>
+</ul>
+<h4>Denial of Service</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>TR-D1</td>
+<td>Trust computation exhaustion</td>
+<td>Bounded depth (3 hops), cycle prevention</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>TR-D2</td>
+<td>Spam trust edges</td>
+<td>Rate limiting on edge creation</td>
+<td>✅ Mitigated</td>
+</tr>
+</tbody></table>
+<h4>Elevation of Privilege</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>TR-E1</td>
+<td>Trust inflation via collusion</td>
+<td>⚠️ Bounded computation limits impact</td>
+<td>🟡 Partial</td>
+</tr>
+<tr>
+<td>TR-E2</td>
+<td>Bypass trust thresholds</td>
+<td>Configurable minimum thresholds</td>
+<td>✅ Mitigated</td>
+</tr>
+</tbody></table>
+<h3>4.4 Gossip System</h3>
+<h4>Spoofing</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GOS-S1</td>
+<td>Spoof gossip message origin</td>
+<td>SignedEnvelope verification</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>GOS-S2</td>
+<td>Spoof anti-entropy responses</td>
+<td>SignedEnvelope verification</td>
+<td>✅ Mitigated</td>
+</tr>
+</tbody></table>
+<h4>Tampering</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GOS-T1</td>
+<td>Modify gossip entries</td>
+<td>Content-addressed hashing</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>GOS-T2</td>
+<td>Tamper with vector clocks</td>
+<td>Signed vector clock updates</td>
+<td>✅ Mitigated</td>
+</tr>
+</tbody></table>
+<h4>Repudiation</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GOS-R1</td>
+<td>Deny publishing entry</td>
+<td>Entry includes signed creator DID</td>
+<td>✅ Mitigated</td>
+</tr>
+</tbody></table>
+<h4>Information Disclosure</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GOS-I1</td>
+<td>Access private topic data</td>
+<td>AccessControl::Private enforcement</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>GOS-I2</td>
+<td>Enumerate topic subscribers</td>
+<td>⚠️ Subscription metadata visible</td>
+<td>🟡 Partial</td>
+</tr>
+</tbody></table>
+<h4>Denial of Service</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GOS-D1</td>
+<td>Gossip flooding</td>
+<td>Trust-gated rate limiting</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>GOS-D2</td>
+<td>Bloom filter overflow</td>
+<td>Bounds validation</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>GOS-D3</td>
+<td>Topic entry exhaustion</td>
+<td>Entry limit per topic (1000)</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>GOS-D4</td>
+<td>Large entry flooding</td>
+<td>zstd compression, size limits</td>
+<td>✅ Mitigated</td>
+</tr>
+</tbody></table>
+<h4>Elevation of Privilege</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GOS-E1</td>
+<td>Subscribe to trust-gated topic</td>
+<td>Trust threshold check</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>GOS-E2</td>
+<td>Publish to restricted topic</td>
+<td>AccessControl enforcement</td>
+<td>✅ Mitigated</td>
+</tr>
+</tbody></table>
+<h3>4.5 Ledger System</h3>
+<h4>Spoofing</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>LED-S1</td>
+<td>Create transaction as another user</td>
+<td>SignedEnvelope verification</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>LED-S2</td>
+<td>Forge journal entry</td>
+<td>Entry signature verification</td>
+<td>✅ Mitigated</td>
+</tr>
+</tbody></table>
+<h4>Tampering</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>LED-T1</td>
+<td>Modify transaction amount</td>
+<td>Signed entry data</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>LED-T2</td>
+<td>Alter transaction history</td>
+<td>Merkle-DAG chain</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>LED-T3</td>
+<td>Double-spend</td>
+<td>Quarantine + sync protocol</td>
+<td>✅ Mitigated</td>
+</tr>
+</tbody></table>
+<h4>Repudiation</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>LED-R1</td>
+<td>Deny creating transaction</td>
+<td>Signed journal entries</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>LED-R2</td>
+<td>Deny dispute filing</td>
+<td>Dispute record with signature</td>
+<td>✅ Mitigated</td>
+</tr>
+</tbody></table>
+<h4>Information Disclosure</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>LED-I1</td>
+<td>View other users&#39; balances</td>
+<td>⚠️ Balance queries permitted</td>
+<td>🟡 By Design</td>
+</tr>
+<tr>
+<td>LED-I2</td>
+<td>Transaction history exposure</td>
+<td>Per-coop isolation</td>
+<td>✅ Mitigated</td>
+</tr>
+</tbody></table>
+<h4>Denial of Service</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>LED-D1</td>
+<td>Transaction flooding</td>
+<td>Dynamic credit limits</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>LED-D2</td>
+<td>Sync exhaustion</td>
+<td>Gossip rate limiting</td>
+<td>✅ Mitigated</td>
+</tr>
+</tbody></table>
+<h4>Elevation of Privilege</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>LED-E1</td>
+<td>Exceed credit limit</td>
+<td>Dynamic limit enforcement</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>LED-E2</td>
+<td>Bypass new member throttling</td>
+<td>Progressive ramping (90 days)</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>LED-E3</td>
+<td>Create unbacked credit</td>
+<td>Double-entry accounting</td>
+<td>✅ Mitigated</td>
+</tr>
+</tbody></table>
+<h3>4.6 Governance System</h3>
+<h4>Spoofing</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GOV-S1</td>
+<td>Vote as another member</td>
+<td>JWT auth + DID verification</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>GOV-S2</td>
+<td>Spoof governance messages</td>
+<td>SignedEnvelope verification</td>
+<td>✅ Mitigated</td>
+</tr>
+</tbody></table>
+<h4>Tampering</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GOV-T1</td>
+<td>Modify proposal content</td>
+<td>Signed proposal data</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>GOV-T2</td>
+<td>Alter vote tallies</td>
+<td>Signed individual votes</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>GOV-T3</td>
+<td>Change proposal state illegally</td>
+<td>State machine validation</td>
+<td>✅ Mitigated</td>
+</tr>
+</tbody></table>
+<h4>Repudiation</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GOV-R1</td>
+<td>Deny casting vote</td>
+<td>Signed vote records</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>GOV-R2</td>
+<td>Deny creating proposal</td>
+<td>Signed proposal</td>
+<td>✅ Mitigated</td>
+</tr>
+</tbody></table>
+<h4>Information Disclosure</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GOV-I1</td>
+<td>See votes before voting closes</td>
+<td>⚠️ Votes visible in real-time</td>
+<td>🟡 By Design</td>
+</tr>
+</tbody></table>
+<h4>Denial of Service</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GOV-D1</td>
+<td>Proposal spam</td>
+<td>Rate limiting</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>GOV-D2</td>
+<td>Block quorum</td>
+<td>⚠️ No forced participation</td>
+<td>🟡 By Design</td>
+</tr>
+</tbody></table>
+<h4>Elevation of Privilege</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GOV-E1</td>
+<td>Vote without membership</td>
+<td>Membership resolver check</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>GOV-E2</td>
+<td>Close proposal prematurely</td>
+<td>State machine + timing</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>GOV-E3</td>
+<td>Bypass quorum requirements</td>
+<td>Quorum validation</td>
+<td>✅ Mitigated</td>
+</tr>
+</tbody></table>
+<h3>4.7 Compute System</h3>
+<h4>Spoofing</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>COM-S1</td>
+<td>Claim task execution falsely</td>
+<td>Ed25519 signature on results</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>COM-S2</td>
+<td>Spoof submitter identity</td>
+<td>JWT auth + DID verification</td>
+<td>✅ Mitigated</td>
+</tr>
+</tbody></table>
+<h4>Tampering</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>COM-T1</td>
+<td>Modify task code</td>
+<td>Content-addressed task hash</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>COM-T2</td>
+<td>Alter execution results</td>
+<td>Signed result payloads</td>
+<td>✅ Mitigated</td>
+</tr>
+</tbody></table>
+<h4>Repudiation</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>COM-R1</td>
+<td>Deny task submission</td>
+<td>Signed submission record</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>COM-R2</td>
+<td>Deny execution</td>
+<td>Executor signature on result</td>
+<td>✅ Mitigated</td>
+</tr>
+</tbody></table>
+<h4>Information Disclosure</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>COM-I1</td>
+<td>Side-channel data extraction</td>
+<td>CCL deterministic execution</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>COM-I2</td>
+<td>Task content exposure</td>
+<td>⚠️ Task code visible to executors</td>
+<td>🟡 By Design</td>
+</tr>
+</tbody></table>
+<h4>Denial of Service</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>COM-D1</td>
+<td>Fuel bombing</td>
+<td>Fuel metering with limits</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>COM-D2</td>
+<td>Task queue flooding</td>
+<td>Rate limiting, trust-gated submission</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>COM-D3</td>
+<td>Executor exhaustion</td>
+<td>Capacity limits (max_concurrent_tasks)</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>COM-D4</td>
+<td>Timeout abuse</td>
+<td>Automatic timeout enforcement</td>
+<td>✅ Mitigated</td>
+</tr>
+</tbody></table>
+<h4>Elevation of Privilege</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>COM-E1</td>
+<td>Execute without sufficient trust</td>
+<td>MIN_TRUST_EXECUTE (0.3)</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>COM-E2</td>
+<td>Bypass capability restrictions</td>
+<td>CCL capability system</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>COM-E3</td>
+<td>Stack overflow via nested exprs</td>
+<td>MAX_EXPRESSION_DEPTH validation</td>
+<td>✅ Mitigated</td>
+</tr>
+</tbody></table>
+<h3>4.8 Gateway API</h3>
+<h4>Spoofing</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GW-S1</td>
+<td>Impersonate authenticated user</td>
+<td>JWT token verification</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>GW-S2</td>
+<td>Forge challenge-response</td>
+<td>Ed25519 signature verification</td>
+<td>✅ Mitigated</td>
+</tr>
+</tbody></table>
+<h4>Tampering</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GW-T1</td>
+<td>Modify JWT payload</td>
+<td>JWT signature verification</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>GW-T2</td>
+<td>Tamper with request body</td>
+<td>HTTPS in production</td>
+<td>✅ Mitigated</td>
+</tr>
+</tbody></table>
+<h4>Repudiation</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GW-R1</td>
+<td>Deny API action</td>
+<td>JWT claims + audit logging</td>
+<td>✅ Mitigated</td>
+</tr>
+</tbody></table>
+<h4>Information Disclosure</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GW-I1</td>
+<td>Token theft</td>
+<td>Token expiry (24h default)</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>GW-I2</td>
+<td>Scope information leakage</td>
+<td>Scope-based authorization</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>GW-I3</td>
+<td>Error message data leakage</td>
+<td>Sanitized error responses</td>
+<td>✅ Mitigated</td>
+</tr>
+</tbody></table>
+<h4>Denial of Service</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GW-D1</td>
+<td>API flooding</td>
+<td>Per-DID rate limiting (100 burst)</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>GW-D2</td>
+<td>WebSocket exhaustion</td>
+<td>Connection limits + heartbeat</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>GW-D3</td>
+<td>Challenge accumulation</td>
+<td>5-minute challenge TTL</td>
+<td>✅ Mitigated</td>
+</tr>
+</tbody></table>
+<h4>Elevation of Privilege</h4>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GW-E1</td>
+<td>Access without required scope</td>
+<td>Scope enforcement per endpoint</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>GW-E2</td>
+<td>Bypass authentication</td>
+<td>JWT middleware on protected routes</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td>GW-E3</td>
+<td>TOCTOU race conditions</td>
+<td>Atomic operations, duplicate ID prevention</td>
+<td>✅ Mitigated</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>5. Mitigations Reference</h2>
+<h3>5.1 Transport Layer Security</h3>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Implementation</th>
+<th>Files</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>QUIC/TLS 1.3</td>
+<td>quinn crate with rustls</td>
+<td><code>icn-net/src/session.rs</code></td>
+</tr>
+<tr>
+<td>DID-TLS Binding</td>
+<td>Certificate SAN + signature</td>
+<td><code>icn-net/src/tls.rs</code></td>
+</tr>
+<tr>
+<td>Connection Limits</td>
+<td>PeerRegistry with eviction</td>
+<td><code>icn-net/src/actor.rs</code></td>
+</tr>
+<tr>
+<td>Stream Limits</td>
+<td>QUIC transport config</td>
+<td><code>icn-net/src/session.rs</code></td>
+</tr>
+</tbody></table>
+<h3>5.2 Message Layer Security</h3>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Implementation</th>
+<th>Files</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>SignedEnvelope</td>
+<td>Ed25519 signatures</td>
+<td><code>icn-net/src/envelope.rs</code></td>
+</tr>
+<tr>
+<td>ReplayGuard</td>
+<td>Sequence + Bloom filter</td>
+<td><code>icn-net/src/replay_guard.rs</code></td>
+</tr>
+<tr>
+<td>EncryptedEnvelope</td>
+<td>X25519-ChaCha20-Poly1305</td>
+<td><code>icn-net/src/encrypted.rs</code></td>
+</tr>
+<tr>
+<td>Message Size Limits</td>
+<td>10MB max, validate before alloc</td>
+<td><code>icn-net/src/protocol.rs</code></td>
+</tr>
+</tbody></table>
+<h3>5.3 Trust-Based Rate Limiting</h3>
+<table>
+<thead>
+<tr>
+<th>Trust Class</th>
+<th>Rate (msg/sec)</th>
+<th>Burst</th>
+<th>Threshold</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Isolated</td>
+<td>10</td>
+<td>2</td>
+<td>&lt;0.1</td>
+</tr>
+<tr>
+<td>Known</td>
+<td>50</td>
+<td>10</td>
+<td>0.1-0.4</td>
+</tr>
+<tr>
+<td>Partner</td>
+<td>100</td>
+<td>20</td>
+<td>0.4-0.7</td>
+</tr>
+<tr>
+<td>Federated</td>
+<td>200</td>
+<td>50</td>
+<td>&gt;0.7</td>
+</tr>
+</tbody></table>
+<p><strong>Implementation</strong>: <code>icn-net/src/rate_limit.rs</code></p>
+<h3>5.4 Authentication &amp; Authorization</h3>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Implementation</th>
+<th>Files</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Challenge-Response</td>
+<td>5-minute nonce TTL</td>
+<td><code>icn-gateway/src/auth.rs</code></td>
+</tr>
+<tr>
+<td>JWT Tokens</td>
+<td>24-hour expiry, HS256</td>
+<td><code>icn-gateway/src/auth.rs</code></td>
+</tr>
+<tr>
+<td>Scope Enforcement</td>
+<td>Per-endpoint checks</td>
+<td><code>icn-gateway/src/middleware.rs</code></td>
+</tr>
+<tr>
+<td>Rate Limiting</td>
+<td>Token bucket per DID</td>
+<td><code>icn-gateway/src/rate_limit.rs</code></td>
+</tr>
+</tbody></table>
+<h3>5.5 Economic Controls</h3>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Implementation</th>
+<th>Files</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Dynamic Credit Limits</td>
+<td>Trust + history formula</td>
+<td><code>icn-ledger/src/credit_policy.rs</code></td>
+</tr>
+<tr>
+<td>New Member Throttling</td>
+<td>90-day progressive ramp</td>
+<td><code>icn-ledger/src/credit_policy.rs</code></td>
+</tr>
+<tr>
+<td>Dispute Resolution</td>
+<td>Mediator workflow</td>
+<td><code>icn-ledger/src/dispute.rs</code></td>
+</tr>
+<tr>
+<td>Double-Entry Accounting</td>
+<td>Debit/credit invariants</td>
+<td><code>icn-ledger/src/ledger.rs</code></td>
+</tr>
+</tbody></table>
+<h3>5.6 Contract Security</h3>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Implementation</th>
+<th>Files</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Fuel Metering</td>
+<td>Per-statement cost</td>
+<td><code>icn-ccl/src/interpreter.rs</code></td>
+</tr>
+<tr>
+<td>Capability System</td>
+<td>Read/Write restrictions</td>
+<td><code>icn-ccl/src/capability.rs</code></td>
+</tr>
+<tr>
+<td>Expression Depth</td>
+<td>MAX_EXPRESSION_DEPTH</td>
+<td><code>icn-ccl/src/ast.rs</code></td>
+</tr>
+<tr>
+<td>Input Validation</td>
+<td>Name, var, rule limits</td>
+<td><code>icn-ccl/src/ast.rs</code></td>
+</tr>
+</tbody></table>
+<h3>5.7 Byzantine Detection (Phase 18)</h3>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Implementation</th>
+<th>Files</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>MisbehaviorDetector</td>
+<td>7 violation types with severity levels</td>
+<td><code>icn-security/src/misbehavior.rs</code></td>
+</tr>
+<tr>
+<td>Reputation System</td>
+<td>0.0-1.0 score with decay</td>
+<td><code>icn-security/src/misbehavior.rs</code></td>
+</tr>
+<tr>
+<td>Auto-Quarantine</td>
+<td>Score &lt; 0.5 triggers quarantine</td>
+<td><code>icn-security/src/misbehavior.rs</code></td>
+</tr>
+<tr>
+<td>Auto-Ban</td>
+<td>Critical violations trigger immediate ban</td>
+<td><code>icn-security/src/misbehavior.rs</code></td>
+</tr>
+<tr>
+<td>Trust Integration</td>
+<td>Misbehavior reduces trust score</td>
+<td><code>icn-trust/src/lib.rs</code></td>
+</tr>
+</tbody></table>
+<p><strong>Violation Types</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Severity</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ConflictingLedgerEntries</td>
+<td>Critical (10)</td>
+<td>Double-spend or fork attempt</td>
+</tr>
+<tr>
+<td>ConflictingSignedStatements</td>
+<td>Critical (10)</td>
+<td>Equivocation detected</td>
+</tr>
+<tr>
+<td>ReplayAttack</td>
+<td>Critical (10)</td>
+<td>Attempted message replay</td>
+</tr>
+<tr>
+<td>InvalidSignature</td>
+<td>Major (5)</td>
+<td>Forged or invalid cryptographic signature</td>
+</tr>
+<tr>
+<td>FailedComputeVerification</td>
+<td>Major (5)</td>
+<td>Submitted invalid computation result</td>
+</tr>
+<tr>
+<td>ExcessiveResourceUse</td>
+<td>Minor (1)</td>
+<td>Resource exhaustion attempt</td>
+</tr>
+<tr>
+<td>TrustGraphSpam</td>
+<td>Minor (1)</td>
+<td>Excessive trust edge creation</td>
+</tr>
+</tbody></table>
+<p><strong>Reputation Mechanics</strong>:</p>
+<ul>
+<li><strong>Score Range</strong>: 0.0 (banned) to 1.0 (perfect)</li>
+<li><strong>Penalty Formula</strong>: <code>score -= severity * 0.05</code></li>
+<li><strong>Decay Rate</strong>: +0.01/hour recovery</li>
+<li><strong>Quarantine Threshold</strong>: &lt; 0.5</li>
+<li><strong>Rate Limit</strong>: Max 10 violations/hour before auto-ban</li>
+</ul>
+<h3>5.8 SDIS Identity Verification</h3>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Implementation</th>
+<th>Files</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Multi-Level Verification</td>
+<td>Level 0-2 progressive trust</td>
+<td><code>icn-gateway/src/api/sdis/</code></td>
+</tr>
+<tr>
+<td>Steward Vouching</td>
+<td>Human verification step</td>
+<td><code>icn-governance/src/steward.rs</code></td>
+</tr>
+<tr>
+<td>Vouch Uniqueness</td>
+<td>Rate limiting, sybil resistance</td>
+<td><code>icn-governance/src/steward_store.rs</code></td>
+</tr>
+<tr>
+<td>Device Attestation</td>
+<td>Hardware-bound identity proofs</td>
+<td><code>icn-identity/src/multi_device.rs</code></td>
+</tr>
+</tbody></table>
+<p><strong>Verification Levels</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Level</th>
+<th>Requirement</th>
+<th>Trust Impact</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>0</td>
+<td>Enrollment started</td>
+<td>No trust granted</td>
+</tr>
+<tr>
+<td>1</td>
+<td>Device proof verified</td>
+<td>Minimal trust (0.1)</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Steward vouched</td>
+<td>Standard trust (0.3-0.5)</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>6. Gap Analysis</h2>
+<h3>6.1 High Priority Gaps</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Gap</th>
+<th>Risk</th>
+<th>Recommendation</th>
+<th>Effort</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GAP-H1</td>
+<td>No Sybil attack prevention</td>
+<td>Attackers can create many identities</td>
+<td>Require external identity proof or stake</td>
+<td>High</td>
+<td>🟡 Partial (SDIS)</td>
+</tr>
+<tr>
+<td>GAP-H2</td>
+<td>Traffic analysis possible</td>
+<td>Network metadata reveals activity patterns</td>
+<td>Implement mix networking or padding</td>
+<td>High</td>
+<td>Open</td>
+</tr>
+<tr>
+<td><del>GAP-H3</del></td>
+<td><del>No Byzantine fault tolerance</del></td>
+<td><del>Equivocating nodes not detected</del></td>
+<td><del>Implement BFT consensus</del></td>
+<td><del>High</del></td>
+<td>✅ <strong>Closed (Phase 18)</strong></td>
+</tr>
+</tbody></table>
+<blockquote>
+<p><strong>GAP-H3 Resolution</strong>: Phase 18 (2025-12-04) implemented MisbehaviorDetector with 7 violation types,
+reputation scoring (0.0-1.0), automatic quarantine at score &lt; 0.5, and auto-ban for critical violations.
+See <a href="#57-byzantine-detection">Section 5.7 Byzantine Detection</a> for details.</p>
+</blockquote>
+<h3>6.2 Medium Priority Gaps</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Gap</th>
+<th>Risk</th>
+<th>Recommendation</th>
+<th>Effort</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GAP-M1</td>
+<td>Trust inflation via collusion</td>
+<td>Colluding nodes can boost each other</td>
+<td>Add Sybil resistance metrics</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>GAP-M2</td>
+<td>mDNS exposes local presence</td>
+<td>Local network attackers see nodes</td>
+<td>Add optional private discovery</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>GAP-M3</td>
+<td>Subscription metadata visible</td>
+<td>Topic structure reveals interests</td>
+<td>Add encrypted topic names</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>GAP-M4</td>
+<td>Votes visible during voting</td>
+<td>Enables vote buying</td>
+<td>Implement commit-reveal scheme</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>GAP-M5</td>
+<td>Trust score <code>inputs_hash</code> timing leak</td>
+<td>Raw timestamps reveal attestation arrival patterns</td>
+<td>Truncate timestamps to coarser granularity or add traffic obfuscation</td>
+<td>Low-Medium</td>
+</tr>
+</tbody></table>
+<p><strong>GAP-M5 Details</strong>: The <code>inputs_hash</code> computation in the trust attestation reducer implementation
+(within the trust computation logic of the <code>icn-trust</code> crate) includes raw Unix timestamps from attestations. 
+This creates a timing side-channel that allows adversaries to:</p>
+<ul>
+<li><strong>Correlation Attack</strong>: Query <code>inputs_hash</code> from multiple nodes. Identical hashes indicate nodes 
+processed the same attestations with the same timestamps, revealing shared trust relationships.</li>
+<li><strong>Temporal Attack</strong>: Poll a target node&#39;s trust score repeatedly. Hash changes reveal the exact 
+moment new attestations arrive, enabling network activity monitoring.</li>
+<li><strong>Social Graph Mapping</strong>: Combine timing data across nodes to build a temporal map of trust 
+network formation (who attested for whom, and when).</li>
+</ul>
+<p><strong>Severity Rationale</strong>: Medium risk because:</p>
+<ul>
+<li>Requires persistent polling (detectable via rate limiting)</li>
+<li>Limited scope (only reveals timing of trust graph changes, not content)</li>
+<li>Mitigated by cooperative&#39;s transparency philosophy (trust graph is intentionally public)</li>
+</ul>
+<p>However, timing precision could enable targeted attacks:</p>
+<ul>
+<li>Coordinated social engineering (attacker knows when target receives recommendations)</li>
+<li>Vote manipulation (correlate attestations with governance proposals)</li>
+<li>Sybil detection evasion (coordinate attestations to appear organic)</li>
+</ul>
+<p><strong>Decision Criteria for Mitigation</strong>:</p>
+<ol>
+<li><strong>No action needed if</strong>: Cooperatives accept that attestation timing is observable (transparency trade-off)</li>
+<li><strong>Timestamp truncation if</strong>: Cooperatives need timing obfuscation without breaking cache invalidation</li>
+<li><strong>Traffic obfuscation if</strong>: Cooperatives require strong unlinkability (enterprise/sensitive contexts)</li>
+</ol>
+<p><strong>Implementation Path</strong>:</p>
+<ul>
+<li><strong>Phase 1</strong> (Low effort): Document trade-off in operator manual, add warning in API docs</li>
+<li><strong>Phase 2</strong> (Medium effort): Add configurable timestamp truncation (hourly/daily buckets)</li>
+<li><strong>Phase 3</strong> (High effort): Wire <code>icn-privacy</code> traffic obfuscation into trust score query paths (primitives exist, integration needed)</li>
+</ul>
+<p><strong>Related</strong>:</p>
+<ul>
+<li>Threat TR-I2 in Section 4.3 (Trust System - Information Disclosure)</li>
+<li><code>icn-privacy</code> traffic obfuscation module (implemented in <code>icn-privacy/src/traffic_obfuscation.rs</code>)</li>
+<li>Trust score caching and invalidation strategy</li>
+</ul>
+<h3>6.3 Low Priority Gaps</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Gap</th>
+<th>Risk</th>
+<th>Recommendation</th>
+<th>Effort</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GAP-L1</td>
+<td>Balance queries public</td>
+<td>Privacy concern</td>
+<td>Add optional balance privacy</td>
+<td>Low</td>
+</tr>
+<tr>
+<td>GAP-L2</td>
+<td>Task code visible to executors</td>
+<td>IP exposure for compute tasks</td>
+<td>Implement FHE or TEE execution</td>
+<td>High</td>
+</tr>
+<tr>
+<td>GAP-L3</td>
+<td>No perfect forward secrecy</td>
+<td>Past message decryption if key stolen</td>
+<td>Implement ratcheting protocol</td>
+<td>Medium</td>
+</tr>
+</tbody></table>
+<h3>6.4 By-Design Limitations</h3>
+<p>These are intentional design decisions, not gaps:</p>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Public trust graph</td>
+<td>Transparency is core cooperative value</td>
+</tr>
+<tr>
+<td>Real-time vote visibility</td>
+<td>Prevents hidden vote manipulation</td>
+</tr>
+<tr>
+<td>Quorum not enforceable</td>
+<td>Cannot force participation in democratic systems</td>
+</tr>
+</tbody></table>
+<h3>6.5 Pilot Deployment Specific Risks</h3>
+<p>The K3s homelab deployment introduces deployment-specific attack surfaces:</p>
+<table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Description</th>
+<th>Mitigation</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>NodePort Exposure</strong></td>
+<td>Gateway API exposed on 30080, Grafana on 30300</td>
+<td>Firewall rules, VPN access</td>
+<td>✅ Mitigated</td>
+</tr>
+<tr>
+<td><strong>NFS Storage</strong></td>
+<td>Single point of failure for persistent data</td>
+<td>Regular backups, RAID on NFS server</td>
+<td>🟡 Partial</td>
+</tr>
+<tr>
+<td><strong>Limited Node Count</strong></td>
+<td>5 nodes insufficient for Byzantine tolerance</td>
+<td>Accept pilot limitations</td>
+<td>🟡 Documented</td>
+</tr>
+<tr>
+<td><strong>Known Participant Set</strong></td>
+<td>All pilot participants known</td>
+<td>Reduces Sybil risk, but limits testing</td>
+<td>🟡 By Design</td>
+</tr>
+<tr>
+<td><strong>Dev-mode Secrets</strong></td>
+<td>Some secrets use placeholder values</td>
+<td>Document for production hardening</td>
+<td>🟡 Documented</td>
+</tr>
+<tr>
+<td><strong>Single Control Plane</strong></td>
+<td>K3s control plane is single node</td>
+<td>Accept for homelab, plan HA for production</td>
+<td>🟡 Documented</td>
+</tr>
+</tbody></table>
+<p><strong>Kubernetes-Specific Attack Vectors</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Vector</th>
+<th>Description</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Container Escape</td>
+<td>Malicious container breakout</td>
+<td>No privileged containers, securityContext</td>
+</tr>
+<tr>
+<td>RBAC Bypass</td>
+<td>Unauthorized API access</td>
+<td>Minimal RBAC, namespace isolation</td>
+</tr>
+<tr>
+<td>Pod-to-Pod</td>
+<td>Lateral movement between pods</td>
+<td>NetworkPolicy (planned)</td>
+</tr>
+<tr>
+<td>Image Supply Chain</td>
+<td>Compromised container images</td>
+<td>Local image build, no external registries</td>
+</tr>
+<tr>
+<td>Secret Exposure</td>
+<td>Secrets in etcd or environment</td>
+<td>Kubernetes Secrets, avoid env vars</td>
+</tr>
+</tbody></table>
+<p><strong>Monitoring Coverage</strong>:</p>
+<ul>
+<li>15 Alertmanager rules configured for ICN-specific conditions</li>
+<li>Grafana dashboards for gossip, ledger, trust, compute</li>
+<li>Health endpoints monitored via liveness/readiness probes</li>
+</ul>
+<p>See <a href="/docs/operations/deployment/incident-response">incident-response.md</a> for K3s-specific incident procedures.</p>
+<hr>
+<h2>7. Security Assumptions</h2>
+<h3>7.1 What This System Provides</h3>
+<ul>
+<li><strong>Authenticated communication</strong> between known identities</li>
+<li><strong>Integrity</strong> of messages and stored data</li>
+<li><strong>Non-repudiation</strong> of signed actions</li>
+<li><strong>Availability</strong> under normal and moderate attack conditions</li>
+<li><strong>Economic safety rails</strong> against common abuse patterns</li>
+<li><strong>Capability-constrained</strong> contract execution</li>
+</ul>
+<h3>7.2 What This System Does NOT Provide</h3>
+<ul>
+<li><strong>Anonymous communication</strong> - All actions tied to DIDs</li>
+<li><del><strong>Byzantine fault tolerance</strong></del> - <strong>Now partially provided</strong> via MisbehaviorDetector (Phase 18)</li>
+<li><strong>Perfect forward secrecy</strong> - Key compromise reveals past messages</li>
+<li><strong>Traffic analysis resistance</strong> - Network patterns observable</li>
+<li><del><strong>Sybil resistance</strong></del> - <strong>Now partially provided</strong> via SDIS steward verification</li>
+<li><strong>Legal enforceability</strong> - Technical system only</li>
+</ul>
+<h3>7.3 Trust Assumptions</h3>
+<table>
+<thead>
+<tr>
+<th>Assumption</th>
+<th>Impact if Violated</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Ed25519 is secure</td>
+<td>Complete system compromise</td>
+</tr>
+<tr>
+<td>TLS 1.3 is secure</td>
+<td>Network traffic exposure</td>
+</tr>
+<tr>
+<td>ChaCha20-Poly1305 is secure</td>
+<td>Encrypted data exposure</td>
+</tr>
+<tr>
+<td>Age encryption is secure</td>
+<td>Keystore compromise</td>
+</tr>
+<tr>
+<td>System clocks are roughly synchronized</td>
+<td>Replay attacks possible</td>
+</tr>
+<tr>
+<td>Cooperative members are mostly honest</td>
+<td>Governance manipulation</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>8. References</h2>
+<h3>Internal Documentation</h3>
+<ul>
+<li><a href="/docs/ARCHITECTURE">ARCHITECTURE.md</a> - System architecture</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/production-hardening">production-hardening.md</a> - Security fixes</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/security-roadmap">security-roadmap.md</a> - Security implementation plan</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/phase-10c-security-analysis">phase-10c-security-analysis.md</a> - Contract security</li>
+</ul>
+<h3>External References</h3>
+<ul>
+<li><a href="https://docs.microsoft.com/en-us/azure/security/develop/threat-modeling-tool-threats" target="_blank" rel="noopener">STRIDE Threat Modeling</a></li>
+<li><a href="https://owasp.org/www-project-top-ten/" target="_blank" rel="noopener">OWASP Top 10</a></li>
+<li><a href="https://www.rfc-editor.org/rfc/rfc9000.html" target="_blank" rel="noopener">QUIC RFC 9000</a></li>
+<li><a href="https://www.rfc-editor.org/rfc/rfc8446.html" target="_blank" rel="noopener">TLS 1.3 RFC 8446</a></li>
+<li><a href="https://www.rfc-editor.org/rfc/rfc8032.html" target="_blank" rel="noopener">Ed25519 RFC 8032</a></li>
+</ul>
+<hr>
+<h2>Changelog</h2>
+<ul>
+<li><strong>2026-02-01</strong>: Trust score timing attack documentation (v1.2)<ul>
+<li>Added TR-I2 threat: <code>inputs_hash</code> timing side-channel</li>
+<li>Added GAP-M5 gap: Trust score timestamp precision leak</li>
+<li>Documented three mitigation options with trade-offs</li>
+<li>Cross-referenced with <code>icn-privacy</code> traffic obfuscation</li>
+<li>Related: Issue #999, PR #987</li>
+</ul>
+</li>
+<li><strong>2026-01-04</strong>: Updated for pilot deployment (v1.1)<ul>
+<li>Added Byzantine Detection mitigations (Phase 18)</li>
+<li>Added SDIS identity verification controls</li>
+<li>Added K3s pilot deployment specific risks</li>
+<li>Updated gap analysis (GAP-H3 closed, GAP-H1 partial)</li>
+<li>Updated security assumptions for new capabilities</li>
+</ul>
+</li>
+<li><strong>2025-11-29</strong>: Initial comprehensive STRIDE analysis (v1.0)</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

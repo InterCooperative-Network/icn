@@ -1,0 +1,327 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Tail-Based Sampling Configuration Guide | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>observability</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>tail based sampling</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/observability/tail-based-sampling.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Tail-Based Sampling Configuration Guide</h1>
+<p>This guide explains how to configure tail-based sampling for ICN traces using external collectors.</p>
+<h2>Overview</h2>
+<p>ICN supports two complementary sampling strategies:</p>
+<table>
+<thead>
+<tr>
+<th>Strategy</th>
+<th>When Decision Made</th>
+<th>Implemented By</th>
+<th>Best For</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Head-based</strong></td>
+<td>At span creation</td>
+<td>ICN daemon</td>
+<td>Reducing trace volume, always capturing security spans</td>
+</tr>
+<tr>
+<td><strong>Tail-based</strong></td>
+<td>After span completion</td>
+<td>Collector</td>
+<td>Capturing errors, slow requests, and anomalies</td>
+</tr>
+</tbody></table>
+<h2>Head-Based Sampling in ICN</h2>
+<p>ICN&#39;s <code>PrioritySampler</code> makes sampling decisions at span creation time:</p>
+<pre><code class="language-toml">[tracing]
+enabled = true
+otlp_endpoint = &quot;http://tempo:4317&quot;
+sampling_rate = 0.1  # 10% of normal traces
+</code></pre>
+<p><strong>Priority spans always sampled</strong> (regardless of <code>sampling_rate</code>):</p>
+<ul>
+<li>Spans whose names contain <code>&quot;security&quot;</code> (case-insensitive)</li>
+</ul>
+<p>Other high-value span patterns (for example, <code>auth.*</code>, <code>permission.*</code>, <code>trust.*</code>, <code>crypto.*</code>, <code>signature.*</code>) are <strong>not</strong> automatically prioritized by ICN&#39;s head-based sampler and must be handled via collector-side tail-based sampling policies if you want them always captured.</p>
+<h2>Why Tail-Based Sampling?</h2>
+<p>Head-based sampling cannot capture:</p>
+<ol>
+<li><strong>Errors</strong> - The span hasn&#39;t completed yet, so we don&#39;t know if it will error</li>
+<li><strong>Slow requests</strong> - Duration is unknown at span creation</li>
+<li><strong>Anomalies</strong> - Pattern detection requires seeing the complete trace</li>
+</ol>
+<p>The <code>TracingConfig</code> includes intent flags for these scenarios:</p>
+<pre><code class="language-toml">[tracing]
+always_sample_errors = true   # Capture all error traces
+always_sample_slow = true     # Capture slow request traces
+slow_threshold_ms = 1000      # Define &quot;slow&quot; as &gt; 1 second
+</code></pre>
+<p>These flags are <strong>not enforced by ICN</strong> - they document intent for collector-side configuration.</p>
+<h2>Collector Configuration</h2>
+<h3>Strategy: Full Capture + Collector Filtering</h3>
+<p>For critical environments, capture 100% of traces and let the collector filter:</p>
+<pre><code class="language-toml"># ICN config: send everything to collector
+[tracing]
+sampling_rate = 1.0           # 100% to collector
+always_sample_errors = true
+always_sample_slow = true
+slow_threshold_ms = 1000
+</code></pre>
+<p>Then configure tail-based sampling in the collector.</p>
+<h3>Grafana Tempo</h3>
+<p>Tempo stores all received traces and provides filtering via TraceQL queries. For true tail-based sampling (dropping traces before storage), use the OTEL Collector as a preprocessor in front of Tempo.</p>
+<p><strong>tempo.yaml:</strong></p>
+<pre><code class="language-yaml"># Tempo receives all traces and stores them
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          # Binds to all interfaces - use specific IP in production
+          endpoint: 0.0.0.0:4317
+
+# Metrics generator for trace-derived metrics
+overrides:
+  defaults:
+    metrics_generator:
+      processors: [span-metrics, service-graphs]
+
+storage:
+  trace:
+    backend: local
+    local:
+      path: /var/tempo/traces
+</code></pre>
+<p><strong>Querying for errors and slow traces</strong> (TraceQL in Grafana):</p>
+<pre><code># Find error traces
+{ status = error }
+
+# Find slow traces (&gt; 1s)
+{ duration &gt; 1s }
+
+# Find security-related traces (ICN sets sampling.priority attribute)
+{ resource.sampling.priority = &quot;security&quot; }
+</code></pre>
+<blockquote>
+<p><strong>Note</strong>: Tempo stores all traces it receives. The TraceQL queries shown above are for <strong>retrieval</strong> only, not filtering during ingestion. To reduce storage costs, place an OTEL Collector with tail sampling in front of Tempo (see configuration below).</p>
+</blockquote>
+<h3>OpenTelemetry Collector</h3>
+<p>The OTEL Collector provides the most flexible tail-based sampling.</p>
+<p><strong>otel-collector.yaml:</strong></p>
+<pre><code class="language-yaml">receivers:
+  otlp:
+    protocols:
+      grpc:
+        # Binds to all interfaces - use specific IP in production
+        endpoint: 0.0.0.0:4317
+
+processors:
+  # Tail-based sampling processor
+  tail_sampling:
+    # Wait for trace spans to arrive before making sampling decision.
+    # Increase if you have long-running operations or high network latency.
+    decision_wait: 10s
+    num_traces: 100000
+    expected_new_traces_per_sec: 1000
+    policies:
+      # Always sample errors
+      - name: error-policy
+        type: status_code
+        status_code:
+          status_codes: [ERROR]
+
+      # Always sample slow requests (&gt; 1s)
+      - name: latency-policy
+        type: latency
+        latency:
+          threshold_ms: 1000
+
+      # Always sample security spans
+      # ICN sets sampling.priority=&quot;security&quot; attribute on priority spans
+      - name: security-policy
+        type: string_attribute
+        string_attribute:
+          key: sampling.priority
+          values: [&quot;security&quot;]
+
+      # Probabilistic sampling for everything else
+      - name: probabilistic-policy
+        type: probabilistic
+        probabilistic:
+          sampling_percentage: 10
+
+exporters:
+  otlp:
+    endpoint: tempo:4317
+    tls:
+      # Set to false in production with proper TLS certificates
+      insecure: true
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [tail_sampling]
+      exporters: [otlp]
+</code></pre>
+<h3>Jaeger</h3>
+<p>Jaeger uses a remote sampling configuration:</p>
+<p><strong>jaeger-sampling.json:</strong></p>
+<pre><code class="language-json">{
+  &quot;service_strategies&quot;: [
+    {
+      &quot;service&quot;: &quot;icnd&quot;,
+      &quot;type&quot;: &quot;probabilistic&quot;,
+      &quot;param&quot;: 0.1,
+      &quot;operation_strategies&quot;: [
+        {
+          &quot;operation&quot;: &quot;security.*&quot;,
+          &quot;type&quot;: &quot;probabilistic&quot;,
+          &quot;param&quot;: 1.0
+        }
+      ]
+    }
+  ],
+  &quot;default_strategy&quot;: {
+    &quot;type&quot;: &quot;probabilistic&quot;,
+    &quot;param&quot;: 0.1
+  }
+}
+</code></pre>
+<p>For tail-based sampling with Jaeger, use the OTEL Collector as an intermediary.</p>
+<h2>Recommended Configurations</h2>
+<h3>Development</h3>
+<p>Capture everything for debugging:</p>
+<pre><code class="language-toml">[tracing]
+enabled = true
+sampling_rate = 1.0
+always_sample_errors = true
+always_sample_slow = true
+# Lower threshold in dev to catch moderately slow operations during debugging
+slow_threshold_ms = 500
+</code></pre>
+<h3>Production (Low Volume)</h3>
+<p>Use head-based sampling only:</p>
+<pre><code class="language-toml">[tracing]
+enabled = true
+sampling_rate = 0.1  # 10%
+always_sample_errors = true
+always_sample_slow = true
+slow_threshold_ms = 1000
+</code></pre>
+<h3>Production (High Volume with Collector)</h3>
+<p>Full capture with collector-side filtering:</p>
+<pre><code class="language-toml">[tracing]
+enabled = true
+sampling_rate = 1.0  # Send everything
+always_sample_errors = true
+always_sample_slow = true
+slow_threshold_ms = 1000
+</code></pre>
+<p>Use OTEL Collector tail-based sampling (see configuration above).</p>
+<blockquote>
+<p><strong>⚠️ Performance Warning</strong>: Sending 100% of traces (<code>sampling_rate = 1.0</code>) generates significant network traffic. A node producing 10K spans/sec at ~1KB each results in ~10MB/sec egress. Ensure adequate network capacity and collector resources before enabling full capture.</p>
+</blockquote>
+<h2>Verifying Configuration</h2>
+<h3>Check Trace Sampling</h3>
+<pre><code class="language-bash"># Query for sampled traces in the last hour
+curl -G &#39;http://tempo:3200/api/search&#39; \
+  --data-urlencode &#39;tags=service.name=icnd&#39; \
+  --data-urlencode &#39;minDuration=1s&#39;
+</code></pre>
+<h3>Check Error Capture</h3>
+<pre><code class="language-bash"># Verify error traces are captured
+curl -G &#39;http://tempo:3200/api/search&#39; \
+  --data-urlencode &#39;tags=status=error&#39;
+</code></pre>
+<h3>Monitor Sampling Rates</h3>
+<p>The OTEL Collector exposes metrics:</p>
+<ul>
+<li><code>otelcol_processor_tail_sampling_count_traces_sampled</code></li>
+<li><code>otelcol_processor_tail_sampling_count_traces_dropped</code></li>
+</ul>
+<h2>Troubleshooting</h2>
+<h3>Missing Error Traces</h3>
+<ol>
+<li>Verify <code>always_sample_errors = true</code> in ICN config</li>
+<li>Check collector tail-sampling policy includes error status</li>
+<li>Ensure <code>decision_wait</code> is long enough for traces to complete</li>
+</ol>
+<h3>Missing Slow Traces</h3>
+<ol>
+<li>Verify <code>slow_threshold_ms</code> matches your latency SLO</li>
+<li>Check collector latency policy threshold matches ICN config</li>
+<li>Increase <code>decision_wait</code> for long-running operations</li>
+</ol>
+<h3>High Memory Usage in Collector</h3>
+<p>Tail-based sampling buffers traces in memory:</p>
+<ol>
+<li>Reduce <code>num_traces</code> buffer size</li>
+<li>Decrease <code>decision_wait</code> time</li>
+<li>Use probabilistic pre-filtering before tail sampling</li>
+</ol>
+<h2>Related Documentation</h2>
+<ul>
+<li><a href="/docs/security/production-hardening">Production Hardening Guide</a> - Security configuration</li>
+<li><a href="/docs/ARCHITECTURE">ICN Architecture</a> - Architecture overview</li>
+<li><a href="https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/tailsamplingprocessor" target="_blank" rel="noopener">OpenTelemetry Tail Sampling Processor</a></li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

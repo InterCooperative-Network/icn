@@ -1,0 +1,907 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Federation Foundations: Topology-Aware Networking and RPC Improvements | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>development</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>sessions</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>2025 11</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>2025 11 13 federation foundations</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/development/sessions/2025-11/2025-11-13-federation-foundations.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Federation Foundations: Topology-Aware Networking and RPC Improvements</h1>
+<p><strong>Date</strong>: 2025-11-13
+<strong>Phase</strong>: Federation Foundation (Phase 1E-1F) + RPC Polish
+<strong>Objective</strong>: Implement regional/cluster-based topology awareness with scope-aware gossip fanout, plus RPC receipt tracking and pagination</p>
+<hr>
+<h2>Overview</h2>
+<p>This session laid critical groundwork for ICN federation by implementing topology-aware networking that enables efficient regional and cluster-based communication. Additionally, completed RPC server improvements with operation receipts and pagination support.</p>
+<h3>Key Achievements</h3>
+<ol>
+<li>✅ <strong>Topology-Aware Networking</strong> - Regional/cluster peer organization with handshake protocol</li>
+<li>✅ <strong>NeighborSets Implementation</strong> - Smart peer categorization (LocalCluster, Regional, Backbone, Trusted)</li>
+<li>✅ <strong>Scope-Aware Gossip Fanout</strong> - Efficient message propagation based on scope</li>
+<li>✅ <strong>Receipt Tracking</strong> - UUID-based operation outcome persistence with 24h TTL</li>
+<li>✅ <strong>Pagination Support</strong> - Consistent pagination across all RPC list endpoints</li>
+<li>✅ <strong>All Tests Passing</strong> - 240 tests passing across workspace (38 in icn-net, 25 in icn-rpc)</li>
+</ol>
+<hr>
+<h2>Part 1: Topology-Aware Networking</h2>
+<h3>1. Topology Configuration Schema</h3>
+<p><strong>File</strong>: <code>icn/crates/icn-net/src/topology.rs</code></p>
+<p>Added comprehensive topology types to support regional/cluster-based federation:</p>
+<pre><code class="language-rust">/// Topology configuration for regional/cluster-based networking
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TopologyConfig {
+    pub region: String,
+    pub cluster_id: String,
+    pub role: NodeRole,
+    pub neighbor_limits: NeighborLimitsConfig,
+    pub fanout: FanoutConfig,
+}
+
+/// Node role in the network topology
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = &quot;lowercase&quot;)]
+pub enum NodeRole {
+    Edge,        // Regular node
+    Rendezvous,  // Bootstrap/discovery hub
+    Archive,     // Long-term storage node
+}
+
+/// Gossip fanout configuration per scope
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FanoutConfig {
+    pub local_cluster: usize,  // How many peers for cluster-local gossip
+    pub regional: usize,       // How many peers for regional gossip
+    pub global: usize,         // How many peers for global gossip
+}
+</code></pre>
+<p><strong>Key Design Decisions</strong>:</p>
+<ul>
+<li><strong>Separation of Concerns</strong>: Topology types live in <code>icn-net</code>, re-exported by <code>icn-core</code> to avoid circular dependencies</li>
+<li><strong>Three-Tier Hierarchy</strong>: Local cluster → Region → Global for efficient message routing</li>
+<li><strong>Role-Based Behavior</strong>: Enables specialized node types (e.g., archives for historical data)</li>
+</ul>
+<hr>
+<h3>2. NeighborSets: Smart Peer Categorization</h3>
+<p><strong>File</strong>: <code>icn/crates/icn-net/src/topology.rs:60-324</code></p>
+<p>Implemented intelligent peer categorization that combines topology and trust:</p>
+<pre><code class="language-rust">pub struct NeighborSets {
+    local_cluster: HashMap&lt;PeerId, PeerMetadata&gt;,
+    regional: HashMap&lt;PeerId, PeerMetadata&gt;,
+    backbone: HashMap&lt;PeerId, PeerMetadata&gt;,
+    trusted: HashMap&lt;PeerId, PeerMetadata&gt;,
+    own_topology: TopologyInfo,
+}
+
+impl NeighborSets {
+    /// Add a neighbor to the appropriate set based on topology + trust
+    pub fn add_neighbor(
+        &amp;mut self,
+        peer_id: PeerId,
+        topology_info: TopologyInfo,
+        metrics: Option&lt;NeighborMetrics&gt;,
+        trust_score: f32,
+        limits: &amp;NeighborLimitsConfig,
+    ) {
+        let category = self.categorize_peer(&amp;topology_info, trust_score);
+
+        // Add to appropriate set with LRU eviction
+        let (set, limit) = match category {
+            PeerCategory::LocalCluster =&gt; (&amp;mut self.local_cluster, limits.max_local_cluster),
+            PeerCategory::Regional =&gt; (&amp;mut self.regional, limits.max_regional),
+            PeerCategory::Backbone =&gt; (&amp;mut self.backbone, limits.max_backbone),
+            PeerCategory::Trusted =&gt; (&amp;mut self.trusted, limits.max_trusted),
+        };
+
+        // LRU eviction if at capacity
+        if set.len() &gt;= limit &amp;&amp; !set.contains_key(&amp;peer_id) {
+            if let Some(oldest) = set.iter().min_by_key(|(_, m)| m.connected_at).map(|(id, _)| id.clone()) {
+                set.remove(&amp;oldest);
+            }
+        }
+
+        set.insert(peer_id, metadata);
+    }
+}
+</code></pre>
+<p><strong>Categorization Logic</strong>:</p>
+<ul>
+<li><strong>Trusted</strong> (trust ≥ 0.7): High-trust peers, regardless of location</li>
+<li><strong>LocalCluster</strong>: Same region AND cluster_id</li>
+<li><strong>Regional</strong>: Same region, different cluster</li>
+<li><strong>Backbone</strong>: Different region (cross-regional connectivity)</li>
+</ul>
+<p><strong>Key Features</strong>:</p>
+<ul>
+<li><strong>LRU Eviction</strong>: Bounded memory usage per category</li>
+<li><strong>Metrics Tracking</strong>: RTT, connection time for future optimizations</li>
+<li><strong>Prometheus Metrics</strong>: Exports neighbor counts per category</li>
+</ul>
+<hr>
+<h3>3. Handshake Protocol for Topology Exchange</h3>
+<p><strong>File</strong>: <code>icn/crates/icn-net/src/protocol.rs:48-66</code></p>
+<p>Added handshake messages to wire protocol:</p>
+<pre><code class="language-rust">#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum MessagePayload {
+    Gossip(GossipMessage),
+    Ping,
+    Pong,
+    Subscribe { topics: Vec&lt;String&gt; },
+    Unsubscribe { topics: Vec&lt;String&gt; },
+    SubscribeAck { topics: Vec&lt;String&gt; },
+    /// NEW: Handshake with topology information
+    Handshake {
+        region: String,
+        cluster_id: String,
+        role: String,
+    },
+    /// NEW: Handshake acknowledgement
+    HandshakeAck,
+}
+</code></pre>
+<p><strong>Handshake Flow</strong> (<code>icn/crates/icn-net/src/actor.rs:640-682</code>):</p>
+<ol>
+<li><strong>Connection Established</strong>: Peer A dials Peer B</li>
+<li><strong>A → B</strong>: Handshake message with (region, cluster_id, role)</li>
+<li><strong>B Processes</strong>: Categorizes A into NeighborSets based on topology + trust</li>
+<li><strong>B → A</strong>: HandshakeAck</li>
+<li><strong>Both sides</strong>: Now aware of peer&#39;s location for scope-aware routing</li>
+</ol>
+<p><strong>Trust Integration</strong>:</p>
+<pre><code class="language-rust">let trust_score = if let Some(ref tg) = trust_graph {
+    tg.read().await.compute_trust_score(&amp;message.from).unwrap_or(0.0) as f32
+} else {
+    0.5  // Default for unknown peers
+};
+
+sets.write().await.add_neighbor(
+    PeerId(message.from.clone()),
+    peer_topology,
+    None,
+    trust_score,
+    &amp;limits,
+);
+</code></pre>
+<hr>
+<h3>4. NetworkActor Integration</h3>
+<p><strong>File</strong>: <code>icn/crates/icn-net/src/actor.rs</code></p>
+<p>Extended NetworkActor to support topology:</p>
+<pre><code class="language-rust">pub struct NetworkActor {
+    // ... existing fields ...
+    neighbor_sets: Option&lt;Arc&lt;RwLock&lt;NeighborSets&gt;&gt;&gt;,
+    topology_config: Option&lt;TopologyConfig&gt;,
+    trust_graph: Option&lt;Arc&lt;tokio::sync::RwLock&lt;icn_trust::TrustGraph&gt;&gt;&gt;,
+}
+
+pub struct NetworkHandle {
+    tx: mpsc::Sender&lt;NetworkMsg&gt;,
+    neighbor_sets: Option&lt;Arc&lt;RwLock&lt;NeighborSets&gt;&gt;&gt;,  // NEW: Direct access for sampling
+}
+
+impl NetworkHandle {
+    /// Sample peers based on scope (for gossip fanout)
+    pub async fn sample_peers(&amp;self, scope: Scope, count: usize) -&gt; Vec&lt;Did&gt; {
+        if let Some(ref sets) = self.neighbor_sets {
+            let sets_read = sets.read().await;
+            sets_read.sample(scope, count).into_iter().map(|peer_id| peer_id.0).collect()
+        } else {
+            Vec::new()  // Fallback: no topology support
+        }
+    }
+}
+</code></pre>
+<p><strong>Why Direct Access?</strong></p>
+<ul>
+<li>GossipActor needs fast peer sampling during message propagation</li>
+<li>Storing <code>Arc&lt;RwLock&lt;NeighborSets&gt;&gt;</code> in NetworkHandle avoids message passing overhead</li>
+<li>Async read locks enable concurrent sampling</li>
+</ul>
+<hr>
+<h3>5. Scope-Aware Gossip Fanout</h3>
+<p><strong>File</strong>: <code>icn/crates/icn-gossip/src/gossip.rs</code></p>
+<p>Added scope-aware message propagation:</p>
+<pre><code class="language-rust">/// Callback for sampling peers based on scope
+pub type PeerSamplingCallback = Arc&lt;dyn Fn(Scope, usize) -&gt; Vec&lt;Did&gt; + Send + Sync&gt;;
+
+pub struct GossipActor {
+    // ... existing fields ...
+    peer_sampling: Option&lt;PeerSamplingCallback&gt;,
+}
+
+impl GossipActor {
+    /// Send a message with scope-aware peer selection
+    fn send_message_scoped(&amp;self, scope: Scope, fanout: usize, message: GossipMessage) {
+        if let Some(sampling) = &amp;self.peer_sampling {
+            let peers = sampling(scope, fanout);
+
+            if peers.is_empty() {
+                debug!(&quot;No peers available for scope {:?}&quot;, scope);
+                return;
+            }
+
+            for peer in peers {
+                self.send_message(Some(peer), message.clone());
+            }
+
+            icn_obs::metrics::topology::gossip_fanout_record(
+                match scope {
+                    Scope::LocalCluster =&gt; &quot;local_cluster&quot;,
+                    Scope::Regional =&gt; &quot;regional&quot;,
+                    Scope::Global =&gt; &quot;global&quot;,
+                },
+                fanout,
+            );
+        } else {
+            // Fallback: broadcast to all peers
+            self.send_message(None, message);
+        }
+    }
+}
+</code></pre>
+<p><strong>Fanout Strategy</strong>:</p>
+<ul>
+<li><strong>LocalCluster</strong>: 8 peers (tight cluster coordination)</li>
+<li><strong>Regional</strong>: 6 peers (regional sync)</li>
+<li><strong>Global</strong>: 4 peers (efficient global propagation)</li>
+</ul>
+<p><strong>Metrics</strong>: <code>icn_gossip_fanout_peers_total{scope=&quot;local_cluster|regional|global&quot;}</code></p>
+<hr>
+<h3>6. Supervisor Integration</h3>
+<p><strong>File</strong>: <code>icn/crates/icn-core/src/supervisor.rs</code></p>
+<p>Wired peer sampling callback from NetworkHandle to GossipActor:</p>
+<pre><code class="language-rust">// Set up peer sampling callback for scope-aware gossip fanout
+let network_handle_for_sampling = network_handle.clone();
+let peer_sampling_callback: icn_gossip::PeerSamplingCallback = Arc::new(move |scope, count| {
+    let net_handle = network_handle_for_sampling.clone();
+    tokio::task::block_in_place(move || {
+        tokio::runtime::Handle::current().block_on(async move {
+            net_handle.sample_peers(scope, count).await
+        })
+    })
+});
+
+gossip.set_peer_sampling(peer_sampling_callback);
+</code></pre>
+<p><strong>Sync-to-Async Bridge</strong>:</p>
+<ul>
+<li>GossipActor uses sync callbacks for performance</li>
+<li><code>tokio::task::block_in_place</code> safely bridges to async NetworkHandle</li>
+<li>Prevents blocking the Tokio runtime</li>
+</ul>
+<hr>
+<h3>7. Metrics Implementation</h3>
+<p><strong>File</strong>: <code>icn/crates/icn-obs/src/metrics/topology.rs</code></p>
+<p>Added comprehensive topology metrics:</p>
+<pre><code class="language-rust">pub fn neighbor_set_size(category: &amp;str, count: usize) {
+    NEIGHBOR_SET_SIZE.with_label_values(&amp;[category]).set(count as i64);
+}
+
+pub fn neighbor_added(category: &amp;str) {
+    NEIGHBOR_OPERATIONS.with_label_values(&amp;[category, &quot;added&quot;]).inc();
+}
+
+pub fn neighbor_removed(category: &amp;str) {
+    NEIGHBOR_OPERATIONS.with_label_values(&amp;[category, &quot;removed&quot;]).inc();
+}
+
+pub fn gossip_fanout_record(scope: &amp;str, peer_count: usize) {
+    GOSSIP_FANOUT_PEERS.with_label_values(&amp;[scope]).observe(peer_count as f64);
+}
+</code></pre>
+<p><strong>Prometheus Metrics</strong>:</p>
+<ul>
+<li><code>icn_neighbor_set_size{category}</code> - Current neighbor count per category</li>
+<li><code>icn_neighbor_operations_total{category,operation}</code> - Add/remove operations</li>
+<li><code>icn_gossip_fanout_peers{scope}</code> - Peers selected per scope</li>
+</ul>
+<hr>
+<h2>Part 2: RPC Receipt Tracking and Pagination</h2>
+<h3>1. Receipt Store Integration</h3>
+<p><strong>Files</strong>:</p>
+<ul>
+<li><code>icn/crates/icn-rpc/src/receipt.rs</code> (already existed)</li>
+<li><code>icn/crates/icn-rpc/src/server.rs:32,44</code></li>
+</ul>
+<p>Integrated ReceiptStore into RPC server:</p>
+<pre><code class="language-rust">pub struct RpcServer {
+    network_handle: Option&lt;Arc&lt;RwLock&lt;NetworkHandle&gt;&gt;&gt;,
+    ledger_handle: Option&lt;Arc&lt;RwLock&lt;Ledger&gt;&gt;&gt;,
+    contract_runtime: Option&lt;Arc&lt;RwLock&lt;ContractRuntime&gt;&gt;&gt;,
+    gossip_handle: Option&lt;Arc&lt;RwLock&lt;GossipActor&gt;&gt;&gt;,
+    receipt_store: Arc&lt;ReceiptStore&gt;,  // NEW: 10k capacity, 24h TTL
+    listen_addr: SocketAddr,
+}
+
+impl RpcServer {
+    pub fn new(listen_addr: SocketAddr) -&gt; Self {
+        RpcServer {
+            // ...
+            receipt_store: Arc::new(ReceiptStore::new(10_000, 86400)),
+            // ...
+        }
+    }
+}
+</code></pre>
+<p><strong>Configuration</strong>:</p>
+<ul>
+<li><strong>Capacity</strong>: 10,000 receipts (LRU eviction when exceeded)</li>
+<li><strong>TTL</strong>: 86,400 seconds (24 hours)</li>
+<li><strong>Eviction</strong>: Both time-based (on insert) and space-based (LRU)</li>
+</ul>
+<hr>
+<h3>2. Receipt Creation on Operations</h3>
+<p><strong>Contract Deployment</strong> (<code>icn/crates/icn-rpc/src/server.rs:535-568</code>):</p>
+<pre><code class="language-rust">match gossip.publish(&quot;contracts:deploy&quot;, message_bytes) {
+    Ok(_) =&gt; {
+        // Create receipt for successful deployment
+        let receipt = Receipt::new(
+            deployment_msg.installation.installed_by.clone(),
+            Operation::ContractDeploy {
+                code_hash: code_hash.to_hex(),
+            },
+            Outcome::success(Some(code_hash.to_hex())),
+        );
+        let receipt_id = receipt.id.clone();
+        state.receipt_store.insert(receipt).await;
+
+        let response = serde_json::json!({
+            &quot;code_hash&quot;: code_hash.to_hex(),
+            &quot;receipt_id&quot;: receipt_id.to_string(),  // Return to client
+            &quot;success&quot;: true,
+        });
+        RpcResponse::success(id, response)
+    }
+    Err(e) =&gt; {
+        // Create receipt for failed deployment
+        let receipt = Receipt::new(
+            deployment_msg.installation.installed_by.clone(),
+            Operation::ContractDeploy { code_hash: code_hash.to_hex() },
+            Outcome::failure(e.to_string()),
+        );
+        state.receipt_store.insert(receipt).await;
+
+        RpcResponse::error(id, -32000, format!(&quot;Failed to publish deployment: {}&quot;, e))
+    }
+}
+</code></pre>
+<p><strong>Contract Execution</strong> (<code>icn/crates/icn-rpc/src/server.rs:628-676</code>):</p>
+<pre><code class="language-rust">match runtime.execute_rule(&amp;code_hash, &amp;call_params.rule_name, context, args).await {
+    Ok(result) =&gt; {
+        // Create receipt with resource tracking
+        let resources = Resources {
+            fuel_used: result.fuel_consumed,
+            bytes_processed: 0,  // TODO: Track in future
+            wall_time_ms: 0,     // TODO: Track in future
+        };
+
+        let receipt = Receipt::with_resources(
+            caller_did.clone(),
+            Operation::ContractExecute {
+                code_hash: call_params.code_hash.clone(),
+                rule: call_params.rule_name.clone(),
+            },
+            Outcome::success(None),
+            resources,
+        );
+        let receipt_id = receipt.id.clone();
+        state.receipt_store.insert(receipt).await;
+
+        // Add receipt_id to response
+        let mut value = serde_json::to_value(&amp;response).unwrap();
+        value.as_object_mut().unwrap().insert(
+            &quot;receipt_id&quot;.to_string(),
+            serde_json::Value::String(receipt_id.to_string()),
+        );
+
+        RpcResponse::success(id, value)
+    }
+    // ... error case also creates receipt
+}
+</code></pre>
+<p><strong>Receipt Fields</strong>:</p>
+<ul>
+<li><code>id</code>: UUID v4 (unique identifier)</li>
+<li><code>timestamp</code>: Unix timestamp (seconds)</li>
+<li><code>caller</code>: DID of requester</li>
+<li><code>operation</code>: ContractDeploy | ContractExecute | LedgerTransfer | TrustEdgeAdd</li>
+<li><code>outcome</code>: Success(commit_hash) | Failure(error)</li>
+<li><code>resources</code>: fuel_used, bytes_processed, wall_time_ms</li>
+</ul>
+<hr>
+<h3>3. Receipt Query Endpoint</h3>
+<p><strong>File</strong>: <code>icn/crates/icn-rpc/src/server.rs:910-938</code></p>
+<p>Added <code>receipt.get</code> RPC method:</p>
+<pre><code class="language-rust">async fn handle_receipt_get(
+    id: u64,
+    params: &amp;serde_json::Value,
+    state: &amp;Arc&lt;RpcServer&gt;,
+) -&gt; RpcResponse {
+    #[derive(serde::Deserialize)]
+    struct GetReceiptParams {
+        receipt_id: String,
+    }
+
+    let get_params: GetReceiptParams = match serde_json::from_value(params.clone()) {
+        Ok(p) =&gt; p,
+        Err(e) =&gt; return RpcResponse::error(id, -32602, format!(&quot;Invalid params: {}&quot;, e)),
+    };
+
+    let receipt_id = ReceiptId::from_string(get_params.receipt_id);
+
+    match state.receipt_store.get(&amp;receipt_id).await {
+        Some(receipt) =&gt; match serde_json::to_value(&amp;receipt) {
+            Ok(value) =&gt; RpcResponse::success(id, value),
+            Err(e) =&gt; RpcResponse::error(id, -32603, format!(&quot;Internal error: {}&quot;, e)),
+        },
+        None =&gt; RpcResponse::error(id, -32000, &quot;Receipt not found&quot;.to_string()),
+    }
+}
+</code></pre>
+<p><strong>Example Response</strong>:</p>
+<pre><code class="language-json">{
+  &quot;jsonrpc&quot;: &quot;2.0&quot;,
+  &quot;result&quot;: {
+    &quot;id&quot;: &quot;550e8400-e29b-41d4-a716-446655440000&quot;,
+    &quot;timestamp&quot;: 1731532800,
+    &quot;caller&quot;: &quot;did:icn:...&quot;,
+    &quot;operation&quot;: {
+      &quot;type&quot;: &quot;contract_execute&quot;,
+      &quot;code_hash&quot;: &quot;abc123...&quot;,
+      &quot;rule&quot;: &quot;process&quot;
+    },
+    &quot;outcome&quot;: {
+      &quot;status&quot;: &quot;success&quot;,
+      &quot;commit_hash&quot;: null
+    },
+    &quot;resources&quot;: {
+      &quot;fuel_used&quot;: 1234,
+      &quot;bytes_processed&quot;: 0,
+      &quot;wall_time_ms&quot;: 0
+    }
+  },
+  &quot;id&quot;: 1
+}
+</code></pre>
+<hr>
+<h3>4. Pagination Support</h3>
+<p><strong>Files</strong>:</p>
+<ul>
+<li><code>icn/crates/icn-rpc/src/pagination.rs</code> (already existed)</li>
+<li><code>icn/crates/icn-rpc/src/server.rs</code> (updated list methods)</li>
+</ul>
+<p>Converted three list methods to support pagination:</p>
+<p><strong>contract.list</strong> (<code>icn/crates/icn-rpc/src/server.rs:679-724</code>):</p>
+<pre><code class="language-rust">async fn handle_contract_list(
+    id: u64,
+    params: &amp;serde_json::Value,
+    state: &amp;Arc&lt;RpcServer&gt;,
+) -&gt; RpcResponse {
+    // Parse pagination parameters (defaults to offset=0, limit=100)
+    let page_request: PageRequest = match serde_json::from_value(params.clone()) {
+        Ok(p) =&gt; p,
+        Err(_) =&gt; PageRequest::default(),
+    };
+
+    let runtime = contract_runtime.read().await;
+    let contracts = runtime.list_contracts();
+
+    // Convert to RPC format
+    let contracts_rpc: Vec&lt;ContractInfo&gt; = contracts.iter().map(|info| ...).collect();
+
+    // Apply pagination
+    let page = paginate(contracts_rpc, &amp;page_request, DEFAULT_MAX_PAGE_SIZE);
+
+    match serde_json::to_value(&amp;page) {
+        Ok(value) =&gt; RpcResponse::success(id, value),
+        Err(e) =&gt; RpcResponse::error(id, -32603, format!(&quot;Internal error: {}&quot;, e)),
+    }
+}
+</code></pre>
+<p><strong>ledger.quarantine.list</strong> (<code>icn/crates/icn-rpc/src/server.rs:726-771</code>):</p>
+<ul>
+<li>Similar pattern: parse PageRequest → get all items → paginate → return PageResponse</li>
+</ul>
+<p><strong>ledger.history</strong> (<code>icn/crates/icn-rpc/src/server.rs:405-473</code>):</p>
+<ul>
+<li>Reverses entries (most recent first) → paginates → returns PageResponse</li>
+</ul>
+<p><strong>PageResponse Format</strong>:</p>
+<pre><code class="language-json">{
+  &quot;items&quot;: [...],
+  &quot;total&quot;: 150,
+  &quot;has_more&quot;: true,
+  &quot;offset&quot;: 0,
+  &quot;limit&quot;: 100
+}
+</code></pre>
+<p><strong>Server-Side Caps</strong>:</p>
+<ul>
+<li><code>DEFAULT_MAX_PAGE_SIZE = 100</code> (prevents unbounded memory usage)</li>
+<li><code>ABSOLUTE_MAX_PAGE_SIZE = 1000</code> (hard limit)</li>
+</ul>
+<hr>
+<h2>Testing</h2>
+<h3>Topology Tests</h3>
+<p><strong>File</strong>: <code>icn/crates/icn-net/src/topology.rs:326-580</code></p>
+<p>Comprehensive test coverage for NeighborSets:</p>
+<pre><code class="language-rust">#[test]
+fn test_neighbor_placement_local_cluster() {
+    let own = TopologyInfo { region: &quot;us-west&quot;.to_string(), cluster_id: &quot;c1&quot;.to_string(), role: NodeRole::Edge };
+    let mut sets = NeighborSets::new(own);
+
+    let same_cluster = TopologyInfo { region: &quot;us-west&quot;.to_string(), cluster_id: &quot;c1&quot;.to_string(), role: NodeRole::Edge };
+
+    sets.add_neighbor(PeerId(did1), same_cluster, None, 0.3, &amp;limits);
+
+    assert_eq!(sets.local_cluster.len(), 1);
+    assert_eq!(sets.regional.len(), 0);
+}
+
+#[test]
+fn test_sampling_respects_count() {
+    // ... add 10 peers to local_cluster
+    let sampled = sets.sample(Scope::LocalCluster, 5);
+    assert_eq!(sampled.len(), 5);  // Exactly 5 peers returned
+}
+
+#[test]
+fn test_lru_eviction() {
+    let limits = NeighborLimitsConfig {
+        max_local_cluster: 3,
+        max_regional: 5,
+        max_backbone: 5,
+        max_trusted: 10,
+    };
+
+    // Add 5 peers to local_cluster (limit = 3)
+    for i in 0..5 {
+        sets.add_neighbor(PeerId(did), topology, None, 0.3, &amp;limits);
+    }
+
+    assert_eq!(sets.local_cluster.len(), 3);  // Only 3 retained (LRU evicted 2)
+}
+</code></pre>
+<p><strong>Test Results</strong>:</p>
+<ul>
+<li>✅ <code>test_neighbor_placement_local_cluster</code> - Verifies LocalCluster categorization</li>
+<li>✅ <code>test_neighbor_placement_regional</code> - Verifies Regional categorization</li>
+<li>✅ <code>test_neighbor_placement_backbone</code> - Verifies Backbone categorization</li>
+<li>✅ <code>test_neighbor_placement_trusted</code> - Verifies high-trust override</li>
+<li>✅ <code>test_sampling_respects_count</code> - Verifies sampling limits</li>
+<li>✅ <code>test_sampling_local_cluster</code> - Verifies scope-based sampling</li>
+<li>✅ <code>test_sampling_regional</code> - Verifies regional peer selection</li>
+<li>✅ <code>test_sampling_global</code> - Verifies global peer selection</li>
+<li>✅ <code>test_lru_eviction</code> - Verifies bounded memory usage</li>
+<li>✅ <code>test_remove_neighbor</code> - Verifies peer removal</li>
+<li>✅ <code>test_metrics</code> - Verifies Prometheus metrics</li>
+</ul>
+<hr>
+<h3>RPC Tests</h3>
+<p><strong>File</strong>: <code>icn/crates/icn-rpc/src/receipt.rs:284-451</code></p>
+<p>Receipt and pagination test coverage:</p>
+<ul>
+<li>✅ <code>test_receipt_id_generation</code> - Unique UUID generation</li>
+<li>✅ <code>test_receipt_creation</code> - Basic receipt creation</li>
+<li>✅ <code>test_receipt_with_resources</code> - Resource tracking</li>
+<li>✅ <code>test_receipt_store_insert_and_get</code> - Store operations</li>
+<li>✅ <code>test_receipt_store_size_limit</code> - LRU eviction at capacity</li>
+<li>✅ <code>test_receipt_store_ttl_eviction</code> - Time-based eviction</li>
+<li>✅ <code>test_receipt_store_concurrent_access</code> - Thread safety</li>
+<li>✅ <code>test_paginate_first_page</code> - First page extraction</li>
+<li>✅ <code>test_paginate_middle_page</code> - Middle page extraction</li>
+<li>✅ <code>test_paginate_last_page</code> - Last page extraction</li>
+<li>✅ <code>test_paginate_enforces_max_page_size</code> - Server-side caps</li>
+<li>✅ <code>test_page_response_map</code> - Type transformation</li>
+</ul>
+<hr>
+<h3>Integration Test Fixes</h3>
+<p><strong>Files</strong>: Fixed 6 test files to include new <code>TopologyConfig</code> parameter:</p>
+<ul>
+<li><code>icn/crates/icn-net/tests/trust_gated_tls_integration.rs</code> (6 spawn calls)</li>
+<li><code>icn/crates/icn-core/tests/network_gossip_integration.rs</code></li>
+<li><code>icn/crates/icn-core/tests/subscription_integration.rs</code></li>
+<li><code>icn/crates/icn-core/tests/contract_deployment_integration.rs</code></li>
+<li><code>icn/crates/icn-core/tests/gossip_pull_protocol_integration.rs</code></li>
+<li><code>icn/crates/icn-core/tests/multi_node_gossip_convergence.rs</code></li>
+<li><code>icn/crates/icn-core/tests/trust_propagation_integration.rs</code></li>
+</ul>
+<p><strong>Before</strong>:</p>
+<pre><code class="language-rust">let network_handle = NetworkActor::spawn(
+    &amp;keypair,
+    listen_addr,
+    shutdown_tx.clone(),
+    None,
+    None,
+    None,
+    None,  // 7 parameters
+).await?;
+</code></pre>
+<p><strong>After</strong>:</p>
+<pre><code class="language-rust">let network_handle = NetworkActor::spawn(
+    &amp;keypair,
+    listen_addr,
+    shutdown_tx.clone(),
+    None,
+    None,
+    None,
+    None,
+    None,  // 8 parameters (added topology_config)
+).await?;
+</code></pre>
+<hr>
+<h2>Test Results</h2>
+<p><strong>Workspace Test Summary</strong> (240 tests total):</p>
+<pre><code>icn-ccl:       36 passed
+icn-core:      26 passed
+icn-gossip:    52 passed
+icn-identity:  12 passed
+icn-ledger:    32 passed
+icn-net:       38 passed (includes 11 topology tests)
+icn-rpc:       25 passed (includes pagination + receipt tests)
+icn-trust:     19 passed
+</code></pre>
+<p><strong>Build Status</strong>: ✅ Clean build in 7.68s
+<strong>All Tests</strong>: ✅ 240 passing, 0 failing, 4 ignored</p>
+<hr>
+<h2>Architecture Decisions</h2>
+<h3>1. Why NeighborSets vs. Simple Peer List?</h3>
+<p><strong>Decision</strong>: Categorize peers into sets (LocalCluster, Regional, Backbone, Trusted)</p>
+<p><strong>Rationale</strong>:</p>
+<ul>
+<li><strong>Efficient Sampling</strong>: O(1) category lookup, fast random sampling within category</li>
+<li><strong>Bounded Memory</strong>: LRU eviction per category prevents unbounded growth</li>
+<li><strong>Separation of Concerns</strong>: Different categories have different retention strategies</li>
+<li><strong>Future-Proof</strong>: Enables category-specific optimizations (e.g., different heartbeat intervals)</li>
+</ul>
+<p><strong>Alternatives Considered</strong>:</p>
+<ul>
+<li>Single peer list with tags: Slower sampling, harder to enforce category limits</li>
+<li>Separate data structures: More complex, harder to maintain invariants</li>
+</ul>
+<hr>
+<h3>2. Why Handshake Protocol vs. mDNS Broadcast?</h3>
+<p><strong>Decision</strong>: Explicit handshake messages on connection establishment</p>
+<p><strong>Rationale</strong>:</p>
+<ul>
+<li><strong>Privacy</strong>: Don&#39;t broadcast cluster membership to entire local network</li>
+<li><strong>Flexibility</strong>: Works across WAN, not just LAN</li>
+<li><strong>Extensibility</strong>: Can add more fields (capabilities, version negotiation) in future</li>
+<li><strong>Trust Integration</strong>: Immediate access to peer&#39;s trust score for categorization</li>
+</ul>
+<p><strong>Alternatives Considered</strong>:</p>
+<ul>
+<li>mDNS TXT records: Works only on LAN, privacy concerns</li>
+<li>Gossip-based discovery: Slower convergence, more bandwidth</li>
+</ul>
+<hr>
+<h3>3. Why Sync Callback for Peer Sampling?</h3>
+<p><strong>Decision</strong>: GossipActor uses synchronous <code>PeerSamplingCallback</code></p>
+<p><strong>Rationale</strong>:</p>
+<ul>
+<li><strong>Performance</strong>: Gossip message handling is latency-sensitive</li>
+<li><strong>Simplicity</strong>: Avoids async-in-sync complications in GossipActor core logic</li>
+<li><strong>Safe Bridge</strong>: <code>tokio::task::block_in_place</code> safely bridges to async NetworkHandle</li>
+</ul>
+<p><strong>Alternatives Considered</strong>:</p>
+<ul>
+<li>Async callback: Would require GossipActor refactor to async, significant churn</li>
+<li>Message passing: Adds latency, complicates error handling</li>
+</ul>
+<hr>
+<h3>4. Why 24h Receipt TTL?</h3>
+<p><strong>Decision</strong>: Receipts expire after 24 hours</p>
+<p><strong>Rationale</strong>:</p>
+<ul>
+<li><strong>Auditability Window</strong>: Clients have reasonable time to query operation outcomes</li>
+<li><strong>Memory Bounds</strong>: Prevents indefinite growth (10k * 24h ≈ reasonable for most deployments)</li>
+<li><strong>Business Logic</strong>: Most async operations resolve within minutes; 24h is generous</li>
+</ul>
+<p><strong>Alternatives Considered</strong>:</p>
+<ul>
+<li>1 hour: Too short for debugging slow operations</li>
+<li>7 days: Excessive memory usage for typical deployment rates</li>
+<li>Infinite: Unbounded growth, eventual OOM</li>
+</ul>
+<hr>
+<h2>Commits</h2>
+<ol>
+<li><p><strong>7ab222b</strong> - feat: Integrate topology-aware networking into NetworkActor</p>
+<ul>
+<li>Added TopologyConfig, NeighborSets, handshake protocol</li>
+<li>Wired topology into NetworkActor and supervisor</li>
+<li>221 tests passing</li>
+</ul>
+</li>
+<li><p><strong>630054f</strong> - feat: Add scope-aware gossip fanout using NeighborSets</p>
+<ul>
+<li>Added PeerSamplingCallback to GossipActor</li>
+<li>Implemented send_message_scoped with fanout strategy</li>
+<li>Wired peer sampling from NetworkHandle to GossipActor</li>
+<li>126 tests passing</li>
+</ul>
+</li>
+<li><p><strong>ed1b8ea</strong> - feat: Add receipt tracking and pagination to RPC server</p>
+<ul>
+<li>Integrated ReceiptStore into RpcServer</li>
+<li>Create receipts for contract.deploy and contract.call</li>
+<li>Added receipt.get RPC method</li>
+<li>Converted contract.list, ledger.quarantine.list, ledger.history to paginated</li>
+<li>Fixed NetworkActor::spawn calls in tests</li>
+</ul>
+</li>
+<li><p><strong>e126228</strong> - fix: Clean up unused imports in icn-net tests</p>
+</li>
+<li><p><strong>67e268b</strong> - fix: Add TopologyConfig parameter to NetworkActor::spawn in tests</p>
+<ul>
+<li>Fixed all icn-core test files</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h2>Next Steps</h2>
+<h3>Immediate (Phase 1 completion)</h3>
+<ol>
+<li><p><strong>End-to-End Topology Testing</strong> - Multi-node integration test with regional setup</p>
+<ul>
+<li>Deploy 3 regions × 2 clusters × 3 nodes = 18 nodes</li>
+<li>Verify LocalCluster, Regional, Global gossip propagation</li>
+<li>Measure fanout efficiency vs. broadcast baseline</li>
+</ul>
+</li>
+<li><p><strong>Config File Examples</strong> - Update <code>config/icn.toml.example</code></p>
+<pre><code class="language-toml">[topology]
+region = &quot;us-west&quot;
+cluster_id = &quot;sfo-1&quot;
+role = &quot;edge&quot;
+
+[topology.neighbor_limits]
+max_local_cluster = 50
+max_regional = 30
+max_backbone = 20
+max_trusted = 100
+
+[topology.fanout]
+local_cluster = 8
+regional = 6
+global = 4
+</code></pre>
+</li>
+<li><p><strong>Grafana Dashboards</strong> - Visualize topology metrics</p>
+<ul>
+<li>Neighbor distribution (LocalCluster vs Regional vs Backbone)</li>
+<li>Gossip fanout per scope</li>
+<li>Handshake success/failure rates</li>
+</ul>
+</li>
+</ol>
+<h3>Phase 2: Trust-Based Access Control</h3>
+<ol start="4">
+<li><p><strong>TrustPolicy Wiring</strong> (deferred from this session)</p>
+<ul>
+<li>Wire <code>TrustPolicy</code> into RPC server for operation authorization</li>
+<li>Implement <code>can_deploy_contract()</code>, <code>can_execute_contract()</code> policies</li>
+<li>Add audit logging for policy violations</li>
+</ul>
+</li>
+<li><p><strong>Topic-Level Trust Gates</strong></p>
+<ul>
+<li>Enforce minimum trust scores for sensitive topics (e.g., <code>ledger:sync</code>)</li>
+<li>Implement <code>TrustGatedTopicConfig</code> in gossip subscriptions</li>
+</ul>
+</li>
+</ol>
+<h3>Phase 3: Federation Features</h3>
+<ol start="6">
+<li><p><strong>Cluster Coordination</strong></p>
+<ul>
+<li>Implement cluster-local consensus for low-latency decisions</li>
+<li>Add cluster leader election (Raft or simplified voting)</li>
+<li>Cross-cluster replication for critical state</li>
+</ul>
+</li>
+<li><p><strong>Regional Routing</strong></p>
+<ul>
+<li>Optimize inter-region message routing (prefer backbone nodes)</li>
+<li>Implement regional quotas for fairness</li>
+</ul>
+</li>
+<li><p><strong>Archive Nodes</strong></p>
+<ul>
+<li>Design long-term storage protocol for archive role</li>
+<li>Implement pruning policies for edge nodes (delegate to archives)</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h2>Known Issues</h2>
+<ol>
+<li><p><strong>TODO Comments</strong>: Two resource tracking fields remain unimplemented:</p>
+<ul>
+<li><code>bytes_processed</code> in contract execution receipts</li>
+<li><code>wall_time_ms</code> in contract execution receipts</li>
+<li>These should be tracked in ContractRuntime and passed to RPC layer</li>
+</ul>
+</li>
+<li><p><strong>No Topology Config Validation</strong>: NetworkActor accepts invalid configs (e.g., empty region)</p>
+<ul>
+<li>Should add validation in <code>TopologyConfig::new()</code> or NetworkActor::spawn</li>
+</ul>
+</li>
+<li><p><strong>Handshake Timing</strong>: No retry logic if handshake fails</p>
+<ul>
+<li>Consider adding exponential backoff for handshake retries</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h2>Conclusion</h2>
+<p>This session laid a solid foundation for ICN federation:</p>
+<p><strong>Topology-Aware Networking</strong> enables efficient regional and cluster-based communication, reducing unnecessary cross-region gossip while maintaining global connectivity. The NeighborSets abstraction provides bounded memory usage and fast peer sampling for scope-aware message propagation.</p>
+<p><strong>Receipt Tracking</strong> gives clients visibility into async operation outcomes, enabling better error handling and audit trails. Combined with <strong>Pagination</strong>, the RPC API can now handle large result sets without memory exhaustion.</p>
+<p>All 240 tests passing demonstrates the robustness of these changes. The architecture is extensible for future federation features (cluster coordination, regional routing, archive nodes).</p>
+<p><strong>Total Lines Changed</strong>:</p>
+<ul>
+<li>Added: ~800 lines (topology, receipts, pagination)</li>
+<li>Modified: ~200 lines (integration, tests)</li>
+<li>5 commits, all tests green</li>
+</ul>
+<p>Ready for Phase 2: Trust-Based Access Control and Federation polish.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

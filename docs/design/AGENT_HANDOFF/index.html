@@ -1,0 +1,283 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Agent Handoff: Deterministic Compute Sprint | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>AGENT HANDOFF</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/AGENT_HANDOFF.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Agent Handoff: Deterministic Compute Sprint</h1>
+<p><strong>Branch</strong>: <code>feature/deterministic-compute-core</code><br><strong>Created</strong>: 2026-02-11<br><strong>Updated</strong>: 2026-02-12<br><strong>Purpose</strong>: Enable any AI agent to continue this work
+<strong>PR</strong>: <a href="https://github.com/InterCooperative-Network/icn/pull/1151" target="_blank" rel="noopener">https://github.com/InterCooperative-Network/icn/pull/1151</a></p>
+<hr>
+<h2>Quick Start</h2>
+<pre><code class="language-bash"># Verify you&#39;re on the right branch
+git branch --show-current  # Should show: feature/deterministic-compute-core
+
+# Find repo root (docs live at repo root, not inside icn/)
+REPO_ROOT=$(git rev-parse --show-toplevel)
+
+# Read the master plan first
+cat &quot;$REPO_ROOT/docs/design/DETERMINISTIC_COMPUTE_SPRINT.md&quot;
+
+# Then read the specifications
+cat &quot;$REPO_ROOT/docs/design/compute-classes.md&quot;
+cat &quot;$REPO_ROOT/docs/design/scope-scheduling.md&quot;
+cat &quot;$REPO_ROOT/docs/design/deterministic-core.md&quot;
+
+# Rust commands run from icn/ subdirectory
+cd &quot;$REPO_ROOT/icn&quot;
+cargo build -p icn-compute &amp;&amp; cargo test -p icn-compute
+</code></pre>
+<p><strong>Note</strong>: The <code>docs/</code> directory is at repo root, not inside <code>icn/</code>. If <code>cat docs/...</code> fails, you&#39;re probably in <code>icn/</code> - use <code>cat ../docs/...</code> instead.</p>
+<hr>
+<h2>What This Branch Is About</h2>
+<p>We&#39;re implementing <strong>deterministic WASM execution</strong> for ICN&#39;s governance and ledger paths. Without this, nodes running the same code with the same inputs can produce different outputs, causing consensus forks.</p>
+<p><strong>The Problem</strong>: Standard WASM is not deterministic:</p>
+<ul>
+<li>NaN bit patterns vary by CPU</li>
+<li>HashMap iteration order is random</li>
+<li>OOM behavior depends on host OS</li>
+<li>SIMD optimizations vary by CPU generation</li>
+</ul>
+<p><strong>The Solution</strong>: ICN Deterministic Core (ICN-DC) - a hardened Wasmtime configuration that guarantees bit-exact reproducibility across x86_64 and aarch64.</p>
+<hr>
+<h2>Current State</h2>
+<h3>Completed ✅</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> Created branch <code>feature/deterministic-compute-core</code></li>
+<li><input checked="" disabled="" type="checkbox"> Wrote <code>docs/design/DETERMINISTIC_COMPUTE_SPRINT.md</code> (master plan)</li>
+<li><input checked="" disabled="" type="checkbox"> Wrote <code>docs/design/compute-classes.md</code> (LC vs UC spec)</li>
+<li><input checked="" disabled="" type="checkbox"> Wrote <code>docs/design/scope-scheduling.md</code> (capacity slices)</li>
+<li><input checked="" disabled="" type="checkbox"> Wrote <code>docs/design/deterministic-core.md</code> (ICN-DC profile)</li>
+</ul>
+<h3>Ready to Implement 🚀</h3>
+<table>
+<thead>
+<tr>
+<th>Task ID</th>
+<th>Description</th>
+<th>Priority</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>det-engine</code></td>
+<td>Create <code>deterministic_engine.rs</code></td>
+<td>P0</td>
+</tr>
+<tr>
+<td><code>trust-caps</code></td>
+<td>Add MAX_LOCAL_NODES/EDGES</td>
+<td>P1</td>
+</tr>
+<tr>
+<td><code>trust-bench</code></td>
+<td>Add trust graph benchmarks</td>
+<td>P1</td>
+</tr>
+</tbody></table>
+<h3>Blocked (has dependencies)</h3>
+<table>
+<thead>
+<tr>
+<th>Task ID</th>
+<th>Blocked By</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>det-imports</code></td>
+<td><code>det-engine</code></td>
+</tr>
+<tr>
+<td><code>det-ci-ban</code></td>
+<td><code>det-engine</code></td>
+</tr>
+<tr>
+<td><code>nasties-tests</code></td>
+<td><code>det-engine</code></td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Key Files to Understand</h2>
+<h3>Current WASM Executor (THE PROBLEM)</h3>
+<p><strong>File</strong>: <code>icn/crates/icn-compute/src/wasm_executor.rs</code></p>
+<pre><code class="language-rust">// Line 59 - THIS IS WHAT WE&#39;RE FIXING
+let engine = Engine::default();  // No determinism config!
+</code></pre>
+<p><strong>Issues</strong>:</p>
+<ul>
+<li>No NaN canonicalization</li>
+<li>No fuel metering at Wasmtime level</li>
+<li>No parallel compilation control</li>
+<li>Timestamp host function uses SystemTime::now() (non-deterministic)</li>
+</ul>
+<h3>Wasmtime Version</h3>
+<p><strong>File</strong>: <code>icn/crates/icn-compute/Cargo.toml</code></p>
+<pre><code class="language-toml"># Line 52 - already pinned for security
+wasmtime = { version = &quot;24.0.5&quot;, optional = true }
+</code></pre>
+<h3>Governance Path (THE LC BOUNDARY)</h3>
+<p><strong>File</strong>: <code>icn/crates/icn-governance-actor/src/handlers/execution.rs</code></p>
+<p>The function <code>translate_payload_to_effects()</code> is the LC boundary - this is where proposals become kernel effects that mutate state.</p>
+<hr>
+<h2>Implementation Order</h2>
+<h3>Phase 1: Deterministic Engine (Start Here)</h3>
+<ol>
+<li><strong>Create</strong>: <code>icn/crates/icn-compute/src/deterministic_engine.rs</code></li>
+</ol>
+<pre><code class="language-rust">use wasmtime::{Config, Engine};
+
+pub const WASMTIME_VERSION_PIN: &amp;str = &quot;24.0.5&quot;;
+
+pub fn create_deterministic_engine() -&gt; anyhow::Result&lt;(Engine, DeterminismManifest)&gt; {
+    let mut config = Config::new();
+    config.cranelift_nan_canonicalization(true);
+    config.consume_fuel(true);
+    config.parallel_compilation(false);
+    // ... see docs/design/deterministic-core.md for full config
+}
+</code></pre>
+<ol start="2">
+<li><p><strong>Modify</strong>: <code>icn/crates/icn-compute/src/wasm_executor.rs</code></p>
+<ul>
+<li>Replace <code>Engine::default()</code> with <code>create_deterministic_engine()</code></li>
+<li>Add <code>DeterminismManifest</code> to <code>WasmExecutor</code> struct</li>
+</ul>
+</li>
+<li><p><strong>Test</strong>: <code>cargo test -p icn-compute</code></p>
+</li>
+</ol>
+<h3>Phase 2: Nasties Test Suite</h3>
+<p>Create tests that verify determinism:</p>
+<ul>
+<li><code>nan_payload_miner</code> - NaN bit patterns</li>
+<li><code>mem_grow_boundary</code> - OOM behavior</li>
+<li><code>fuel_exhaustion</code> - Fuel metering</li>
+</ul>
+<h3>Phase 3: WASM Subset Validator</h3>
+<p>Create <code>subset.rs</code> that validates modules at load time:</p>
+<ul>
+<li>Forbid float opcodes (LC v1)</li>
+<li>Forbid SIMD</li>
+<li>Limit control flow depth</li>
+<li>Restrict memory.copy size</li>
+</ul>
+<hr>
+<h2>Critical Rules</h2>
+<p>From <code>AGENTS.md</code>:</p>
+<ol>
+<li><strong>Never weaken safety to fix tests</strong> - if tests fail, the code is wrong</li>
+<li><strong>Run verification</strong> after changes:<pre><code class="language-bash">cd icn &amp;&amp; cargo build &amp;&amp; cargo test -p icn-compute
+</code></pre>
+</li>
+<li><strong>Commit atomically</strong> - one logical change per commit</li>
+<li><strong>Follow conventional commits</strong>: <code>feat(compute): add deterministic engine</code></li>
+</ol>
+<hr>
+<h2>Verification Commands</h2>
+<pre><code class="language-bash">cd icn
+
+# Build
+cargo build -p icn-compute
+
+# Test
+cargo test -p icn-compute
+
+# Lint
+cargo clippy -p icn-compute -- -D warnings
+
+# Specific test
+cargo test -p icn-compute test_deterministic_engine
+</code></pre>
+<hr>
+<h2>Questions That Might Come Up</h2>
+<h3>Should we use Wasmtime 29.0.0 (from the spec)?</h3>
+<p><strong>No.</strong> Current version is 24.0.5, pinned for security reasons (see Cargo.toml comment). Upgrading is a separate effort.</p>
+<h3>Should floats be allowed in LC?</h3>
+<p><strong>No (for v1).</strong> Integer-only LC massively reduces fork surface. Can enable floats in v2 with proven NaN canonicalization.</p>
+<h3>What about SIMD?</h3>
+<p><strong>Forbidden in LC v1.</strong> Either <code>relaxed_simd_deterministic(true)</code> or reject in subset. Since config knob availability varies by Wasmtime version, safer to reject.</p>
+<h3>What about the credential scheme (Coconut)?</h3>
+<p><strong>Keep current approach.</strong> ICN currently uses Ed25519 for signatures. Ed25519 is <strong>not</strong> post-quantum safe. Post-quantum upgrade is future work tracked separately.</p>
+<p>The determinism sprint does not change crypto primitives. For PQ considerations:</p>
+<ul>
+<li>Some proof systems (STARK, Merkle) are believed PQ-resistant</li>
+<li>Signatures remain the weak link unless migrated to hybrid/PQ schemes</li>
+<li>See <code>docs/design/icn-crypto-pq/</code> for future PQ roadmap</li>
+</ul>
+<hr>
+<h2>For Deep Technical Details</h2>
+<p>This handoff is intentionally brief. For full specifications, see:</p>
+<ul>
+<li><code>docs/design/deterministic-core.md</code> - ICN-DC profile, config rationale</li>
+<li><code>docs/design/compute-classes.md</code> - LC vs UC boundaries</li>
+<li><code>docs/design/scope-scheduling.md</code> - Capacity and preemption</li>
+<li><code>docs/design/DETERMINISTIC_COMPUTE_SPRINT.md</code> - Master implementation plan</li>
+</ul>
+<hr>
+<h2>Contact / Escalation</h2>
+<p>If stuck, check:</p>
+<ol>
+<li><code>docs/design/DETERMINISTIC_COMPUTE_SPRINT.md</code> - comprehensive plan</li>
+<li><code>AGENTS.md</code> - operating rules</li>
+<li><code>CLAUDE.md</code> - project context</li>
+</ol>
+<p>The design docs contain all the context needed to implement.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

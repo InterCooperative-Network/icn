@@ -1,0 +1,354 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Development Journal: Strategic Gap Analysis | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>development</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>sessions</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>2026 01</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>2025 01 15 strategic gap analysis</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/development/sessions/2026-01/2025-01-15-strategic-gap-analysis.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Development Journal: Strategic Gap Analysis</h1>
+<p><strong>Date</strong>: 2025-01-15
+<strong>Phase</strong>: Post-Phase 12 Strategic Assessment
+<strong>Status</strong>: All infrastructure complete, pilot-ready</p>
+<h2>Context</h2>
+<p>With Phase 12 (Economic Safety Rails), Track B1 (Operational Hardening), and Track B3 (Economic Modeling) complete, ICN has reached a significant milestone: the substrate is production-ready for security, reliability, and economic safety.</p>
+<p>This journal entry documents a comprehensive gap analysis examining the distance between &quot;working substrate daemon&quot; and &quot;deployable cooperative platform.&quot;</p>
+<h2>Assessment Methodology</h2>
+<p>Examined ICN capabilities against real-world deployment requirements for cooperative communities. Identified 15 structural gaps across 4 tiers:</p>
+<ol>
+<li><strong>Tier 1</strong>: Hard blockers (can&#39;t deploy without these)</li>
+<li><strong>Tier 2</strong>: Economic/social survival (required for real communities)</li>
+<li><strong>Tier 3</strong>: Scale &amp; ecosystem (required for network effects)</li>
+<li><strong>Tier 4</strong>: Usability &amp; operations (required for adoption)</li>
+</ol>
+<h2>Key Findings</h2>
+<h3>What We Have (268 tests passing)</h3>
+<p><strong>Security Foundation</strong>:</p>
+<ul>
+<li>Three-layer security architecture (transport, message, application)</li>
+<li>Trust-gated rate limiting with 4 trust tiers</li>
+<li>Production hardening (8 vulnerability fixes)</li>
+<li>Replay protection, certificate verification</li>
+</ul>
+<p><strong>Identity</strong>:</p>
+<ul>
+<li>Multi-device support (Phase 11 complete)</li>
+<li>DID Document v2 with device lifecycle</li>
+<li>Gossip-based identity sync</li>
+<li>Keystore v3 with automatic migration</li>
+</ul>
+<p><strong>Economic Safety</strong>:</p>
+<ul>
+<li>Dynamic credit limits (trust + history)</li>
+<li>New member protection (90-day progressive ramping)</li>
+<li>Dispute resolution (file, mediate, resolve, write-off)</li>
+<li>Multi-currency support</li>
+<li>Validated via agent-based simulation (Track B3)</li>
+</ul>
+<p><strong>Operations</strong>:</p>
+<ul>
+<li>Backup/restore with encryption</li>
+<li>Graceful restart with state persistence</li>
+<li>Prometheus metrics + real-time dashboard</li>
+<li>Health checks, incident response procedures</li>
+</ul>
+<h3>The 15 Gaps</h3>
+<p><strong>Tier 1 (Hard Blockers)</strong>:</p>
+<ol>
+<li>✅ Multi-Device Identity - CLOSED (Phase 11)</li>
+<li>⏸️ NAT Traversal - Deferred (manual peering works for pilot)</li>
+<li>🔴 Client Layer/SDK - OPEN (critical for Track C2)</li>
+</ol>
+<p><strong>Tier 2 (Economic/Social)</strong>:
+4. 🚧 Protective Ledger - Partial (escrow, rollback still needed)
+5. 🔵 Dynamic Trust - Open (context scopes, evidence events)
+6. 🔴 Governance Layer - Planned (Phase 13)
+7. 🔵 Social Protocols - Open (invitations, roles, consent)</p>
+<p><strong>Tier 3 (Scale &amp; Ecosystem)</strong>:
+8. ⏸️ Federation - Deferred (wait for multi-pilot need)
+9. 🔴 Contract Templates - Planned (Phase 13)
+10. ✅ Economic Simulation - COMPLETE (Track B3)
+11. 🚧 Social-Scale Security - Partial (Sybil resistance needed)</p>
+<p><strong>Tier 4 (Usability)</strong>:
+12. 🔴 Onboarding Flows - OPEN (Track C2)
+13. 🚧 Storage Abstractions - Partial (advanced sync needed)
+14. 🚧 Observability UX - Partial (viz tools needed)
+15. 🔴 UX of Cooperation - OPEN (Track C2)</p>
+<h3>Status Summary</h3>
+<ul>
+<li>✅ <strong>Closed</strong>: 3 gaps</li>
+<li>🚧 <strong>Partial</strong>: 4 gaps</li>
+<li>⏸️ <strong>Deferred</strong>: 2 gaps (intentional)</li>
+<li>🔴 <strong>Critical</strong>: 6 gaps (on critical path)</li>
+<li>🔵 <strong>Future</strong>: 3 gaps (Phase 14+)</li>
+</ul>
+<h2>Critical Path Analysis</h2>
+<p><strong>Immediate Priorities</strong> (Next 8-12 weeks):</p>
+<ol>
+<li><p><strong>Track C1: Community Selection</strong> (2-4 weeks)</p>
+<ul>
+<li>Recommended: Timebank (simple mutual credit, low stakes)</li>
+<li>Alternative: Housing co-op (complex governance, higher stakes)</li>
+<li>Criteria: existing trust, real problems, digital fluency</li>
+</ul>
+</li>
+<li><p><strong>Track C2: Pilot MVP</strong> (4-6 weeks)</p>
+<ul>
+<li>Simple web UI for target workflows</li>
+<li>gRPC API extensions</li>
+<li>Minimal observability (ledger browser)</li>
+<li>Guided onboarding</li>
+<li>Notification integration (email/SMS)</li>
+</ul>
+</li>
+<li><p><strong>Phase 13: Governance Primitives</strong> (6-8 weeks, parallel)</p>
+<ul>
+<li>Driven by pilot community needs</li>
+<li>CCL governance primitives</li>
+<li>3-4 template contracts</li>
+</ul>
+</li>
+</ol>
+<p><strong>Intentionally Deferred</strong>:</p>
+<ul>
+<li><strong>Federation</strong> (Phase 16+): Single pilot doesn&#39;t need cross-network</li>
+<li><strong>Advanced Privacy</strong> (Phase 17+): ZK proofs not needed for trust-first communities</li>
+<li><strong>Formal Verification</strong>: Too expensive, tests sufficient for cooperative-scale</li>
+</ul>
+<h2>Philosophical Insights</h2>
+<p><strong>Key Realization</strong>: ICN is infrastructure for civilizational transition, not a product roadmap.</p>
+<p>The most important thing we can do now:</p>
+<ol>
+<li>Select a pilot community (Track C1)</li>
+<li>Build minimal tools for their success (Track C2)</li>
+<li>Let real-world use drive Phase 13+</li>
+</ol>
+<p>Everything else is premature optimization.</p>
+<p><strong>&quot;Build what communities need, not what the architecture diagram suggests.&quot;</strong></p>
+<h2>Technical Implications</h2>
+<h3>For Track C2 (Pilot MVP)</h3>
+<p><strong>Minimum Viable Stack</strong>:</p>
+<ul>
+<li>Web UI (static HTML + JS or basic Rust/Actix server)</li>
+<li>gRPC API bridge (extend <code>icn-rpc</code>)</li>
+<li>Ledger browser (search, filter, export)</li>
+<li>Onboarding wizard (guided setup)</li>
+<li>External integrations (email notifications)</li>
+</ul>
+<p><strong>Non-Goals for MVP</strong>:</p>
+<ul>
+<li>❌ Mobile app (web-on-phone is fine)</li>
+<li>❌ Real-time collaboration (async is fine)</li>
+<li>❌ Advanced governance (Phase 13)</li>
+<li>❌ Federation (single community)</li>
+</ul>
+<h3>For Phase 13 (Governance)</h3>
+<p><strong>CCL Extensions Needed</strong>:</p>
+<pre><code class="language-rust">// Built-in capabilities
+proposal_create(subject: String, payload_ref: Hash) -&gt; ProposalID
+proposal_vote(id: ProposalID, vote: Vote) -&gt; Result
+proposal_state(id: ProposalID) -&gt; ProposalState
+quorum_met(members: Vec&lt;DID&gt;) -&gt; bool
+threshold_met(yes: u64, no: u64, abstain: u64, threshold: f64) -&gt; bool
+has_role(member: DID, role: String) -&gt; bool
+member_count() -&gt; u64
+
+// State machine hooks
+on_proposal_open(callback)
+on_proposal_consent(callback)
+on_proposal_block(callback)
+on_proposal_timeout(callback)
+on_proposal_execute(callback)
+</code></pre>
+<p><strong>Template Contracts</strong> (from roadmap):</p>
+<ol>
+<li>Consensus with Fallback Majority</li>
+<li>Sociocracy-style Consent</li>
+<li>Council Delegation</li>
+<li>Emergency Lock</li>
+</ol>
+<p><strong>CRITICAL</strong>: Don&#39;t build until C2 reveals what pilot actually needs.</p>
+<h2>Learning Loop Design</h2>
+<p><strong>Weekly Debrief Structure</strong> (during pilot):</p>
+<ul>
+<li>Meet with 2-3 core pilot members</li>
+<li>Questions:<ul>
+<li>What worked this week?</li>
+<li>What broke or confused you?</li>
+<li>What did you try to do but couldn&#39;t?</li>
+<li>What would you change?</li>
+</ul>
+</li>
+<li>Document in <code>docs/pilot-learnings/YYYY-MM-DD.md</code></li>
+</ul>
+<p><strong>Instrumentation</strong>:</p>
+<ul>
+<li>Failed transactions (what errors hit users?)</li>
+<li>Abandoned flows (where do people give up?)</li>
+<li>Support requests (what questions repeat?)</li>
+<li>Feature requests (what doesn&#39;t exist that they need?)</li>
+</ul>
+<p><strong>Decision Protocol</strong>:</p>
+<ul>
+<li>Don&#39;t over-fit to one community&#39;s quirks</li>
+<li>Look for patterns across 3+ similar requests</li>
+<li>Validate: general cooperative need vs. group-specific?</li>
+<li>Prioritize: unblock adoption vs. polish happy path?</li>
+</ul>
+<h2>Gap Analysis Alignment</h2>
+<p><strong>Comparison to Original Assessment</strong>:</p>
+<p>The original analysis identified ICN as &quot;Phase 7 complete&quot; with the brutal truth: &quot;Phase 7 is the end of infrastructure, not the beginning of deployment.&quot;</p>
+<p><strong>What&#39;s changed</strong>:</p>
+<ul>
+<li>Phases 8-12 complete (security, multi-device, economic safety)</li>
+<li>Track B1 complete (operations)</li>
+<li>Track B3 complete (validation)</li>
+<li>3 of 15 gaps closed</li>
+</ul>
+<p><strong>What remains true</strong>:</p>
+<ul>
+<li>ICN is a <em>substrate daemon</em>, not a product</li>
+<li>Critical path runs through Track C (pilot community)</li>
+<li>Federation, privacy, messaging intentionally deferred</li>
+<li>&quot;Track 3&quot; insight: gap between substrate and system requires social protocols, onboarding, UX</li>
+</ul>
+<p><strong>Validation</strong>: Current roadmap aligns with gap analysis. Track C is the correct next step.</p>
+<h2>Deliverables</h2>
+<p>Created comprehensive documentation:</p>
+<ol>
+<li><p><strong><code>docs/strategic-gap-analysis.md</code></strong></p>
+<ul>
+<li>15 gaps identified and categorized</li>
+<li>Status assessment (closed, partial, deferred, open)</li>
+<li>Critical path analysis</li>
+<li>Philosophical stance</li>
+</ul>
+</li>
+<li><p><strong>This dev journal entry</strong></p>
+<ul>
+<li>Context and methodology</li>
+<li>Key findings</li>
+<li>Technical implications</li>
+<li>Learning loop design</li>
+</ul>
+</li>
+</ol>
+<h2>Next Steps</h2>
+<p><strong>Immediate</strong>:</p>
+<ol>
+<li>✅ Document gap analysis (this entry)</li>
+<li>⏭️ Update ROADMAP.md with gap status</li>
+<li>⏭️ Begin Track C1 (community selection)</li>
+</ol>
+<p><strong>Track C1 Actions</strong>:</p>
+<ul>
+<li><input disabled="" type="checkbox"> List 2-3 organizations with existing relationships</li>
+<li><input disabled="" type="checkbox"> Draft one-page pilot proposal</li>
+<li><input disabled="" type="checkbox"> Start one real conversation this week</li>
+</ul>
+<p><strong>Blocked on C1</strong>:</p>
+<ul>
+<li>Track C2 scope (can&#39;t design MVP without knowing community)</li>
+<li>Phase 13 details (governance driven by pilot needs)</li>
+</ul>
+<h2>Open Questions</h2>
+<p><strong>Strategic</strong>:</p>
+<ul>
+<li>Should we target existing cooperatives or help form new ones?</li>
+<li>How much interoperability with legacy systems (email, banking)?</li>
+<li>What&#39;s the business model for ongoing development?</li>
+</ul>
+<p><strong>Operational</strong>:</p>
+<ul>
+<li>Who runs pilot infrastructure? (Us, community, shared?)</li>
+<li>What&#39;s the handoff plan when pilot becomes production?</li>
+<li>How do we avoid becoming single point of failure?</li>
+</ul>
+<p><strong>Technical</strong>:</p>
+<ul>
+<li>Web UI stack? (Static HTML+JS vs. Rust/Actix vs. Next.js?)</li>
+<li>Mobile strategy? (Web-first vs. native apps vs. PWA?)</li>
+<li>Notification backend? (SMTP vs. service like SendGrid?)</li>
+</ul>
+<h2>Conclusion</h2>
+<p>ICN has successfully transitioned from &quot;research prototype&quot; to &quot;production-ready substrate.&quot; All technical foundations are in place:</p>
+<ul>
+<li>Security: Hardened and verified</li>
+<li>Identity: Multi-device with key rotation</li>
+<li>Economics: Validated via simulation</li>
+<li>Operations: Backup, monitoring, incident response</li>
+</ul>
+<p><strong>The next phase is fundamentally different</strong>: deployment with a real community.</p>
+<p>This isn&#39;t about building more infrastructure. It&#39;s about:</p>
+<ol>
+<li>Finding the right community partner</li>
+<li>Understanding their real workflows</li>
+<li>Building minimal tools to support those workflows</li>
+<li>Learning what actually matters</li>
+</ol>
+<p>Success looks like: &quot;10+ active users logging hours weekly. Community says &#39;we&#39;d rather fix this than go back to spreadsheets.&#39;&quot;</p>
+<p>The substrate is ready. Now we build <em>with</em> communities, not <em>for</em> them.</p>
+<hr>
+<p><strong>Session Complete</strong>: 2025-01-15
+<strong>All Tests Passing</strong>: 268/268 ✅
+<strong>Ready for</strong>: Track C1 (Community Selection)</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

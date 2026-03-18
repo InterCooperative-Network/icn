@@ -1,0 +1,454 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Capability-Based Feature Gating | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>capability based features</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/capability-based-features.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Capability-Based Feature Gating</h1>
+<p>This document explains how to use ICN&#39;s capability-based feature gating system to build protocols that gracefully handle peers running different software versions.</p>
+<h2>Overview</h2>
+<p>ICN implements protocol version negotiation during the Hello handshake. Each node announces:</p>
+<ul>
+<li>Its supported protocol version range (min, current, max)</li>
+<li>A bitmap of feature capabilities it supports</li>
+<li>Its software version string</li>
+</ul>
+<p>The network layer automatically negotiates the highest mutually-supported protocol version and calculates the intersection of capabilities. This information is then available for application-level feature gating.</p>
+<h2>Capability Flags</h2>
+<p>All capabilities are defined in <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-net/src/version.rs">`icn-net/src/version.rs`</a>:</p>
+<pre><code class="language-rust">pub struct CapabilityFlags: u64 {
+    const E2E_ENCRYPTION = 0b00000001;       // Phase 10: End-to-end encryption
+    const SIGNED_MESSAGES = 0b00000010;      // Phase 9: Message signing
+    const GRACEFUL_RESTART = 0b00000100;     // State persistence
+    const TOPOLOGY_AWARE = 0b00001000;       // Topology-aware routing
+    const TRUST_RATE_LIMITING = 0b00010000;  // Trust-based rate limits
+    const GOSSIP_PULL = 0b00100000;          // Gossip pull protocol
+    const MULTI_DEVICE = 0b01000000;         // Phase 11: Multi-device identity
+    const ECONOMIC_SAFETY = 0b10000000;      // Phase 12: Economic safety rails
+}
+</code></pre>
+<h2>Checking Peer Capabilities</h2>
+<p>The <code>NetworkHandle</code> provides several methods for capability checking:</p>
+<h3>1. Check if a Peer Supports a Capability</h3>
+<pre><code class="language-rust">if network_handle.peer_has_capability(&amp;peer_did, CapabilityFlags::E2E_ENCRYPTION).await {
+    // Peer supports encrypted communication
+    network_handle.send_encrypted_message(/* ... */).await?;
+} else {
+    // Fall back to signed-only communication
+    network_handle.send_message(peer_did, signed_msg).await?;
+}
+</code></pre>
+<h3>2. Get All Peers With a Capability</h3>
+<pre><code class="language-rust">// Broadcast encrypted messages only to capable peers
+let encrypted_peers = network_handle.get_peers_with_capability(
+    CapabilityFlags::E2E_ENCRYPTION
+).await;
+
+for peer in encrypted_peers {
+    network_handle.send_encrypted_message(&amp;peer, /* ... */).await?;
+}
+</code></pre>
+<h3>3. Get Peer&#39;s Protocol Version</h3>
+<pre><code class="language-rust">if let Some(version) = network_handle.get_peer_protocol_version(&amp;peer_did).await {
+    if version &gt;= 2 {
+        // Use protocol v2 features
+    } else {
+        // Fall back to v1 behavior
+    }
+}
+</code></pre>
+<h3>4. Get Full Connection Info</h3>
+<pre><code class="language-rust">if let Some(info) = network_handle.get_peer_connection_info(&amp;peer_did).await {
+    println!(&quot;Peer: {}&quot;, info.did);
+    println!(&quot;Version: {}&quot;, info.negotiated_version);
+    println!(&quot;Software: {}&quot;, info.peer_software);
+    println!(&quot;Capabilities: {:?}&quot;, info.peer_capabilities.describe());
+}
+</code></pre>
+<h2>Feature Gating Patterns</h2>
+<h3>Pattern 1: Graceful Degradation</h3>
+<p>Use newer features when available, fall back to basic functionality otherwise:</p>
+<pre><code class="language-rust">async fn send_sensitive_data(
+    network: &amp;NetworkHandle,
+    recipient: &amp;Did,
+    data: &amp;[u8],
+) -&gt; Result&lt;()&gt; {
+    if network.peer_has_capability(recipient, CapabilityFlags::E2E_ENCRYPTION).await {
+        // Best: End-to-end encrypted
+        network.send_encrypted_message(
+            recipient,
+            keypair,
+            x25519_secret,
+            sequence,
+            data
+        ).await?;
+    } else if network.peer_has_capability(recipient, CapabilityFlags::SIGNED_MESSAGES).await {
+        // Good: Signed for authenticity
+        let signed = SignedEnvelope::new(/* ... */)?;
+        network.send_message(recipient.clone(), NetworkMessage::signed(/* ... */)).await?;
+    } else {
+        // Basic: No extra security (legacy peer)
+        warn!(&quot;Peer {} lacks modern security features&quot;, recipient);
+        network.send_message(recipient.clone(), NetworkMessage::new(/* ... */)).await?;
+    }
+    Ok(())
+}
+</code></pre>
+<h3>Pattern 2: Require Capability</h3>
+<p>Reject operations if the peer doesn&#39;t support required features:</p>
+<pre><code class="language-rust">async fn request_contract_execution(
+    network: &amp;NetworkHandle,
+    executor: &amp;Did,
+    contract: &amp;Contract,
+) -&gt; Result&lt;()&gt; {
+    // Economic safety required for contract execution
+    if !network.peer_has_capability(executor, CapabilityFlags::ECONOMIC_SAFETY).await {
+        anyhow::bail!(
+            &quot;Peer {} does not support ECONOMIC_SAFETY - cannot execute contracts&quot;,
+            executor
+        );
+    }
+
+    // Proceed with contract execution request...
+    Ok(())
+}
+</code></pre>
+<h3>Pattern 3: Broadcast to Capable Peers Only</h3>
+<p>Send feature-specific broadcasts only to peers that support them:</p>
+<pre><code class="language-rust">async fn broadcast_topology_update(
+    network: &amp;NetworkHandle,
+    update: TopologyUpdate,
+) -&gt; Result&lt;()&gt; {
+    let topology_peers = network.get_peers_with_capability(
+        CapabilityFlags::TOPOLOGY_AWARE
+    ).await;
+
+    if topology_peers.is_empty() {
+        info!(&quot;No topology-aware peers connected&quot;);
+        return Ok(());
+    }
+
+    for peer in topology_peers {
+        network.send_message(peer, update.clone().into()).await?;
+    }
+
+    Ok(())
+}
+</code></pre>
+<h3>Pattern 4: Version-Based Protocol Changes</h3>
+<p>Use protocol version for wire-format changes:</p>
+<pre><code class="language-rust">async fn sync_ledger_entries(
+    network: &amp;NetworkHandle,
+    peer: &amp;Did,
+    entries: &amp;[Entry],
+) -&gt; Result&lt;()&gt; {
+    let version = network.get_peer_protocol_version(peer).await.unwrap_or(1);
+
+    let message = if version &gt;= 2 {
+        // Protocol v2: Compressed entries
+        LedgerSyncMessage::V2 {
+            entries: compress_entries(entries)?,
+        }
+    } else {
+        // Protocol v1: Uncompressed
+        LedgerSyncMessage::V1 {
+            entries: entries.to_vec(),
+        }
+    };
+
+    network.send_message(peer.clone(), message.into()).await?;
+    Ok(())
+}
+</code></pre>
+<h2>Adding New Capabilities</h2>
+<p>When adding a new feature that requires capability detection:</p>
+<h3>1. Define the Capability Flag</h3>
+<p>Edit <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-net/src/version.rs">`icn-net/src/version.rs`</a>:</p>
+<pre><code class="language-rust">pub struct CapabilityFlags: u64 {
+    // ... existing flags ...
+
+    /// Supports quantum-resistant signatures (Phase 15)
+    const QUANTUM_RESISTANT = 0b100000000;
+}
+</code></pre>
+<h3>2. Add to Current Capabilities</h3>
+<p>Update <code>CapabilityFlags::current()</code> if the feature is implemented:</p>
+<pre><code class="language-rust">pub fn current() -&gt; Self {
+    Self::E2E_ENCRYPTION
+        | Self::SIGNED_MESSAGES
+        | Self::GRACEFUL_RESTART
+        | Self::TOPOLOGY_AWARE
+        | Self::TRUST_RATE_LIMITING
+        | Self::GOSSIP_PULL
+        | Self::MULTI_DEVICE
+        | Self::ECONOMIC_SAFETY
+        | Self::QUANTUM_RESISTANT  // Add new capability
+}
+</code></pre>
+<h3>3. Add to Description Method</h3>
+<p>Update <code>CapabilityFlags::describe()</code> for human-readable output:</p>
+<pre><code class="language-rust">pub fn describe(&amp;self) -&gt; Vec&lt;&amp;&#39;static str&gt; {
+    let mut features = Vec::new();
+    // ... existing checks ...
+    if self.contains(Self::QUANTUM_RESISTANT) {
+        features.push(&quot;quantum_resistant&quot;);
+    }
+    features
+}
+</code></pre>
+<h3>4. Use in Your Code</h3>
+<pre><code class="language-rust">if network.peer_has_capability(&amp;peer, CapabilityFlags::QUANTUM_RESISTANT).await {
+    // Use quantum-resistant signatures
+} else {
+    // Fall back to Ed25519
+}
+</code></pre>
+<h2>Backward Compatibility</h2>
+<h3>Legacy Nodes</h3>
+<p>Nodes that don&#39;t send <code>version_info</code> in Hello messages are treated as:</p>
+<ul>
+<li>Protocol version: 1</li>
+<li>Capabilities: empty set</li>
+<li>Software: &quot;legacy-node&quot;</li>
+</ul>
+<p>Your code should handle this gracefully:</p>
+<pre><code class="language-rust">let caps = network.get_peer_connection_info(&amp;peer).await
+    .map(|info| info.peer_capabilities)
+    .unwrap_or(CapabilityFlags::empty());
+
+if caps.is_empty() {
+    // Legacy peer - use basic protocol
+} else {
+    // Modern peer - check specific capabilities
+}
+</code></pre>
+<h3>Capability Negotiation</h3>
+<p>The network layer automatically calculates the intersection of capabilities:</p>
+<pre><code>Local capabilities:  E2E_ENCRYPTION | SIGNED_MESSAGES | GRACEFUL_RESTART
+Remote capabilities: E2E_ENCRYPTION | SIGNED_MESSAGES | TOPOLOGY_AWARE
+                     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Common capabilities: E2E_ENCRYPTION | SIGNED_MESSAGES
+</code></pre>
+<p>Only use features that appear in the common set.</p>
+<h2>Testing Capability-Based Code</h2>
+<h3>Unit Tests</h3>
+<pre><code class="language-rust">#[tokio::test]
+async fn test_capability_based_routing() {
+    let network = create_test_network().await;
+
+    // Mock peer with encryption support
+    let encrypted_peer = Did::from_str(&quot;did:icn:alice&quot;)?;
+    mock_peer_capabilities(
+        &amp;network,
+        &amp;encrypted_peer,
+        CapabilityFlags::E2E_ENCRYPTION
+    ).await;
+
+    // Mock peer without encryption
+    let legacy_peer = Did::from_str(&quot;did:icn:bob&quot;)?;
+    mock_peer_capabilities(
+        &amp;network,
+        &amp;legacy_peer,
+        CapabilityFlags::empty()
+    ).await;
+
+    // Should send encrypted to alice
+    assert!(network.peer_has_capability(&amp;encrypted_peer, CapabilityFlags::E2E_ENCRYPTION).await);
+
+    // Should fall back to signed for bob
+    assert!(!network.peer_has_capability(&amp;legacy_peer, CapabilityFlags::E2E_ENCRYPTION).await);
+}
+</code></pre>
+<h3>Integration Tests</h3>
+<p>Test mixed-version networks:</p>
+<pre><code class="language-rust">#[tokio::test]
+async fn test_mixed_version_network() {
+    // Spawn v1 node
+    let node_v1 = spawn_node_with_version(1, CapabilityFlags::SIGNED_MESSAGES).await;
+
+    // Spawn v2 node
+    let node_v2 = spawn_node_with_version(2, CapabilityFlags::E2E_ENCRYPTION | CapabilityFlags::SIGNED_MESSAGES).await;
+
+    // Connect them
+    node_v2.dial(&amp;node_v1.addr, &amp;node_v1.did).await?;
+
+    // Wait for Hello exchange
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
+    // v2 should detect v1&#39;s limited capabilities
+    let v1_caps = node_v2.network.get_peer_connection_info(&amp;node_v1.did).await.unwrap();
+    assert_eq!(v1_caps.negotiated_version, 1);
+    assert_eq!(v1_caps.peer_capabilities, CapabilityFlags::SIGNED_MESSAGES);
+}
+</code></pre>
+<h2>Metrics</h2>
+<p>The system exports Prometheus metrics for monitoring version distribution:</p>
+<ul>
+<li><code>icn_network_peer_versions{version=&quot;1&quot;}</code> - Number of peers at each protocol version</li>
+<li><code>icn_network_peer_capabilities{capability=&quot;e2e_encryption&quot;}</code> - Number of peers with each capability</li>
+<li><code>icn_network_version_negotiation_success_total{negotiated_version=&quot;1&quot;}</code> - Successful negotiations</li>
+<li><code>icn_network_version_negotiation_failures_total{reason=&quot;incompatible_version&quot;}</code> - Failed negotiations</li>
+</ul>
+<h2>Best Practices</h2>
+<ol>
+<li><p><strong>Always check capabilities before using optional features</strong></p>
+<ul>
+<li>Don&#39;t assume all peers support modern features</li>
+<li>Provide fallback behavior for legacy peers</li>
+</ul>
+</li>
+<li><p><strong>Log capability mismatches</strong></p>
+<ul>
+<li>Helps diagnose version rollout issues</li>
+<li>Use <code>info!()</code> for expected behavior, <code>warn!()</code> for degraded mode</li>
+</ul>
+</li>
+<li><p><strong>Test with mixed versions</strong></p>
+<ul>
+<li>Write integration tests with old and new nodes</li>
+<li>Verify graceful degradation paths work</li>
+</ul>
+</li>
+<li><p><strong>Document capability requirements</strong></p>
+<ul>
+<li>Clearly state which capabilities a feature requires</li>
+<li>Include examples of fallback behavior</li>
+</ul>
+</li>
+<li><p><strong>Use semantic versioning</strong></p>
+<ul>
+<li>Protocol version for breaking wire-format changes</li>
+<li>Capabilities for optional features</li>
+<li>Software version for informational purposes</li>
+</ul>
+</li>
+<li><p><strong>Monitor version distribution</strong></p>
+<ul>
+<li>Track metrics to understand deployment progress</li>
+<li>Alert if too many peers lack critical capabilities</li>
+</ul>
+</li>
+</ol>
+<h2>Example: Gossip Protocol</h2>
+<p>The gossip protocol demonstrates capability-based feature gating:</p>
+<pre><code class="language-rust">async fn propagate_entry(
+    network: &amp;NetworkHandle,
+    entry: &amp;Entry,
+    topic: &amp;str,
+) -&gt; Result&lt;()&gt; {
+    // Get all peers subscribed to this topic
+    let subscribers = get_topic_subscribers(topic).await;
+
+    for peer in subscribers {
+        // Check if peer supports pull protocol
+        if network.peer_has_capability(&amp;peer, CapabilityFlags::GOSSIP_PULL).await {
+            // Just send announcement hash (peer can pull if interested)
+            send_announcement(&amp;network, &amp;peer, entry.hash()).await?;
+        } else {
+            // Legacy: Send full entry
+            send_full_entry(&amp;network, &amp;peer, entry).await?;
+        }
+    }
+
+    Ok(())
+}
+</code></pre>
+<h2>Troubleshooting</h2>
+<h3>Peer Capability Check Returns False</h3>
+<p><strong>Possible causes:</strong></p>
+<ol>
+<li>Peer hasn&#39;t completed Hello handshake yet</li>
+<li>Peer is a legacy node</li>
+<li>Peer&#39;s software doesn&#39;t support the capability</li>
+</ol>
+<p><strong>Solution:</strong></p>
+<pre><code class="language-rust">if let Some(info) = network.get_peer_connection_info(&amp;peer).await {
+    println!(&quot;Peer capabilities: {:?}&quot;, info.peer_capabilities.describe());
+    println!(&quot;Peer software: {}&quot;, info.peer_software);
+} else {
+    println!(&quot;No connection info for peer {} - handshake not complete&quot;, peer);
+}
+</code></pre>
+<h3>Version Negotiation Fails</h3>
+<p><strong>Error message:</strong> <code>&quot;No compatible version. Local: [1-2], Remote: [3-4]&quot;</code></p>
+<p><strong>Cause:</strong> No overlap in supported version ranges</p>
+<p><strong>Solution:</strong></p>
+<ul>
+<li>Check PROTOCOL_VERSION, MIN_SUPPORTED_VERSION, MAX_SUPPORTED_VERSION</li>
+<li>Ensure gradual version rollout (keep backward compatibility window)</li>
+<li>Don&#39;t drop old version support until all nodes upgraded</li>
+</ul>
+<h3>Capability Set Is Empty</h3>
+<p><strong>Possible causes:</strong></p>
+<ol>
+<li>Talking to a legacy node</li>
+<li>Peer capabilities genuinely empty (very old version)</li>
+</ol>
+<p><strong>Solution:</strong> Handle empty capabilities gracefully with fallback behavior</p>
+<h2>See Also</h2>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-net/src/protocol.rs">Protocol Version Constants</a> - Version numbers</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-net/src/version.rs">Version Negotiation Logic</a> - Negotiation algorithm</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-net/src/actor/mod.rs">Network Actor</a> - Hello handshake implementation</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-obs/src/metrics/mod.rs">Prometheus Metrics</a> - Monitoring</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

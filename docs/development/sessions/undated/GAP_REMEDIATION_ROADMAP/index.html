@@ -1,0 +1,409 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Gap Remediation Roadmap - ICN Architecture Completion | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>development</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>sessions</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>undated</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>GAP REMEDIATION ROADMAP</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/development/sessions/undated/GAP_REMEDIATION_ROADMAP.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Gap Remediation Roadmap - ICN Architecture Completion</h1>
+<p><strong>Date:</strong> 2025-12-17<br><strong>Status:</strong> Priority Action Plan<br><strong>Goal:</strong> Close critical gaps identified in implementation audit</p>
+<hr>
+<h2>🎯 Priority Matrix</h2>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Impact</th>
+<th>Effort</th>
+<th>Priority</th>
+<th>Target</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Upgrade Coordination</td>
+<td>HIGH</td>
+<td>MEDIUM</td>
+<td>P0</td>
+<td>Week 1</td>
+</tr>
+<tr>
+<td>Dispute Resolution</td>
+<td>HIGH</td>
+<td>LOW</td>
+<td>P0</td>
+<td>Week 1</td>
+</tr>
+<tr>
+<td>SDIS Integration Tests</td>
+<td>MEDIUM</td>
+<td>LOW</td>
+<td>P1</td>
+<td>Week 2</td>
+</tr>
+<tr>
+<td>Trust-Adaptive Credits</td>
+<td>MEDIUM</td>
+<td>MEDIUM</td>
+<td>P1</td>
+<td>Week 3</td>
+</tr>
+<tr>
+<td>Charter Enforcement</td>
+<td>MEDIUM</td>
+<td>HIGH</td>
+<td>P2</td>
+<td>Week 4</td>
+</tr>
+<tr>
+<td>Federation Protocol</td>
+<td>LOW</td>
+<td>HIGH</td>
+<td>P3</td>
+<td>Week 5</td>
+</tr>
+<tr>
+<td>Distributed Snapshots</td>
+<td>LOW</td>
+<td>MEDIUM</td>
+<td>P3</td>
+<td>Week 6</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Sprint 1: Critical Infrastructure (Week 1-2)</h2>
+<h3>1.1 Upgrade Coordination Protocol ⚠️ CRITICAL</h3>
+<p><strong>Why:</strong> Without this, any protocol change breaks the network permanently.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Add <code>ProtocolVersion</code> struct to <code>icn-net/src/protocol.rs</code></li>
+<li><input disabled="" type="checkbox"> Implement version negotiation in QUIC handshake</li>
+<li><input disabled="" type="checkbox"> Add feature flags for backward compatibility</li>
+<li><input disabled="" type="checkbox"> Create upgrade gossip topic for coordination</li>
+<li><input disabled="" type="checkbox"> Test mixed-version cluster (v1 + v2 nodes)</li>
+</ul>
+<p><strong>Files:</strong></p>
+<pre><code>icn/crates/icn-net/src/protocol.rs         // Add ProtocolVersion
+icn/crates/icn-net/src/handshake.rs        // Version negotiation
+icn/crates/icn-core/src/supervisor.rs      // Feature flag loading
+icn/crates/icn-gossip/src/topics.rs        // Add &quot;icn:upgrade&quot; topic
+icn/tests/upgrade_test.rs                  // Integration test
+</code></pre>
+<p><strong>Definition of Done:</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Nodes reject incompatible protocol versions</li>
+<li><input disabled="" type="checkbox"> Mixed-version clusters can coexist during rollout</li>
+<li><input disabled="" type="checkbox"> Upgrade path documented in <code>/docs/UPGRADE-PROTOCOL.md</code></li>
+</ul>
+<hr>
+<h3>1.2 Dispute Resolution Mechanism ⚠️ CRITICAL</h3>
+<p><strong>Why:</strong> Ledger quarantine is a black hole without resolution logic.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Add <code>DisputeDomain</code> to governance system</li>
+<li><input disabled="" type="checkbox"> Create <code>Dispute</code> proposal type</li>
+<li><input disabled="" type="checkbox"> Link dispute proposals to quarantined ledger entries</li>
+<li><input disabled="" type="checkbox"> Implement arbitrator voting (3-of-5 stewards)</li>
+<li><input disabled="" type="checkbox"> Add dispute resolution gossip topic</li>
+<li><input disabled="" type="checkbox"> Test: Create dispute → Vote → Resolve entry</li>
+</ul>
+<p><strong>Files:</strong></p>
+<pre><code>icn/crates/icn-governance/src/domain.rs    // Add DisputeDomain
+icn/crates/icn-governance/src/proposal.rs  // Add DisputeProposal
+icn/crates/icn-ledger/src/quarantine.rs    // Link to governance
+icn/crates/icn-gateway/src/api/governance.rs // Add dispute endpoints
+icn/tests/dispute_resolution_test.rs       // Integration test
+</code></pre>
+<p><strong>Definition of Done:</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Quarantined entries can be voted on</li>
+<li><input disabled="" type="checkbox"> Winning vote releases or permanently quarantines entry</li>
+<li><input disabled="" type="checkbox"> UI shows dispute status in dashboard</li>
+<li><input disabled="" type="checkbox"> Documentation in <code>/docs/DISPUTE-RESOLUTION.md</code></li>
+</ul>
+<hr>
+<h3>1.3 SDIS End-to-End Integration Tests 🔧</h3>
+<p><strong>Why:</strong> SDIS UI/API exists, but no tests prove steward enrollment/recovery works.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Create 5-node test cluster with 3 designated stewards</li>
+<li><input disabled="" type="checkbox"> Test: Enroll identity with 3 stewards</li>
+<li><input disabled="" type="checkbox"> Test: Lose device, recover with 2-of-3 steward approval</li>
+<li><input disabled="" type="checkbox"> Test: Proof generation and verification</li>
+<li><input disabled="" type="checkbox"> Test: Anchor creation and gossip propagation</li>
+<li><input disabled="" type="checkbox"> Add CI test for SDIS flow</li>
+</ul>
+<p><strong>Files:</strong></p>
+<pre><code>icn/tests/sdis_enrollment_test.rs          // Full enrollment flow
+icn/tests/sdis_recovery_test.rs            // 2-of-3 recovery
+icn/tests/sdis_proof_verification_test.rs  // ZK proof validation
+docs/SDIS-ARCHITECTURE.md                  // Document steward selection
+</code></pre>
+<p><strong>Definition of Done:</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> All SDIS flows tested end-to-end</li>
+<li><input disabled="" type="checkbox"> Tests run in CI</li>
+<li><input disabled="" type="checkbox"> Steward selection algorithm documented</li>
+<li><input disabled="" type="checkbox"> Recovery flow proven in multi-node environment</li>
+</ul>
+<hr>
+<h2>Sprint 2: Economic Hardening (Week 3-4)</h2>
+<h3>2.1 Trust-Adaptive Credit Limits 💰</h3>
+<p><strong>Why:</strong> Static credit limits allow abuse by coordinated attackers.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Query trust graph during transaction validation</li>
+<li><input disabled="" type="checkbox"> Implement trust-weighted credit limit formula</li>
+<li><input disabled="" type="checkbox"> Add decay function for low-trust paths</li>
+<li><input disabled="" type="checkbox"> Create governance override mechanism</li>
+<li><input disabled="" type="checkbox"> Test: High-trust user gets higher limit</li>
+<li><input disabled="" type="checkbox"> Test: Low-trust user restricted</li>
+</ul>
+<p><strong>Files:</strong></p>
+<pre><code>icn/crates/icn-ledger/src/validation.rs    // Query trust graph
+icn/crates/icn-trust/src/credit_weights.rs // Credit limit calculation
+icn/crates/icn-governance/src/overrides.rs // Manual adjustments
+docs/ECONOMIC-SAFETY.md                    // Document model
+</code></pre>
+<p><strong>Definition of Done:</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Credit limits scale with trust scores</li>
+<li><input disabled="" type="checkbox"> Governance can override automatic limits</li>
+<li><input disabled="" type="checkbox"> Tests show abuse prevention</li>
+<li><input disabled="" type="checkbox"> Documentation explains formula</li>
+</ul>
+<hr>
+<h3>2.2 Charter Enforcement via CCL 📜</h3>
+<p><strong>Why:</strong> Charters are currently descriptive, not enforceable.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Define charter rule AST in CCL</li>
+<li><input disabled="" type="checkbox"> Add charter validation hook in ledger</li>
+<li><input disabled="" type="checkbox"> Implement &quot;before_transaction&quot; CCL trigger</li>
+<li><input disabled="" type="checkbox"> Add charter violation quarantine</li>
+<li><input disabled="" type="checkbox"> Test: Transaction violates charter → rejected</li>
+<li><input disabled="" type="checkbox"> UI shows charter rule violations</li>
+</ul>
+<p><strong>Files:</strong></p>
+<pre><code>icn/crates/icn-ccl/src/charter_rules.rs    // Charter AST
+icn/crates/icn-ledger/src/validation.rs    // Add charter check
+icn/crates/icn-cooperative/src/charter.rs  // Charter storage
+icn/crates/icn-gateway/src/api/charter/    // Charter endpoints
+docs/CHARTER-ENFORCEMENT.md                // Documentation
+</code></pre>
+<p><strong>Definition of Done:</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Transactions must pass charter rules</li>
+<li><input disabled="" type="checkbox"> Charter violations logged and quarantined</li>
+<li><input disabled="" type="checkbox"> UI shows enforcement status</li>
+<li><input disabled="" type="checkbox"> Example charter rules documented</li>
+</ul>
+<hr>
+<h2>Sprint 3: Federation &amp; Advanced Features (Week 5-6)</h2>
+<h3>3.1 Federation Protocol 🌐</h3>
+<p><strong>Why:</strong> Multi-cooperative networks need bridge nodes.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Document federation trust model</li>
+<li><input disabled="" type="checkbox"> Implement federated gossip topics (namespaced)</li>
+<li><input disabled="" type="checkbox"> Add cross-federation trust attestation</li>
+<li><input disabled="" type="checkbox"> Create bridge node role</li>
+<li><input disabled="" type="checkbox"> Test: Two coops communicate via bridge</li>
+<li><input disabled="" type="checkbox"> Add federation dashboard to UI</li>
+</ul>
+<p><strong>Files:</strong></p>
+<pre><code>icn/crates/icn-federation/src/bridge.rs    // Bridge node logic
+icn/crates/icn-federation/src/protocol.rs  // Federation protocol
+icn/crates/icn-gossip/src/federation.rs    // Federated topics
+icn/tests/federation_bridge_test.rs        // Integration test
+docs/FEDERATION-PROTOCOL.md                // Documentation
+</code></pre>
+<p><strong>Definition of Done:</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Two isolated coops can communicate</li>
+<li><input disabled="" type="checkbox"> Bridge nodes enforce trust boundaries</li>
+<li><input disabled="" type="checkbox"> Tests prove message routing</li>
+<li><input disabled="" type="checkbox"> Documentation complete</li>
+</ul>
+<hr>
+<h3>3.2 Distributed Snapshot Coordination 📸</h3>
+<p><strong>Why:</strong> Current snapshots are node-local only.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Implement Chandy-Lamport snapshot algorithm</li>
+<li><input disabled="" type="checkbox"> Add snapshot negotiation gossip topic</li>
+<li><input disabled="" type="checkbox"> Coordinate snapshot across all nodes</li>
+<li><input disabled="" type="checkbox"> Test: Cluster-wide consistent snapshot</li>
+<li><input disabled="" type="checkbox"> Add snapshot verification logic</li>
+</ul>
+<p><strong>Files:</strong></p>
+<pre><code>icn/crates/icn-snapshot/src/coordinator.rs // Snapshot coordination
+icn/crates/icn-snapshot/src/chandy_lamport.rs // Algorithm
+icn/crates/icn-gossip/src/topics.rs        // Add snapshot topic
+icn/tests/distributed_snapshot_test.rs     // Integration test
+docs/SNAPSHOT-PROTOCOL.md                  // Documentation
+</code></pre>
+<p><strong>Definition of Done:</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Cluster-wide snapshots are consistent</li>
+<li><input disabled="" type="checkbox"> Snapshots include all actor state</li>
+<li><input disabled="" type="checkbox"> Tests prove correctness</li>
+<li><input disabled="" type="checkbox"> Restore from snapshot works</li>
+</ul>
+<hr>
+<h2>Documentation Cleanup Sprint (Parallel)</h2>
+<h3>Tasks:</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Remove claims about unimplemented features from README</li>
+<li><input disabled="" type="checkbox"> Update ARCHITECTURE.md to reflect reality</li>
+<li><input disabled="" type="checkbox"> Mark aspirational features as &quot;Roadmap&quot; not &quot;Implemented&quot;</li>
+<li><input disabled="" type="checkbox"> Add implementation status badges to all docs</li>
+<li><input disabled="" type="checkbox"> Create KNOWN-LIMITATIONS.md</li>
+</ul>
+<p><strong>Files to Update:</strong></p>
+<pre><code>README.md
+docs/ARCHITECTURE.md
+docs/GETTING_STARTED.md
+ROADMAP.md
+</code></pre>
+<hr>
+<h2>Success Metrics</h2>
+<h3>Phase 1 Complete When:</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Mixed-version clusters survive upgrades</li>
+<li><input disabled="" type="checkbox"> Disputes can be resolved democratically</li>
+<li><input disabled="" type="checkbox"> SDIS flows tested in CI</li>
+</ul>
+<h3>Phase 2 Complete When:</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Trust scores affect credit limits</li>
+<li><input disabled="" type="checkbox"> Charter violations are caught automatically</li>
+<li><input disabled="" type="checkbox"> Economic abuse scenarios fail in tests</li>
+</ul>
+<h3>Phase 3 Complete When:</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Two coops can federate</li>
+<li><input disabled="" type="checkbox"> Snapshots are cluster-consistent</li>
+<li><input disabled="" type="checkbox"> All integration tests pass</li>
+</ul>
+<hr>
+<h2>Risk Mitigation</h2>
+<h3>High-Risk Items:</h3>
+<ol>
+<li><p><strong>Upgrade coordination</strong> - Breaking change to handshake</p>
+<ul>
+<li>Mitigation: Test with 3-node cluster (v1, v1, v2)</li>
+</ul>
+</li>
+<li><p><strong>Charter enforcement</strong> - Could break existing transactions</p>
+<ul>
+<li>Mitigation: Feature flag, opt-in per cooperative</li>
+</ul>
+</li>
+<li><p><strong>Federation</strong> - Complex trust boundaries</p>
+<ul>
+<li>Mitigation: Start with trusted bridge nodes only</li>
+</ul>
+</li>
+</ol>
+<h3>Low-Risk Items:</h3>
+<ul>
+<li>Dispute resolution (additive, no breaking changes)</li>
+<li>SDIS tests (validation only)</li>
+<li>Snapshot coordination (opt-in feature)</li>
+</ul>
+<hr>
+<h2>Deployment Strategy</h2>
+<h3>Week 1-2: Critical Fixes</h3>
+<ul>
+<li>Deploy upgrade coordination to testnet</li>
+<li>Enable dispute resolution in pilot</li>
+</ul>
+<h3>Week 3-4: Economic Features</h3>
+<ul>
+<li>Roll out trust-adaptive limits gradually</li>
+<li>Charter enforcement behind feature flag</li>
+</ul>
+<h3>Week 5-6: Advanced Features</h3>
+<ul>
+<li>Federation for pilot cooperatives</li>
+<li>Snapshot coordination in production</li>
+</ul>
+<hr>
+<h2>Open Questions</h2>
+<ol>
+<li><strong>Upgrade Coordination:</strong> Should we use semantic versioning or custom protocol versions?</li>
+<li><strong>Dispute Resolution:</strong> Should disputes require stake (prevent spam)?</li>
+<li><strong>Federation:</strong> Should bridge nodes be elected or permissioned?</li>
+<li><strong>Snapshots:</strong> Should snapshots be triggered manually or automatically?</li>
+</ol>
+<hr>
+<h2>Next Steps</h2>
+<ol>
+<li>Review this roadmap with team</li>
+<li>Assign owners to each sprint</li>
+<li>Create GitHub issues for each task</li>
+<li>Begin Sprint 1 implementation</li>
+<li>Update project board</li>
+</ol>
+<p><strong>Roadmap Finalized: Ready for implementation.</strong></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

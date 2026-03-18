@@ -1,0 +1,1143 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Kernel/App Separation Transition Plan | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>archive</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>2025</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>TRANSITION PLAN</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/archive/2025/TRANSITION_PLAN.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Kernel/App Separation Transition Plan</h1>
+<blockquote>
+<p><strong>Archived Document Notice (2026-02-12):</strong> This file is retained for historical context and may not reflect current code, APIs, runtime defaults, CI status, or deployment posture.
+Use active documentation under <code>docs/</code> as authoritative.</p>
+</blockquote>
+<h2>Overview</h2>
+<p>Transform ICN from a tightly-coupled 27-crate system to a clean kernel/app architecture where:</p>
+<ul>
+<li><strong>Kernel</strong> provides 8 generic primitives (Identity, Authorization, State, Compute, Communication, Time, Coordination, Naming)</li>
+<li><strong>Apps</strong> implement all domain logic (trust, ledger, governance, membership) using the same APIs as third-party apps</li>
+</ul>
+<p><strong>Breaking changes acceptable</strong> - no production deployment exists.</p>
+<p><strong>Core Principle</strong>: We are not refactoring code. We are <strong>deleting privilege</strong>. Every direct trust import removed is removing implicit authority from kernel.</p>
+<hr>
+<h2>Phase Ordering</h2>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Description</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>0</td>
+<td>PolicyOracle infrastructure (generalized)</td>
+<td>✅ Complete</td>
+</tr>
+<tr>
+<td>1</td>
+<td>Minimal App Runtime skeleton</td>
+<td>✅ Complete</td>
+</tr>
+<tr>
+<td>1.5</td>
+<td>Echo test app (validates runtime)</td>
+<td>✅ Complete</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Trust extraction (first real app)</td>
+<td>⏳ Planned</td>
+</tr>
+<tr>
+<td>3</td>
+<td>State generalization (formalize trait contracts)</td>
+<td>⏳ Planned</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Governance extraction</td>
+<td>⏳ Planned</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Membership consolidation (canonical Entity model)</td>
+<td>⏳ Planned</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Naming primitive</td>
+<td>⏳ Planned</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Crate consolidation (last)</td>
+<td>⏳ Planned</td>
+</tr>
+</tbody></table>
+<p><strong>Critical ordering rationale</strong>: Runtime MUST exist before extraction. Otherwise supervisor becomes the new god-object that hardcodes first-party apps.</p>
+<hr>
+<h2>Phase 0: PolicyOracle Infrastructure ✅</h2>
+<p><strong>Status</strong>: Complete</p>
+<p><strong>Goal</strong>: Generalize PolicyDecision beyond rate limiting. Split PolicyRequest for caching performance.</p>
+<p><strong>Implementation</strong>: <code>icn/crates/icn-kernel-api/src/authz.rs</code> and <code>icn/crates/icn-kernel-api/src/bootstrap.rs</code></p>
+<h3>Design</h3>
+<h4>Generalized PolicyDecision</h4>
+<pre><code class="language-rust">/// Result of a policy evaluation.
+/// Kernel enforces these constraints WITHOUT understanding their semantic origin.
+pub enum PolicyDecision {
+    /// Request allowed with optional constraints
+    Allow { constraints: ConstraintSet },
+    /// Request denied
+    Deny { reason: PolicyError },
+}
+
+/// Kernel-enforced constraints. Kernel does not know WHY these exist.
+/// Apps (trust, governance, ledger) set these via PolicyOracle.
+#[derive(Default, Clone, Debug, Serialize, Deserialize)]
+pub struct ConstraintSet {
+    /// Rate limiting parameters
+    pub rate_limit: Option&lt;RateLimit&gt;,
+    /// Maximum topics this actor can subscribe to
+    pub max_topics: Option&lt;u32&gt;,
+    /// Credit multiplier for ledger operations
+    pub credit_multiplier: Option&lt;f64&gt;,
+    /// Voting weight for governance
+    pub voting_weight: Option&lt;f64&gt;,
+    /// App-specific constraints (bounded, serializable)
+    pub custom: HashMap&lt;String, ConstraintValue&gt;,
+}
+
+/// Bounded constraint value - NOT Box&lt;dyn Any&gt;
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum ConstraintValue {
+    Bool(bool),
+    Int(i64),
+    Float(f64),
+    String(String),
+    List(Vec&lt;ConstraintValue&gt;),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct RateLimit {
+    pub messages_per_second: u32,
+    pub burst_size: u32,
+}
+</code></pre>
+<h4>Split PolicyRequest for Caching</h4>
+<pre><code class="language-rust">/// Cacheable core - small, hashable, no allocations on hot path
+#[derive(Clone, Hash, Eq, PartialEq)]
+pub struct PolicyRequestCore {
+    pub actor: Did,
+    pub action: ActionKind,
+    pub domain: Domain,
+}
+
+/// Context metadata - inspected only on cache miss
+pub struct PolicyContext {
+    pub metadata: HashMap&lt;String, String&gt;,
+    pub capability: Option&lt;Capability&gt;,
+}
+
+pub struct PolicyRequest {
+    pub core: PolicyRequestCore,
+    pub context: PolicyContext,
+}
+
+/// Domain identifier for oracle routing
+#[derive(Clone, Hash, Eq, PartialEq)]
+pub struct Domain(pub String);
+
+/// Action categories
+#[derive(Clone, Hash, Eq, PartialEq)]
+pub enum ActionKind {
+    Read,
+    Write,
+    Subscribe,
+    Publish,
+    Execute,
+    Custom(String),
+}
+</code></pre>
+<h4>Atomic Oracle Registry</h4>
+<pre><code class="language-rust">pub struct OracleRegistry {
+    oracles: ArcSwap&lt;HashMap&lt;Domain, Arc&lt;dyn PolicyOracle&gt;&gt;&gt;,
+    cache: Cache&lt;PolicyRequestCore, CachedDecision&gt;,
+    phase: AtomicU8, // BootstrapPhase as u8
+}
+
+struct CachedDecision {
+    decision: PolicyDecision,
+    expires_at: Instant,
+}
+
+impl OracleRegistry {
+    /// Atomically replace oracle and invalidate domain cache
+    pub fn replace(&amp;self, domain: Domain, oracle: Arc&lt;dyn PolicyOracle&gt;) {
+        let mut map = (**self.oracles.load()).clone();
+        map.insert(domain.clone(), oracle);
+        self.oracles.store(Arc::new(map));
+        self.cache.invalidate_domain(&amp;domain);
+    }
+
+    /// Evaluate with caching
+    pub fn evaluate(&amp;self, request: &amp;PolicyRequest) -&gt; PolicyDecision {
+        // Check cache first (core only)
+        if let Some(cached) = self.cache.get(&amp;request.core) {
+            if cached.expires_at &gt; Instant::now() {
+                return cached.decision.clone();
+            }
+        }
+
+        // Cache miss - consult oracle
+        let oracle = self.oracles.load()
+            .get(&amp;request.core.domain)
+            .cloned()
+            .unwrap_or_else(|| Arc::new(AllowAllOracle));
+
+        let decision = oracle.evaluate(request);
+        let ttl = oracle.cache_ttl();
+
+        if !ttl.is_zero() {
+            self.cache.insert(request.core.clone(), CachedDecision {
+                decision: decision.clone(),
+                expires_at: Instant::now() + ttl,
+            });
+        }
+
+        decision
+    }
+}
+</code></pre>
+<h4>Expiring Genesis Capabilities</h4>
+<pre><code class="language-rust">#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum BootstrapPhase {
+    Genesis = 0,    // Initial startup, AllowAllOracle
+    CoreApps = 1,   // Loading first-party apps
+    Running = 2,    // Normal operation
+}
+
+pub struct GenesisCapabilities {
+    phase_guard: Arc&lt;AtomicU8&gt;,
+    expires_at: Instant,
+}
+
+impl GenesisCapabilities {
+    pub fn new(phase: Arc&lt;AtomicU8&gt;, ttl: Duration) -&gt; Self {
+        Self {
+            phase_guard: phase,
+            expires_at: Instant::now() + ttl,
+        }
+    }
+
+    pub fn issue(&amp;self, resource: &amp;str, action: &amp;str) -&gt; Result&lt;Capability, AuthzError&gt; {
+        let phase = self.phase_guard.load(Ordering::SeqCst);
+        if phase != BootstrapPhase::Genesis as u8 {
+            return Err(AuthzError::NotInGenesis);
+        }
+        if Instant::now() &gt; self.expires_at {
+            return Err(AuthzError::GenesisExpired);
+        }
+        // Issue capability...
+    }
+}
+</code></pre>
+<h3>Files to Modify</h3>
+<ul>
+<li><code>icn/crates/icn-kernel-api/src/authz.rs</code> - Generalize PolicyDecision, add ConstraintSet</li>
+<li><code>icn/crates/icn-kernel-api/src/lib.rs</code> - Add bootstrap module</li>
+<li><code>icn/crates/icn-kernel-api/src/bootstrap.rs</code> - New: OracleRegistry, BootstrapPhase, GenesisCapabilities</li>
+</ul>
+<h3>Verification</h3>
+<ul>
+<li><code>cargo test -p icn-kernel-api</code> passes</li>
+<li>Benchmark: CachingOracle lookup &lt; 1μs (core-only cache key)</li>
+<li>No domain-specific types in authz module</li>
+</ul>
+<hr>
+<h2>Phase 1: Minimal App Runtime ✅</h2>
+<p><strong>Status</strong>: Complete</p>
+<p><strong>Goal</strong>: Runtime that can load ONE app via manifest before extracting trust.</p>
+<p><strong>Implementation</strong>: <code>icn/crates/icn-core/src/apps/</code> module with:</p>
+<ul>
+<li><code>manifest.rs</code> - YAML manifest parser with validation</li>
+<li><code>state_factory.rs</code> - Namespaced state handles (KV, Log, Blob)</li>
+<li><code>dispatcher.rs</code> - ComputeDispatcher with Reducer/Service split</li>
+<li><code>runtime.rs</code> - AppRuntime for lifecycle management (install, start, stop, uninstall)</li>
+</ul>
+<h3>Manifest Schema</h3>
+<pre><code class="language-yaml"># apps/echo/manifest.yaml - Example
+name: echo
+version: 1.0.0
+publisher: did:icn:test
+
+capabilities_required:
+  - state:logs:append:self      # Write to own namespace
+  - state:kv:read:self          # Read own KV
+  - state:kv:write:self         # Write own KV
+
+capabilities_provided: []        # Echo provides no capabilities to others
+
+state:
+  logs:
+    - name: events
+      ordering: total
+  kv:
+    - name: cache
+
+compute:
+  reducers:
+    - name: echo_reducer
+      event_type: echo:event
+  services:
+    - name: echo_service
+      request_type: echo:query
+</code></pre>
+<pre><code class="language-yaml"># apps/trust/manifest.yaml - Real app
+name: trust
+version: 1.0.0
+publisher: did:icn:icn-foundation
+
+capabilities_required:
+  - state:logs:append:self
+  - state:kv:read:self
+  - state:kv:write:self
+  - comms:subscribe:trust:*
+
+capabilities_provided:
+  - oracle:trust:*              # Provides trust oracle to kernel
+
+state:
+  logs:
+    - name: attestations
+      ordering: causal
+  kv:
+    - name: scores
+    - name: graph
+
+compute:
+  reducers:
+    - name: attestation_reducer
+      event_type: trust:attestation
+  services:
+    - name: score_query
+      request_type: trust:query
+
+oracle:
+  domain: trust
+  implementation: TrustOracle
+</code></pre>
+<h3>Compute Dispatcher with Event Routing</h3>
+<pre><code class="language-rust">pub struct ComputeDispatcher {
+    reducers: HashMap&lt;EventType, Box&lt;dyn ErasedReducer&gt;&gt;,
+    services: HashMap&lt;RequestType, Box&lt;dyn ErasedService&gt;&gt;,
+    event_tx: mpsc::Sender&lt;Event&gt;,
+    event_rx: mpsc::Receiver&lt;Event&gt;,
+}
+
+impl ComputeDispatcher {
+    /// Services emit events here
+    pub fn event_sender(&amp;self) -&gt; mpsc::Sender&lt;Event&gt; {
+        self.event_tx.clone()
+    }
+
+    /// Run event loop - routes events to reducers
+    pub async fn run(&amp;mut self, state: &amp;mut AppState) {
+        while let Some(event) = self.event_rx.recv().await {
+            if let Some(reducer) = self.reducers.get(&amp;event.event_type) {
+                // Reducers run in restricted context:
+                // - No async runtime access
+                // - Receive &amp;State, return new State
+                // - No access to Comms, Time, IO
+                let new_state = reducer.reduce(&amp;state.snapshot(), &amp;event);
+                state.apply(new_state);
+            }
+        }
+    }
+}
+</code></pre>
+<h3>Reducer Purity Enforcement</h3>
+<p>Rust cannot enforce purity at compile time, but runtime enforces isolation:</p>
+<pre><code class="language-rust">/// Reducers: pure, deterministic, state-in → state-out
+pub trait Reducer: Send + Sync {
+    type State: Clone;
+    type Action;
+
+    /// MUST be deterministic. Same state + action = same result.
+    /// Receives immutable state reference, returns new state.
+    fn reduce(&amp;self, state: &amp;Self::State, action: &amp;Self::Action) -&gt; Self::State;
+}
+
+/// Type-erased reducer for dispatcher
+pub trait ErasedReducer: Send + Sync {
+    fn reduce(&amp;self, state: &amp;StateSnapshot, event: &amp;Event) -&gt; StateSnapshot;
+}
+
+/// Services: may have side effects, cannot mutate state directly
+pub trait Service: Send + Sync {
+    type Request;
+    type Response;
+    type Event;
+
+    /// May call external systems. MUST NOT mutate state directly.
+    /// Returns response + events that reducers consume.
+    async fn handle(
+        &amp;self,
+        req: Self::Request,
+        event_tx: mpsc::Sender&lt;Event&gt;,
+    ) -&gt; Result&lt;Self::Response&gt;;
+}
+</code></pre>
+<h3>Capability Granting from Manifest</h3>
+<pre><code class="language-rust">impl AppRuntime {
+    pub fn install(
+        &amp;mut self,
+        manifest: Manifest,
+        installer_caps: &amp;CapabilitySet,  // What the installer can grant
+    ) -&gt; Result&lt;AppHandle&gt; {
+        // 1. Validate: app cannot request more than installer holds
+        for cap_req in &amp;manifest.capabilities_required {
+            if !installer_caps.can_delegate(cap_req) {
+                return Err(RuntimeError::InsufficientPrivilege(cap_req.clone()));
+            }
+        }
+
+        // 2. Create namespaced state handles
+        let namespace = Namespace::new(&amp;manifest.publisher, &amp;manifest.name);
+        let state = self.state_factory.create_for_namespace(&amp;namespace, &amp;manifest.state)?;
+
+        // 3. Register reducers/services
+        let dispatcher = self.create_dispatcher(&amp;manifest.compute)?;
+
+        // 4. Issue scoped capabilities
+        let caps = self.capability_engine.issue_scoped(
+            &amp;manifest.capabilities_required,
+            &amp;namespace,
+        )?;
+
+        // 5. Register oracle if app provides one
+        if let Some(oracle_def) = &amp;manifest.oracle {
+            // App must provide oracle implementation
+            // Runtime wires it to OracleRegistry
+        }
+
+        Ok(AppHandle { namespace, state, dispatcher, caps })
+    }
+}
+</code></pre>
+<h3>Supervisor Constraint</h3>
+<pre><code class="language-rust">// icn-core/src/supervisor/mod.rs - THE RULE
+
+impl Supervisor {
+    pub fn init(&amp;mut self, config: &amp;Config) -&gt; Result&lt;()&gt; {
+        // Phase 1: Genesis - AllowAllOracle active
+        self.runtime.set_phase(BootstrapPhase::Genesis);
+
+        // Load manifests from config paths
+        // Supervisor has ROOT capabilities during genesis
+        let genesis_caps = self.runtime.genesis_capabilities();
+
+        for manifest_path in &amp;config.apps {
+            let manifest = Manifest::load(manifest_path)?;
+            self.runtime.install(manifest, &amp;genesis_caps)?;
+        }
+
+        // Phase 2: CoreApps loaded
+        self.runtime.set_phase(BootstrapPhase::CoreApps);
+
+        // Start all apps
+        for app in self.runtime.apps() {
+            self.runtime.start(&amp;app)?;
+        }
+
+        // Phase 3: Running - genesis capabilities expired
+        self.runtime.set_phase(BootstrapPhase::Running);
+
+        Ok(())
+
+        // ============================================
+        // NO DOMAIN KNOWLEDGE BELOW THIS LINE
+        // Supervisor does not know &quot;trust&quot; or &quot;governance&quot;
+        // It just loads what config tells it to load
+        // ============================================
+    }
+}
+</code></pre>
+<h3>App Isolation (Current + Future)</h3>
+<p><strong>Current (namespace isolation)</strong>:</p>
+<ul>
+<li>Each app gets isolated state namespace</li>
+<li>Apps cannot read/write other apps&#39; state directly</li>
+<li>Communication only via Comms primitive (pub/sub, request/response)</li>
+</ul>
+<p><strong>Future (WASM sandbox)</strong>:</p>
+<ul>
+<li>Resource quotas (CPU, memory, storage per app)</li>
+<li>No direct inter-app memory access</li>
+<li>Metered execution</li>
+</ul>
+<p>Runtime interface is designed to support WASM sandbox later without API changes.</p>
+<h3>Files to Create</h3>
+<ul>
+<li><code>icn/crates/icn-core/src/runtime/mod.rs</code> - AppRuntime</li>
+<li><code>icn/crates/icn-core/src/runtime/manifest.rs</code> - Manifest parser</li>
+<li><code>icn/crates/icn-core/src/runtime/dispatcher.rs</code> - ComputeDispatcher</li>
+<li><code>icn/crates/icn-core/src/runtime/state_factory.rs</code> - Namespaced state creation</li>
+<li><code>icn/crates/icn-core/src/runtime/capabilities.rs</code> - Capability granting</li>
+</ul>
+<h3>Verification</h3>
+<ul>
+<li>Can install echo app from manifest</li>
+<li>Supervisor has zero domain-specific code</li>
+<li>Events flow: Service → event_tx → Dispatcher → Reducer → State</li>
+</ul>
+<hr>
+<h2>Phase 1.5: Echo Test App ✅</h2>
+<p><strong>Status</strong>: Complete</p>
+<p><strong>Goal</strong>: Validate runtime works before extracting trust.</p>
+<p><strong>Implementation</strong>: <code>apps/echo/</code> with:</p>
+<ul>
+<li><code>manifest.yaml</code> - App manifest declaring KV state and handlers</li>
+<li><code>src/lib.rs</code> - EchoReducer (pure state updates) and EchoService (async queries)</li>
+<li>Integration test validating full lifecycle: prepare → install → start → dispatch → query → stop → uninstall</li>
+</ul>
+<h3>Structure</h3>
+<pre><code>apps/
+  echo/
+    Cargo.toml
+    manifest.yaml
+    src/
+      lib.rs
+      reducer.rs    # Echoes events to state
+      service.rs    # Responds to queries
+</code></pre>
+<h3>Implementation</h3>
+<pre><code class="language-rust">// apps/echo/src/reducer.rs
+pub struct EchoReducer;
+
+impl Reducer for EchoReducer {
+    type State = EchoState;
+    type Action = EchoEvent;
+
+    fn reduce(&amp;self, state: &amp;Self::State, action: &amp;Self::Action) -&gt; Self::State {
+        let mut new_state = state.clone();
+        new_state.events.push(action.clone());
+        new_state.count += 1;
+        new_state
+    }
+}
+
+// apps/echo/src/service.rs
+pub struct EchoService;
+
+impl Service for EchoService {
+    type Request = EchoQuery;
+    type Response = EchoResponse;
+    type Event = EchoEvent;
+
+    async fn handle(
+        &amp;self,
+        req: Self::Request,
+        event_tx: mpsc::Sender&lt;Event&gt;,
+    ) -&gt; Result&lt;Self::Response&gt; {
+        // Emit event for reducer
+        event_tx.send(Event::new(&quot;echo:event&quot;, EchoEvent {
+            message: req.message.clone(),
+            timestamp: Instant::now(),
+        })).await?;
+
+        // Return response
+        Ok(EchoResponse {
+            echoed: req.message,
+        })
+    }
+}
+</code></pre>
+<h3>Verification</h3>
+<ul>
+<li><code>cargo test -p echo</code> passes</li>
+<li>Echo app installs via runtime</li>
+<li>Service receives query → emits event → reducer updates state</li>
+<li>State is queryable</li>
+</ul>
+<hr>
+<h2>Phase 2: Trust Extraction</h2>
+<p><strong>Goal</strong>: Replace all direct TrustGraph/TrustClass usage with PolicyOracle calls.</p>
+<h3>Infection Points</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Lines</th>
+<th>Issue</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icn-net/src/rate_limit.rs</code></td>
+<td>14, 302, 383-446</td>
+<td>Direct TrustGraph, hardcoded thresholds</td>
+</tr>
+<tr>
+<td><code>icn-gateway/src/rate_limit.rs</code></td>
+<td>429-493, 469-479</td>
+<td>Duplicate trust mapping</td>
+</tr>
+<tr>
+<td><code>icn-gossip/src/gossip.rs</code></td>
+<td>9, 46, 172-183</td>
+<td>THREE trust integration paths</td>
+</tr>
+<tr>
+<td><code>icn-ledger/src/credit_policy.rs</code></td>
+<td>12, 89-111</td>
+<td>Direct TrustGraph calls</td>
+</tr>
+</tbody></table>
+<h3>Order of Changes</h3>
+<ol>
+<li><p><strong>Create Trust App using runtime</strong></p>
+<pre><code>apps/trust/
+  Cargo.toml
+  manifest.yaml
+  src/
+    lib.rs
+    oracle.rs      # PolicyOracle implementation
+    graph.rs       # Move from icn-trust
+    reducer.rs     # Attestation processing
+    service.rs     # Score queries
+</code></pre>
+</li>
+<li><p><strong>Fix icn-net</strong> (simplest infection)</p>
+<ul>
+<li>Remove <code>use icn_trust::TrustClass</code></li>
+<li>Replace <code>trust_graph: Option&lt;Arc&lt;RwLock&lt;TrustGraph&gt;&gt;&gt;</code> with <code>oracle: Arc&lt;OracleRegistry&gt;</code></li>
+<li>Replace trust lookups with <code>oracle.evaluate()</code></li>
+<li>Use <code>ConstraintSet.rate_limit</code> from decision</li>
+</ul>
+</li>
+<li><p><strong>Fix icn-gateway</strong> (same pattern)</p>
+</li>
+<li><p><strong>Fix icn-gossip</strong> - Remove all three trust paths, single oracle reference</p>
+</li>
+<li><p><strong>Fix icn-ledger</strong> - <code>credit_policy.rs</code>: Use <code>ConstraintSet.credit_multiplier</code></p>
+</li>
+<li><p><strong>Update supervisor</strong> - Load trust app via runtime, not direct wiring</p>
+</li>
+</ol>
+<h3>Trust Oracle Implementation</h3>
+<pre><code class="language-rust">// apps/trust/src/oracle.rs
+pub struct TrustOracle {
+    graph: Arc&lt;RwLock&lt;TrustGraph&gt;&gt;,
+}
+
+impl PolicyOracle for TrustOracle {
+    fn evaluate(&amp;self, request: &amp;PolicyRequest) -&gt; PolicyDecision {
+        let score = self.graph.read().compute_trust_score(&amp;request.core.actor);
+
+        let constraints = ConstraintSet {
+            rate_limit: Some(score_to_rate_limit(score)),
+            max_topics: Some(score_to_max_topics(score)),
+            credit_multiplier: Some(score_to_credit_mult(score)),
+            voting_weight: Some(score), // Trust score IS voting weight
+            ..Default::default()
+        };
+
+        PolicyDecision::Allow { constraints }
+    }
+
+    fn cache_ttl(&amp;self) -&gt; Duration {
+        Duration::from_secs(60)
+    }
+}
+
+fn score_to_rate_limit(score: f64) -&gt; RateLimit {
+    // Kernel does not know these thresholds exist
+    // This is app logic
+    match score {
+        s if s &gt;= 0.7 =&gt; RateLimit { messages_per_second: 200, burst_size: 50 },
+        s if s &gt;= 0.4 =&gt; RateLimit { messages_per_second: 100, burst_size: 25 },
+        s if s &gt;= 0.1 =&gt; RateLimit { messages_per_second: 50, burst_size: 10 },
+        _ =&gt; RateLimit { messages_per_second: 10, burst_size: 5 },
+    }
+}
+</code></pre>
+<h3>Verification</h3>
+<ul>
+<li><code>cargo check --workspace</code> - no TrustGraph/TrustClass imports in kernel crates</li>
+<li><code>cargo test -p icn-net -p icn-gossip -p icn-ledger</code> passes</li>
+<li>Trust app loads via runtime manifest</li>
+<li>Supervisor contains zero trust-specific code</li>
+</ul>
+<hr>
+<h2>Phase 3: State Generalization</h2>
+<p><strong>Goal</strong>: Formalize state trait contracts. Move domain logic out of icn-store.</p>
+<h3>Formalized Trait Contracts</h3>
+<pre><code class="language-rust">/// Ordering guarantee for logs
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Ordering {
+    /// Strict total ordering - entries have global sequence
+    Total,
+    /// Causal ordering - happens-before relationships preserved
+    Causal,
+    /// Concurrent - CRDTs resolve conflicts, no ordering guarantee
+    Concurrent,
+}
+
+pub trait LogService: Send + Sync {
+    /// Create a new log with specified ordering
+    fn create_log(&amp;self, namespace: &amp;Namespace, name: &amp;str, ordering: Ordering) -&gt; Result&lt;LogId&gt;;
+
+    /// Get ordering guarantee for a log
+    fn ordering(&amp;self, log: &amp;LogId) -&gt; Result&lt;Ordering&gt;;
+
+    /// Append with optional idempotency key
+    /// If idempotency_key matches previous append, this is a no-op
+    fn append(
+        &amp;self,
+        log: &amp;LogId,
+        entry: &amp;[u8],
+        idempotency_key: Option&lt;&amp;str&gt;,
+    ) -&gt; Result&lt;Offset&gt;;
+
+    /// Read entries in order
+    fn read(&amp;self, log: &amp;LogId, from: Offset, limit: usize) -&gt; Result&lt;Vec&lt;LogEntry&gt;&gt;;
+
+    /// Get consistent point-in-time snapshot
+    fn snapshot(&amp;self, log: &amp;LogId) -&gt; Result&lt;LogSnapshot&gt;;
+}
+
+pub struct LogSnapshot {
+    pub log_id: LogId,
+    pub offset: Offset,
+    pub timestamp: LogicalTimestamp,
+}
+</code></pre>
+<h3>Files to Move</h3>
+<table>
+<thead>
+<tr>
+<th>From</th>
+<th>To</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icn-store/src/escrow.rs</code></td>
+<td><code>apps/ledger/src/escrow.rs</code></td>
+</tr>
+<tr>
+<td><code>icn-store/src/budgets.rs</code></td>
+<td><code>apps/ledger/src/budgets.rs</code></td>
+</tr>
+<tr>
+<td><code>icn-store/src/recurring_payments.rs</code></td>
+<td><code>apps/ledger/src/recurring.rs</code></td>
+</tr>
+</tbody></table>
+<h3>icn-store Final Structure</h3>
+<pre><code>icn-store/src/
+  lib.rs          # Only generic exports
+  kv.rs           # KvService implementation
+  log.rs          # LogService implementation
+  blob.rs         # BlobService implementation
+  namespace.rs    # Namespace isolation
+</code></pre>
+<h3>Verification</h3>
+<ul>
+<li>icn-store has no domain-specific types</li>
+<li><code>cargo test -p icn-store</code> passes</li>
+<li>Ordering is per-log, not per-service</li>
+</ul>
+<hr>
+<h2>Phase 4: Governance Extraction</h2>
+<p><strong>Goal</strong>: Move governance from kernel to app. Remove WitnessPolicy from supervisor.</p>
+<h3>Files to Remove from icn-core</h3>
+<ul>
+<li><code>icn-core/src/governance/</code> (entire directory if exists)</li>
+<li>Any governance-specific handler code in supervisor</li>
+</ul>
+<h3>Create Governance App</h3>
+<pre><code>apps/governance/
+  Cargo.toml
+  manifest.yaml
+  src/
+    lib.rs
+    oracle.rs       # Voting weight via PolicyOracle
+    proposal.rs     # From icn-governance
+    voting.rs
+    charter.rs
+    reducer.rs      # Vote processing
+    service.rs      # Proposal queries
+</code></pre>
+<h3>WitnessPolicy Migration</h3>
+<p>WitnessPolicy must become:</p>
+<ol>
+<li>A governance rule stored in app state</li>
+<li>Interpreted by runtime via PolicyOracle or Coordination primitive</li>
+</ol>
+<pre><code class="language-rust">// apps/governance/src/oracle.rs
+impl PolicyOracle for GovernanceOracle {
+    fn evaluate(&amp;self, request: &amp;PolicyRequest) -&gt; PolicyDecision {
+        if request.core.action == ActionKind::Custom(&quot;witness&quot;.into()) {
+            let witness_policy = self.load_witness_policy(&amp;request.core.domain);
+            let constraints = ConstraintSet {
+                custom: hashmap! {
+                    &quot;required_witnesses&quot;.into() =&gt; ConstraintValue::Int(witness_policy.min_witnesses as i64),
+                    &quot;witness_threshold&quot;.into() =&gt; ConstraintValue::Float(witness_policy.threshold),
+                },
+                ..Default::default()
+            };
+            return PolicyDecision::Allow { constraints };
+        }
+        // ...
+    }
+}
+</code></pre>
+<h3>Verification</h3>
+<ul>
+<li>Supervisor contains no governance branching</li>
+<li><code>cargo check --workspace</code> - no governance imports in kernel</li>
+<li>Governance app uses PolicyOracle for all decisions</li>
+</ul>
+<hr>
+<h2>Phase 5: Membership Consolidation</h2>
+<p><strong>Goal</strong>: Merge icn-entity, icn-coop, icn-community into single app with canonical Entity model.</p>
+<h3>Canonical Entity Abstraction</h3>
+<pre><code class="language-rust">/// Unique entity identifier
+#[derive(Clone, Hash, Eq, PartialEq)]
+pub struct EntityId(pub String);
+
+/// Entity kinds
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum EntityKind {
+    Individual,
+    Cooperative,
+    Federation,
+    Community,
+}
+
+/// Core entity trait
+pub trait Entity {
+    fn id(&amp;self) -&gt; &amp;EntityId;
+    fn kind(&amp;self) -&gt; EntityKind;
+    fn did(&amp;self) -&gt; &amp;Did;
+}
+
+/// Generic membership - works for any entity type
+pub struct Membership&lt;E: Entity&gt; {
+    pub entity: EntityId,
+    pub member: EntityId,
+    pub role: MembershipRole,
+    pub joined_at: LogicalTimestamp,
+    pub _phantom: PhantomData&lt;E&gt;,
+}
+</code></pre>
+<h3>Create Membership App</h3>
+<pre><code>apps/membership/
+  Cargo.toml
+  manifest.yaml
+  src/
+    lib.rs
+    entity.rs       # Unified EntityId model
+    membership.rs   # Generic Membership&lt;E&gt;
+    coop.rs         # Cooperative-specific config
+    community.rs    # Community-specific config
+    federation.rs   # Federation-specific config
+    reducer.rs
+    service.rs
+</code></pre>
+<h3>Verification</h3>
+<ul>
+<li>Single canonical Entity model</li>
+<li>Old crates (icn-entity, icn-coop, icn-community) deprecated</li>
+<li>No parallel membership models</li>
+</ul>
+<hr>
+<h2>Phase 6: Naming Primitive</h2>
+<p><strong>Goal</strong>: Implement naming/discovery for app-to-app communication.</p>
+<h3>Design Constraints</h3>
+<ul>
+<li>Naming depends ONLY on State + Identity</li>
+<li>Do NOT entangle with gossip/protocol layer</li>
+<li>This is capability advertisement + dependency resolution</li>
+</ul>
+<h3>Implementation</h3>
+<pre><code class="language-rust">pub trait NamingService: Send + Sync {
+    /// Register a name with authority signature
+    fn register(
+        &amp;self,
+        name: &amp;Name,
+        record: NameRecord,
+        authority_sig: &amp;Signature,
+    ) -&gt; Result&lt;()&gt;;
+
+    /// Resolve a name to its record
+    fn resolve(&amp;self, name: &amp;Name) -&gt; Result&lt;Option&lt;NameRecord&gt;&gt;;
+
+    /// List names matching pattern
+    fn list(&amp;self, pattern: &amp;str) -&gt; Result&lt;Vec&lt;Name&gt;&gt;;
+}
+
+pub struct NameRecord {
+    pub name: Name,
+    pub kind: NameKind,
+    pub endpoints: Vec&lt;Endpoint&gt;,
+    pub capabilities: Vec&lt;CapabilityId&gt;,  // What this service provides
+    pub dependencies: Vec&lt;Name&gt;,           // What this service needs
+    pub metadata: HashMap&lt;String, String&gt;,
+    pub expires_at: LogicalTimestamp,
+}
+
+pub enum NameKind {
+    App,
+    Service,
+    Oracle,
+    Federation,
+}
+</code></pre>
+<h3>Files to Create</h3>
+<pre><code>icn-core/src/naming/
+  mod.rs
+  service.rs        # NamingService impl
+  discovery.rs      # Discovery impl (uses NamingService)
+  records.rs        # NameRecord storage
+</code></pre>
+<h3>Verification</h3>
+<ul>
+<li>Naming uses only State + Identity primitives</li>
+<li>No gossip dependencies</li>
+<li>Apps can discover each other by name</li>
+</ul>
+<hr>
+<h2>Phase 7: Crate Consolidation</h2>
+<p><strong>Goal</strong>: Reduce kernel crates from 17+ to ~12. Do this LAST.</p>
+<h3>Merge Plan</h3>
+<table>
+<thead>
+<tr>
+<th>Target</th>
+<th>Sources</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icn-protocol</code></td>
+<td>icn-gossip + icn-net</td>
+</tr>
+<tr>
+<td><code>icn-services</code></td>
+<td>icn-api + icn-rpc + icn-gateway</td>
+</tr>
+<tr>
+<td><code>icn-crypto</code></td>
+<td>icn-crypto-pq + crypto from icn-identity</td>
+</tr>
+</tbody></table>
+<h3>Final Kernel Structure (12 crates)</h3>
+<pre><code>icn-kernel-api/   # Trait definitions
+icn-identity/     # DID + keystore
+icn-store/        # Generic storage
+icn-protocol/     # Gossip + networking
+icn-core/         # Runtime + supervisor
+icn-services/     # API surfaces
+icn-security/     # Security primitives
+icn-crypto/       # Cryptography
+icn-obs/          # Observability
+icn-encoding/     # Serialization
+icn-time/         # Time primitives
+icn-testkit/      # Test utilities
+</code></pre>
+<h3>Rules</h3>
+<ul>
+<li>Do NOT consolidate during extraction phases</li>
+<li>Complete all extractions first</li>
+<li>Use <code>pub use</code> re-exports for migration</li>
+<li>Document all path changes in CHANGELOG</li>
+</ul>
+<hr>
+<h2>Critical Files Summary</h2>
+<ol>
+<li><strong><code>icn-kernel-api/src/authz.rs</code></strong> - Generalize PolicyDecision</li>
+<li><strong><code>icn-kernel-api/src/bootstrap.rs</code></strong> - OracleRegistry, BootstrapPhase</li>
+<li><strong><code>icn-core/src/runtime/mod.rs</code></strong> - AppRuntime</li>
+<li><strong><code>icn-core/src/runtime/manifest.rs</code></strong> - Manifest parser</li>
+<li><strong><code>icn-core/src/runtime/dispatcher.rs</code></strong> - ComputeDispatcher</li>
+<li><strong><code>icn-net/src/rate_limit.rs</code></strong> - First trust extraction (1309 lines)</li>
+<li><strong><code>icn-gossip/src/gossip.rs</code></strong> - Three trust paths → one oracle</li>
+<li><strong><code>icn-ledger/src/credit_policy.rs</code></strong> - TrustGraph → PolicyOracle</li>
+<li><strong><code>icn-core/src/supervisor/mod.rs</code></strong> - Wire runtime, no domain knowledge</li>
+</ol>
+<hr>
+<h2>Verification Strategy</h2>
+<h3>Per-Phase Checks</h3>
+<pre><code class="language-bash">cargo check --workspace
+cargo test --workspace
+cargo clippy --workspace -- -D warnings
+</code></pre>
+<h3>Integration Tests</h3>
+<ul>
+<li>Echo app lifecycle (install, start, query, stop)</li>
+<li>Multi-node convergence with trust app</li>
+<li>Cross-app communication via naming</li>
+<li>Capability delegation chain</li>
+</ul>
+<h3>Success Criteria</h3>
+<ul>
+<li>No domain logic in kernel crates</li>
+<li>All apps use same kernel APIs</li>
+<li>Supervisor has zero domain-specific code</li>
+<li>&quot;Meaning firewall&quot; test passes: search for domain terms in kernel crates</li>
+</ul>
+<pre><code class="language-bash"># Must return zero results
+rg &quot;TrustGraph|TrustClass|credit_limit|voting_weight|membership&quot; \
+   icn/crates/icn-{kernel-api,core,store,net,gossip,security,crypto,obs,encoding,time,testkit}
+</code></pre>
+<hr>
+<h2>Timeline</h2>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Estimate</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>0: PolicyOracle generalization</td>
+<td>2-3 days</td>
+</tr>
+<tr>
+<td>1: Minimal App Runtime</td>
+<td>4-5 days</td>
+</tr>
+<tr>
+<td>1.5: Echo test app</td>
+<td>1 day</td>
+</tr>
+<tr>
+<td>2: Trust extraction</td>
+<td>5-7 days</td>
+</tr>
+<tr>
+<td>3: State generalization</td>
+<td>3-4 days</td>
+</tr>
+<tr>
+<td>4: Governance extraction</td>
+<td>3-4 days</td>
+</tr>
+<tr>
+<td>5: Membership consolidation</td>
+<td>4-5 days</td>
+</tr>
+<tr>
+<td>6: Naming primitive</td>
+<td>3-4 days</td>
+</tr>
+<tr>
+<td>7: Crate consolidation</td>
+<td>3-4 days</td>
+</tr>
+</tbody></table>
+<p><strong>Total: ~30-40 days</strong></p>
+<hr>
+<h2>Risk Mitigation</h2>
+<table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Supervisor becomes god-object</td>
+<td>Runtime exists BEFORE extraction</td>
+</tr>
+<tr>
+<td>PolicyDecision too trust-shaped</td>
+<td>ConstraintSet is generic from start</td>
+</tr>
+<tr>
+<td>Genesis capabilities permanent</td>
+<td>Expiring + phase-guarded</td>
+</tr>
+<tr>
+<td>Reducer purity not enforced</td>
+<td>Runtime isolation, no async access</td>
+</tr>
+<tr>
+<td>State contracts implicit</td>
+<td>Formalize Ordering, Idempotency in traits</td>
+</tr>
+<tr>
+<td>Crate consolidation during extraction</td>
+<td>Consolidation is LAST phase</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>The Meaning Firewall</h2>
+<p>Before adding ANY code to kernel crates, ask:</p>
+<ol>
+<li>Does this interpret domain semantics? → Must be an app</li>
+<li>Does this hardcode a schema? → Must be an app</li>
+<li>Does this privilege a specific application? → Must be an app</li>
+<li>Does this understand &quot;trust&quot; or &quot;governance&quot;? → Must be an app</li>
+</ol>
+<p>The kernel is deliberately dumb. It provides pipes, not policies.</p>
+<p><strong>We are not refactoring code. We are deleting privilege.</strong></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

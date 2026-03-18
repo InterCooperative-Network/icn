@@ -1,0 +1,337 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Workshop 10: Contributor Workflow Practice | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>onboarding</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>workshops</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>workshop 10 contributor</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/onboarding/workshops/workshop-10-contributor.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Workshop 10: Contributor Workflow Practice</h1>
+<h2>Goal</h2>
+<p>Practice the ICN contribution workflow by running local checks, understanding
+test scopes, and preparing a sample PR.</p>
+<h2>Prerequisites</h2>
+<ul>
+<li>Completed Module 10 reading</li>
+<li>ICN repo cloned with toolchain installed</li>
+<li>Rust toolchain with rustfmt and clippy</li>
+</ul>
+<h2>Estimated time</h2>
+<p>1.5-2 hours</p>
+<h2>Part 1: Run Local Quality Checks</h2>
+<h3>Steps</h3>
+<ol>
+<li><p>Navigate to the ICN workspace:</p>
+<pre><code class="language-bash">cd icn
+</code></pre>
+</li>
+<li><p>Check formatting (should pass if no changes):</p>
+<pre><code class="language-bash">cargo fmt --all -- --check
+</code></pre>
+</li>
+<li><p>Run clippy:</p>
+<pre><code class="language-bash">cargo clippy --workspace --all-targets -- -D warnings
+</code></pre>
+</li>
+<li><p>Run the test suite:</p>
+<pre><code class="language-bash">cargo test --workspace --lib
+</code></pre>
+</li>
+</ol>
+<h3>Expected results</h3>
+<ul>
+<li>Format check: No output means success</li>
+<li>Clippy: Warnings/errors only if there are issues</li>
+<li>Tests: All tests should pass on a clean checkout</li>
+</ul>
+<h3>Record your findings</h3>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Result</th>
+<th>Time</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>cargo fmt --check</code></td>
+<td>Pass/Fail</td>
+<td>___ sec</td>
+</tr>
+<tr>
+<td><code>cargo clippy</code></td>
+<td>___ warnings</td>
+<td>___ sec</td>
+</tr>
+<tr>
+<td><code>cargo test --lib</code></td>
+<td>___ passed</td>
+<td>___ sec</td>
+</tr>
+</tbody></table>
+<h3>Checkpoint</h3>
+<ul>
+<li><input disabled="" type="checkbox"> All local checks pass</li>
+<li><input disabled="" type="checkbox"> You understand what each check validates</li>
+</ul>
+<h2>Part 2: Understand Test Scopes</h2>
+<h3>Steps</h3>
+<ol>
+<li><p>List available tests for icn-core:</p>
+<pre><code class="language-bash">cargo test -p icn-core --lib -- --list 2&gt;&amp;1 | head -30
+</code></pre>
+</li>
+<li><p>List available tests for icn-gateway:</p>
+<pre><code class="language-bash">cargo test -p icn-gateway --lib -- --list 2&gt;&amp;1 | head -30
+</code></pre>
+</li>
+<li><p>Identify integration tests:</p>
+<pre><code class="language-bash">ls icn/crates/*/tests/*.rs 2&gt;/dev/null
+</code></pre>
+</li>
+</ol>
+<h3>Questions to answer</h3>
+<ol>
+<li>What&#39;s the difference between <code>--lib</code> and <code>--test</code>?</li>
+<li>Which crates have integration tests?</li>
+<li>How do you run tests for a specific function?</li>
+</ol>
+<h3>Checkpoint</h3>
+<ul>
+<li><input disabled="" type="checkbox"> You can list tests for a specific crate</li>
+<li><input disabled="" type="checkbox"> You understand the test scope options</li>
+</ul>
+<h2>Part 3: Test Scope Decision Exercise</h2>
+<h3>Scenario</h3>
+<p>You&#39;re making changes to the following areas. Decide which tests to run:</p>
+<table>
+<thead>
+<tr>
+<th>Change</th>
+<th>Minimum Test Command</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Bug fix in <code>icn/crates/icn-ledger/src/ledger.rs</code></td>
+<td>?</td>
+</tr>
+<tr>
+<td>New endpoint in <code>icn-gateway/src/api/</code></td>
+<td>?</td>
+</tr>
+<tr>
+<td>Change to <code>icn/crates/icn-trust/src/types.rs</code></td>
+<td>?</td>
+</tr>
+<tr>
+<td>Modify <code>icn/crates/icn-core/src/supervisor/mod.rs</code></td>
+<td>?</td>
+</tr>
+</tbody></table>
+<h3>Hints</h3>
+<ul>
+<li>Unit tests: <code>cargo test -p &lt;crate&gt; --lib</code></li>
+<li>Integration tests: <code>cargo test -p &lt;crate&gt; --test &lt;name&gt;</code></li>
+<li>Full workspace: <code>cargo test --workspace</code></li>
+</ul>
+<h3>Expected answers</h3>
+<ol>
+<li><code>cargo test -p icn-ledger --lib</code></li>
+<li><code>cargo test -p icn-gateway</code> (includes integration tests)</li>
+<li><code>cargo test -p icn-trust --lib</code></li>
+<li><code>cargo test -p icn-core</code> (full crate tests)</li>
+</ol>
+<h3>Checkpoint</h3>
+<ul>
+<li><input disabled="" type="checkbox"> You can determine the right test scope for a change</li>
+</ul>
+<h2>Part 4: PR Checklist Review</h2>
+<h3>Steps</h3>
+<ol>
+<li>Read <code>CONTRIBUTING.md</code></li>
+<li>Find the PR checklist</li>
+<li>List the requirements for a PR</li>
+</ol>
+<h3>Expected checklist items</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Tests pass locally</li>
+<li><input disabled="" type="checkbox"> Code is formatted (<code>cargo fmt</code>)</li>
+<li><input disabled="" type="checkbox"> Clippy passes</li>
+<li><input disabled="" type="checkbox"> Documentation updated (if needed)</li>
+<li><input disabled="" type="checkbox"> Commit messages follow convention</li>
+<li><input disabled="" type="checkbox"> PR description explains the change</li>
+</ul>
+<h3>Questions to answer</h3>
+<ol>
+<li>What is the commit message format?</li>
+<li>When should you update documentation?</li>
+<li>What should a PR description include?</li>
+</ol>
+<h3>Checkpoint</h3>
+<ul>
+<li><input disabled="" type="checkbox"> You can list PR requirements from memory</li>
+<li><input disabled="" type="checkbox"> You understand the commit message convention</li>
+</ul>
+<h2>Part 5: Simulate a Contribution</h2>
+<h3>Exercise</h3>
+<p>Create a small documentation improvement (do not commit):</p>
+<ol>
+<li>Find a typo or unclear sentence in any doc file</li>
+<li>Note the file path and line number</li>
+<li>Write down:<ul>
+<li>What change you would make</li>
+<li>Which tests you would run</li>
+<li>What your commit message would be</li>
+</ul>
+</li>
+</ol>
+<h3>Example</h3>
+<pre><code>File: docs/ARCHITECTURE.md:42
+Change: Fix typo &quot;coordinaton&quot; → &quot;coordination&quot;
+Tests: None needed (docs only)
+Commit: docs: fix typo in architecture overview
+</code></pre>
+<h3>Checkpoint</h3>
+<ul>
+<li><input disabled="" type="checkbox"> You identified a potential improvement</li>
+<li><input disabled="" type="checkbox"> You determined the correct test scope (none for docs)</li>
+<li><input disabled="" type="checkbox"> You wrote a proper commit message</li>
+</ul>
+<h2>Part 6: Branch and Commit Conventions</h2>
+<h3>Steps</h3>
+<ol>
+<li>Review the branch naming conventions in <code>CLAUDE.md</code> or <code>CONTRIBUTING.md</code></li>
+<li>Practice creating a branch name for:<ul>
+<li>A bug fix in the ledger</li>
+<li>A new feature for governance</li>
+<li>A documentation update</li>
+</ul>
+</li>
+</ol>
+<h3>Expected branch names</h3>
+<ul>
+<li><code>fix/ledger-balance-calculation</code></li>
+<li><code>feat/governance-delegation</code></li>
+<li><code>docs/update-architecture-overview</code></li>
+</ul>
+<h3>Commit message format</h3>
+<pre><code>&lt;type&gt;(&lt;scope&gt;): &lt;summary&gt;
+
+&lt;optional body&gt;
+
+Co-Authored-By: Your Name &lt;email&gt;
+</code></pre>
+<p>Types: <code>feat</code>, <code>fix</code>, <code>docs</code>, <code>refactor</code>, <code>test</code>, <code>chore</code></p>
+<h3>Checkpoint</h3>
+<ul>
+<li><input disabled="" type="checkbox"> You can create proper branch names</li>
+<li><input disabled="" type="checkbox"> You understand the commit message format</li>
+</ul>
+<h2>Summary</h2>
+<p>After completing this workshop you should be able to:</p>
+<ul>
+<li>Run all local quality checks</li>
+<li>Determine the correct test scope for changes</li>
+<li>Follow the PR checklist</li>
+<li>Use proper branch and commit conventions</li>
+</ul>
+<h2>Quick Reference</h2>
+<h3>Common Commands</h3>
+<pre><code class="language-bash"># Format check
+cargo fmt --all -- --check
+
+# Lint
+cargo clippy --workspace --all-targets -- -D warnings
+
+# All tests
+cargo test --workspace
+
+# Single crate tests
+cargo test -p icn-&lt;crate&gt; --lib
+
+# Run specific test
+cargo test -p icn-&lt;crate&gt; test_function_name
+</code></pre>
+<h3>PR Workflow</h3>
+<pre><code class="language-bash"># Create branch
+git checkout -b &lt;type&gt;/&lt;short-description&gt;
+
+# Make changes, then:
+cargo fmt --all
+cargo clippy --workspace
+cargo test --workspace
+
+# Commit
+git add -A
+git commit -m &quot;&lt;type&gt;(&lt;scope&gt;): &lt;summary&gt;&quot;
+
+# Push and create PR
+git push -u origin &lt;branch&gt;
+gh pr create --title &quot;&lt;title&gt;&quot; --body &quot;&lt;description&gt;&quot;
+</code></pre>
+<h2>Next steps</h2>
+<p>You&#39;ve completed the onboarding curriculum! Consider:</p>
+<ul>
+<li>Working on a &quot;good first issue&quot;</li>
+<li>Reviewing the capstone project in <code>capstone.md</code></li>
+<li>Joining the community discussions</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

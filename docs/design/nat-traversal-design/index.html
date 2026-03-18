@@ -1,0 +1,406 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>NAT Traversal Design | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>nat traversal design</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/nat-traversal-design.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>NAT Traversal Design</h1>
+<p><strong>Status</strong>: Design Phase (MVC Week 3-4)
+<strong>Priority</strong>: Tier 1 Gap #2 - Blocking pilot deployment</p>
+<h2>Problem Statement</h2>
+<p>Real cooperatives operate behind NAT/firewalls (home routers, corporate networks). Current ICN requires:</p>
+<ul>
+<li>Manually configured port forwarding, OR</li>
+<li>Nodes with public IP addresses</li>
+</ul>
+<p>This is <strong>unacceptable</strong> for production deployment. Members cannot be expected to configure their routers.</p>
+<h2>Success Criteria</h2>
+<ul>
+<li>✅ Members behind home routers connect without port forwarding</li>
+<li>✅ Two NAT-ed nodes can establish direct connection (hole punching)</li>
+<li>✅ Relay fallback when direct connection fails (symmetric NAT, strict firewalls)</li>
+<li>✅ No degradation of security (all traffic still authenticated + encrypted)</li>
+<li>✅ Minimal latency overhead (&lt;100ms added for STUN discovery)</li>
+</ul>
+<h2>Architecture Overview</h2>
+<h3>Three-Tier Connection Strategy</h3>
+<pre><code>1. Direct Connection (preferred)
+   └─ Public IP nodes connect directly via QUIC
+
+2. STUN Hole Punching (most NAT scenarios)
+   ├─ Query STUN server for public IP/port
+   ├─ Exchange connection info via gossip
+   └─ Simultaneous hole punch to establish direct QUIC
+
+3. TURN Relay (fallback for symmetric NAT)
+   ├─ Route traffic through trusted relay node
+   └─ Still end-to-end encrypted (QUIC)
+</code></pre>
+<h3>Integration with Existing Architecture</h3>
+<p>ICN uses Quinn (Rust QUIC library), which makes NAT traversal straightforward:</p>
+<p><strong>Key Insight</strong>: QUIC&#39;s header design allows multiplexing STUN and QUIC on the same UDP socket. Quinn endpoints expose the underlying UDP socket for this exact use case.</p>
+<h2>Technical Design</h2>
+<h3>1. STUN Client Integration</h3>
+<p><strong>Crate</strong>: Use <code>stun-rs</code> (supports STUN + TURN + ICE attributes per RFC8445/RFC8656)</p>
+<p><strong>Responsibility</strong>: Discover public IP/port for a node behind NAT</p>
+<pre><code class="language-rust">// icn-net/src/stun.rs
+use stun_rs::MessageClass;
+
+pub struct StunClient {
+    server_addr: SocketAddr,  // e.g., stun.l.google.com:19302
+}
+
+impl StunClient {
+    /// Discover public IP/port by querying STUN server
+    pub async fn discover_public_endpoint(
+        &amp;self,
+        local_socket: &amp;UdpSocket,
+    ) -&gt; Result&lt;SocketAddr&gt; {
+        // Send STUN Binding Request
+        let request = Message::new(MessageClass::Request(BINDING));
+        send_to_stun_server(local_socket, &amp;request, self.server_addr).await?;
+
+        // Receive STUN Binding Response
+        let response = receive_from_stun_server(local_socket).await?;
+        let public_addr = extract_mapped_address(&amp;response)?;
+
+        Ok(public_addr)
+    }
+}
+</code></pre>
+<p><strong>STUN Servers</strong>: Use public STUN infrastructure initially:</p>
+<ul>
+<li><code>stun.l.google.com:19302</code> (Google)</li>
+<li><code>stun1.l.google.com:19302</code> (Google backup)</li>
+<li><code>stun.icn.coop:3478</code> (ICN-operated, future)</li>
+</ul>
+<h3>2. Connection Candidate Exchange</h3>
+<p><strong>Challenge</strong>: How do two NAT-ed peers exchange their public endpoints?</p>
+<p><strong>Solution</strong>: Use existing gossip protocol to announce connection info</p>
+<pre><code class="language-rust">// icn-gossip/src/connection.rs
+
+/// Broadcast to topic: &quot;network:candidates&quot;
+#[derive(Serialize, Deserialize)]
+pub struct ConnectionCandidate {
+    pub did: Did,
+    pub local_addr: SocketAddr,   // Private IP
+    pub public_addr: Option&lt;SocketAddr&gt;,  // Discovered via STUN
+    pub relay_addr: Option&lt;SocketAddr&gt;,   // TURN relay (if available)
+    pub timestamp: u64,
+}
+</code></pre>
+<p><strong>Flow</strong>:</p>
+<ol>
+<li>Node A starts, queries STUN, discovers public endpoint</li>
+<li>Node A publishes <code>ConnectionCandidate</code> to gossip topic</li>
+<li>Node B receives candidates via gossip subscription</li>
+<li>Node B attempts connection using:<ul>
+<li>Try <code>public_addr</code> first (direct or hole-punched)</li>
+<li>Fall back to <code>relay_addr</code> if direct fails</li>
+</ul>
+</li>
+</ol>
+<h3>3. Hole Punching Strategy</h3>
+<p><strong>UDP Hole Punching</strong>: Send packets from both sides simultaneously to &quot;punch&quot; through NAT</p>
+<pre><code class="language-rust">// icn-net/src/hole_punch.rs
+
+pub async fn attempt_hole_punch(
+    endpoint: &amp;Endpoint,
+    local_public: SocketAddr,
+    remote_public: SocketAddr,
+    peer_did: Did,
+) -&gt; Result&lt;Connection&gt; {
+    // Timing is critical: both peers must send simultaneously
+    // Use synchronized timestamp from gossip message
+
+    // Send hole-punch packet (empty QUIC initial)
+    endpoint.connect(remote_public, &quot;localhost&quot;)?.await
+}
+</code></pre>
+<p><strong>NAT Type Compatibility</strong>:</p>
+<ul>
+<li>Full Cone NAT: ✅ Works perfectly</li>
+<li>Restricted Cone NAT: ✅ Works (most common)</li>
+<li>Port-Restricted Cone NAT: ✅ Works with coordination</li>
+<li>Symmetric NAT: ❌ Requires TURN relay</li>
+</ul>
+<h3>4. TURN Relay Implementation</h3>
+<p><strong>Two Modes</strong>:</p>
+<p><strong>A. External TURN Server</strong> (short-term, bootstrap):</p>
+<ul>
+<li>Use <code>coturn</code> or similar TURN server</li>
+<li>Hosted at <code>turn.icn.coop</code></li>
+<li>Credentials distributed via bootstrap config</li>
+</ul>
+<p><strong>B. Peer Relay Capability</strong> (long-term, decentralized):</p>
+<ul>
+<li>Nodes with public IPs can volunteer as relays</li>
+<li>Trust-gated: only relay for trusted peers (trust score &gt; 0.4)</li>
+<li>Resource limits: max relay bandwidth per peer</li>
+</ul>
+<pre><code class="language-rust">// icn-net/src/relay.rs
+
+pub struct RelayNode {
+    max_relay_bandwidth_mbps: u32,  // e.g., 10 Mbps
+    min_trust_score: f64,            // e.g., 0.4 (partner tier)
+    allowed_peers: HashSet&lt;Did&gt;,     // Explicit whitelist
+}
+
+impl RelayNode {
+    /// Check if we should relay for this peer
+    fn should_relay_for(&amp;self, peer_did: &amp;Did, trust_graph: &amp;TrustGraph) -&gt; bool {
+        if self.allowed_peers.contains(peer_did) {
+            return true;
+        }
+
+        match trust_graph.compute_trust_score(peer_did) {
+            Ok(score) if score &gt;= self.min_trust_score =&gt; true,
+            _ =&gt; false,
+        }
+    }
+}
+</code></pre>
+<h3>5. Session Manager Integration</h3>
+<p><strong>Modify <code>SessionManager</code> to support NAT traversal</strong>:</p>
+<pre><code class="language-rust">// icn-net/src/session.rs
+
+impl SessionManager {
+    pub async fn start(&amp;mut self, ..., nat_config: NatTraversalConfig) -&gt; Result&lt;()&gt; {
+        // 1. Create QUIC endpoint as before
+        let endpoint = Endpoint::server(server_config, listen_addr)?;
+
+        // 2. If NAT traversal enabled, discover public endpoint
+        if nat_config.stun_enabled {
+            let stun_client = StunClient::new(nat_config.stun_server);
+            let public_addr = stun_client.discover_public_endpoint(
+                endpoint.local_addr()?
+            ).await?;
+
+            info!(&quot;Discovered public endpoint: {}&quot;, public_addr);
+
+            // 3. Announce to gossip
+            self.announce_connection_candidate(public_addr).await?;
+        }
+
+        // 4. Subscribe to connection candidates from peers
+        self.subscribe_to_candidates().await?;
+
+        Ok(())
+    }
+
+    /// Attempt connection with NAT traversal
+    pub async fn dial_with_nat(&amp;self, peer_candidate: ConnectionCandidate) -&gt; Result&lt;Connection&gt; {
+        // Try strategies in order:
+        // 1. Direct connection to public_addr (if no NAT or hole punch works)
+        if let Some(public_addr) = peer_candidate.public_addr {
+            if let Ok(conn) = self.dial(public_addr, peer_candidate.did).await {
+                return Ok(conn);
+            }
+        }
+
+        // 2. Try relay if available
+        if let Some(relay_addr) = peer_candidate.relay_addr {
+            return self.dial_via_relay(relay_addr, peer_candidate.did).await;
+        }
+
+        bail!(&quot;All connection strategies failed&quot;)
+    }
+}
+</code></pre>
+<h3>6. Configuration</h3>
+<p><strong>User-facing config in <code>icn.toml</code></strong>:</p>
+<pre><code class="language-toml">[nat]
+enabled = true
+stun_servers = [
+    &quot;stun.l.google.com:19302&quot;,
+    &quot;stun.icn.coop:3478&quot;
+]
+
+# Optional: Enable relay capability on this node
+[relay]
+enabled = false
+max_bandwidth_mbps = 10
+min_trust_score = 0.4
+</code></pre>
+<p><strong>CLI arguments</strong>:</p>
+<pre><code class="language-bash">icnd --nat-enable --stun-server stun.l.google.com:19302
+icnd --relay-enable --relay-max-bw 10
+</code></pre>
+<h2>Implementation Plan</h2>
+<h3>Phase 1: STUN Discovery (Week 3, Days 1-2)</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Add <code>stun-rs</code> dependency to <code>icn-net/Cargo.toml</code></li>
+<li><input disabled="" type="checkbox"> Implement <code>StunClient</code> in <code>icn-net/src/stun.rs</code></li>
+<li><input disabled="" type="checkbox"> Unit tests: STUN query/response parsing</li>
+<li><input disabled="" type="checkbox"> Integration test: Discover public endpoint</li>
+</ul>
+<h3>Phase 2: Candidate Exchange (Week 3, Days 3-4)</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Add <code>ConnectionCandidate</code> message to <code>icn-gossip</code></li>
+<li><input disabled="" type="checkbox"> Create <code>network:candidates</code> gossip topic</li>
+<li><input disabled="" type="checkbox"> SessionManager announces candidate on startup</li>
+<li><input disabled="" type="checkbox"> Subscribe to peer candidates</li>
+</ul>
+<h3>Phase 3: Hole Punching (Week 3, Day 5)</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Implement <code>attempt_hole_punch()</code> in <code>icn-net</code></li>
+<li><input disabled="" type="checkbox"> Integration test: Two NAT-ed nodes connect</li>
+<li><input disabled="" type="checkbox"> Test various NAT types (full cone, restricted, symmetric)</li>
+</ul>
+<h3>Phase 4: TURN Relay (Week 4, Days 1-3)</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Deploy external TURN server (<code>coturn</code>) at <code>turn.icn.coop</code></li>
+<li><input disabled="" type="checkbox"> Implement <code>dial_via_relay()</code> using TURN allocation</li>
+<li><input disabled="" type="checkbox"> Integration test: Symmetric NAT nodes connect via relay</li>
+</ul>
+<h3>Phase 5: Peer Relay Capability (Week 4, Days 4-5)</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Implement <code>RelayNode</code> with trust-gating</li>
+<li><input disabled="" type="checkbox"> Add relay configuration to bootstrap nodes</li>
+<li><input disabled="" type="checkbox"> Integration test: Node relays traffic for trusted peer</li>
+</ul>
+<h2>Security Considerations</h2>
+<h3>1. STUN Server Trust</h3>
+<p><strong>Risk</strong>: Malicious STUN server could lie about public IP
+<strong>Mitigation</strong>:</p>
+<ul>
+<li>Query multiple STUN servers, use majority vote</li>
+<li>Fallback to known-good Google STUN servers</li>
+</ul>
+<h3>2. Relay Node Trust</h3>
+<p><strong>Risk</strong>: Relay could log/inspect traffic
+<strong>Mitigation</strong>:</p>
+<ul>
+<li>All traffic still end-to-end encrypted (QUIC/TLS)</li>
+<li>Relay sees encrypted packets only</li>
+<li>Trust-gate relay usage (only for partners)</li>
+</ul>
+<h3>3. DoS via Relay</h3>
+<p><strong>Risk</strong>: Attacker requests relay for expensive traffic
+<strong>Mitigation</strong>:</p>
+<ul>
+<li>Bandwidth limits per peer</li>
+<li>Trust-gated relay (score &gt; 0.4)</li>
+<li>Rate limiting relay requests</li>
+</ul>
+<h2>Testing Strategy</h2>
+<h3>Unit Tests</h3>
+<ul>
+<li>STUN message parsing</li>
+<li>Connection candidate serialization</li>
+<li>Trust-gated relay logic</li>
+</ul>
+<h3>Integration Tests</h3>
+<pre><code class="language-rust">#[tokio::test]
+async fn test_nat_traversal_full_cone() {
+    // Simulate two nodes behind full cone NAT
+    // Verify direct connection via hole punch
+}
+
+#[tokio::test]
+async fn test_nat_traversal_symmetric_relay() {
+    // Simulate symmetric NAT (worst case)
+    // Verify relay fallback works
+}
+
+#[tokio::test]
+async fn test_relay_trust_gating() {
+    // Verify relay rejects low-trust peers
+}
+</code></pre>
+<h3>Manual Testing</h3>
+<ul>
+<li>AWS NAT Gateway simulation</li>
+<li>Home router testing (multiple ISPs)</li>
+<li>Symmetric NAT testing (corporate firewalls)</li>
+</ul>
+<h2>Metrics</h2>
+<p><strong>Prometheus metrics to add</strong>:</p>
+<pre><code class="language-rust">icn_network_nat_type{type=&quot;full_cone|restricted|symmetric&quot;} - Detected NAT type
+icn_network_stun_queries_total - STUN queries sent
+icn_network_hole_punch_attempts_total{result=&quot;success|failed&quot;} - Hole punch attempts
+icn_network_relay_connections_total - Connections via relay
+icn_network_relay_bytes_total{direction=&quot;in|out&quot;} - Relay traffic volume
+</code></pre>
+<h2>Documentation Updates</h2>
+<ul>
+<li><input disabled="" type="checkbox"> <code>docs/deployment-guide.md</code>: Add NAT traversal configuration</li>
+<li><input disabled="" type="checkbox"> <a href="/docs/ARCHITECTURE">../ARCHITECTURE.md</a>: Document NAT traversal architecture</li>
+<li><input disabled="" type="checkbox"> <code>README.md</code>: Update with NAT traversal capabilities</li>
+</ul>
+<h2>Future Enhancements (Post-MVC)</h2>
+<ul>
+<li><strong>ICE (Interactive Connectivity Establishment)</strong>: Full RFC8445 support for optimal path selection</li>
+<li><strong>IPv6 Support</strong>: Many home routers now have IPv6, no NAT needed</li>
+<li><strong>Relay Load Balancing</strong>: Distribute relay load across multiple nodes</li>
+<li><strong>Relay Incentives</strong>: Economic model for relay operators (credit for bandwidth)</li>
+</ul>
+<h2>References</h2>
+<ul>
+<li>RFC 5389: STUN (Session Traversal Utilities for NAT)</li>
+<li>RFC 8656: TURN (Traversal Using Relays around NAT)</li>
+<li>RFC 8445: ICE (Interactive Connectivity Establishment)</li>
+<li><a href="https://www.ietf.org/archive/id/draft-seemann-quic-nat-traversal-01.html" target="_blank" rel="noopener">QUIC NAT Traversal Draft</a></li>
+<li><a href="https://tailscale.com/blog/how-nat-traversal-works" target="_blank" rel="noopener">Tailscale: How NAT Traversal Works</a></li>
+<li><a href="https://github.com/libp2p/specs/issues/434" target="_blank" rel="noopener">libp2p QUIC NAT Traversal Issue</a></li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

@@ -1,0 +1,743 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Economics Subsystem — Truth Contract | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>economics</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>economics truth contract</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/economics/economics-truth-contract.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Economics Subsystem — Truth Contract</h1>
+<p><strong>Date</strong>: 2026-02-17
+<strong>Auditor</strong>: Claude (automated audit)
+<strong>Scope</strong>: All economics-related code across <code>icn-ledger</code>, <code>icn-gateway</code>, <code>icn-coop</code>, <code>icn-federation</code>, and supervisor wiring.</p>
+<hr>
+<h2>Methodology</h2>
+<p>For each of 4 cooperative archetypes, I enumerate the economic operations they need to function, then audit ICN&#39;s current state across 5 columns:</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>ICN API/Type</strong></td>
+<td>The Rust type or function that implements this operation</td>
+</tr>
+<tr>
+<td><strong>State Location</strong></td>
+<td>Where the data lives (sled key prefix, in-memory struct, etc.)</td>
+</tr>
+<tr>
+<td><strong>Test Evidence</strong></td>
+<td>File:line of tests proving it works</td>
+</tr>
+<tr>
+<td><strong>Failure Mode</strong></td>
+<td>What breaks or is missing</td>
+</tr>
+<tr>
+<td><strong>Minimum Viable Fix</strong></td>
+<td>Smallest change to make it work for pilot</td>
+</tr>
+</tbody></table>
+<p><strong>Verdict key</strong>: WORKS = tested + wired to daemon. SCHEMA = types exist, logic exists, but not wired or not called. MISSING = no code at all.</p>
+<hr>
+<h2>1. Worker Co-op (10 members, time-banking)</h2>
+<p>Members log hours of work, get credited. They spend hours to receive services from each other. The co-op has a treasury for collective expenses.</p>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>ICN API/Type</th>
+<th>State Location</th>
+<th>Test Evidence</th>
+<th>Failure Mode</th>
+<th>Min Viable Fix</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Create payment</strong> (Alice pays Bob 10 hours)</td>
+<td><code>LedgerManager::create_payment()</code></td>
+<td>sled: per-coop ledger dir <code>data/ledgers/{coop_id}/</code></td>
+<td><code>ledger_mgr.rs:591</code> (test_create_payment)</td>
+<td><strong>WORKS</strong> — Gateway wired via <code>GatewayHandles.ledger</code>, <code>LedgerManager</code> creates <code>JournalEntry</code> with double-entry, appends to <code>Ledger</code>.</td>
+<td>None</td>
+</tr>
+<tr>
+<td><strong>Query balance</strong></td>
+<td><code>LedgerManager::get_balance()</code></td>
+<td>sled: per-coop ledger + cached_balances HashMap</td>
+<td><code>ledger_mgr.rs:610-620</code></td>
+<td><strong>WORKS</strong> — Balance read from ledger&#39;s in-memory cache, backed by sled.</td>
+<td>None</td>
+</tr>
+<tr>
+<td><strong>Transaction history</strong></td>
+<td><code>LedgerManager::get_history()</code>, <code>get_history_paginated()</code></td>
+<td>sled: timestamp index + entry store</td>
+<td><code>ledger_mgr.rs:647-690</code></td>
+<td><strong>WORKS</strong> — Cursor-based pagination for unfiltered; DID-filtered uses full scan (perf concern at scale).</td>
+<td>Add DID index for filtered queries (P2).</td>
+</tr>
+<tr>
+<td><strong>Register treasury</strong></td>
+<td><code>GatewayTreasuryManager::register_treasury()</code></td>
+<td>sled: <code>treasury:{did}</code> via <code>TreasuryManager</code></td>
+<td><code>treasury.rs:500-514</code> (test_actor_backed_mode)</td>
+<td><strong>WORKS</strong> — Both standalone (in-memory, test only) and actor-backed modes. Handle wired via <code>GatewayHandles.treasury</code>.</td>
+<td>None</td>
+</tr>
+<tr>
+<td><strong>Treasury deposit</strong></td>
+<td><code>GatewayTreasuryManager::create_deposit()</code></td>
+<td>sled: ledger entry + audit trail</td>
+<td><code>treasury_mgr.rs:411-486</code></td>
+<td><strong>WORKS</strong> — Creates journal entry (credit depositor, debit treasury), records audit trail atomically.</td>
+<td>None</td>
+</tr>
+<tr>
+<td><strong>Treasury spend (governance-gated)</strong></td>
+<td><code>propose_spend</code> gateway endpoint</td>
+<td>Routes through governance proposal system</td>
+<td><code>icn-gateway/src/api/treasury.rs</code></td>
+<td><strong>SCHEMA</strong> — Endpoint creates a governance proposal but the actual ledger transfer on proposal approval is not wired. The <code>SettlementEngine</code> exists but is never called from the governance execution path.</td>
+<td>Wire governance proposal execution to <code>SettlementEngine::settle_receipt()</code> or <code>create_deposit()</code> reverse.</td>
+</tr>
+<tr>
+<td><strong>Spending rules</strong></td>
+<td><code>TreasuryManager::validate_entry()</code>, <code>SpendingRule</code></td>
+<td>sled: <code>spending_rule:{id}</code></td>
+<td><code>treasury.rs</code> (30+ unit tests)</td>
+<td><strong>WORKS</strong> — Rules with <code>ApprovalType::None / CouncilVote / MemberVote</code> correctly enforce thresholds.</td>
+<td>None</td>
+</tr>
+<tr>
+<td><strong>Budget limits</strong></td>
+<td><code>BudgetStore::check_spending()</code></td>
+<td>sled: per-account budget tracking</td>
+<td>Gateway <code>budgets.rs</code> endpoints</td>
+<td><strong>WORKS</strong> — <code>LedgerManager</code> checks <code>BudgetStore</code> before allowing payment.</td>
+<td>None</td>
+</tr>
+<tr>
+<td><strong>Labor share tracking</strong></td>
+<td><code>TreasuryManager::create_labor_share()</code>, <code>record_labor_contribution()</code></td>
+<td>sled: <code>labor_share:{id}</code></td>
+<td><code>treasury.rs</code> (test_create_labor_share, test_record_contribution)</td>
+<td><strong>WORKS</strong> as types + persistence. <strong>SCHEMA</strong> for gateway — no REST endpoint exposes labor share creation/query.</td>
+<td>Add gateway endpoints for labor shares (3 routes).</td>
+</tr>
+<tr>
+<td><strong>Surplus distribution</strong></td>
+<td><code>TreasuryManager::execute_surplus_allocation()</code></td>
+<td>In-memory <code>SurplusAllocation</code> + sled persistence</td>
+<td><code>treasury.rs</code> (test_surplus_allocation_proportional)</td>
+<td><strong>WORKS</strong> as logic — uses largest-remainder algorithm for exact integer distribution. <strong>SCHEMA</strong> for gateway — no REST endpoint triggers it.</td>
+<td>Add gateway endpoint + governance trigger.</td>
+</tr>
+<tr>
+<td><strong>Credit limits (new member ramping)</strong></td>
+<td><code>CreditPolicyManager::calculate_credit_limit()</code>, <code>NewMemberPolicy</code></td>
+<td>sled: <code>membership:since:{did}</code> via <code>MembershipStore</code></td>
+<td><code>membership.rs:173-205</code>, <code>credit_policy.rs</code> tests</td>
+<td><strong>SCHEMA</strong> — Types and logic exist. <code>MembershipStore</code> is implemented. But <code>CreditPolicyManager</code> is never called from <code>Ledger::append_entry()</code> validation path.</td>
+<td>Wire <code>CreditPolicyManager</code> into ledger validation.</td>
+</tr>
+<tr>
+<td><strong>Dynamic credit limits</strong></td>
+<td><code>DynamicCreditLimitManager</code></td>
+<td>sled: <code>dynamic_limit:state:{did}:{currency}</code></td>
+<td><code>dynamic_limits.rs:692-1052</code> (20+ tests)</td>
+<td><strong>SCHEMA</strong> — Full implementation with decay/recovery/trust-change. Persists to sled. But never wired into <code>Ledger::append_entry()</code>.</td>
+<td>Wire <code>get_effective_limit()</code> into ledger transaction validation.</td>
+</tr>
+<tr>
+<td><strong>Dispute resolution</strong></td>
+<td><code>DisputeManager::file_dispute()</code> etc.</td>
+<td>sled: <code>dispute:{id}</code></td>
+<td><code>dispute.rs</code> (8 tests)</td>
+<td><strong>SCHEMA</strong> — Full lifecycle (file, evidence, mediator, resolve, escalate). Persists to sled. But no gateway endpoint exposes it.</td>
+<td>Add 4-5 gateway endpoints for dispute CRUD.</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>2. Consumer Co-op (200 members, bulk purchasing)</h2>
+<p>Members pool purchasing power. They pay into the co-op, the co-op buys in bulk, members receive goods at cost. Needs payment escrow, recurring payments, and budget tracking.</p>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>ICN API/Type</th>
+<th>State Location</th>
+<th>Test Evidence</th>
+<th>Failure Mode</th>
+<th>Min Viable Fix</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Member payment</strong></td>
+<td><code>LedgerManager::create_payment()</code></td>
+<td>sled: per-coop ledger</td>
+<td>Same as Worker Co-op</td>
+<td><strong>WORKS</strong></td>
+<td>None</td>
+</tr>
+<tr>
+<td><strong>Payment escrow</strong> (member pays, released on delivery)</td>
+<td><code>create_escrow</code>, <code>release_escrow</code>, <code>refund_escrow</code></td>
+<td>sled: <code>icn_ledger_app::EscrowStore</code></td>
+<td>Gateway <code>escrow.rs</code> endpoints</td>
+<td><strong>SCHEMA</strong> — <code>create_escrow</code> does NOT lock funds in ledger. It creates a record but the sender&#39;s balance is not debited until <code>release_escrow</code>. This means the sender can spend the escrowed amount before release.</td>
+<td><code>create_escrow</code> must debit sender immediately. <code>refund_escrow</code> must credit back.</td>
+</tr>
+<tr>
+<td><strong>Recurring payments</strong> (monthly dues)</td>
+<td><code>RecurringPayment</code>, <code>execute_due_payments()</code>, <code>start_scheduler()</code></td>
+<td>sled: <code>icn_ledger_app::RecurringPaymentStore</code></td>
+<td>Gateway <code>recurring_payments.rs</code></td>
+<td><strong>SCHEMA</strong> — Full CRUD + scheduler exists. <code>start_scheduler</code> spawns a tokio task. But the scheduler is NOT started from <code>init_gateway.rs</code> or <code>background_tasks.rs</code>. It is dead code.</td>
+<td>Call <code>start_scheduler()</code> from supervisor or gateway init.</td>
+</tr>
+<tr>
+<td><strong>Budget tracking</strong></td>
+<td>Same as Worker Co-op</td>
+<td>Same</td>
+<td>Same</td>
+<td><strong>WORKS</strong></td>
+<td>None</td>
+</tr>
+<tr>
+<td><strong>Progressive balance limits</strong> (sybil resistance)</td>
+<td><code>ProgressiveLimitManager::check_balance_limits()</code>, <code>check_velocity_limits()</code></td>
+<td>sled: <code>progressive_velocity:{did}:{currency}</code></td>
+<td><code>progressive_limits.rs:488-860</code> (25+ tests)</td>
+<td><strong>SCHEMA</strong> — Full implementation with POPLevel-based limits and velocity windows. Persists to sled. But never wired into <code>Ledger::append_entry()</code>.</td>
+<td>Wire into ledger validation path.</td>
+</tr>
+<tr>
+<td><strong>Cross-currency payment</strong> (e.g., hours → USD)</td>
+<td><code>LedgerManager::create_cross_payment()</code></td>
+<td>sled: ledger entries (4-5 leg pattern)</td>
+<td><code>fx.rs:1050-1475</code> (15+ integration tests)</td>
+<td><strong>WORKS</strong> — Full pipeline: oracle rate fetch, prepare, execute with clearing account, fee collection. Gateway endpoint wired.</td>
+<td>None</td>
+</tr>
+<tr>
+<td><strong>FX quote</strong></td>
+<td><code>LedgerManager::get_cross_payment_quote()</code></td>
+<td>Stateless (reads oracle + config)</td>
+<td><code>fx.rs</code> integration tests</td>
+<td><strong>WORKS</strong></td>
+<td>None</td>
+</tr>
+<tr>
+<td><strong>Exchange rate oracle</strong></td>
+<td><code>OracleManager</code>, <code>ManualRateSource</code>, <code>FederationRateSource</code></td>
+<td>sled: rate cache</td>
+<td><code>oracle.rs</code> tests</td>
+<td><strong>WORKS</strong> — Manual rate setting works. Federation rate source exists.</td>
+<td>None</td>
+</tr>
+<tr>
+<td><strong>Treasury operations</strong></td>
+<td>Same as Worker Co-op</td>
+<td>Same</td>
+<td>Same</td>
+<td>Same verdicts</td>
+<td>Same fixes</td>
+</tr>
+<tr>
+<td><strong>Member freeze</strong> (delinquent member)</td>
+<td><code>FreezeManager::freeze_member()</code></td>
+<td>sled: freeze records</td>
+<td><code>freeze.rs</code> tests</td>
+<td><strong>SCHEMA</strong> — Logic exists but no gateway endpoint.</td>
+<td>Add gateway endpoints.</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>3. Housing Co-op (50 units, maintenance fees + reserves)</h2>
+<p>Members own shares in housing units. They pay monthly maintenance fees, the co-op maintains reserves. Needs cooperative bonds, capital tracking, and dissolution planning.</p>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>ICN API/Type</th>
+<th>State Location</th>
+<th>Test Evidence</th>
+<th>Failure Mode</th>
+<th>Min Viable Fix</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Monthly payments</strong></td>
+<td><code>LedgerManager::create_payment()</code> + recurring payments</td>
+<td>Same as above</td>
+<td>Same</td>
+<td>Recurring payments: <strong>SCHEMA</strong> (scheduler not wired). One-time payments: <strong>WORKS</strong>.</td>
+<td>Wire recurring scheduler.</td>
+</tr>
+<tr>
+<td><strong>Capital contributions</strong></td>
+<td><code>Cooperative.add_capital()</code>, <code>Member.capital_contribution</code></td>
+<td>sled: coop store (via <code>icn-coop</code>)</td>
+<td><code>types.rs:795-807</code> (test_cooperative_capital)</td>
+<td><strong>WORKS</strong> as data model. <strong>SCHEMA</strong> for ledger integration — capital contributions are tracked on the <code>Cooperative</code> struct but not as ledger journal entries. No double-entry accounting for capital.</td>
+<td>Create a capital contribution journal entry type or use existing entry builder with decision provenance.</td>
+</tr>
+<tr>
+<td><strong>Cooperative bonds</strong></td>
+<td><code>TreasuryManager::create_bond()</code>, <code>CooperativeBond</code>, <code>BondPayment</code></td>
+<td>sled: <code>bond:{id}</code></td>
+<td><code>treasury.rs</code> (test_create_bond, test_bond_payment)</td>
+<td><strong>WORKS</strong> as types + persistence. <strong>SCHEMA</strong> for gateway — no REST endpoint. Bond payment scheduling not automated.</td>
+<td>Add gateway endpoints for bond CRUD. Wire payment schedule to recurring payment system.</td>
+</tr>
+<tr>
+<td><strong>Reserve fund management</strong></td>
+<td><code>TreasuryManager</code> (budgets + spending rules)</td>
+<td>sled: treasury budgets</td>
+<td>treasury.rs tests</td>
+<td><strong>WORKS</strong> for budgets/rules. Reserve tracking is just a treasury budget with restrictions.</td>
+<td>None — model as restricted budget.</td>
+</tr>
+<tr>
+<td><strong>Dissolution planning</strong></td>
+<td><code>Cooperative::set_dissolution_plan()</code>, <code>AssetDistributionPlan</code></td>
+<td>sled: coop store</td>
+<td><code>types.rs</code> (dissolution tests)</td>
+<td><strong>SCHEMA</strong> — Types exist (BalanceAction, DebtAction, CapitalReturnMethod). Lifecycle transitions work. But no execution logic to actually distribute assets per the plan.</td>
+<td>Implement <code>execute_dissolution()</code> that reads the plan and creates journal entries for each member&#39;s share.</td>
+</tr>
+<tr>
+<td><strong>Share trading</strong> (unit transfer)</td>
+<td>None</td>
+<td>None</td>
+<td>None</td>
+<td><strong>MISSING</strong> — No mechanism for transferring housing shares between members.</td>
+<td>Model as a ledger entry with a &quot;shares&quot; currency and governance approval gate.</td>
+</tr>
+<tr>
+<td><strong>Maintenance fund accounting</strong></td>
+<td><code>TreasuryManager</code> + budgets</td>
+<td>sled: treasury</td>
+<td>treasury.rs tests</td>
+<td><strong>WORKS</strong> — Can be modeled as a treasury budget line item.</td>
+<td>None</td>
+</tr>
+<tr>
+<td><strong>Member exit + capital return</strong></td>
+<td><code>Cooperative::remove_capital()</code></td>
+<td>In-memory coop struct</td>
+<td><code>types.rs:795-807</code></td>
+<td><strong>SCHEMA</strong> — Capital pool tracking exists but no logic to calculate member&#39;s pro-rata share and create the ledger entry.</td>
+<td>Wire capital return to ledger payment.</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>4. Federation of 5 Co-ops (inter-coop clearing)</h2>
+<p>Five cooperatives trade services/goods with each other. Needs bilateral clearing agreements, multilateral netting, cross-coop transfers, and federation-level governance.</p>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>ICN API/Type</th>
+<th>State Location</th>
+<th>Test Evidence</th>
+<th>Failure Mode</th>
+<th>Min Viable Fix</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Bilateral clearing agreement</strong></td>
+<td><code>BilateralClearingAgreement</code></td>
+<td>sled: via <code>ClearingManager</code></td>
+<td><code>clearing.rs:286-337</code> (3 tests)</td>
+<td><strong>SCHEMA</strong> — Types fully defined (exchange rates, settlement interval, max imbalance, signatures). <code>ClearingManager</code> exists. But not wired to any gateway endpoint or gossip protocol.</td>
+<td>Add gateway endpoints for agreement CRUD. Wire to gossip for multi-node agreement sync.</td>
+</tr>
+<tr>
+<td><strong>Cross-coop transfer</strong></td>
+<td><code>CrossCoopTransfer</code></td>
+<td>sled: via clearing positions</td>
+<td><code>clearing.rs:316-337</code> (test_cross_coop_transfer)</td>
+<td><strong>SCHEMA</strong> — Types exist with full lifecycle (Pending→Confirmed→Settled→Disputed). But no execution path creates these transfers from a gateway API call.</td>
+<td>Add gateway endpoint that creates CrossCoopTransfer and updates ClearingPosition.</td>
+</tr>
+<tr>
+<td><strong>Multilateral netting</strong></td>
+<td><code>NettingEngine::net()</code></td>
+<td>In-memory (no persistence)</td>
+<td><code>netting.rs:299-407</code> (7 tests, including 4-party cycles)</td>
+<td><strong>SCHEMA</strong> — Algorithm is correct and well-tested (bilateral + cycle detection + cancellation). But: (1) in-memory only, (2) no gateway endpoint, (3) no scheduler to run netting periodically.</td>
+<td>Add persistence, gateway endpoint for manual netting, optional scheduler.</td>
+</tr>
+<tr>
+<td><strong>Federation settlement</strong></td>
+<td><code>SettlementEngine::settle_receipt()</code></td>
+<td>In-memory dedup set (no sled persistence)</td>
+<td><code>settlement.rs</code> tests</td>
+<td><strong>SCHEMA</strong> — Converts execution receipts to journal entries. Validates executor_verified, rejects federation scope (intentionally), prevents self-dealing. But dedup is in-memory only — restarts lose dedup state.</td>
+<td>Persist dedup set to sled. Remove federation scope rejection or add federation-specific settlement path.</td>
+</tr>
+<tr>
+<td><strong>Inter-coop exchange rates</strong></td>
+<td><code>BilateralClearingAgreement::get_rate()</code></td>
+<td>sled: agreement store</td>
+<td><code>clearing.rs:298</code></td>
+<td><strong>SCHEMA</strong> — Rates stored per agreement. But not integrated with <code>OracleManager</code>.</td>
+<td>Register <code>BilateralClearingAgreement</code> rates as an oracle source, or use separate lookup.</td>
+</tr>
+<tr>
+<td><strong>Federation governance</strong> (shared policies)</td>
+<td><code>icn-federation::agreement::AgreementManager</code></td>
+<td>sled: agreement store</td>
+<td><code>agreement/</code> module tests</td>
+<td><strong>SCHEMA</strong> — Agreement manager exists with gossip wiring via <code>AgreementManagerHandle</code> (wired in <code>init_gateway.rs:39</code>). Gateway has service discovery. But no federation-level governance proposals.</td>
+<td>Extend governance system with federation-scoped proposals.</td>
+</tr>
+<tr>
+<td><strong>Allocation receipts</strong> (governance→economics bridge)</td>
+<td><code>create_budget_allocation()</code>, <code>AllocationReceipt</code>, <code>SettlementIntent</code></td>
+<td>In-memory (receipt not persisted)</td>
+<td><code>allocations.rs:60-168</code> (6 tests)</td>
+<td><strong>WORKS</strong> as pure logic — correctly creates receipts with provenance chain. But receipt is never persisted and <code>SettlementIntent</code> is never executed to create a journal entry.</td>
+<td>Wire allocation receipt creation to settlement execution path.</td>
+</tr>
+<tr>
+<td><strong>Cross-coop privacy</strong></td>
+<td>Gateway <code>coop_id</code> scope checking</td>
+<td>Per-coop ledger isolation</td>
+<td><code>ledger.rs</code> gateway tests (cross-coop privacy)</td>
+<td><strong>WORKS</strong> — Each coop has separate sled directory. Balance queries scoped to <code>coop_id</code>. Gateway validates <code>coop_id</code> in JWT claims.</td>
+<td>None</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Summary Matrix</h2>
+<table>
+<thead>
+<tr>
+<th>Capability</th>
+<th>Worker</th>
+<th>Consumer</th>
+<th>Housing</th>
+<th>Federation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Basic payments</td>
+<td>WORKS</td>
+<td>WORKS</td>
+<td>WORKS</td>
+<td>WORKS (within coop)</td>
+</tr>
+<tr>
+<td>Balance queries</td>
+<td>WORKS</td>
+<td>WORKS</td>
+<td>WORKS</td>
+<td>WORKS</td>
+</tr>
+<tr>
+<td>Transaction history</td>
+<td>WORKS</td>
+<td>WORKS</td>
+<td>WORKS</td>
+<td>WORKS</td>
+</tr>
+<tr>
+<td>Treasury (register + deposit)</td>
+<td>WORKS</td>
+<td>WORKS</td>
+<td>WORKS</td>
+<td>WORKS</td>
+</tr>
+<tr>
+<td>Treasury spend (governance)</td>
+<td>SCHEMA</td>
+<td>SCHEMA</td>
+<td>SCHEMA</td>
+<td>SCHEMA</td>
+</tr>
+<tr>
+<td>Budget limits</td>
+<td>WORKS</td>
+<td>WORKS</td>
+<td>WORKS</td>
+<td>WORKS</td>
+</tr>
+<tr>
+<td>Spending rules</td>
+<td>WORKS</td>
+<td>WORKS</td>
+<td>WORKS</td>
+<td>WORKS</td>
+</tr>
+<tr>
+<td>FX / cross-currency</td>
+<td>WORKS</td>
+<td>WORKS</td>
+<td>N/A</td>
+<td>SCHEMA</td>
+</tr>
+<tr>
+<td>Credit limits</td>
+<td>SCHEMA</td>
+<td>SCHEMA</td>
+<td>SCHEMA</td>
+<td>SCHEMA</td>
+</tr>
+<tr>
+<td>Dynamic limits</td>
+<td>SCHEMA</td>
+<td>SCHEMA</td>
+<td>SCHEMA</td>
+<td>SCHEMA</td>
+</tr>
+<tr>
+<td>Progressive limits</td>
+<td>SCHEMA</td>
+<td>SCHEMA</td>
+<td>SCHEMA</td>
+<td>SCHEMA</td>
+</tr>
+<tr>
+<td>Escrow</td>
+<td>-</td>
+<td>SCHEMA</td>
+<td>-</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Recurring payments</td>
+<td>SCHEMA</td>
+<td>SCHEMA</td>
+<td>SCHEMA</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Labor shares</td>
+<td>SCHEMA</td>
+<td>-</td>
+<td>-</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Surplus distribution</td>
+<td>SCHEMA</td>
+<td>-</td>
+<td>-</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Dispute resolution</td>
+<td>SCHEMA</td>
+<td>SCHEMA</td>
+<td>SCHEMA</td>
+<td>SCHEMA</td>
+</tr>
+<tr>
+<td>Member freeze</td>
+<td>SCHEMA</td>
+<td>SCHEMA</td>
+<td>SCHEMA</td>
+<td>SCHEMA</td>
+</tr>
+<tr>
+<td>Capital tracking</td>
+<td>-</td>
+<td>-</td>
+<td>SCHEMA</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Bonds</td>
+<td>-</td>
+<td>-</td>
+<td>SCHEMA</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Dissolution</td>
+<td>-</td>
+<td>-</td>
+<td>SCHEMA</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Bilateral clearing</td>
+<td>-</td>
+<td>-</td>
+<td>-</td>
+<td>SCHEMA</td>
+</tr>
+<tr>
+<td>Multilateral netting</td>
+<td>-</td>
+<td>-</td>
+<td>-</td>
+<td>SCHEMA</td>
+</tr>
+<tr>
+<td>Cross-coop transfers</td>
+<td>-</td>
+<td>-</td>
+<td>-</td>
+<td>SCHEMA</td>
+</tr>
+<tr>
+<td>Allocation receipts</td>
+<td>-</td>
+<td>-</td>
+<td>-</td>
+<td>SCHEMA</td>
+</tr>
+<tr>
+<td>Share trading</td>
+<td>-</td>
+<td>-</td>
+<td>MISSING</td>
+<td>-</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Critical Path for Pilot</h2>
+<p>The following 7 items, if wired, unlock all 4 archetypes for basic operation:</p>
+<ol>
+<li><strong>Wire recurring payment scheduler</strong> — <code>start_scheduler()</code> is dead code. One line in supervisor/gateway init.</li>
+<li><strong>Fix escrow fund locking</strong> — <code>create_escrow</code> must debit sender immediately. ~20 lines in escrow handler.</li>
+<li><strong>Wire credit limits into ledger validation</strong> — <code>CreditPolicyManager</code> exists, tested, but <code>Ledger::append_entry()</code> never calls it. ~15 lines.</li>
+<li><strong>Wire governance proposal execution to treasury</strong> — <code>propose_spend</code> creates a proposal but approval never creates the ledger entry. Needs settlement bridge.</li>
+<li><strong>Add gateway endpoints for labor shares + disputes</strong> — Types and logic exist. Need ~8 REST routes total.</li>
+<li><strong>Persist netting engine state</strong> — Currently in-memory only. ~30 lines to add sled persistence.</li>
+<li><strong>Wire allocation receipt → settlement</strong> — The governance→economics bridge types exist but the final step (creating journal entries from <code>SettlementIntent</code>) is never executed.</li>
+</ol>
+<hr>
+<h2>Supervisor Wiring Audit</h2>
+<p>What economic services are actually connected to the running daemon (<code>init_gateway.rs</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Handle</th>
+<th>Wired?</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>GatewayHandles.treasury</code></td>
+<td>YES</td>
+<td><code>TreasuryHandle = Arc&lt;RwLock&lt;LedgerTreasuryManager&gt;&gt;</code></td>
+</tr>
+<tr>
+<td><code>GatewayHandles.ledger</code></td>
+<td>YES</td>
+<td><code>LedgerHandle = Arc&lt;RwLock&lt;Ledger&gt;&gt;</code></td>
+</tr>
+<tr>
+<td><code>GatewayHandles.governance</code></td>
+<td>YES</td>
+<td>For proposal creation (but not execution)</td>
+</tr>
+<tr>
+<td><code>GatewayHandles.agreement_manager</code></td>
+<td>YES</td>
+<td>Federation agreements</td>
+</tr>
+<tr>
+<td><code>GatewayHandles.coop</code></td>
+<td>YES</td>
+<td>Cooperative management</td>
+</tr>
+<tr>
+<td>Recurring payment scheduler</td>
+<td><strong>NO</strong></td>
+<td><code>start_scheduler()</code> never called</td>
+</tr>
+<tr>
+<td>Dynamic limit decay scheduler</td>
+<td><strong>NO</strong></td>
+<td><code>apply_decay()</code> never called periodically</td>
+</tr>
+<tr>
+<td>Netting scheduler</td>
+<td><strong>NO</strong></td>
+<td>No background task exists</td>
+</tr>
+<tr>
+<td>Settlement execution on proposal approval</td>
+<td><strong>NO</strong></td>
+<td>Governance proposals created but never executed</td>
+</tr>
+</tbody></table>
+<h3>Background tasks that DO run (<code>background_tasks.rs</code>):</h3>
+<ul>
+<li>Clock sync (NTP)</li>
+<li>Metrics update</li>
+<li>Parameter scheduler (governance parameter changes)</li>
+<li>Audit record pruning</li>
+<li>Connection candidate re-announcement</li>
+<li>Bootstrap peer health</li>
+<li>Storage maintenance</li>
+</ul>
+<p>None of these are economics-related. All economics background tasks are unwired.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

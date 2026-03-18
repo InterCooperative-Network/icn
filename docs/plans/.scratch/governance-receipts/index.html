@@ -1,0 +1,1227 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Governance / Receipts — Repo State &amp; Gap Analysis | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>plans</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>.scratch</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>governance receipts</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/plans/.scratch/governance-receipts.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Governance / Receipts — Repo State &amp; Gap Analysis</h1>
+<p><strong>Date</strong>: 2026-02-14
+<strong>Analyst</strong>: icn-architect agent (governance-receipts)
+<strong>Codebase</strong>: 414K LOC, ~5,060 tests</p>
+<hr>
+<h2>1. Current State</h2>
+<h3>1.1 Proposal Types</h3>
+<p><code>ProposalPayload</code> enum — <strong>16 variants</strong> at <code>icn-governance/src/proposal.rs:396</code>:</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Variant</th>
+<th>Purpose</th>
+<th>File:Line</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td><code>Text</code></td>
+<td>Free-form text proposal</td>
+<td><code>proposal.rs:398</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>Budget</code></td>
+<td>Budget allocation (amount, currency, recipient, purpose)</td>
+<td><code>proposal.rs:404</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>Membership</code></td>
+<td>Add/remove member</td>
+<td><code>proposal.rs:416</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>ConfigChange</code></td>
+<td>Governance config change (JSON)</td>
+<td><code>proposal.rs:424</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>SchedulingPolicy</code></td>
+<td>Coop scheduling policy update</td>
+<td><code>proposal.rs:430</code></td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>FreezeMember</code></td>
+<td>Emergency: freeze member (supermajority)</td>
+<td><code>proposal.rs:442</code></td>
+</tr>
+<tr>
+<td>7</td>
+<td><code>UnfreezeMember</code></td>
+<td>Emergency: unfreeze member</td>
+<td><code>proposal.rs:452</code></td>
+</tr>
+<tr>
+<td>8</td>
+<td><code>VetoProposal</code></td>
+<td>Emergency: veto existing proposal</td>
+<td><code>proposal.rs:460</code></td>
+</tr>
+<tr>
+<td>9</td>
+<td><code>ForceCloseProposal</code></td>
+<td>Emergency: force close proposal</td>
+<td><code>proposal.rs:470</code></td>
+</tr>
+<tr>
+<td>10</td>
+<td><code>RollbackLedger</code></td>
+<td>Emergency: rollback ledger to hash (highest threshold)</td>
+<td><code>proposal.rs:482</code></td>
+</tr>
+<tr>
+<td>11</td>
+<td><code>DisputeResolution</code></td>
+<td>Escalated dispute requiring community vote</td>
+<td><code>proposal.rs:499</code></td>
+</tr>
+<tr>
+<td>12</td>
+<td><code>Sdis</code></td>
+<td>SDIS-specific (steward mgmt, thresholds)</td>
+<td><code>proposal.rs:517</code></td>
+</tr>
+<tr>
+<td>13</td>
+<td><code>ProtocolUpgrade</code></td>
+<td>Protocol version upgrade (breaking changes)</td>
+<td><code>proposal.rs:532</code></td>
+</tr>
+<tr>
+<td>14</td>
+<td><code>ProtocolChange</code></td>
+<td>Protocol parameter change (scoped)</td>
+<td><code>proposal.rs:558</code></td>
+</tr>
+<tr>
+<td>15</td>
+<td><code>Treasury</code></td>
+<td>Treasury operations (spend, budget, withdraw)</td>
+<td><code>proposal.rs:573</code></td>
+</tr>
+<tr>
+<td>16</td>
+<td><code>SurplusAllocation</code></td>
+<td>Labor surplus distribution</td>
+<td><code>proposal.rs:587</code></td>
+</tr>
+<tr>
+<td>17</td>
+<td><code>ShareRedemption</code></td>
+<td>Departing member share redemption</td>
+<td><code>proposal.rs:599</code></td>
+</tr>
+<tr>
+<td>—</td>
+<td><code>Federation(FederationProposal)</code></td>
+<td>Federation operations (7 sub-types via gateway endpoints)</td>
+<td>Used in gateway federation endpoints</td>
+</tr>
+</tbody></table>
+<p><strong>Federation sub-proposals</strong> (created via gateway helpers): JoinFederation, LeaveFederation, EstablishClearing, TerminateClearing, Vouch, RevokeVouch, UpdateFederationPolicy.</p>
+<p><strong>TreasuryProposalOperation</strong> sub-variants: <code>Spend</code>, <code>CreateBudget</code>, <code>CancelBudget</code>, <code>ModifySpendingRules</code>, <code>TransferBetweenBudgets</code>, <code>Withdraw</code>.</p>
+<h3>1.2 Voting Mechanics</h3>
+<p><strong>Core types</strong> at <code>icn-governance/src/vote.rs</code>:</p>
+<ul>
+<li><code>VoteChoice</code>: <code>For</code>, <code>Against</code>, <code>Abstain</code></li>
+<li><code>Vote</code>: <code>{ proposal_id, voter: Did, choice, weight: usize, timestamp, comment: Option&lt;String&gt; }</code></li>
+<li><code>VoteTally</code>: <code>{ for_votes, against_votes, abstain_votes }</code> with <code>from(Vec&lt;Vote&gt;)</code>, <code>approval_percentage()</code>, <code>total_votes()</code></li>
+</ul>
+<p><strong>Quorum &amp; Threshold</strong> at <code>icn-governance/src/domain.rs</code> (GovernanceParams):</p>
+<ul>
+<li><code>quorum_percentage: u8</code> — minimum participation required</li>
+<li><code>approval_threshold_percentage: u8</code> — threshold for acceptance</li>
+<li>Quorum = <code>(total_votes * 100) / total_members</code></li>
+<li>If quorum not met → <code>ProposalState::NoQuorum</code></li>
+<li>If quorum met and approval &gt;= threshold → <code>ProposalState::Accepted</code></li>
+<li>Else → <code>ProposalState::Rejected</code></li>
+</ul>
+<p><strong>Delegation</strong> at <code>icn-governance/src/delegation.rs</code>:</p>
+<ul>
+<li><code>Delegation</code>: <code>{ delegator, delegate, domain_id, created_at, expires_at, is_revoked }</code></li>
+<li>Gateway endpoints: <code>POST /delegations</code>, <code>GET /delegations</code>, <code>GET /delegations/{id}</code>, <code>DELETE /delegations/{id}</code></li>
+<li><strong>Note</strong>: Delegation is stored but <strong>not applied</strong> during vote tallying in <code>governance_mgr.rs:close_proposal</code>. The <code>VoteTally::from(votes)</code> simply counts cast votes. Delegated votes do NOT automatically count.</li>
+</ul>
+<p><strong>Weighted Voting</strong>: Vote has <code>weight: usize</code> field. <code>VoteTally</code> sums weights. The gateway <code>cast_vote</code> handler sets weight=1 by default (<code>governance.rs:1455</code>). No trust-based weighting is wired up.</p>
+<p><strong>Deliberation</strong>: Proposals can enter a deliberation period via <code>POST /proposals/{id}/deliberation/start</code> and <code>POST /proposals/{id}/deliberation/end</code>. Comments system: <code>POST /proposals/{id}/comments</code>, <code>GET /proposals/{id}/comments</code>, reactions on comments.</p>
+<h3>1.3 Decision → Receipt Chain</h3>
+<p><strong>GovernanceProof (V1)</strong> at <code>icn-governance/src/proof.rs:54</code>:</p>
+<ul>
+<li>Node-local proof with: <code>proposal_id</code>, <code>domain_id</code>, <code>outcome</code>, <code>vote_tally</code>, <code>vote_hash</code>, <code>timestamp</code>, <code>signer_did</code>, <code>proof_hash</code>, <code>signature</code></li>
+<li><code>proof_hash</code> = blake3 with domain tag <code>&quot;icn:governance-proof:v1&quot;</code>, length-prefixed fields</li>
+<li><code>verify_binding()</code> recomputes and compares</li>
+<li><code>sign()</code> / <code>verify_signature()</code> with Ed25519</li>
+<li><code>vote_hash</code> = merkle root of sorted (voter, choice, weight) tuples</li>
+</ul>
+<p><strong>GovernanceDecisionReceipt (V2)</strong> at <code>proof.rs:224</code>:</p>
+<ul>
+<li>Cross-node deterministic: <code>proposal_id</code>, <code>domain_id</code>, <code>outcome</code>, <code>vote_tally</code>, <code>vote_hash</code>, <code>decision_hash</code></li>
+<li><code>decision_hash</code> = blake3 with domain tag <code>&quot;icn:gov:decision:v1&quot;</code>, excludes node-local fields (timestamp, signer)</li>
+<li><code>PartialEq/Eq</code> anchored to <code>decision_hash</code> only</li>
+<li><code>verify()</code> recomputes and compares</li>
+<li><code>from_legacy(GovernanceProof)</code> conversion</li>
+</ul>
+<p><strong>GovernanceDecisionAttestation</strong> at <code>proof.rs:362</code>:</p>
+<ul>
+<li>Node-local signed attestation: <code>decision_hash</code>, <code>signer_did</code>, <code>timestamp</code>, <code>signature</code></li>
+<li>Domain tag: <code>&quot;icn:gov:attest:v1&quot;</code></li>
+<li><code>sign()</code> / <code>verify()</code> with Ed25519</li>
+</ul>
+<p><strong>GovernanceProofV2</strong> at <code>proof.rs:423</code>:</p>
+<ul>
+<li>Bundle: <code>{ receipt: GovernanceDecisionReceipt, attestations: Vec&lt;GovernanceDecisionAttestation&gt; }</code></li>
+<li><code>PartialEq</code> on <code>receipt.decision_hash</code> only</li>
+<li><code>verify_receipt()</code> delegates to <code>receipt.verify()</code></li>
+</ul>
+<p><strong>Where receipt is created</strong>: In standalone mode (<code>governance_mgr.rs:638</code>), <code>close_proposal</code> DOES NOT create a GovernanceProof or GovernanceDecisionReceipt. It only updates <code>ProposalState</code> to Accepted/Rejected/NoQuorum. In actor-backed mode, the <code>GovernanceActor</code> (via <code>handle.close_proposal()</code>) would generate proofs, but the gateway delegates to <code>handle.get_proof()</code> which returns <code>None</code> in standalone mode (<code>governance_mgr.rs:790</code>).</p>
+<p><strong>Critical Gap</strong>: The receipt generation happens ONLY in actor-backed mode (daemon with GovernanceActor). The gateway standalone mode (which is what the pilot currently uses) does NOT generate GovernanceDecisionReceipt or GovernanceProofV2 on close.</p>
+<h3>1.4 Effect Path: Decision → Treasury → Settlement → Ledger</h3>
+<p><strong>The intended chain:</strong></p>
+<pre><code>GovernanceDecisionReceipt → AllocationReceipt → SettlementIntent(s) → LedgerEntry
+</code></pre>
+<p><strong>AllocationReceipt</strong> at <code>icn-kernel-api/src/receipts.rs:121</code>:</p>
+<ul>
+<li>Fields: <code>receipt_id</code>, <code>decision_hash</code>, <code>intents: Vec&lt;SettlementIntent&gt;</code>, <code>scope</code>, <code>created_at</code>, <code>provenance</code>, <code>signature</code></li>
+<li>Implements <code>CanonicalReceipt</code> trait</li>
+<li><code>provenance</code> links back to <code>decision_hash</code> via <code>ProvenanceAnchors::from_parent(decision_hash)</code></li>
+<li>Canonical hash is deterministic (sorted intent hashes, excludes receipt_id and signature)</li>
+</ul>
+<p><strong>SettlementIntent</strong> at <code>icn-kernel-api/src/economics.rs:85</code>:</p>
+<ul>
+<li>Fields: <code>intent_id</code>, <code>decision_receipt_id</code>, <code>decision_hash</code>, <code>asset: AssetType</code>, <code>from</code>, <code>to</code>, <code>amount</code>, <code>unit</code>, <code>scope</code>, <code>memo</code>, <code>provenance</code>, <code>created_at</code></li>
+<li>Implements <code>CanonicalReceipt</code> trait</li>
+<li>Memo excluded from canonical hash</li>
+<li>6 AssetType variants: Fungible, Consumable, Depreciating, Transformable, Service, Claim</li>
+</ul>
+<p><strong>ReceiptStore</strong> at <code>icn-gateway/src/receipt_store.rs:20</code>:</p>
+<ul>
+<li>Sled-backed store for AllocationReceipt and SettlementIntent</li>
+<li>Stores by canonical hash</li>
+<li>Indexes by decision_hash</li>
+<li>Methods: <code>put_allocation</code>, <code>get_allocation</code>, <code>put_intent</code>, <code>get_intent</code>, <code>list_allocations_by_decision</code>, <code>list_intents_by_decision</code>, <code>put_allocation_with_intents</code>, <code>get_chain_by_decision</code></li>
+<li><strong>But</strong>: No code path automatically creates AllocationReceipt/SettlementIntent when a governance decision occurs</li>
+</ul>
+<p><strong>SettlementEngine</strong> at <code>icn-ledger/src/settlement.rs:86</code>:</p>
+<ul>
+<li>Takes <code>SettlementRequest</code> (not <code>SettlementIntent</code>) — different type!</li>
+<li>Creates balanced double-entry <code>JournalEntry</code></li>
+<li>Dedup by <code>sha256(&quot;icn-ledger:settlement:v1:&quot; || receipt_hash)</code></li>
+<li>Scope routing: Local/Cell/Org settle directly; Federation/Commons rejected (must use <code>ReceiptClearingManager</code>)</li>
+</ul>
+<p><strong>SettlementEngine</strong> at <code>icn-ledger/src/settlement.rs</code>:</p>
+<ul>
+<li>Works with <code>SettlementRequest</code> (from compute layer execution receipts), NOT with <code>SettlementIntent</code></li>
+<li>Different type from the governance path&#39;s <code>SettlementIntent</code></li>
+</ul>
+<p><strong>IMPORTANT: Daemon-mode Effect Execution EXISTS</strong> at <code>icn-core/src/supervisor/governance_executor.rs</code>:</p>
+<ul>
+<li><code>KernelGovernanceExecutor</code> implements <code>EffectExecutor</code> trait</li>
+<li>Handles: Treasury (spend via <code>KernelTreasuryExecutor</code>), Protocol (param changes), Federation, Control (veto/force-close), Membership (freeze/unfreeze)</li>
+<li><code>KernelTreasuryExecutor</code> has optional <code>ledger: Option&lt;Arc&lt;dyn LedgerService&gt;&gt;</code> — when present, treasury spends submit <code>TreasuryEntryRequest</code> to ledger service</li>
+<li><strong>JournalEntry already has provenance fields</strong>: <code>decision_receipt_id: Option&lt;String&gt;</code> and <code>decision_hash: Option&lt;String&gt;</code> at <code>icn-ledger/src/types.rs:82-99</code></li>
+<li><code>JournalEntryBuilder::with_decision_provenance()</code> wires governance decision hash into ledger entries</li>
+<li>This path is ONLY available when running as full daemon (icnd) with GovernanceActor — NOT in gateway standalone mode</li>
+</ul>
+<p><strong>Gateway standalone mode gap remains</strong>:</p>
+<ul>
+<li><code>propose_spend</code> creates a <code>ProposalPayload::Treasury { operation: Spend { ... } }</code> proposal</li>
+<li>In standalone mode, <code>close_proposal</code> sets outcome to Accepted but no effect execution occurs</li>
+<li>The <code>KernelGovernanceExecutor</code> effect path is not wired into the standalone gateway</li>
+</ul>
+<h3>1.5 Receipt Store &amp; Provenance</h3>
+<p><strong>CanonicalReceipt trait</strong> at <code>icn-kernel-api/src/receipts.rs:77</code>:</p>
+<pre><code class="language-rust">pub trait CanonicalReceipt {
+    fn canonical_hash(&amp;self) -&gt; Hash;      // Deterministic cross-node hash
+    fn receipt_id(&amp;self) -&gt; &amp;ReceiptId;     // Node-local ID
+    fn provenance(&amp;self) -&gt; &amp;ProvenanceAnchors;  // Upstream chain
+}
+</code></pre>
+<p><strong>Implementors</strong>: <code>AllocationReceipt</code>, <code>SettlementIntent</code></p>
+<p><strong>ProvenanceAnchors</strong> at <code>receipts.rs:36</code>:</p>
+<ul>
+<li><code>upstream_hashes: Vec&lt;Hash&gt;</code> — links to parent receipts</li>
+<li><code>root()</code> — genesis receipt</li>
+<li><code>from_parent(hash)</code> — single parent</li>
+<li><code>from_parents(hashes)</code> — multiple parents</li>
+</ul>
+<p><strong>ArtifactReceipt</strong> at <code>icn-kernel-api/src/proofs.rs</code>:</p>
+<ul>
+<li>Separate from CanonicalReceipt — used for compute task artifacts</li>
+<li>Fields: <code>receipt_hash</code>, <code>artifact_hash</code>, <code>artifact_size</code>, <code>submitter_did</code>, <code>executor_did</code>, <code>attester_did</code>, <code>created_at</code>, <code>binding_hash</code>, <code>signatures</code></li>
+<li><code>verify_binding()</code> with blake3 domain-separated hash</li>
+</ul>
+<p><strong>ReceiptStore (icn-rpc)</strong> at <code>icn-rpc/src/receipt.rs:198</code>:</p>
+<ul>
+<li>In-memory TTL-bounded LRU cache for RPC operation receipts</li>
+<li>Different from the gateway ReceiptStore — this is for RPC operation tracking, not governance receipts</li>
+</ul>
+<p><strong>Two separate ReceiptStores exist</strong>: Gateway (sled-backed, for AllocationReceipt/SettlementIntent) and RPC (in-memory LRU, for RPC operation receipts). Neither stores GovernanceDecisionReceipt/GovernanceProofV2.</p>
+<h3>1.6 Gateway Endpoints</h3>
+<h4>Governance Endpoints (prefix: <code>/v1/governance/</code>)</h4>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Handler</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>POST</td>
+<td><code>/domains</code></td>
+<td><code>create_domain</code></td>
+<td>Create governance domain</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/domains</code></td>
+<td><code>list_domains</code></td>
+<td>List domains</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/domains/{id}</code></td>
+<td><code>get_domain</code></td>
+<td>Get domain details</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/domains/{domain_id}/members</code></td>
+<td><code>add_domain_member</code></td>
+<td>Add member to domain</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/proposals</code></td>
+<td><code>create_proposal</code></td>
+<td>Create proposal</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/proposals</code></td>
+<td><code>list_proposals</code></td>
+<td>List proposals (filter by domain/state)</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/proposals/{id}</code></td>
+<td><code>get_proposal</code></td>
+<td>Get proposal details</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/proposals/{id}/votes</code></td>
+<td><code>get_votes</code></td>
+<td>Get vote tally</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/proposals/{id}/proof</code></td>
+<td><code>get_proposal_proof</code></td>
+<td>Get GovernanceProofV2 (verified)</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/proposals/{id}/open</code></td>
+<td><code>open_proposal</code></td>
+<td>Open proposal for voting</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/proposals/{id}/close</code></td>
+<td><code>close_proposal</code></td>
+<td>Close proposal, determine outcome</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/proposals/{id}/vote</code></td>
+<td><code>cast_vote</code></td>
+<td>Cast vote</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/delegations</code></td>
+<td><code>create_delegation</code></td>
+<td>Create vote delegation</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/delegations</code></td>
+<td><code>list_delegations</code></td>
+<td>List delegations</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/delegations/{id}</code></td>
+<td><code>get_delegation</code></td>
+<td>Get delegation</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/delegations/{id}</code></td>
+<td><code>revoke_delegation</code></td>
+<td>Revoke delegation</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/proposals/{id}/deliberation/start</code></td>
+<td><code>start_deliberation</code></td>
+<td>Start deliberation period</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/proposals/{id}/deliberation/end</code></td>
+<td><code>end_deliberation</code></td>
+<td>End deliberation period</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/proposals/{id}/comments</code></td>
+<td><code>add_comment</code></td>
+<td>Add comment</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/proposals/{id}/comments</code></td>
+<td><code>list_comments</code></td>
+<td>List comments</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/proposals/{id}/discussion</code></td>
+<td><code>get_discussion</code></td>
+<td>Get discussion with reactions</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/comments/{id}</code></td>
+<td><code>edit_comment</code></td>
+<td>Edit comment</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/comments/{id}</code></td>
+<td><code>delete_comment</code></td>
+<td>Delete comment</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/comments/{id}/reactions</code></td>
+<td><code>add_reaction</code></td>
+<td>Add reaction</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/comments/{id}/reactions/{emoji}</code></td>
+<td><code>remove_reaction</code></td>
+<td>Remove reaction</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/domains/{domain_id}/action-items</code></td>
+<td><code>create_action_item</code></td>
+<td>Create action item</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/domains/{domain_id}/action-items</code></td>
+<td><code>list_action_items</code></td>
+<td>List action items</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/domains/{domain_id}/action-items/{item_id}</code></td>
+<td><code>get_action_item</code></td>
+<td>Get action item</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/domains/{domain_id}/action-items/{item_id}</code></td>
+<td><code>update_action_item</code></td>
+<td>Update action item</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/domains/{domain_id}/action-items/{item_id}</code></td>
+<td><code>delete_action_item</code></td>
+<td>Delete action item</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/domains/{domain_id}/action-items/{item_id}/notes</code></td>
+<td><code>add_action_item_note</code></td>
+<td>Add note</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/domains/{domain_id}/action-items/{item_id}/status</code></td>
+<td><code>update_action_item_status</code></td>
+<td>Update status</td>
+</tr>
+</tbody></table>
+<p><strong>Federation proposal endpoints</strong> (7 specialized POST endpoints):</p>
+<ul>
+<li><code>POST /proposals/federation/join</code></li>
+<li><code>POST /proposals/federation/leave</code></li>
+<li><code>POST /proposals/federation/clearing</code></li>
+<li><code>POST /proposals/federation/clearing/terminate</code></li>
+<li><code>POST /proposals/federation/vouch</code></li>
+<li><code>POST /proposals/federation/vouch/revoke</code></li>
+<li><code>POST /proposals/federation/policy</code></li>
+</ul>
+<h4>Governance Dashboard</h4>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Handler</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GET</td>
+<td><code>/governance/{charter_id}/dashboard</code></td>
+<td><code>get_governance_dashboard</code></td>
+<td>Aggregate stats (amendments/appeals)</td>
+</tr>
+</tbody></table>
+<h4>Receipt Endpoints (prefix: <code>/v1/receipts/</code>)</h4>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Handler</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GET</td>
+<td><code>/allocations/{hash}</code></td>
+<td><code>get_allocation</code></td>
+<td>Get AllocationReceipt by hash</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/intents/{hash}</code></td>
+<td><code>get_intent</code></td>
+<td>Get SettlementIntent by hash</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/chain?decision_hash=...</code></td>
+<td><code>get_chain</code></td>
+<td>Get full economic chain for decision</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/allocations?decision_hash=...</code></td>
+<td><code>list_allocations</code></td>
+<td>List allocations for decision</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/intents?decision_hash=...</code></td>
+<td><code>list_intents</code></td>
+<td>List intents for decision</td>
+</tr>
+</tbody></table>
+<p><strong>Total: 5 receipt endpoints</strong>, focused on AllocationReceipt and SettlementIntent. GovernanceDecisionReceipt served via <code>/proposals/{id}/proof</code>.</p>
+<h4>Constitutional Endpoints (prefix: <code>/v1/constitutional/</code>)</h4>
+<p><strong>Amendment endpoints</strong> (8):</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Handler</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>POST</td>
+<td><code>/amendments</code></td>
+<td><code>create_amendment</code></td>
+<td>Create charter amendment</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/amendments</code></td>
+<td><code>list_amendments</code></td>
+<td>List amendments (paginated)</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/amendments/{id}</code></td>
+<td><code>get_amendment</code></td>
+<td>Get amendment detail</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/amendments/{id}/submit</code></td>
+<td><code>submit_amendment</code></td>
+<td>Submit for review</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/amendments/{id}/vote</code></td>
+<td><code>open_amendment_voting</code></td>
+<td>Open amendment voting</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/amendments/{id}/ratify</code></td>
+<td><code>ratify_amendment</code></td>
+<td>Ratify amendment</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/amendments/{id}/changes</code></td>
+<td><code>add_amendment_change</code></td>
+<td>Add changes to amendment</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/amendments/{id}/withdraw</code></td>
+<td><code>withdraw_amendment</code></td>
+<td>Withdraw amendment</td>
+</tr>
+</tbody></table>
+<p><strong>Amendment voting endpoints</strong> (4):</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Handler</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>POST</td>
+<td><code>/amendments/{id}/votes</code></td>
+<td><code>cast_vote</code></td>
+<td>Cast vote on amendment</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/amendments/{id}/votes</code></td>
+<td><code>list_votes</code></td>
+<td>List votes</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/amendments/{id}/results</code></td>
+<td><code>get_results</code></td>
+<td>Get voting results</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/amendments/{id}/my-vote</code></td>
+<td><code>get_my_vote</code></td>
+<td>Get current user&#39;s vote</td>
+</tr>
+</tbody></table>
+<p><strong>Appeal endpoints</strong> (8):</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Handler</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>POST</td>
+<td><code>/appeals</code></td>
+<td><code>file_appeal</code></td>
+<td>File new appeal</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/appeals</code></td>
+<td><code>list_appeals</code></td>
+<td>List appeals (paginated)</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/appeals/{id}</code></td>
+<td><code>get_appeal</code></td>
+<td>Get appeal detail</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/appeals/{id}/evidence</code></td>
+<td><code>add_appeal_evidence</code></td>
+<td>Add evidence</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/appeals/{id}/respond</code></td>
+<td><code>add_appeal_response</code></td>
+<td>Add response</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/appeals/{id}/review</code></td>
+<td><code>begin_appeal_review</code></td>
+<td>Start review</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/appeals/{id}/resolve</code></td>
+<td><code>resolve_appeal</code></td>
+<td>Resolve appeal</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/appeals/{id}/withdraw</code></td>
+<td><code>withdraw_appeal</code></td>
+<td>Withdraw appeal</td>
+</tr>
+</tbody></table>
+<p><strong>Appeal UI endpoints</strong> (4):</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Handler</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GET</td>
+<td><code>/appeals/{id}/timeline</code></td>
+<td><code>get_appeal_timeline</code></td>
+<td>Appeal event timeline</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/appeals/{id}/status</code></td>
+<td><code>get_appeal_status</code></td>
+<td>Status detail + next steps + deadlines</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/appeals/{id}/assign-reviewer</code></td>
+<td><code>assign_reviewer</code></td>
+<td>Assign reviewer</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/appeals/dashboard</code></td>
+<td><code>get_appeals_dashboard</code></td>
+<td>Metrics + recent appeals</td>
+</tr>
+</tbody></table>
+<h4>Ledger Provenance Endpoints (prefix: <code>/v1/ledger/</code>)</h4>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Handler</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GET</td>
+<td><code>/{coop_id}/entries/by-decision</code></td>
+<td><code>get_entries_by_decision</code></td>
+<td>Trace ledger entries back to governance decision</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/{coop_id}/history</code></td>
+<td><code>get_history</code></td>
+<td>Transaction history (paginated)</td>
+</tr>
+</tbody></table>
+<p><strong>Grand total: ~76 governance-related endpoints across governance, constitutional, receipts, ledger, and treasury modules.</strong></p>
+<h4>Treasury Endpoints (prefix: <code>/v1/treasury/</code>)</h4>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Handler</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GET</td>
+<td><code>/{coop_id}</code></td>
+<td><code>get_treasury_status</code></td>
+<td>Treasury status</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/{coop_id}/balance</code></td>
+<td><code>get_treasury_balance</code></td>
+<td>Treasury balance</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/{coop_id}/budgets</code></td>
+<td><code>list_budgets</code></td>
+<td>List budgets</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/{coop_id}/budgets/{budget_id}</code></td>
+<td><code>get_budget</code></td>
+<td>Get budget</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/{coop_id}/budgets</code></td>
+<td><code>create_budget</code></td>
+<td>Create budget (governance)</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/{coop_id}/spending-rules</code></td>
+<td><code>list_spending_rules</code></td>
+<td>List spending rules</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/{coop_id}/audit</code></td>
+<td><code>get_audit_trail</code></td>
+<td>Audit trail</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/{coop_id}/deposit</code></td>
+<td><code>deposit_to_treasury</code></td>
+<td>Deposit</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/{coop_id}/spend</code></td>
+<td><code>propose_spend</code></td>
+<td>Propose spend (creates governance proposal)</td>
+</tr>
+</tbody></table>
+<h3>1.7 Appeals System</h3>
+<p><strong>AppealType</strong> at <code>icn-governance/src/appeal.rs:66</code> — 7 variants:</p>
+<ol>
+<li><code>Revocation</code> — appeal revocation of membership/anchor/holder status</li>
+<li><code>Suspension</code> — appeal a suspension</li>
+<li><code>GovernanceDecision</code> — appeal a governance decision (with <code>proposal_id</code>, <code>decision</code>)</li>
+<li><code>DisputeResolution</code> — appeal a dispute resolution outcome</li>
+<li><code>MembershipDenial</code> — appeal membership denial</li>
+<li><code>StewardAction</code> — appeal steward action</li>
+<li><code>Other</code> — general appeal</li>
+</ol>
+<p><strong>AppealGrounds</strong> at <code>appeal.rs:269</code> — 8 variants:</p>
+<ol>
+<li><code>ProceduralError</code></li>
+<li><code>NewEvidence</code></li>
+<li><code>ExceededAuthority</code></li>
+<li><code>RightsViolation</code></li>
+<li><code>FactualError</code></li>
+<li><code>Bias</code></li>
+<li><code>DisproportionatePenalty</code></li>
+<li><code>Other</code></li>
+</ol>
+<p><strong>AppealRemedy</strong> at <code>appeal.rs:252</code> — 6 variants:</p>
+<ol>
+<li><code>Reverse</code> — reverse original decision</li>
+<li><code>Reinstate</code> — reinstate membership/status</li>
+<li><code>Modify</code> — modify decision</li>
+<li><code>Compensation</code> — monetary compensation</li>
+<li><code>Custom</code> — custom remedy</li>
+<li><code>None</code> — declaratory only</li>
+</ol>
+<p><strong>AppealStatus</strong> at <code>appeal.rs:155</code> — 6 states:</p>
+<ol>
+<li><code>Filed { filed_at }</code></li>
+<li><code>UnderReview { filed_at, review_started_at }</code></li>
+<li><code>Hearing { filed_at, hearing_started_at, hearing_ends_at }</code></li>
+<li><code>Resolved { filed_at, resolved_at, outcome: AppealOutcome }</code></li>
+<li><code>Dismissed { filed_at, dismissed_at, reason }</code></li>
+<li><code>Withdrawn { filed_at, withdrawn_at, reason }</code></li>
+</ol>
+<p><strong>AppealOutcome</strong> at <code>appeal.rs:221</code> — 4 variants:</p>
+<ul>
+<li><code>Upheld { reason, remedy }</code>, <code>Denied { reason }</code>, <code>PartiallyUpheld { reason, remedy }</code>, <code>Remanded { instructions, remanded_to }</code></li>
+</ul>
+<p><strong>AppealScope</strong> at <code>appeal.rs:134</code> — 3 levels:</p>
+<ul>
+<li><code>Jurisdiction</code>, <code>Federation</code>, <code>Network</code></li>
+</ul>
+<p><strong>AppealDeadlines</strong> at <code>appeal.rs:304</code>:</p>
+<ul>
+<li>Default: 30d filing, 14d review, 7d hearing, 90d max</li>
+<li>Expedited: 7d/3d/2d/21d</li>
+<li>Extended: 60d/30d/14d/180d</li>
+</ul>
+<p><strong>Appeal evidence</strong>: <code>AppealEvidence</code> struct with <code>evidence_type</code> (Document, Testimony, Record, Communication, SystemLog, Other), hash, submitted_at.</p>
+<p><strong>Receipt integration</strong>: Appeals have NO connection to the receipt system. No <code>decision_hash</code> or <code>ProvenanceAnchors</code> on Appeal. The <code>GovernanceDecision</code> appeal type stores only <code>proposal_id</code> (string) and <code>decision</code> (string description), not a <code>decision_hash</code>.</p>
+<hr>
+<h2>2. Chain Completeness Audit</h2>
+<table>
+<thead>
+<tr>
+<th>Link</th>
+<th>Exists?</th>
+<th>Connected?</th>
+<th>Human-traceable?</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Proposal → Vote</td>
+<td>YES</td>
+<td>YES</td>
+<td>YES</td>
+<td>Votes stored per proposal; tally computed on close</td>
+</tr>
+<tr>
+<td>Vote → Decision</td>
+<td>YES</td>
+<td>PARTIAL</td>
+<td>PARTIAL</td>
+<td>State transitions to Accepted/Rejected/NoQuorum; but GovernanceDecisionReceipt only generated in actor-backed mode, not standalone</td>
+</tr>
+<tr>
+<td>Decision → Receipt</td>
+<td>PARTIAL</td>
+<td>PARTIAL</td>
+<td>NO</td>
+<td>GovernanceProofV2 exists with canonical hashing and attestations, but only generated when GovernanceActor is running; standalone mode returns None</td>
+</tr>
+<tr>
+<td>Receipt → Allocation</td>
+<td>DESIGNED</td>
+<td>NO</td>
+<td>NO</td>
+<td>AllocationReceipt has <code>decision_hash</code> field linking to receipt, but NO code path creates AllocationReceipt from a governance decision</td>
+</tr>
+<tr>
+<td>Allocation → Settlement</td>
+<td>DESIGNED</td>
+<td>NO</td>
+<td>NO</td>
+<td>AllocationReceipt contains <code>Vec&lt;SettlementIntent&gt;</code>, but no code creates intents from governance decisions</td>
+</tr>
+<tr>
+<td>Settlement → LedgerEntry</td>
+<td>YES (daemon) / NO (standalone)</td>
+<td>YES (daemon)</td>
+<td>PARTIAL</td>
+<td><code>KernelGovernanceExecutor</code> → <code>KernelTreasuryExecutor</code> → <code>LedgerService.submit_treasury_entry()</code> in daemon mode. Gateway standalone has no path.</td>
+</tr>
+<tr>
+<td>LedgerEntry → Provenance</td>
+<td>YES (daemon)</td>
+<td>YES (daemon)</td>
+<td>PARTIAL</td>
+<td><code>JournalEntry.decision_receipt_id</code> and <code>decision_hash</code> fields set by <code>JournalEntryBuilder::with_decision_provenance()</code> in daemon mode. Not set in standalone mode.</td>
+</tr>
+<tr>
+<td>Appeal → Receipt</td>
+<td>NO</td>
+<td>NO</td>
+<td>NO</td>
+<td>Appeals have no receipt chain integration — AppealType::GovernanceDecision stores proposal_id as string, not decision_hash</td>
+</tr>
+</tbody></table>
+<p><strong>Summary</strong>: The top half (Proposal→Vote→Decision) works in both modes. In daemon mode (icnd with GovernanceActor), the full chain works: decision→receipt→effect execution→treasury→ledger entry with provenance. In gateway standalone mode (current pilot default), the chain is <strong>broken at Decision→Receipt</strong> — no receipt generated, no effect execution. The gap is a <strong>mode gap</strong>, not a missing-types gap.</p>
+<hr>
+<h2>3. Issue #1012 Analysis</h2>
+<p>Issue #1012 specifies &quot;Constraints with Receipts&quot; pattern:</p>
+<ul>
+<li><strong>What</strong>: constraint value(s)</li>
+<li><strong>Why</strong>: policy/authority</li>
+<li><strong>Who</strong>: authority</li>
+<li><strong>When</strong>: timestamp</li>
+</ul>
+<h3>Fields ALREADY available:</h3>
+<table>
+<thead>
+<tr>
+<th>#1012 Field</th>
+<th>Available in Receipt Types</th>
+<th>Where</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>What</strong> (constraint value)</td>
+<td><code>ConstraintSet</code> has <code>rate_limit</code>, <code>max_topics</code>, <code>max_message_size</code>, <code>custom: HashMap&lt;String, ConstraintValue&gt;</code></td>
+<td><code>icn-kernel-api/src/authz.rs:155</code></td>
+</tr>
+<tr>
+<td><strong>Why</strong> (policy/authority)</td>
+<td><code>PolicyDecision::Deny { reason: PolicyError }</code> has 6 error variants. <code>ConstraintSet</code> has no &quot;why&quot; field. GovernanceDecisionReceipt has <code>outcome</code> + <code>vote_tally</code> but no explicit policy reference.</td>
+<td>Partially available</td>
+</tr>
+<tr>
+<td><strong>Who</strong> (authority)</td>
+<td><code>GovernanceProofV2.attestations[].signer_did</code>. <code>SettlementIntent.decision_receipt_id</code>. <code>AllocationReceipt.provenance.upstream_hashes</code>. But: no authority DID on ConstraintSet.</td>
+<td>Partially available</td>
+</tr>
+<tr>
+<td><strong>When</strong> (timestamp)</td>
+<td><code>AllocationReceipt.created_at</code>, <code>SettlementIntent.created_at</code>, <code>GovernanceProof.timestamp</code>, <code>GovernanceDecisionAttestation.timestamp</code></td>
+<td>Available</td>
+</tr>
+</tbody></table>
+<h3>Fields MISSING:</h3>
+<ol>
+<li><p><strong>Policy Reference on ConstraintSet</strong>: When the kernel enforces a constraint, there is no field saying &quot;this constraint came from TrustPolicyOracle evaluating policy X&quot;. The <code>custom</code> hashmap COULD carry this, but no oracle currently sets a <code>policy_ref</code> key.</p>
+</li>
+<li><p><strong>Decision → Constraint Provenance</strong>: When a governance decision produces a ConstraintSet change, there is no link from the new constraint to the decision that caused it. The ConstraintSet is ephemeral (computed per-request by PolicyOracle), not persisted with provenance.</p>
+</li>
+<li><p><strong>Constraint History</strong>: No history of past constraint values. You can see what a constraint IS but not what it WAS or WHY it changed.</p>
+</li>
+<li><p><strong>Authority DID on Constraint</strong>: ConstraintSet doesn&#39;t carry the DID of the authority that imposed it. The PolicyOracle knows, but the kernel discards that information at the meaning firewall.</p>
+</li>
+</ol>
+<hr>
+<h2>4. Gap Analysis</h2>
+<h3>Gap G1: Decision Receipt Not Generated in Standalone Mode</h3>
+<ul>
+<li><strong>User story blocked</strong>: &quot;View decision receipt for a closed proposal&quot; — returns 404 in standalone gateway</li>
+<li><strong>Missing</strong>: Runtime receipt generation outside GovernanceActor</li>
+<li><strong>Where</strong>: <code>icn-gateway/src/governance_mgr.rs:close_proposal</code> (standalone branch)</li>
+<li><strong>Receipt expectation</strong>: GovernanceDecisionReceipt with canonical hash, verified attestation</li>
+<li><strong>Phase</strong>: 0</li>
+</ul>
+<h3>Gap G2: Effect Execution Only Available in Daemon Mode</h3>
+<ul>
+<li><strong>User story blocked</strong>: &quot;Treasury spend proposal passes → money actually moves&quot; (in standalone gateway)</li>
+<li><strong>In daemon mode</strong>: <code>KernelGovernanceExecutor</code> at <code>icn-core/src/supervisor/governance_executor.rs</code> handles Treasury, Protocol, Federation, Control, Membership effects. Treasury spends go through <code>KernelTreasuryExecutor</code> → <code>LedgerService.submit_treasury_entry()</code> with provenance. <strong>This works.</strong></li>
+<li><strong>In standalone mode</strong>: Gateway <code>close_proposal</code> only updates proposal state. No effect execution.</li>
+<li><strong>Where</strong>: <code>icn-gateway/src/governance_mgr.rs</code> standalone branch vs <code>icn-core/src/supervisor/governance_executor.rs</code></li>
+<li><strong>Receipt expectation</strong>: AllocationReceipt → SettlementIntent(s) → JournalEntry chain with provenance</li>
+<li><strong>Phase</strong>: 0 (ensure daemon mode used for pilot) / 1 (bring effect execution to standalone or make standalone unnecessary)</li>
+</ul>
+<h3>Gap G3: Receipt Chain Not Populated at Runtime</h3>
+<ul>
+<li><strong>User story blocked</strong>: &quot;View economic chain for a governance decision&quot; — <code>/v1/receipts/chain?decision_hash=...</code> returns empty</li>
+<li><strong>Missing</strong>: Code that creates and stores AllocationReceipt + SettlementIntent when a decision takes effect</li>
+<li><strong>Where</strong>: <code>icn-gateway/src/receipt_store.rs</code> has storage, no producers</li>
+<li><strong>Receipt expectation</strong>: Full chain visible via API</li>
+<li><strong>Phase</strong>: 0 (for display of existing data) / 1 (for runtime generation)</li>
+</ul>
+<h3>Gap G4: SettlementIntent ≠ SettlementRequest Type Mismatch</h3>
+<ul>
+<li><strong>User story blocked</strong>: &quot;Governance treasury spend settles in ledger&quot;</li>
+<li><strong>Missing</strong>: Converter from <code>SettlementIntent</code> (governance path) to <code>SettlementRequest</code> (ledger engine) or unified type</li>
+<li><strong>Where</strong>: <code>icn-kernel-api/src/economics.rs</code> vs <code>icn-ledger/src/settlement.rs</code></li>
+<li><strong>Receipt expectation</strong>: Unified settlement path</li>
+<li><strong>Phase</strong>: 1</li>
+</ul>
+<h3>Gap G5: Appeal Not Linked to Receipt Chain</h3>
+<ul>
+<li><strong>User story blocked</strong>: &quot;File appeal against decision with decision_hash&quot;</li>
+<li><strong>Missing</strong>: <code>AppealType::GovernanceDecision</code> uses string <code>proposal_id</code>, not <code>decision_hash</code></li>
+<li><strong>Where</strong>: <code>icn-governance/src/appeal.rs:82</code></li>
+<li><strong>Receipt expectation</strong>: Appeal records decision_hash, appeal resolution produces own receipt</li>
+<li><strong>Phase</strong>: 1</li>
+</ul>
+<h3>Gap G6: Delegation Not Applied in Vote Tally</h3>
+<ul>
+<li><strong>User story blocked</strong>: &quot;Delegate my vote to a trusted representative&quot;</li>
+<li><strong>Missing</strong>: Delegation application in <code>close_proposal</code> tally computation</li>
+<li><strong>Where</strong>: <code>governance_mgr.rs:678</code> — <code>VoteTally::from(proposal_votes)</code> ignores delegations</li>
+<li><strong>Receipt expectation</strong>: Vote tally includes delegated votes</li>
+<li><strong>Phase</strong>: 1</li>
+</ul>
+<h3>Gap G7: No Constraint Provenance (Issue #1012)</h3>
+<ul>
+<li><strong>User story blocked</strong>: &quot;See WHY this rate limit was imposed on me&quot;</li>
+<li><strong>Missing</strong>: Policy reference / authority / timestamp on ConstraintSet or PolicyDecision</li>
+<li><strong>Where</strong>: <code>icn-kernel-api/src/authz.rs:155</code> — ConstraintSet has no provenance</li>
+<li><strong>Receipt expectation</strong>: &quot;What / Why / Who / When&quot; visible in dashboard</li>
+<li><strong>Phase</strong>: 0 (stub with available data) / 1 (full provenance chain)</li>
+</ul>
+<h3>Gap G8: No GovernanceDecisionReceipt Storage</h3>
+<ul>
+<li><strong>User story blocked</strong>: &quot;Look up any past governance decision by decision_hash&quot;</li>
+<li><strong>Missing</strong>: Persistent storage for GovernanceDecisionReceipt (not just in GovernanceActor memory)</li>
+<li><strong>Where</strong>: No ReceiptStore method for GovernanceDecisionReceipt</li>
+<li><strong>Receipt expectation</strong>: Sled-persisted, queryable by proposal_id or decision_hash</li>
+<li><strong>Phase</strong>: 0</li>
+</ul>
+<hr>
+<h2>5. Phase 0 Tasks (5 tasks)</h2>
+<h3>P0-GOV-T01: Generate GovernanceDecisionReceipt in standalone close_proposal</h3>
+<ul>
+<li><strong>What</strong>: When <code>close_proposal</code> runs in standalone mode, compute <code>GovernanceDecisionReceipt</code> from the votes and store it</li>
+<li><strong>Files</strong>: <code>icn-gateway/src/governance_mgr.rs</code> (close_proposal standalone branch), add <code>decision_receipts: RwLock&lt;HashMap&lt;ProposalId, GovernanceDecisionReceipt&gt;&gt;</code> storage</li>
+<li><strong>Test</strong>: Close a proposal → <code>get_proof</code> returns a valid GovernanceDecisionReceipt with <code>verify()</code> == true</li>
+<li><strong>Demo</strong>: Create proposal → vote → close → GET <code>/proposals/{id}/proof</code> returns valid receipt</li>
+</ul>
+<h3>P0-GOV-T02: Store GovernanceDecisionReceipt in ReceiptStore</h3>
+<ul>
+<li><strong>What</strong>: Extend <code>receipt_store.rs</code> to store/index GovernanceDecisionReceipt by decision_hash and proposal_id</li>
+<li><strong>Files</strong>: <code>icn-gateway/src/receipt_store.rs</code> (add GovernanceDecisionReceipt methods), <code>icn-gateway/src/api/receipts.rs</code> (add endpoint)</li>
+<li><strong>Test</strong>: Put receipt → get by hash → get by proposal_id → all return same receipt</li>
+<li><strong>Demo</strong>: GET <code>/v1/receipts/decisions/{hash}</code> returns GovernanceDecisionReceipt</li>
+</ul>
+<h3>P0-GOV-T03: Wire close_proposal → ReceiptStore</h3>
+<ul>
+<li><strong>What</strong>: After generating GovernanceDecisionReceipt in close_proposal, store it in ReceiptStore</li>
+<li><strong>Files</strong>: <code>icn-gateway/src/governance_mgr.rs</code>, <code>icn-gateway/src/server.rs</code> (inject ReceiptStore dependency)</li>
+<li><strong>Test</strong>: Full flow: create → vote → close → receipt stored → queryable via API</li>
+<li><strong>Demo</strong>: Receipts Explorer can show decision receipt for any closed proposal</li>
+</ul>
+<h3>P0-GOV-T04: Receipts Explorer data contract</h3>
+<ul>
+<li><strong>What</strong>: Define and serve the data needed for a Receipt Explorer UI — decision receipt + linked chain (even if chain is empty for now)</li>
+<li><strong>Files</strong>: <code>icn-gateway/src/api/receipts.rs</code> (add unified chain endpoint that includes GovernanceDecisionReceipt)</li>
+<li><strong>Test</strong>: API contract test returning <code>{ decision: GovernanceDecisionReceipt, allocations: [], intents: [] }</code></li>
+<li><strong>Demo</strong>: Frontend can render a receipt with &quot;Verified&quot; badge when <code>verify()</code> passes</li>
+</ul>
+<h3>P0-GOV-T05: Constraint provenance stub (#1012)</h3>
+<ul>
+<li><strong>What</strong>: Add <code>policy_domain: Option&lt;String&gt;</code> and <code>evaluated_at: Option&lt;u64&gt;</code> to PolicyDecision or a new <code>ConstraintProvenance</code> struct. TrustPolicyOracle sets these when returning constraints.</li>
+<li><strong>Files</strong>: <code>icn-kernel-api/src/authz.rs</code> (add provenance fields or struct), <code>apps/trust/src/</code> (set fields)</li>
+<li><strong>Test</strong>: TrustPolicyOracle returns PolicyDecision with <code>policy_domain = &quot;trust&quot;</code>, <code>evaluated_at = now</code></li>
+<li><strong>Demo</strong>: Dashboard shows &quot;Rate limit: 20 msg/sec | Source: Trust Policy | Trust Score: 0.35&quot;</li>
+</ul>
+<hr>
+<h2>6. Phase 1 Tasks (5 tasks)</h2>
+<h3>P1-GOV-T01: Effect execution engine for treasury proposals</h3>
+<ul>
+<li><strong>What</strong>: When a Treasury::Spend proposal is accepted, create AllocationReceipt + SettlementIntent(s), store in ReceiptStore, and execute the spend against the ledger</li>
+<li><strong>Files</strong>: New <code>icn-gateway/src/effect_executor.rs</code> or within <code>governance_mgr.rs</code>, <code>receipt_store.rs</code></li>
+<li><strong>Test</strong>: Treasury spend proposal accepted → AllocationReceipt created → SettlementIntent stored → balance changes in ledger</li>
+<li><strong>Demo</strong>: Full treasury spend lifecycle visible in Receipts Explorer</li>
+</ul>
+<h3>P1-GOV-T02: Unify SettlementIntent → SettlementRequest</h3>
+<ul>
+<li><strong>What</strong>: Either make SettlementEngine accept SettlementIntent directly, or create a converter. The governance path and compute path should both reach the ledger.</li>
+<li><strong>Files</strong>: <code>icn-ledger/src/settlement.rs</code>, <code>icn-kernel-api/src/economics.rs</code></li>
+<li><strong>Test</strong>: SettlementIntent from governance → settled in ledger → JournalEntry created</li>
+<li><strong>Demo</strong>: Provenance chain: decision_hash → allocation → intent → journal entry</li>
+</ul>
+<h3>P1-GOV-T03: Appeal receipt chain integration</h3>
+<ul>
+<li><strong>What</strong>: Add <code>decision_hash: Option&lt;Hash&gt;</code> to <code>AppealType::GovernanceDecision</code>. When an appeal resolves, create an AppealReceipt linking to the original decision.</li>
+<li><strong>Files</strong>: <code>icn-governance/src/appeal.rs</code>, new <code>AppealReceipt</code> type (or extend CanonicalReceipt)</li>
+<li><strong>Test</strong>: File appeal with decision_hash → resolve → receipt links back to original decision</li>
+<li><strong>Demo</strong>: Appeal shows &quot;Appealing decision 0xABC123...&quot; with link to original receipt</li>
+</ul>
+<h3>P1-GOV-T04: Apply delegated votes in tally</h3>
+<ul>
+<li><strong>What</strong>: When computing vote tally in close_proposal, check for active delegations and include delegated votes</li>
+<li><strong>Files</strong>: <code>icn-gateway/src/governance_mgr.rs</code> (close_proposal), delegation lookup</li>
+<li><strong>Test</strong>: Alice delegates to Bob, Bob votes For, tally includes Alice&#39;s delegated weight</li>
+<li><strong>Demo</strong>: Vote tally shows &quot;3 For (including 1 delegated)&quot; in proposal detail</li>
+</ul>
+<h3>P1-GOV-T05: Full provenance navigation in receipt API</h3>
+<ul>
+<li><strong>What</strong>: Add upstream/downstream navigation to receipt endpoints. Given any receipt hash, return its upstream chain (provenance) and downstream dependents.</li>
+<li><strong>Files</strong>: <code>icn-gateway/src/receipt_store.rs</code> (add reverse index), <code>icn-gateway/src/api/receipts.rs</code> (add navigation endpoints)</li>
+<li><strong>Test</strong>: Decision receipt → follow provenance chain → allocation → intents → all linked</li>
+<li><strong>Demo</strong>: Receipts Explorer shows clickable chain: Decision → Allocation → Settlement → Ledger Entry</li>
+</ul>
+<hr>
+<h2>7. Relevant Open Issues</h2>
+<ul>
+<li><strong>#1012</strong>: Legibility Dashboards UX Spec — &quot;Constraints with Receipts&quot; pattern (What/Why/Who/When). Directly drives P0-GOV-T05 and P1-GOV-T05.</li>
+<li><strong>#246</strong>: Treasury operations — drives the treasury proposal types and P1-GOV-T01 (effect execution).</li>
+<li><strong>#25</strong>: Emergency proposals — already implemented as ProposalPayload variants (FreezeMember, VetoProposal, ForceCloseProposal, RollbackLedger).</li>
+<li><strong>#52</strong>: Dispute escalation — DisputeResolution proposal variant exists.</li>
+<li><strong>#389</strong>: Labor share operations — SurplusAllocation and ShareRedemption proposal variants exist.</li>
+</ul>
+<hr>
+<h2>Summary: Chain Status</h2>
+<pre><code>Proposal → Vote → Decision    [WORKS in standalone + daemon mode]
+                    ↓
+    GovernanceDecisionReceipt  [WORKS in daemon mode, BROKEN in standalone]
+                    ↓
+    KernelGovernanceExecutor   [WORKS in daemon mode, NOT AVAILABLE in standalone]
+         ↓ (effect execution)
+    KernelTreasuryExecutor     [WORKS in daemon w/ LedgerService, placeholder otherwise]
+         ↓
+    TreasuryEntryRequest       [WORKS in daemon mode]
+         ↓
+    JournalEntryBuilder        [WITH decision_receipt_id + decision_hash provenance]
+         ↓
+    JournalEntry               [PROVENANCE FIELDS EXIST: decision_receipt_id, decision_hash]
+         ↓
+    Merkle-DAG                 [IMMUTABLE, PARENTS LINKED]
+</code></pre>
+<p><strong>Bottom line</strong>: The governance decision chain is ~60% connected in daemon mode (icnd), but ~30% in standalone gateway mode (current pilot default). The full effect execution path exists: <code>KernelGovernanceExecutor</code> → <code>KernelTreasuryExecutor</code> → <code>LedgerService</code> → <code>JournalEntry</code> with provenance. The gap is a <strong>mode gap</strong>: standalone gateway doesn&#39;t use the daemon&#39;s execution infrastructure. Phase 0 should either (a) make standalone generate receipts, or (b) ensure the pilot uses daemon mode. Phase 1 connects the receipt store and makes everything queryable via API.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

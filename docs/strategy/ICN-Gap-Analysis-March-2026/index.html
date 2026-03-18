@@ -1,0 +1,529 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN System-by-System Gap Analysis: Vision vs. Reality | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>strategy</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ICN Gap Analysis March 2026</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/strategy/ICN-Gap-Analysis-March-2026.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN System-by-System Gap Analysis: Vision vs. Reality</h1>
+<p><strong>March 17, 2026 | Tracing each subsystem from conceptual origin through protocol spec to current implementation</strong></p>
+<p><em>Cross-referenced from: 9 protocol specs (Aug 2025), 7 current status files (Mar 2026), 11 research/ecosystem docs, and the full conceptual archive.</em></p>
+<hr>
+<h2>How to Read This Document</h2>
+<p>For each of ICN&#39;s core subsystems, I trace three layers:</p>
+<ol>
+<li><strong>The Origin</strong> — where the idea came from (philosophical, academic, or practical)</li>
+<li><strong>The Spec</strong> — what the August 2025 protocol suite promised</li>
+<li><strong>The Reality</strong> — what actually exists in code as of March 2026</li>
+<li><strong>The Verdict</strong> — confirmed, gap, or divergence</li>
+</ol>
+<hr>
+<h2>1. IDENTITY &amp; CRYPTOGRAPHY</h2>
+<h3>Origin</h3>
+<p>The March 31, 2024 founding conversation asked: &quot;Can&#39;t the ICN be the IdP?&quot; — establishing that identity IS the network, not something external. The DSL Design Research (March 2024) established that cooperative members must understand the rules governing them, which requires identity to be self-sovereign and human-legible. The Revolutionary Strategy Synthesis grounded this in Ella Baker&#39;s &quot;strong people don&#39;t need strong leaders&quot; — identity as self-determination.</p>
+<h3>Spec (Identity Protocol, Aug 2025)</h3>
+<ul>
+<li>Self-sovereign DIDs (<code>did:icn:</code> format), W3C compliant</li>
+<li>Five DID types: Person, Organization, Device, Service, Ephemeral</li>
+<li>Verification methods: Ed25519, ECDSA, RSA, BLS12381</li>
+<li>Mana burn on DID creation (anti-Sybil)</li>
+<li>Key rotation, social recovery, multi-device binding</li>
+<li>Zero-knowledge proofs for attribute verification</li>
+<li>ICNMetadata: org membership, node type, compute score, trust score, recovery contacts</li>
+</ul>
+<h3>Reality (March 2026)</h3>
+<ul>
+<li><strong>WORKING:</strong> Full DID system (Ed25519-based <code>did:icn:&lt;base58pubkey&gt;</code>)</li>
+<li><strong>WORKING:</strong> Two DID types implemented: Traditional + SDIS Anchor (privacy-preserving via VUI)</li>
+<li><strong>WORKING:</strong> SDIS steward network, threshold PRF, enrollment ceremonies</li>
+<li><strong>WORKING:</strong> VUI (Verifiable Unique Identifier) via Merkle + RSA accumulators</li>
+<li><strong>WORKING:</strong> Post-quantum cryptography (Kyber/Dilithium) as optional feature</li>
+<li><strong>WORKING:</strong> Zero-knowledge proofs for SDIS (attribute, non-revocation, compound)</li>
+<li><strong>WORKING:</strong> Multi-device support with HSM + TPM 2.0 optional</li>
+<li><strong>WORKING:</strong> Social key recovery via steward attestations</li>
+<li><strong>WORKING:</strong> Age-encrypted keystore with auto-migration</li>
+</ul>
+<h3>Verdict: CONFIRMED — Identity is the strongest subsystem</h3>
+<p>The implementation actually <strong>exceeds</strong> the original spec in some areas. SDIS (Sovereign Digital Identity System) with VUI provides stronger Sybil resistance than the spec&#39;s mana-burn approach alone. Post-quantum crypto was speculative in the spec; it&#39;s operational with feature flags.</p>
+<p><strong>Minor gap:</strong> The spec called for five DID types (Person, Organization, Device, Service, Ephemeral). Implementation has two (Traditional, SDIS Anchor). Organization/Device/Service DIDs exist implicitly through the entity model but aren&#39;t distinct DID types. This is a design simplification, not a deficit — the entity system handles the differentiation at a higher layer.</p>
+<hr>
+<h2>2. GOVERNANCE</h2>
+<h3>Origin</h3>
+<p>The entire governance architecture traces to three sources: Ella Baker&#39;s group-centered leadership model (from the Revolutionary Strategy Synthesis), Elinor Ostrom&#39;s eight design principles for commons governance, and Mondragon&#39;s nested polycentric structure (local autonomy + federated coordination). The DSL Design Research directly seeded the idea that governance rules should be machine-verifiable.</p>
+<h3>Spec (Governance Protocol, Aug 2025)</h3>
+<ul>
+<li>One member, one vote (never token-weighted)</li>
+<li>Seven voting models: SimpleMajority, SuperMajority, Consensus, Sociocracy, LiquidDemocracy, Futarchy, Random</li>
+<li>Three scope levels: Local, Federation, Global</li>
+<li>Soul-bound membership credentials</li>
+<li>Mana fee waivers for below-threshold members</li>
+<li>Proposal lifecycle: Draft → Open → Accepted/Rejected/NoQuorum</li>
+<li>Delegation system with liquid democracy</li>
+<li>All proposals/votes immutable in DAG</li>
+</ul>
+<h3>Reality (March 2026)</h3>
+<ul>
+<li><strong>WORKING:</strong> Full proposal state machine (Draft → Open → Accepted/Rejected/NoQuorum)</li>
+<li><strong>WORKING:</strong> Proposal types: Text, Budget, Membership, ConfigChange</li>
+<li><strong>WORKING:</strong> Vote types: For/Against/Abstain with comments + discussion</li>
+<li><strong>WORKING:</strong> Quorum + approval thresholds, configurable per-domain</li>
+<li><strong>WORKING:</strong> Liquid democracy delegation (scope + expiry aware)</li>
+<li><strong>WORKING:</strong> Charter system (TOML format per coop/community)</li>
+<li><strong>WORKING:</strong> Amendment system for constitutional changes</li>
+<li><strong>WORKING:</strong> Appeal system for due process</li>
+<li><strong>WORKING:</strong> Cryptographic decision proofs (Ed25519 hashes + voter attestations)</li>
+<li><strong>WORKING:</strong> Capability-based authorization (Meaning Firewall compliant)</li>
+<li><strong>WORKING:</strong> Full REST API (20+ endpoints)</li>
+<li><strong>547 tests passing</strong> in governance module</li>
+</ul>
+<h3>Verdict: CONFIRMED with minor scope reduction</h3>
+<p>The spec promised seven voting models. The implementation has the core ones (majority, supermajority, consent, delegation) but <strong>Futarchy, Sociocracy circles, and Random (sortition) are not yet implemented</strong>. This is reasonable prioritization — you built the ones cooperatives actually use first.</p>
+<p><strong>Active gap:</strong> Charter templates (pre-built TOML configs for worker-coop, consumer-coop, community-land, federation, housing) don&#39;t exist yet. Estimated 1-2 days to create. This is a Phase 2 blocker for demo simplicity.</p>
+<p><strong>Structural gap:</strong> CCL formula extraction (#1308) — the commons credit formula is hardcoded in Rust rather than expressed in CCL. This violates the Meaning Firewall principle (kernel contains semantic business logic). Flagged as Phase 1 compliance work, not yet started.</p>
+<hr>
+<h2>3. ECONOMICS &amp; LEDGER</h2>
+<h3>Origin</h3>
+<p>Three theoretical lineages converge:</p>
+<ol>
+<li><strong>Mondragon&#39;s Caja Laboral</strong> — cooperative bank as active incubator, not passive lender</li>
+<li><strong>Sardex (Sardinia mutual credit)</strong> — proof that bilateral credit systems work at regional scale</li>
+<li><strong>Kropotkin&#39;s Mutual Aid</strong> — evolutionary basis for inter-cooperative economics</li>
+</ol>
+<p>The Dual Power Strategy (Sep 2024) specified three financial layers: Cooperative Banking, Mutual Credit, and Inter-Cooperative Risk Pool.</p>
+<p><strong>NOTE (March 17, 2026):</strong> The &quot;Mana&quot; economic model — regenerative computational credits with decay, demurrage, trust multipliers, and the regeneration formula — is <strong>not part of the current iteration</strong>. It was an earlier theoretical design that has been set aside. The current economic layer is the mutual credit ledger, patronage distribution, and budget management. This is a deliberate scoping decision, not a gap.</p>
+<h3>Spec (Current Scope)</h3>
+<ul>
+<li>Double-entry mutual credit (bilateral, not blockchain)</li>
+<li>Multi-currency support</li>
+<li>Credit limits, settlement, patronage distribution</li>
+<li>Treasury management and budgeting</li>
+<li>Escrow for governance-approved allocations</li>
+</ul>
+<h3>Reality (March 2026)</h3>
+<ul>
+<li><strong>WORKING:</strong> Double-entry mutual credit ledger (Merkle-DAG, append-only, content-addressed)</li>
+<li><strong>WORKING:</strong> Multi-currency support (Hours, USD, kWh, custom units)</li>
+<li><strong>WORKING:</strong> Credit limits (per-participant, per-currency)</li>
+<li><strong>WORKING:</strong> Settlement operations (cross-cooperative transfers)</li>
+<li><strong>WORKING:</strong> Patronage distribution (S14 complete, internal capital accounts)</li>
+<li><strong>WORKING:</strong> Treasury anchor (deterministic DID derivation)</li>
+<li><strong>WORKING:</strong> Budget management + escrow system</li>
+<li><strong>WORKING:</strong> Full REST API for ledger operations</li>
+<li><strong>WORKING:</strong> Python Mesa simulation validating mutual credit parameters</li>
+</ul>
+<h3>Verdict: CONFIRMED — the economic layer does what it needs to for this iteration</h3>
+<p>The double-entry mutual credit ledger, patronage distribution, multi-currency support, and settlement all work. This is a solid, practical cooperative economics layer that handles real cooperative needs (budgets, patronage, cross-coop settlement) without overcommitting to untested theoretical models.</p>
+<p><strong>Remaining work:</strong></p>
+<ul>
+<li>Commons credit formula extraction from Rust to CCL (#1308) — still a Meaning Firewall compliance issue regardless of Mana&#39;s status</li>
+<li>If/when a more sophisticated economic model is desired in the future, the ledger infrastructure can support it</li>
+</ul>
+<hr>
+<h2>4. FEDERATION &amp; INTEROPERATION</h2>
+<h3>Origin</h3>
+<p>Directly from Ostrom&#39;s design principle #8 (&quot;nested enterprises for larger systems&quot;) and the Mondragon model (individual co-ops → Corporación → Social Council). The Cooperative DSL research framed federation as the mechanism for &quot;cooperation among cooperatives&quot; (Rochdale Principle #6). The Federation Sync Protocol was one of seven protocols written in the August 2025 sprint.</p>
+<h3>Spec (Federation Sync Protocol, Aug 2025)</h3>
+<ul>
+<li>Local-first operation with periodic checkpoints</li>
+<li>Semi-autonomous federation clusters with own DAG segments</li>
+<li>Byzantine fault tolerance (up to 1/3 faulty federations)</li>
+<li>Eventual consistency across boundaries</li>
+<li>Automatic partition healing</li>
+<li>Cross-federation resource sharing</li>
+<li>Three-epoch checkpoint system</li>
+<li>Four connection types: Peer, ParentChild, Bridge, Emergency</li>
+<li>Formation requires: 2+ founding orgs, 3+ validators, mana stake, charter approval</li>
+</ul>
+<h3>Reality (March 2026)</h3>
+<ul>
+<li><strong>WORKING:</strong> Federation registry, attestations, clearing, vouching</li>
+<li><strong>WORKING:</strong> Gossip-based registry discovery</li>
+<li><strong>WORKING:</strong> Federated attestations (cross-boundary trust scores)</li>
+<li><strong>WORKING:</strong> Cross-coop settlement</li>
+<li><strong>WORKING:</strong> DID resolution across federation (<code>did:icn:coop-prefix:pubkey</code>)</li>
+<li><strong>WORKING:</strong> Vouching (cooperative-to-coop endorsements)</li>
+<li><strong>WORKING:</strong> Demo federation (4 personas: BrightWorks, River City Tool Library, Harbor Homes, Finger Lakes CDN)</li>
+<li><strong>WORKING:</strong> Federation joining/leaving proposal types</li>
+<li><strong>BLOCKED:</strong> <code>treasury:write</code> and <code>federation:write</code> scopes missing from K3s ALLOWED_SCOPES</li>
+</ul>
+<h3>Verdict: PARTIALLY CONFIRMED — federation exists but async proof exchange undefined</h3>
+<p>The basic federation model works. Four demo cooperatives coordinate, vouch for each other, and settle across boundaries. But the spec&#39;s more sophisticated features are absent:</p>
+<p><strong>Gaps:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Spec</th>
+<th>Status</th>
+<th>Severity</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Three-epoch checkpoint system</td>
+<td>Periodic federation checkpoints</td>
+<td>NOT BUILT</td>
+<td>MEDIUM</td>
+</tr>
+<tr>
+<td>Partition healing</td>
+<td>Automatic reconciliation after split</td>
+<td>NOT BUILT</td>
+<td>MEDIUM</td>
+</tr>
+<tr>
+<td>Byzantine tolerance (1/3)</td>
+<td>Formal BFT across federations</td>
+<td>NOT IMPLEMENTED</td>
+<td>HIGH for production</td>
+</tr>
+<tr>
+<td>Cross-federation async proof exchange</td>
+<td>Cryptographic proofs between separate federations</td>
+<td>NOT SPECIFIED (mechanism undefined)</td>
+<td>HIGH</td>
+</tr>
+<tr>
+<td>Market maker for exchange rates</td>
+<td>Algorithmic or governed rate-setting</td>
+<td>NOT SPECIFIED</td>
+<td>HIGH for real inter-federation trade</td>
+</tr>
+<tr>
+<td>Netting algorithm</td>
+<td>Automatic offsetting of bilateral obligations</td>
+<td>NOT BUILT</td>
+<td>MEDIUM</td>
+</tr>
+<tr>
+<td>Inter-org dispute resolution</td>
+<td>Arbitration for settlement failures</td>
+<td>NOT BUILT</td>
+<td>HIGH</td>
+</tr>
+</tbody></table>
+<p>The ecosystem docs flag this clearly: &quot;Settlement finality is undefined. How are inter-org disputes resolved when organizations disagree on exchange rates or outstanding balances?&quot; This is a gap between the theoretical model (which assumes cooperative good faith) and the adversarial-by-default security posture (which assumes bad actors).</p>
+<hr>
+<h2>5. CCL (Cooperative Contract Language)</h2>
+<h3>Origin</h3>
+<p>The DSL Design Research (March 2024) is the direct ancestor. It analyzed how domain-specific languages could replace natural language bylaws — the tension between human-readability and machine-verifiability. This is arguably the most intellectually distinctive component of ICN.</p>
+<h3>Spec (CCL Protocol, Aug 2025)</h3>
+<ul>
+<li>WASM-based smart contracts with Rust-like syntax</li>
+<li>Deterministic execution (no external I/O during execution)</li>
+<li>Strict resource metering via mana</li>
+<li>Built-in governance primitives (voting, proposals)</li>
+<li>Mutual aid automation (resource sharing, collective agreements)</li>
+<li>Organization/federation scoped contracts</li>
+<li>Type system: Bool, U64, I64, F64, String, Bytes + ICN types (DID, CID, Mana, Epoch, TokenClass)</li>
+<li>Built-in operations: identity, economic, governance, time, DAG</li>
+<li>Constructor, public, automatic, and view functions</li>
+<li>Complete auditability (all executions in DAG)</li>
+</ul>
+<h3>Reality (March 2026)</h3>
+<ul>
+<li><strong>WORKING:</strong> CCL interpreter with fuel metering</li>
+<li><strong>WORKING:</strong> Deterministic execution</li>
+<li><strong>WORKING:</strong> Capability-based security</li>
+<li><strong>WORKING:</strong> WASM execution via wasmtime (optional feature flag)</li>
+<li><strong>WORKING:</strong> Fuzz testing target for CCL</li>
+<li><strong>PARTIAL:</strong> CCL is &quot;not Turing-complete&quot; (intentional design choice for safety)</li>
+<li><strong>GAP:</strong> Commons credit formula hardcoded, not in CCL (#1308)</li>
+<li><strong>GAP:</strong> No pre-built contract library for common cooperative patterns</li>
+<li><strong>GAP:</strong> No charter-to-CCL translation pipeline</li>
+</ul>
+<h3>Verdict: WORKING but immature — the language exists, the ecosystem doesn&#39;t</h3>
+<p>The CCL interpreter runs, metered, deterministic, and fuzz-tested. That&#39;s real. But the spec promised rich built-in operations (identity, economic, governance, time, DAG), a type system with ICN-specific types, and contract scoping by organization. The current implementation appears to be a capable runtime without the library of cooperative governance primitives that would make it accessible to non-programmers.</p>
+<p><strong>Critical gap:</strong> The original DSL research emphasized that non-technical members must be able to understand the rules governing their cooperative. If CCL requires programming expertise to write governance rules, it has failed its core design requirement. The charter template system (TOML configs) may serve as the &quot;non-programmer interface&quot; with CCL underneath, but that pipeline doesn&#39;t exist yet.</p>
+<hr>
+<h2>6. STORAGE (DAG)</h2>
+<h3>Origin</h3>
+<p>The choice of content-addressed DAG (not blockchain) traces to the founding architecture. &quot;Boring tech where possible&quot; from the PoC spec. Event sourcing was in the original March 2024 conversations. The DAG model comes from IPLD/IPFS lineage, adapted for cooperative governance.</p>
+<h3>Spec (DAG Storage Protocol, Aug 2025)</h3>
+<ul>
+<li>Immutable content-addressed DAG (CID-based)</li>
+<li>Local-first (no global consensus required)</li>
+<li>Three-tier storage: Hot (24h), Warm (2 epochs), Cold (forever)</li>
+<li>Archive cooperatives compensated with tokens</li>
+<li>Mana costs per storage operation (scaled by size)</li>
+<li>Eight block types: Genesis, Identity, Economic, Governance, Execution, Federation, Checkpoint, Emergency</li>
+<li>Four node classes: Mobile (&lt;100MB), Community (&lt;10GB), Federation (&lt;100GB), Archive (unlimited)</li>
+<li>Causal ordering and topological sorting</li>
+</ul>
+<h3>Reality (March 2026)</h3>
+<ul>
+<li><strong>WORKING:</strong> Merkle-DAG, append-only journal, content-addressed (in icn-ledger)</li>
+<li><strong>WORKING:</strong> Tamper-evident, independently verifiable</li>
+<li><strong>WORKING:</strong> Sled KV store for local persistence</li>
+<li><strong>WORKING:</strong> NFS-backed persistent volumes on K3s</li>
+</ul>
+<h3>Verdict: SIMPLIFIED — core works, tiered storage not implemented</h3>
+<p>The Merkle-DAG exists and works for the ledger. But the spec&#39;s sophisticated three-tier storage system (Hot/Warm/Cold), archive cooperative compensation model, mana-based storage pricing, and node class differentiation are not implemented. This is reasonable for the current phase — you need governance and economics working before you need a storage economy. But it represents significant future work.</p>
+<hr>
+<h2>7. COMPUTE &amp; MESH JOBS</h2>
+<h3>Origin</h3>
+<p>The Mesh Job Protocol emerged from the idea that cooperative members should be able to contribute compute resources and be compensated — extending the mutual aid principle to infrastructure. The COVM (April 2025) was the breakthrough: governance as executable computation.</p>
+<h3>Spec (Mesh Job Protocol, Aug 2025)</h3>
+<ul>
+<li>Distributed compute marketplace with transparent bidding</li>
+<li>Four runtimes: WASM, Docker, Native, CCL</li>
+<li>Job categories: Rendering, ML, Scientific, DataProcessing, MapReduce, etc.</li>
+<li>Deterministic verification with multi-validator sampling</li>
+<li>Privacy-preserving execution (optional ZK proofs)</li>
+<li>Automatic mana payment on completion</li>
+<li>Slashing for failures</li>
+</ul>
+<h3>Reality (March 2026)</h3>
+<ul>
+<li><strong>WORKING:</strong> Trust-gated distributed execution (icn-compute)</li>
+<li><strong>WORKING:</strong> WASM execution via wasmtime</li>
+<li><strong>WORKING:</strong> CCL contract execution with fuel metering</li>
+<li><strong>WORKING:</strong> Gossip-based task distribution</li>
+<li><strong>PARTIAL:</strong> Execution receipts (ExecutionReceiptGate merged, commons loop incomplete)</li>
+<li><strong>NOT BUILT:</strong> Workload manifest schema (Phase 2 Track E)</li>
+<li><strong>NOT BUILT:</strong> Deterministic vs. advisory classification</li>
+<li><strong>NOT BUILT:</strong> Job marketplace with bidding</li>
+<li><strong>NOT BUILT:</strong> Storage specification for compute tasks</li>
+<li><strong>NOT BUILT:</strong> Cell operator boundary definition</li>
+<li><strong>NOT BUILT:</strong> Commons compute governance (Mana formula + CCL)</li>
+</ul>
+<h3>Verdict: FOUNDATION ONLY — runtime works, marketplace and economics don&#39;t</h3>
+<p>The compute substrate runs. WASM contracts execute deterministically with fuel metering. But the spec&#39;s vision of a cooperative compute marketplace — with transparent bidding, multi-validator verification, job categories, and automatic mana compensation — is almost entirely unbuilt. Six of seven Phase 2 Track E specs are written but zero are implemented.</p>
+<p>This is the biggest gap between vision and reality by spec coverage, though it&#39;s appropriately deprioritized. You don&#39;t need a compute marketplace to demonstrate governance and economics. It&#39;s Phase 2+ work.</p>
+<hr>
+<h2>8. SECURITY &amp; PRIVACY</h2>
+<h3>Origin</h3>
+<p>&quot;Adversarial-by-default&quot; is an architectural principle from the earliest specs. The Security Protocol&#39;s dual-layer model — adversarial at machine layer, cooperative at social layer — maps directly to the Meaning Firewall concept. The privacy work traces to the recognition that cooperative members in hostile political environments need protection.</p>
+<h3>Spec (Security Protocol, Aug 2025)</h3>
+<ul>
+<li>Comprehensive threat model: state actors, corporate, criminal, internal, governance capture</li>
+<li>Defense in depth (no single point of failure)</li>
+<li>End-to-end encryption and surveillance resistance</li>
+<li>Democratic security (no barriers to legitimate participation)</li>
+<li>Zero-trust architecture</li>
+<li>Three-layer security: Transport → Message → Application</li>
+</ul>
+<h3>Reality (March 2026)</h3>
+<ul>
+<li><strong>WORKING:</strong> Transport security (QUIC/TLS with DID-TLS binding)</li>
+<li><strong>WORKING:</strong> Message authentication (SignedEnvelope, Ed25519)</li>
+<li><strong>WORKING:</strong> Replay protection (sequence tracking)</li>
+<li><strong>WORKING:</strong> Encrypted topics (ChaCha20-Poly1305)</li>
+<li><strong>WORKING:</strong> Bloom filter deduplication</li>
+<li><strong>WORKING:</strong> Trust graph (3D: Social, Economic, Technical)</li>
+<li><strong>NOT BUILT:</strong> Onion routing (Phase 20, Week 3-4)</li>
+<li><strong>NOT BUILT:</strong> Traffic obfuscation (Phase 20, Week 5-6)</li>
+<li><strong>STUB:</strong> Active attack detection (icn-security crate exists, minimal)</li>
+<li><strong>WORKING:</strong> Meaning Firewall surface audit (kernel_surface.toml: 9 clean, 11 infected, 9 needs-review)</li>
+</ul>
+<h3>Verdict: CONFIRMED for current phase — privacy features are correctly deprioritized</h3>
+<p>Transport, message, and application security all work. The three-layer model is implemented. The missing pieces (onion routing, traffic obfuscation) are correctly classified as future work — they matter for deployment in hostile political environments but not for the NY Coop Summit demo.</p>
+<p><strong>Important note:</strong> The Meaning Firewall audit (kernel_surface.toml) shows 11 &quot;infected&quot; crates — meaning 11 crates in the kernel contain semantic business logic that should be in the apps layer. This is the most architecturally significant security finding. Cleaning these infected crates is ongoing work that directly affects regulatory positioning.</p>
+<hr>
+<h2>9. NETWORK TRANSPORT</h2>
+<h3>Origin</h3>
+<p>QUIC was chosen early for its multiplexing, built-in encryption, and NAT-friendliness. The gossip layer follows the anti-entropy model (not blockchain consensus). mDNS for local discovery is &quot;boring tech where possible.&quot;</p>
+<h3>Spec</h3>
+<ul>
+<li>QUIC/TLS with DID-TLS binding</li>
+<li>mDNS + DHT discovery</li>
+<li>NAT traversal (STUN + TURN)</li>
+<li>Topic-based gossip pub/sub</li>
+<li>Vector clocks for ordering</li>
+<li><code>icn://DID@IP:PORT</code> bootstrap format</li>
+</ul>
+<h3>Reality (March 2026)</h3>
+<ul>
+<li><strong>WORKING:</strong> QUIC/TLS (quinn + rustls)</li>
+<li><strong>WORKING:</strong> mDNS + DHT discovery</li>
+<li><strong>WORKING:</strong> Topic-based gossip with anti-entropy + Bloom filter dedup</li>
+<li><strong>WORKING:</strong> SignedEnvelope + EncryptedEnvelope formats</li>
+<li><strong>WORKING:</strong> DID bootstrap format</li>
+<li><strong>PARTIAL:</strong> NAT traversal (configured, not fully tested for production)</li>
+</ul>
+<h3>Verdict: CONFIRMED — network layer is solid</h3>
+<p>This is one of the most mature subsystems. The only production gap is NAT traversal hardening, which matters for federation across the public internet but not for homelab/K3s demos.</p>
+<hr>
+<h2>10. ENTITY MODEL</h2>
+<h3>Origin</h3>
+<p>The four-level hierarchy (Person → Cooperative → Community → Federation) maps directly to Ostrom&#39;s nested enterprises and Mondragon&#39;s organizational structure.</p>
+<h3>Spec</h3>
+<ul>
+<li>Recursive entity abstraction: <code>entity:icn:&lt;type&gt;:&lt;id&gt;</code></li>
+<li>Entity types: Person, Cooperative, Community, Federation</li>
+<li>Composable membership (person can be in multiple orgs)</li>
+<li>Hierarchical naming service</li>
+<li>Deterministic treasury derivation from entity ID</li>
+</ul>
+<h3>Reality (March 2026)</h3>
+<ul>
+<li><strong>WORKING:</strong> Full EntityId format with type + identifier</li>
+<li><strong>WORKING:</strong> Cooperative actor (full lifecycle: Formation → Active → Dissolution)</li>
+<li><strong>WORKING:</strong> Community entity (Geographic, Interest, Solidarity types)</li>
+<li><strong>WORKING:</strong> Federation entity (inter-coop coordination)</li>
+<li><strong>WORKING:</strong> Recursive composite membership</li>
+<li><strong>WORKING:</strong> Naming service with bounded alias resolution</li>
+<li><strong>WORKING:</strong> Deterministic treasury DID derivation</li>
+</ul>
+<h3>Verdict: CONFIRMED — entity model fully implements the spec</h3>
+<p>No gaps identified. This subsystem does exactly what was designed.</p>
+<hr>
+<h2>Summary: The Scorecard</h2>
+<table>
+<thead>
+<tr>
+<th>Subsystem</th>
+<th align="center">Origin → Spec</th>
+<th align="center">Spec → Code</th>
+<th>Assessment</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Identity &amp; Crypto</strong></td>
+<td align="center">✅</td>
+<td align="center">✅</td>
+<td><strong>EXCEEDS SPEC</strong> — SDIS is more sophisticated than original DID-only design</td>
+</tr>
+<tr>
+<td><strong>Governance</strong></td>
+<td align="center">✅</td>
+<td align="center">✅ (minor reduction)</td>
+<td><strong>CONFIRMED</strong> — core pipeline works; 3 of 7 voting models deferred; charter templates missing</td>
+</tr>
+<tr>
+<td><strong>Economics (Ledger)</strong></td>
+<td align="center">✅</td>
+<td align="center">✅</td>
+<td><strong>CONFIRMED</strong> — mutual credit, patronage, multi-currency, settlement all working. Mana model deliberately descoped from current iteration</td>
+</tr>
+<tr>
+<td><strong>Federation</strong></td>
+<td align="center">✅</td>
+<td align="center">⚠️</td>
+<td><strong>PARTIALLY CONFIRMED</strong> — basic federation works; checkpointing, BFT, partition healing, cross-federation settlement undefined</td>
+</tr>
+<tr>
+<td><strong>CCL</strong></td>
+<td align="center">✅</td>
+<td align="center">⚠️</td>
+<td><strong>WORKING BUT IMMATURE</strong> — runtime exists; no cooperative pattern library; charter-to-CCL pipeline missing</td>
+</tr>
+<tr>
+<td><strong>Storage (DAG)</strong></td>
+<td align="center">✅</td>
+<td align="center">⬜ (simplified)</td>
+<td><strong>SIMPLIFIED</strong> — Merkle-DAG works for ledger; tiered storage economy not built</td>
+</tr>
+<tr>
+<td><strong>Compute (Mesh)</strong></td>
+<td align="center">✅</td>
+<td align="center">⬜ (foundation only)</td>
+<td><strong>FOUNDATION ONLY</strong> — runtime executes; marketplace, bidding, compensation not built</td>
+</tr>
+<tr>
+<td><strong>Security</strong></td>
+<td align="center">✅</td>
+<td align="center">✅ (phase-appropriate)</td>
+<td><strong>CONFIRMED</strong> — three-layer model works; privacy features correctly deferred</td>
+</tr>
+<tr>
+<td><strong>Network</strong></td>
+<td align="center">✅</td>
+<td align="center">✅</td>
+<td><strong>CONFIRMED</strong> — QUIC, gossip, discovery all working; NAT needs hardening</td>
+</tr>
+<tr>
+<td><strong>Entity Model</strong></td>
+<td align="center">✅</td>
+<td align="center">✅</td>
+<td><strong>CONFIRMED</strong> — fully implements spec with recursive membership</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>The Two Critical Gaps</h2>
+<h3>Gap 1: Meaning Firewall Enforcement (HIGH)</h3>
+<p>The Meaning Firewall is ICN&#39;s regulatory immunity strategy. If the kernel contains business logic (what a &quot;vote&quot; means, how patronage distributes), then ICN looks like a regulated financial system. If the kernel is purely mechanical, it&#39;s infrastructure (like TCP/IP).</p>
+<p>The kernel_surface.toml audit shows <strong>11 &quot;infected&quot; crates</strong> — kernel code containing semantic business logic. The commons credit formula is hardcoded in Rust instead of expressed in CCL (#1308). This is the most architecturally urgent gap because it undermines the regulatory positioning that protects the entire project.</p>
+<p><strong>To close:</strong> Clean infected kernel crates. Extract commons credit formula to CCL. Verify constraint engine has zero semantic interpretation. This is ongoing Phase 1 compliance work.</p>
+<h3>Gap 2: Federation Settlement Finality (HIGH for production)</h3>
+<p>The federation model works for demo purposes (four cooperatives coordinating). But the spec&#39;s promises of Byzantine fault tolerance, automatic partition healing, and cross-federation settlement are not implemented. More critically, the mechanism for settling disputes between federations — what happens when Org A and Org B disagree about a transaction — is undefined at both the spec and code level.</p>
+<p><strong>What this means:</strong> ICN can demo inter-cooperative coordination with good-faith actors. It cannot handle adversarial federation scenarios. Given the &quot;adversarial-by-default&quot; security posture, this is a contradiction that must be resolved before production federation.</p>
+<p><strong>To close:</strong> Define async proof format for cross-federation claims. Implement dispute resolution protocol. Build netting algorithm for bilateral obligations. Test with adversarial scenarios.</p>
+<h3>Note: Mana is Descoped</h3>
+<p>The Mana regenerative economic model (computational credits with decay, demurrage, trust multipliers, and the regeneration formula) is <strong>not part of the current iteration</strong>. This was a deliberate scoping decision. The mutual credit ledger, patronage distribution, and budget management that are currently implemented cover the actual economic needs of cooperatives in the near term. Mana remains a theoretical design that can be revisited in a future iteration if the cooperative ecosystem demands it.</p>
+<hr>
+<h2>What This Confirms</h2>
+<p>Despite the gaps, the analysis confirms that ICN&#39;s architecture is fundamentally sound:</p>
+<ol>
+<li><p><strong>The spec-to-code pipeline works.</strong> Every subsystem that&#39;s been prioritized (identity, governance, network, entity model) implements the spec faithfully. The team (you + AI agents) can execute specs.</p>
+</li>
+<li><p><strong>The prioritization is correct.</strong> Identity → Governance → Ledger → Federation is the right build order. You can&#39;t have economics without governance, can&#39;t have governance without identity. The foundation is solid.</p>
+</li>
+<li><p><strong>The deferred work is appropriately deferred.</strong> Compute marketplace, tiered storage economy, onion routing — these matter for production at scale but not for proving the core thesis at a summit demo.</p>
+</li>
+<li><p><strong>The theoretical grounding holds up.</strong> Every subsystem traces cleanly to a philosophical or practical origin (Ostrom, Baker, Mondragon, etc.). The architecture isn&#39;t ad hoc — it implements a coherent theory of cooperative digital infrastructure.</p>
+</li>
+<li><p><strong>414,000 lines of Rust is not vaporware.</strong> 38 crates, 2,287 tests, 547 governance tests, K3s deployed, four demo personas running. This is real infrastructure.</p>
+</li>
+</ol>
+<p>The question isn&#39;t &quot;does the architecture work?&quot; It does. The question is: <strong>can the two critical gaps (Meaning Firewall cleanup, Federation settlement) be closed before the Sovereign Tech Fund application and the October summit?</strong></p>
+<p>With Mana descoped from the current iteration, the economic layer is in better shape than the earlier analysis suggested — the mutual credit ledger, patronage, and settlement all work and cover real cooperative needs. The pressure shifts to Meaning Firewall compliance (#1308, infected kernel crates) and federation hardening.</p>
+<p>The forward plan says Phase 1 compliance (including #1308 CCL extraction) targets March 20. Phase 2 targets April 15 for v1.0.0 tag. With one fewer critical gap, this timeline is more realistic.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

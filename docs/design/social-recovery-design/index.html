@@ -1,0 +1,464 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Social Recovery Design | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>social recovery design</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/social-recovery-design.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Social Recovery Design</h1>
+<p><strong>Feature</strong>: M-of-N Social Recovery for Lost Devices
+<strong>Phase</strong>: Week 1-2 of MVC Track
+<strong>Status</strong>: Design → Implementation
+<strong>Date</strong>: 2025-01-15</p>
+<h2>Problem Statement</h2>
+<p>Multi-device identity (Phase 11) allows users to have multiple devices, but what happens when:</p>
+<ul>
+<li>User loses ALL devices (laptop stolen, house fire, etc.)</li>
+<li>User loses access to all backups (encrypted backup but forgot passphrase)</li>
+<li>User&#39;s only device breaks and keystore is corrupted</li>
+</ul>
+<p><strong>Current State</strong>: User loses their identity permanently. All economic history, trust relationships, and cooperative memberships are gone forever.</p>
+<p><strong>Required State</strong>: User can recover identity with help from trusted friends/colleagues.</p>
+<h2>Solution: M-of-N Social Recovery</h2>
+<h3>High-Level Design</h3>
+<p><strong>Recovery Trustees</strong>: User designates N trusted individuals (friends, colleagues, family)
+<strong>Recovery Threshold</strong>: User sets M (e.g., 3-of-5 trustees must agree)
+<strong>Recovery Process</strong>:</p>
+<ol>
+<li>User loses all devices, creates new DID on new device</li>
+<li>User contacts M trustees out-of-band (phone, in-person)</li>
+<li>Each trustee signs a recovery attestation linking old DID → new DID</li>
+<li>Once M signatures collected, old DID is marked as recovered, new DID inherits identity</li>
+<li>Trust graph, ledger, and contracts automatically recognize new DID</li>
+</ol>
+<h3>Technical Design</h3>
+<h4>1. DID Document Extension</h4>
+<p>Extend Phase 11 DID Document v2 with recovery configuration:</p>
+<pre><code class="language-rust">// icn-identity/src/did_document.rs
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecoveryConfig {
+    /// Trustee DIDs who can help with recovery
+    pub trustees: Vec&lt;DID&gt;,
+
+    /// Number of trustees required for recovery (M)
+    pub threshold: usize,
+
+    /// Optional: Recovery delay period (seconds)
+    /// Allows old owner to cancel fraudulent recovery
+    pub delay_period: Option&lt;u64&gt;,
+}
+
+// Add to DIDDocument
+pub struct DIDDocument {
+    pub id: DID,
+    pub verification_method: Vec&lt;VerificationMethod&gt;,
+    pub authentication: Vec&lt;String&gt;,
+    pub created: u64,
+    pub updated: u64,
+    pub rotation_events: Vec&lt;RotationEvent&gt;,
+    pub recovery: Option&lt;RecoveryConfig&gt;,  // NEW
+}
+</code></pre>
+<h4>2. Recovery Event Chain</h4>
+<p>Track recovery events separately from rotation events:</p>
+<pre><code class="language-rust">// icn-identity/src/recovery.rs
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecoveryAttestation {
+    /// Trustee&#39;s DID
+    pub trustee: DID,
+
+    /// Old DID being recovered
+    pub old_did: DID,
+
+    /// New DID to inherit identity
+    pub new_did: DID,
+
+    /// Trustee&#39;s signature over (old_did, new_did, timestamp)
+    pub signature: Signature,
+
+    /// When attestation was created
+    pub timestamp: u64,
+
+    /// Optional: Evidence of identity verification
+    /// (e.g., &quot;met in person&quot;, &quot;video call&quot;, &quot;shared secret&quot;)
+    pub verification_method: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecoveryEvent {
+    /// Old DID being recovered
+    pub old_did: DID,
+
+    /// New DID inheriting identity
+    pub new_did: DID,
+
+    /// M attestations from trustees
+    pub attestations: Vec&lt;RecoveryAttestation&gt;,
+
+    /// When recovery was initiated
+    pub initiated_at: u64,
+
+    /// When recovery was finalized (after delay period)
+    pub finalized_at: Option&lt;u64&gt;,
+
+    /// Recovery status
+    pub status: RecoveryStatus,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum RecoveryStatus {
+    /// Collecting attestations (need M signatures)
+    Pending,
+
+    /// Waiting for delay period to expire
+    WaitingForDelay { expires_at: u64 },
+
+    /// Recovery finalized, new DID active
+    Finalized,
+
+    /// Recovery cancelled by old owner (fraudulent attempt)
+    Cancelled { cancelled_by: DID, reason: String },
+}
+</code></pre>
+<h4>3. Recovery Protocol</h4>
+<p><strong>Step 1: Configure Recovery (One-Time Setup)</strong></p>
+<pre><code class="language-bash"># User sets up recovery trustees
+icnctl identity recovery setup \
+  --trustees did:icn:alice,did:icn:bob,did:icn:carol,did:icn:dave,did:icn:eve \
+  --threshold 3 \
+  --delay-period 86400  # 24 hours
+
+# This updates DID Document and broadcasts via gossip
+</code></pre>
+<p><strong>Step 2: Initiate Recovery (After Device Loss)</strong></p>
+<pre><code class="language-bash"># On new device, create new identity
+icnctl id init
+
+# Initiate recovery for old DID
+icnctl identity recovery initiate \
+  --old-did did:icn:user123 \
+  --new-did did:icn:newkey456
+
+# System broadcasts recovery request to trustees
+# User contacts trustees out-of-band: &quot;I lost my device, please sign recovery&quot;
+</code></pre>
+<p><strong>Step 3: Trustees Attest (Out-of-Band Verification)</strong></p>
+<pre><code class="language-bash"># Each trustee verifies user&#39;s identity (phone call, video, in-person)
+# Then signs recovery attestation
+
+icnctl identity recovery attest \
+  --old-did did:icn:user123 \
+  --new-did did:icn:newkey456 \
+  --verification &quot;Video call - confirmed identity via shared memories&quot;
+
+# System broadcasts attestation to network
+</code></pre>
+<p><strong>Step 4: Finalize Recovery (After M Signatures)</strong></p>
+<pre><code class="language-bash"># Once M attestations collected, recovery enters delay period
+# After delay expires (or immediately if no delay configured):
+
+icnctl identity recovery finalize \
+  --recovery-id &lt;hash&gt;
+
+# System updates trust graph, ledger references, contract permissions
+# Old DID marked as &quot;recovered&quot; → points to new DID
+# New DID inherits all relationships and history
+</code></pre>
+<h4>4. Fraud Prevention</h4>
+<p><strong>Delay Period</strong>: 24-72 hour window where original owner can cancel</p>
+<pre><code class="language-bash"># If someone tries to steal your identity via fraudulent recovery:
+icnctl identity recovery cancel \
+  --recovery-id &lt;hash&gt; \
+  --reason &quot;I still have my device, this recovery is fraudulent&quot;
+
+# Requires signature from old DID&#39;s active device
+# Immediately cancels recovery and alerts network
+</code></pre>
+<p><strong>Attestation Requirements</strong>:</p>
+<ul>
+<li>Trustees should verify identity out-of-band (phone, video, in-person)</li>
+<li>Include verification method in attestation</li>
+<li>Community can audit attestations for suspicious patterns</li>
+</ul>
+<h4>5. Gossip Integration</h4>
+<p>Recovery events propagate via gossip on <code>identity:recovery</code> topic:</p>
+<pre><code class="language-rust">// icn-gossip topic for recovery events
+Topic: &quot;identity:recovery&quot;
+Access Control: Public (anyone can read recovery events)
+
+Message Types:
+1. RecoveryRequest { old_did, new_did, initiated_at }
+2. RecoveryAttestation { trustee, old_did, new_did, signature }
+3. RecoveryFinalized { old_did, new_did, finalized_at }
+4. RecoveryCancelled { old_did, recovery_id, reason }
+</code></pre>
+<h4>6. Storage Schema</h4>
+<p><strong>In icn-store (Sled database)</strong>:</p>
+<pre><code class="language-rust">// Key: &quot;recovery:&lt;old_did&gt;&quot;
+// Value: RecoveryEvent (serialized)
+
+// Key: &quot;recovery_config:&lt;did&gt;&quot;
+// Value: RecoveryConfig (serialized)
+
+// Key: &quot;did_mapping:&lt;old_did&gt;&quot;
+// Value: new_did (after recovery finalized)
+</code></pre>
+<h4>7. Trust Graph Integration</h4>
+<p>When recovery is finalized, update all trust edges:</p>
+<pre><code class="language-rust">// icn-trust/src/graph.rs
+
+impl TrustGraph {
+    /// Update all references to old_did to point to new_did
+    pub fn apply_recovery(&amp;mut self, old_did: &amp;DID, new_did: &amp;DID) {
+        // For each trust edge (A → old_did), update to (A → new_did)
+        for edge in self.edges_to(old_did) {
+            self.add_edge(edge.from, new_did.clone(), edge.weight);
+            self.remove_edge(&amp;edge.from, old_did);
+        }
+
+        // For each trust edge (old_did → B), update to (new_did → B)
+        for edge in self.edges_from(old_did) {
+            self.add_edge(new_did.clone(), edge.to, edge.weight);
+            self.remove_edge(old_did, &amp;edge.to);
+        }
+
+        // Store mapping for historical queries
+        self.did_recovery_map.insert(old_did.clone(), new_did.clone());
+    }
+}
+</code></pre>
+<h4>8. Ledger Integration</h4>
+<p>Ledger must recognize new DID as continuation of old DID:</p>
+<pre><code class="language-rust">// icn-ledger/src/ledger.rs
+
+impl Ledger {
+    /// Get balance, checking for DID recovery
+    pub fn balance(&amp;self, did: &amp;DID) -&gt; Result&lt;i64&gt; {
+        // Check if this DID has been recovered
+        let effective_did = self.resolve_did_recovery(did)?;
+
+        // Use effective DID for balance lookup
+        self.accounts.get(&amp;effective_did)
+            .map(|account| account.balance)
+            .ok_or(Error::AccountNotFound)
+    }
+
+    fn resolve_did_recovery(&amp;self, did: &amp;DID) -&gt; Result&lt;DID&gt; {
+        // If DID has been recovered, return new DID
+        // Otherwise return original DID
+        match self.recovery_map.get(did) {
+            Some(new_did) =&gt; Ok(new_did.clone()),
+            None =&gt; Ok(did.clone()),
+        }
+    }
+}
+</code></pre>
+<h2>Security Considerations</h2>
+<h3>Attack Vectors</h3>
+<p><strong>1. Sybil Attack on Trustees</strong></p>
+<ul>
+<li><strong>Attack</strong>: Attacker creates 5 fake identities, user sets them as trustees</li>
+<li><strong>Mitigation</strong>: Trustees must have trust edges from other community members</li>
+<li><strong>Recommendation</strong>: UI should warn if trustees aren&#39;t well-connected in trust graph</li>
+</ul>
+<p><strong>2. Collusion Attack</strong></p>
+<ul>
+<li><strong>Attack</strong>: 3 malicious trustees collude to steal user&#39;s identity</li>
+<li><strong>Mitigation</strong>: Delay period allows victim to cancel fraudulent recovery</li>
+<li><strong>Recommendation</strong>: Choose trustees who don&#39;t know each other (geographic/social diversity)</li>
+</ul>
+<p><strong>3. Coercion Attack</strong></p>
+<ul>
+<li><strong>Attack</strong>: Attacker forces user to initiate recovery and hand over new device</li>
+<li><strong>Mitigation</strong>: Hard to prevent (rubber-hose cryptanalysis)</li>
+<li><strong>Recommendation</strong>: Document risk, recommend trustee diversity</li>
+</ul>
+<p><strong>4. Replay Attack</strong></p>
+<ul>
+<li><strong>Attack</strong>: Old recovery attestations reused for new recovery attempt</li>
+<li><strong>Mitigation</strong>: Attestations include timestamp and specific new_did</li>
+<li><strong>Verification</strong>: Check attestation timestamp is recent (e.g., within 7 days)</li>
+</ul>
+<h3>Best Practices</h3>
+<p><strong>Trustee Selection</strong>:</p>
+<ul>
+<li>Choose 5-7 trustees (redundancy)</li>
+<li>Set threshold to 3-of-5 or 4-of-7 (balance security vs availability)</li>
+<li>Pick trustees from different social circles (colleagues, friends, family)</li>
+<li>Ensure trustees are active ICN users (not dormant accounts)</li>
+</ul>
+<p><strong>Delay Period</strong>:</p>
+<ul>
+<li><strong>Low-stakes identities</strong>: 24 hours (faster recovery)</li>
+<li><strong>High-stakes identities</strong>: 72 hours (more time to detect fraud)</li>
+<li><strong>Critical identities</strong>: 7 days + community vote (governance integration)</li>
+</ul>
+<p><strong>Verification Methods</strong>:</p>
+<ul>
+<li><strong>In-person</strong>: Strongest (shared physical token, biometrics)</li>
+<li><strong>Video call</strong>: Strong (visual confirmation + shared memories)</li>
+<li><strong>Phone call</strong>: Medium (voice recognition + security questions)</li>
+<li><strong>Email/chat</strong>: Weak (vulnerable to account compromise)</li>
+</ul>
+<h2>Implementation Plan</h2>
+<h3>Phase 1: Core Recovery Primitives (Week 1)</h3>
+<ol>
+<li>Extend DID Document with RecoveryConfig</li>
+<li>Implement RecoveryEvent and RecoveryAttestation types</li>
+<li>Add recovery storage to icn-store</li>
+<li>Unit tests for recovery data structures</li>
+</ol>
+<h3>Phase 2: CLI Integration (Week 1-2)</h3>
+<ol start="5">
+<li><code>icnctl identity recovery setup</code> - Configure trustees</li>
+<li><code>icnctl identity recovery initiate</code> - Start recovery</li>
+<li><code>icnctl identity recovery attest</code> - Trustee signs attestation</li>
+<li><code>icnctl identity recovery finalize</code> - Complete recovery</li>
+<li><code>icnctl identity recovery cancel</code> - Cancel fraudulent recovery</li>
+<li><code>icnctl identity recovery status</code> - Check recovery progress</li>
+</ol>
+<h3>Phase 3: Gossip Integration (Week 2)</h3>
+<ol start="11">
+<li>Create <code>identity:recovery</code> topic</li>
+<li>Broadcast recovery events (request, attestation, finalized, cancelled)</li>
+<li>Listen for recovery events and update local state</li>
+<li>Tests for gossip propagation</li>
+</ol>
+<h3>Phase 4: Trust Graph &amp; Ledger Integration (Week 2)</h3>
+<ol start="15">
+<li>Implement trust graph DID mapping</li>
+<li>Implement ledger DID recovery resolution</li>
+<li>Integration tests: recover identity, verify balance preserved</li>
+<li>Integration tests: recover identity, verify trust edges preserved</li>
+</ol>
+<h3>Phase 5: Documentation &amp; Testing (Week 2)</h3>
+<ol start="19">
+<li>User guide: &quot;How to set up social recovery&quot;</li>
+<li>Operator guide: &quot;How to handle recovery requests&quot;</li>
+<li>End-to-end test: Full recovery flow with 3-of-5 trustees</li>
+<li>Security audit: Review attack vectors and mitigations</li>
+</ol>
+<h2>Success Criteria</h2>
+<ul>
+<li>✅ User can configure 3-of-5 recovery via CLI</li>
+<li>✅ User can initiate recovery after losing device</li>
+<li>✅ Trustees can sign attestations via CLI</li>
+<li>✅ Recovery finalizes after M signatures collected</li>
+<li>✅ Trust edges automatically transfer to new DID</li>
+<li>✅ Ledger balance preserved after recovery</li>
+<li>✅ Fraudulent recovery can be cancelled within delay period</li>
+<li>✅ All tests pass (unit + integration)</li>
+<li>✅ Documentation complete (user + operator guides)</li>
+</ul>
+<h2>Future Enhancements (Post-MVC)</h2>
+<p><strong>Governance Integration</strong>:</p>
+<ul>
+<li>High-stakes recovery requires community vote (not just trustees)</li>
+<li>Cooperative can override individual recovery decisions</li>
+</ul>
+<p><strong>Multi-Factor Recovery</strong>:</p>
+<ul>
+<li>Require N-of-M trustees + backup seed phrase</li>
+<li>Require trustees + hardware security key</li>
+</ul>
+<p><strong>Recovery Analytics</strong>:</p>
+<ul>
+<li>Track recovery success/failure rates</li>
+<li>Detect suspicious recovery patterns (same trustees used repeatedly)</li>
+</ul>
+<p><strong>UX Improvements</strong>:</p>
+<ul>
+<li>Visual trustee selection (show trust graph connections)</li>
+<li>Recovery progress dashboard</li>
+<li>Email/SMS notifications to trustees</li>
+</ul>
+<h2>Open Questions</h2>
+<ol>
+<li><p><strong>Trustee Incentives</strong>: Should trustees receive compensation for helping with recovery?</p>
+<ul>
+<li>Pro: Incentivizes responsiveness</li>
+<li>Con: Creates market for fake attestations</li>
+<li><strong>Decision</strong>: Start without compensation, add if pilots request it</li>
+</ul>
+</li>
+<li><p><strong>Automatic vs Manual Finalization</strong>: Should recovery auto-finalize after delay, or require explicit finalization?</p>
+<ul>
+<li><strong>Decision</strong>: Require explicit finalization for security (prevents automatic takeover)</li>
+</ul>
+</li>
+<li><p><strong>Recovery History Visibility</strong>: Should recovery events be public or private?</p>
+<ul>
+<li><strong>Decision</strong>: Public (transparency prevents fraud, enables community oversight)</li>
+</ul>
+</li>
+<li><p><strong>Cross-Cooperative Recovery</strong>: Can trustees be from other cooperatives?</p>
+<ul>
+<li><strong>Decision</strong>: Yes (federated trust is a feature, not a bug)</li>
+</ul>
+</li>
+</ol>
+<hr>
+<p><strong>Document Status</strong>: Design Complete - Ready for Implementation
+<strong>Next Step</strong>: Implement Phase 1 (Core Recovery Primitives)
+<strong>Estimated Effort</strong>: 2 weeks (matches MVC Week 1-2)</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

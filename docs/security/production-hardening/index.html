@@ -1,0 +1,809 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Production Hardening - Security &amp; Stability | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>security</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>production hardening</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/security/production-hardening.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Production Hardening - Security &amp; Stability</h1>
+<p>This document details the production hardening measures implemented in ICN to protect against DoS attacks, resource exhaustion, and operational edge cases.</p>
+<h2>Table of Contents</h2>
+<ol>
+<li><a href="#overview">Overview</a></li>
+<li><a href="#critical-security-fixes">Critical Security Fixes</a></li>
+<li><a href="#high-priority-fixes">High Priority Fixes</a></li>
+<li><a href="#configuration">Configuration</a></li>
+<li><a href="#monitoring">Monitoring</a></li>
+<li><a href="#remaining-work">Remaining Work</a></li>
+</ol>
+<hr>
+<h2>Overview</h2>
+<p>ICN&#39;s production hardening focuses on three primary threat vectors:</p>
+<ol>
+<li><strong>Network-level attacks</strong>: DoS via malicious peers exploiting QUIC/gossip protocols</li>
+<li><strong>Resource exhaustion</strong>: Memory/CPU attacks via unbounded allocations or streams</li>
+<li><strong>Operational failures</strong>: Edge cases like clock skew, malformed data, blocking operations</li>
+</ol>
+<p>Historical claim from the Phase 7 cycle: critical and high-priority issues in that cycle were marked resolved at the time.</p>
+<hr>
+<h2>Critical Security Fixes</h2>
+<h3>1. Unbounded Message Allocation DoS</h3>
+<p><strong>Severity</strong>: Critical
+<strong>File</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-net/src/protocol.rs#L143-L167#L143-L167">`icn-net/src/protocol.rs:143-167`</a></p>
+<p><strong>Vulnerability</strong>: Malicious peer could send a network message with an extremely large length prefix, causing the victim to allocate gigabytes of memory before validating content.</p>
+<p><strong>Fix</strong>:</p>
+<pre><code class="language-rust">// Read 4-byte length prefix
+let len_u32 = u32::from_be_bytes(len_buf);
+
+// Validate BEFORE allocation
+if len_u32 == 0 {
+    bail!(&quot;Invalid message: zero length&quot;);
+}
+if len_u32 &gt; MAX_MESSAGE_SIZE as u32 {
+    bail!(&quot;Message too large: {} bytes (max {})&quot;, len_u32, MAX_MESSAGE_SIZE);
+}
+
+// Safe to allocate after validation
+let len = len_u32 as usize;
+let mut buf = vec![0u8; len];
+</code></pre>
+<p><strong>Additional protections</strong>:</p>
+<ul>
+<li>Prevents u32→usize overflow on 32-bit systems</li>
+<li>Rejects zero-length messages (invalid protocol state)</li>
+<li>Maximum message size: 10MB (<code>MAX_MESSAGE_SIZE</code>)</li>
+</ul>
+<hr>
+<h3>2. Blocking Operations in Async Context</h3>
+<p><strong>Severity</strong>: Critical
+<strong>File</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-core/src/supervisor/mod.rs">`icn-core/src/supervisor/mod.rs`</a></p>
+<p><strong>Vulnerability</strong>: The incoming message handler used <code>blocking_write()</code> to acquire RwLock on shared state (GossipActor). Under high message load, this blocks Tokio worker threads, causing thread starvation and degraded performance across the entire runtime.</p>
+<p><strong>Fix</strong>: Replaced blocking operations with async task spawning:</p>
+<pre><code class="language-rust">// Before (blocking - BAD):
+let mut gossip = gossip_handle.blocking_write();
+gossip.handle_message(gossip_msg)?;
+
+// After (async - GOOD):
+tokio::spawn(async move {
+    let mut gossip = gossip_handle.write().await;
+    if let Err(e) = gossip.handle_message(gossip_msg) {
+        warn!(&quot;Failed to handle message: {}&quot;, e);
+    }
+});
+</code></pre>
+<p><strong>Impact</strong>:</p>
+<ul>
+<li>Applied to all message handlers: Gossip, Subscribe, Unsubscribe</li>
+<li>Prevents thread pool exhaustion under high load</li>
+<li>Maintains async/await best practices throughout</li>
+</ul>
+<hr>
+<h3>3. TLS Certificate Verification Disabled</h3>
+<p><strong>Severity</strong>: Critical
+<strong>File</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-net/src/tls.rs#L81-L195#L81-L195">`icn-net/src/tls.rs:81-195`</a></p>
+<p><strong>Vulnerability</strong>: Custom <code>DidCertificateVerifier</code> accepted all certificates without validation, enabling trivial MITM attacks and peer impersonation.</p>
+<p><strong>Fix</strong>: Implemented comprehensive certificate validation:</p>
+<pre><code class="language-rust">impl DidCertificateVerifier {
+    fn extract_did_from_cert(cert: &amp;CertificateDer) -&gt; Result&lt;String, rustls::Error&gt; {
+        // Parse X.509 certificate using x509-parser
+        let (_, parsed_cert) = X509Certificate::from_der(cert)?;
+
+        // Extract DID from Subject Alternative Name (SAN)
+        if let Ok(Some(san_ext)) = parsed_cert.subject_alternative_name() {
+            for name in &amp;san_ext.value.general_names {
+                if let GeneralName::DNSName(dns) = name {
+                    if dns.starts_with(&quot;did:icn:&quot;) {
+                        return Ok(dns.to_string());
+                    }
+                }
+            }
+        }
+
+        Err(rustls::Error::General(&quot;No DID found in certificate SAN&quot;))
+    }
+
+    fn check_expiration(cert: &amp;CertificateDer, now: UnixTime) -&gt; Result&lt;(), rustls::Error&gt; {
+        let (_, parsed_cert) = X509Certificate::from_der(cert)?;
+        let current_time = UNIX_EPOCH + Duration::from_secs(now.as_secs());
+        let not_before = parsed_cert.validity().not_before.to_datetime();
+        let not_after = parsed_cert.validity().not_after.to_datetime();
+
+        if current_time &lt; not_before {
+            return Err(rustls::Error::General(&quot;Certificate not yet valid&quot;));
+        }
+        if current_time &gt; not_after {
+            return Err(rustls::Error::General(&quot;Certificate expired&quot;));
+        }
+
+        Ok(())
+    }
+}
+</code></pre>
+<p><strong>Validation steps</strong>:</p>
+<ol>
+<li>Parse X.509 certificate structure</li>
+<li>Extract DID from Subject Alternative Name</li>
+<li>Validate DID format (<code>did:icn:*</code>)</li>
+<li>Check certificate validity period (not before/after)</li>
+<li>Log verification for security audit trail</li>
+</ol>
+<p><strong>Current limitations</strong>:</p>
+<ul>
+<li>⚠️ Does NOT yet integrate with trust graph (TODO)</li>
+<li>Accepts all valid DID certificates regardless of trust score</li>
+<li>Self-signed certificates accepted (required for P2P architecture)</li>
+</ul>
+<p><strong>Dependencies added</strong>: <code>x509-parser = &quot;0.16&quot;</code></p>
+<hr>
+<h3>8. Social Recovery Ledger Transfer Bug</h3>
+<p><strong>Severity</strong>: Critical
+<strong>File</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-ledger/src/ledger.rs#L469-L484#L469-L484">`icn-ledger/src/ledger.rs:469-484`</a>
+<strong>Status</strong>: Fixed (2025-11-17)</p>
+<p><strong>Vulnerability</strong>: The <code>transfer_balances_for_recovery()</code> function had inverted debit/credit logic, causing ALL social recovery operations to incorrectly transfer balances.</p>
+<p><strong>Broken behavior</strong>:</p>
+<pre><code class="language-rust">// BEFORE (INCORRECT):
+let entry = if *balance &gt; 0 {
+    JournalEntryBuilder::new(new_did.clone())
+        .debit(old_did.clone(), currency.clone(), *balance)   // WRONG: increases old_did!
+        .credit(new_did.clone(), currency.clone(), *balance)  // WRONG: decreases new_did!
+        .build()?
+}
+</code></pre>
+<p><strong>Impact</strong>:</p>
+<ul>
+<li><strong>Old DID</strong>: Balance would double instead of zeroing (100 → 200)</li>
+<li><strong>New DID</strong>: Would receive negative balance instead of positive (-100 instead of +100)</li>
+<li><strong>Accounting</strong>: Every recovery would create permanent accounting errors</li>
+<li><strong>User Experience</strong>: Catastrophic - users would lose their balances during recovery</li>
+</ul>
+<p><strong>Example failure scenario</strong>:</p>
+<ol>
+<li>Alice has +100 hours balance, loses device</li>
+<li>Creates new identity, initiates social recovery</li>
+<li>Trustees attest, recovery finalizes</li>
+<li><strong>Expected</strong>: Old DID: 100→0, New DID: 0→100</li>
+<li><strong>Actual (broken)</strong>: Old DID: 100→200, New DID: 0→-100</li>
+<li>Alice now has -100 hours (debt!) instead of her 100 hours credit</li>
+</ol>
+<p><strong>Fix</strong>:</p>
+<pre><code class="language-rust">// AFTER (CORRECT):
+let entry = if *balance &gt; 0 {
+    // old_did has positive balance (+100 means they have credit)
+    // Transfer it to new_did: reduce old_did&#39;s balance, increase new_did&#39;s balance
+    JournalEntryBuilder::new(new_did.clone())
+        .credit(old_did.clone(), currency.clone(), *balance)  // Reduce old_did&#39;s balance ✅
+        .debit(new_did.clone(), currency.clone(), *balance)   // Increase new_did&#39;s balance ✅
+        .build()?
+}
+</code></pre>
+<p><strong>Root cause</strong>: Confusion between mutual credit semantics and traditional accounting:</p>
+<ul>
+<li>In mutual credit: <code>debit</code> increases assets (receiving credit)</li>
+<li>The transfer logic incorrectly debited the old account (giving it more credit)</li>
+</ul>
+<p><strong>Discovery</strong>: Found during integration test debugging for <code>test_full_recovery_flow</code></p>
+<p><strong>Test coverage</strong>: Integration test now validates:</p>
+<ul>
+<li>Old DID balance reduces to 0 after transfer</li>
+<li>New DID receives full balance (100 hours)</li>
+<li>Trust graph edges correctly migrate (2 edges)</li>
+</ul>
+<p><strong>Additional context</strong>:</p>
+<ul>
+<li>This bug was introduced when social recovery was first implemented (Phase 11)</li>
+<li>Would have affected EVERY social recovery operation in production</li>
+<li>Highlights importance of end-to-end integration tests for financial operations</li>
+<li>Related to Phase 7 ledger semantics fix (which this test initially failed against)</li>
+</ul>
+<hr>
+<h2>High Priority Fixes</h2>
+<h3>4. Integer Overflow in Timestamp Conversion</h3>
+<p><strong>Severity</strong>: High
+<strong>Files</strong>:</p>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-ledger/src/entry.rs#L68-L73#L68-L73">`icn-ledger/src/entry.rs:68-73`</a></li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-gossip/src/gossip.rs#L127-L131#L127-L131">`icn-gossip/src/gossip.rs:127-131`</a></li>
+</ul>
+<p><strong>Vulnerability</strong>: Unchecked cast from <code>u128</code> (Duration::as_millis) to <code>u64</code> causes silent wraparound if system clock is set far in the future (post year 2262).</p>
+<p><strong>Fix</strong>:</p>
+<pre><code class="language-rust">// Before (unsafe):
+let timestamp = SystemTime::now()
+    .duration_since(UNIX_EPOCH)?
+    .as_millis() as u64;
+
+// After (safe):
+let timestamp = SystemTime::now()
+    .duration_since(UNIX_EPOCH)?
+    .as_millis()
+    .try_into()
+    .context(&quot;Timestamp overflow - system clock too far in future&quot;)?;
+</code></pre>
+<p><strong>Impact</strong>: Prevents silent data corruption in ledger entries and gossip messages.</p>
+<hr>
+<h3>5. Bloom Filter Index Out of Bounds</h3>
+<p><strong>Severity</strong>: High
+<strong>File</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-gossip/src/bloom.rs#L103-L149#L103-L149">`icn-gossip/src/bloom.rs:103-149`</a></p>
+<p><strong>Vulnerability</strong>: <code>BloomFilter::from_data()</code> didn&#39;t validate that claimed size matched actual data, allowing malicious peer to trigger index panic via crafted <code>BloomFilterData</code>.</p>
+<p><strong>Fix</strong>: Added validation before truncation:</p>
+<pre><code class="language-rust">pub fn from_data(data: &amp;BloomFilterData) -&gt; Self {
+    // Validate non-zero size
+    if data.size == 0 {
+        tracing::warn!(&quot;BloomFilter: zero size, creating minimal filter&quot;);
+        return BloomFilter { bits: vec![false], num_hashes: 1, size: 1 };
+    }
+
+    let mut bits = Vec::new();
+    // Unpack bytes into bits...
+
+    let unpacked_bits = bits.len();
+    let claimed_size = data.size as usize;
+
+    if claimed_size &gt; unpacked_bits {
+        // Malformed: claimed &gt; actual
+        tracing::warn!(
+            &quot;BloomFilter: claimed size {} exceeds actual {}&quot;,
+            claimed_size, unpacked_bits
+        );
+        return BloomFilter {
+            bits,
+            num_hashes: data.num_hashes,
+            size: unpacked_bits as u64, // Use actual size
+        };
+    }
+
+    // Normal case: trim to claimed size
+    bits.truncate(claimed_size);
+    BloomFilter { bits, num_hashes: data.num_hashes, size: data.size }
+}
+</code></pre>
+<p><strong>Protections</strong>:</p>
+<ul>
+<li>Zero-size filter detection (prevents division by zero)</li>
+<li>Size mismatch handling (prevents index panic in insert/contains)</li>
+<li>Logging for security auditing</li>
+</ul>
+<hr>
+<h3>6. Network Message Rate Limiting</h3>
+<p><strong>Severity</strong>: High
+<strong>Files</strong>:</p>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-net/src/rate_limit.rs">`icn-net/src/rate_limit.rs`</a> (new module)</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-net/src/actor/mod.rs">`icn-net/src/actor/mod.rs`</a></li>
+</ul>
+<p><strong>Vulnerability</strong>: No rate limiting allowed malicious peer to flood victim with messages, exhausting CPU and memory.</p>
+<p><strong>Solution</strong>: Implemented token bucket rate limiter with per-peer tracking.</p>
+<p><strong>Algorithm</strong>: Token Bucket</p>
+<ul>
+<li>Each peer has a bucket of tokens (burst capacity)</li>
+<li>Tokens refill at configurable rate</li>
+<li>Each message consumes 1 token</li>
+<li>Messages are dropped (not queued) when bucket empty</li>
+</ul>
+<p><strong>Configuration</strong> (<a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-net/src/rate_limit.rs">`RateLimitConfig`</a>):</p>
+<pre><code class="language-rust">pub struct RateLimitConfig {
+    pub max_messages_per_second: u32,  // Default: 100
+    pub burst_capacity: u32,            // Default: 20
+    pub refill_interval: Duration,      // Default: 100ms
+}
+</code></pre>
+<p><strong>Integration</strong>:</p>
+<pre><code class="language-rust">async fn handle_connection(
+    connection: quinn::Connection,
+    handler: IncomingMessageHandler,
+    rate_limiter: Arc&lt;RateLimiter&gt;,
+) -&gt; Result&lt;()&gt; {
+    loop {
+        match connection.accept_bi().await {
+            Ok((mut send, mut recv)) =&gt; {
+                match read_message(&amp;mut recv).await {
+                    Ok(message) =&gt; {
+                        // Check rate limit BEFORE processing
+                        if !rate_limiter.check_rate_limit(&amp;message.from).await {
+                            warn!(&quot;Rate limited message from {}&quot;, message.from);
+                            icn_obs::metrics::network::messages_rate_limited_inc();
+                            continue; // Drop message
+                        }
+
+                        // Process message normally
+                        handler(message);
+                    }
+                    Err(e) =&gt; warn!(&quot;Failed to read message: {}&quot;, e),
+                }
+            }
+            Err(e) =&gt; break,
+        }
+    }
+}
+</code></pre>
+<p><strong>Metrics</strong>: <code>icn_network_messages_rate_limited_total</code> (counter)</p>
+<p><strong>Memory management</strong>: Periodic cleanup of inactive peer buckets via <code>cleanup_old_buckets()</code>.</p>
+<hr>
+<h3>7. Bounded QUIC Stream Limits</h3>
+<p><strong>Severity</strong>: High
+<strong>File</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-net/src/session.rs#L20-L44#L20-L44">`icn-net/src/session.rs:20-44`</a></p>
+<p><strong>Vulnerability</strong>: Default QUIC configuration allowed 100+ concurrent streams per connection, enabling resource exhaustion via stream flooding.</p>
+<p><strong>Fix</strong>: Created conservative transport configuration:</p>
+<pre><code class="language-rust">fn create_transport_config() -&gt; quinn::TransportConfig {
+    let mut config = quinn::TransportConfig::default();
+
+    // Limit concurrent streams
+    config.max_concurrent_bidi_streams(10u32.into());  // Was 100
+    config.max_concurrent_uni_streams(0u32.into());    // Not used
+
+    // Idle timeout and keep-alive
+    config.max_idle_timeout(Some(Duration::from_secs(60).try_into().unwrap()));
+    config.keep_alive_interval(Some(Duration::from_secs(30)));
+
+    // Stream data windows
+    config.stream_receive_window((1024u32 * 1024u32).into());  // 1MB per stream
+    config.receive_window((10u32 * 1024u32 * 1024u32).into()); // 10MB per connection
+
+    config
+}
+</code></pre>
+<p><strong>Rationale</strong>:</p>
+<ul>
+<li><strong>10 bidirectional streams</strong>: Sufficient for gossip protocol (typically 1-3 concurrent operations)</li>
+<li><strong>0 unidirectional streams</strong>: Not used by ICN protocol</li>
+<li><strong>60s idle timeout</strong>: Detects and closes stale connections</li>
+<li><strong>30s keep-alive</strong>: Proactive detection of network failures</li>
+<li><strong>1MB per stream</strong>: Large enough for gossip messages (max 10MB), prevents memory exhaustion</li>
+<li><strong>10MB per connection</strong>: Total receive window caps memory usage per peer</li>
+</ul>
+<p><strong>Applied to</strong>: Both server and client QUIC configurations.</p>
+<hr>
+<h3>8. Ledger Recovery Transfer Bug (BUG #30)</h3>
+<p><strong>Severity</strong>: Critical
+<strong>File</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-ledger/src/ledger.rs#L469-L484#L469-L484">`icn-ledger/src/ledger.rs:469-484`</a></p>
+<p><strong>Vulnerability</strong>: The <code>transfer_balances_for_recovery()</code> function had inverted debit/credit operations, causing balance transfers during social recovery to <strong>double the old DID&#39;s balance</strong> instead of transferring it to the new DID. This would have allowed users to create unlimited credit by repeatedly initiating fake recoveries.</p>
+<p><strong>Before (BROKEN)</strong>:</p>
+<pre><code class="language-rust">let entry = if *balance &gt; 0 {
+    // WRONG: This increases old_did&#39;s balance instead of reducing it
+    JournalEntryBuilder::new(new_did.clone())
+        .debit(old_did.clone(), currency.clone(), *balance)  // Increases old_did balance
+        .credit(new_did.clone(), currency.clone(), *balance) // Decreases new_did balance
+        .build()?
+} else {
+    // Negative balance (debt) transfer also broken
+    JournalEntryBuilder::new(new_did.clone())
+        .credit(old_did.clone(), currency.clone(), balance.abs())
+        .debit(new_did.clone(), currency.clone(), balance.abs())
+        .build()?
+};
+</code></pre>
+<p><strong>After (FIXED)</strong>:</p>
+<pre><code class="language-rust">let entry = if *balance &gt; 0 {
+    // Correct: Transfer positive balance from old_did to new_did
+    JournalEntryBuilder::new(new_did.clone())
+        .credit(old_did.clone(), currency.clone(), *balance)  // Reduce old_did&#39;s balance
+        .debit(new_did.clone(), currency.clone(), *balance)   // Increase new_did&#39;s balance
+        .build()?
+} else {
+    // Correct: Transfer debt from old_did to new_did
+    JournalEntryBuilder::new(new_did.clone())
+        .debit(old_did.clone(), currency.clone(), balance.abs())  // Remove debt from old_did
+        .credit(new_did.clone(), currency.clone(), balance.abs()) // Add debt to new_did
+        .build()?
+};
+</code></pre>
+<p><strong>Impact</strong>:</p>
+<ul>
+<li><strong>Production-blocking severity</strong>: Would have allowed unlimited credit creation via fake recovery</li>
+<li><strong>Attack vector</strong>: User creates recovery event → finalizes it → old DID balance doubles instead of transfers</li>
+<li><strong>Repeat exploit</strong>: Could be repeated indefinitely to create arbitrary amounts of credit</li>
+<li><strong>Economic impact</strong>: Complete breakdown of mutual credit system integrity</li>
+<li><strong>Discovery</strong>: Found during social recovery integration test development (2025-11-17)</li>
+<li><strong>Status</strong>: Fixed before feature deployment - no production data affected</li>
+</ul>
+<p><strong>Mutual Credit Semantics Reminder</strong>:
+In double-entry mutual credit accounting:</p>
+<ul>
+<li><strong>Debit</strong> increases an asset account (receiving credit from someone)</li>
+<li><strong>Credit</strong> increases a liability account (giving credit to someone)</li>
+<li>Positive balance = net creditor (others owe you)</li>
+<li>Negative balance = net debtor (you owe others)</li>
+</ul>
+<p><strong>Test Coverage</strong>: Integration test <code>test_full_recovery_lifecycle()</code> now validates correct balance transfers:</p>
+<pre><code class="language-rust">// Old DID starts with 100 hours credit
+assert_eq!(old_balance, Some(100));
+
+// After recovery finalization
+assert_eq!(alice.ledger.read().await.balance(&amp;alice_did, &quot;hours&quot;), Some(0));      // Old DID: 100 → 0
+assert_eq!(alice.ledger.read().await.balance(&amp;alice2_did, &quot;hours&quot;), Some(100));   // New DID: 0 → 100
+</code></pre>
+<hr>
+<h2>Configuration</h2>
+<h3>Default Security Settings</h3>
+<p>All production hardening features are enabled by default with conservative limits:</p>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Default Value</th>
+<th>Tunable</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Max message size</td>
+<td>10 MB</td>
+<td>Yes (via <code>MAX_MESSAGE_SIZE</code>)</td>
+</tr>
+<tr>
+<td>Rate limit (msg/sec)</td>
+<td>100</td>
+<td>Yes (via <code>RateLimitConfig</code>)</td>
+</tr>
+<tr>
+<td>Burst capacity</td>
+<td>20 messages</td>
+<td>Yes (via <code>RateLimitConfig</code>)</td>
+</tr>
+<tr>
+<td>QUIC concurrent streams</td>
+<td>10</td>
+<td>Yes (via <code>TransportConfig</code>)</td>
+</tr>
+<tr>
+<td>QUIC stream window</td>
+<td>1 MB</td>
+<td>Yes (via <code>TransportConfig</code>)</td>
+</tr>
+<tr>
+<td>QUIC connection window</td>
+<td>10 MB</td>
+<td>Yes (via <code>TransportConfig</code>)</td>
+</tr>
+<tr>
+<td>Connection idle timeout</td>
+<td>60 seconds</td>
+<td>Yes (via <code>TransportConfig</code>)</td>
+</tr>
+<tr>
+<td>Keep-alive interval</td>
+<td>30 seconds</td>
+<td>Yes (via <code>TransportConfig</code>)</td>
+</tr>
+</tbody></table>
+<h3>Customizing Rate Limits</h3>
+<p>To adjust rate limiting (e.g., for high-throughput scenarios):</p>
+<pre><code class="language-rust">use icn_net::{RateLimitConfig, RateLimiter};
+use std::time::Duration;
+
+let config = RateLimitConfig {
+    max_messages_per_second: 200,  // Higher throughput
+    burst_capacity: 50,             // Larger bursts
+    refill_interval: Duration::from_millis(100),
+};
+
+let rate_limiter = Arc::new(RateLimiter::new(config));
+</code></pre>
+<p><strong>Note</strong>: Current implementation requires modifying <code>NetworkActor::spawn()</code> to accept custom config. This is a future enhancement opportunity.</p>
+<h3>Witness Signatures for Material Transactions</h3>
+<p>Witness signatures provide Byzantine fault tolerance by requiring multiple parties to co-sign material transactions. This prevents double-spending and provides additional security for high-value transfers.</p>
+<p><strong>Configuration</strong> (<code>[ledger.witness]</code> in TOML):</p>
+<pre><code class="language-toml">[ledger.witness]
+# Witness policy: &quot;none&quot;, &quot;counterparty&quot;, &quot;quorum&quot;, &quot;all_parties&quot;
+# Default is &quot;none&quot;. Example shows recommended production config:
+default_policy = &quot;counterparty&quot;
+
+# Only require witnesses for transactions above this value
+threshold = 1000
+
+# Timeout for collecting signatures (seconds)
+collection_timeout_secs = 300
+
+# For quorum policy only:
+# quorum_required = 2
+# quorum_witnesses = [&quot;did:icn:abc123&quot;, &quot;did:icn:def456&quot;, &quot;did:icn:ghi789&quot;]
+</code></pre>
+<p><strong>Policies</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Policy</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>none</code></td>
+<td>No witness signatures required (default)</td>
+</tr>
+<tr>
+<td><code>counterparty</code></td>
+<td>The other party in the transaction must co-sign</td>
+</tr>
+<tr>
+<td><code>quorum</code></td>
+<td>N-of-M designated witnesses must sign</td>
+</tr>
+<tr>
+<td><code>all_parties</code></td>
+<td>All transaction participants must sign</td>
+</tr>
+</tbody></table>
+<p><strong>Metrics</strong>:</p>
+<ul>
+<li><code>icn_ledger_witnessed_entries_accepted_total</code>: Witnessed entries successfully processed</li>
+<li><code>icn_ledger_witnessed_entries_rejected_total{reason}</code>: Rejected entries by reason (invalid_signature, insufficient_signatures)</li>
+<li><code>icn_ledger_witness_signature_count</code>: Histogram of signatures per witnessed entry</li>
+</ul>
+<p><strong>Use Cases</strong>:</p>
+<ol>
+<li><strong>High-value transfers</strong>: Set <code>threshold = 10000</code> with <code>counterparty</code> policy</li>
+<li><strong>Multi-sig treasury</strong>: Use <code>quorum</code> policy with 2-of-3 trusted witnesses</li>
+<li><strong>Full consensus</strong>: Use <code>all_parties</code> for unanimous agreement requirements</li>
+</ol>
+<hr>
+<h2>Monitoring</h2>
+<h3>Security Metrics</h3>
+<p>The following Prometheus metrics track security-related events:</p>
+<p><strong>Rate Limiting</strong>:</p>
+<ul>
+<li><code>icn_network_messages_rate_limited_total</code> (counter): Messages dropped due to rate limiting</li>
+</ul>
+<p><strong>Network Health</strong>:</p>
+<ul>
+<li><code>icn_network_connections_total</code> (counter): Total connection attempts</li>
+<li><code>icn_network_connections_active</code> (gauge): Currently active connections</li>
+<li><code>icn_network_messages_received_total</code> (counter): Successfully processed messages</li>
+</ul>
+<p><strong>Gossip Protocol</strong>:</p>
+<ul>
+<li><code>icn_gossip_entries_total</code> (gauge): Total gossip entries stored</li>
+<li><code>icn_gossip_announces_received_total</code> (counter): Announce messages received</li>
+<li><code>icn_gossip_requests_received_total</code> (counter): Request messages received</li>
+</ul>
+<h3>Alerting Recommendations</h3>
+<p>Consider setting up alerts for:</p>
+<ol>
+<li><p><strong>High rate limiting</strong>: <code>rate(icn_network_messages_rate_limited_total[5m]) &gt; 10</code></p>
+<ul>
+<li>Indicates potential DoS attack or misbehaving peer</li>
+</ul>
+</li>
+<li><p><strong>Connection churn</strong>: <code>rate(icn_network_connections_total[5m]) &gt; 100</code></p>
+<ul>
+<li>May indicate connection exhaustion attack</li>
+</ul>
+</li>
+<li><p><strong>Low message throughput</strong>: <code>rate(icn_network_messages_received_total[5m]) &lt; 1</code></p>
+<ul>
+<li>Could indicate network partition or isolation</li>
+</ul>
+</li>
+</ol>
+<h3>Log Monitoring</h3>
+<p>Security-relevant log patterns:</p>
+<pre><code class="language-bash"># Rate limiting events
+grep &quot;Rate limited message from&quot; /var/log/icnd.log
+
+# Certificate verification warnings
+grep &quot;SECURITY: Trust graph verification not yet implemented&quot; /var/log/icnd.log
+
+# Bloom filter validation warnings
+grep &quot;BloomFilter deserialization&quot; /var/log/icnd.log
+
+# Message validation errors
+grep &quot;Message too large\|Invalid message&quot; /var/log/icnd.log
+</code></pre>
+<h3>Scope-Aware Capacity (Epic 2)</h3>
+<p><strong>Metrics</strong> (added in PR #962):</p>
+<ul>
+<li><code>icn_compute_task_scope_map_size</code> (gauge): Number of active task→scope mappings. Tracks memory overhead of scope queue tracking. Alert if &gt;500 (warning) or &gt;2000 (critical, possible leak).</li>
+</ul>
+<p><strong>Alert rules</strong>: See <code>deploy/prometheus/scope-capacity-alerts.yml</code> for the rule set used by this hardening pass.</p>
+<p><strong>Operational notes</strong>:</p>
+<ol>
+<li><p><strong>Timeout decrement lag</strong>: The timeout checker (<code>check_timeouts</code>) runs synchronously in the main command loop, so scope queue decrements for timed-out tasks may lag by the timeout check interval. This is acceptable because the demand adjustment loop runs every 60s — any lag within that window has no effect on budget rebalancing. If a burst of timeouts occurs, queue depths self-correct on the next check cycle.</p>
+</li>
+<li><p><strong>CellService not configured</strong>: If <code>ComputeActor</code> is started without a <code>CellService</code>, a WARN log is emitted and all submitters are treated as <code>Commons</code> scope. This is the expected state during bootstrap or for nodes not yet enrolled in a cell.</p>
+</li>
+<li><p><strong>Demand adjustment cold start</strong>: The demand loop requires <code>min_samples</code> (default: 5) total queued tasks before making any adjustments. On lightly loaded nodes, the default <code>CapacityBudget</code> applies indefinitely. This is by design — adjustment noise on sparse data would degrade allocation quality.</p>
+</li>
+<li><p><strong>Memory scaling</strong>: At 100K concurrent tasks, <code>task_scope_map</code> consumes ~5MB. Monitor via <code>icn_compute_task_scope_map_size</code> gauge. Set alerts at 50K+ entries for production.</p>
+</li>
+</ol>
+<hr>
+<h2>Remaining Work</h2>
+<h3>High Priority (Not Yet Implemented)</h3>
+<p>The following issues were identified but not yet addressed:</p>
+<h4>Medium Priority (5 issues):</h4>
+<ol>
+<li><p><strong>No request timeouts in session management</strong></p>
+<ul>
+<li>Impact: Hung requests can accumulate</li>
+<li>Recommendation: Add timeout to dial/send operations</li>
+</ul>
+</li>
+<li><p><strong>Panic on invalid DID parsing</strong></p>
+<ul>
+<li>File: Trust graph DID parsing</li>
+<li>Impact: Malformed DID crashes process</li>
+<li>Recommendation: Replace unwrap() with Result handling</li>
+</ul>
+</li>
+<li><p><strong>Unbounded vector growth in gossip subscriptions</strong></p>
+<ul>
+<li>Impact: Memory exhaustion with many topics</li>
+<li>Recommendation: Add max topics per node limit</li>
+</ul>
+</li>
+<li><p><strong>No compression for large gossip messages</strong></p>
+<ul>
+<li>Impact: Bandwidth waste, slower sync</li>
+<li>Recommendation: Add zstd compression for messages &gt;1KB</li>
+</ul>
+</li>
+<li><p><strong>Missing input sanitization in contract interpreter</strong></p>
+<ul>
+<li>Impact: Potential for crafted contracts to cause issues</li>
+<li>Recommendation: Add stricter AST validation</li>
+</ul>
+</li>
+</ol>
+<h4>Low Priority (3 issues):</h4>
+<ol>
+<li><p><strong>Inconsistent error handling patterns</strong></p>
+<ul>
+<li>Some modules use panic, others use Result</li>
+<li>Recommendation: Standardize on Result&lt;T, E&gt;</li>
+</ul>
+</li>
+<li><p><strong>Missing trace logs for debugging</strong></p>
+<ul>
+<li>Hard to diagnose issues in production</li>
+<li>Recommendation: Add trace! logs at key decision points</li>
+</ul>
+</li>
+<li><p><strong>TODO comments in non-critical paths</strong></p>
+<ul>
+<li>Minor TODOs in test utilities and helper functions</li>
+<li>Recommendation: Track as GitHub issues</li>
+</ul>
+</li>
+</ol>
+<h3>Trust-Gated TLS Verification (✓ Implemented - Phase 8B)</h3>
+<p><strong>Status</strong>: COMPLETE (2025-01-12)
+<strong>File</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-net/src/tls.rs">`icn-net/src/tls.rs`</a></p>
+<p>The TLS certificate verifier now integrates with the trust graph to enforce trust-based access control:</p>
+<pre><code class="language-rust">// Extract DID from certificate
+let did_str = Self::extract_did_from_cert(end_entity)?;
+let peer_did = Did::from_str(&amp;did_str)?;
+
+// Query trust graph for peer&#39;s trust score
+let trust_score = {
+    let graph = self.trust_graph.blocking_read();
+    graph.compute_trust_score(&amp;peer_did).unwrap_or(0.0)
+};
+
+// Enforce trust threshold
+if trust_score &lt; self.min_trust_threshold {
+    warn!(&quot;🔒 Connection rejected: DID {} has insufficient trust&quot;, did_str);
+    icn_obs::metrics::network::connections_rejected_untrusted_inc(&amp;did_str, trust_score);
+    return Err(rustls::Error::General(format!(
+        &quot;Peer DID {} has insufficient trust score {:.3} (required: {:.3})&quot;,
+        did_str, trust_score, self.min_trust_threshold
+    )));
+}
+</code></pre>
+<p><strong>Security Benefits</strong>:</p>
+<ul>
+<li>Prevents Sybil attacks from unknown/untrusted peers</li>
+<li>Configurable trust thresholds (default: 0.0 = development mode)</li>
+<li>Production recommendation: 0.1 (reject isolated peers) or 0.4 (partners only)</li>
+<li>Per-peer and per-trust-class rejection metrics</li>
+<li>Full Ed25519 signature verification on TLS 1.3 handshakes</li>
+</ul>
+<p><strong>Configuration</strong>:</p>
+<pre><code class="language-rust">TrustGatedRateLimitConfig {
+    min_trust_threshold: 0.1,  // Reject isolated peers (score &lt; 0.1)
+    // ... rate limit settings
+}
+</code></pre>
+<p><strong>Tests</strong>: 3 comprehensive integration tests in <code>icn-net/tests/trust_gated_tls_integration.rs</code></p>
+<ul>
+<li>Trusted peer connection acceptance</li>
+<li>Untrusted peer connection rejection</li>
+<li>Trust threshold boundary conditions</li>
+</ul>
+<hr>
+<h2>Testing</h2>
+<p>All production hardening changes include comprehensive tests:</p>
+<ul>
+<li><strong>Rate limiter</strong>: 4 unit tests (token consumption, refills, per-peer isolation, cleanup)</li>
+<li><strong>Bloom filter validation</strong>: Covered by existing test suite</li>
+<li><strong>Timestamp overflow</strong>: Implicit coverage (would fail if overflow occurred)</li>
+<li><strong>Certificate verification</strong>: 3 unit tests (cert generation, server config, client config)</li>
+</ul>
+<p>Run the full test suite:</p>
+<pre><code class="language-bash">cargo test -p icn-net -p icn-gossip -p icn-ledger -p icn-obs
+</code></pre>
+<p>Historical result (2025-11-17 snapshot): 64 tests passed (27 + 18 + 16 + 0)</p>
+<hr>
+<h2>References</h2>
+<ul>
+<li><a href="/docs/ARCHITECTURE">Architecture Documentation</a></li>
+<li><a href="/docs/reference/api/topic-subscriptions-api">Topic Subscriptions API</a></li>
+<li><a href="https://www.rfc-editor.org/rfc/rfc9000.html" target="_blank" rel="noopener">QUIC Transport RFC 9000</a></li>
+<li><a href="https://en.wikipedia.org/wiki/Token_bucket" target="_blank" rel="noopener">Token Bucket Algorithm</a></li>
+<li><a href="https://owasp.org/www-project-top-ten/" target="_blank" rel="noopener">OWASP Top 10</a></li>
+</ul>
+<hr>
+<h2>Changelog</h2>
+<ul>
+<li><p><strong>2025-11-17</strong>: Critical ledger recovery bug fix (BUG #30)</p>
+<ul>
+<li>Fixed inverted debit/credit in <code>transfer_balances_for_recovery()</code></li>
+<li>Production-blocking: Would have enabled unlimited credit creation</li>
+<li>Discovered during social recovery integration test development</li>
+<li>Fixed before feature deployment - no production impact</li>
+</ul>
+</li>
+<li><p><strong>2025-01-XX</strong>: Initial production hardening (Phase 7)</p>
+<ul>
+<li>Fixed 3 critical security issues</li>
+<li>Fixed 4 high-priority stability issues</li>
+<li>Added comprehensive metrics and logging</li>
+<li>64 tests passing across modified crates</li>
+</ul>
+</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

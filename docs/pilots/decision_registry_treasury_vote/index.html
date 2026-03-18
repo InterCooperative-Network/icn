@@ -1,0 +1,428 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Decision Registry + Treasury Vote Pilot | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>pilots</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>decision registry treasury vote</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/pilots/decision_registry_treasury_vote.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Decision Registry + Treasury Vote Pilot</h1>
+<p>This document describes the economic receipt chain implemented in Sprint 8-9, demonstrating ICN&#39;s deterministic governance → economics → ledger flow.</p>
+<h2>Overview</h2>
+<p>ICN&#39;s pilot program proves that governance decisions produce verifiable economic artifacts:</p>
+<pre><code>GovernanceDecision → AllocationReceipt → SettlementIntent → LedgerEntry
+                           ↓                    ↓               ↓
+                    canonical_hash       canonical_hash    provenance
+</code></pre>
+<p><strong>Key Invariant</strong>: Two nodes independently processing the same decision produce identical canonical hashes at every step.</p>
+<h2>Economic Receipt Types</h2>
+<h3>AllocationReceipt</h3>
+<p>Bridges governance decisions to economic intents.</p>
+<pre><code class="language-rust">pub struct AllocationReceipt {
+    pub receipt_id: [u8; 32],      // Node-local (excluded from canonical hash)
+    pub decision_hash: [u8; 32],   // Links to governance decision
+    pub intents: Vec&lt;SettlementIntent&gt;,
+    pub scope: ScopeLevel,
+    pub created_at: u64,
+}
+</code></pre>
+<h3>SettlementIntent</h3>
+<p>Declarative economic payload - &quot;what should happen&quot;.</p>
+<pre><code class="language-rust">pub struct SettlementIntent {
+    pub intent_id: Option&lt;String&gt;, // Node-local (excluded from canonical hash)
+    pub decision_receipt_id: String,
+    pub decision_hash: [u8; 32],
+    pub asset: AssetType,
+    pub from: String,
+    pub to: String,
+    pub amount: u64,
+    pub unit: String,
+    pub scope: ScopeLevel,
+    pub memo: Option&lt;String&gt;,      // Excluded from canonical hash
+    pub created_at: u64,
+}
+</code></pre>
+<h3>AssetType</h3>
+<p>Semantic value classification:</p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Description</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Fungible</code></td>
+<td>Standard mutual credit</td>
+<td>Treasury hours</td>
+</tr>
+<tr>
+<td><code>Consumable</code></td>
+<td>Single-use, may expire</td>
+<td>Compute vouchers</td>
+</tr>
+<tr>
+<td><code>Depreciating</code></td>
+<td>Loses value over time</td>
+<td>Equipment licenses</td>
+</tr>
+<tr>
+<td><code>Transformable</code></td>
+<td>Converts to other assets</td>
+<td>Raw materials</td>
+</tr>
+<tr>
+<td><code>Service</code></td>
+<td>Non-storable value</td>
+<td>Labor hours rendered</td>
+</tr>
+<tr>
+<td><code>Claim</code></td>
+<td>Future performance IOU</td>
+<td>Receivables, bonds</td>
+</tr>
+</tbody></table>
+<h2>API Endpoints</h2>
+<h3>Receipt Queries</h3>
+<pre><code class="language-bash"># Get allocation receipt by canonical hash
+GET /v1/receipts/allocations/{hash}
+
+# List allocation receipts by decision
+GET /v1/receipts/allocations?decision_hash={hex}
+
+# Get settlement intent by canonical hash
+GET /v1/receipts/intents/{hash}
+
+# List settlement intents by decision
+GET /v1/receipts/intents?decision_hash={hex}
+
+# Get full economic chain for a decision
+GET /v1/receipts/chain?decision_hash={hex}
+</code></pre>
+<h3>Ledger Provenance Queries</h3>
+<pre><code class="language-bash"># Ledger entries with provenance for a decision
+GET /v1/ledger/{coop_id}/entries/by-decision?decision_hash={hex}
+</code></pre>
+<p>Response includes <code>decision_receipt_id</code> and <code>decision_hash</code> fields for each transaction:</p>
+<pre><code class="language-json">{
+  &quot;transactions&quot;: [
+    {
+      &quot;id&quot;: &quot;tx-uuid&quot;,
+      &quot;timestamp&quot;: 1704067200,
+      &quot;author&quot;: &quot;did:icn:abc123...&quot;,
+      &quot;accounts&quot;: [
+        {
+          &quot;accountId&quot;: &quot;treasury:main&quot;,
+          &quot;debit&quot;: 1000,
+          &quot;currency&quot;: &quot;HOURS&quot;
+        },
+        {
+          &quot;accountId&quot;: &quot;member:alice&quot;,
+          &quot;credit&quot;: 1000,
+          &quot;currency&quot;: &quot;HOURS&quot;
+        }
+      ],
+      &quot;decisionReceiptId&quot;: &quot;decision-001&quot;,
+      &quot;decisionHash&quot;: &quot;2a2a2a2a2a2a2a2a...&quot;
+    }
+  ],
+  &quot;pagination&quot;: {
+    &quot;page&quot;: 1,
+    &quot;perPage&quot;: 10,
+    &quot;total&quot;: 1,
+    &quot;hasMore&quot;: false
+  }
+}
+</code></pre>
+<blockquote>
+<p><strong>Note:</strong> Ledger entries use double-entry accounting with account deltas (credit/debit) rather than simple from/to transfers.</p>
+</blockquote>
+<h3>Receipt Chain Example</h3>
+<pre><code class="language-json">{
+  &quot;decisionHash&quot;: &quot;2a2a2a2a2a2a2a2a...&quot;,
+  &quot;allocations&quot;: [
+    {
+      &quot;canonicalHash&quot;: &quot;8e1779e535438507...&quot;,
+      &quot;decisionHash&quot;: &quot;2a2a2a2a2a2a2a2a...&quot;,
+      &quot;scope&quot;: &quot;Org&quot;,
+      &quot;createdAt&quot;: 1704067200,
+      &quot;intentCount&quot;: 1,
+      &quot;intentHashes&quot;: [&quot;dfe9845ac806f40b...&quot;]
+    }
+  ],
+  &quot;intents&quot;: [
+    {
+      &quot;canonicalHash&quot;: &quot;dfe9845ac806f40b...&quot;,
+      &quot;decisionReceiptId&quot;: &quot;decision-001&quot;,
+      &quot;decisionHash&quot;: &quot;2a2a2a2a2a2a2a2a...&quot;,
+      &quot;assetType&quot;: &quot;Fungible&quot;,
+      &quot;from&quot;: &quot;treasury&quot;,
+      &quot;to&quot;: &quot;member-alice&quot;,
+      &quot;amount&quot;: 1000,
+      &quot;unit&quot;: &quot;HOURS&quot;,
+      &quot;scope&quot;: &quot;Org&quot;,
+      &quot;memo&quot;: null,
+      &quot;createdAt&quot;: 1704067200
+    }
+  ]
+}
+</code></pre>
+<h2>Demo Scripts</h2>
+<h3>Economics Determinism Demo</h3>
+<pre><code class="language-bash">./scripts/pilot_economics_demo.sh
+</code></pre>
+<p>Runs three test suites:</p>
+<ol>
+<li><strong>Two-node determinism</strong>: Proves cross-node hash equality</li>
+<li><strong>CanonicalReceipt tests</strong>: Hash stability + serde roundtrip</li>
+<li><strong>SettlementIntent tests</strong>: Asset type semantics</li>
+</ol>
+<p>Expected output:</p>
+<pre><code>ECONOMIC DETERMINISM TRIPWIRES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ TRIPWIRE: Cross-node determinism verified
+✅ TRIPWIRE: SettlementIntent hash stability verified
+✅ TRIPWIRE: AllocationReceipt tests passed
+✅ TRIPWIRE: All test suites passed
+
+═══════════════════════════════════════════════════════════════════
+  ECONOMIC DETERMINISM INVARIANT PROVEN
+</code></pre>
+<h3>Governance Chain Demo</h3>
+<pre><code class="language-bash">./scripts/pilot_chain_demo.sh
+</code></pre>
+<p>Proves the complete governance → ledger provenance chain.</p>
+<h3>Receipt Chain Demo (Full Visibility)</h3>
+<pre><code class="language-bash">./scripts/pilot_receipt_chain_demo.sh
+</code></pre>
+<p>Runs determinism tests + queries gateway API (if running):</p>
+<pre><code>RECEIPT CHAIN INVARIANTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Cross-node determinism: VERIFIED
+✅ Intent ordering determinism: VERIFIED
+✅ Provenance chain integrity: VERIFIED
+
+════════════════════════════════════════════════════════════════════
+  RECEIPT CHAIN DEMO COMPLETE
+</code></pre>
+<h2>Proof of Legitimacy Walkthrough</h2>
+<p>This section shows three ways to verify the economic chain is working correctly.</p>
+<h3>Method 1: CLI (icnctl)</h3>
+<pre><code class="language-bash"># Query the full chain for a decision
+icnctl receipts chain &lt;decision_hash_64hex&gt; --gateway http://localhost:8080 --coop-id my-coop
+
+# Get a single allocation receipt
+icnctl receipts allocation &lt;canonical_hash_64hex&gt; --gateway http://localhost:8080
+
+# Get a single settlement intent
+icnctl receipts intent &lt;canonical_hash_64hex&gt; --gateway http://localhost:8080
+
+# JSON output for scripting
+icnctl receipts chain &lt;hash&gt; --json | jq &#39;.allocations[0].canonicalHash&#39;
+</code></pre>
+<h3>Method 2: REST API</h3>
+<pre><code class="language-bash"># Query full chain
+curl http://localhost:8080/v1/receipts/chain?decision_hash=2a2a2a...
+
+# Query ledger entries by decision
+curl http://localhost:8080/v1/ledger/my-coop/entries/by-decision?decision_hash=2a2a2a...
+
+# Get single allocation
+curl http://localhost:8080/v1/receipts/allocations/&lt;canonical_hash&gt;
+
+# Get single intent
+curl http://localhost:8080/v1/receipts/intents/&lt;canonical_hash&gt;
+</code></pre>
+<h3>Method 3: Pilot UI</h3>
+<ol>
+<li>Open Pilot UI in browser</li>
+<li>Navigate to <strong>Receipts</strong> tab</li>
+<li>Paste decision hash (64 hex characters)</li>
+<li>Click <strong>Query Chain</strong></li>
+<li>View:<ul>
+<li>Allocation receipts with <strong>canonicalized</strong> badge (sorted verification)</li>
+<li>Settlement intents with amounts/accounts</li>
+<li>Ledger entries with provenance links</li>
+</ul>
+</li>
+<li>Click <strong>Copy</strong> to get chain summary for bug reports</li>
+</ol>
+<h3>Verification Checklist</h3>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>How to Verify</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Cross-node determinism</td>
+<td>Run <code>pilot_receipt_chain_demo.sh</code> - all tripwires green</td>
+</tr>
+<tr>
+<td>Order-independence</td>
+<td>AllocationReceipt hash unchanged regardless of intent order</td>
+</tr>
+<tr>
+<td>Provenance linkage</td>
+<td>Ledger entries show <code>decision_hash</code> field</td>
+</tr>
+<tr>
+<td>Sorted intents</td>
+<td>UI shows &quot;✓ canonicalized&quot; badge on allocation</td>
+</tr>
+<tr>
+<td>Restart durability</td>
+<td>After <code>icnd</code> restart, same hashes returned</td>
+</tr>
+</tbody></table>
+<h2>Invariants</h2>
+<h3>Cross-Node Determinism</h3>
+<p>Same economic inputs → same canonical hashes:</p>
+<pre><code>Node A: intent_id=&quot;node-a-001&quot; → canonical_hash = dfe9845a...
+Node B: intent_id=&quot;node-b-777&quot; → canonical_hash = dfe9845a...
+                                             ✅ MATCH
+</code></pre>
+<p>Node-local identifiers (<code>intent_id</code>, <code>receipt_id</code>, <code>memo</code>) are excluded from canonical hash computation.</p>
+<h3>Provenance Chain Integrity</h3>
+<p>Every ledger entry from economic intents carries:</p>
+<ul>
+<li><code>decision_receipt_id</code>: Links to governance decision</li>
+<li><code>decision_hash</code>: Canonical anchor for cross-node verification</li>
+</ul>
+<h3>Hash Stability Across Restart</h3>
+<p>Receipts persist in durable storage. After node restart:</p>
+<ul>
+<li>Same canonical hashes are computed</li>
+<li>Chain queries return identical results</li>
+</ul>
+<h2>Test Coverage</h2>
+<table>
+<thead>
+<tr>
+<th>Test</th>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>test_economic_chain_canonical_hash_determinism</code></td>
+<td><code>economic_chain_two_node.rs</code></td>
+<td>Two-node hash equality</td>
+</tr>
+<tr>
+<td><code>test_receipt_store_persistence_across_restart</code></td>
+<td><code>receipt_persistence_e2e.rs</code></td>
+<td>Durability proof</td>
+</tr>
+<tr>
+<td><code>test_allocation_receipt_*</code></td>
+<td><code>receipts.rs</code></td>
+<td>Hash stability tests</td>
+</tr>
+<tr>
+<td><code>test_settlement_intent_*</code></td>
+<td><code>economics.rs</code></td>
+<td>Intent canonicalization</td>
+</tr>
+</tbody></table>
+<h2>Architecture</h2>
+<pre><code>┌─────────────────┐
+│  Governance     │
+│  Decision       │
+└────────┬────────┘
+         │ ProposalAccepted
+         ▼
+┌─────────────────┐
+│  Effect         │
+│  Translator     │
+└────────┬────────┘
+         │ TreasuryEffect::Spend
+         ▼
+┌─────────────────┐
+│  Kernel         │
+│  Executor       │
+└────────┬────────┘
+         │ SettlementIntent
+         ▼
+┌─────────────────┐
+│  ReceiptStore   │  ← Persists AllocationReceipt + SettlementIntent
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  LedgerService  │  ← Creates entry with provenance
+└─────────────────┘
+</code></pre>
+<h2>What This Enables</h2>
+<ol>
+<li><strong>Dispute Resolution</strong>: Explicit intents to contest</li>
+<li><strong>Audit Trail</strong>: Complete decision → ledger chain</li>
+<li><strong>Federation</strong>: Canonical payloads for gossip</li>
+<li><strong>CCL Integration</strong>: Economic clauses with teeth</li>
+</ol>
+<h2>Related Documentation</h2>
+<ul>
+<li><a href="/docs/ARCHITECTURE">ARCHITECTURE.md</a> - System architecture</li>
+<li><a href="/docs/design/governance/governance-primitives">governance-primitives.md</a> - Governance design</li>
+<li><code>Sprint 8 Plan</code>: <code>.copilot/session-state/*/plan.md</code> (local planning artifact, not tracked in repo)</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

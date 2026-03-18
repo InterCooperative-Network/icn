@@ -1,0 +1,460 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Phase 11: Multi-Device Identity &amp; Sync | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>development</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>sessions</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>2025 11</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>2025 11 14 phase 11 multi device identity</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/development/sessions/2025-11/2025-11-14-phase-11-multi-device-identity.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Phase 11: Multi-Device Identity &amp; Sync</h1>
+<p><strong>Date</strong>: 2025-01-14
+<strong>Phase</strong>: 11
+<strong>Status</strong>: Complete ✅</p>
+<h2>Overview</h2>
+<p>Phase 11 implements multi-device identity support, allowing a single DID to be controlled by multiple devices with capability-based permissions. This is foundational for ICN&#39;s real-world usability - users need to access their cooperative identity from laptops, phones, and servers.</p>
+<h2>Goals</h2>
+<ol>
+<li><strong>Multi-device support</strong>: One DID, multiple authorized keys</li>
+<li><strong>Capability-based security</strong>: Fine-grained per-device permissions</li>
+<li><strong>Audit trail</strong>: Track device lifecycle (add, revoke, rotate)</li>
+<li><strong>Secure storage</strong>: Keystore v3 with automatic migration</li>
+<li><strong>Gossip sync</strong>: Distribute DID Document updates across network</li>
+<li><strong>CLI workflow</strong>: Complete device management interface</li>
+</ol>
+<h2>Architecture Decisions</h2>
+<h3>1. DID Document v2 Design</h3>
+<p><strong>Decision</strong>: Extend DID Documents to support multiple VerificationMethods per DID.</p>
+<p><strong>Rationale</strong>:</p>
+<ul>
+<li>Follows W3C DID spec patterns</li>
+<li>Each device gets its own keypair</li>
+<li>Enables device-specific revocation without rotating primary key</li>
+<li>Supports gradual permission reduction (e.g., laptop loses AddDevice capability)</li>
+</ul>
+<p><strong>Key data structures</strong>:</p>
+<pre><code class="language-rust">pub struct DidDocument {
+    pub id: Did,
+    pub version: u64,
+    pub updated_at: u64,
+    pub verification_method: Vec&lt;VerificationMethod&gt;,
+    pub authentication: Vec&lt;String&gt;,  // Signing-enabled device IDs
+    pub recovery: Option&lt;RecoveryConfig&gt;,
+}
+
+pub struct VerificationMethod {
+    pub id: String,              // Device ID
+    pub label: String,           // User-friendly name
+    pub key_type: KeyType,
+    pub public_key: Vec&lt;u8&gt;,
+    pub capabilities: Vec&lt;Capability&gt;,
+    pub added_at: u64,
+    pub revoked_at: Option&lt;u64&gt;,
+}
+</code></pre>
+<p><strong>Capabilities</strong>:</p>
+<ul>
+<li><code>Sign</code> - Sign messages and contracts</li>
+<li><code>AddDevice</code> - Authorize new devices</li>
+<li><code>RevokeDevice</code> - Revoke other devices</li>
+<li><code>RotateKey</code> - Rotate this device&#39;s key</li>
+<li><code>Recover</code> - Use recovery mechanisms</li>
+<li><code>Encrypt</code> - Decrypt messages (X25519)</li>
+</ul>
+<h3>2. Keystore v3 Format</h3>
+<p><strong>Decision</strong>: Extend keystore format to include DID Document, device ID, and rotation chain.</p>
+<p><strong>Migration path</strong>:</p>
+<ul>
+<li>v1: Ed25519 only (legacy)</li>
+<li>v2: + TLS binding</li>
+<li>v2.1: + X25519 keys</li>
+<li>v3: + DID Document + device ID + rotation chain</li>
+</ul>
+<p><strong>Auto-migration</strong>: Seamless v1 → v2.1 → v3 upgrade on first unlock.</p>
+<p><strong>Key implementation detail</strong>:</p>
+<pre><code class="language-rust">impl Drop for StoredKeyV3 {
+    fn drop(&amp;mut self) {
+        // Only zeroize sensitive fields
+        self.secret_bytes.zeroize();
+        self.x25519_secret.zeroize();
+        self.tls_key_der.zeroize();
+        // DID Document and rotation chain are public data
+    }
+}
+</code></pre>
+<p><strong>Challenge</strong>: Balancing security (zeroization) with Rust&#39;s ownership model. Initially tried to derive <code>Zeroize</code>, but <code>DidDocument</code> and <code>Vec&lt;RotationEvent&gt;</code> are public data that don&#39;t need zeroization. Solution: Manual <code>Drop</code> implementation.</p>
+<h3>3. Identity Sync Protocol</h3>
+<p><strong>Decision</strong>: Use gossip topic <code>identity:updates</code> for broadcasting DID Document changes.</p>
+<p><strong>Message format</strong>:</p>
+<pre><code class="language-rust">pub struct IdentityUpdateMessage {
+    pub did: Did,
+    pub event: RotationEvent,
+    pub new_version: u64,
+    pub timestamp: u64,
+}
+</code></pre>
+<p><strong>Serialization</strong>: bincode (~280 bytes per update)</p>
+<p><strong>Cache implementation</strong>:</p>
+<pre><code class="language-rust">pub struct DidDocumentCache {
+    inner: Arc&lt;RwLock&lt;HashMap&lt;Did, CachedDidDocument&gt;&gt;&gt;,
+}
+</code></pre>
+<p><strong>Version ordering</strong>: Prevents replay attacks by rejecting stale updates.</p>
+<p><strong>Verification</strong>: Every device change is signed by an authorized key (capability: <code>AddDevice</code> or <code>RevokeDevice</code>).</p>
+<h3>4. CLI Workflow</h3>
+<p><strong>Device addition workflow</strong>:</p>
+<ol>
+<li>New device: <code>icnctl device add laptop2</code> → generates Ed25519 + X25519 keys + request file</li>
+<li>Authorized device: <code>icnctl device approve laptop2-request.json</code> → updates DID Document</li>
+<li>Broadcast: IdentityUpdateMessage sent via gossip</li>
+<li>Peers: Apply rotation event to cached DID Document</li>
+</ol>
+<p><strong>Device revocation workflow</strong>:</p>
+<ol>
+<li><code>icnctl device revoke device-abc123 --reason &quot;lost laptop&quot;</code></li>
+<li>DID Document updated with revoked_at timestamp</li>
+<li>Broadcast via gossip</li>
+<li>Peers: Mark device as revoked in cache</li>
+</ol>
+<p><strong>Design decision</strong>: Revocation is soft deletion (preserves audit trail) rather than removal.</p>
+<h2>Implementation Challenges</h2>
+<h3>Challenge 1: Zeroize Trait Constraints</h3>
+<p><strong>Problem</strong>: <code>StoredKeyV3</code> contains fields that don&#39;t implement <code>DefaultIsZeroes</code> (DidDocument, Vec<RotationEvent>).</p>
+<p><strong>Initial approach</strong>: Derive <code>Zeroize</code> on entire struct.</p>
+<p><strong>Error</strong>:</p>
+<pre><code>error: cannot move out of type &#39;StoredKeyV3&#39;, which implements the &#39;Drop&#39; trait
+</code></pre>
+<p><strong>Solution</strong>: Manual <code>Drop</code> implementation that only zeroizes sensitive fields:</p>
+<pre><code class="language-rust">impl Drop for StoredKeyV3 {
+    fn drop(&amp;mut self) {
+        self.secret_bytes.zeroize();
+        self.x25519_secret.zeroize();
+        self.tls_key_der.zeroize();
+    }
+}
+</code></pre>
+<p><strong>Lesson</strong>: Not all data needs zeroization - only cryptographic secrets. DID Documents and rotation events are public data.</p>
+<h3>Challenge 2: Device Workflow Conceptual Issue</h3>
+<p><strong>Problem</strong>: Initially implemented <code>device add</code> to generate a new DID per device.</p>
+<p><strong>Error</strong>: Misunderstanding of multi-device identity model.</p>
+<p><strong>Insight</strong>: Multi-device identity means:</p>
+<ul>
+<li><strong>Same DID</strong> across all devices</li>
+<li><strong>Different keys</strong> for each device</li>
+<li>Each key has its own VerificationMethod entry</li>
+</ul>
+<p><strong>Corrected workflow</strong>:</p>
+<pre><code class="language-rust">// Prompt for the target DID (the identity to add this device to)
+print!(&quot;Enter the DID to add this device to: &quot;);
+let target_did = did_input.trim();
+
+// Generate Ed25519 keypair for THIS device (not new DID)
+let keypair = KeyPair::generate()?;
+</code></pre>
+<p><strong>Lesson</strong>: Multi-device is about key management, not identity creation.</p>
+<h3>Challenge 3: Version Mismatch in Device Approval (Critical Bug)</h3>
+<p><strong>Problem</strong>: Device approval was calling <code>add_device()</code> twice (once for Ed25519, once for X25519), incrementing the version from 1→2→3, but the rotation event was created with <code>new_version = did_doc.version + 1 = 2</code>.</p>
+<p><strong>Error</strong>: Version mismatch between rotation event and actual DID Document state.</p>
+<p><strong>Example</strong>:</p>
+<pre><code class="language-rust">// rotation_event created BEFORE applying update
+let rotation_event = RotationEvent {
+    new_version: did_doc.version + 1,  // e.g., 2
+    // ...
+};
+
+// Then update function called add_device() TWICE
+keystore.update_did_document(|did_doc| {
+    did_doc.add_device(...)?;  // version: 1 → 2
+    did_doc.add_device(...)?;  // version: 2 → 3 ⚠️ MISMATCH!
+}, Some(rotation_event), &amp;passphrase)?;
+</code></pre>
+<p><strong>Impact</strong>: This would cause verification failures in identity sync when peers try to apply rotation events, because the version check at <code>multi_device.rs:450</code> expects <code>new_version</code> to be <code>did_doc.version + 1</code>.</p>
+<p><strong>Solution</strong>: Created <code>add_device_with_encryption_key()</code> method that adds both keys with single version increment:</p>
+<pre><code class="language-rust">pub fn add_device_with_encryption_key(
+    &amp;mut self,
+    device_id: String,
+    label: String,
+    ed25519_public_key: Vec&lt;u8&gt;,
+    x25519_public_key: Vec&lt;u8&gt;,
+    signing_capabilities: Vec&lt;Capability&gt;,
+) -&gt; Result&lt;()&gt; {
+    // Add Ed25519 signing key
+    self.verification_method.push(...);
+
+    // Add X25519 encryption key
+    self.verification_method.push(...);
+
+    // Update version ONCE for the logical operation
+    self.version += 1;
+    Ok(())
+}
+</code></pre>
+<p><strong>Test coverage</strong>: Added <code>test_add_device_with_encryption_key_version_increment()</code> to verify version increments by exactly 1.</p>
+<p><strong>Lesson</strong>: When creating rotation events, ensure the version increment matches the semantic operation being performed. A device addition is a single logical operation, even if it involves multiple keys.</p>
+<h3>Challenge 4: Borrow Checker in Migration Test</h3>
+<p><strong>Problem</strong>: Held reference to DID Document while trying to lock/unlock keystore.</p>
+<p><strong>Error</strong>:</p>
+<pre><code>cannot borrow &#39;ks&#39; as mutable because it is also borrowed as immutable
+</code></pre>
+<p><strong>Solution</strong>: Clone values before mutation:</p>
+<pre><code class="language-rust">let did_doc_id = did_doc.id.clone();
+let did_doc_version = did_doc.version;
+// Now can lock/unlock
+ks.lock();
+ks.unlock(passphrase).unwrap();
+</code></pre>
+<p><strong>Lesson</strong>: Rust&#39;s borrow checker enforces clear separation between reading and writing.</p>
+<h2>Test Coverage</h2>
+<p><strong>Unit tests</strong> (31 total in icn-identity):</p>
+<ul>
+<li><code>multi_device.rs</code>: DID Document creation, device add/revoke, capability checks, version increment behavior</li>
+<li><code>keystore.rs</code>: v3 creation, unlock, v2.1→v3 migration, update_did_document()</li>
+<li><code>sync.rs</code>: IdentityUpdateMessage serialization, cache apply_event(), version ordering</li>
+</ul>
+<p><strong>Integration tests</strong> (2 in icn-identity/tests/):</p>
+<ul>
+<li><code>identity_sync_test.rs</code>: End-to-end workflow (Alice adds device → Bob caches → Alice revokes → Bob verifies)</li>
+<li>Version ordering and conflict resolution</li>
+</ul>
+<p><strong>Doc tests</strong>: 1 in sync.rs</p>
+<p><strong>Test results</strong>: All 34 tests pass in icn-identity (31 unit + 2 integration + 1 doc).</p>
+<h2>Security Considerations</h2>
+<h3>1. Capability Enforcement</h3>
+<p>Every device operation checks capabilities:</p>
+<pre><code class="language-rust">pub fn can_add_device(&amp;self, device_id: &amp;str) -&gt; bool {
+    self.verification_method.iter().any(|vm| {
+        vm.id == device_id
+        &amp;&amp; vm.revoked_at.is_none()
+        &amp;&amp; vm.capabilities.contains(&amp;Capability::AddDevice)
+    })
+}
+</code></pre>
+<h3>2. Revocation Semantics</h3>
+<p><strong>Soft deletion</strong>: Revoked devices remain in DID Document with <code>revoked_at</code> timestamp.</p>
+<p><strong>Rationale</strong>:</p>
+<ul>
+<li>Preserves audit trail</li>
+<li>Prevents ID reuse</li>
+<li>Enables forensic analysis</li>
+</ul>
+<p><strong>Verification</strong>:</p>
+<pre><code class="language-rust">pub fn can_sign(&amp;self, did: &amp;Did, public_key_bytes: &amp;[u8]) -&gt; bool {
+    // Check if key exists, matches DID, has Sign capability, NOT revoked
+}
+</code></pre>
+<h3>3. Version Ordering</h3>
+<p><strong>Prevents replay attacks</strong>: Older versions are rejected.</p>
+<p><strong>Implementation</strong>:</p>
+<pre><code class="language-rust">if update.new_version &lt;= cached.version {
+    return Ok(false);  // Stale update
+}
+</code></pre>
+<p><strong>Caveat</strong>: This assumes monotonic version increments. Concurrent updates from multiple devices could cause conflicts. Future work: CRDTs or vector clocks.</p>
+<h3>4. Signature Verification</h3>
+<p><strong>Current limitation</strong>: <code>DidDocumentCache.apply_event()</code> accepts events without verifying signatures.</p>
+<p><strong>Justification</strong>: Phase 11 focuses on data structures and storage. Signature verification will be added when integrating with supervisor/gossip in production.</p>
+<p><strong>TODO</strong>: Before production deployment:</p>
+<pre><code class="language-rust">pub fn apply_event(&amp;self, did: &amp;Did, event: &amp;RotationEvent, signature: &amp;[u8]) -&gt; Result&lt;bool&gt; {
+    // Verify signature with authorized key
+    // Then apply event
+}
+</code></pre>
+<h2>Gossip Integration</h2>
+<p><strong>Topic</strong>: <code>identity:updates</code></p>
+<p><strong>Access control</strong>: Public (all nodes can subscribe)</p>
+<p><strong>Message flow</strong>:</p>
+<ol>
+<li>Device updates DID Document locally</li>
+<li>Creates <code>IdentityUpdateMessage</code> with RotationEvent</li>
+<li>Serializes to bytes (bincode)</li>
+<li>Publishes to gossip topic</li>
+<li>Peers receive, deserialize, apply to cache</li>
+<li>Cache validates version ordering</li>
+</ol>
+<p><strong>Bandwidth</strong>: ~280 bytes per device operation (add/revoke/rotate).</p>
+<p><strong>Frequency</strong>: Low (human-driven events, not high-frequency data).</p>
+<p><strong>Future optimization</strong>: Batch multiple rotation events into single message.</p>
+<h2>CLI User Experience</h2>
+<h3>Device List</h3>
+<pre><code class="language-bash">$ icnctl device list
+
+Current DID: did:icn:z6Mk...
+
+Devices:
+  [✓] device-abc123 (laptop-primary)
+      Added: 2025-01-14 10:23:45 UTC
+      Capabilities: Sign, AddDevice, RevokeDevice, RotateKey, Recover, Encrypt
+      Status: Active
+
+  [✓] device-xyz789 (phone)
+      Added: 2025-01-14 11:45:22 UTC
+      Capabilities: Sign, Encrypt
+      Status: Active
+
+  [✗] device-old456 (old-laptop)
+      Added: 2025-01-10 08:12:33 UTC
+      Revoked: 2025-01-14 12:05:10 UTC
+      Reason: Device lost
+</code></pre>
+<h3>Device Add</h3>
+<pre><code class="language-bash">$ icnctl device add phone
+Enter the DID to add this device to: did:icn:z6Mk...
+
+Generated device keys:
+  Device ID: device-xyz789
+  Ed25519 Public Key: abc123...
+  X25519 Public Key: def456...
+
+Device add request saved to: device-xyz789-request.json
+
+Next steps:
+  1. Transfer this request file to an authorized device
+  2. On authorized device, run: icnctl device approve device-xyz789-request.json
+  3. Return to this device and run: icnctl id import &lt;keystore&gt;
+</code></pre>
+<h3>Device Approve</h3>
+<pre><code class="language-bash">$ icnctl device approve phone-request.json
+Loaded device add request:
+  DID: did:icn:z6Mk...
+  Label: phone
+  Capabilities: Sign, Encrypt
+
+Approve this device? [y/N]: y
+
+✅ Device approved and DID Document updated
+✅ Identity update broadcasted to network
+</code></pre>
+<h3>Device Revoke</h3>
+<pre><code class="language-bash">$ icnctl device revoke device-old456 --reason &quot;Device lost&quot;
+
+Revoking device: device-old456 (old-laptop)
+Reason: Device lost
+
+⚠️  This device will no longer be able to sign transactions.
+
+Proceed? [y/N]: y
+
+✅ Device revoked
+✅ DID Document updated (version 5)
+✅ Identity update broadcasted to network
+</code></pre>
+<h2>Deferred Work</h2>
+<h3>11.5.4: Supervisor Integration</h3>
+<p><strong>Status</strong>: Deferred to production deployment</p>
+<p><strong>Rationale</strong>:</p>
+<ul>
+<li>Core infrastructure complete</li>
+<li>Integration requires broader system changes</li>
+<li>Not blocking for MVP testing</li>
+</ul>
+<p><strong>Work required</strong>:</p>
+<ol>
+<li>Wire <code>DidDocumentCache</code> into supervisor</li>
+<li>Subscribe to <code>identity:updates</code> topic</li>
+<li>Apply rotation events to cache</li>
+<li>Use cache for signature verification in NetworkActor</li>
+</ol>
+<h3>11.6: Social Recovery</h3>
+<p><strong>Status</strong>: Deferred (not critical for MVP)</p>
+<p><strong>Rationale</strong>:</p>
+<ul>
+<li>Complex trust graph integration</li>
+<li>Requires governance mechanisms</li>
+<li>Can be added post-MVP</li>
+</ul>
+<p><strong>Design sketch</strong>:</p>
+<pre><code class="language-rust">pub struct RecoveryConfig {
+    pub recovery_method: RecoveryMethod,
+    pub threshold: u8,
+    pub guardians: Vec&lt;Did&gt;,
+}
+
+pub enum RecoveryMethod {
+    SocialRecovery { threshold: u8, guardians: Vec&lt;Did&gt; },
+    RecoveryPhrase { hash: Vec&lt;u8&gt; },
+    MultiSig { threshold: u8, keys: Vec&lt;Vec&lt;u8&gt;&gt; },
+}
+</code></pre>
+<h2>What&#39;s Next</h2>
+<p>Phase 11 is complete. See <a href="https://github.com/InterCooperative-Network/icn/blob/main/ROADMAP">ROADMAP.md</a> for next phases:</p>
+<ul>
+<li><strong>Phase 12</strong>: Operational Hardening (monitoring, backups, disaster recovery)</li>
+<li><strong>Phase 13</strong>: Economic Safety Rails (dynamic credit limits, dispute resolution)</li>
+<li><strong>Phase 14</strong>: Governance Primitives v1 (driven by pilot community)</li>
+</ul>
+<h2>Commits</h2>
+<ol>
+<li><code>3b712f9</code> - feat: Implement multi-device identity core (DID Document v2, Keystore v3)</li>
+<li><code>c405c23</code> - feat: Implement identity sync protocol via gossip</li>
+<li><code>085c59e</code> - feat: Add device management CLI commands</li>
+<li><code>857eec3</code> - docs: Add multi-device identity design doc and roadmap</li>
+<li><code>0247acc</code> - docs: Add Phase 11 dev journal and update CLAUDE.md</li>
+<li><code>c705831</code> - fix: Correct DID Document version increment in device approval</li>
+</ol>
+<h2>References</h2>
+<ul>
+<li><a href="https://www.w3.org/TR/did-core/" target="_blank" rel="noopener">W3C DID Specification</a></li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/multi-device-identity-design">docs/multi-device-identity-design.md</a></li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/ROADMAP">ROADMAP.md</a></li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-identity/src/multi_device.rs">icn-identity/src/multi_device.rs</a></li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-identity/src/sync.rs">icn-identity/src/sync.rs</a></li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

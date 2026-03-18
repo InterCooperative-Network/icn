@@ -1,0 +1,524 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Economic Modeling for Mutual Credit Systems | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>economics</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>econ modeling</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/economics/econ-modeling.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Economic Modeling for Mutual Credit Systems</h1>
+<p><strong>Status</strong>: ✅ <strong>COMPLETE</strong> (Track B3)
+<strong>Last Updated</strong>: 2025-01-14
+<strong>Simulation Results</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/sims/mutual-credit/RESULTS_SUMMARY">sims/mutual-credit/RESULTS_SUMMARY.md</a></p>
+<h2>Purpose</h2>
+<p>Mutual credit systems have well-documented failure modes. Before deploying ICN&#39;s ledger in production, we need to:</p>
+<ol>
+<li><strong>Catalog known failure modes</strong> from historical mutual credit systems</li>
+<li><strong>Model agent behaviors</strong> that lead to system collapse</li>
+<li><strong>Test economic parameters</strong> (credit limits, demurrage, default handling)</li>
+<li><strong>Recommend defaults</strong> for Phase 12 (Economic Safety Rails)</li>
+</ol>
+<p>This document guides the economic modeling parallel research track.</p>
+<hr>
+<h2>Simulation Results Summary (January 2025)</h2>
+<p><strong>Framework Implemented</strong>: Agent-based model using Mesa 3.3.1 with 100 agents over 12 months across 5 scenarios.</p>
+<h3>Key Findings</h3>
+<table>
+<thead>
+<tr>
+<th>Intervention</th>
+<th>Effect</th>
+<th>Recommendation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Dynamic Credit Limits</strong> (2x trust multiplier)</td>
+<td>-16% velocity, -33% defaults</td>
+<td>✅ Use for stability, accept lower volume</td>
+</tr>
+<tr>
+<td><strong>Demurrage</strong> (-2% monthly on &gt;50)</td>
+<td>-22% inequality (Gini), no velocity harm</td>
+<td>✅ Highly effective redistribution</td>
+</tr>
+<tr>
+<td><strong>High Free-Riders</strong> (20% vs 8%)</td>
+<td>+51% defaults, system stressed but stable</td>
+<td>⚠️ System tolerates up to ~20%</td>
+</tr>
+<tr>
+<td><strong>Low Trust Network</strong> (30% density)</td>
+<td>+100% hoarding, conservative behavior</td>
+<td>⚠️ Network density critical</td>
+</tr>
+</tbody></table>
+<h3>Validated Hypotheses</h3>
+<ol>
+<li>✅ <strong>Demurrage works</strong>: Reduced Gini from 0.36 to 0.28 without harming velocity</li>
+<li>✅ <strong>Trust-gated limits reduce defaults</strong>: 1.8% vs 2.7% baseline</li>
+<li>✅ <strong>System can tolerate free-riders</strong>: Up to 20% before serious stress</li>
+<li>❌ <strong>Sparse networks reduce hoarding</strong>: WRONG - they increase it (counterintuitive but economically sound)</li>
+</ol>
+<h3>Recommended Defaults (Updated with Simulation Data)</h3>
+<p>Based on 5 scenarios with ~13,000 transactions each:</p>
+<p><strong>Credit Limits</strong>:</p>
+<ul>
+<li>Initial: -20 (validated - allows 2-4 small transactions)</li>
+<li>Maximum: -500 (validated - caps extreme exposure)</li>
+<li>Growth: +10 per 50 cleared (validated - agents reached -500 in 3-4 months)</li>
+<li>Trust multiplier: 2.0 (tested - provides meaningful differentiation)</li>
+</ul>
+<p><strong>Demurrage</strong>:</p>
+<ul>
+<li>Rate: -2% monthly on balances &gt;50 (validated - reduces inequality 22%)</li>
+<li>Threshold: 50 credits (tested - exempts small savers)</li>
+<li>Application: Monthly (timing critical - must be synchronized)</li>
+</ul>
+<p><strong>New Member Protection</strong>:</p>
+<ul>
+<li>Initial limit: -20 (conservative, validated)</li>
+<li>Ramp period: 3 months (implemented in Phase 12)</li>
+<li>Contribution requirement: 10 credits cleared (Phase 12 feature)</li>
+</ul>
+<h3>Implementation Notes</h3>
+<p>All economic safety features from simulation are now implemented in ICN:</p>
+<ul>
+<li>Phase 12: Dynamic credit limits, new member throttling, dispute resolution</li>
+<li>Ledger: Double-entry with quarantine for conflicts</li>
+<li>Trust graph: Transitive trust computation with decay</li>
+</ul>
+<p>See <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/sims/mutual-credit/">sims/mutual-credit/</a> for complete framework, scenarios, and analysis notebooks.</p>
+<hr>
+<h2>Known Failure Modes</h2>
+<h3>1. Tragedy of the Credits (Hoarding / Deflation)</h3>
+<p><strong>Symptom</strong>: Users accumulate positive balances and refuse to spend, leading to systemic deflation.</p>
+<p><strong>Mechanism</strong>:</p>
+<ul>
+<li>Alice provides 100 hours of service, earns +100 credits</li>
+<li>Alice never spends those credits (treats them as savings)</li>
+<li>System has net negative balance elsewhere (someone is -100)</li>
+<li>As more people hoard, fewer credits circulate</li>
+<li>New members can&#39;t earn credits because no one is spending</li>
+</ul>
+<p><strong>Historical Examples</strong>:</p>
+<ul>
+<li>LETS (Local Exchange Trading Systems) in 1990s UK: 20-30% of members held 80% of positive balances</li>
+<li>Ithaca Hours: Chronic deflation as businesses accumulated hours but couldn&#39;t spend them locally</li>
+</ul>
+<p><strong>Potential Mitigations</strong>:</p>
+<ul>
+<li><strong>Demurrage</strong>: Negative interest on positive balances (e.g., -2% per month)</li>
+<li><strong>Expiring credits</strong>: Credits lose value after 12 months</li>
+<li><strong>Balance caps</strong>: Maximum positive balance enforced by protocol</li>
+<li><strong>Contribution requirements</strong>: Must spend X% of earnings to remain in good standing</li>
+</ul>
+<p><strong>Questions for Simulation</strong>:</p>
+<ul>
+<li>What demurrage rate prevents hoarding without punishing savers?</li>
+<li>Does demurrage increase velocity or just annoy users?</li>
+<li>Do expiring credits create panic spending (bad UX) or healthy circulation?</li>
+</ul>
+<hr>
+<h3>2. Free-Rider Problem (Extraction Without Contribution)</h3>
+<p><strong>Symptom</strong>: Users extract value from the community without contributing, exploiting trust or weak enforcement.</p>
+<p><strong>Mechanism</strong>:</p>
+<ul>
+<li>Bob joins, earns high trust quickly (is friendly, shows up to meetings)</li>
+<li>Bob racks up -50 credits (receives services)</li>
+<li>Bob ghosts the community, never clears debt</li>
+<li>Community eats the loss; trust in system degrades</li>
+</ul>
+<p><strong>Historical Examples</strong>:</p>
+<ul>
+<li>WIR Bank (Switzerland): Required mandatory membership fees + strict credit limits to prevent free-riding</li>
+<li>Sardex (Italy): Uses credit scoring + mandatory clearing periods</li>
+</ul>
+<p><strong>Potential Mitigations</strong>:</p>
+<ul>
+<li><strong>New member throttling</strong>: Very low initial credit limits</li>
+<li><strong>Trust-gated limits</strong>: Credit limit scales with demonstrated trustworthiness</li>
+<li><strong>Mandatory clearing</strong>: Must clear debt within 90 days or lose borrowing privileges</li>
+<li><strong>Default visibility</strong>: Failed obligations are publicly visible in reputation layer</li>
+</ul>
+<p><strong>Questions for Simulation</strong>:</p>
+<ul>
+<li>How low should initial credit limits be? (Too low = useless, too high = risky)</li>
+<li>Does trust-gated scaling work if trust graph is manipulated?</li>
+<li>What percentage of free-riders can a system tolerate before collapse?</li>
+</ul>
+<hr>
+<h3>3. Credit Limit Gaming (Borrow-and-Bail)</h3>
+<p><strong>Symptom</strong>: Users maximize their credit limit, extract maximum value, then abandon the community.</p>
+<p><strong>Mechanism</strong>:</p>
+<ul>
+<li>Carol builds trust over 6 months (clears small debts reliably)</li>
+<li>Carol&#39;s credit limit increases to -200</li>
+<li>Carol immediately borrows -200 (receives services)</li>
+<li>Carol disappears, never repays</li>
+</ul>
+<p><strong>Historical Examples</strong>:</p>
+<ul>
+<li>Mutual credit systems without dynamic limits often see &quot;graduation fraud&quot;</li>
+<li>Similar to credit card bust-out schemes in traditional finance</li>
+</ul>
+<p><strong>Potential Mitigations</strong>:</p>
+<ul>
+<li><strong>Gradual limit increases</strong>: Ramp credit slowly based on <em>cleared</em> volume (not just time)</li>
+<li><strong>Velocity-based limits</strong>: Can only borrow X per month (rate limiting)</li>
+<li><strong>Collateral requirements</strong>: High-trust members can vouch for new members (skin in the game)</li>
+<li><strong>Quarantine on large debts</strong>: Debts above threshold require community approval to continue</li>
+</ul>
+<p><strong>Questions for Simulation</strong>:</p>
+<ul>
+<li>What&#39;s the optimal credit limit curve? (Linear, logarithmic, stepwise?)</li>
+<li>How fast should limits ramp? (Too slow = frustration, too fast = exploitation)</li>
+<li>Can social collateral (vouching) prevent gaming?</li>
+</ul>
+<hr>
+<h3>4. Velocity Collapse (Trust Breakdown → No Spending)</h3>
+<p><strong>Symptom</strong>: After a few defaults or conflicts, members stop transacting out of fear.</p>
+<p><strong>Mechanism</strong>:</p>
+<ul>
+<li>Dan defaults on -30 credits</li>
+<li>Community becomes risk-averse</li>
+<li>Members only transact with known-safe people (high trust scores)</li>
+<li>New members can&#39;t break into the trade network</li>
+<li>Velocity drops to near-zero; system is technically alive but functionally dead</li>
+</ul>
+<p><strong>Historical Examples</strong>:</p>
+<ul>
+<li>Many LETS systems collapsed not from technical failure but from &quot;loss of nerve&quot;</li>
+<li>TimeBanks suffer from this when a few bad experiences go unresolved</li>
+</ul>
+<p><strong>Potential Mitigations</strong>:</p>
+<ul>
+<li><strong>Trust graph resilience</strong>: Default by one member shouldn&#39;t tank trust in the system</li>
+<li><strong>Dispute resolution</strong>: Fast, fair handling of conflicts prevents fear spiral</li>
+<li><strong>System insurance</strong>: Community reserve pool to absorb small losses</li>
+<li><strong>Velocity targets</strong>: Alert community if transaction volume drops below threshold</li>
+</ul>
+<p><strong>Questions for Simulation</strong>:</p>
+<ul>
+<li>What trust graph structure is resilient to local failures?</li>
+<li>Can insurance pools prevent velocity collapse without creating moral hazard?</li>
+<li>What&#39;s the minimum viable transaction volume for a healthy system?</li>
+</ul>
+<hr>
+<h3>5. Pricing Instability (No Shared Unit of Account)</h3>
+<p><strong>Symptom</strong>: Different members value the credit unit differently, leading to price chaos.</p>
+<p><strong>Mechanism</strong>:</p>
+<ul>
+<li>Alice charges 10 credits/hour for massage</li>
+<li>Bob charges 50 credits/hour for plumbing</li>
+<li>Carol charges 5 credits/hour for childcare</li>
+<li>No one can agree on &quot;fair&quot; exchange rates</li>
+<li>System fragments into micro-economies with incompatible pricing</li>
+</ul>
+<p><strong>Historical Examples</strong>:</p>
+<ul>
+<li>Ithaca Hours struggled with this: Was 1 Hour = 1 hour of labor, or 1 Hour = $10?</li>
+<li>LETS systems often saw &quot;professional service&quot; vs. &quot;manual labor&quot; pricing conflicts</li>
+</ul>
+<p><strong>Potential Mitigations</strong>:</p>
+<ul>
+<li><strong>Anchoring to external unit</strong>: 1 credit = 1 hour of time (TimeBanks)</li>
+<li><strong>Pricing guidelines</strong>: Community-approved rate sheets for common services</li>
+<li><strong>Market feedback</strong>: Show &quot;typical rates&quot; for similar services</li>
+<li><strong>Trust-weighted pricing</strong>: Trusted members&#39; pricing signals influence norms</li>
+</ul>
+<p><strong>Questions for Simulation</strong>:</p>
+<ul>
+<li>Does anchoring (1 credit = 1 hour) prevent pricing chaos or cause other problems?</li>
+<li>Can pricing norms emerge organically, or do they need governance?</li>
+<li>What happens if a few members consistently over/underprice?</li>
+</ul>
+<hr>
+<h2>Agent-Based Simulation Design</h2>
+<h3>Goals</h3>
+<ul>
+<li>Model 50-200 agents with heterogeneous behaviors</li>
+<li>Simulate 1-2 years of transactions</li>
+<li>Test different parameter sets (credit limits, demurrage, trust dynamics)</li>
+<li>Identify failure modes and resilience thresholds</li>
+</ul>
+<h3>Agent Types</h3>
+<p><strong>Reciprocators</strong> (60-70% of population):</p>
+<ul>
+<li>Provide and consume services roughly equally</li>
+<li>Clear debts within reasonable time</li>
+<li>Build trust through consistent behavior</li>
+<li>Realistic model of &quot;good community members&quot;</li>
+</ul>
+<p><strong>Hoarders</strong> (10-15%):</p>
+<ul>
+<li>Accumulate positive balances</li>
+<li>Rarely spend earned credits</li>
+<li>Not malicious, just risk-averse or have fewer needs</li>
+<li>Test demurrage effectiveness</li>
+</ul>
+<p><strong>Free-Riders</strong> (5-10%):</p>
+<ul>
+<li>Consume more than they provide</li>
+<li>May ghost after hitting credit limit</li>
+<li>Test robustness of credit policies</li>
+</ul>
+<p><strong>Opportunists</strong> (5-10%):</p>
+<ul>
+<li>Game the system (build trust, then extract maximum)</li>
+<li>Test security of trust-gated limits</li>
+</ul>
+<p><strong>Super-Contributors</strong> (5-10%):</p>
+<ul>
+<li>Provide far more than they consume</li>
+<li>Anchor the economy with consistent supply</li>
+<li>Can become resentful if taken advantage of</li>
+</ul>
+<h3>Simulation Parameters</h3>
+<p><strong>Economic</strong>:</p>
+<ul>
+<li><code>initial_credit_limit</code>: Starting borrowing limit (e.g., -10 to -50)</li>
+<li><code>max_credit_limit</code>: Maximum borrowing limit (e.g., -500)</li>
+<li><code>limit_growth_rate</code>: How fast limits increase (e.g., 10% of cleared volume)</li>
+<li><code>demurrage_rate</code>: Negative interest on positive balances (e.g., -2% per month)</li>
+<li><code>default_threshold</code>: When is someone considered in default? (e.g., -100 for &gt;90 days)</li>
+</ul>
+<p><strong>Trust</strong>:</p>
+<ul>
+<li><code>trust_growth_rate</code>: How fast trust builds with successful transactions</li>
+<li><code>trust_decay_rate</code>: How fast trust decays with failed obligations</li>
+<li><code>trust_limit_multiplier</code>: How much trust boosts credit limit (e.g., 2x at max trust)</li>
+</ul>
+<p><strong>Network</strong>:</p>
+<ul>
+<li><code>network_density</code>: How connected is the trust graph? (affects transaction opportunities)</li>
+<li><code>new_member_rate</code>: How many new members join per month?</li>
+<li><code>churn_rate</code>: How many members leave per month?</li>
+</ul>
+<h3>Metrics to Track</h3>
+<p><strong>System Health</strong>:</p>
+<ul>
+<li>Total transaction volume per month (velocity)</li>
+<li>Gini coefficient of balances (inequality)</li>
+<li>Number of defaults / write-offs</li>
+<li>Percentage of members in good standing</li>
+</ul>
+<p><strong>Individual Outcomes</strong>:</p>
+<ul>
+<li>Average balance over time</li>
+<li>Credit limit distribution</li>
+<li>Trust score distribution</li>
+<li>Time to clear debts</li>
+</ul>
+<p><strong>Failure Indicators</strong>:</p>
+<ul>
+<li>Velocity collapse: Transactions drop below threshold</li>
+<li>Deflation spiral: Positive balance accumulation accelerates</li>
+<li>Default cascade: Multiple simultaneous defaults</li>
+<li>Network fragmentation: Isolated clusters stop trading</li>
+</ul>
+<hr>
+<h2>Simulation Implementation</h2>
+<h3>Tools</h3>
+<p><strong>Option 1: Python + Mesa (Agent-Based Modeling)</strong></p>
+<ul>
+<li>Pros: Fast prototyping, good visualization, familiar to social scientists</li>
+<li>Cons: Slower execution for large simulations</li>
+</ul>
+<p><strong>Option 2: Rust (Custom Simulation)</strong></p>
+<ul>
+<li>Pros: Fast, can reuse ICN types (DID, Ledger, TrustGraph)</li>
+<li>Cons: More code to write, less off-the-shelf visualization</li>
+</ul>
+<p><strong>Recommendation</strong>: Start with Python/Mesa for rapid iteration, rewrite in Rust if performance matters.</p>
+<h3>Directory Structure</h3>
+<pre><code>sims/mutual-credit/
+  ├── agents.py          # Agent behavior definitions
+  ├── economy.py         # Transaction logic, credit limits
+  ├── trust.py           # Trust graph dynamics
+  ├── model.py           # Mesa model orchestration
+  ├── scenarios/         # Parameter sets for different tests
+  │   ├── baseline.json
+  │   ├── high_demurrage.json
+  │   ├── low_trust.json
+  ├── analysis/          # Jupyter notebooks for visualization
+  │   ├── velocity.ipynb
+  │   ├── inequality.ipynb
+  ├── results/           # Simulation output (CSV, plots)
+  └── README.md
+</code></pre>
+<hr>
+<h2>Validation Against Pilot Data</h2>
+<p>Once the pilot community (Phase C2) is running:</p>
+<ol>
+<li><p><strong>Export real transaction data</strong>:</p>
+<ul>
+<li>Transaction volume per week</li>
+<li>Balance distribution</li>
+<li>Default rate</li>
+<li>Trust dynamics</li>
+</ul>
+</li>
+<li><p><strong>Calibrate simulation</strong>:</p>
+<ul>
+<li>Adjust agent behavior probabilities to match observed patterns</li>
+<li>Tune parameters to reproduce actual velocity, inequality, defaults</li>
+</ul>
+</li>
+<li><p><strong>Test counterfactuals</strong>:</p>
+<ul>
+<li>&quot;What if we had 10% higher demurrage?&quot;</li>
+<li>&quot;What if credit limits were 2x higher?&quot;</li>
+<li>&quot;What if we had 5% more free-riders?&quot;</li>
+</ul>
+</li>
+<li><p><strong>Predict outcomes</strong>:</p>
+<ul>
+<li>&quot;If we grow to 200 members, will velocity hold?&quot;</li>
+<li>&quot;If defaults spike, what interventions work?&quot;</li>
+</ul>
+</li>
+</ol>
+<p><strong>Success Criteria</strong>: Simulation predictions match pilot outcomes within 20% margin.</p>
+<hr>
+<h2>Recommended Defaults (Preliminary)</h2>
+<p><strong>IMPORTANT</strong>: These are hypotheses to be tested, not final values.</p>
+<h3>Credit Limits</h3>
+<ul>
+<li><strong>Initial</strong>: -20 credits (enough for 2-3 small transactions)</li>
+<li><strong>Maximum</strong>: -500 credits (caps extreme exposure)</li>
+<li><strong>Growth</strong>: +10 credits per 50 credits cleared (rewards reliability)</li>
+<li><strong>Trust multiplier</strong>: 2x at max trust (score &gt; 0.8)</li>
+</ul>
+<h3>Demurrage</h3>
+<ul>
+<li><strong>Rate</strong>: -1% per month on positive balances &gt; 50</li>
+<li><strong>Rationale</strong>: Gentle nudge to spend, not punitive</li>
+<li><strong>Exempt</strong>: Balances under 50 (don&#39;t punish small savers)</li>
+</ul>
+<h3>Default Handling</h3>
+<ul>
+<li><strong>Threshold</strong>: Negative balance &gt; 100 for &gt; 90 days</li>
+<li><strong>Action</strong>: Freeze further borrowing, flag for dispute resolution</li>
+<li><strong>Write-off</strong>: Community vote can socialize loss (mark as bad debt)</li>
+</ul>
+<h3>New Member Protection</h3>
+<ul>
+<li><strong>Ramp period</strong>: 3 months before reaching baseline credit limit</li>
+<li><strong>Contribution requirement</strong>: Must clear at least 10 credits in first month</li>
+<li><strong>Monitoring</strong>: Flag accounts with unusual borrowing patterns</li>
+</ul>
+<hr>
+<h2>Open Questions</h2>
+<ol>
+<li><strong>Demurrage psychology</strong>: Does it create resentment or acceptance? (Can&#39;t simulate this, need real users)</li>
+<li><strong>Trust graph manipulation</strong>: Can agents collude to artificially boost each other&#39;s trust?</li>
+<li><strong>External shocks</strong>: How does the system handle sudden loss of high-trust members?</li>
+<li><strong>Interoperability</strong>: If ICN connects to traditional banking, how does pricing stability change?</li>
+</ol>
+<hr>
+<h2>Next Steps</h2>
+<p><strong>Immediate (Week 1-2)</strong>:</p>
+<ul>
+<li><input disabled="" type="checkbox"> Set up Python/Mesa simulation environment</li>
+<li><input disabled="" type="checkbox"> Implement basic agent types (reciprocators, hoarders, free-riders)</li>
+<li><input disabled="" type="checkbox"> Run baseline scenario (no demurrage, fixed credit limits)</li>
+</ul>
+<p><strong>Short-term (Month 1)</strong>:</p>
+<ul>
+<li><input disabled="" type="checkbox"> Test demurrage scenarios (0%, 1%, 2%, 5%)</li>
+<li><input disabled="" type="checkbox"> Test credit limit curves (linear, logarithmic, stepwise)</li>
+<li><input disabled="" type="checkbox"> Visualize velocity, inequality, default rates</li>
+</ul>
+<p><strong>Medium-term (Month 2-3)</strong>:</p>
+<ul>
+<li><input disabled="" type="checkbox"> Calibrate against pilot data (once available)</li>
+<li><input disabled="" type="checkbox"> Run sensitivity analysis (which parameters matter most?)</li>
+<li><input disabled="" type="checkbox"> Document recommended defaults for Phase 12</li>
+</ul>
+<p><strong>Long-term (Month 4+)</strong>:</p>
+<ul>
+<li><input disabled="" type="checkbox"> Rewrite in Rust for performance (if needed)</li>
+<li><input disabled="" type="checkbox"> Add governance modeling (how do decisions affect economics?)</li>
+<li><input disabled="" type="checkbox"> Model federation scenarios (multi-community trade)</li>
+</ul>
+<hr>
+<h2>References</h2>
+<p><strong>Historical Mutual Credit Systems</strong>:</p>
+<ul>
+<li>Lietaer, Bernard. &quot;The Future of Money&quot; (2001) - Comprehensive survey</li>
+<li>Williams, Colin. &quot;A Commodified World? Mapping the Limits of Capitalism&quot; (2005) - LETS case studies</li>
+<li>Stodder, James. &quot;Reciprocal Exchange Networks&quot; (2009) - WIR Bank analysis</li>
+</ul>
+<p><strong>Agent-Based Modeling</strong>:</p>
+<ul>
+<li>Wilensky, Uri. &quot;NetLogo&quot; - Classic ABM platform</li>
+<li>Mesa: Python framework for ABM (mesa.readthedocs.io)</li>
+<li>Epstein, Joshua. &quot;Generative Social Science&quot; (2006) - ABM methodology</li>
+</ul>
+<p><strong>Economic Theory</strong>:</p>
+<ul>
+<li>Graeber, David. &quot;Debt: The First 5,000 Years&quot; (2011) - Historical context</li>
+<li>North, Peter. &quot;Money and Liberation&quot; (2007) - Mutual credit philosophy</li>
+<li>Gesell, Silvio. &quot;The Natural Economic Order&quot; (1916) - Original demurrage theory</li>
+</ul>
+<hr>
+<p><strong>Status</strong>: This is a living research document. Add findings, update hypotheses, link to simulation results as they emerge.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

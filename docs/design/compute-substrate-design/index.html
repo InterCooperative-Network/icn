@@ -1,0 +1,1356 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Compute Substrate Design | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>compute substrate design</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/compute-substrate-design.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Compute Substrate Design</h1>
+<p><strong>Date</strong>: 2025-11-18
+<strong>Status</strong>: Design Document
+<strong>Phase</strong>: Pre-implementation (C0 ready to start)</p>
+<hr>
+<h2>1. Overview</h2>
+<h3>1.1 Vision</h3>
+<p>ICN&#39;s compute substrate transforms distributed computing resources into a <strong>shared cooperative asset</strong>. Nodes contribute CPU, memory, storage, and GPU capacity; the network tracks contributions, schedules workloads, meters usage, and settles payments in mutual credit.</p>
+<p>This is <strong>not</strong> another cloud provider or blockchain compute market. It&#39;s:</p>
+<ul>
+<li><strong>Cooperative-owned</strong>: Resources belong to participating coops, not a platform</li>
+<li><strong>Trust-integrated</strong>: Placement and pricing depend on trust relationships</li>
+<li><strong>Governance-driven</strong>: Policies set by democratic decision-making</li>
+<li><strong>Economically aligned</strong>: Contributors earn credit, consumers pay credit</li>
+</ul>
+<h3>1.2 Design Principles</h3>
+<ol>
+<li><strong>ICN coordinates, doesn&#39;t orchestrate</strong>: We use existing tools (K8s, Nomad, Proxmox) for actual workload execution</li>
+<li><strong>Trust gates everything</strong>: Untrusted nodes can&#39;t access sensitive jobs</li>
+<li><strong>Metering is transparent</strong>: All resource consumption is cryptographically attested</li>
+<li><strong>Governance controls policy</strong>: Pricing, pools, and access are decided democratically</li>
+<li><strong>Progressive complexity</strong>: Start simple (C0), add sophistication incrementally</li>
+</ol>
+<h3>1.3 Non-Goals</h3>
+<ul>
+<li>Replacing Kubernetes/Nomad/Slurm (we integrate with them)</li>
+<li>Real-time or latency-critical scheduling (batch-oriented first)</li>
+<li>Verifiable computation proofs (trust + spot-checks, not ZK proofs)</li>
+<li>Token-based payment (mutual credit only)</li>
+</ul>
+<hr>
+<h2>2. Architecture</h2>
+<pre><code>┌─────────────────────────────────────────────────────────────┐
+│                      ICN Compute Layer                       │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐       │
+│  │   Capacity   │  │     Job      │  │   Metering   │       │
+│  │   Registry   │  │  Scheduler   │  │   &amp; Billing  │       │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘       │
+│         │                 │                 │                │
+│         ▼                 ▼                 ▼                │
+│  ┌─────────────────────────────────────────────────┐        │
+│  │              Gossip Topics                       │        │
+│  │  compute:nodes | compute:jobs | compute:usage    │        │
+│  └─────────────────────────────────────────────────┘        │
+│                          │                                   │
+├──────────────────────────┼───────────────────────────────────┤
+│                          │                                   │
+│  ┌───────────────────────▼───────────────────────┐          │
+│  │            Gateway API (/v1/compute/*)         │          │
+│  └───────────────────────────────────────────────┘          │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    Compute Nodes                             │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐       │
+│  │ ComputeAgent │  │ ComputeAgent │  │ ComputeAgent │       │
+│  │   (Node A)   │  │   (Node B)   │  │   (Node C)   │       │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘       │
+│         │                 │                 │                │
+│         ▼                 ▼                 ▼                │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐       │
+│  │  K8s/Nomad/  │  │  K8s/Nomad/  │  │  K8s/Nomad/  │       │
+│  │   Proxmox    │  │   Proxmox    │  │   Proxmox    │       │
+│  └──────────────┘  └──────────────┘  └──────────────┘       │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+</code></pre>
+<hr>
+<h2>3. Data Structures</h2>
+<h3>3.1 Compute Profile</h3>
+<p>Advertises a node&#39;s available resources and capabilities.</p>
+<pre><code class="language-rust">use icn_identity::Did;
+use serde::{Deserialize, Serialize};
+
+/// Compute capabilities a node can provide
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub enum ComputeCapability {
+    /// Can run OCI containers (Docker/Podman)
+    Containers,
+    /// Can run WebAssembly modules
+    Wasm,
+    /// Has GPU available
+    Gpu,
+    /// Supports Intel SGX enclaves
+    Sgx,
+    /// Supports AMD SEV
+    Sev,
+    /// Has high-bandwidth network (&gt;1Gbps)
+    HighBandwidth,
+    /// Has SSD storage
+    SsdStorage,
+    /// Custom capability (for future extensibility)
+    Custom(String),
+}
+
+/// GPU information if available
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GpuProfile {
+    /// GPU model (e.g., &quot;NVIDIA RTX 4090&quot;)
+    pub model: String,
+    /// VRAM in GB
+    pub vram_gb: u32,
+    /// CUDA compute capability (e.g., &quot;8.9&quot;)
+    pub compute_capability: Option&lt;String&gt;,
+}
+
+/// A node&#39;s advertised compute capacity
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ComputeProfile {
+    /// Node&#39;s DID
+    pub node_did: Did,
+
+    /// CPU cores available for compute jobs
+    pub cpu_cores: u32,
+
+    /// RAM available in GB
+    pub ram_gb: u32,
+
+    /// Disk space available in GB
+    pub disk_gb: u32,
+
+    /// GPU if available
+    pub gpu: Option&lt;GpuProfile&gt;,
+
+    /// Supported capabilities
+    pub capabilities: Vec&lt;ComputeCapability&gt;,
+
+    /// Network bandwidth in Mbps
+    pub network_mbps: u32,
+
+    /// Geographic region (e.g., &quot;us-east&quot;, &quot;eu-west&quot;)
+    pub region: String,
+
+    /// Legal jurisdiction for data sovereignty
+    pub jurisdiction: String,
+
+    /// Average availability (0.0-1.0, e.g., 0.99 = 99% uptime)
+    pub availability: f32,
+
+    /// Maximum concurrent jobs this node will accept
+    pub max_concurrent_jobs: u32,
+
+    /// Unix timestamp of last update
+    pub updated_at: u64,
+
+    /// Signature over profile by node&#39;s DID
+    pub signature: Vec&lt;u8&gt;,
+}
+
+impl ComputeProfile {
+    /// Check if node has all required capabilities
+    pub fn has_capabilities(&amp;self, required: &amp;[ComputeCapability]) -&gt; bool {
+        required.iter().all(|cap| self.capabilities.contains(cap))
+    }
+
+    /// Check if node can satisfy resource request
+    pub fn can_satisfy(&amp;self, request: &amp;ResourceRequest) -&gt; bool {
+        self.cpu_cores &gt;= request.cpu_cores
+            &amp;&amp; self.ram_gb &gt;= request.ram_gb
+            &amp;&amp; self.disk_gb &gt;= request.disk_gb.unwrap_or(0)
+            &amp;&amp; (request.gpu.is_none() || self.gpu.is_some())
+    }
+}
+</code></pre>
+<h3>3.2 Job Specification</h3>
+<p>Defines a compute job to be scheduled and executed.</p>
+<pre><code class="language-rust">use std::collections::HashMap;
+
+/// Unique job identifier
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub struct JobId(pub String);
+
+/// Reference to a container image or WASM module
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ImageRef {
+    /// OCI container image (e.g., &quot;ghcr.io/coop/app:v1.0&quot;)
+    Container(String),
+    /// WASM module by content hash
+    Wasm { hash: String, size_bytes: u64 },
+    /// WASM module by URL
+    WasmUrl(String),
+}
+
+/// Resource requirements for a job
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourceRequest {
+    /// Minimum CPU cores required
+    pub cpu_cores: u32,
+    /// Minimum RAM in GB
+    pub ram_gb: u32,
+    /// Minimum disk space in GB (optional)
+    pub disk_gb: Option&lt;u32&gt;,
+    /// Requires GPU
+    pub gpu: Option&lt;GpuRequest&gt;,
+}
+
+/// GPU requirements
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GpuRequest {
+    /// Minimum VRAM in GB
+    pub min_vram_gb: u32,
+    /// Required compute capability (optional)
+    pub min_compute_capability: Option&lt;String&gt;,
+}
+
+/// Constraints on where a job can be placed
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlacementConstraints {
+    /// Allowed regions (empty = any)
+    pub regions: Vec&lt;String&gt;,
+    /// Allowed jurisdictions for data sovereignty (empty = any)
+    pub jurisdictions: Vec&lt;String&gt;,
+    /// Minimum trust score required (0.0-1.0)
+    pub min_trust: f32,
+    /// Required capabilities
+    pub capabilities: Vec&lt;ComputeCapability&gt;,
+    /// Preferred nodes (DIDs) - scheduler will try these first
+    pub preferred_nodes: Vec&lt;Did&gt;,
+    /// Excluded nodes (DIDs) - scheduler will never use these
+    pub excluded_nodes: Vec&lt;Did&gt;,
+}
+
+/// Reference to input data
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum DataRef {
+    /// ICN ledger entry
+    LedgerEntry { entry_id: String },
+    /// ICN gossip entry
+    GossipEntry { topic: String, hash: String },
+    /// External URL
+    Url(String),
+    /// Inline data (for small inputs)
+    Inline(Vec&lt;u8&gt;),
+}
+
+/// Job priority level
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+pub enum JobPriority {
+    Low = 0,
+    Normal = 1,
+    High = 2,
+    Critical = 3,
+}
+
+/// A compute job to be scheduled
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ComputeJob {
+    /// Unique job ID
+    pub id: JobId,
+
+    /// Job owner&#39;s DID
+    pub owner: Did,
+
+    /// Cooperative this job belongs to
+    pub coop_id: String,
+
+    /// Container image or WASM module to run
+    pub image: ImageRef,
+
+    /// Resource requirements
+    pub resources: ResourceRequest,
+
+    /// Placement constraints
+    pub constraints: PlacementConstraints,
+
+    /// Input data references
+    pub inputs: Vec&lt;DataRef&gt;,
+
+    /// Environment variables
+    pub env: HashMap&lt;String, String&gt;,
+
+    /// Command to run (overrides image entrypoint)
+    pub command: Option&lt;Vec&lt;String&gt;&gt;,
+
+    /// Maximum runtime in seconds (0 = no limit)
+    pub timeout_secs: u64,
+
+    /// Job priority
+    pub priority: JobPriority,
+
+    /// CCL contract for settlement (optional - uses default if not specified)
+    pub settlement_contract: Option&lt;String&gt;,
+
+    /// Unix timestamp when job was submitted
+    pub submitted_at: u64,
+
+    /// Signature over job spec by owner
+    pub signature: Vec&lt;u8&gt;,
+}
+
+/// Current state of a job
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum JobState {
+    /// Job submitted, waiting for scheduling
+    Pending,
+    /// Job assigned to a node, waiting to start
+    Scheduled { node: Did },
+    /// Job is currently running
+    Running { node: Did, started_at: u64 },
+    /// Job completed successfully
+    Completed { node: Did, completed_at: u64 },
+    /// Job failed
+    Failed { node: Did, error: String, failed_at: u64 },
+    /// Job was cancelled
+    Cancelled { cancelled_at: u64 },
+    /// Job timed out
+    TimedOut { node: Did, timed_out_at: u64 },
+}
+
+/// Job with current state
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JobStatus {
+    pub job: ComputeJob,
+    pub state: JobState,
+    /// Output data references (populated on completion)
+    pub outputs: Vec&lt;DataRef&gt;,
+}
+</code></pre>
+<h3>3.3 Usage Report</h3>
+<p>Metering data from job execution.</p>
+<pre><code class="language-rust">/// Resource usage report from a completed job
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ComputeUsageReport {
+    /// Job that was executed
+    pub job_id: JobId,
+
+    /// Node that executed the job
+    pub executor: Did,
+
+    /// CPU time consumed in seconds
+    pub cpu_seconds: u64,
+
+    /// Peak memory usage in MB
+    pub memory_peak_mb: u64,
+
+    /// Average memory usage in MB
+    pub memory_avg_mb: u64,
+
+    /// Total disk read in bytes
+    pub disk_read_bytes: u64,
+
+    /// Total disk write in bytes
+    pub disk_write_bytes: u64,
+
+    /// Total network ingress in bytes
+    pub network_in_bytes: u64,
+
+    /// Total network egress in bytes
+    pub network_out_bytes: u64,
+
+    /// GPU time in seconds (if applicable)
+    pub gpu_seconds: Option&lt;u64&gt;,
+
+    /// Wall-clock duration in milliseconds
+    pub duration_ms: u64,
+
+    /// Exit code (0 = success)
+    pub exit_code: i32,
+
+    /// Unix timestamp when report was generated
+    pub reported_at: u64,
+
+    /// Signature over report by executor
+    pub signature: Vec&lt;u8&gt;,
+}
+
+impl ComputeUsageReport {
+    /// Calculate memory GB-seconds for billing
+    pub fn memory_gb_seconds(&amp;self) -&gt; f64 {
+        (self.memory_avg_mb as f64 / 1024.0) * (self.duration_ms as f64 / 1000.0)
+    }
+
+    /// Calculate total IO in GB
+    pub fn total_io_gb(&amp;self) -&gt; f64 {
+        let total_bytes = self.disk_read_bytes
+            + self.disk_write_bytes
+            + self.network_in_bytes
+            + self.network_out_bytes;
+        total_bytes as f64 / (1024.0 * 1024.0 * 1024.0)
+    }
+}
+</code></pre>
+<h3>3.4 Gossip Messages</h3>
+<p>Messages for the compute gossip topics.</p>
+<pre><code class="language-rust">/// Messages for compute:nodes topic
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ComputeNodeMessage {
+    /// Node advertising/updating its profile
+    ProfileUpdate(ComputeProfile),
+    /// Node going offline
+    GoingOffline { node: Did, until: Option&lt;u64&gt; },
+    /// Node back online
+    BackOnline { node: Did },
+}
+
+/// Messages for compute:jobs topic
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ComputeJobMessage {
+    /// New job submitted
+    JobSubmitted(ComputeJob),
+    /// Job assigned to node
+    JobScheduled { job_id: JobId, node: Did },
+    /// Job started running
+    JobStarted { job_id: JobId, node: Did },
+    /// Job completed
+    JobCompleted { job_id: JobId, node: Did, outputs: Vec&lt;DataRef&gt; },
+    /// Job failed
+    JobFailed { job_id: JobId, node: Did, error: String },
+    /// Job cancelled
+    JobCancelled { job_id: JobId },
+}
+
+/// Messages for compute:usage topic
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ComputeUsageMessage {
+    /// Usage report from completed job
+    UsageReport(ComputeUsageReport),
+    /// Verification result (for spot-checked jobs)
+    VerificationResult {
+        job_id: JobId,
+        primary_node: Did,
+        verifier_node: Did,
+        matches: bool,
+        discrepancy: Option&lt;String&gt;,
+    },
+}
+</code></pre>
+<hr>
+<h2>4. Gateway API</h2>
+<h3>4.1 Endpoints</h3>
+<pre><code># Node capacity management
+GET    /v1/compute/nodes              # List all compute nodes
+GET    /v1/compute/nodes/:did         # Get specific node profile
+POST   /v1/compute/nodes              # Register/update own profile
+DELETE /v1/compute/nodes              # Unregister own node
+
+# Job management
+POST   /v1/compute/jobs               # Submit a new job
+GET    /v1/compute/jobs               # List jobs (filterable)
+GET    /v1/compute/jobs/:id           # Get job status
+DELETE /v1/compute/jobs/:id           # Cancel a job
+
+# Usage and billing
+GET    /v1/compute/usage              # Get usage reports (filterable)
+GET    /v1/compute/usage/:job_id      # Get usage for specific job
+GET    /v1/compute/billing/summary    # Get billing summary for coop
+
+# Pool management (Phase C3)
+GET    /v1/compute/pools              # List compute pools
+GET    /v1/compute/pools/:id          # Get pool details
+POST   /v1/compute/pools              # Create pool (requires gov approval)
+PUT    /v1/compute/pools/:id          # Update pool settings
+</code></pre>
+<h3>4.2 Request/Response Types</h3>
+<pre><code class="language-rust">/// Request to register/update compute profile
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RegisterNodeRequest {
+    pub cpu_cores: u32,
+    pub ram_gb: u32,
+    pub disk_gb: u32,
+    pub gpu: Option&lt;GpuProfile&gt;,
+    pub capabilities: Vec&lt;ComputeCapability&gt;,
+    pub network_mbps: u32,
+    pub region: String,
+    pub jurisdiction: String,
+    pub availability: f32,
+    pub max_concurrent_jobs: u32,
+}
+
+/// Request to submit a job
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SubmitJobRequest {
+    pub image: ImageRef,
+    pub resources: ResourceRequest,
+    pub constraints: PlacementConstraints,
+    pub inputs: Vec&lt;DataRef&gt;,
+    pub env: HashMap&lt;String, String&gt;,
+    pub command: Option&lt;Vec&lt;String&gt;&gt;,
+    pub timeout_secs: u64,
+    pub priority: JobPriority,
+    pub settlement_contract: Option&lt;String&gt;,
+}
+
+/// Response with job ID
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SubmitJobResponse {
+    pub job_id: JobId,
+    pub estimated_start: Option&lt;u64&gt;,
+}
+
+/// Query parameters for listing jobs
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ListJobsQuery {
+    pub state: Option&lt;String&gt;,       // pending, running, completed, failed
+    pub owner: Option&lt;String&gt;,       // filter by owner DID
+    pub coop_id: Option&lt;String&gt;,     // filter by coop
+    pub since: Option&lt;u64&gt;,          // jobs submitted after timestamp
+    pub limit: Option&lt;u32&gt;,          // max results
+    pub offset: Option&lt;u32&gt;,         // pagination offset
+}
+
+/// Billing summary for a coop
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BillingSummary {
+    pub coop_id: String,
+    pub period_start: u64,
+    pub period_end: u64,
+    pub total_jobs: u64,
+    pub total_cpu_seconds: u64,
+    pub total_memory_gb_seconds: f64,
+    pub total_io_gb: f64,
+    pub total_cost: f64,           // in mutual credit units
+    pub breakdown_by_node: HashMap&lt;String, NodeBilling&gt;,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NodeBilling {
+    pub node_did: String,
+    pub jobs_executed: u64,
+    pub cpu_seconds: u64,
+    pub memory_gb_seconds: f64,
+    pub cost: f64,
+}
+</code></pre>
+<hr>
+<h2>5. Scheduling</h2>
+<h3>5.1 Placement Algorithm</h3>
+<pre><code class="language-rust">/// Scheduler state
+pub struct Scheduler {
+    /// Known compute nodes
+    nodes: HashMap&lt;Did, ComputeProfile&gt;,
+    /// Trust graph for trust lookups
+    trust_graph: Arc&lt;RwLock&lt;TrustGraph&gt;&gt;,
+    /// Pending jobs queue
+    pending: VecDeque&lt;ComputeJob&gt;,
+    /// Running jobs by node
+    running: HashMap&lt;Did, Vec&lt;JobId&gt;&gt;,
+}
+
+impl Scheduler {
+    /// Find best node for a job
+    pub fn find_placement(&amp;self, job: &amp;ComputeJob) -&gt; Option&lt;Did&gt; {
+        let candidates: Vec&lt;_&gt; = self.nodes
+            .iter()
+            .filter(|(did, profile)| {
+                // Check basic capacity
+                if !profile.can_satisfy(&amp;job.resources) {
+                    return false;
+                }
+
+                // Check capabilities
+                if !profile.has_capabilities(&amp;job.constraints.capabilities) {
+                    return false;
+                }
+
+                // Check region constraint
+                if !job.constraints.regions.is_empty()
+                    &amp;&amp; !job.constraints.regions.contains(&amp;profile.region) {
+                    return false;
+                }
+
+                // Check jurisdiction constraint
+                if !job.constraints.jurisdictions.is_empty()
+                    &amp;&amp; !job.constraints.jurisdictions.contains(&amp;profile.jurisdiction) {
+                    return false;
+                }
+
+                // Check exclusion list
+                if job.constraints.excluded_nodes.contains(did) {
+                    return false;
+                }
+
+                // Check concurrent job limit
+                let running_count = self.running
+                    .get(did)
+                    .map(|jobs| jobs.len() as u32)
+                    .unwrap_or(0);
+                if running_count &gt;= profile.max_concurrent_jobs {
+                    return false;
+                }
+
+                true
+            })
+            .collect();
+
+        if candidates.is_empty() {
+            return None;
+        }
+
+        // Score candidates
+        let mut scored: Vec&lt;_&gt; = candidates
+            .into_iter()
+            .map(|(did, profile)| {
+                let score = self.score_candidate(did, profile, job);
+                (did.clone(), score)
+            })
+            .collect();
+
+        // Sort by score (highest first)
+        scored.sort_by(|a, b| b.1.partial_cmp(&amp;a.1).unwrap());
+
+        Some(scored[0].0.clone())
+    }
+
+    /// Score a candidate node for a job
+    fn score_candidate(&amp;self, did: &amp;Did, profile: &amp;ComputeProfile, job: &amp;ComputeJob) -&gt; f64 {
+        let mut score = 0.0;
+
+        // Trust score (0-1) weighted heavily
+        let trust = self.trust_graph
+            .read()
+            .unwrap()
+            .get_trust_score(&amp;job.owner, did)
+            .unwrap_or(0.0);
+
+        if trust &lt; job.constraints.min_trust {
+            return 0.0; // Below minimum trust threshold
+        }
+        score += trust * 40.0;
+
+        // Availability score
+        score += profile.availability * 20.0;
+
+        // Prefer nodes with fewer running jobs (load balancing)
+        let running_count = self.running
+            .get(did)
+            .map(|jobs| jobs.len())
+            .unwrap_or(0);
+        let load_factor = 1.0 - (running_count as f64 / profile.max_concurrent_jobs as f64);
+        score += load_factor * 20.0;
+
+        // Bonus for preferred nodes
+        if job.constraints.preferred_nodes.contains(did) {
+            score += 15.0;
+        }
+
+        // Slight preference for closer match to requested resources (efficiency)
+        let cpu_efficiency = job.resources.cpu_cores as f64 / profile.cpu_cores as f64;
+        let ram_efficiency = job.resources.ram_gb as f64 / profile.ram_gb as f64;
+        let efficiency = (cpu_efficiency + ram_efficiency) / 2.0;
+        score += efficiency * 5.0;
+
+        score
+    }
+}
+</code></pre>
+<h3>5.2 Fair Scheduling (Phase C3)</h3>
+<p>For cooperatives with governance policies around fair resource allocation:</p>
+<pre><code class="language-rust">/// Fair scheduling policy
+pub struct FairSchedulingPolicy {
+    /// Minimum share per coop (0.0-1.0)
+    pub min_share: HashMap&lt;String, f64&gt;,
+    /// Maximum share per coop (0.0-1.0)
+    pub max_share: HashMap&lt;String, f64&gt;,
+    /// Priority boost for underutilized coops
+    pub fairness_weight: f64,
+}
+
+impl Scheduler {
+    /// Adjust job priority based on fairness
+    fn apply_fair_scheduling(&amp;self, job: &amp;mut ComputeJob, policy: &amp;FairSchedulingPolicy) {
+        // Calculate current utilization per coop
+        let utilization = self.calculate_coop_utilization();
+
+        let coop_util = utilization.get(&amp;job.coop_id).unwrap_or(&amp;0.0);
+        let min_share = policy.min_share.get(&amp;job.coop_id).unwrap_or(&amp;0.0);
+
+        // Boost priority if coop is below fair share
+        if coop_util &lt; min_share {
+            let boost = (min_share - coop_util) * policy.fairness_weight;
+            // Increase effective priority
+            // (implementation detail: could use a priority queue with adjusted scores)
+        }
+    }
+}
+</code></pre>
+<hr>
+<h2>6. Compute Agent</h2>
+<p>The ComputeAgent runs alongside <code>icnd</code> on each compute node.</p>
+<h3>6.1 Architecture</h3>
+<pre><code class="language-rust">/// Compute agent for executing jobs
+pub struct ComputeAgent {
+    /// Node&#39;s DID
+    node_did: Did,
+    /// Node&#39;s keypair for signing
+    keypair: KeyPair,
+    /// Connection to ICN gateway
+    gateway_client: GatewayClient,
+    /// Execution backend
+    executor: Box&lt;dyn JobExecutor&gt;,
+    /// Currently running jobs
+    running_jobs: HashMap&lt;JobId, RunningJob&gt;,
+    /// Usage collector
+    usage_collector: UsageCollector,
+}
+
+/// Trait for job execution backends
+#[async_trait]
+pub trait JobExecutor: Send + Sync {
+    /// Start a job
+    async fn start(&amp;self, job: &amp;ComputeJob) -&gt; Result&lt;ExecutionHandle, ExecutorError&gt;;
+    /// Check job status
+    async fn status(&amp;self, handle: &amp;ExecutionHandle) -&gt; Result&lt;ExecutionStatus, ExecutorError&gt;;
+    /// Stop a job
+    async fn stop(&amp;self, handle: &amp;ExecutionHandle) -&gt; Result&lt;(), ExecutorError&gt;;
+    /// Get job logs
+    async fn logs(&amp;self, handle: &amp;ExecutionHandle) -&gt; Result&lt;String, ExecutorError&gt;;
+}
+
+/// Docker/Podman executor
+pub struct ContainerExecutor {
+    runtime: String, // &quot;docker&quot; or &quot;podman&quot;
+}
+
+/// Kubernetes executor
+pub struct KubernetesExecutor {
+    kubeconfig: PathBuf,
+    namespace: String,
+}
+
+/// Nomad executor
+pub struct NomadExecutor {
+    nomad_addr: String,
+}
+
+/// WASM executor
+pub struct WasmExecutor {
+    runtime: WasmRuntime,
+}
+</code></pre>
+<h3>6.2 Main Loop</h3>
+<pre><code class="language-rust">impl ComputeAgent {
+    pub async fn run(&amp;mut self, shutdown: broadcast::Receiver&lt;()&gt;) -&gt; Result&lt;()&gt; {
+        let mut shutdown = shutdown;
+
+        loop {
+            tokio::select! {
+                // Check for new job assignments
+                _ = tokio::time::sleep(Duration::from_secs(5)) =&gt; {
+                    self.poll_for_jobs().await?;
+                    self.check_running_jobs().await?;
+                }
+
+                // Handle shutdown
+                _ = shutdown.recv() =&gt; {
+                    self.graceful_shutdown().await?;
+                    break;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn poll_for_jobs(&amp;mut self) -&gt; Result&lt;()&gt; {
+        // Query gateway for jobs assigned to this node
+        let jobs = self.gateway_client
+            .list_jobs(ListJobsQuery {
+                state: Some(&quot;scheduled&quot;.to_string()),
+                // Filter for jobs assigned to this node
+                ..Default::default()
+            })
+            .await?;
+
+        for job_status in jobs {
+            if let JobState::Scheduled { node } = &amp;job_status.state {
+                if node == &amp;self.node_did {
+                    self.start_job(job_status.job).await?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn start_job(&amp;mut self, job: ComputeJob) -&gt; Result&lt;()&gt; {
+        let handle = self.executor.start(&amp;job).await?;
+
+        let running_job = RunningJob {
+            job_id: job.id.clone(),
+            handle,
+            started_at: now_unix(),
+            usage_tracker: UsageTracker::new(),
+        };
+
+        self.running_jobs.insert(job.id.clone(), running_job);
+
+        // Notify ICN that job started
+        self.gateway_client
+            .update_job_state(&amp;job.id, JobState::Running {
+                node: self.node_did.clone(),
+                started_at: now_unix(),
+            })
+            .await?;
+
+        Ok(())
+    }
+
+    async fn check_running_jobs(&amp;mut self) -&gt; Result&lt;()&gt; {
+        let mut completed = Vec::new();
+
+        for (job_id, running_job) in &amp;mut self.running_jobs {
+            let status = self.executor.status(&amp;running_job.handle).await?;
+
+            match status {
+                ExecutionStatus::Running { cpu, memory } =&gt; {
+                    running_job.usage_tracker.record(cpu, memory);
+                }
+                ExecutionStatus::Completed { exit_code, outputs } =&gt; {
+                    let report = self.generate_usage_report(job_id, &amp;running_job, exit_code);
+                    self.submit_usage_report(report).await?;
+
+                    if exit_code == 0 {
+                        self.gateway_client
+                            .update_job_state(job_id, JobState::Completed {
+                                node: self.node_did.clone(),
+                                completed_at: now_unix(),
+                            })
+                            .await?;
+                    } else {
+                        self.gateway_client
+                            .update_job_state(job_id, JobState::Failed {
+                                node: self.node_did.clone(),
+                                error: format!(&quot;Exit code: {}&quot;, exit_code),
+                                failed_at: now_unix(),
+                            })
+                            .await?;
+                    }
+
+                    completed.push(job_id.clone());
+                }
+                ExecutionStatus::Failed { error } =&gt; {
+                    self.gateway_client
+                        .update_job_state(job_id, JobState::Failed {
+                            node: self.node_did.clone(),
+                            error,
+                            failed_at: now_unix(),
+                        })
+                        .await?;
+
+                    completed.push(job_id.clone());
+                }
+            }
+        }
+
+        for job_id in completed {
+            self.running_jobs.remove(&amp;job_id);
+        }
+
+        Ok(())
+    }
+
+    fn generate_usage_report(
+        &amp;self,
+        job_id: &amp;JobId,
+        running_job: &amp;RunningJob,
+        exit_code: i32,
+    ) -&gt; ComputeUsageReport {
+        let usage = running_job.usage_tracker.finalize();
+
+        ComputeUsageReport {
+            job_id: job_id.clone(),
+            executor: self.node_did.clone(),
+            cpu_seconds: usage.cpu_seconds,
+            memory_peak_mb: usage.memory_peak_mb,
+            memory_avg_mb: usage.memory_avg_mb,
+            disk_read_bytes: usage.disk_read_bytes,
+            disk_write_bytes: usage.disk_write_bytes,
+            network_in_bytes: usage.network_in_bytes,
+            network_out_bytes: usage.network_out_bytes,
+            gpu_seconds: usage.gpu_seconds,
+            duration_ms: now_unix() - running_job.started_at,
+            exit_code,
+            reported_at: now_unix(),
+            signature: vec![], // Sign with keypair
+        }
+    }
+}
+</code></pre>
+<hr>
+<h2>7. Billing &amp; Settlement</h2>
+<h3>7.1 Pricing Policy</h3>
+<pre><code class="language-rust">/// Pricing policy for compute resources
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ComputePricingPolicy {
+    /// Price per CPU-second
+    pub cpu_second_price: f64,
+    /// Price per GB-second of memory
+    pub memory_gb_second_price: f64,
+    /// Price per GB of IO
+    pub io_gb_price: f64,
+    /// Price per GPU-second
+    pub gpu_second_price: f64,
+    /// Discount for internal (same coop) jobs
+    pub internal_discount: f64,
+    /// Premium for high-priority jobs
+    pub priority_premium: HashMap&lt;JobPriority, f64&gt;,
+}
+
+impl ComputePricingPolicy {
+    /// Calculate cost for a usage report
+    pub fn calculate_cost(&amp;self, report: &amp;ComputeUsageReport, is_internal: bool) -&gt; f64 {
+        let mut cost = 0.0;
+
+        // CPU cost
+        cost += report.cpu_seconds as f64 * self.cpu_second_price;
+
+        // Memory cost
+        cost += report.memory_gb_seconds() * self.memory_gb_second_price;
+
+        // IO cost
+        cost += report.total_io_gb() * self.io_gb_price;
+
+        // GPU cost
+        if let Some(gpu_secs) = report.gpu_seconds {
+            cost += gpu_secs as f64 * self.gpu_second_price;
+        }
+
+        // Apply internal discount
+        if is_internal {
+            cost *= 1.0 - self.internal_discount;
+        }
+
+        cost
+    }
+}
+</code></pre>
+<h3>7.2 CCL Settlement Contract</h3>
+<p>Example CCL contract for compute billing:</p>
+<pre><code class="language-rust">// Pseudocode for CCL contract structure
+contract ComputeBilling {
+    // Pricing policy stored in contract state
+    state pricing: ComputePricingPolicy;
+
+    // Process a usage report and create ledger entry
+    rule settle_usage(report: ComputeUsageReport) {
+        // Verify report signature
+        require(verify_signature(report.executor, report.signature));
+
+        // Calculate cost
+        let cost = pricing.calculate_cost(report);
+
+        // Get job details
+        let job = lookup_job(report.job_id);
+
+        // Create ledger entry
+        // Debit job owner, credit executor
+        ledger.transfer(
+            from: job.owner,
+            to: report.executor,
+            amount: cost,
+            currency: &quot;COMPUTE&quot;,
+            memo: format!(&quot;Job {}&quot;, report.job_id),
+        );
+
+        // Emit event
+        emit ComputeSettled {
+            job_id: report.job_id,
+            cost: cost,
+            executor: report.executor,
+        };
+    }
+}
+</code></pre>
+<hr>
+<h2>8. Verification &amp; Anti-Cheating</h2>
+<h3>8.1 Spot Check System</h3>
+<pre><code class="language-rust">/// Configuration for spot checks
+pub struct SpotCheckConfig {
+    /// Percentage of jobs to spot check (0.0-1.0)
+    pub check_rate: f64,
+    /// Tolerance for resource usage discrepancy (e.g., 0.1 = 10%)
+    pub tolerance: f64,
+    /// Trust penalty for failed verification
+    pub trust_penalty: f64,
+}
+
+impl Scheduler {
+    /// Decide if a job should be spot-checked
+    fn should_spot_check(&amp;self, job: &amp;ComputeJob) -&gt; bool {
+        // Higher check rate for:
+        // - Low trust executors
+        // - High-value jobs
+        // - Jobs with sensitive constraints
+
+        let base_rate = self.spot_check_config.check_rate;
+
+        // Random selection
+        rand::random::&lt;f64&gt;() &lt; base_rate
+    }
+
+    /// Schedule a spot check job
+    async fn schedule_spot_check(&amp;self, original_job: &amp;ComputeJob, original_executor: &amp;Did) {
+        // Create verification job
+        let verify_job = ComputeJob {
+            id: JobId(format!(&quot;verify-{}&quot;, original_job.id.0)),
+            constraints: PlacementConstraints {
+                // Must run on different node
+                excluded_nodes: vec![original_executor.clone()],
+                ..original_job.constraints.clone()
+            },
+            ..original_job.clone()
+        };
+
+        // Submit verification job
+        self.submit_job(verify_job).await;
+    }
+
+    /// Compare original and verification results
+    async fn verify_results(
+        &amp;self,
+        original: &amp;ComputeUsageReport,
+        verification: &amp;ComputeUsageReport,
+    ) -&gt; VerificationResult {
+        let tolerance = self.spot_check_config.tolerance;
+
+        // Compare CPU usage
+        let cpu_diff = (original.cpu_seconds as f64 - verification.cpu_seconds as f64).abs()
+            / original.cpu_seconds as f64;
+
+        // Compare memory usage
+        let mem_diff = (original.memory_avg_mb as f64 - verification.memory_avg_mb as f64).abs()
+            / original.memory_avg_mb as f64;
+
+        if cpu_diff &gt; tolerance || mem_diff &gt; tolerance {
+            VerificationResult::Failed {
+                discrepancy: format!(
+                    &quot;CPU diff: {:.1}%, Memory diff: {:.1}%&quot;,
+                    cpu_diff * 100.0,
+                    mem_diff * 100.0
+                ),
+            }
+        } else {
+            VerificationResult::Passed
+        }
+    }
+}
+</code></pre>
+<h3>8.2 Trust Integration</h3>
+<pre><code class="language-rust">impl TrustGraph {
+    /// Apply penalty for failed verification
+    pub fn apply_compute_penalty(&amp;mut self, node: &amp;Did, penalty: f64) {
+        if let Some(edge) = self.get_edge_mut(node) {
+            edge.score = (edge.score - penalty).max(0.0);
+            edge.reason = Some(format!(
+                &quot;Compute verification failed at {}&quot;,
+                chrono::Utc::now()
+            ));
+        }
+    }
+
+    /// Apply bonus for consistent good behavior
+    pub fn apply_compute_bonus(&amp;mut self, node: &amp;Did, bonus: f64) {
+        if let Some(edge) = self.get_edge_mut(node) {
+            edge.score = (edge.score + bonus).min(1.0);
+        }
+    }
+}
+</code></pre>
+<hr>
+<h2>9. Governance Integration</h2>
+<h3>9.1 Compute Pool Domain</h3>
+<pre><code class="language-rust">/// Governance domain for compute policy
+pub struct ComputePoolDomain {
+    /// Domain ID (e.g., &quot;coop:food:compute&quot;)
+    pub domain_id: String,
+    /// Nodes in this pool
+    pub nodes: Vec&lt;Did&gt;,
+    /// Pricing policy
+    pub pricing: ComputePricingPolicy,
+    /// Access policy
+    pub access: PoolAccessPolicy,
+    /// Resource allocation
+    pub allocation: ResourceAllocation,
+}
+
+/// Who can use this compute pool
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum PoolAccessPolicy {
+    /// Only members of this coop
+    Internal,
+    /// Members and specific federations
+    Federation { allowed: Vec&lt;String&gt; },
+    /// Anyone with minimum trust
+    Public { min_trust: f32 },
+}
+
+/// How resources are allocated
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourceAllocation {
+    /// Percentage reserved for internal use
+    pub internal_reserve: f64,
+    /// Percentage available to federation
+    pub federation_share: f64,
+    /// Percentage available to public
+    pub public_share: f64,
+}
+</code></pre>
+<h3>9.2 Governance Proposals</h3>
+<p>Proposal types for compute governance:</p>
+<pre><code class="language-rust">/// Compute-related proposal payloads
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ComputeProposalPayload {
+    /// Add node to compute pool
+    AddNode { node: Did, pool_id: String },
+    /// Remove node from pool
+    RemoveNode { node: Did, pool_id: String },
+    /// Update pricing policy
+    UpdatePricing { pool_id: String, pricing: ComputePricingPolicy },
+    /// Update access policy
+    UpdateAccess { pool_id: String, access: PoolAccessPolicy },
+    /// Update resource allocation
+    UpdateAllocation { pool_id: String, allocation: ResourceAllocation },
+    /// Create new compute pool
+    CreatePool { pool: ComputePoolDomain },
+}
+</code></pre>
+<hr>
+<h2>10. CLI Commands</h2>
+<h3>10.1 icnctl compute commands</h3>
+<pre><code class="language-bash"># Node registration
+icnctl compute register \
+  --cpu 8 \
+  --ram 32 \
+  --disk 500 \
+  --gpu &quot;NVIDIA RTX 4090,24GB&quot; \
+  --capabilities containers,wasm,gpu \
+  --region us-east \
+  --jurisdiction US \
+  --availability 0.99 \
+  --max-jobs 4
+
+# Update profile
+icnctl compute update --cpu 16 --ram 64
+
+# List nodes
+icnctl compute nodes
+icnctl compute nodes --region us-east --capability gpu
+
+# Show node details
+icnctl compute node show did:icn:abc123
+
+# Unregister
+icnctl compute unregister
+
+# Job submission
+icnctl compute job submit \
+  --image ghcr.io/mycoop/processor:v1 \
+  --cpu 2 \
+  --ram 8 \
+  --timeout 3600 \
+  --region us-east \
+  --min-trust 0.5 \
+  --input &quot;icn://ledger/entry/xyz&quot;
+
+# Job management
+icnctl compute job list
+icnctl compute job list --state running
+icnctl compute job status job-123
+icnctl compute job cancel job-123
+icnctl compute job logs job-123
+
+# Usage reports
+icnctl compute usage --since 2025-01-01
+icnctl compute usage --job job-123
+
+# Billing
+icnctl compute billing summary
+icnctl compute billing summary --period 2025-01
+</code></pre>
+<hr>
+<h2>11. Metrics</h2>
+<h3>11.1 Prometheus Metrics</h3>
+<pre><code class="language-rust">// Node metrics
+icn_compute_nodes_total                    // Total registered compute nodes
+icn_compute_nodes_online                   // Currently online nodes
+icn_compute_capacity_cpu_cores_total       // Total CPU cores across all nodes
+icn_compute_capacity_ram_gb_total          // Total RAM across all nodes
+icn_compute_capacity_gpu_count             // Total GPUs
+
+// Job metrics
+icn_compute_jobs_submitted_total           // Total jobs submitted
+icn_compute_jobs_completed_total           // Total jobs completed
+icn_compute_jobs_failed_total              // Total jobs failed
+icn_compute_jobs_running                   // Currently running jobs
+icn_compute_jobs_pending                   // Jobs waiting to be scheduled
+icn_compute_job_duration_seconds           // Histogram of job durations
+
+// Usage metrics
+icn_compute_cpu_seconds_total              // Total CPU seconds consumed
+icn_compute_memory_gb_seconds_total        // Total memory GB-seconds
+icn_compute_io_gb_total                    // Total IO in GB
+icn_compute_gpu_seconds_total              // Total GPU seconds
+
+// Billing metrics
+icn_compute_credits_earned_total           // Credits earned by this node
+icn_compute_credits_spent_total            // Credits spent by this coop
+
+// Verification metrics
+icn_compute_spot_checks_total              // Total spot checks performed
+icn_compute_spot_checks_failed_total       // Failed spot checks
+icn_compute_trust_penalties_total          // Trust penalties applied
+</code></pre>
+<hr>
+<h2>12. Implementation Phases</h2>
+<h3>Phase C0: Representation (2-3 weeks)</h3>
+<p><strong>Goal</strong>: Make compute capacity visible in ICN.</p>
+<p><strong>Deliverables</strong>:</p>
+<ul>
+<li><input disabled="" type="checkbox"> <code>ComputeProfile</code> and related types in new <code>icn-compute</code> crate</li>
+<li><input disabled="" type="checkbox"> <code>compute:nodes</code> gossip topic</li>
+<li><input disabled="" type="checkbox"> Gateway endpoints: GET/POST /v1/compute/nodes</li>
+<li><input disabled="" type="checkbox"> icnctl commands: register, update, list, show</li>
+<li><input disabled="" type="checkbox"> Unit tests for serialization</li>
+<li><input disabled="" type="checkbox"> Integration test for profile gossip</li>
+</ul>
+<p><strong>Non-goals</strong>:</p>
+<ul>
+<li>Job scheduling</li>
+<li>Metering</li>
+<li>Billing</li>
+</ul>
+<h3>Phase C1: Off-Chain Integration (3-4 weeks)</h3>
+<p><strong>Goal</strong>: Run real jobs with flat-rate billing.</p>
+<p><strong>Deliverables</strong>:</p>
+<ul>
+<li><input disabled="" type="checkbox"> External scheduler service (Rust or TS)</li>
+<li><input disabled="" type="checkbox"> <code>ComputeJob</code> spec and <code>compute:jobs</code> topic</li>
+<li><input disabled="" type="checkbox"> Gateway endpoints for job submission</li>
+<li><input disabled="" type="checkbox"> Basic placement algorithm</li>
+<li><input disabled="" type="checkbox"> Flat-rate ledger entries for completed jobs</li>
+<li><input disabled="" type="checkbox"> icnctl job commands</li>
+<li><input disabled="" type="checkbox"> Console: nodes list, jobs table</li>
+</ul>
+<p><strong>Non-goals</strong>:</p>
+<ul>
+<li>Real metering</li>
+<li>Verification</li>
+</ul>
+<h3>Phase C2: Metering &amp; Settlement (4-5 weeks)</h3>
+<p><strong>Goal</strong>: Meter actual usage and bill accurately.</p>
+<p><strong>Deliverables</strong>:</p>
+<ul>
+<li><input disabled="" type="checkbox"> <code>ComputeUsageReport</code> and <code>compute:usage</code> topic</li>
+<li><input disabled="" type="checkbox"> ComputeAgent v1 with container executor</li>
+<li><input disabled="" type="checkbox"> Usage collection and reporting</li>
+<li><input disabled="" type="checkbox"> CCL billing contract</li>
+<li><input disabled="" type="checkbox"> Spot check system</li>
+<li><input disabled="" type="checkbox"> Trust integration for penalties</li>
+<li><input disabled="" type="checkbox"> Billing summary endpoint</li>
+</ul>
+<h3>Phase C3: Pools &amp; Governance (4-5 weeks)</h3>
+<p><strong>Goal</strong>: Democratically governed compute resources.</p>
+<p><strong>Deliverables</strong>:</p>
+<ul>
+<li><input disabled="" type="checkbox"> <code>ComputePoolDomain</code> types</li>
+<li><input disabled="" type="checkbox"> Governance proposals for compute</li>
+<li><input disabled="" type="checkbox"> Pool-aware scheduling</li>
+<li><input disabled="" type="checkbox"> Access policies and allocation</li>
+<li><input disabled="" type="checkbox"> Federation integration</li>
+<li><input disabled="" type="checkbox"> Console: Compute tab with full UX</li>
+<li><input disabled="" type="checkbox"> Fair scheduling policies</li>
+</ul>
+<hr>
+<h2>13. Open Questions</h2>
+<ol>
+<li><strong>Determinism</strong>: How do we handle non-deterministic workloads for verification?</li>
+<li><strong>Data transfer</strong>: How do large inputs/outputs get to/from nodes?</li>
+<li><strong>Secrets</strong>: How do jobs access credentials securely?</li>
+<li><strong>Preemption</strong>: Can high-priority jobs preempt running jobs?</li>
+<li><strong>Quotas</strong>: Hard limits per coop beyond soft fair-share?</li>
+<li><strong>Multi-tenant</strong>: Multiple coops sharing a single physical node?</li>
+</ol>
+<hr>
+<h2>14. References</h2>
+<ul>
+<li><a href="/docs/architecture/IMPLEMENTATION_GAP_ANALYSIS">Gap Analysis</a> - Section 7 (Compute Substrate Gaps)</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/economics/economic-safety">Economic Safety</a> - Credit limits and billing integration</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/governance/governance">Governance</a> - Proposal patterns for compute policies</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CLAUDE">CLAUDE.md</a> - Actor patterns and integration points</li>
+</ul>
+<hr>
+<p><em>Document created: 2025-11-18</em>
+<em>Status: Design complete, ready for C0 implementation</em></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

@@ -1,0 +1,2862 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Docs Reality Audit - 2026-02-11 | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>internal</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>status</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>DOCS REALITY AUDIT 2026 02 11</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/internal/status/DOCS_REALITY_AUDIT_2026-02-11.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Docs Reality Audit - 2026-02-11</h1>
+<h2>Scope</h2>
+<p>Initial code-first documentation alignment pass, focused on core orientation docs and skill bootstrap for repeatable drift cleanup.</p>
+<h2>Canonical truth sources used</h2>
+<ul>
+<li><code>AGENTS.md</code></li>
+<li><code>icn/Cargo.toml</code></li>
+<li><code>.github/workflows/*.yml</code></li>
+<li><code>icn/bins/*/Cargo.toml</code></li>
+<li><code>docs/INDEX.md</code></li>
+</ul>
+<h2>Changes applied (Batch A1)</h2>
+<ol>
+<li><code>docs/README.md</code></li>
+</ol>
+<ul>
+<li>Replaced non-existent <code>dev-journal/</code> reference with <code>docs/development/sessions/</code>.</li>
+<li>Replaced non-existent <code>decisions/</code> reference with <code>docs/adr/</code>.</li>
+</ul>
+<ol start="2">
+<li><code>docs/STATE.md</code></li>
+</ol>
+<ul>
+<li>Removed dead <code>docs/dev-journal/ROADMAP.md</code> references.</li>
+<li>Repointed roadmap mention to <code>docs/development/sessions/undated/ROADMAP.md</code> and architecture direction to <code>docs/architecture/KERNEL_APP_SEPARATION.md</code>.</li>
+</ul>
+<ol start="3">
+<li><code>docs/ARCHITECTURE.md</code></li>
+</ol>
+<ul>
+<li>Clarified canonical app topology (<code>icn/apps/*</code>) with explicit note that top-level <code>apps/*</code> is transitional.</li>
+<li>Fixed broken production hardening link to <code>docs/security/production-hardening.md</code>.</li>
+</ul>
+<ol start="4">
+<li>Skill created: <code>.codex/skills/icn-docs-reality-sync/</code></li>
+</ol>
+<ul>
+<li>Added <code>SKILL.md</code> with recursive self-correction loop.</li>
+<li>Added references:<ul>
+<li><code>references/reality-sources.md</code></li>
+<li><code>references/mismatch-rubric.md</code></li>
+</ul>
+</li>
+<li>Added scanner:<ul>
+<li><code>scripts/doc_reality_scan.sh</code></li>
+</ul>
+</li>
+</ul>
+<h2>Mismatch table (open items after Batch A1)</h2>
+<table>
+<thead>
+<tr>
+<th>Severity</th>
+<th>Doc</th>
+<th>Mismatch</th>
+<th>Truth source</th>
+<th>Planned batch</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>blocker</td>
+<td><code>docs/PHASE_HISTORY.md</code></td>
+<td>broken local links to design docs (<code>scheduler-evolution-plan.md</code>, <code>multi-device-identity-design.md</code>, <code>capability-based-features.md</code>)</td>
+<td>files exist under <code>docs/design/</code></td>
+<td>A2</td>
+</tr>
+<tr>
+<td>high</td>
+<td><code>docs/architecture/KERNEL_APP_SEPARATION.md</code></td>
+<td>examples and rules still imply top-level <code>apps/*</code> as canonical</td>
+<td><code>AGENTS.md</code>, <code>docs/adr/ADR-0010-app-topology.md</code></td>
+<td>B1</td>
+</tr>
+<tr>
+<td>high</td>
+<td><code>docs/ci/CI_CURRENT_STATUS.md</code> and status docs</td>
+<td>stale &quot;all green / ready now&quot; claims from 2026-01-20 and older point-in-time docs</td>
+<td>workflow files + dated status policy</td>
+<td>D1</td>
+</tr>
+<tr>
+<td>high</td>
+<td>multiple active docs under <code>docs/guides/</code>, <code>docs/reference/</code>, <code>docs/operations/</code></td>
+<td>broken relative links from prior reorganizations</td>
+<td>repo path map + scanner output</td>
+<td>A2/A3</td>
+</tr>
+</tbody></table>
+<h2>Verification commands and outcomes</h2>
+<pre><code class="language-bash">python3 /home/ubuntu/.codex/skills/.system/skill-creator/scripts/quick_validate.py .codex/skills/icn-docs-reality-sync
+</code></pre>
+<p>Result: <code>Skill is valid!</code></p>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+</code></pre>
+<p>Result: scanner runs successfully and reports remaining mismatches.</p>
+<h2>Recursive self-correction score (Batch A1)</h2>
+<ul>
+<li>Accuracy: 4/5</li>
+<li>Completeness: 3/5</li>
+<li>Consistency: 4/5</li>
+<li>Verifiability: 4/5</li>
+</ul>
+<p>Trigger status: <code>Completeness &lt; 4</code> -&gt; continue with Batch A2.</p>
+<h2>Changes applied (Batch A2)</h2>
+<ol>
+<li><code>docs/architecture/ARCHITECTURE_INDEX.md</code></li>
+</ol>
+<ul>
+<li>Fixed multiple broken references introduced by docs reorganization:<ul>
+<li><code>./docs/*</code> paths -&gt; correct <code>../*</code> and <code>../guides/*</code> targets</li>
+<li>security/design/ops links pointed to current locations</li>
+<li>root repo links corrected to <code>../../CONTRIBUTING.md</code> and <code>../../CHANGELOG.md</code></li>
+<li>roadmap link changed to historical session roadmap path</li>
+</ul>
+</li>
+</ul>
+<ol start="2">
+<li><code>docs/architecture/ARCHITECTURE_QUICK_REF.md</code></li>
+</ol>
+<ul>
+<li>Fixed <code>./docs/ARCHITECTURE.md</code> and <code>./docs/GETTING_STARTED.md</code> links to valid <code>../</code> targets.</li>
+</ul>
+<ol start="3">
+<li>Deployment guides:</li>
+</ol>
+<ul>
+<li><code>docs/deployment/DEPLOYMENT_GUIDE.md</code></li>
+<li><code>docs/deployment/DEPLOYMENT_COMPLETE.md</code></li>
+<li><code>docs/deployment/DEPLOYMENT_READY.md</code></li>
+<li><code>docs/deployment/QUICK_DEPLOY.md</code></li>
+<li>Repointed broken references (<code>docs/ARCHITECTURE.md</code>, <code>docs/api/</code>, <code>docs/production-hardening.md</code>, <code>MOBILE_APP_STATUS.md</code>) to current docs paths.</li>
+</ul>
+<h2>Changes applied (Batch A3)</h2>
+<ol>
+<li><code>docs/PHASE_HISTORY.md</code></li>
+</ol>
+<ul>
+<li>Fixed broken links:<ul>
+<li><code>KERNEL_APP_SEPARATION.md</code> -&gt; <code>architecture/KERNEL_APP_SEPARATION.md</code></li>
+<li><code>scheduler-evolution-plan.md</code> -&gt; <code>design/scheduler-evolution-plan.md</code></li>
+<li><code>multi-device-identity-design.md</code> -&gt; <code>design/multi-device-identity-design.md</code></li>
+<li><code>capability-based-features.md</code> -&gt; <code>design/capability-based-features.md</code></li>
+<li><code>production-hardening.md</code> -&gt; <code>security/production-hardening.md</code></li>
+</ul>
+</li>
+<li>Applied CRLF-safe, in-place substitutions to avoid noisy full-file rewrite.</li>
+</ul>
+<h2>Mismatch table (open items after Batch A3)</h2>
+<table>
+<thead>
+<tr>
+<th>Severity</th>
+<th>Doc</th>
+<th>Mismatch</th>
+<th>Truth source</th>
+<th>Planned batch</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>high</td>
+<td>session/status historical docs under <code>docs/development/sessions/</code></td>
+<td>stale &quot;all green / ready for production&quot; phrasing without point-in-time labeling</td>
+<td>dated status policy + workflow files</td>
+<td>D2</td>
+</tr>
+<tr>
+<td>high</td>
+<td>multiple active docs under <code>docs/guides/</code>, <code>docs/reference/</code>, <code>docs/operations/</code></td>
+<td>broken relative links from prior reorganizations</td>
+<td>repo path map + scanner output</td>
+<td>A3/A4</td>
+</tr>
+</tbody></table>
+<h2>Verification updates (Batch A2)</h2>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | rg -n &quot;MISSING_LINK\\|docs/(architecture/ARCHITECTURE_INDEX.md|architecture/ARCHITECTURE_QUICK_REF.md|deployment/DEPLOYMENT_GUIDE.md|deployment/DEPLOYMENT_COMPLETE.md|deployment/DEPLOYMENT_READY.md|deployment/QUICK_DEPLOY.md)\\|&quot;
+</code></pre>
+<p>Result: no matches (all targeted links resolved).</p>
+<h2>Recursive self-correction score (Batch A2)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 4/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4 for Batch A2; proceed to A3 for remaining blockers/highs.</p>
+<h2>Verification updates (Batch A3)</h2>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | rg -n &quot;MISSING_LINK\\|docs/PHASE_HISTORY.md\\|&quot;
+</code></pre>
+<p>Result: no matches (PHASE_HISTORY blocker closed).</p>
+<h2>Recursive self-correction score (Batch A3)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 4/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4 for Batch A3; continue with B1 and D1.</p>
+<h2>Changes applied (Batch B1)</h2>
+<ol>
+<li><code>docs/architecture/KERNEL_APP_SEPARATION.md</code></li>
+</ol>
+<ul>
+<li>Updated topology language to match canonical app root rule:<ul>
+<li>Canonical runtime app location: <code>icn/apps/*</code></li>
+<li>Top-level <code>apps/*</code> documented as legacy/transitional during migration</li>
+</ul>
+</li>
+<li>Updated example and appendix wording to avoid presenting <code>apps/*</code> as canonical.</li>
+</ul>
+<h2>Changes applied (Batch D1)</h2>
+<ol>
+<li><code>docs/ci/CI_CURRENT_STATUS.md</code></li>
+</ol>
+<ul>
+<li>Replaced stale &quot;all green/deploy now&quot; narrative with a dated operational snapshot format.</li>
+<li>Added explicit authoritative sources and re-verification commands.</li>
+<li>Added update protocol requiring date, branch/commit, commands, outcomes, and blockers.</li>
+</ul>
+<h2>Verification updates (Batch B1 + D1)</h2>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | rg -n &quot;MISSING_LINK\\|docs/(PHASE_HISTORY.md|architecture/KERNEL_APP_SEPARATION.md|ci/CI_CURRENT_STATUS.md|README.md|STATE.md|ARCHITECTURE.md|architecture/ARCHITECTURE_INDEX.md|architecture/ARCHITECTURE_QUICK_REF.md|deployment/DEPLOYMENT_GUIDE.md|deployment/DEPLOYMENT_COMPLETE.md|deployment/DEPLOYMENT_READY.md|deployment/QUICK_DEPLOY.md)\\|&quot;
+</code></pre>
+<p>Result: no matches for targeted core docs.</p>
+<pre><code class="language-bash">rg -n &quot;ALL GREEN|READY FOR PRODUCTION DEPLOYMENT|Recommendation: \\*\\*DEPLOY NOW\\*\\*&quot; docs/ci/CI_CURRENT_STATUS.md docs/status/*.md docs/development/sessions/**/*.md
+</code></pre>
+<p>Result: no stale claims in <code>docs/ci/CI_CURRENT_STATUS.md</code>; remaining hits are in historical session docs.</p>
+<h2>Recursive self-correction score (Batch B1 + D1)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 4/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4 for this batch; continue with A4/D2 backlog.</p>
+<h2>Changes applied (Batch A4 - slice 1)</h2>
+<ol>
+<li><code>docs/guides/developer/DEV_ENVIRONMENT.md</code></li>
+</ol>
+<ul>
+<li>Fixed related-doc links to current paths:<ul>
+<li><code>HOMELAB_DEPLOYMENT.md</code> -&gt; <code>docs/operations/deployment/HOMELAB_DEPLOYMENT.md</code></li>
+<li><code>GETTING_STARTED.md</code> -&gt; <code>docs/GETTING_STARTED.md</code></li>
+<li><code>ARCHITECTURE.md</code> -&gt; <code>docs/ARCHITECTURE.md</code></li>
+</ul>
+</li>
+</ul>
+<h2>Verification updates (Batch A4 - slice 1)</h2>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | rg -n &quot;MISSING_LINK\\|docs/guides/developer/DEV_ENVIRONMENT.md\\|&quot;
+</code></pre>
+<p>Result: no matches.</p>
+<h2>Changes applied (Batch A4 - slice 2)</h2>
+<ol>
+<li><code>docs/guides/operations/operations-guide.md</code></li>
+</ol>
+<ul>
+<li>Repointed deployment/incident/changelog/roadmap links to current locations.</li>
+</ul>
+<ol start="2">
+<li><code>docs/guides/operations/backup-and-recovery.md</code></li>
+</ol>
+<ul>
+<li>Repointed multi-device, deployment, and architecture links to current paths.</li>
+</ul>
+<ol start="3">
+<li><code>docs/guides/operations/replication-operations.md</code></li>
+</ol>
+<ul>
+<li>Repointed architecture/roadmap/changelog links.</li>
+<li>Replaced obsolete <code>docs/dev-journal/</code> reference with <code>docs/development/sessions/</code>.</li>
+</ul>
+<ol start="4">
+<li><code>docs/guides/operations/troubleshooting.md</code></li>
+</ol>
+<ul>
+<li>Repointed incident response and production hardening links.</li>
+</ul>
+<ol start="5">
+<li><code>docs/reference/api/api-versioning.md</code></li>
+</ol>
+<ul>
+<li>Repointed architecture/capability/deployment/changelog references.</li>
+</ul>
+<ol start="6">
+<li><code>docs/reference/api/topic-subscriptions-api.md</code></li>
+</ol>
+<ul>
+<li>Repointed architecture and CLAUDE references to valid paths.</li>
+</ul>
+<h2>Verification updates (Batch A4 - slice 2)</h2>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | rg -n &quot;MISSING_LINK\\|docs/(guides/operations/operations-guide.md|guides/operations/backup-and-recovery.md|guides/operations/replication-operations.md|guides/operations/troubleshooting.md|reference/api/api-versioning.md|reference/api/topic-subscriptions-api.md)\\|&quot;
+</code></pre>
+<p>Result: no matches.</p>
+<h2>Changes applied (Batch A4 - slice 3)</h2>
+<ol>
+<li><code>docs/reference/config/identity-backend-configuration.md</code></li>
+</ol>
+<ul>
+<li>Fixed architecture reference path.</li>
+</ul>
+<ol start="2">
+<li><code>docs/reference/config/trust-threshold-configuration.md</code></li>
+</ol>
+<ul>
+<li>Fixed architecture, production-hardening, and deployment guide references.</li>
+</ul>
+<ol start="3">
+<li><code>docs/operations/deployment/deployment-guide.md</code></li>
+</ol>
+<ul>
+<li>Fixed config/docker links to top-level directories.</li>
+<li>Fixed architecture/security/API references to current docs paths.</li>
+</ul>
+<ol start="4">
+<li><code>docs/operations/deployment/distributed-tracing.md</code></li>
+</ol>
+<ul>
+<li>Fixed production hardening, Kubernetes deployment, and architecture references.</li>
+</ul>
+<ol start="5">
+<li><code>docs/operations/deployment/HOMELAB_DEPLOYMENT.md</code></li>
+</ol>
+<ul>
+<li>Fixed <code>deploy/k8s/README.md</code> and developer environment link paths.</li>
+</ul>
+<h2>Verification updates (Batch A4 - slice 3)</h2>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | rg -n &quot;MISSING_LINK\\|docs/(reference/config/identity-backend-configuration.md|reference/config/trust-threshold-configuration.md|operations/deployment/deployment-guide.md|operations/deployment/distributed-tracing.md|operations/deployment/HOMELAB_DEPLOYMENT.md)\\|&quot;
+</code></pre>
+<p>Result: no matches.</p>
+<h2>Mismatch table (open after A4 slices 1-3)</h2>
+<table>
+<thead>
+<tr>
+<th>Severity</th>
+<th>Doc set</th>
+<th>Mismatch</th>
+<th>Truth source</th>
+<th>Planned batch</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>high</td>
+<td>additional active docs under <code>docs/guides/*</code>, <code>docs/reference/*</code>, <code>docs/operations/*</code> not yet touched</td>
+<td>residual broken links from historical reorg</td>
+<td>scanner output + path map</td>
+<td>A4 (next slices)</td>
+</tr>
+<tr>
+<td>high</td>
+<td>historical session/status docs under <code>docs/development/sessions/</code></td>
+<td>stale “all green / ready now” language without explicit historical framing</td>
+<td>dated status policy + workflow files</td>
+<td>D2</td>
+</tr>
+</tbody></table>
+<h2>Recursive self-correction score (A4 slices 2-3)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 4/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4; continue with remaining A4 slices.</p>
+<h2>Changes applied (Batch A4 - slice 4)</h2>
+<ol>
+<li><code>docs/guides/FAQ.md</code></li>
+</ol>
+<ul>
+<li>Repointed broken links for design/internal/core docs:<ul>
+<li>NAT traversal, multi-device identity, legal considerations</li>
+<li>economic safety, governance primitives</li>
+<li>roadmap/contributing/getting started/architecture/operations guide</li>
+</ul>
+</li>
+</ul>
+<ol start="2">
+<li><code>docs/guides/user/cooperative-setup-guide.md</code></li>
+</ol>
+<ul>
+<li>Repointed broken links for onboarding and references:<ul>
+<li>getting started, backup and recovery, architecture observability anchor</li>
+<li>governance primitives, economic safety, trust threshold config</li>
+<li>API reference, glossary</li>
+</ul>
+</li>
+</ul>
+<h2>Verification updates (Batch A4 - slice 4)</h2>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | rg -n &quot;MISSING_LINK\\|docs/(guides/FAQ.md|guides/user/cooperative-setup-guide.md)\\|&quot;
+</code></pre>
+<p>Result: no matches.</p>
+<h2>Consolidated verification (A4 slices 2-4)</h2>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | rg -n &quot;MISSING_LINK\\|docs/(guides/FAQ.md|guides/user/cooperative-setup-guide.md|guides/operations/operations-guide.md|guides/operations/backup-and-recovery.md|guides/operations/replication-operations.md|guides/operations/troubleshooting.md|reference/api/api-versioning.md|reference/api/topic-subscriptions-api.md|reference/config/identity-backend-configuration.md|reference/config/trust-threshold-configuration.md|operations/deployment/deployment-guide.md|operations/deployment/distributed-tracing.md|operations/deployment/HOMELAB_DEPLOYMENT.md)\\|&quot;
+</code></pre>
+<p>Result: no matches.</p>
+<h2>Mismatch table (open after A4 slices 1-4)</h2>
+<table>
+<thead>
+<tr>
+<th>Severity</th>
+<th>Doc set</th>
+<th>Mismatch</th>
+<th>Truth source</th>
+<th>Planned batch</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>high</td>
+<td>remaining active docs outside already-patched sets</td>
+<td>residual broken links from historical reorg</td>
+<td>scanner output + path map</td>
+<td>A4 (next slices)</td>
+</tr>
+<tr>
+<td>high</td>
+<td>historical session/status docs under <code>docs/development/sessions/</code></td>
+<td>stale “all green / ready now” language without explicit historical framing</td>
+<td>dated status policy + workflow files</td>
+<td>D2</td>
+</tr>
+</tbody></table>
+<h2>Recursive self-correction score (A4 slice 4)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 4/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4; proceed to next A4 slices and D2.</p>
+<h2>Changes applied (Batch A4 - slice 5: design/economics links)</h2>
+<ol>
+<li><code>docs/design/COMMONS_EVOLUTION.md</code></li>
+</ol>
+<ul>
+<li>Repointed architecture/governance/security links to current locations:<ul>
+<li><code>../ARCHITECTURE.md</code></li>
+<li><code>governance/governance-primitives.md</code></li>
+<li><code>../security/threat-model.md</code></li>
+</ul>
+</li>
+</ul>
+<ol start="2">
+<li><code>docs/design/compute-substrate-design.md</code></li>
+</ol>
+<ul>
+<li>Fixed missing references for gap analysis, economics safety, governance, and repo root guidance:<ul>
+<li><code>../architecture/IMPLEMENTATION_GAP_ANALYSIS.md</code></li>
+<li><code>economics/economic-safety.md</code></li>
+<li><code>governance/governance.md</code></li>
+<li><code>../../CLAUDE.md</code></li>
+</ul>
+</li>
+</ul>
+<ol start="3">
+<li><code>docs/design/economics/ECONOMIC_VISION.md</code></li>
+</ol>
+<ul>
+<li>Corrected roadmap and architecture links to canonical docs paths.</li>
+</ul>
+<ol start="4">
+<li><code>docs/design/economics/contribution-credits-design.md</code></li>
+</ol>
+<ul>
+<li>Corrected roadmap and federation roadmap links to current docs/development paths.</li>
+</ul>
+<ol start="5">
+<li><code>docs/design/economics/econ-modeling.md</code></li>
+</ol>
+<ul>
+<li>Corrected simulation references to <code>sims/mutual-credit/</code> from the economics subdirectory depth.</li>
+</ul>
+<ol start="6">
+<li><code>docs/design/economics/economic-safety.md</code></li>
+</ol>
+<ul>
+<li>Corrected roadmap, operations, and implementation source links:<ul>
+<li><code>../../development/sessions/undated/ROADMAP.md</code></li>
+<li><code>../../operations/deployment/incident-response.md</code></li>
+<li><code>../../guides/operations/operations-guide.md</code></li>
+<li><code>../../../icn/crates/icn-ledger/src/credit_policy.rs</code></li>
+<li><code>../../../icn/crates/icn-ledger/src/dispute.rs</code></li>
+</ul>
+</li>
+</ul>
+<h2>Verification updates (Batch A4 - slice 5)</h2>
+<pre><code class="language-bash">for f in docs/design/compute-substrate-design.md docs/design/economics/ECONOMIC_VISION.md docs/design/economics/contribution-credits-design.md docs/design/economics/econ-modeling.md docs/design/economics/economic-safety.md; do
+  ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | rg &quot;^MISSING_LINK\|${f//\//\/}\|&quot; || true
+done
+</code></pre>
+<p>Result: no missing-link matches for the targeted design/economics docs.</p>
+<h2>Audit ledger updates (slice 5)</h2>
+<ul>
+<li><code>docs/design/COMMONS_EVOLUTION.md | docs/ARCHITECTURE.md, docs/design/governance/governance-primitives.md, docs/security/threat-model.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/design/compute-substrate-design.md | docs/architecture/IMPLEMENTATION_GAP_ANALYSIS.md, docs/design/economics/economic-safety.md, docs/design/governance/governance.md, CLAUDE.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/design/economics/ECONOMIC_VISION.md | docs/development/sessions/undated/ROADMAP.md, docs/ARCHITECTURE.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/design/economics/contribution-credits-design.md | docs/development/sessions/undated/ROADMAP.md, docs/development/federation-roadmap-implementation.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/design/economics/econ-modeling.md | sims/mutual-credit/RESULTS_SUMMARY.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/design/economics/economic-safety.md | docs/development/sessions/undated/ROADMAP.md, docs/operations/deployment/incident-response.md, docs/guides/operations/operations-guide.md, icn/crates/icn-ledger/src/credit_policy.rs, icn/crates/icn-ledger/src/dispute.rs | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+</ul>
+<h2>Recursive self-correction score (A4 slice 5)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4; continue to next drift slice.</p>
+<h2>Changes applied (Batch A4 - slice 6: governance design links)</h2>
+<ol>
+<li><code>docs/design/governance/PROJECT_GOVERNANCE.md</code></li>
+</ol>
+<ul>
+<li>Fixed broken root-level governance links:<ul>
+<li><code>../../../CONTRIBUTING.md</code></li>
+<li><code>../../../CODE_OF_CONDUCT.md</code></li>
+<li><code>../../development/sessions/undated/ROADMAP.md</code></li>
+</ul>
+</li>
+</ul>
+<ol start="2">
+<li><code>docs/design/governance/governance.md</code></li>
+</ol>
+<ul>
+<li>Fixed architecture, social recovery, and roadmap links:<ul>
+<li><code>../../ARCHITECTURE.md</code></li>
+<li><code>../sdis/social-recovery.md</code></li>
+<li><code>../../development/sessions/undated/ROADMAP.md</code></li>
+</ul>
+</li>
+</ul>
+<ol start="3">
+<li><code>docs/design/governance/witness-trust-validation.md</code></li>
+</ol>
+<ul>
+<li>Fixed trust/governance/config/security references:<ul>
+<li><code>../../development/trust-multi-graph-migration.md</code></li>
+<li><code>../../development/sessions/2026-01/2025-01-17-governance-ledger-integration.md</code></li>
+<li><code>../../reference/config/trust-threshold-configuration.md</code></li>
+<li><code>../../security/production-hardening.md</code></li>
+</ul>
+</li>
+</ul>
+<h2>Verification updates (Batch A4 - slice 6)</h2>
+<pre><code class="language-bash">for f in docs/design/governance/PROJECT_GOVERNANCE.md docs/design/governance/governance.md docs/design/governance/witness-trust-validation.md; do
+  ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | rg &quot;^MISSING_LINK\|${f//\//\/}\|&quot; || true
+done
+</code></pre>
+<p>Result: no missing-link matches for targeted governance design docs.</p>
+<h2>Audit ledger updates (slice 6)</h2>
+<ul>
+<li><code>docs/design/governance/PROJECT_GOVERNANCE.md | CONTRIBUTING.md, CODE_OF_CONDUCT.md, docs/development/sessions/undated/ROADMAP.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/design/governance/governance.md | docs/ARCHITECTURE.md, docs/design/sdis/social-recovery.md, docs/development/sessions/undated/ROADMAP.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/design/governance/witness-trust-validation.md | docs/development/trust-multi-graph-migration.md, docs/development/sessions/2026-01/2025-01-17-governance-ledger-integration.md, docs/reference/config/trust-threshold-configuration.md, docs/security/production-hardening.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+</ul>
+<h2>Recursive self-correction score (A4 slice 6)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4; continue to next drift slice.</p>
+<h2>Changes applied (Batch A4 - slice 7: design platform links)</h2>
+<ol>
+<li><code>docs/design/capability-based-features.md</code></li>
+</ol>
+<ul>
+<li>Fixed crate source links from <code>docs/design/</code> depth to canonical <code>icn/</code> paths.</li>
+<li>Updated moved module links:<ul>
+<li><code>icn-net/src/actor/mod.rs</code></li>
+<li><code>icn-obs/src/metrics/mod.rs</code></li>
+</ul>
+</li>
+</ul>
+<ol start="2">
+<li><code>docs/design/scheduler-evolution-plan.md</code></li>
+</ol>
+<ul>
+<li>Corrected compute module links to <code>../../icn/crates/icn-compute/...</code>.</li>
+<li>Corrected roadmap and project guidance links:<ul>
+<li><code>../development/sessions/undated/ROADMAP.md</code></li>
+<li><code>../../CLAUDE.md</code></li>
+</ul>
+</li>
+<li>Repointed strategic gap analysis to dated session doc path.</li>
+</ul>
+<ol start="3">
+<li><code>docs/design/razeto-integration-design.md</code></li>
+</ol>
+<ul>
+<li>Corrected related document links:<ul>
+<li><code>economics/contribution-credits-design.md</code></li>
+<li><code>../ARCHITECTURE.md</code></li>
+<li><code>../PHASE_HISTORY.md</code></li>
+</ul>
+</li>
+</ul>
+<h2>Verification updates (Batch A4 - slice 7)</h2>
+<pre><code class="language-bash">for f in docs/design/capability-based-features.md docs/design/scheduler-evolution-plan.md docs/design/razeto-integration-design.md; do
+  ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | rg &quot;^MISSING_LINK\|${f//\//\/}\|&quot; || true
+done
+</code></pre>
+<p>Result: no missing-link matches for targeted design docs.</p>
+<h2>Audit ledger updates (slice 7)</h2>
+<ul>
+<li><code>docs/design/capability-based-features.md | icn/crates/icn-net/src/{version.rs,protocol.rs,actor/mod.rs}, icn/crates/icn-obs/src/metrics/mod.rs | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/design/scheduler-evolution-plan.md | icn/crates/icn-compute/src/{actor/mod.rs,scheduler.rs}, docs/development/sessions/undated/ROADMAP.md, CLAUDE.md, docs/development/sessions/2026-01/2025-01-15-strategic-gap-analysis.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/design/razeto-integration-design.md | docs/design/economics/contribution-credits-design.md, docs/ARCHITECTURE.md, docs/PHASE_HISTORY.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+</ul>
+<h2>Recursive self-correction score (A4 slice 7)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4; continue to next drift slice.</p>
+<h2>Changes applied (Batch A4 - slice 8: api/deploy/development links)</h2>
+<ol>
+<li><code>docs/api/README.md</code></li>
+</ol>
+<ul>
+<li>Repointed pilot coordinator guide link to <code>docs/internal/pilots/pilot-coordinator-guide.md</code>.</li>
+</ul>
+<ol start="2">
+<li><code>docs/demo/DEMO_README.md</code></li>
+</ol>
+<ul>
+<li>Repointed script link to repo script path: <code>../../scripts/quick-start-test.sh</code>.</li>
+</ul>
+<ol start="3">
+<li><code>docs/deployment/DEPLOY_TEST_NETWORK.md</code></li>
+</ol>
+<ul>
+<li>Fixed testing plan/quickstart links to <code>docs/development/testing/*</code>.</li>
+<li>Fixed <code>CLAUDE.md</code> link to repo root <code>../../CLAUDE.md</code>.</li>
+</ul>
+<ol start="4">
+<li><code>docs/development/RELEASE_PROCESS.md</code></li>
+</ol>
+<ul>
+<li>Replaced dead <code>UPGRADING.md</code> links with canonical migration guide:<ul>
+<li><code>../migration-guides/version-upgrades.md</code></li>
+</ul>
+</li>
+</ul>
+<ol start="5">
+<li><code>docs/development/code-quality-improvements.md</code></li>
+</ol>
+<ul>
+<li>Fixed deny config source link to <code>../../icn/deny.toml</code>.</li>
+</ul>
+<ol start="6">
+<li><code>docs/development/testing/TESTING_QUICKSTART.md</code></li>
+</ol>
+<ul>
+<li>Fixed deploy guide link to <code>../../deployment/DEPLOY_TEST_NETWORK.md</code>.</li>
+</ul>
+<ol start="7">
+<li><code>docs/examples/policies/README.md</code></li>
+</ol>
+<ul>
+<li>Fixed governance primitives link to <code>../../design/governance/governance-primitives.md</code>.</li>
+</ul>
+<h2>Verification updates (Batch A4 - slice 8)</h2>
+<pre><code class="language-bash">for f in docs/api/README.md docs/demo/DEMO_README.md docs/deployment/DEPLOY_TEST_NETWORK.md docs/development/RELEASE_PROCESS.md docs/development/code-quality-improvements.md docs/development/testing/TESTING_QUICKSTART.md docs/examples/policies/README.md; do
+  ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | rg &quot;^MISSING_LINK\|${f//\//\/}\|&quot; || true
+done
+</code></pre>
+<p>Result: no missing-link matches for targeted files.</p>
+<h2>Audit ledger updates (slice 8)</h2>
+<ul>
+<li><code>docs/api/README.md | docs/internal/pilots/pilot-coordinator-guide.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/demo/DEMO_README.md | scripts/quick-start-test.sh | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/deployment/DEPLOY_TEST_NETWORK.md | docs/development/testing/{INTERNAL_TESTING_PLAN.md,TESTING_QUICKSTART.md}, CLAUDE.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/development/RELEASE_PROCESS.md | docs/migration-guides/version-upgrades.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/development/code-quality-improvements.md | icn/deny.toml | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/development/testing/TESTING_QUICKSTART.md | docs/deployment/DEPLOY_TEST_NETWORK.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/examples/policies/README.md | docs/design/governance/governance-primitives.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+</ul>
+<h2>Recursive self-correction score (A4 slice 8)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4; continue to next drift slice.</p>
+<h2>Changes applied (Batch A4 - slice 9: sdis/features/glossary/migration links)</h2>
+<ol>
+<li><code>docs/design/sdis/social-recovery.md</code></li>
+</ol>
+<ul>
+<li>Fixed related design and source links:<ul>
+<li><code>../multi-device-identity-design.md</code></li>
+<li><code>../../../icn/crates/icn-identity/src/recovery.rs</code></li>
+<li><code>../../../icn/crates/icn-core/tests/recovery_integration.rs</code></li>
+</ul>
+</li>
+</ul>
+<ol start="2">
+<li><code>docs/features/witness-signature-best-practices.md</code></li>
+</ol>
+<ul>
+<li>Fixed cross-doc references to current architecture/security/development/design locations.</li>
+</ul>
+<ol start="3">
+<li><code>docs/glossary.md</code></li>
+</ol>
+<ul>
+<li>Fixed design references for contribution credits, governance primitives, and commons evolution.</li>
+</ul>
+<ol start="4">
+<li><code>docs/migration-guides/keystore-versions.md</code></li>
+</ol>
+<ul>
+<li>Fixed multi-device identity and operations guide references to current docs paths.</li>
+</ul>
+<ol start="5">
+<li><code>docs/migration-guides/version-upgrades.md</code></li>
+</ol>
+<ul>
+<li>Fixed backup/operations references to <code>docs/guides/operations/*</code>.</li>
+</ul>
+<h2>Verification updates (Batch A4 - slice 9)</h2>
+<pre><code class="language-bash">for f in docs/design/sdis/social-recovery.md docs/features/witness-signature-best-practices.md docs/glossary.md docs/migration-guides/keystore-versions.md docs/migration-guides/version-upgrades.md; do
+  ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | rg &quot;^MISSING_LINK\|${f//\//\/}\|&quot; || true
+done
+</code></pre>
+<p>Result: no missing-link matches for targeted files.</p>
+<h2>Audit ledger updates (slice 9)</h2>
+<ul>
+<li><code>docs/design/sdis/social-recovery.md | docs/design/multi-device-identity-design.md, icn/crates/icn-identity/src/recovery.rs, icn/crates/icn-core/tests/recovery_integration.rs | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/features/witness-signature-best-practices.md | docs/design/economics/ECONOMIC_ARCHITECTURE.md, docs/security/production-hardening.md, docs/development/trust-multi-graph-migration.md, docs/design/governance/governance-primitives.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/glossary.md | docs/design/economics/contribution-credits-design.md, docs/design/governance/governance-primitives.md, docs/design/COMMONS_EVOLUTION.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/migration-guides/keystore-versions.md | docs/design/multi-device-identity-design.md, docs/guides/operations/{backup-and-recovery.md,operations-guide.md} | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/migration-guides/version-upgrades.md | docs/guides/operations/{backup-and-recovery.md,operations-guide.md} | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+</ul>
+<h2>Recursive self-correction score (A4 slice 9)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4; continue to next drift slice.</p>
+<h2>Changes applied (Batch A4 - slice 10: security/observability/onboarding)</h2>
+<ol>
+<li><code>docs/security/production-hardening.md</code></li>
+</ol>
+<ul>
+<li>Fixed crate source paths to <code>../../icn/...</code> from <code>docs/security/</code> depth.</li>
+<li>Updated moved module references:<ul>
+<li><code>icn-core/src/supervisor/mod.rs</code></li>
+<li><code>icn-net/src/actor/mod.rs</code></li>
+</ul>
+</li>
+<li>Fixed architecture/API references:<ul>
+<li><code>../ARCHITECTURE.md</code></li>
+<li><code>../reference/api/topic-subscriptions-api.md</code></li>
+</ul>
+</li>
+<li>Context normalization: converted test-count claim to historical snapshot wording with explicit date.</li>
+</ul>
+<ol start="2">
+<li><code>docs/security/SECRET_MANAGEMENT.md</code></li>
+</ol>
+<ul>
+<li>Fixed cross-doc references:<ul>
+<li><code>production-hardening.md</code></li>
+<li><code>../operations/deployment/incident-response.md</code></li>
+<li><code>../archive/2025/KUBERNETES_DEPLOYMENT.md</code></li>
+</ul>
+</li>
+<li>Context normalization: labeled Kubernetes deployment link as archived (2025).</li>
+</ul>
+<ol start="3">
+<li><code>docs/security/threat-model.md</code></li>
+</ol>
+<ul>
+<li>Fixed incident response and architecture links:<ul>
+<li><code>../operations/deployment/incident-response.md</code></li>
+<li><code>../ARCHITECTURE.md</code></li>
+</ul>
+</li>
+</ul>
+<ol start="4">
+<li><code>docs/observability/storage-metrics.md</code></li>
+</ol>
+<ul>
+<li>Fixed distributed tracing and security hardening references:<ul>
+<li><code>../operations/deployment/distributed-tracing.md</code></li>
+<li><code>../security/production-hardening.md</code></li>
+</ul>
+</li>
+</ul>
+<ol start="5">
+<li><code>docs/observability/tail-based-sampling.md</code></li>
+</ol>
+<ul>
+<li>Fixed security hardening reference to <code>../security/production-hardening.md</code>.</li>
+</ul>
+<ol start="6">
+<li>Onboarding workshops:</li>
+</ol>
+<ul>
+<li><code>docs/onboarding/workshops/workshop-03-runtime.md</code>: <code>../../../CLAUDE.md</code></li>
+<li><code>docs/onboarding/workshops/workshop-05-network-gossip.md</code>: <code>../../../CLAUDE.md</code></li>
+<li><code>docs/onboarding/workshops/workshop-07-gateway-sdk.md</code>: <code>../../../sdk/typescript/README.md</code></li>
+<li><code>docs/onboarding/workshops/workshop-09-ops.md</code>:<ul>
+<li><code>../../operations/deployment/HOMELAB_DEPLOYMENT.md</code></li>
+<li><code>../../security/production-hardening.md</code></li>
+</ul>
+</li>
+</ul>
+<h2>Verification updates (Batch A4 - slice 10)</h2>
+<pre><code class="language-bash">for f in docs/security/SECRET_MANAGEMENT.md docs/security/production-hardening.md docs/security/threat-model.md docs/observability/storage-metrics.md docs/observability/tail-based-sampling.md docs/onboarding/workshops/workshop-03-runtime.md docs/onboarding/workshops/workshop-05-network-gossip.md docs/onboarding/workshops/workshop-07-gateway-sdk.md docs/onboarding/workshops/workshop-09-ops.md; do
+  ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | rg &quot;^MISSING_LINK\|${f//\//\/}\|&quot; || true
+done
+</code></pre>
+<p>Result: no missing-link matches for targeted files.</p>
+<h2>Audit ledger updates (slice 10)</h2>
+<ul>
+<li><code>docs/security/production-hardening.md | icn/crates/{icn-net,icn-core,icn-ledger,icn-gossip}, docs/ARCHITECTURE.md, docs/reference/api/topic-subscriptions-api.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/security/SECRET_MANAGEMENT.md | docs/security/production-hardening.md, docs/operations/deployment/incident-response.md, docs/archive/2025/KUBERNETES_DEPLOYMENT.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/security/threat-model.md | docs/operations/deployment/incident-response.md, docs/ARCHITECTURE.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/observability/storage-metrics.md | docs/operations/deployment/distributed-tracing.md, docs/security/production-hardening.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/observability/tail-based-sampling.md | docs/security/production-hardening.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/onboarding/workshops/workshop-03-runtime.md | CLAUDE.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/onboarding/workshops/workshop-05-network-gossip.md | CLAUDE.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/onboarding/workshops/workshop-07-gateway-sdk.md | sdk/typescript/README.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/onboarding/workshops/workshop-09-ops.md | docs/operations/deployment/HOMELAB_DEPLOYMENT.md, docs/security/production-hardening.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+</ul>
+<h2>Recursive self-correction score (A4 slice 10)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4; continue to next drift slice.</p>
+<h2>Changes applied (Batch A4 - slice 11: developer/internal/sdis/security-roadmap/vision)</h2>
+<ol>
+<li><code>docs/guides/developer/i18n-guide.md</code></li>
+</ol>
+<ul>
+<li>Fixed root and workspace path references for contribution guide and localization directories.</li>
+</ul>
+<ol start="2">
+<li><code>docs/guides/developer/DOCUMENTATION_STYLE.md</code></li>
+</ol>
+<ul>
+<li>Replaced placeholder broken link example with non-link file-location literal.</li>
+</ul>
+<ol start="3">
+<li><code>docs/internal/pilots/pilot-playbook.md</code></li>
+</ol>
+<ul>
+<li>Fixed incident response link to canonical ops runbook path.</li>
+</ul>
+<ol start="4">
+<li><code>docs/internal/pilots/pilot-readiness-gaps.md</code></li>
+</ol>
+<ul>
+<li>Replaced dead completion-doc link with existing governance-ledger session record.</li>
+</ul>
+<ol start="5">
+<li><code>docs/internal/status/GAP_ANALYSIS.md</code></li>
+</ol>
+<ul>
+<li>Fixed references to repo root <code>CLAUDE.md</code>, roadmap, and internal testing plan.</li>
+</ul>
+<ol start="6">
+<li><code>docs/sdis/SDIS_SYSTEM.md</code></li>
+</ol>
+<ul>
+<li>Repointed missing SDIS references to canonical design/security docs.</li>
+</ul>
+<ol start="7">
+<li><code>docs/security/TOFU_SECURITY_MODEL.md</code></li>
+</ol>
+<ul>
+<li>Replaced dead trust-graph link with current trust migration doc.</li>
+<li>Converted plain-text source references into verified clickable links.</li>
+</ul>
+<ol start="8">
+<li><code>docs/security/security-roadmap.md</code></li>
+</ol>
+<ul>
+<li>Fixed architecture and root guidance links.</li>
+</ul>
+<ol start="9">
+<li><code>docs/vision/FUTURE_WORK.md</code></li>
+</ol>
+<ul>
+<li>Fixed gap/roadmap/architecture references to canonical docs locations.</li>
+</ul>
+<h2>Verification updates (Batch A4 - slice 11)</h2>
+<pre><code class="language-bash">for f in docs/guides/developer/i18n-guide.md docs/guides/developer/DOCUMENTATION_STYLE.md docs/internal/pilots/pilot-playbook.md docs/internal/pilots/pilot-readiness-gaps.md docs/internal/status/GAP_ANALYSIS.md docs/sdis/SDIS_SYSTEM.md docs/security/TOFU_SECURITY_MODEL.md docs/security/security-roadmap.md docs/vision/FUTURE_WORK.md; do
+  ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | rg &quot;^MISSING_LINK\|${f//\//\/}\|&quot; || true
+done
+</code></pre>
+<p>Result: no missing-link matches for targeted files.</p>
+<p>Global missing-link count after this slice: <code>29</code>.</p>
+<h2>Audit ledger updates (slice 11)</h2>
+<ul>
+<li><code>docs/guides/developer/i18n-guide.md | CONTRIBUTING.md, icn/bins/icnctl/locales, icn/crates/icn-gateway/locales, web/pilot-ui/locales, sdk/react-native/examples/CoopWallet/src/i18n | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/guides/developer/DOCUMENTATION_STYLE.md | style guidance example normalization | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/internal/pilots/pilot-playbook.md | docs/operations/deployment/incident-response.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/internal/pilots/pilot-readiness-gaps.md | docs/development/sessions/2026-01/2025-01-17-governance-ledger-integration.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/internal/status/GAP_ANALYSIS.md | CLAUDE.md, docs/development/sessions/undated/ROADMAP.md, docs/development/testing/INTERNAL_TESTING_PLAN.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/sdis/SDIS_SYSTEM.md | docs/design/multi-device-identity-design.md, docs/security/threat-model.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/security/TOFU_SECURITY_MODEL.md | docs/development/trust-multi-graph-migration.md, docs/ARCHITECTURE.md, docs/security/production-hardening.md, icn/crates/icn-net/src/{tls.rs,actor/mod.rs} | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/security/security-roadmap.md | docs/ARCHITECTURE.md, CLAUDE.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/vision/FUTURE_WORK.md | docs/internal/status/GAP_ANALYSIS.md, docs/development/sessions/undated/ROADMAP.md, docs/ARCHITECTURE.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+</ul>
+<h2>Recursive self-correction score (A4 slice 11)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4; continue.</p>
+<h2>Changes applied (Batch A4 - slice 12: final residual scan cleanup)</h2>
+<ol>
+<li><code>docs/DOCUMENTATION_MAINTENANCE.md</code></li>
+</ol>
+<ul>
+<li>Fixed root-relative path examples to docs-relative examples.</li>
+<li>Reworked markdown-link regex examples to avoid scanner false positives from literal markdown-link syntax in code examples.</li>
+<li>Updated cross-reference examples to current existing docs paths.</li>
+</ul>
+<ol start="2">
+<li><code>docs/architecture/ARCHITECTURE_COMPLETION_STATUS_OLD.md</code></li>
+</ol>
+<ul>
+<li>Repointed historical references to current canonical locations:<ul>
+<li><code>../ARCHITECTURE.md</code></li>
+<li><code>../development/sessions/undated/ROADMAP.md</code></li>
+<li><code>../GETTING_STARTED.md</code></li>
+<li><code>../security/production-hardening.md</code></li>
+<li><code>../design/governance/governance-primitives.md</code></li>
+</ul>
+</li>
+</ul>
+<ol start="3">
+<li><code>docs/architecture/IMPLEMENTATION_GAP_ANALYSIS.md</code></li>
+</ol>
+<ul>
+<li>Repointed <code>../dev-journal/</code> to <code>../development/sessions/</code>.</li>
+</ul>
+<ol start="4">
+<li><code>docs/pilots/decision_registry_treasury_vote.md</code></li>
+</ol>
+<ul>
+<li>Replaced non-repo wildcard link with explicit local-artifact note for <code>.copilot/session-state/*/plan.md</code>.</li>
+</ul>
+<ol start="5">
+<li><code>docs/security/phase-10c-security-analysis.md</code></li>
+</ol>
+<ul>
+<li>Corrected source-code links to repo root relative paths:<ul>
+<li><code>../../icn/crates/icn-ccl/src/ast.rs</code></li>
+<li><code>../../icn/crates/icn-ccl/src/messages.rs</code></li>
+<li><code>../../icn/bins/icnctl/src/main.rs</code></li>
+</ul>
+</li>
+</ul>
+<h2>Verification updates (Batch A4 - slice 12)</h2>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | rg &#39;^MISSING_LINK\|&#39;
+</code></pre>
+<p>Result: zero missing-link findings.</p>
+<h2>Audit ledger updates (slice 12)</h2>
+<ul>
+<li><code>docs/DOCUMENTATION_MAINTENANCE.md | docs/{INDEX.md,architecture/ARCHITECTURE_MAP.md,architecture/README.md,reference/api/api-versioning.md} | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/architecture/ARCHITECTURE_COMPLETION_STATUS_OLD.md | docs/{ARCHITECTURE.md,GETTING_STARTED.md,security/production-hardening.md,design/governance/governance-primitives.md,development/sessions/undated/ROADMAP.md} | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/architecture/IMPLEMENTATION_GAP_ANALYSIS.md | docs/development/sessions/ | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/pilots/decision_registry_treasury_vote.md | local artifact note + docs policy | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/security/phase-10c-security-analysis.md | icn/{crates/icn-ccl/src/{ast.rs,messages.rs},bins/icnctl/src/main.rs} | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)</code></li>
+</ul>
+<h2>Recursive self-correction score (A4 slice 12)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 5/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4; link-drift backlog cleared for active scanner scope.</p>
+<h2>Changes applied (Batch D2 - slice 1: context normalization)</h2>
+<ol>
+<li><code>docs/architecture/ARCHITECTURE_COMPLETION_STATUS_OLD.md</code></li>
+</ol>
+<ul>
+<li>Converted absolute readiness language to explicit historical framing (2025-12-17 snapshot).</li>
+<li>Reworded test and production-readiness statements to point-in-time conclusions.</li>
+</ul>
+<ol start="2">
+<li><code>docs/internal/status/GAP_ANALYSIS.md</code></li>
+</ol>
+<ul>
+<li>Recast status and progress statements as historical snapshot language (2025-12-04).</li>
+<li>Preserved underlying findings while removing present-tense implication.</li>
+</ul>
+<ol start="3">
+<li><code>docs/security/production-hardening.md</code></li>
+</ol>
+<ul>
+<li>Recast Phase 7 completion claim as historical cycle claim.</li>
+<li>Softened “production-ready rules” wording to avoid present-tense readiness assertion.</li>
+</ul>
+<ol start="4">
+<li><code>docs/vision/FUTURE_WORK.md</code></li>
+</ol>
+<ul>
+<li>Marked document as historical planning snapshot (2025-12-04).</li>
+<li>Recast gap-closure and pilot-blocker statements as date-bounded planning context.</li>
+</ul>
+<h2>Verification updates (Batch D2 - slice 1)</h2>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | rg &#39;^MISSING_LINK\|&#39;
+rg -n &quot;Historical note|historical|snapshot|pilot-ready|production-ready|all critical and high-priority&quot; docs/architecture/ARCHITECTURE_COMPLETION_STATUS_OLD.md docs/internal/status/GAP_ANALYSIS.md docs/security/production-hardening.md docs/vision/FUTURE_WORK.md
+</code></pre>
+<p>Result:</p>
+<ul>
+<li>Missing-link findings remain zero.</li>
+<li>Targeted stale-claim hotspots now include explicit historical/snapshot framing.</li>
+</ul>
+<h2>Audit ledger updates (D2 slice 1)</h2>
+<ul>
+<li><code>docs/architecture/ARCHITECTURE_COMPLETION_STATUS_OLD.md | docs/ARCHITECTURE.md + CI/workflow reality context | doc_reality_scan + stale-claim grep | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/internal/status/GAP_ANALYSIS.md | dated snapshot normalization policy | doc_reality_scan + stale-claim grep | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/security/production-hardening.md | phase-bound security claim normalization | doc_reality_scan + stale-claim grep | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/vision/FUTURE_WORK.md | roadmap/status historical framing policy | doc_reality_scan + stale-claim grep | pass | reviewed_on(2026-02-11)</code></li>
+</ul>
+<h2>Recursive self-correction score (D2 slice 1)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4; continue to next context slice.</p>
+<h2>Changes applied (Batch D2 - slice 2: active-doc readiness language)</h2>
+<ol>
+<li><code>docs/guides/FAQ.md</code></li>
+</ol>
+<ul>
+<li>Kept FAQ question unchanged, but normalized answer to explicit 2025-11-21 status snapshot language.</li>
+<li>Added direction to verify current readiness against latest status/CI artifacts.</li>
+</ul>
+<ol start="2">
+<li><code>docs/internal/pilots/pilot-limitations.md</code></li>
+</ol>
+<ul>
+<li>Reframed overview and &quot;What&#39;s NOT Limited&quot; section from present-tense readiness claims to dated snapshot assessment wording.</li>
+</ul>
+<ol start="3">
+<li><code>docs/security/security-roadmap.md</code></li>
+</ol>
+<ul>
+<li>Reframed intro from implied current production-readiness to roadmap guidance.</li>
+<li>Marked phase status as snapshot wording.</li>
+</ul>
+<h2>Verification updates (Batch D2 - slice 2)</h2>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | rg &#39;^MISSING_LINK\|&#39;
+rg -n &quot;Status snapshot|Status \(snapshot\)|assessed as production-ready at that time|roadmap guidance&quot; docs/guides/FAQ.md docs/internal/pilots/pilot-limitations.md docs/security/security-roadmap.md
+</code></pre>
+<p>Result:</p>
+<ul>
+<li>Missing-link findings remain zero.</li>
+<li>Targeted active-doc readiness language now uses snapshot/qualified wording.</li>
+</ul>
+<h2>Audit ledger updates (D2 slice 2)</h2>
+<ul>
+<li><code>docs/guides/FAQ.md | snapshot policy for readiness claims | doc_reality_scan + stale-claim grep | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/internal/pilots/pilot-limitations.md | pilot snapshot framing policy | doc_reality_scan + stale-claim grep | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/security/security-roadmap.md | roadmap-vs-readiness framing policy | doc_reality_scan + stale-claim grep | pass | reviewed_on(2026-02-11)</code></li>
+</ul>
+<h2>Recursive self-correction score (D2 slice 2)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4; continue.</p>
+<h2>Changes applied (Batch D2 - slice 3: architecture/deploy/config wording)</h2>
+<ol>
+<li><code>docs/architecture/ARCHITECTURAL_GAPS_AND_FIXES.md</code></li>
+</ol>
+<ul>
+<li>Marked document as historical review snapshot (2025-12-17).</li>
+<li>Reframed pilot-readiness conclusion statements to point-in-time assessment language.</li>
+</ul>
+<ol start="2">
+<li><code>docs/deployment/DEPLOYMENT_GUIDE.md</code></li>
+</ol>
+<ul>
+<li>Replaced absolute &quot;Ready to Deploy&quot; footer wording with snapshot guidance phrasing.</li>
+<li>Reframed backend readiness language as revision-time, pilot-scoped guidance.</li>
+</ul>
+<ol start="3">
+<li><code>docs/reference/config/identity-backend-configuration.md</code></li>
+</ol>
+<ul>
+<li>Replaced absolute &quot;production-ready&quot; phrasing for Age backend with maturity-based wording.</li>
+</ul>
+<h2>Verification updates (Batch D2 - slice 3)</h2>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | rg &#39;^MISSING_LINK\|&#39;
+rg -n &quot;pilot-ready|production-ready|historical review snapshot|production-capable|mature backend&quot; docs/architecture/ARCHITECTURAL_GAPS_AND_FIXES.md docs/deployment/DEPLOYMENT_GUIDE.md docs/reference/config/identity-backend-configuration.md
+</code></pre>
+<p>Result:</p>
+<ul>
+<li>Missing-link findings remain zero.</li>
+<li>Targeted wording in active docs now uses qualified/snapshot phrasing.</li>
+</ul>
+<h2>Audit ledger updates (D2 slice 3)</h2>
+<ul>
+<li><code>docs/architecture/ARCHITECTURAL_GAPS_AND_FIXES.md | historical framing policy for readiness claims | doc_reality_scan + stale-claim grep | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/deployment/DEPLOYMENT_GUIDE.md | deployment guidance phrasing normalization | doc_reality_scan + stale-claim grep | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/reference/config/identity-backend-configuration.md | backend maturity wording normalization | doc_reality_scan + stale-claim grep | pass | reviewed_on(2026-02-11)</code></li>
+</ul>
+<h2>Recursive self-correction score (D2 slice 3)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4; continue.</p>
+<h2>Changes applied (Batch C2 - slice 1: code-aligned API/backend docs)</h2>
+<ol>
+<li><code>docs/reference/api/topic-subscriptions-api.md</code></li>
+</ol>
+<ul>
+<li>Updated incoming subscription handler example to match current runtime pattern in <code>icn-core/src/supervisor/init_network.rs</code>:<ul>
+<li>non-blocking callback</li>
+<li><code>tokio::spawn</code> for async work</li>
+<li><code>gossip_handle.write().await</code> and <code>subscribe(...).await</code></li>
+</ul>
+</li>
+<li>Removed outdated <code>blocking_write()</code> example semantics.</li>
+</ul>
+<ol start="2">
+<li><code>icn/bins/icnd/src/main.rs</code></li>
+</ol>
+<ul>
+<li>Corrected hardware-backend error guidance path to the canonical docs location:<ul>
+<li><code>docs/reference/config/identity-backend-configuration.md</code></li>
+</ul>
+</li>
+</ul>
+<h2>Verification updates (Batch C2 - slice 1)</h2>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | rg &#39;^MISSING_LINK\|&#39;
+rg -n &quot;blocking_write\(|reference/config/identity-backend-configuration\.md&quot; docs/reference/api/topic-subscriptions-api.md icn/bins/icnd/src/main.rs
+</code></pre>
+<p>Result:</p>
+<ul>
+<li>Missing-link findings remain zero.</li>
+<li>API example and daemon error guidance align with current code paths and async behavior.</li>
+</ul>
+<h2>Audit ledger updates (C2 slice 1)</h2>
+<ul>
+<li><code>docs/reference/api/topic-subscriptions-api.md | icn/crates/icn-core/src/supervisor/init_network.rs | doc_reality_scan + semantic grep | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>icn/bins/icnd/src/main.rs | docs/reference/config/identity-backend-configuration.md | path verification + grep | pass | reviewed_on(2026-02-11)</code></li>
+</ul>
+<h2>Recursive self-correction score (C2 slice 1)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4; continue.</p>
+<h2>Changes applied (Batch D2 - slice 4: internal status snapshot framing)</h2>
+<ol>
+<li><code>docs/internal/status/gap-analysis.md</code></li>
+</ol>
+<ul>
+<li>Marked document as historical analysis snapshot (2025-11-18).</li>
+<li>Reframed substrate readiness claim to explicit point-in-time assessment language.</li>
+</ul>
+<ol start="2">
+<li><code>docs/internal/status/strategic-gap-analysis.md</code></li>
+</ol>
+<ul>
+<li>Marked status as historical strategic analysis snapshot (2025-01-15).</li>
+<li>Reframed completion/test-count/readiness statements to date-bounded wording.</li>
+</ul>
+<ol start="3">
+<li><code>docs/internal/status/multi-device-status.md</code></li>
+</ol>
+<ul>
+<li>Reframed summary and issue status claims as snapshot assessments.</li>
+<li>Reworded production-ready language to historical status notation.</li>
+</ul>
+<ol start="4">
+<li><code>docs/architecture/ARCHITECTURE_REVIEW_SUMMARY.md</code></li>
+</ol>
+<ul>
+<li>Marked report as historical review snapshot (2025-12-17).</li>
+<li>Reframed conclusion/recommendation and status labels to explicit review-time context.</li>
+</ul>
+<h2>Verification updates (Batch D2 - slice 4)</h2>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | rg &#39;^MISSING_LINK\|&#39;
+rg -n &quot;Historical|snapshot|Status at review time|production-ready|pilot-ready&quot; docs/internal/status/gap-analysis.md docs/internal/status/strategic-gap-analysis.md docs/internal/status/multi-device-status.md docs/architecture/ARCHITECTURE_REVIEW_SUMMARY.md
+</code></pre>
+<p>Result:</p>
+<ul>
+<li>Missing-link findings remain zero.</li>
+<li>Targeted internal status and architecture review docs now use explicit snapshot framing.</li>
+</ul>
+<h2>Audit ledger updates (D2 slice 4)</h2>
+<ul>
+<li><code>docs/internal/status/gap-analysis.md | status snapshot framing policy | doc_reality_scan + stale-claim grep | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/internal/status/strategic-gap-analysis.md | status snapshot framing policy | doc_reality_scan + stale-claim grep | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/internal/status/multi-device-status.md | status snapshot framing policy | doc_reality_scan + stale-claim grep | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/architecture/ARCHITECTURE_REVIEW_SUMMARY.md | architecture review snapshot framing policy | doc_reality_scan + stale-claim grep | pass | reviewed_on(2026-02-11)</code></li>
+</ul>
+<h2>Recursive self-correction score (D2 slice 4)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4; continue.</p>
+<h2>Changes applied (Batch C2 - slice 2: config/runtime docs vs icnd behavior)</h2>
+<ol>
+<li><code>docs/reference/config/CONFIGURATION.md</code></li>
+</ol>
+<ul>
+<li>Corrected config loading behavior to match <code>icnd</code>:<ul>
+<li>no multi-path auto-search order</li>
+<li><code>--config</code> explicit path or runtime defaults (<code>Config::default()</code>)</li>
+</ul>
+</li>
+<li>Corrected example config reference path to <code>icn/config/icn.toml.example</code>.</li>
+<li>Reframed validation guidance to prefer <code>icnd --validate-config</code> (runtime-native validation).</li>
+<li>Reworked <code>validate-config.py</code> usage examples to require explicit <code>--schema</code> path (optional/legacy path).</li>
+<li>Updated troubleshooting/migration snippets from hardcoded <code>icn.toml</code> assumptions to generic <code>config.toml</code> paths.</li>
+<li>Clarified IDE schema section as optional/local schema workflow.</li>
+</ul>
+<ol start="2">
+<li><code>docs/reference/config/identity-backend-configuration.md</code></li>
+</ol>
+<ul>
+<li>Replaced hardcoded <code>icn.toml</code> assumption with generic <code>--config</code> file wording.</li>
+<li>Corrected default keystore location semantics to <code>{data_dir}/identity.age</code> and typical Linux default <code>~/.local/share/icn/identity.age</code>.</li>
+<li>Updated runtime selection and <code>--validate-config</code> examples to match current daemon behavior.</li>
+</ul>
+<h2>Verification updates (Batch C2 - slice 2)</h2>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | rg &#39;^MISSING_LINK\|&#39;
+rg -n &quot;Config::default\(\)|--validate-config|identity\.age|icn\.toml|searches in this order&quot; docs/reference/config/CONFIGURATION.md docs/reference/config/identity-backend-configuration.md icn/bins/icnd/src/main.rs
+</code></pre>
+<p>Result:</p>
+<ul>
+<li>Missing-link findings remain zero.</li>
+<li>Config/runtime documentation now aligns with current <code>icnd</code> load and validation behavior.</li>
+</ul>
+<h2>Audit ledger updates (C2 slice 2)</h2>
+<ul>
+<li><code>docs/reference/config/CONFIGURATION.md | icn/bins/icnd/src/main.rs + icn/config/icn.toml.example + scripts/validate-config.py | doc_reality_scan + semantic grep | pass | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/reference/config/identity-backend-configuration.md | icn/bins/icnd/src/main.rs + icn/crates/icn-core/src/config/identity.rs | doc_reality_scan + semantic grep | pass | reviewed_on(2026-02-11)</code></li>
+</ul>
+<h2>Recursive self-correction score (C2 slice 2)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4; continue.</p>
+<h2>Changes applied (Batch C2 - Quickstart/runtime docs)</h2>
+<ol>
+<li><code>icn/QUICKSTART.md</code></li>
+</ol>
+<ul>
+<li>Aligned passphrase guidance with <code>icnd</code> runtime precedence:<ul>
+<li><code>ICN_KEYSTORE_PASSPHRASE</code> preferred</li>
+<li><code>ICN_PASSPHRASE</code> legacy fallback</li>
+</ul>
+</li>
+<li>Replaced legacy <code>~/.icn/identity.age</code> assumptions with default Linux path from <code>Config::default()</code> (<code>~/.local/share/icn/identity.age</code>).</li>
+<li>Reworked &quot;without identity&quot; flow to use <code>--data-dir /tmp/icn-demo</code> instead of renaming files in-place.</li>
+<li>Corrected static asset layout to current files under <code>crates/icn-gateway/static/</code> (<code>index.html</code>, <code>style.css</code>, <code>app.js</code>, <code>README.md</code>).</li>
+<li>Kept health endpoint guidance on <code>/v1/health</code>.</li>
+</ul>
+<ol start="2">
+<li><code>icn/start-gateway.sh</code></li>
+</ol>
+<ul>
+<li>Updated operator hint to prefer <code>ICN_KEYSTORE_PASSPHRASE</code> (was legacy-only <code>ICN_PASSPHRASE</code>).</li>
+</ul>
+<h2>Verification updates (Batch C2)</h2>
+<pre><code class="language-bash">rg -n &quot;ICN_KEYSTORE_PASSPHRASE|ICN_PASSPHRASE|~/.local/share/icn/identity.age|~/.icn/identity.age|crates/icn-gateway/static/js|crates/icn-gateway/static/css&quot; icn/QUICKSTART.md icn/start-gateway.sh
+</code></pre>
+<p>Result: quickstart and startup script now use preferred passphrase variable, retain legacy fallback note, and no longer reference obsolete static subdirectories.</p>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+</code></pre>
+<p>Result: no <code>MISSING_LINK</code> findings.</p>
+<h2>Audit ledger additions (Batch C2)</h2>
+<ul>
+<li><code>icn/QUICKSTART.md | icn/bins/icnd/src/main.rs + icn/crates/icn-core/src/config/mod.rs + icn/crates/icn-gateway/static/* | rg -n &quot;ICN_KEYSTORE_PASSPHRASE|ICN_PASSPHRASE|data_dir|identity.age|health&quot; + find icn/crates/icn-gateway/static -maxdepth 2 -type f | aligned | reviewed_on(2026-02-11)</code></li>
+<li><code>icn/start-gateway.sh | icn/bins/icnd/src/main.rs (passphrase precedence comments) | rg -n &quot;ICN_KEYSTORE_PASSPHRASE|ICN_PASSPHRASE&quot; icn/start-gateway.sh icn/bins/icnd/src/main.rs | aligned | reviewed_on(2026-02-11)</code></li>
+</ul>
+<h2>Recursive self-correction score (Batch C2)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4 for Batch C2; continue next A4 slices and D2 historical normalization.</p>
+<h2>Changes applied (Batch C3 - onboarding/ops runtime semantics)</h2>
+<ol>
+<li><code>docs/GETTING_STARTED.md</code></li>
+</ol>
+<ul>
+<li>Added explicit <code>--data-dir ~/.icn</code> usage for <code>icnctl</code> and <code>icnd</code> in startup flow so identity and daemon state align.</li>
+<li>Updated keystore terminology/path to <code>{data_dir}/identity.age</code>.</li>
+</ul>
+<ol start="2">
+<li><code>docs/operations/deployment/deployment-guide.md</code></li>
+</ol>
+<ul>
+<li>Corrected daemon defaults and examples:<ul>
+<li>QUIC default port <code>7777</code> (not <code>4433</code>)</li>
+<li>Prometheus metrics default <code>9100</code> (not <code>9090</code>)</li>
+<li>data/identity path examples to <code>/var/lib/icn/identity.age</code></li>
+</ul>
+</li>
+<li>Removed unsupported environment-variable assumptions and clarified that path/network settings are controlled via <code>--data-dir</code>, <code>--config</code>, and config file fields.</li>
+<li>Corrected systemd and Docker examples to pass explicit <code>--data-dir</code>/<code>--config</code>.</li>
+<li>Fixed backup/recovery examples to reference <code>identity.age</code> instead of <code>keystore.age</code>.</li>
+</ul>
+<ol start="3">
+<li><code>docs/ops/runbooks/README.md</code></li>
+</ol>
+<ul>
+<li>Updated environment variable table to reflect current runtime behavior (<code>ICN_KEYSTORE_PASSPHRASE</code>, <code>ICN_PASSPHRASE</code>, <code>ICN_GATEWAY_JWT_SECRET</code>).</li>
+<li>Added explicit CLI-path guidance for <code>icnd</code> and <code>icnctl</code>.</li>
+</ul>
+<h2>Verification updates (Batch C3)</h2>
+<pre><code class="language-bash">rg -n &quot;~/.icn/keystore.age|0.0.0.0:4433|:9090/metrics|ICN_DATA_DIR=|ICN_OBSERVABILITY_LOG_LEVEL|/etc/icn/icn.toml|targets: \[&#39;icnd:9090&#39;\]&quot; docs/GETTING_STARTED.md docs/operations/deployment/deployment-guide.md docs/ops/runbooks/README.md
+</code></pre>
+<p>Result: no matches.</p>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+</code></pre>
+<p>Result: no broken relative links; only expected historical/stale-marker reports remain.</p>
+<h2>Audit ledger additions (Batch C3)</h2>
+<ul>
+<li><code>docs/GETTING_STARTED.md | icn/bins/icnctl/src/main.rs:get_data_dir + icn/bins/icnd/src/main.rs + icn/crates/icn-core/src/config/mod.rs | rg -n &quot;get_data_dir|identity.age|data_dir|listen_addr|metrics_port&quot; | aligned | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/operations/deployment/deployment-guide.md | icn/bins/icnd/src/main.rs + icn/crates/icn-core/src/config/mod.rs | rg -n &quot;data_dir|listen_addr|metrics_port|ICN_KEYSTORE_PASSPHRASE|ICN_GATEWAY_JWT_SECRET&quot; | aligned | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/ops/runbooks/README.md | icn/bins/icnd/src/main.rs + icn/bins/icnctl/src/main.rs | rg -n &quot;ICN_KEYSTORE_PASSPHRASE|ICN_PASSPHRASE|--data-dir|--config&quot; | aligned | reviewed_on(2026-02-11)</code></li>
+</ul>
+<h2>Recursive self-correction score (Batch C3)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4 for Batch C3; proceed with next active-doc slices.</p>
+<h2>Changes applied (Batch C4 - active FAQ/architecture defaults)</h2>
+<ol>
+<li><code>docs/guides/FAQ.md</code></li>
+</ol>
+<ul>
+<li>Corrected default P2P port references from <code>5600</code> to <code>7777</code> and updated firewall examples.</li>
+<li>Replaced hard-coded keystore path (<code>~/.icn/keystore.age</code>) with runtime-correct <code>{data_dir}/identity.age</code> wording.</li>
+<li>Reworded persistence and troubleshooting sections to use configured data-dir semantics.</li>
+<li>Kept reset example explicit with <code>--data-dir ~/.icn</code> to avoid ambiguity.</li>
+</ul>
+<ol start="2">
+<li><code>docs/architecture/KERNEL_APP_SEPARATION.md</code></li>
+</ol>
+<ul>
+<li>Corrected daemon default store-path example to <code>~/.local/share/icn/store/</code> (Linux default via <code>Config::default().data_dir</code>).</li>
+</ul>
+<h2>Verification updates (Batch C4)</h2>
+<pre><code class="language-bash">rg -n &quot;5600|keystore.age|~/.icn/store/|~/.icn/keystore.age&quot; docs/guides/FAQ.md docs/architecture/KERNEL_APP_SEPARATION.md
+</code></pre>
+<p>Result: no matches.</p>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+</code></pre>
+<p>Result: no broken relative links; only expected historical marker reports remain.</p>
+<h2>Audit ledger additions (Batch C4)</h2>
+<ul>
+<li><code>docs/guides/FAQ.md | icn/crates/icn-core/src/config/mod.rs + icn/bins/icnd/src/main.rs | rg -n &quot;listen_addr|metrics_port|keystore_path|data_dir&quot; + source review | aligned | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/architecture/KERNEL_APP_SEPARATION.md | icn/crates/icn-core/src/config/mod.rs | rg -n &quot;store_path|data_dir|dirs::data_dir&quot; | aligned | reviewed_on(2026-02-11)</code></li>
+</ul>
+<h2>Recursive self-correction score (Batch C4)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4 for Batch C4; continue active-doc drift reduction.</p>
+<h2>Changes applied (Batch C5 - active operations/API defaults)</h2>
+<ol>
+<li><code>docs/guides/operations/troubleshooting.md</code></li>
+</ol>
+<ul>
+<li>Updated QUIC troubleshooting examples from stale <code>5600</code> to default <code>7777/udp</code>.</li>
+<li>Adjusted in-pod socket checks to UDP (<code>ss -ulnp</code>) and UDP probe example (<code>nc -zvu</code>).</li>
+</ul>
+<ol start="2">
+<li><code>docs/guides/operations/replication-operations.md</code></li>
+</ol>
+<ul>
+<li>Updated metrics endpoint examples from <code>:9090/metrics</code> to <code>:9100/metrics</code>.</li>
+</ul>
+<ol start="3">
+<li><code>docs/guides/operations/operations-guide.md</code></li>
+</ol>
+<ul>
+<li>Updated backup content examples to current keystore naming (<code>identity.age</code>) and <code>{data_dir}</code> semantics.</li>
+<li>Updated port conflict example from <code>4433</code> to <code>7777</code>.</li>
+<li>Removed hard-coded config-path assumption in remediation text.</li>
+</ul>
+<ol start="4">
+<li><code>docs/reference/api/topic-subscriptions-api.md</code></li>
+</ol>
+<ul>
+<li>Updated metrics query endpoint from <code>:9090/metrics</code> to <code>:9100/metrics</code>.</li>
+</ul>
+<ol start="5">
+<li><code>docs/operations/deployment/incident-response.md</code></li>
+</ol>
+<ul>
+<li>Updated QUIC firewall verification from <code>5600</code> to <code>7777</code>.</li>
+</ul>
+<h2>Verification updates (Batch C5)</h2>
+<pre><code class="language-bash">rg -n &quot;\b5600\b|\b4433\b|:9090/metrics|keystore.age&quot; docs/guides/operations/troubleshooting.md docs/guides/operations/replication-operations.md docs/guides/operations/operations-guide.md docs/reference/api/topic-subscriptions-api.md docs/operations/deployment/incident-response.md
+</code></pre>
+<p>Result: no matches.</p>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+</code></pre>
+<p>Result: no broken relative links; expected marker-only findings remain.</p>
+<h2>Audit ledger additions (Batch C5)</h2>
+<ul>
+<li><code>docs/guides/operations/troubleshooting.md | icn/crates/icn-core/src/config/mod.rs (listen_addr default) | rg -n &quot;listen_addr|7777&quot; + source review | aligned | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/guides/operations/replication-operations.md | icn/crates/icn-core/src/config/mod.rs (observability.metrics_port default) | rg -n &quot;metrics_port|9100&quot; + source review | aligned | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/guides/operations/operations-guide.md | icn/bins/icnctl/src/main.rs + icn/crates/icn-core/src/config/mod.rs | rg -n &quot;identity.age|store|listen_addr&quot; + source review | aligned | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/reference/api/topic-subscriptions-api.md | icn/crates/icn-core/src/config/mod.rs (metrics_port default) | rg -n &quot;metrics_port|9100&quot; + source review | aligned | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/operations/deployment/incident-response.md | icn/crates/icn-core/src/config/mod.rs (listen_addr default) | rg -n &quot;listen_addr|7777&quot; + source review | aligned | reviewed_on(2026-02-11)</code></li>
+</ul>
+<h2>Recursive self-correction score (Batch C5)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4 for Batch C5; continue through remaining active doc drift.</p>
+<h2>Changes applied (Batch C6 - deployment/config/perf active docs)</h2>
+<ol>
+<li><code>docs/deployment/DEPLOYMENT_GUIDE.md</code></li>
+</ol>
+<ul>
+<li>Updated stale metrics default in environment example from <code>9090</code> to <code>9100</code>.</li>
+<li>Updated Prometheus endpoint reference to <code>http://localhost:9100/metrics</code>.</li>
+<li>Added explicit note that <code>icnd</code> does not directly consume <code>ICN_DATA_DIR</code>/<code>ICN_QUIC_PORT</code>/<code>ICN_METRICS_PORT</code>; authoritative settings are CLI flags + config fields.</li>
+</ul>
+<ol start="2">
+<li><code>docs/reference/config/CONFIGURATION.md</code></li>
+</ol>
+<ul>
+<li>Replaced incorrect blanket env override table with currently supported runtime envs:<ul>
+<li><code>ICN_GATEWAY_JWT_SECRET</code></li>
+<li><code>OTEL_EXPORTER_OTLP_ENDPOINT</code></li>
+<li><code>OTEL_SERVICE_NAME</code></li>
+<li><code>ICN_KEYSTORE_PASSPHRASE</code> / legacy <code>ICN_PASSPHRASE</code></li>
+</ul>
+</li>
+<li>Corrected precedence wording to avoid implying all config fields are env-overridable.</li>
+<li>Updated troubleshooting debug example from <code>ICN_LOG_LEVEL=debug icnd</code> to <code>icnd --log-level debug</code>.</li>
+</ul>
+<ol start="3">
+<li><code>docs/examples/policies/README.md</code></li>
+</ol>
+<ul>
+<li>Updated metrics endpoint reference from <code>:9090</code> to <code>:9100</code>.</li>
+</ul>
+<ol start="4">
+<li><code>docs/performance/PROFILING.md</code></li>
+</ol>
+<ul>
+<li>Updated iftop port filter from <code>5600</code> to default QUIC port <code>7777</code>.</li>
+</ul>
+<ol start="5">
+<li><code>docs/guides/operations/operations-guide.md</code></li>
+</ol>
+<ul>
+<li>Corrected backup verification command to use <code>icnctl --data-dir ...</code> instead of unsupported <code>ICN_DATA_DIR=... icnctl ...</code>.</li>
+</ul>
+<h2>Verification updates (Batch C6)</h2>
+<pre><code class="language-bash">rg -n &quot;ICN_DATA_DIR|ICN_NETWORK_LISTEN_ADDR|ICN_LOG_LEVEL|:9090/metrics|port 5600|ICN_METRICS_PORT=9090&quot; docs/deployment/DEPLOYMENT_GUIDE.md docs/reference/config/CONFIGURATION.md docs/examples/policies/README.md docs/performance/PROFILING.md docs/guides/operations/operations-guide.md
+</code></pre>
+<p>Result: remaining matches are explanatory notes about unsupported env usage; stale operational claims removed.</p>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+</code></pre>
+<p>Result: no broken relative links; expected marker-only findings remain.</p>
+<h2>Audit ledger additions (Batch C6)</h2>
+<ul>
+<li><code>docs/deployment/DEPLOYMENT_GUIDE.md | icn/bins/icnd/src/main.rs + icn/crates/icn-core/src/config/mod.rs | rg -n &quot;metrics_port|listen_addr|ICN_GATEWAY_JWT_SECRET&quot; + source review | aligned | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/reference/config/CONFIGURATION.md | icn/bins/icnd/src/main.rs | rg -n &quot;ICN_GATEWAY_JWT_SECRET|OTEL_EXPORTER_OTLP_ENDPOINT|OTEL_SERVICE_NAME|ICN_KEYSTORE_PASSPHRASE|ICN_PASSPHRASE|--log-level&quot; | aligned | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/examples/policies/README.md | icn/crates/icn-core/src/config/mod.rs | rg -n &quot;metrics_port&quot; | aligned | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/performance/PROFILING.md | icn/crates/icn-core/src/config/mod.rs | rg -n &quot;listen_addr|7777&quot; | aligned | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/guides/operations/operations-guide.md | icn/bins/icnctl/src/main.rs:get_data_dir | rg -n &quot;get_data_dir|--data-dir&quot; | aligned | reviewed_on(2026-02-11)</code></li>
+</ul>
+<h2>Recursive self-correction score (Batch C6)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4 for Batch C6; continue with next active-doc drift slice.</p>
+<h2>Changes applied (Batch C7 - architecture/onboarding identity and network defaults)</h2>
+<ol>
+<li><code>docs/ARCHITECTURE.md</code></li>
+</ol>
+<ul>
+<li>Replaced stale keystore path examples (<code>.../identity/keypair.age</code>) with current <code>{data_dir}/identity.age</code> semantics.</li>
+<li>Updated mDNS/peer port example from <code>4433</code> to default <code>7777</code>.</li>
+<li>Updated config guidance from <code>$ICN_DATA_DIR/config.toml</code> + outdated <code>[node]/bind_addr</code> example to current <code>data_dir</code>, <code>[network].listen_addr</code>, and explicit <code>--config</code> usage.</li>
+<li>Replaced unsupported env override claims (<code>ICN_DATA_DIR</code>, <code>ICN_LOG_LEVEL</code>) with runtime-correct CLI override guidance.</li>
+</ul>
+<ol start="2">
+<li><code>docs/architecture/ARCHITECTURE_INDEX.md</code></li>
+</ol>
+<ul>
+<li>Updated identity-save flow path to <code>{data_dir}/identity.age</code>.</li>
+</ul>
+<ol start="3">
+<li><code>docs/onboarding/reference/module-04-identity-trust.md</code></li>
+</ol>
+<ul>
+<li>Replaced <code>~/.icn/keystore.age</code> references with <code>{data_dir}/identity.age</code> in architecture diagram, lifecycle notes, and identity flow.</li>
+</ul>
+<ol start="4">
+<li><code>docs/design/multi-device-identity-design.md</code></li>
+</ol>
+<ul>
+<li>Updated keystore save path reference to <code>{data_dir}/identity.age</code>.</li>
+</ul>
+<h2>Verification updates (Batch C7)</h2>
+<pre><code class="language-bash">rg -n &quot;keypair.age|keystore.age|port=4433|bind_addr = \&quot;0.0.0.0:4433\&quot;|ICN_DATA_DIR|ICN_LOG_LEVEL&quot; docs/ARCHITECTURE.md docs/architecture/ARCHITECTURE_INDEX.md docs/onboarding/reference/module-04-identity-trust.md docs/design/multi-device-identity-design.md
+</code></pre>
+<p>Result: stale runtime/default references removed from the edited docs.</p>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+</code></pre>
+<p>Result: no broken relative links; expected marker-only findings remain.</p>
+<h2>Audit ledger additions (Batch C7)</h2>
+<ul>
+<li><code>docs/ARCHITECTURE.md | icn/crates/icn-core/src/config/mod.rs + icn/bins/icnd/src/main.rs | rg -n &quot;data_dir|keystore_path|listen_addr|--config|--log-level&quot; + source review | aligned | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/architecture/ARCHITECTURE_INDEX.md | icn/crates/icn-core/src/config/mod.rs | rg -n &quot;identity.age|keystore_path&quot; | aligned | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/onboarding/reference/module-04-identity-trust.md | icn/crates/icn-core/src/config/mod.rs + icn/bins/icnctl/src/main.rs:get_keystore_path | rg -n &quot;identity.age|get_keystore_path&quot; | aligned | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/design/multi-device-identity-design.md | icn/crates/icn-core/src/config/mod.rs + icn/bins/icnctl/src/main.rs:get_keystore_path | rg -n &quot;identity.age|get_keystore_path&quot; | aligned | reviewed_on(2026-02-11)</code></li>
+</ul>
+<h2>Recursive self-correction score (Batch C7)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4 for Batch C7; continue active-doc drift cleanup.</p>
+<h2>Changes applied (Batch C8 - testing and migration guide command drift)</h2>
+<ol>
+<li><code>docs/development/testing/INTERNAL_TESTING_PLAN.md</code></li>
+</ol>
+<ul>
+<li>Replaced unsupported local-process examples (<code>ICN_DATA_DIR=...</code> and <code>--bind</code>) with valid per-node config-file startup (<code>--config /tmp/icn-nodeN.toml</code>) using <code>network.listen_addr</code> and per-node observability ports.</li>
+</ul>
+<ol start="2">
+<li><code>docs/development/testing/testing-rpc.md</code></li>
+</ol>
+<ul>
+<li>Updated daemon/runtime examples from stale defaults (<code>0.0.0.0:4433</code>) to current <code>0.0.0.0:7777</code>.</li>
+<li>Updated sample data-dir output to Linux default path <code>~/.local/share/icn</code>.</li>
+<li>Updated peer dial example port to <code>7777</code>.</li>
+</ul>
+<ol start="3">
+<li><code>docs/migration-guides/version-upgrades.md</code></li>
+</ol>
+<ul>
+<li>Updated metrics endpoint examples from <code>:9090/metrics</code> to <code>:9100/metrics</code>.</li>
+</ul>
+<h2>Verification updates (Batch C8)</h2>
+<pre><code class="language-bash">rg -n &quot;ICN_DATA_DIR=/tmp/icn-node|--bind 127.0.0.1|0.0.0.0:4433|:9090/metrics&quot; docs/development/testing/INTERNAL_TESTING_PLAN.md docs/development/testing/testing-rpc.md docs/migration-guides/version-upgrades.md
+</code></pre>
+<p>Result: no matches.</p>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+</code></pre>
+<p>Result: no broken relative links; expected marker-only findings remain.</p>
+<h2>Audit ledger additions (Batch C8)</h2>
+<ul>
+<li><code>docs/development/testing/INTERNAL_TESTING_PLAN.md | icn/bins/icnd/src/main.rs + icn/crates/icn-core/src/config/mod.rs | rg -n &quot;--config|listen_addr|metrics_port|health_port&quot; + source review | aligned | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/development/testing/testing-rpc.md | icn/crates/icn-core/src/config/mod.rs | rg -n &quot;listen_addr|data_dir&quot; | aligned | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/migration-guides/version-upgrades.md | icn/crates/icn-core/src/config/mod.rs | rg -n &quot;metrics_port|9100&quot; | aligned | reviewed_on(2026-02-11)</code></li>
+</ul>
+<h2>Recursive self-correction score (Batch C8)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4 for Batch C8; continue active-doc drift cleanup.</p>
+<h2>Changes applied (Batch D3 - deployment status snapshot framing)</h2>
+<ol>
+<li><code>docs/deployment/DEPLOYMENT_ACTIVE.md</code></li>
+<li><code>docs/deployment/DEPLOYMENT_STATUS_2025-12-12.md</code></li>
+<li><code>docs/deployment/DEPLOYMENT_READY.md</code></li>
+</ol>
+<p>Updates:</p>
+<ul>
+<li>Added explicit historical snapshot banners (with concrete date context) to prevent these docs from being interpreted as current operational truth.</li>
+<li>Added pointer to <code>docs/ci/CI_CURRENT_STATUS.md</code> for current/live status verification.</li>
+</ul>
+<h2>Verification updates (Batch D3)</h2>
+<pre><code class="language-bash">rg -n &quot;Historical snapshot|not current|CI_CURRENT_STATUS&quot; docs/deployment/DEPLOYMENT_ACTIVE.md docs/deployment/DEPLOYMENT_STATUS_2025-12-12.md docs/deployment/DEPLOYMENT_READY.md
+</code></pre>
+<p>Result: all three docs now explicitly marked as historical snapshots.</p>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+</code></pre>
+<p>Result: no broken relative links; expected marker-only findings remain.</p>
+<h2>Audit ledger additions (Batch D3)</h2>
+<ul>
+<li><code>docs/deployment/DEPLOYMENT_ACTIVE.md | docs/ci/CI_CURRENT_STATUS.md + document date metadata | rg -n &quot;Date|Status|Historical snapshot|CI_CURRENT_STATUS&quot; | aligned | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/deployment/DEPLOYMENT_STATUS_2025-12-12.md | docs/ci/CI_CURRENT_STATUS.md + document date metadata | rg -n &quot;December 12, 2025|Historical snapshot|CI_CURRENT_STATUS&quot; | aligned | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/deployment/DEPLOYMENT_READY.md | docs/ci/CI_CURRENT_STATUS.md + document date metadata | rg -n &quot;December 12, 2025|Historical readiness snapshot|CI_CURRENT_STATUS&quot; | aligned | reviewed_on(2026-02-11)</code></li>
+</ul>
+<h2>Recursive self-correction score (Batch D3)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4 for Batch D3; continue with remaining active docs.</p>
+<h2>Changes applied (Batch C9 - architecture map + user manual runtime alignment)</h2>
+<ol>
+<li><code>docs/manual/ICN_USER_MANUAL.md</code></li>
+</ol>
+<ul>
+<li>Replaced unsupported daemon commands/flags:<ul>
+<li><code>icnd --validate</code> -&gt; <code>icnd --validate-config</code></li>
+<li>removed <code>icnd --dry-run</code> usage</li>
+<li>removed <code>icnd --generate-config</code></li>
+</ul>
+</li>
+<li>Updated config workflow to use <code>icn/config/icn.toml.example</code> copied to <code>~/.icn/config.toml</code>.</li>
+<li>Updated startup examples to explicit <code>icnd --config ~/.icn/config.toml --data-dir ~/.icn</code>.</li>
+<li>Corrected keystore naming to <code>identity.age</code>.</li>
+<li>Updated config examples from obsolete sections/keys (<code>[node]</code>, <code>[metrics]</code>, gateway <code>listen_addr</code>) to current structure (<code>data_dir</code>, <code>[observability]</code>, gateway <code>bind_addr</code>).</li>
+<li>Updated environment variable table to supported vars (<code>ICN_KEYSTORE_PASSPHRASE</code>, <code>ICN_PASSPHRASE</code>, <code>ICN_GATEWAY_JWT_SECRET</code>, OTEL vars).</li>
+<li>Updated bootstrap grep path from <code>~/.icn/icn.toml</code> to <code>~/.icn/config.toml</code>.</li>
+</ul>
+<ol start="2">
+<li><code>docs/architecture/ARCHITECTURE_MAP.md</code></li>
+</ol>
+<ul>
+<li>Updated metrics default in config examples from <code>9090</code> to <code>9100</code>.</li>
+<li>Replaced unsupported env override claim (<code>ICN_DATA_DIR</code>) with CLI <code>--data-dir</code> guidance.</li>
+<li>Updated docker env block to supported secrets/logging vars and explicit runtime flag note (<code>icnd --data-dir /data --gateway-enable</code>).</li>
+</ul>
+<h2>Verification updates (Batch C9)</h2>
+<pre><code class="language-bash">rg -n &quot;--validate\b|--dry-run|--generate-config|keystore.age|\[node\]|\[metrics\]|listen_addr = \&quot;127.0.0.1:8080\&quot;|ICN_CONFIG|ICN_DATA_DIR|ICN_LOG_LEVEL&quot; docs/manual/ICN_USER_MANUAL.md docs/architecture/ARCHITECTURE_MAP.md
+</code></pre>
+<p>Result: stale/unsupported runtime claims removed from edited sections.</p>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+</code></pre>
+<p>Result: no broken relative links; expected marker-only findings remain.</p>
+<h2>Audit ledger additions (Batch C9)</h2>
+<ul>
+<li><code>docs/manual/ICN_USER_MANUAL.md | icn/bins/icnd/src/main.rs + icn/bins/icnctl/src/main.rs + icn/crates/icn-core/src/config/mod.rs | rg -n &quot;--validate-config|--data-dir|--config|identity.age|bind_addr|observability&quot; + source review | aligned | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/architecture/ARCHITECTURE_MAP.md | icn/bins/icnd/src/main.rs + icn/crates/icn-core/src/config/mod.rs | rg -n &quot;metrics_port|ICN_GATEWAY_JWT_SECRET|--data-dir&quot; + source review | aligned | reviewed_on(2026-02-11)</code></li>
+</ul>
+<h2>Recursive self-correction score (Batch C9)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4 for Batch C9; continue with remaining active-doc drift.</p>
+<h2>Changes applied (Batch C10 - keystore migration guide vs identity runtime)</h2>
+<ol>
+<li><code>docs/migration-guides/keystore-versions.md</code></li>
+</ol>
+<ul>
+<li>Updated format status to reflect current migration target (<code>v3</code> current, <code>v2.1</code> legacy).</li>
+<li>Corrected migration semantics to match code path in <code>icn-identity</code>:<ul>
+<li>legacy formats migrate to v3 on unlock</li>
+<li>keystore is re-encrypted and saved in-place at <code>{data_dir}/identity.age</code></li>
+<li>removed unsupported claim that migration auto-creates <code>backup-v1</code> files</li>
+</ul>
+</li>
+<li>Updated file/path references from <code>keystore.age</code> to <code>identity.age</code> in backup and verification examples.</li>
+<li>Updated multi-keystore guidance from unsupported <code>ICN_DATA_DIR=... icnctl ...</code> to <code>icnctl --data-dir ...</code>.</li>
+<li>Corrected downgrade statement to v3 format.</li>
+</ul>
+<h2>Verification updates (Batch C10)</h2>
+<pre><code class="language-bash">rg -n &quot;backup-v1|ICN_DATA_DIR=|keystore.age|v2.1 keystores cannot&quot; docs/migration-guides/keystore-versions.md
+</code></pre>
+<p>Result: obsolete backup/env/path claims removed; version/downgrade wording aligned.</p>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+</code></pre>
+<p>Result: no broken relative links; expected marker-only findings remain.</p>
+<h2>Audit ledger additions (Batch C10)</h2>
+<ul>
+<li><code>docs/migration-guides/keystore-versions.md | icn/crates/icn-identity/src/keystore.rs + icn/bins/icnctl/src/main.rs | rg -n &quot;migrat|v3|identity.age|--data-dir&quot; + source review | aligned | reviewed_on(2026-02-11)</code></li>
+</ul>
+<h2>Recursive self-correction score (Batch C10)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4 for Batch C10; continue active-doc drift cleanup.</p>
+<h2>Changes applied (Batch C11 - config/onboarding validation command cleanup)</h2>
+<ol>
+<li><code>docs/reference/config/CONFIGURATION.md</code></li>
+</ol>
+<ul>
+<li>Removed stale <code>--dry-run</code> guidance from upgrade checklist (flag not available in current <code>icnd</code>).</li>
+</ul>
+<ol start="2">
+<li><code>docs/onboarding/reference/module-09-ops-deploy.md</code></li>
+</ol>
+<ul>
+<li>Updated validation path example from <code>/etc/icn/icn.toml</code> to <code>/etc/icn/config.toml</code>.</li>
+<li>Updated sample validation output keys from stale fields to current config naming (<code>network.listen_addr</code>, <code>observability.metrics_port</code>).</li>
+</ul>
+<h2>Verification updates (Batch C11)</h2>
+<pre><code class="language-bash">rg -n &quot;--dry-run|/etc/icn/icn.toml|network\.port|metrics\.enabled&quot; docs/reference/config/CONFIGURATION.md docs/onboarding/reference/module-09-ops-deploy.md
+</code></pre>
+<p>Result: no matches.</p>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+</code></pre>
+<p>Result: no broken relative links; expected marker-only findings remain.</p>
+<h2>Audit ledger additions (Batch C11)</h2>
+<ul>
+<li><code>docs/reference/config/CONFIGURATION.md | icn/bins/icnd/src/main.rs | rg -n &quot;validate_config|--validate-config&quot; + source review | aligned | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/onboarding/reference/module-09-ops-deploy.md | icn/bins/icnd/src/main.rs + icn/crates/icn-core/src/config/mod.rs | rg -n &quot;--validate-config|listen_addr|metrics_port&quot; + source review | aligned | reviewed_on(2026-02-11)</code></li>
+</ul>
+<h2>Recursive self-correction score (Batch C11)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4 for Batch C11; continue active-doc drift cleanup.</p>
+<h2>Changes applied (Batch C12 - module-09 deployment config schema correction)</h2>
+<ol>
+<li><code>docs/onboarding/reference/module-09-ops-deploy.md</code></li>
+</ol>
+<ul>
+<li>Replaced outdated configuration model (<code>network.port</code>, <code>bind_address</code>, <code>[rpc]</code>, <code>[metrics]</code>) with current schema (<code>network.listen_addr</code>, gateway <code>bind_addr</code>, <code>[observability]</code>).</li>
+<li>Replaced unsupported environment override examples (<code>ICN_NETWORK_PORT</code>) with supported secret/logging vars.</li>
+<li>Updated systemd/Kubernetes examples to use <code>/etc/icn/config.toml</code> and explicit <code>--data-dir /var/lib/icn</code>.</li>
+<li>Updated CLI examples to current config path conventions.</li>
+</ul>
+<h2>Verification updates (Batch C12)</h2>
+<pre><code class="language-bash">rg -n &quot;ICN_NETWORK_PORT|network.port|\[rpc\]|\[metrics\]|bind_address|/etc/icn/icn.toml&quot; docs/onboarding/reference/module-09-ops-deploy.md
+</code></pre>
+<p>Result: no matches.</p>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+</code></pre>
+<p>Result: no broken relative links; expected marker-only findings remain.</p>
+<h2>Audit ledger additions (Batch C12)</h2>
+<ul>
+<li><code>docs/onboarding/reference/module-09-ops-deploy.md | icn/bins/icnd/src/main.rs + icn/crates/icn-core/src/config/mod.rs | rg -n &quot;listen_addr|bind_addr|observability|--config|--data-dir&quot; + source review | aligned | reviewed_on(2026-02-11)</code></li>
+</ul>
+<h2>Recursive self-correction score (Batch C12)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4 for Batch C12; continue active-doc drift cleanup.</p>
+<h2>Changes applied (Batch C13 - PR review feedback fixes)</h2>
+<ol>
+<li><code>scripts/pilot_receipt_chain_demo.sh</code></li>
+</ol>
+<ul>
+<li>Set gateway connectivity check path to <code>/v1/healthz</code> (gateway liveness under <code>/v1</code> scope).</li>
+</ul>
+<ol start="2">
+<li><code>docs/guides/developer/DEV_ENVIRONMENT.md</code></li>
+</ol>
+<ul>
+<li>Removed exposed code-server password and replaced with secure-channel retrieval guidance.</li>
+</ul>
+<ol start="3">
+<li><code>docs/internal/pilots/pilot-limitations.md</code></li>
+</ol>
+<ul>
+<li>Added explicit snapshot date (<code>2026-02-11</code>) to make deployability framing unambiguous.</li>
+</ul>
+<h2>Verification updates (Batch C13)</h2>
+<pre><code class="language-bash">rg -n &quot;/v1/healthz|/healthz|Password:|Snapshot Date&quot; scripts/pilot_receipt_chain_demo.sh docs/guides/developer/DEV_ENVIRONMENT.md docs/internal/pilots/pilot-limitations.md
+</code></pre>
+<p>Result: liveness path corrected, credential removed, snapshot date present.</p>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+</code></pre>
+<p>Result: no broken relative links; expected marker-only findings remain.</p>
+<h2>Audit ledger additions (Batch C13)</h2>
+<ul>
+<li><code>scripts/pilot_receipt_chain_demo.sh | icn/crates/icn-gateway/src/api/health.rs + server route wiring | rg -n &quot;healthz|/healthz|/v1/health&quot; + source review | aligned | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/guides/developer/DEV_ENVIRONMENT.md | security hygiene policy (no embedded secrets) | manual review | aligned | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/internal/pilots/pilot-limitations.md | docs snapshot-date policy + document context | rg -n &quot;Snapshot Date|Overview&quot; | aligned | reviewed_on(2026-02-11)</code></li>
+</ul>
+<h2>Recursive self-correction score (Batch C13)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 5/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4 for Batch C13.</p>
+<h2>Changes applied (Batch C14 - workshop ops config schema alignment)</h2>
+<ol>
+<li><code>docs/onboarding/workshops/workshop-09-ops.md</code></li>
+</ol>
+<ul>
+<li>Updated workshop config example from obsolete sections/keys to current <code>icnd</code> schema:<ul>
+<li>added top-level <code>data_dir</code></li>
+<li><code>[gateway].bind_addr</code> instead of <code>listen_addr</code></li>
+<li>replaced <code>[metrics]</code> + <code>[logging]</code> with <code>[observability]</code> (<code>metrics_port</code>, <code>health_port</code>, <code>log_level</code>)</li>
+<li>removed unsupported <code>cors_origins</code> field</li>
+</ul>
+</li>
+<li>Updated Docker run example to expose health port and use preferred daemon passphrase env var (<code>ICN_KEYSTORE_PASSPHRASE</code>).</li>
+</ul>
+<h2>Verification updates (Batch C14)</h2>
+<pre><code class="language-bash">rg -n &quot;\[metrics\]|\[logging\]|listen_addr = \&quot;0.0.0.0:8080\&quot;|cors_origins|ICN_PASSPHRASE=workshop&quot; docs/onboarding/workshops/workshop-09-ops.md
+</code></pre>
+<p>Result: no matches.</p>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+</code></pre>
+<p>Result: no broken relative links; expected marker-only findings remain.</p>
+<h2>Audit ledger additions (Batch C14)</h2>
+<ul>
+<li><code>docs/onboarding/workshops/workshop-09-ops.md | icn/crates/icn-core/src/config/mod.rs + icn/bins/icnd/src/main.rs | rg -n &quot;data_dir|gateway.bind_addr|observability|ICN_KEYSTORE_PASSPHRASE&quot; + source review | aligned | reviewed_on(2026-02-11)</code></li>
+</ul>
+<h2>Recursive self-correction score (Batch C14)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4 for Batch C14.</p>
+<h2>Changes applied (Batch C15 - status/demo snapshot normalization)</h2>
+<ol>
+<li><code>docs/demo/DEMO_STATUS_SUMMARY.md</code></li>
+<li><code>docs/demo/DEMO_CURRENT_STATUS.md</code></li>
+<li><code>docs/demo/DEMO_FINAL_STATUS.md</code></li>
+<li><code>docs/demo/DEMO_SUCCESS_FINAL.md</code></li>
+<li><code>docs/demo/DEMO_README.md</code></li>
+<li><code>docs/mobile/MOBILE_APP_STATUS.md</code></li>
+<li><code>docs/development/testing/DR_TEST_RESULTS.md</code></li>
+<li><code>docs/status/DEPLOYMENT_VERIFICATION.md</code></li>
+<li><code>docs/status/CURRENT_SYSTEM_STATUS.md</code></li>
+</ol>
+<ul>
+<li>Added explicit historical snapshot banners with concrete dates.</li>
+<li>Added pointers to current verification sources (<code>docs/ci/CI_CURRENT_STATUS.md</code> and, where relevant, <code>docs/status/CURRENT_SYSTEM_STATUS.md</code>).</li>
+<li>Preserved underlying historical content while removing ambiguity that these reports are evergreen status truths.</li>
+</ul>
+<h2>Verification updates (Batch C15)</h2>
+<pre><code class="language-bash">rg -n &quot;Historical snapshot|For current project/CI status|For current status|For current readiness|Historical test snapshot&quot; docs/demo/DEMO_STATUS_SUMMARY.md docs/demo/DEMO_CURRENT_STATUS.md docs/demo/DEMO_FINAL_STATUS.md docs/demo/DEMO_SUCCESS_FINAL.md docs/demo/DEMO_README.md docs/mobile/MOBILE_APP_STATUS.md docs/development/testing/DR_TEST_RESULTS.md docs/status/DEPLOYMENT_VERIFICATION.md docs/status/CURRENT_SYSTEM_STATUS.md
+</code></pre>
+<p>Result: all touched status/demo docs now contain explicit snapshot framing and current-status pointers.</p>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+</code></pre>
+<p>Result: no broken relative links; expected marker-only findings remain (archive/internal marker references and topology policy mentions).</p>
+<h2>Audit ledger additions (Batch C15)</h2>
+<ul>
+<li><code>docs/demo/DEMO_STATUS_SUMMARY.md | document timestamp + docs/ci/CI_CURRENT_STATUS.md | rg -n &quot;Date:|Historical snapshot|CI_CURRENT_STATUS&quot; | aligned | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/demo/DEMO_CURRENT_STATUS.md | document timestamp + docs/ci/CI_CURRENT_STATUS.md | rg -n &quot;Date:|Historical snapshot|CI_CURRENT_STATUS&quot; | aligned | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/demo/DEMO_FINAL_STATUS.md | document timestamp + docs/ci/CI_CURRENT_STATUS.md | rg -n &quot;Date:|Historical snapshot|CI_CURRENT_STATUS&quot; | aligned | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/demo/DEMO_SUCCESS_FINAL.md | document timestamp + docs/ci/CI_CURRENT_STATUS.md | rg -n &quot;Date:|Historical snapshot|CI_CURRENT_STATUS&quot; | aligned | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/demo/DEMO_README.md | document created date + status pointer policy | rg -n &quot;Created:|snapshot|CI_CURRENT_STATUS|CURRENT_SYSTEM_STATUS&quot; | aligned | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/mobile/MOBILE_APP_STATUS.md | explicit legacy snapshot date + CI status pointer | rg -n &quot;2024-12-12|Historical snapshot|CI_CURRENT_STATUS&quot; | aligned | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/development/testing/DR_TEST_RESULTS.md | test date + revalidation requirement | rg -n &quot;Test Date|Historical test snapshot|Re-run DR&quot; | aligned | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/status/DEPLOYMENT_VERIFICATION.md | timestamp + CI status pointer | rg -n &quot;Date:|Historical deployment snapshot|CI_CURRENT_STATUS&quot; | aligned | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/status/CURRENT_SYSTEM_STATUS.md | timestamp + CI status pointer | rg -n &quot;Date:|Historical demo-environment snapshot|CI_CURRENT_STATUS&quot; | aligned | reviewed_on(2026-02-11)</code></li>
+</ul>
+<h2>Recursive self-correction score (Batch C15)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4 for Batch C15; continue active-doc content drift cleanup.</p>
+<h2>Changes applied (Batch C16 - demo/status path portability normalization)</h2>
+<p>Touched files:</p>
+<ul>
+<li><code>docs/status/CURRENT_SYSTEM_STATUS.md</code></li>
+<li><code>docs/status/DEPLOYMENT_VERIFICATION.md</code></li>
+<li><code>docs/status/FINAL_DEMO_SUCCESS.md</code></li>
+<li>Demo snapshot set under <code>docs/demo/</code>:<ul>
+<li><code>DEMO_AUDIT.md</code></li>
+<li><code>DEMO_BUG_FOUND.md</code></li>
+<li><code>DEMO_CURRENT_STATUS.md</code></li>
+<li><code>DEMO_FINAL_SESSION_SUMMARY.md</code></li>
+<li><code>DEMO_INFRASTRUCTURE_COMPLETE.md</code></li>
+<li><code>DEMO_LOGIN_INFO.md</code></li>
+<li><code>DEMO_NEXT_IMMEDIATE_STEPS.md</code></li>
+<li><code>DEMO_NEXT_STEPS.md</code></li>
+<li><code>DEMO_PROGRESS_UPDATE.md</code></li>
+<li><code>DEMO_QUICK_START.md</code></li>
+<li><code>DEMO_SESSION_1_SUMMARY.md</code></li>
+<li><code>DEMO_SESSION_COMPLETE.md</code></li>
+<li><code>DEMO_STATUS_SUMMARY.md</code></li>
+<li><code>DEMO_SUCCESS_FINAL.md</code></li>
+<li><code>DEMO_WIRING_STATUS.md</code></li>
+</ul>
+</li>
+</ul>
+<p>Changes:</p>
+<ul>
+<li>Replaced machine-specific paths with portable placeholders:<ul>
+<li><code>/home/matt/projects/icn</code> -&gt; <code>&lt;repo-root&gt;</code></li>
+<li><code>/home/matt/icn-demo-test</code> -&gt; <code>&lt;demo-data-dir&gt;</code></li>
+</ul>
+</li>
+<li>Preserved command semantics while making examples reusable across environments.</li>
+</ul>
+<h2>Verification updates (Batch C16)</h2>
+<pre><code class="language-bash">rg -n &quot;/home/matt/projects/icn|/home/matt/icn-demo-test|&lt;repo-root&gt;|&lt;demo-data-dir&gt;&quot; docs/demo docs/status/CURRENT_SYSTEM_STATUS.md docs/status/DEPLOYMENT_VERIFICATION.md docs/status/FINAL_DEMO_SUCCESS.md
+</code></pre>
+<p>Result: no <code>/home/matt/...</code> paths remain in the touched demo/status files; placeholder paths present in all converted locations.</p>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+</code></pre>
+<p>Result: no broken relative links; expected marker-only findings remain (archive/internal marker references and topology policy mentions).</p>
+<h2>Audit ledger additions (Batch C16)</h2>
+<ul>
+<li><code>docs/demo/* + docs/status/{CURRENT_SYSTEM_STATUS,DEPLOYMENT_VERIFICATION,FINAL_DEMO_SUCCESS}.md | portability policy (no machine-specific absolute paths in reusable docs) | rg -n &quot;/home/matt/projects/icn|/home/matt/icn-demo-test|&lt;repo-root&gt;|&lt;demo-data-dir&gt;&quot; + source review | aligned | reviewed_on(2026-02-11)</code></li>
+</ul>
+<h2>Recursive self-correction score (Batch C16)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4 for Batch C16; continue active-doc content drift cleanup.</p>
+<h2>Changes applied (Batch C17 - SDIS API prefix and reality caveats)</h2>
+<ol>
+<li><code>docs/sdis/SDIS_QUICK_START.md</code></li>
+<li><code>docs/sdis/SDIS_SYSTEM.md</code></li>
+<li><code>docs/sdis/SDIS_IMPLEMENTATION_COMPLETE.md</code></li>
+</ol>
+<p>Changes:</p>
+<ul>
+<li>Replaced stale <code>/api/v1/sdis/*</code> references with <code>/v1/sdis/*</code>.</li>
+<li>Added explicit caveats that these SDIS docs include design/snapshot material and must be validated against currently wired gateway routes.</li>
+<li>Fixed stale resource references in quick-start (<code>docs/SDIS_SYSTEM.md</code> -&gt; <code>docs/sdis/SDIS_SYSTEM.md</code>, <code>docs/security-model.md</code> -&gt; <code>docs/security/SDIS_THREAT_MODEL.md</code>).</li>
+</ul>
+<h2>Verification updates (Batch C17)</h2>
+<pre><code class="language-bash">rg -n &quot;/api/v1/sdis|/v1/sdis&quot; docs/sdis/SDIS_QUICK_START.md docs/sdis/SDIS_SYSTEM.md docs/sdis/SDIS_IMPLEMENTATION_COMPLETE.md
+</code></pre>
+<p>Result: no <code>/api/v1/sdis</code> occurrences remain in touched SDIS docs; <code>/v1/sdis</code> paths now used.</p>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+</code></pre>
+<p>Result: no broken relative links; expected marker-only findings remain.</p>
+<h2>Audit ledger additions (Batch C17)</h2>
+<ul>
+<li><code>docs/sdis/SDIS_QUICK_START.md | icn/crates/icn-gateway/src/api/sdis/{mod.rs,simple_enrollment.rs} | rg -n &quot;/api/v1/sdis|/v1/sdis|enrollment/start|verify/level1|verify/level2&quot; + source review | aligned | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/sdis/SDIS_SYSTEM.md | icn/crates/icn-gateway/src/api/sdis/mod.rs | rg -n &quot;/api/v1/sdis|/v1/sdis&quot; + source review | partially-aligned-with-caveat | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/sdis/SDIS_IMPLEMENTATION_COMPLETE.md | snapshot-date policy + gateway route prefix convention | rg -n &quot;/api/v1/sdis|/v1/sdis|Historical implementation snapshot&quot; + source review | aligned-with-snapshot-caveat | reviewed_on(2026-02-11)</code></li>
+</ul>
+<h2>Recursive self-correction score (Batch C17)</h2>
+<ul>
+<li>Accuracy: 4/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4 for Batch C17; continue active-doc content drift cleanup.</p>
+<h2>Changes applied (Batch C18 - SDIS status route-wiring correction)</h2>
+<ol>
+<li><code>docs/sdis/SDIS_STATUS.md</code></li>
+</ol>
+<p>Changes:</p>
+<ul>
+<li>Added explicit historical snapshot banner with truth-source pointers.</li>
+<li>Replaced overbroad &quot;all SDIS endpoints are live&quot; framing with currently wired endpoint groups from <code>sdis::configure</code>.</li>
+<li>Corrected endpoint-shape drift for anchor/recovery routes:<ul>
+<li>current wired paths use <code>/v1/sdis/anchor/*</code> and <code>/v1/sdis/recovery/start</code></li>
+<li>older docs may still reference <code>/v1/sdis/anchors/*</code> or <code>/v1/sdis/recovery/initiate</code></li>
+</ul>
+</li>
+<li>Updated backend implementation section language to reflect wired routes with mixed feature maturity.</li>
+</ul>
+<h2>Verification updates (Batch C18)</h2>
+<pre><code class="language-bash">rg -n &quot;Historical snapshot|Known naming drift|/v1/sdis/anchor|/v1/sdis/recovery/start|WIRED WITH MIXED MATURITY&quot; docs/sdis/SDIS_STATUS.md
+</code></pre>
+<p>Result: snapshot framing and corrected route-shape caveats present.</p>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+</code></pre>
+<p>Result: no broken relative links; expected marker-only findings remain.</p>
+<h2>Audit ledger additions (Batch C18)</h2>
+<ul>
+<li><code>docs/sdis/SDIS_STATUS.md | icn/crates/icn-gateway/src/{server.rs,api/sdis/anchor.rs,api/sdis/recovery.rs,api/sdis/simple_enrollment.rs} | rg -n &quot;scope\\(\&quot;/sdis\&quot;\\)|configure\\(api::sdis::recovery::configure\\)|configure\\(api::sdis::anchor::configure\\)|scope\\(\&quot;/anchor\&quot;\\)|scope\\(\&quot;/recovery\&quot;\\)&quot; + source review | aligned | reviewed_on(2026-02-11)</code></li>
+</ul>
+<h2>Recursive self-correction score (Batch C18)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4 for Batch C18; continue active-doc content drift cleanup.</p>
+<h2>Changes applied (Batch C19 - deployment full-stack endpoint drift correction)</h2>
+<ol>
+<li><code>docs/deployment/FULL_STACK_DEPLOY.md</code></li>
+</ol>
+<p>Changes:</p>
+<ul>
+<li>Added historical snapshot banner with current truth sources.</li>
+<li>Replaced stale gateway checks:<ul>
+<li><code>/health</code> -&gt; <code>/v1/health</code></li>
+<li>removed nonexistent <code>/api/v1/whoami</code>; replaced with <code>/v1/auth/challenge</code> example</li>
+<li><code>/ws</code> -&gt; <code>/v1/ws/{coop_id}</code></li>
+</ul>
+</li>
+<li>Replaced stale <code>/api/v1/*</code> examples with current v1 paths:<ul>
+<li>ledger transaction example -&gt; <code>POST /v1/ledger/{coop_id}/payment</code></li>
+<li>governance examples -&gt; <code>POST /v1/gov/proposals</code>, <code>POST /v1/gov/proposals/{id}/vote</code></li>
+</ul>
+</li>
+<li>Updated request body shapes to match current models:<ul>
+<li>proposal payload uses tagged <code>{&quot;type&quot;:&quot;text&quot;,&quot;body&quot;:&quot;...&quot;}</code></li>
+<li>vote uses <code>choice</code> + optional <code>comment</code>.</li>
+</ul>
+</li>
+<li>Replaced trust-example hardcoding with OpenAPI-discovery check (<code>/api-docs/openapi.json</code>) to avoid asserting non-authoritative trust paths.</li>
+</ul>
+<h2>Verification updates (Batch C19)</h2>
+<pre><code class="language-bash">rg -n &quot;/api/v1/|http://localhost:8080/health\\b|ws://localhost:8080/ws\\b|/api-docs/openapi.json|/v1/gov/proposals|/v1/ledger/.+/payment|/v1/auth/challenge|/v1/ws/&quot; docs/deployment/FULL_STACK_DEPLOY.md
+</code></pre>
+<p>Result: stale <code>/api/v1/*</code>, <code>/health</code>, and <code>/ws</code> forms removed from this file; current v1 forms present.</p>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+</code></pre>
+<p>Result: no broken relative links; expected marker-only findings remain.</p>
+<h2>Audit ledger additions (Batch C19)</h2>
+<ul>
+<li><code>docs/deployment/FULL_STACK_DEPLOY.md | icn/crates/icn-gateway/src/server.rs + icn/crates/icn-gateway/src/models.rs + docs/api/openapi.yaml | rg -n &quot;scope\\(\&quot;/v1\&quot;\\)|scope\\(\&quot;/ledger\&quot;\\)|scope\\(\&quot;/gov\&quot;\\)|/v1/ws/\\{coop_id\\}|CreateProposalRequest|CastVoteRequest&quot; + source review | aligned | reviewed_on(2026-02-11)</code></li>
+</ul>
+<h2>Recursive self-correction score (Batch C19)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4 for Batch C19; continue active-doc content drift cleanup.</p>
+<h2>Changes applied (Batch C20 - getting-started gateway endpoint correction)</h2>
+<ol>
+<li><code>docs/GETTING_STARTED.md</code></li>
+</ol>
+<p>Changes:</p>
+<ul>
+<li>Replaced legacy gateway health path <code>/health</code> with <code>/v1/health</code>.</li>
+<li>Replaced legacy WebSocket path <code>/ws/{coop_id}</code> with <code>/v1/ws/{coop_id}</code>.</li>
+<li>Clarified monitoring wording from &quot;Web Dashboard&quot; to explicit &quot;Gateway Health Endpoint&quot; to avoid implying a UI at gateway root.</li>
+</ul>
+<h2>Verification updates (Batch C20)</h2>
+<pre><code class="language-bash">rg -n &quot;/health\\b|/v1/health|ws://localhost:8080/ws|/v1/ws/&quot; docs/GETTING_STARTED.md
+</code></pre>
+<p>Result: only <code>/v1/health</code> and <code>/v1/ws/{coop_id}</code> variants remain.</p>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+</code></pre>
+<p>Result: no broken relative links; expected marker-only findings remain.</p>
+<h2>Audit ledger additions (Batch C20)</h2>
+<ul>
+<li><code>docs/GETTING_STARTED.md | docs/api/openapi.yaml + icn/crates/icn-gateway/src/server.rs | rg -n &quot;/v1/health|/v1/ws/\\{coop_id\\}|scope\\(\&quot;/v1\&quot;\\)&quot; + source review | aligned | reviewed_on(2026-02-11)</code></li>
+</ul>
+<h2>Recursive self-correction score (Batch C20)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4 for Batch C20; continue active-doc content drift cleanup.</p>
+<h2>Changes applied (Batch C21 - SDIS quick-start endpoint/body alignment)</h2>
+<ol>
+<li><code>docs/sdis/SDIS_QUICK_START.md</code></li>
+</ol>
+<p>Changes:</p>
+<ul>
+<li>Replaced legacy enrollment examples (<code>/v1/sdis/enroll*</code>) with currently wired flow:<ul>
+<li><code>POST /v1/sdis/enrollment/start</code></li>
+<li><code>POST /v1/sdis/vouch/{id}</code></li>
+<li><code>GET /v1/sdis/status/{id}</code></li>
+</ul>
+</li>
+<li>Updated request/response examples to match current simple-enrollment request models (<code>identity_name</code>, <code>coop_id</code>, <code>vouch_statement</code>) and status shape.</li>
+<li>Replaced legacy anchor examples (<code>/v1/sdis/anchors*</code>) with current anchor routes:<ul>
+<li><code>POST /v1/sdis/anchor/devices/add</code></li>
+<li><code>GET /v1/sdis/anchor/{id}/devices</code></li>
+</ul>
+</li>
+<li>Updated advanced endpoint table from legacy <code>enroll/anchors/recover</code> names to current <code>anchor/*</code> and <code>recovery/*</code> route shapes.</li>
+<li>Added explicit caveat that JavaScript SDK snippet is conceptual and should be verified against current <code>sdk/typescript</code> exports.</li>
+</ul>
+<h2>Verification updates (Batch C21)</h2>
+<pre><code class="language-bash">rg -n &quot;/v1/sdis/enroll|/v1/sdis/anchors|/v1/sdis/recover/initiate|/v1/sdis/enrollment/start|/v1/sdis/anchor/|/v1/sdis/recovery/&quot; docs/sdis/SDIS_QUICK_START.md
+</code></pre>
+<p>Result: legacy <code>enroll/anchors/recover/initiate</code> forms removed; current <code>enrollment/anchor/recovery</code> forms present.</p>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+</code></pre>
+<p>Result: no broken relative links; expected marker-only findings remain.</p>
+<h2>Audit ledger additions (Batch C21)</h2>
+<ul>
+<li><code>docs/sdis/SDIS_QUICK_START.md | icn/crates/icn-gateway/src/api/sdis/{simple_enrollment.rs,anchor.rs,recovery.rs} | rg -n &quot;enrollment/start|vouch/\\{enrollment_id\\}|status/\\{enrollment_id\\}|scope\\(\&quot;/anchor\&quot;\\)|scope\\(\&quot;/recovery\&quot;\\)&quot; + source review | aligned | reviewed_on(2026-02-11)</code></li>
+</ul>
+<h2>Recursive self-correction score (Batch C21)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4 for Batch C21; continue active-doc content drift cleanup.</p>
+<h2>Changes applied (Batch C22 - active guide/manual v1 route normalization)</h2>
+<p>Touched files:</p>
+<ol>
+<li><code>docs/guides/operations/operations-guide.md</code></li>
+<li><code>docs/onboarding/workshops/workshop-07-gateway-sdk.md</code></li>
+<li><code>docs/onboarding/workshops/workshop-09-ops.md</code></li>
+<li><code>docs/manual/ICN_USER_MANUAL.md</code></li>
+<li><code>docs/ops/runbooks/05-troubleshooting.md</code></li>
+<li><code>docs/development/testing/DR_TEST_RESULTS.md</code></li>
+<li><code>docs/reference/api/API_REFERENCE.md</code></li>
+</ol>
+<p>Changes:</p>
+<ul>
+<li>Replaced legacy health/websocket/auth path usage in active docs:<ul>
+<li><code>/health</code> -&gt; <code>/v1/health</code></li>
+<li><code>/health/detailed</code> -&gt; <code>/v1/health/detailed</code></li>
+<li><code>ws://.../ws/...</code> -&gt; <code>ws://.../v1/ws/...</code></li>
+<li><code>/v1/auth/token</code> -&gt; <code>/v1/auth/verify</code></li>
+</ul>
+</li>
+<li>Normalized workshop text/diagrams and key-takeaway tables to v1 route names.</li>
+<li>Updated manual appendix endpoint table to current route shapes for auth, identity resolution, ledger, and governance path prefixes.</li>
+<li>Updated operations guide wording from implied gateway-root “dashboard” to explicit health + metrics checks.</li>
+<li>Added explicit snapshot caveat to <code>docs/reference/api/API_REFERENCE.md</code> that authoritative routes are in OpenAPI docs.</li>
+</ul>
+<h2>Verification updates (Batch C22)</h2>
+<pre><code class="language-bash">rg -n &quot;localhost:8080/health\\b|localhost:8080/health/detailed\\b|ws://localhost:8080/ws\\b|/v1/auth/token\\b|/v1/v1/&quot; docs/guides/operations/operations-guide.md docs/onboarding/workshops/workshop-07-gateway-sdk.md docs/onboarding/workshops/workshop-09-ops.md docs/manual/ICN_USER_MANUAL.md docs/ops/runbooks/05-troubleshooting.md docs/development/testing/DR_TEST_RESULTS.md docs/reference/api/API_REFERENCE.md
+</code></pre>
+<p>Result: no matches in touched files.</p>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+</code></pre>
+<p>Result: no broken relative links; expected marker-only findings remain.</p>
+<h2>Audit ledger additions (Batch C22)</h2>
+<ul>
+<li><code>docs/guides/operations/operations-guide.md | icn/crates/icn-gateway/src/server.rs + docs/api/openapi.yaml | rg -n &quot;scope\\(\&quot;/v1\&quot;\\)|/v1/health&quot; + source review | aligned | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/onboarding/workshops/workshop-07-gateway-sdk.md | icn/crates/icn-gateway/src/server.rs | rg -n &quot;/v1/auth/challenge|/v1/auth/verify|/v1/ws/\\{coop_id\\}|/v1/health&quot; + source review | aligned | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/onboarding/workshops/workshop-09-ops.md | icn/crates/icn-gateway/src/api/health.rs | rg -n &quot;/health|/health/detailed&quot; + source review (scoped under /v1) | aligned | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/manual/ICN_USER_MANUAL.md | icn/crates/icn-gateway/src/{server.rs,models.rs} + docs/api/openapi.yaml | rg -n &quot;/v1/auth/verify|/v1/ledger/\\{coop_id\\}/balance/\\{did\\}|/v1/gov/proposals|/v1/health&quot; + source review | aligned | reviewed_on(2026-02-11)</code></li>
+<li><code>docs/reference/api/API_REFERENCE.md | docs/api/openapi.yaml + docs/api/OPENAPI.md | manual review + snapshot caveat insertion | partially-aligned-with-authoritative-pointer | reviewed_on(2026-02-11)</code></li>
+</ul>
+<h2>Recursive self-correction score (Batch C22)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4 for Batch C22; continue active-doc content drift cleanup.</p>
+<h2>Changes applied (Batch C23 - SDIS API guide route-shape correction)</h2>
+<ol>
+<li><code>docs/sdis/SDIS_API_GUIDE.md</code></li>
+</ol>
+<p>Changes:</p>
+<ul>
+<li>Updated anchor management section from legacy <code>/v1/sdis/anchors*</code> routes to current wired anchor routes:<ul>
+<li><code>GET /v1/sdis/anchor/{anchor_id}/devices</code></li>
+<li><code>POST /v1/sdis/anchor/devices/add</code></li>
+<li><code>GET /v1/sdis/anchor/{anchor_id}</code></li>
+<li><code>POST /v1/sdis/anchor/rotate-keys</code></li>
+</ul>
+</li>
+<li>Updated recovery section from <code>/v1/sdis/recovery/initiate</code> and top-level <code>/v1/sdis/recovery/complete</code> to current wired paths:<ul>
+<li><code>POST /v1/sdis/recovery/start</code></li>
+<li><code>GET /v1/sdis/recovery/{recovery_id}</code></li>
+<li><code>POST /v1/sdis/recovery/{recovery_id}/complete</code></li>
+</ul>
+</li>
+<li>Realigned request/response examples to the current request structs (<code>anchor_id</code>, <code>device_pubkey</code>, <code>verification_data</code>, <code>new_keybundle</code>, optional <code>recovery_share</code>).</li>
+<li>Updated integration flow shorthand to match <code>anchor/*</code> and <code>recovery/start</code> naming.</li>
+</ul>
+<h2>Verification updates (Batch C23)</h2>
+<pre><code class="language-bash">rg -n &quot;/v1/sdis/anchors\\b|/v1/sdis/anchors/|/v1/sdis/recovery/initiate\\b|/v1/sdis/recovery/complete\\b|/v1/sdis/recover&quot; docs/sdis/SDIS_API_GUIDE.md
+</code></pre>
+<p>Result: no legacy anchors/recover/initiate path forms remain.</p>
+<pre><code class="language-bash">rg -n &quot;/v1/sdis/anchor/|/v1/sdis/recovery/start|/v1/sdis/recovery/\\{recovery_id\\}/complete&quot; docs/sdis/SDIS_API_GUIDE.md
+</code></pre>
+<p>Result: current anchor and recovery route shapes present.</p>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+</code></pre>
+<p>Result: no broken relative links; expected marker-only findings remain.</p>
+<h2>Audit ledger additions (Batch C23)</h2>
+<ul>
+<li><code>docs/sdis/SDIS_API_GUIDE.md | icn/crates/icn-gateway/src/api/sdis/{anchor.rs,recovery.rs} + icn/crates/icn-gateway/src/server.rs | rg -n &quot;scope\\(\&quot;/anchor\&quot;\\)|scope\\(\&quot;/recovery\&quot;\\)|configure\\(api::sdis::anchor::configure\\)|configure\\(api::sdis::recovery::configure\\)&quot; + source review | aligned | reviewed_on(2026-02-11)</code></li>
+</ul>
+<h2>Recursive self-correction score (Batch C23)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4 for Batch C23; continue active-doc content drift cleanup.</p>
+<h2>Changes applied (Batch C24 - SDIS design/roadmap route taxonomy refresh)</h2>
+<p>Touched files:</p>
+<ol>
+<li><code>docs/sdis/SDIS_SYSTEM.md</code></li>
+<li><code>docs/sdis/SDIS_STEWARD_ROADMAP.md</code></li>
+<li><code>docs/sdis/SDIS_IMPLEMENTATION_COMPLETE.md</code></li>
+</ol>
+<p>Changes:</p>
+<ul>
+<li><code>SDIS_SYSTEM.md</code>:<ul>
+<li>Added explicit route-note that some design examples retain legacy naming.</li>
+<li>Updated Gateway API integration summary to current route taxonomy:<ul>
+<li>enrollment workflow (<code>/v1/sdis/enrollment/*</code>, <code>/status/*</code>, <code>/vouch/*</code>, <code>/reject/*</code>)</li>
+<li>anchor (<code>/v1/sdis/anchor/*</code>)</li>
+<li>recovery (<code>/v1/sdis/recovery/*</code>)</li>
+<li>verification/ephemeral (<code>/v1/sdis/verify/*</code>, <code>/v1/sdis/ephemeral/*</code>)</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><code>SDIS_STEWARD_ROADMAP.md</code>:<ul>
+<li>Updated status sentence from “not exposed” to “exposed but needs productization hardening.”</li>
+<li>Replaced legacy endpoint block with currently wired route shapes from <code>server.rs</code> + SDIS module configs.</li>
+</ul>
+</li>
+<li><code>SDIS_IMPLEMENTATION_COMPLETE.md</code>:<ul>
+<li>Added explicit note that legacy endpoint naming may appear and to prefer <code>SDIS_API_GUIDE.md</code> for current route shapes.</li>
+</ul>
+</li>
+</ul>
+<h2>Verification updates (Batch C24)</h2>
+<pre><code class="language-bash">rg -n &quot;legacy naming|/v1/sdis/enrollment/\\*|/v1/sdis/anchor/\\*|/v1/sdis/recovery/\\*|aren&#39;t exposed|/v1/sdis/enrollment/start|/v1/sdis/recovery/start&quot; docs/sdis/SDIS_SYSTEM.md docs/sdis/SDIS_IMPLEMENTATION_COMPLETE.md docs/sdis/SDIS_STEWARD_ROADMAP.md
+</code></pre>
+<p>Result: route taxonomy updates and explicit caveats present; stale “not exposed” claim removed.</p>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+</code></pre>
+<p>Result: no broken relative links; expected marker-only findings remain.</p>
+<h2>Audit ledger additions (Batch C24)</h2>
+<ul>
+<li><code>docs/sdis/SDIS_SYSTEM.md + docs/sdis/SDIS_STEWARD_ROADMAP.md + docs/sdis/SDIS_IMPLEMENTATION_COMPLETE.md | icn/crates/icn-gateway/src/server.rs + icn/crates/icn-gateway/src/api/sdis/{simple_enrollment.rs,anchor.rs,recovery.rs} | rg -n &quot;scope\\(\&quot;/sdis\&quot;\\)|configure\\(api::sdis::simple_enrollment::configure\\)|configure\\(api::sdis::anchor::configure\\)|configure\\(api::sdis::recovery::configure\\)&quot; + source review | aligned-with-design-caveats | reviewed_on(2026-02-11)</code></li>
+</ul>
+<h2>Recursive self-correction score (Batch C24)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4 for Batch C24; continue active-doc content drift cleanup.</p>
+<h2>Changes applied (Batch C25 - incident-response gateway health path correction)</h2>
+<ol>
+<li><code>docs/operations/deployment/incident-response.md</code></li>
+</ol>
+<p>Changes:</p>
+<ul>
+<li>Replaced remaining gateway health checks from <code>/health</code> to <code>/v1/health</code> in incident response workflows.</li>
+</ul>
+<h2>Verification updates (Batch C25)</h2>
+<pre><code class="language-bash">rg -n &quot;localhost:8080/health\\b|localhost:8080/v1/health\\b&quot; docs/operations/deployment/incident-response.md
+</code></pre>
+<p>Result: all touched checks now use <code>/v1/health</code>.</p>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+</code></pre>
+<p>Result: no broken relative links; expected marker-only findings remain.</p>
+<h2>Audit ledger additions (Batch C25)</h2>
+<ul>
+<li><code>docs/operations/deployment/incident-response.md | icn/crates/icn-gateway/src/server.rs + docs/api/openapi.yaml | rg -n &quot;/v1/health|scope\\(\&quot;/v1\&quot;\\)&quot; + source review | aligned | reviewed_on(2026-02-11)</code></li>
+</ul>
+<h2>Recursive self-correction score (Batch C25)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4 for Batch C25; continue active-doc content drift cleanup.</p>
+<h2>Changes applied (Batch C26 - deployment/demo snapshot framing normalization)</h2>
+<p>Touched files:</p>
+<ol>
+<li><code>docs/deployment/DEPLOYMENT_COMPLETE.md</code></li>
+<li><code>docs/deployment/DEPLOYMENT_GUIDE.md</code></li>
+<li><code>docs/deployment/QUICK_DEPLOY.md</code></li>
+<li><code>docs/status/CURRENT_SYSTEM_STATUS.md</code></li>
+<li><code>docs/demo/DEMO_QUICK_START.md</code></li>
+</ol>
+<p>Changes:</p>
+<ul>
+<li>Converted undated &quot;production-ready/current&quot; framing to explicit historical or reference framing.</li>
+<li>Added explicit guidance to validate runtime truth via live checks and <code>docs/ci/CI_CURRENT_STATUS.md</code>.</li>
+<li>Preserved command examples while clarifying they are point-in-time references, not current guarantees.</li>
+</ul>
+<h2>Verification updates (Batch C26)</h2>
+<pre><code class="language-bash">rg -n &quot;Historical snapshot|Historical quick-reference snapshot|validate against current runtime|current deployment truth|2025-12-18 snapshot&quot; docs/deployment/DEPLOYMENT_COMPLETE.md docs/deployment/DEPLOYMENT_GUIDE.md docs/deployment/QUICK_DEPLOY.md docs/status/CURRENT_SYSTEM_STATUS.md docs/demo/DEMO_QUICK_START.md
+</code></pre>
+<p>Result: snapshot/reference framing present in all touched docs.</p>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+</code></pre>
+<p>Result: no broken relative links; expected marker-only findings remain.</p>
+<h2>Audit ledger additions (Batch C26)</h2>
+<ul>
+<li><code>docs/deployment/DEPLOYMENT_COMPLETE.md + docs/deployment/DEPLOYMENT_GUIDE.md + docs/deployment/QUICK_DEPLOY.md + docs/status/CURRENT_SYSTEM_STATUS.md + docs/demo/DEMO_QUICK_START.md | icn/crates/icn-core/src/config/gateway.rs + icn/bins/icnd/src/main.rs + docs/ci/CI_CURRENT_STATUS.md | rg -n &quot;default_gateway_bind_addr|init_gateway_port|gateway_port|Status:|Historical&quot; + doc_reality_scan.sh | aligned-with-explicit-snapshot-context | reviewed_on(2026-02-12)</code></li>
+</ul>
+<h2>Recursive self-correction score (Batch C26)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4 for Batch C26; continue active-doc content drift cleanup.</p>
+<h2>Changes applied (Batch C27 - active status/readiness language normalization)</h2>
+<p>Touched files:</p>
+<ol>
+<li><code>docs/deployment/DEPLOYMENT_READY.md</code></li>
+<li><code>docs/deployment/DEPLOYMENT_INVITE_SYSTEM.md</code></li>
+<li><code>docs/status/DEPLOYMENT_VERIFICATION.md</code></li>
+<li><code>docs/operations/README.md</code></li>
+<li><code>docs/security/README.md</code></li>
+</ol>
+<p>Changes:</p>
+<ul>
+<li>Reframed remaining present-tense readiness claims in active operational docs to explicit snapshot wording.</li>
+<li>Added guidance to consult <code>docs/ci/CI_CURRENT_STATUS.md</code> for current posture where missing.</li>
+<li>Preserved historical context while removing implied &quot;current&quot; assertions.</li>
+</ul>
+<h2>Verification updates (Batch C27)</h2>
+<pre><code class="language-bash">rg -n &quot;Status at Snapshot Date|Historical deployment snapshot|Historical assessment snapshot|Status Snapshot \\(2025-12-04\\)|current invite-system readiness&quot; docs/deployment/DEPLOYMENT_READY.md docs/deployment/DEPLOYMENT_INVITE_SYSTEM.md docs/status/DEPLOYMENT_VERIFICATION.md docs/operations/README.md docs/security/README.md
+</code></pre>
+<p>Result: normalized status framing present in all touched docs.</p>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+</code></pre>
+<p>Result: no broken relative links; expected marker-only findings remain.</p>
+<h2>Audit ledger additions (Batch C27)</h2>
+<ul>
+<li><code>docs/deployment/DEPLOYMENT_READY.md + docs/deployment/DEPLOYMENT_INVITE_SYSTEM.md + docs/status/DEPLOYMENT_VERIFICATION.md + docs/operations/README.md + docs/security/README.md | docs/ci/CI_CURRENT_STATUS.md + icn/bins/icnd/src/main.rs + icn/crates/icn-core/src/config/gateway.rs | rg -n &quot;Status|Historical|snapshot|CI_CURRENT_STATUS&quot; + doc_reality_scan.sh | aligned-with-snapshot-policy | reviewed_on(2026-02-12)</code></li>
+</ul>
+<h2>Recursive self-correction score (Batch C27)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4 for Batch C27; continue active-doc content drift cleanup.</p>
+<h2>Changes applied (Batch C28 - demo/mobile/testing status language normalization)</h2>
+<p>Touched files:</p>
+<ol>
+<li><code>docs/demo/DEMO_SUCCESS_FINAL.md</code></li>
+<li><code>docs/demo/DEMO_INFRASTRUCTURE_COMPLETE.md</code></li>
+<li><code>docs/demo/DEMO_CURRENT_STATUS.md</code></li>
+<li><code>docs/mobile/MOBILE_WALLET_INTEGRATION.md</code></li>
+<li><code>docs/mobile/MOBILE_APP_STATUS.md</code></li>
+<li><code>docs/testing/INTEGRATION_TEST_STATUS.md</code></li>
+<li><code>docs/status/DEPLOYMENT_VERIFICATION.md</code></li>
+</ol>
+<p>Changes:</p>
+<ul>
+<li>Replaced remaining present-tense &quot;fully operational/production-ready&quot; claims with explicit snapshot framing.</li>
+<li>Preserved historical outcomes while removing implied current-readiness guarantees.</li>
+<li>Kept existing historical date context and current-status pointers intact.</li>
+</ul>
+<h2>Verification updates (Batch C28)</h2>
+<pre><code class="language-bash">rg -n &quot;Historical demo success snapshot|Operational in Snapshot Environment|production-capable for the documented scope|Status at Snapshot Date|Confidence \\(snapshot\\)|Historical integration snapshot&quot; docs/demo/DEMO_SUCCESS_FINAL.md docs/demo/DEMO_INFRASTRUCTURE_COMPLETE.md docs/demo/DEMO_CURRENT_STATUS.md docs/mobile/MOBILE_WALLET_INTEGRATION.md docs/mobile/MOBILE_APP_STATUS.md docs/testing/INTEGRATION_TEST_STATUS.md docs/status/DEPLOYMENT_VERIFICATION.md
+</code></pre>
+<p>Result: snapshot-oriented status language present in all touched docs.</p>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+</code></pre>
+<p>Result: no broken relative links; expected marker-only findings remain.</p>
+<h2>Audit ledger additions (Batch C28)</h2>
+<ul>
+<li><code>docs/demo/DEMO_SUCCESS_FINAL.md + docs/demo/DEMO_INFRASTRUCTURE_COMPLETE.md + docs/demo/DEMO_CURRENT_STATUS.md + docs/mobile/MOBILE_WALLET_INTEGRATION.md + docs/mobile/MOBILE_APP_STATUS.md + docs/testing/INTEGRATION_TEST_STATUS.md + docs/status/DEPLOYMENT_VERIFICATION.md | docs/ci/CI_CURRENT_STATUS.md + snapshot date headers in touched docs | rg -n &quot;Status|Historical|snapshot|production-ready|fully operational&quot; + doc_reality_scan.sh | aligned-with-snapshot-policy | reviewed_on(2026-02-12)</code></li>
+</ul>
+<h2>Recursive self-correction score (Batch C28)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4 for Batch C28; continue active-doc content drift cleanup.</p>
+<h2>Changes applied (Batch C29 - remaining active wording normalization)</h2>
+<p>Touched files:</p>
+<ol>
+<li><code>docs/demo/DEMO_FINAL_STATUS.md</code></li>
+<li><code>docs/demo/DEMO_INFRASTRUCTURE_COMPLETE.md</code></li>
+<li><code>docs/demo/DEMO_PROGRESS_UPDATE.md</code></li>
+<li><code>docs/demo/DEMO_SESSION_COMPLETE.md</code></li>
+<li><code>docs/mobile/MOBILE_APP_STATUS.md</code></li>
+<li><code>docs/operations/deployment/incident-response.md</code></li>
+<li><code>docs/status/FINAL_SESSION_STATUS.md</code></li>
+</ol>
+<p>Changes:</p>
+<ul>
+<li>Replaced remaining &quot;production-ready/current status&quot; phrases in active-facing docs with snapshot-aware wording.</li>
+<li>Updated section labels from &quot;Current Status&quot; to &quot;Snapshot Status&quot; where content is historical.</li>
+<li>Kept operational meaning while avoiding present-tense readiness assertions.</li>
+</ul>
+<h2>Verification updates (Batch C29)</h2>
+<pre><code class="language-bash">rg -n &quot;Historical demo completion snapshot|validated for the snapshot demo flow|operational for the snapshot demo flow|production-capable for pilot scope|Snapshot Status|Status at this update&quot; docs/demo/DEMO_FINAL_STATUS.md docs/demo/DEMO_INFRASTRUCTURE_COMPLETE.md docs/demo/DEMO_PROGRESS_UPDATE.md docs/demo/DEMO_SESSION_COMPLETE.md docs/mobile/MOBILE_APP_STATUS.md docs/operations/deployment/incident-response.md docs/status/FINAL_SESSION_STATUS.md
+</code></pre>
+<p>Result: snapshot-normalized wording present across all touched docs.</p>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+</code></pre>
+<p>Result: no broken relative links; expected marker-only findings remain.</p>
+<h2>Audit ledger additions (Batch C29)</h2>
+<ul>
+<li><code>docs/demo/DEMO_FINAL_STATUS.md + docs/demo/DEMO_INFRASTRUCTURE_COMPLETE.md + docs/demo/DEMO_PROGRESS_UPDATE.md + docs/demo/DEMO_SESSION_COMPLETE.md + docs/mobile/MOBILE_APP_STATUS.md + docs/operations/deployment/incident-response.md + docs/status/FINAL_SESSION_STATUS.md | docs/ci/CI_CURRENT_STATUS.md + snapshot date headers in touched docs | rg -n &quot;Status|snapshot|production-ready|current status&quot; + doc_reality_scan.sh | aligned-with-snapshot-policy | reviewed_on(2026-02-12)</code></li>
+</ul>
+<h2>Recursive self-correction score (Batch C29)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4 for Batch C29; proceed with branch sync against main.</p>
+<h2>Changes applied (Batch C30 - post-merge active wording cleanup)</h2>
+<p>Touched files:</p>
+<ol>
+<li><code>docs/deployment/DEPLOYMENT_READY.md</code></li>
+<li><code>docs/security/README.md</code></li>
+<li><code>docs/security/SECURITY_FOLLOWUP.md</code></li>
+<li><code>docs/mobile/MOBILE_TODO.md</code></li>
+</ol>
+<p>Changes:</p>
+<ul>
+<li>Normalized residual &quot;current status/deployment ready&quot; phrasing to explicit snapshot framing.</li>
+<li>Preserved historical context and technical content; removed implied present-tense readiness assertions.</li>
+</ul>
+<h2>Verification updates (Batch C30)</h2>
+<pre><code class="language-bash">rg -n &quot;Current Status|READY FOR DEPLOYMENT|Status Snapshot \\(2025-12-18\\)|Status Snapshot|Deployment-ready assessment&quot; docs/deployment/DEPLOYMENT_READY.md docs/security/README.md docs/security/SECURITY_FOLLOWUP.md docs/mobile/MOBILE_TODO.md
+</code></pre>
+<p>Result: status framing normalized in touched docs.</p>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+</code></pre>
+<p>Result: no broken relative links; expected marker-only findings remain.</p>
+<h2>Audit ledger additions (Batch C30)</h2>
+<ul>
+<li><code>docs/deployment/DEPLOYMENT_READY.md + docs/security/README.md + docs/security/SECURITY_FOLLOWUP.md + docs/mobile/MOBILE_TODO.md | docs/ci/CI_CURRENT_STATUS.md + local snapshot date headers | rg -n &quot;Status|snapshot|ready&quot; + doc_reality_scan.sh | aligned-with-snapshot-policy | reviewed_on(2026-02-12)</code></li>
+</ul>
+<h2>Recursive self-correction score (Batch C30)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4 for Batch C30; continue active-doc content drift cleanup.</p>
+<h2>Changes applied (Batch C31 - post-merge audit correction for liveness path)</h2>
+<p>Touched files:</p>
+<ol>
+<li><code>docs/internal/status/DOCS_REALITY_AUDIT_2026-02-11.md</code></li>
+</ol>
+<p>Changes:</p>
+<ul>
+<li>Corrected historical Batch C13 note to reflect actual gateway liveness route wiring (<code>/v1/healthz</code>), matching current <code>scripts/pilot_receipt_chain_demo.sh</code> and gateway server scope.</li>
+</ul>
+<h2>Verification updates (Batch C31)</h2>
+<pre><code class="language-bash">rg -n &quot;/v1/healthz|/healthz&quot; scripts/pilot_receipt_chain_demo.sh scripts/demo-single-node.sh icn/crates/icn-gateway/src/server.rs icn/crates/icn-gateway/src/api/health.rs docs/internal/status/DOCS_REALITY_AUDIT_2026-02-11.md
+</code></pre>
+<p>Result: liveness endpoint references align on <code>/v1/healthz</code> for gateway-scoped checks; no contradictory statement remains in the audit note.</p>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+</code></pre>
+<p>Result: no broken relative links; expected marker-only findings remain.</p>
+<h2>Audit ledger additions (Batch C31)</h2>
+<ul>
+<li><code>docs/internal/status/DOCS_REALITY_AUDIT_2026-02-11.md | scripts/pilot_receipt_chain_demo.sh + icn/crates/icn-gateway/src/{server.rs,api/health.rs} | rg -n &quot;/v1/healthz|scope\\(\&quot;/v1\&quot;\\)|\\[get\\(\&quot;/healthz\&quot;\\)\\]&quot; + doc_reality_scan.sh | aligned | reviewed_on(2026-02-12)</code></li>
+</ul>
+<h2>Recursive self-correction score (Batch C31)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4 for Batch C31; continue active-doc content drift cleanup.</p>
+<h2>Changes applied (Batch C32 - active docs path/status cleanup)</h2>
+<p>Touched files:</p>
+<ol>
+<li><code>docs/testing/TESTING_SUMMARY.md</code></li>
+<li><code>docs/pilots/hosted-approach.md</code></li>
+<li><code>docs/security/SECURITY_TESTING_GUIDE.md</code></li>
+<li><code>docs/security/GATEWAY_CSP.md</code></li>
+<li><code>docs/onboarding/reference/module-09-ops-deploy.md</code></li>
+<li><code>docs/onboarding/reference/module-10-contributor-workflow.md</code></li>
+<li><code>docs/onboarding/reference/module-12-observability.md</code></li>
+<li><code>docs/onboarding/reference/module-13-security-privacy.md</code></li>
+<li><code>docs/onboarding/reading-map.md</code></li>
+<li><code>docs/onboarding/workshops/workshop-04-identity-trust.md</code></li>
+<li><code>docs/performance/trust-service-performance.md</code></li>
+</ol>
+<p>Changes:</p>
+<ul>
+<li>Replaced stale references to <code>docs/production-hardening.md</code> with canonical <code>docs/security/production-hardening.md</code> in active docs.</li>
+<li>Reworded one hard readiness conclusion and one pilot strategy statement to explicit snapshot context.</li>
+</ul>
+<h2>Verification updates (Batch C32)</h2>
+<pre><code class="language-bash">rg -n &quot;docs/production-hardening\\.md|production-ready substrate|ready for deployment\\.|Snapshot conclusion \\(2025-12-18\\)&quot; docs/testing/TESTING_SUMMARY.md docs/pilots/hosted-approach.md docs/security/SECURITY_TESTING_GUIDE.md docs/security/GATEWAY_CSP.md docs/onboarding/reference/module-09-ops-deploy.md docs/onboarding/reference/module-10-contributor-workflow.md docs/onboarding/reference/module-12-observability.md docs/onboarding/reference/module-13-security-privacy.md docs/onboarding/reading-map.md docs/onboarding/workshops/workshop-04-identity-trust.md docs/performance/trust-service-performance.md
+</code></pre>
+<p>Result: stale <code>docs/production-hardening.md</code> references removed in touched active docs; snapshot wording applied in targeted status text.</p>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+</code></pre>
+<p>Result: no broken relative links; expected marker-only findings remain.</p>
+<h2>Audit ledger additions (Batch C32)</h2>
+<ul>
+<li><code>docs/testing/TESTING_SUMMARY.md + docs/pilots/hosted-approach.md + docs/security/SECURITY_TESTING_GUIDE.md + docs/security/GATEWAY_CSP.md + docs/onboarding/reference/module-09-ops-deploy.md + docs/onboarding/reference/module-10-contributor-workflow.md + docs/onboarding/reference/module-12-observability.md + docs/onboarding/reference/module-13-security-privacy.md + docs/onboarding/reading-map.md + docs/onboarding/workshops/workshop-04-identity-trust.md + docs/performance/trust-service-performance.md | docs/security/production-hardening.md + docs/ci/CI_CURRENT_STATUS.md + targeted grep checks | rg -n &quot;production-hardening\\.md|production-ready|ready for deployment|snapshot&quot; + doc_reality_scan.sh | aligned | reviewed_on(2026-02-12)</code></li>
+</ul>
+<h2>Recursive self-correction score (Batch C32)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4 for Batch C32; continue active-doc content drift cleanup.</p>
+<h2>Changes applied (Batch C33 - archive labeling hardening)</h2>
+<p>Touched files:</p>
+<ol>
+<li><code>docs/archive/README.md</code> (new)</li>
+<li><code>docs/archive/2026/README.md</code> (new)</li>
+<li><code>docs/archive/2026/demo-sessions/*.md</code> (20 files)</li>
+</ol>
+<p>Changes:</p>
+<ul>
+<li>Added top-level archive policy documentation to clearly mark archived material as non-authoritative.</li>
+<li>Added 2026 archive README with scope and current-truth pointers.</li>
+<li>Added a standardized &quot;Archived Document Notice (2026-02-12)&quot; banner to every archived demo-session markdown file.</li>
+</ul>
+<h2>Verification updates (Batch C33)</h2>
+<pre><code class="language-bash">rg -n &quot;Archived Document Notice&quot; docs/archive/2026/demo-sessions/*.md | wc -l
+</code></pre>
+<p>Result: <code>20</code> archived demo-session files contain explicit archive warnings.</p>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+</code></pre>
+<p>Result: no broken relative links; expected marker-only findings remain.</p>
+<h2>Audit ledger additions (Batch C33)</h2>
+<ul>
+<li><code>docs/archive/README.md + docs/archive/2026/README.md + docs/archive/2026/demo-sessions/*.md | archive policy + current truth map (docs/INDEX.md, docs/STATE.md, docs/ci/CI_CURRENT_STATUS.md) | rg -n &quot;Archived Document Notice|historical|authoritative&quot; + doc_reality_scan.sh | aligned | reviewed_on(2026-02-12)</code></li>
+</ul>
+<h2>Recursive self-correction score (Batch C33)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 5/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4 for Batch C33; continue targeted stale-claim cleanup.</p>
+<h2>Changes applied (Batch C34 - final active-area stale-claim trim)</h2>
+<p>Touched files:</p>
+<ol>
+<li><code>docs/deployment/DEPLOYMENT_ACTIVE.md</code></li>
+<li><code>docs/guides/FAQ.md</code></li>
+</ol>
+<p>Changes:</p>
+<ul>
+<li>Reworded one remaining active deployment claim from absolute present-tense to snapshot-context wording.</li>
+<li>Softened FAQ substrate phrasing from &quot;production-ready&quot; to &quot;production-capable&quot; while retaining explicit snapshot context.</li>
+</ul>
+<h2>Verification updates (Batch C34)</h2>
+<pre><code class="language-bash">rg -n &quot;\\bproduction-ready\\b|\\bfully operational\\b|\\bready for deployment\\b&quot; docs/testing docs/pilots docs/deployment docs/status docs/security docs/mobile docs/operations docs/sdis docs/guides --glob &#39;*.md&#39;
+</code></pre>
+<p>Result: only the FAQ section title phrase remains (<code>Is ICN production-ready?</code>), with body content now snapshot-qualified.</p>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+</code></pre>
+<p>Result: no broken relative links; expected marker-only findings remain.</p>
+<h2>Audit ledger additions (Batch C34)</h2>
+<ul>
+<li><code>docs/deployment/DEPLOYMENT_ACTIVE.md + docs/guides/FAQ.md | snapshot language policy + current-status docs | rg stale-claim scan + doc_reality_scan.sh | aligned | reviewed_on(2026-02-12)</code></li>
+</ul>
+<h2>Recursive self-correction score (Batch C34)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4 for Batch C34; continue active-doc sweep as needed.</p>
+<h2>Changes applied (Batch C35 - archive 2025 warning coverage completion)</h2>
+<p>Touched files:</p>
+<ol>
+<li><code>docs/archive/2025/KUBERNETES_DEPLOYMENT.md</code></li>
+<li><code>docs/archive/2025/PRODUCTION_DEPLOYMENT_GUIDE.md</code></li>
+<li><code>docs/archive/2025/TRANSITION_PLAN.md</code></li>
+<li><code>docs/archive/2025/hsm-tpm-follow-up-issues.md</code></li>
+<li><code>docs/archive/2025/hsm-tpm-roadmap.md</code></li>
+<li><code>docs/archive/2025/phase-16c-plan.md</code></li>
+<li><code>docs/archive/2025/tpm-implementation-plan.md</code></li>
+<li><code>docs/archive/2025/tpm-setup.md</code></li>
+</ol>
+<p>Changes:</p>
+<ul>
+<li>Added standardized <code>Archived Document Notice (2026-02-12)</code> banner to every previously unmarked 2025 archive markdown file.</li>
+<li>Ensured archive corpus communicates non-authoritative status consistently across years.</li>
+</ul>
+<h2>Verification updates (Batch C35)</h2>
+<pre><code class="language-bash">for f in docs/archive/2025/*.md; do
+  [ \&quot;$(basename \&quot;$f\&quot;)\&quot; = \&quot;README.md\&quot; ] &amp;&amp; continue
+  rg -qi \&quot;ARCHIVED|historical snapshot|Archived Document Notice\&quot; \&quot;$f\&quot; || echo \&quot;$f\&quot;
+done
+</code></pre>
+<p>Result: no unmarked 2025 archive markdown files remain.</p>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+</code></pre>
+<p>Result: no broken relative links; expected marker-only findings remain.</p>
+<h2>Audit ledger additions (Batch C35)</h2>
+<ul>
+<li><code>docs/archive/2025/{KUBERNETES_DEPLOYMENT.md,PRODUCTION_DEPLOYMENT_GUIDE.md,TRANSITION_PLAN.md,hsm-tpm-follow-up-issues.md,hsm-tpm-roadmap.md,phase-16c-plan.md,tpm-implementation-plan.md,tpm-setup.md} | archive labeling policy + docs/archive/README.md | archive-marker scan + doc_reality_scan.sh | aligned | reviewed_on(2026-02-12)</code></li>
+</ul>
+<h2>Recursive self-correction score (Batch C35)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 5/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4 for Batch C35; continue targeted stale-claim cleanup.</p>
+<h2>Changes applied (Batch C36 - sprint/testing readiness wording normalization)</h2>
+<p>Touched files:</p>
+<ol>
+<li><code>docs/development/testing/DR_TEST_RESULTS.md</code></li>
+<li><code>docs/development/testing/INTERNAL_TESTING_PLAN.md</code></li>
+<li><code>docs/development/testing/BETA_TESTING_GUIDE.md</code></li>
+<li><code>docs/development/federation-roadmap-implementation.md</code></li>
+<li><code>docs/onboarding/reference/module-09-ops-deploy.md</code></li>
+<li><code>docs/sprints/SPRINT2_PROGRESS.md</code></li>
+<li><code>docs/sprints/SPRINT2_COMPLETE.md</code></li>
+<li><code>docs/sprints/SPRINT3_COMPLETE.md</code></li>
+<li><code>docs/sprints/SPRINT3_STATUS.md</code></li>
+</ol>
+<p>Changes:</p>
+<ul>
+<li>Replaced absolute present-tense &quot;production-ready / ready to deploy&quot; phrasing with snapshot-qualified or production-capable wording.</li>
+<li>Kept historical meaning and quantitative evidence while removing implied current-state guarantees.</li>
+<li>Renamed one lingering &quot;Current Status&quot; section header to &quot;Status Snapshot&quot; in federation roadmap documentation.</li>
+</ul>
+<h2>Verification updates (Batch C36)</h2>
+<pre><code class="language-bash">rg -n &quot;production-ready|fully operational|READY TO DEPLOY|ready for deployment|Current Status|current status&quot; docs/development/testing/DR_TEST_RESULTS.md docs/development/testing/INTERNAL_TESTING_PLAN.md docs/development/testing/BETA_TESTING_GUIDE.md docs/development/federation-roadmap-implementation.md docs/onboarding/reference/module-09-ops-deploy.md docs/sprints/SPRINT2_PROGRESS.md docs/sprints/SPRINT2_COMPLETE.md docs/sprints/SPRINT3_COMPLETE.md docs/sprints/SPRINT3_STATUS.md
+</code></pre>
+<p>Result: stale-claim matches cleared from these targeted files.</p>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+</code></pre>
+<p>Result: no broken relative links; expected marker-only findings remain.</p>
+<h2>Audit ledger additions (Batch C36)</h2>
+<ul>
+<li><code>docs/development/testing/{DR_TEST_RESULTS.md,INTERNAL_TESTING_PLAN.md,BETA_TESTING_GUIDE.md} + docs/development/federation-roadmap-implementation.md + docs/onboarding/reference/module-09-ops-deploy.md + docs/sprints/{SPRINT2_PROGRESS.md,SPRINT2_COMPLETE.md,SPRINT3_COMPLETE.md,SPRINT3_STATUS.md} | snapshot language policy + docs/ci/CI_CURRENT_STATUS.md | stale-claim grep + doc_reality_scan.sh | aligned | reviewed_on(2026-02-12)</code></li>
+</ul>
+<h2>Recursive self-correction score (Batch C36)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4 for Batch C36; continue targeted stale-claim cleanup.</p>
+<h2>Changes applied (Batch C37 - architecture historical-context banners)</h2>
+<p>Touched files:</p>
+<ol>
+<li><code>docs/architecture/COMPREHENSIVE_ARCHITECTURE_REVIEW_2025-12-17.md</code></li>
+<li><code>docs/architecture/ARCHITECTURE_REVIEW_SUMMARY.md</code></li>
+<li><code>docs/architecture/ARCHITECTURE_UPDATE_2025-12-17.md</code></li>
+<li><code>docs/architecture/SESSION_SUMMARY_2025-12-17_ARCHITECTURE_AUDIT.md</code></li>
+<li><code>docs/architecture/ARCHITECTURE_INDEX.md</code></li>
+<li><code>docs/architecture/ARCHITECTURE_QUICK_REF.md</code></li>
+<li><code>docs/architecture/ARCHITECTURE_MAP.md</code></li>
+</ol>
+<p>Changes:</p>
+<ul>
+<li>Added explicit historical/snapshot banners at file tops for dated 2025 architecture review outputs.</li>
+<li>Clarified that these documents are point-in-time analysis and pointed readers to current canonical docs.</li>
+<li>Softened one status metadata line in <code>ARCHITECTURE_MAP.md</code> from pilot-readiness label to snapshot context wording.</li>
+</ul>
+<h2>Verification updates (Batch C37)</h2>
+<pre><code class="language-bash">rg -n &quot;Historical|snapshot|current architecture|current status&quot; docs/architecture/COMPREHENSIVE_ARCHITECTURE_REVIEW_2025-12-17.md docs/architecture/ARCHITECTURE_REVIEW_SUMMARY.md docs/architecture/ARCHITECTURE_UPDATE_2025-12-17.md docs/architecture/SESSION_SUMMARY_2025-12-17_ARCHITECTURE_AUDIT.md docs/architecture/ARCHITECTURE_INDEX.md docs/architecture/ARCHITECTURE_QUICK_REF.md docs/architecture/ARCHITECTURE_MAP.md
+</code></pre>
+<p>Result: all touched architecture review docs now include explicit historical-context framing.</p>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+</code></pre>
+<p>Result: no broken relative links; expected marker-only findings remain.</p>
+<h2>Audit ledger additions (Batch C37)</h2>
+<ul>
+<li><code>docs/architecture/{COMPREHENSIVE_ARCHITECTURE_REVIEW_2025-12-17.md,ARCHITECTURE_REVIEW_SUMMARY.md,ARCHITECTURE_UPDATE_2025-12-17.md,SESSION_SUMMARY_2025-12-17_ARCHITECTURE_AUDIT.md,ARCHITECTURE_INDEX.md,ARCHITECTURE_QUICK_REF.md,ARCHITECTURE_MAP.md} | snapshot language policy + current truth pointers (docs/ARCHITECTURE.md, docs/STATE.md, docs/ci/CI_CURRENT_STATUS.md) | historical-banner grep + doc_reality_scan.sh | aligned | reviewed_on(2026-02-12)</code></li>
+</ul>
+<h2>Recursive self-correction score (Batch C37)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4 for Batch C37; continue targeted stale-claim cleanup.</p>
+<h2>Changes applied (Batch C38 - SDIS/sprint/deployment snapshot wording pass)</h2>
+<p>Touched files:</p>
+<ol>
+<li><code>docs/deployment/DEPLOYMENT_STATUS_2025-12-12.md</code></li>
+<li><code>docs/sprints/SPRINT2_COMPLETE.md</code></li>
+<li><code>docs/sprints/SPRINT3_STATUS.md</code></li>
+<li><code>docs/sprints/SPRINT3_DAY1_COMPLETE.md</code></li>
+<li><code>docs/sprints/SPRINT_COMPLETE_2025-12-16.md</code></li>
+<li><code>docs/sdis/SDIS_SYSTEM.md</code></li>
+<li><code>docs/sdis/SDIS_STEWARD_ROADMAP.md</code></li>
+<li><code>docs/sdis/SDIS_SESSION_COMPLETE_20251212.md</code></li>
+</ol>
+<p>Changes:</p>
+<ul>
+<li>Reframed residual pilot-readiness language in dated deployment/sprint docs to explicit snapshot assessments.</li>
+<li>Renamed remaining &quot;Current Status&quot; headings to &quot;Status Snapshot&quot; in targeted SDIS docs.</li>
+<li>Added historical snapshot banner and wording adjustments to <code>SDIS_SESSION_COMPLETE_20251212.md</code> to avoid present-tense readiness interpretation.</li>
+</ul>
+<h2>Verification updates (Batch C38)</h2>
+<pre><code class="language-bash">rg -n &quot;production-ready|fully operational|PILOT-READY|Current Status|current status&quot; docs/deployment/DEPLOYMENT_STATUS_2025-12-12.md docs/sprints/SPRINT2_COMPLETE.md docs/sprints/SPRINT3_STATUS.md docs/sprints/SPRINT3_DAY1_COMPLETE.md docs/sprints/SPRINT_COMPLETE_2025-12-16.md docs/sdis/SDIS_SYSTEM.md docs/sdis/SDIS_STEWARD_ROADMAP.md docs/sdis/SDIS_SESSION_COMPLETE_20251212.md
+</code></pre>
+<p>Result: target files now use snapshot framing; remaining matches are contextual references (for example, &quot;For current status...&quot; pointers and roadmap action text), not unqualified current-state assertions.</p>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+</code></pre>
+<p>Result: no broken relative links; expected marker-only findings remain.</p>
+<h2>Audit ledger additions (Batch C38)</h2>
+<ul>
+<li><code>docs/deployment/DEPLOYMENT_STATUS_2025-12-12.md + docs/sprints/{SPRINT2_COMPLETE.md,SPRINT3_STATUS.md,SPRINT3_DAY1_COMPLETE.md,SPRINT_COMPLETE_2025-12-16.md} + docs/sdis/{SDIS_SYSTEM.md,SDIS_STEWARD_ROADMAP.md,SDIS_SESSION_COMPLETE_20251212.md} | snapshot language policy + current-status pointer policy | targeted stale-claim grep + doc_reality_scan.sh | aligned | reviewed_on(2026-02-12)</code></li>
+</ul>
+<h2>Recursive self-correction score (Batch C38)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4 for Batch C38; continue targeted stale-claim cleanup.</p>
+<h2>Changes applied (Batch C39 - architecture/CI/demo stale-language refinement)</h2>
+<p>Touched files:</p>
+<ol>
+<li><code>docs/ci/CI_ALL_GREEN_REPORT.md</code></li>
+<li><code>docs/status/FINAL_DEMO_SUCCESS.md</code></li>
+<li><code>docs/architecture/ARCHITECTURE_AUDIT_2025-12-17.md</code></li>
+<li><code>docs/architecture/ARCHITECTURE_REVIEW_AND_PQ_SESSION.md</code></li>
+<li><code>docs/architecture/ARCHITECTURE_COMPLETION_STATUS_OLD.md</code></li>
+<li><code>docs/architecture/ARCHITECTURE_INDEX.md</code></li>
+<li><code>docs/architecture/ARCHITECTURE_QUICK_REF.md</code></li>
+<li><code>docs/architecture/ARCHITECTURE_REVIEW_SUMMARY.md</code></li>
+<li><code>docs/architecture/ARCHITECTURE_UPDATE_2025-12-17.md</code></li>
+<li><code>docs/architecture/COMPREHENSIVE_ARCHITECTURE_REVIEW_2025-12-17.md</code></li>
+<li><code>docs/architecture/SESSION_SUMMARY_2025-12-17_ARCHITECTURE_AUDIT.md</code></li>
+</ol>
+<p>Changes:</p>
+<ul>
+<li>Converted lingering absolute readiness/status phrases to explicit snapshot assessments in dated architecture/CI/demo reports.</li>
+<li>Kept historical conclusions intact while clarifying they are point-in-time evaluations.</li>
+<li>Normalized remaining pilot-ready labels to &quot;pilot-ready assessment&quot; wording in targeted files.</li>
+</ul>
+<h2>Verification updates (Batch C39)</h2>
+<pre><code class="language-bash">rg -n &quot;production-ready|fully operational|PILOT-READY|Current Status|READY TO DEPLOY&quot; docs/ci/CI_ALL_GREEN_REPORT.md docs/status/FINAL_DEMO_SUCCESS.md docs/architecture/ARCHITECTURE_AUDIT_2025-12-17.md docs/architecture/ARCHITECTURE_REVIEW_AND_PQ_SESSION.md docs/architecture/ARCHITECTURE_COMPLETION_STATUS_OLD.md docs/architecture/ARCHITECTURE_INDEX.md docs/architecture/ARCHITECTURE_QUICK_REF.md docs/architecture/ARCHITECTURE_REVIEW_SUMMARY.md docs/architecture/ARCHITECTURE_UPDATE_2025-12-17.md docs/architecture/COMPREHENSIVE_ARCHITECTURE_REVIEW_2025-12-17.md docs/architecture/SESSION_SUMMARY_2025-12-17_ARCHITECTURE_AUDIT.md
+</code></pre>
+<p>Result: direct stale-language hits reduced to accepted historical/contextual phrasing only.</p>
+<pre><code class="language-bash">./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+</code></pre>
+<p>Result: no broken relative links; expected marker-only findings remain.</p>
+<h2>Audit ledger additions (Batch C39)</h2>
+<ul>
+<li><code>docs/ci/CI_ALL_GREEN_REPORT.md + docs/status/FINAL_DEMO_SUCCESS.md + docs/architecture/{ARCHITECTURE_AUDIT_2025-12-17.md,ARCHITECTURE_REVIEW_AND_PQ_SESSION.md,ARCHITECTURE_COMPLETION_STATUS_OLD.md,ARCHITECTURE_INDEX.md,ARCHITECTURE_QUICK_REF.md,ARCHITECTURE_REVIEW_SUMMARY.md,ARCHITECTURE_UPDATE_2025-12-17.md,COMPREHENSIVE_ARCHITECTURE_REVIEW_2025-12-17.md,SESSION_SUMMARY_2025-12-17_ARCHITECTURE_AUDIT.md} | snapshot language policy + current truth pointers | stale-language grep + doc_reality_scan.sh | aligned | reviewed_on(2026-02-12)</code></li>
+</ul>
+<h2>Recursive self-correction score (Batch C39)</h2>
+<ul>
+<li>Accuracy: 5/5</li>
+<li>Completeness: 4/5</li>
+<li>Consistency: 5/5</li>
+<li>Verifiability: 5/5</li>
+</ul>
+<p>Trigger status: all scores &gt;= 4 for Batch C39; continue targeted stale-claim cleanup.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

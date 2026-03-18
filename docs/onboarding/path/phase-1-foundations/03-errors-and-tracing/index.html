@@ -1,0 +1,272 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>03: Errors and Tracing — Distributed Visibility | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>onboarding</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>path</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>phase 1 foundations</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>03 errors and tracing</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/onboarding/path/phase-1-foundations/03-errors-and-tracing.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>03: Errors and Tracing — Distributed Visibility</h1>
+<blockquote>
+<p><strong>Phase</strong>: 1 | <strong>Tier</strong>: Reader<br><strong>Patterns introduced</strong>: <a href="#error-handling">Error Handling</a>, <a href="#receipt-pattern">Receipt Pattern</a>, <a href="#metrics-integration">Metrics Integration</a><br><strong>Prerequisite</strong>: 02-rust-through-icn.md</p>
+</blockquote>
+<h2>Why This Matters</h2>
+<p><strong>&quot;You can&#39;t debug what you can&#39;t see.&quot;</strong> Distributed systems multiply this problem: failures happen across nodes, causality is non-obvious, and post-mortems rely on structured logs and metrics.</p>
+<p>ICN makes visibility a first-class concern — errors carry structured context, tracing spans show request flows, and metrics expose system health. This layer teaches you to instrument code <strong>before</strong> building features, not as an afterthought.</p>
+<p>→ See <code>manual.md</code> § &quot;Observability First&quot; for the design rationale.</p>
+<h2>What You&#39;ll Read</h2>
+<h3>1. Foundation: <code>icn/crates/icn-core/src/error.rs</code></h3>
+<p>This is the simplest error pattern — <code>thiserror</code> for domain errors:</p>
+<pre><code class="language-rust">#[derive(Debug, thiserror::Error)]
+pub enum CoreError {
+    #[error(&quot;Actor not found: {0}&quot;)]
+    ActorNotFound(String),
+    
+    #[error(&quot;Shutdown in progress&quot;)]
+    ShuttingDown,
+    
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+}
+</code></pre>
+<p><strong>Key observations</strong>:</p>
+<ul>
+<li><code>#[error(&quot;...&quot;)]</code> provides human-readable messages</li>
+<li><code>#[from]</code> enables <code>?</code> operator for automatic error conversion</li>
+<li><code>#[error(transparent)]</code> delegates Display to the inner error</li>
+<li>No <code>unwrap()</code> or <code>expect()</code> — always <code>Result&lt;T, E&gt;</code></li>
+</ul>
+<h3>2. Structured Errors: <code>icn/crates/icn-ledger/src/error.rs</code></h3>
+<p>Domain errors add <strong>structured fields</strong> for better diagnostics:</p>
+<pre><code class="language-rust">#[derive(Debug, thiserror::Error)]
+pub enum LedgerError {
+    #[error(&quot;Credit limit exceeded: account={account}, attempted={attempted}, limit={limit}&quot;)]
+    CreditLimitExceeded {
+        account: Did,
+        attempted: i64,
+        limit: i64,
+    },
+    
+    #[error(&quot;Unbalanced entry: sum={sum}&quot;)]
+    UnbalancedEntry { sum: i64 },
+    
+    #[error(&quot;Entry quarantined: {reason}&quot;)]
+    Quarantined { reason: String },
+}
+</code></pre>
+<p><strong>Why structured fields matter</strong>:</p>
+<ul>
+<li>Errors become <strong>queryable</strong> (e.g., &quot;Show all credit limit violations for account X&quot;)</li>
+<li>Metrics can extract values (e.g., histogram of attempted amounts)</li>
+<li>Logs preserve context without string parsing</li>
+</ul>
+<h3>3. Source Location Tracking: <code>icn/crates/icn-ccl/src/error.rs</code></h3>
+<p>Contract execution errors include <strong>source spans</strong> (line/column) for debugging:</p>
+<pre><code class="language-rust">#[derive(Debug, thiserror::Error)]
+pub enum CclError {
+    #[error(&quot;Type mismatch at {span:?}: expected {expected}, got {actual}&quot;)]
+    TypeMismatch {
+        span: Span,
+        expected: String,
+        actual: String,
+    },
+    
+    #[error(&quot;Out of fuel at {span:?}&quot;)]
+    OutOfFuel { span: Span },
+}
+
+pub struct Span {
+    pub start: usize,
+    pub end: usize,
+}
+</code></pre>
+<p><strong>Why spans matter</strong>: When a contract fails, developers need to know <strong>where</strong> in the source code the failure occurred. Spans enable IDE integration, syntax highlighting of errors, and precise debugging.</p>
+<h3>4. End-to-End Error Flow</h3>
+<p><strong>Trace this sequence</strong>:</p>
+<ol>
+<li><p><strong>Validation</strong>: <code>Ledger::validate_entry()</code> in <code>icn/crates/icn-ledger/src/ledger.rs:487-520</code></p>
+<pre><code class="language-rust">if account_balance + amount &lt; credit_limit {
+    return Err(LedgerError::CreditLimitExceeded {
+        account: posting.account.clone(),
+        attempted: amount,
+        limit: credit_limit,
+    });
+}
+</code></pre>
+</li>
+<li><p><strong>Quarantine</strong>: Failed entry is moved to quarantine (not dropped)</p>
+<pre><code class="language-rust">self.quarantine.insert(entry.id.clone(), entry);
+</code></pre>
+</li>
+<li><p><strong>Metrics</strong>: Failure increments counter</p>
+<pre><code class="language-rust">metrics::counter!(&quot;ledger_validation_failures_total&quot;, 
+    &quot;reason&quot; =&gt; &quot;credit_limit_exceeded&quot;).increment(1);
+</code></pre>
+</li>
+<li><p><strong>Gateway</strong>: Error propagates to REST API in <code>icn-gateway/src/api/ledger.rs</code></p>
+<pre><code class="language-rust">Err(e) =&gt; {
+    tracing::error!(error = %e, &quot;Entry validation failed&quot;);
+    ApiError::ValidationFailed(e.to_string())
+}
+</code></pre>
+</li>
+<li><p><strong>Client</strong>: Receives structured JSON error with code + details</p>
+<pre><code class="language-json">{
+    &quot;error&quot;: {
+        &quot;code&quot;: &quot;VALIDATION_FAILED&quot;,
+        &quot;message&quot;: &quot;Credit limit exceeded: ...&quot;,
+        &quot;details&quot;: { &quot;account&quot;: &quot;...&quot;, &quot;attempted&quot;: 1000, &quot;limit&quot;: 500 }
+    }
+}
+</code></pre>
+</li>
+</ol>
+<h3>5. The Lint Rule: Never Panic in Production</h3>
+<p><strong>File</strong>: <code>icn/crates/icn-core/Cargo.toml</code> and all crate manifests</p>
+<pre><code class="language-toml">[lints.clippy]
+unwrap_used = &quot;deny&quot;
+expect_used = &quot;deny&quot;
+</code></pre>
+<p><strong>Escape hatch for tests</strong>:</p>
+<pre><code class="language-rust">#![deny(clippy::unwrap_used, clippy::expect_used)]
+
+#[cfg(test)]
+mod tests {
+    // Tests can use unwrap/expect via this attribute
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
+    
+    #[test]
+    fn test_happy_path() {
+        let result = some_operation().unwrap();  // OK in tests
+        assert_eq!(result, expected);
+    }
+}
+</code></pre>
+<p><strong>Why</strong>: Panics in protocol/network/actor paths crash the entire daemon. <code>Result&lt;T, E&gt;</code> forces explicit error handling.</p>
+<h3>6. Coding Convention from <code>AGENTS.md</code></h3>
+<p><strong>Pattern</strong>:</p>
+<ul>
+<li><strong>thiserror</strong> for crate-local domain errors (e.g., <code>LedgerError</code>, <code>GossipError</code>)</li>
+<li><strong>anyhow</strong> at service boundaries (e.g., Gateway API handlers, CLI commands)</li>
+<li><strong>Never panic</strong> in protocol/network/actor/deserialization paths</li>
+</ul>
+<p><strong>Example (anyhow at boundary)</strong>:</p>
+<pre><code class="language-rust">use anyhow::{Context, Result};
+
+pub async fn handle_request(req: Request) -&gt; Result&lt;Response&gt; {
+    let entry = parse_entry(&amp;req.body)
+        .context(&quot;Failed to parse ledger entry&quot;)?;
+    
+    ledger.submit_entry(entry).await
+        .context(&quot;Failed to submit entry to ledger&quot;)?;
+    
+    Ok(Response::ok())
+}
+</code></pre>
+<p>The <code>.context(&quot;...&quot;)</code> adds human-readable context to errors without changing the error type.</p>
+<h2>Patterns Introduced</h2>
+<h3>Error Handling Pattern</h3>
+<p><strong>Used for</strong>: Domain-specific errors with structured fields.</p>
+<p>→ See <code>patterns.md</code> #2 for full template (thiserror + anyhow).</p>
+<h3>Receipt Pattern</h3>
+<p><strong>Used for</strong>: Explicit success/failure results (not &quot;accepted&quot; lies).</p>
+<p>The quarantine system in <code>icn/crates/icn-ledger/src/ledger.rs</code> is a receipt pattern:</p>
+<ul>
+<li>Entries that fail validation aren&#39;t silently dropped</li>
+<li>They&#39;re moved to quarantine with reason</li>
+<li>Callers receive explicit rejection, not false success</li>
+</ul>
+<p>→ See <code>patterns.md</code> #12 for full template.</p>
+<h3>Metrics Integration Pattern</h3>
+<p><strong>Used for</strong>: Prometheus metrics at key decision points.</p>
+<p><strong>Example</strong> from <code>icn/crates/icn-ledger/src/ledger.rs</code>:</p>
+<pre><code class="language-rust">metrics::counter!(&quot;ledger_entries_total&quot;, 
+    &quot;status&quot; =&gt; &quot;submitted&quot;).increment(1);
+
+if validation_fails {
+    metrics::counter!(&quot;ledger_validation_failures_total&quot;,
+        &quot;reason&quot; =&gt; error_type).increment(1);
+}
+</code></pre>
+<p>→ See <code>patterns.md</code> #7 for full template.</p>
+<h2>What You&#39;ll Build</h2>
+<p>→ <strong>Lab</strong>: <code>labs/lab-02-error-receipt/</code></p>
+<p>Extend your workspace from Layers 01-02:</p>
+<ul>
+<li>Add structured errors with thiserror</li>
+<li>Add tracing spans showing request lifecycle</li>
+<li>Add receipt pattern: operations return typed receipts, failures include context</li>
+<li>Add metrics counters for success/failure paths</li>
+</ul>
+<p><strong>Done when</strong>: You can see a request flow through tracing output, and errors include structured context.</p>
+<h2>Checkpoint</h2>
+<p>You&#39;ve completed this layer when you can:</p>
+<ol>
+<li><strong>Reproduce a bug</strong>: Take a failing test, add tracing spans, run it, and explain causality from the output</li>
+<li><strong>Instrument a function</strong>: Add tracing span, structured error, and metrics to a new function</li>
+<li><strong>Explain error patterns</strong>: Describe when to use thiserror vs anyhow vs panic</li>
+<li><strong>Trace an error end-to-end</strong>: Follow an error from validation → quarantine → metrics → gateway → client</li>
+</ol>
+<p><strong>Artifact</strong>: Submit a tracing output snippet showing an end-to-end request flow with at least 3 nested spans.</p>
+<h2>Deep Reference</h2>
+<p>→ <code>reference/module-12-observability.md</code> — Full metrics, tracing, logging guide<br>→ <code>reference/module-13-security-privacy.md</code> — Security instrumentation patterns<br>→ <code>docs/architecture/PRODUCTION_HARDENING.md</code> — Error handling best practices<br>→ <a href="https://docs.rs/tracing/" target="_blank" rel="noopener">tracing crate docs</a> — Tracing span API reference</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

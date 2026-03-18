@@ -1,0 +1,323 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>CoopWallet Mobile App - Testing Instructions | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>testing</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>MOBILE APP TESTING GUIDE</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/testing/MOBILE_APP_TESTING_GUIDE.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>CoopWallet Mobile App - Testing Instructions</h1>
+<h2>Prerequisites ✅</h2>
+<ul>
+<li>✅ Node.js v20.19.4 (installed)</li>
+<li>✅ npm v11.7.0 (installed)</li>
+<li>✅ Expo v54.0.19 (installed)</li>
+<li>✅ ICN Gateway running at <a href="http://10.8.10.40:30080" target="_blank" rel="noopener">http://10.8.10.40:30080</a></li>
+</ul>
+<h2>Option 1: Test in Web Browser (Easiest) 🌐</h2>
+<h3>Quick Start</h3>
+<pre><code class="language-bash">/home/matt/projects/icn/scripts/start-mobile-app.sh
+</code></pre>
+<p>Then press <code>w</code> to open in your web browser.</p>
+<h3>Manual Start</h3>
+<pre><code class="language-bash">cd /home/matt/projects/icn/sdk/react-native/examples/CoopWallet
+npm start
+# Press &#39;w&#39; when prompted
+</code></pre>
+<p>The app will open in your default browser at <code>http://localhost:8081</code></p>
+<hr>
+<h2>Option 2: Test on Your Phone 📱</h2>
+<h3>Requirements</h3>
+<ul>
+<li>Install <strong>Expo Go</strong> app on your phone:<ul>
+<li>iOS: <a href="https://apps.apple.com/app/expo-go/id982107779" target="_blank" rel="noopener">https://apps.apple.com/app/expo-go/id982107779</a></li>
+<li>Android: <a href="https://play.google.com/store/apps/details?id=host.exp.exponent" target="_blank" rel="noopener">https://play.google.com/store/apps/details?id=host.exp.exponent</a></li>
+</ul>
+</li>
+</ul>
+<h3>Steps</h3>
+<ol>
+<li><p><strong>Start the dev server</strong>:</p>
+<pre><code class="language-bash">/home/matt/projects/icn/scripts/start-mobile-app.sh
+</code></pre>
+</li>
+<li><p><strong>Connect your phone to the same network</strong> as your computer</p>
+</li>
+<li><p><strong>Scan the QR code</strong>:</p>
+<ul>
+<li>iOS: Open Camera app and scan the QR code</li>
+<li>Android: Open Expo Go app and scan the QR code</li>
+</ul>
+</li>
+<li><p>The app will open in Expo Go</p>
+</li>
+</ol>
+<h3>Troubleshooting Network Issues</h3>
+<p>If the app can&#39;t connect to the gateway:</p>
+<p><strong>Option A: Use your computer&#39;s local IP</strong></p>
+<ol>
+<li>Find your computer&#39;s IP: <code>ip addr show | grep &quot;inet &quot; | grep -v 127.0.0.1</code></li>
+<li>Edit <code>src/config.ts</code> and change <code>GATEWAY_URL</code> to <code>http://&lt;your-ip&gt;:30080</code></li>
+<li>Restart the dev server</li>
+</ol>
+<p><strong>Option B: Use a tunnel</strong></p>
+<pre><code class="language-bash">cd /home/matt/projects/icn/sdk/react-native/examples/CoopWallet
+npx expo start --tunnel
+</code></pre>
+<p>This creates a public URL that your phone can access.</p>
+<hr>
+<h2>Option 3: Test in Android Emulator 🤖</h2>
+<h3>Requirements</h3>
+<ul>
+<li>Android Studio installed</li>
+<li>Android emulator configured</li>
+</ul>
+<h3>Steps</h3>
+<pre><code class="language-bash">cd /home/matt/projects/icn/sdk/react-native/examples/CoopWallet
+npm run android
+</code></pre>
+<hr>
+<h2>Option 4: Test in iOS Simulator 🍎</h2>
+<h3>Requirements</h3>
+<ul>
+<li>macOS with Xcode installed</li>
+<li>iOS Simulator configured</li>
+</ul>
+<h3>Steps</h3>
+<pre><code class="language-bash">cd /home/matt/projects/icn/sdk/react-native/examples/CoopWallet
+npm run ios
+</code></pre>
+<hr>
+<h2>Testing the App</h2>
+<h3>First Time Setup</h3>
+<ol>
+<li><p><strong>App launches</strong> - You&#39;ll see the Login screen</p>
+</li>
+<li><p><strong>Enter Gateway URL</strong>: <code>http://10.8.10.40:30080</code></p>
+<ul>
+<li>If testing from phone and can&#39;t reach 10.8.10.40, use tunnel mode or your computer&#39;s IP</li>
+</ul>
+</li>
+<li><p><strong>Choose Login Method</strong>:</p>
+<p><strong>Option A: New Identity (SDIS Enrollment)</strong></p>
+<ul>
+<li>Tap &quot;Join Cooperative&quot;</li>
+<li>Enter your name</li>
+<li>Enter Cooperative ID: <code>test-coop</code></li>
+<li>Complete device verification</li>
+<li>(Optional) Get steward to vouch for Level 2</li>
+</ul>
+<p><strong>Option B: Existing Identity</strong></p>
+<ul>
+<li>If you have an existing DID, enter it</li>
+<li>App will handle challenge-response auth</li>
+</ul>
+</li>
+</ol>
+<h3>Test Scenarios</h3>
+<h4>1. Check Balance</h4>
+<ul>
+<li>After login, view your balance (will be 0.0 for new identity)</li>
+<li>Balance is shown in hours</li>
+</ul>
+<h4>2. Send Payment to Yourself</h4>
+<ul>
+<li>Tap &quot;Send&quot; or payment icon</li>
+<li>Enter recipient: Use your own DID (copy from profile)</li>
+<li>Enter amount: <code>0.1</code></li>
+<li>Add memo: &quot;Test payment&quot;</li>
+<li>Tap &quot;Send&quot;</li>
+<li>Check that balance updates</li>
+</ul>
+<h4>3. Generate Receive QR Code</h4>
+<ul>
+<li>Tap &quot;Receive&quot;</li>
+<li>QR code displays with your DID</li>
+<li>Optionally set a suggested amount</li>
+<li>Share QR with another user to receive payment</li>
+</ul>
+<h4>4. View Transaction History</h4>
+<ul>
+<li>Tap &quot;History&quot; or transactions tab</li>
+<li>See list of all your transactions</li>
+<li>Tap transaction for details</li>
+</ul>
+<h4>5. Browse Governance</h4>
+<ul>
+<li>Tap &quot;Governance&quot; tab</li>
+<li>View list of proposals</li>
+<li>Tap a proposal to view details</li>
+<li>Cast a vote (For/Against/Abstain)</li>
+</ul>
+<hr>
+<h2>Configuration</h2>
+<p>The app is pre-configured for your homelab deployment:</p>
+<p><strong>File</strong>: <code>src/config.ts</code></p>
+<pre><code class="language-typescript">export const GATEWAY_URL = &#39;http://10.8.10.40:30080&#39;;
+</code></pre>
+<p>To change gateway URL:</p>
+<ol>
+<li>Edit <code>src/config.ts</code></li>
+<li>Save the file</li>
+<li>App will hot-reload automatically</li>
+</ol>
+<hr>
+<h2>Verifying Backend Connectivity</h2>
+<h3>Test Gateway from Your Computer</h3>
+<pre><code class="language-bash">curl http://10.8.10.40:30080/v1/health
+# Should return: {&quot;status&quot;:&quot;ok&quot;,&quot;version&quot;:&quot;0.1.0&quot;}
+</code></pre>
+<h3>Test Gateway from Your Phone&#39;s Network</h3>
+<p>If you can access your homelab from your phone:</p>
+<pre><code class="language-bash">curl http://10.8.10.40:30080/v1/health
+</code></pre>
+<p>If you can&#39;t reach 10.8.10.40 from your phone:</p>
+<ul>
+<li>Use tunnel mode: <code>npx expo start --tunnel</code></li>
+<li>Or update gateway URL to your computer&#39;s IP</li>
+</ul>
+<hr>
+<h2>Common Issues</h2>
+<h3>&quot;Cannot connect to Metro bundler&quot;</h3>
+<ul>
+<li>Make sure dev server is running: <code>npm start</code></li>
+<li>Check firewall isn&#39;t blocking port 8081</li>
+<li>Try tunnel mode: <code>npx expo start --tunnel</code></li>
+</ul>
+<h3>&quot;Network request failed&quot; in app</h3>
+<ul>
+<li>Gateway URL might be incorrect</li>
+<li>Phone can&#39;t reach 10.8.10.40 (use tunnel or your computer&#39;s IP)</li>
+<li>Test connectivity: <code>curl http://10.8.10.40:30080/v1/health</code></li>
+</ul>
+<h3>&quot;Authentication failed&quot;</h3>
+<ul>
+<li>Make sure you completed the enrollment or have valid credentials</li>
+<li>Check gateway URL has no trailing slash</li>
+<li>Try creating a new identity</li>
+</ul>
+<h3>Hot reload not working</h3>
+<ul>
+<li>Press <code>r</code> in the terminal to reload manually</li>
+<li>Or shake your device and tap &quot;Reload&quot;</li>
+</ul>
+<hr>
+<h2>Development Commands</h2>
+<h3>Start dev server</h3>
+<pre><code class="language-bash">npm start
+</code></pre>
+<h3>Start with tunnel (for phone testing)</h3>
+<pre><code class="language-bash">npx expo start --tunnel
+</code></pre>
+<h3>Clear cache</h3>
+<pre><code class="language-bash">npx expo start --clear
+</code></pre>
+<h3>View logs</h3>
+<pre><code class="language-bash"># In the Expo dev server, press:
+# - &#39;j&#39; to open debugger
+# - &#39;shift+m&#39; to toggle menu
+</code></pre>
+<hr>
+<h2>Backend Monitoring</h2>
+<h3>Check if gateway is healthy</h3>
+<pre><code class="language-bash">curl http://10.8.10.40:30080/v1/health
+curl http://10.8.10.40:30080/v1/sdis/health
+</code></pre>
+<h3>View gateway logs</h3>
+<pre><code class="language-bash">ssh ubuntu@10.8.10.40 &quot;sudo kubectl -n icn logs -f deployment/icn-daemon&quot;
+</code></pre>
+<h3>Check pod status</h3>
+<pre><code class="language-bash">ssh ubuntu@10.8.10.40 &quot;sudo kubectl -n icn get pods&quot;
+</code></pre>
+<hr>
+<h2>What to Test</h2>
+<ul>
+<li><input disabled="" type="checkbox"> App launches successfully</li>
+<li><input disabled="" type="checkbox"> Can enter gateway URL and coop ID</li>
+<li><input disabled="" type="checkbox"> SDIS enrollment creates new identity</li>
+<li><input disabled="" type="checkbox"> Login with existing identity works</li>
+<li><input disabled="" type="checkbox"> Balance displays correctly</li>
+<li><input disabled="" type="checkbox"> Can send payment to self</li>
+<li><input disabled="" type="checkbox"> Transaction appears in history</li>
+<li><input disabled="" type="checkbox"> Can generate receive QR code</li>
+<li><input disabled="" type="checkbox"> Can view governance proposals</li>
+<li><input disabled="" type="checkbox"> Can cast votes</li>
+<li><input disabled="" type="checkbox"> Real-time updates work (send payment, see balance change)</li>
+</ul>
+<hr>
+<h2>Getting Help</h2>
+<ul>
+<li><strong>Gateway API Issues</strong>: Check <code>MOBILE_APP_DEPLOYMENT_STATUS.md</code></li>
+<li><strong>App Issues</strong>: Check <code>sdk/react-native/examples/CoopWallet/README.md</code></li>
+<li><strong>SDIS Issues</strong>: Check <code>docs/sdis/SDIS_API_GUIDE.md</code></li>
+</ul>
+<hr>
+<h2>Success Criteria</h2>
+<p>✅ App loads and shows login screen
+✅ Can create new identity via SDIS
+✅ Can authenticate with gateway
+✅ Balance displays (even if 0)
+✅ Can send test payment
+✅ Transaction appears in history
+✅ Governance proposals load
+✅ Can cast votes</p>
+<p><strong>Status</strong>: Ready to test! 🚀</p>
+<p>Start with: <code>/home/matt/projects/icn/scripts/start-mobile-app.sh</code></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

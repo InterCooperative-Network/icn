@@ -1,0 +1,278 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>06: Persistence and Ledger — Time-Communication + Invariants | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>onboarding</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>path</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>phase 2 architecture</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>06 persistence and ledger</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/onboarding/path/phase-2-architecture/06-persistence-and-ledger.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>06: Persistence and Ledger — Time-Communication + Invariants</h1>
+<blockquote>
+<p><strong>Phase</strong>: 2 | <strong>Tier</strong>: Fixer<br><strong>Patterns introduced</strong>: <a href="#store-abstraction">Store Abstraction</a>, <a href="#double-entry-invariant">Double-Entry Invariant</a>, <a href="#quarantine">Quarantine</a><br><strong>Prerequisite</strong>: 05-the-meaning-firewall.md</p>
+</blockquote>
+<h2>Why This Matters</h2>
+<p>Storage in distributed systems isn&#39;t &quot;a database&quot; — it&#39;s <strong>time-communication</strong>: writing data is sending a message to your future self (or future nodes). The ledger demonstrates this principle: entries persist <strong>with their invariants</strong>, not just their data.</p>
+<p>ICN&#39;s ledger enforces double-entry accounting, credit limits, and fork detection at the storage layer. Entries that violate invariants are <strong>quarantined</strong> (isolated, not dropped), making failures visible and debuggable.</p>
+<p>→ See <code>manual.md</code> § &quot;Storage as Time-Communication&quot; for the design rationale.</p>
+<h2>What You&#39;ll Read</h2>
+<h3>1. The Ledger Validation Chain: <code>icn/crates/icn-ledger/src/ledger.rs</code></h3>
+<p><strong>Function</strong>: <code>validate_entry()</code> (lines ~487-520)</p>
+<p>This function is an <strong>invariant chain</strong> — each check enforces one property:</p>
+<pre><code class="language-rust">pub fn validate_entry(&amp;mut self, entry: &amp;JournalEntry) -&gt; Result&lt;(), LedgerError&gt; {
+    // Invariant 1: Double-entry balance
+    let sum: i64 = entry.postings.iter().map(|p| p.amount).sum();
+    if sum != 0 {
+        return Err(LedgerError::UnbalancedEntry { sum });
+    }
+    
+    // Invariant 2: Signature verification
+    for sig in &amp;entry.signatures {
+        if !sig.verify(&amp;entry.id) {
+            return Err(LedgerError::InvalidSignature);
+        }
+    }
+    
+    // Invariant 3: Credit limit enforcement
+    for posting in &amp;entry.postings {
+        let balance = self.cached_balances.get(&amp;posting.account).unwrap_or(&amp;0);
+        let new_balance = balance + posting.amount;
+        let credit_limit = self.get_credit_limit(&amp;posting.account)?;
+        
+        if new_balance &lt; credit_limit {
+            return Err(LedgerError::CreditLimitExceeded {
+                account: posting.account.clone(),
+                attempted: posting.amount,
+                limit: credit_limit,
+            });
+        }
+    }
+    
+    // Invariant 4: Fork detection
+    if self.fork_detector.is_fork(&amp;entry)? {
+        return Err(LedgerError::ForkDetected {
+            entry_id: entry.id.clone(),
+        });
+    }
+    
+    Ok(())
+}
+</code></pre>
+<p><strong>Key insight</strong>: Validation is <strong>not a monolith</strong>. Each invariant is independent, testable, and has a specific error type.</p>
+<h3>2. The Quarantine System</h3>
+<p>When an entry fails validation, it&#39;s <strong>not dropped</strong> — it&#39;s moved to quarantine:</p>
+<pre><code class="language-rust">pub fn submit_entry(&amp;mut self, entry: JournalEntry) -&gt; Result&lt;(), LedgerError&gt; {
+    match self.validate_entry(&amp;entry) {
+        Ok(()) =&gt; {
+            // Valid: store normally
+            self.store.put(
+                format!(&quot;entry:{}&quot;, entry.id).as_bytes(),
+                bincode::serialize(&amp;entry)?,
+            )?;
+            self.update_cached_balances(&amp;entry);
+            
+            metrics::counter!(&quot;ledger_entries_total&quot;, &quot;status&quot; =&gt; &quot;accepted&quot;)
+                .increment(1);
+        }
+        Err(e) =&gt; {
+            // Invalid: quarantine with reason
+            self.quarantine.insert(entry.id.clone(), QuarantinedEntry {
+                entry,
+                reason: e.to_string(),
+                timestamp: Timestamp::now(),
+            });
+            
+            metrics::counter!(&quot;ledger_validation_failures_total&quot;,
+                &quot;reason&quot; =&gt; error_type(&amp;e)).increment(1);
+            
+            return Err(e);
+        }
+    }
+    Ok(())
+}
+</code></pre>
+<p><strong>Why quarantine matters</strong>:</p>
+<ul>
+<li><strong>Visibility</strong>: Failed entries are retrievable for debugging</li>
+<li><strong>Auditability</strong>: You can inspect <em>why</em> an entry failed</li>
+<li><strong>Recovery</strong>: If validation rules change, quarantined entries can be retried</li>
+<li><strong>Security</strong>: Prevents silent data loss from malicious or buggy entries</li>
+</ul>
+<h3>3. The Ledger Struct Composition</h3>
+<p><strong>File</strong>: <code>icn/crates/icn-ledger/src/ledger.rs</code> (struct definition, ~lines 50-80)</p>
+<pre><code class="language-rust">pub struct Ledger {
+    store: Arc&lt;dyn Store&gt;,                           // Persistent KV storage
+    cached_balances: HashMap&lt;Did, i64&gt;,              // In-memory balance cache
+    quarantine: HashMap&lt;EntryId, QuarantinedEntry&gt;,  // Failed entries
+    fork_detector: ForkDetector,                     // Detects conflicting entries
+    fork_resolver: ForkResolver,                     // Resolves conflicts
+    credit_limits: HashMap&lt;Did, i64&gt;,                // Per-account limits
+    dynamic_limit_manager: Option&lt;DynamicLimitManager&gt;, // Optional: adjust limits based on behavior
+}
+</code></pre>
+<p><strong>Composition principles</strong>:</p>
+<ul>
+<li><strong>Store</strong> is abstract: Works with Sled, Redis, or in-memory (for tests)</li>
+<li><strong>Cached balances</strong> avoid re-reading entries on every validation</li>
+<li><strong>Quarantine</strong> keeps failed entries separate from valid ones</li>
+<li><strong>Fork detector/resolver</strong> handle network partitions and conflicting history</li>
+</ul>
+<h3>4. Test Example: Dynamic Limit Integration</h3>
+<p><strong>File</strong>: <code>icn/crates/icn-ledger/tests/dynamic_limits_integration.rs</code></p>
+<p><strong>Test</strong>: <code>test_credit_limit_enforcement_with_dynamic_manager</code></p>
+<p>This test proves the ledger enforces credit limits correctly:</p>
+<pre><code class="language-rust">#[tokio::test]
+async fn test_credit_limit_enforcement_with_dynamic_manager() {
+    let store = Arc::new(MemStore::new());
+    let mut ledger = Ledger::new(store, IdentityBundle::new()?);
+    
+    // Set credit limit: -500 (can owe up to 500)
+    ledger.set_credit_limit(&amp;alice_did, -500);
+    
+    // Valid entry: Alice owes 300 (within limit)
+    let entry1 = JournalEntry {
+        postings: vec![
+            Posting { account: alice_did.clone(), amount: -300 },
+            Posting { account: bob_did.clone(), amount: 300 },
+        ],
+        ..Default::default()
+    };
+    assert!(ledger.submit_entry(entry1).is_ok());
+    
+    // Invalid entry: Alice would owe 800 (exceeds limit)
+    let entry2 = JournalEntry {
+        postings: vec![
+            Posting { account: alice_did.clone(), amount: -500 },
+            Posting { account: bob_did.clone(), amount: 500 },
+        ],
+        ..Default::default()
+    };
+    assert!(matches!(
+        ledger.submit_entry(entry2),
+        Err(LedgerError::CreditLimitExceeded { .. })
+    ));
+    
+    // Entry2 should be in quarantine
+    let quarantined = ledger.get_quarantine();
+    assert_eq!(quarantined.len(), 1);
+}
+</code></pre>
+<p><strong>What this tests</strong>:</p>
+<ol>
+<li>Valid entries are accepted</li>
+<li>Invalid entries are rejected with specific error</li>
+<li>Rejected entries end up in quarantine (not dropped)</li>
+</ol>
+<h2>Patterns Introduced</h2>
+<h3>Store Abstraction</h3>
+<p><strong>Pattern</strong>: Abstract storage behind traits for testability and backend flexibility.</p>
+<pre><code class="language-rust">pub trait Store: Send + Sync {
+    fn get(&amp;self, key: &amp;[u8]) -&gt; Result&lt;Option&lt;Vec&lt;u8&gt;&gt;&gt;;
+    fn put(&amp;self, key: &amp;[u8], value: Vec&lt;u8&gt;) -&gt; Result&lt;()&gt;;
+    fn delete(&amp;self, key: &amp;[u8]) -&gt; Result&lt;()&gt;;
+}
+</code></pre>
+<p><strong>Implementations</strong>:</p>
+<ul>
+<li><code>SledStore</code> — production (persistent)</li>
+<li><code>MemStore</code> — tests (in-memory)</li>
+<li><code>RedisStore</code> — future (distributed cache)</li>
+</ul>
+<p>→ See <code>patterns.md</code> #4 for full template.</p>
+<h3>Double-Entry Invariant</h3>
+<p><strong>Pattern</strong>: Enforce balanced entries at validation time, reject unbalanced.</p>
+<pre><code class="language-rust">let sum: i64 = entry.postings.iter().map(|p| p.amount).sum();
+if sum != 0 {
+    return Err(LedgerError::UnbalancedEntry { sum });
+}
+</code></pre>
+<p><strong>Why</strong>: Prevents accounting errors, ensures conservation of value.</p>
+<p>→ See <code>patterns.md</code> #14 for full template.</p>
+<h3>Quarantine</h3>
+<p><strong>Pattern</strong>: Isolate failed entries instead of dropping them.</p>
+<pre><code class="language-rust">match validate(entry) {
+    Ok(()) =&gt; store_normally(entry),
+    Err(e) =&gt; quarantine.insert(entry.id, QuarantinedEntry { entry, reason: e }),
+}
+</code></pre>
+<p><strong>Why</strong>: Makes failures visible, supports debugging and auditing.</p>
+<p>→ See <code>patterns.md</code> #16 for full template.</p>
+<h2>What You&#39;ll Build</h2>
+<p>→ <strong>Lab</strong>: <code>labs/lab-05-mini-ledger/</code></p>
+<p>Build a minimal double-entry ledger:</p>
+<ul>
+<li>Accounts, postings, transaction IDs</li>
+<li>Invariant checks: balanced entries required</li>
+<li>Quarantine for entries that fail validation (isolated, not dropped)</li>
+</ul>
+<p><strong>Done when</strong>: Unbalanced entries are rejected, quarantined entries are retrievable, tests prove invariants.</p>
+<h2>Checkpoint</h2>
+<p>You&#39;ve completed this layer when you can:</p>
+<ol>
+<li><strong>Trace validation</strong>: Explain the four invariants enforced by <code>validate_entry()</code></li>
+<li><strong>Implement quarantine</strong>: Add quarantine to your lab ledger, write tests proving it works</li>
+<li><strong>Reason about storage</strong>: Explain why storage is &quot;time-communication&quot; (not just &quot;persistence&quot;)</li>
+<li><strong>Debug failures</strong>: Given a quarantined entry, determine which invariant it violated</li>
+</ol>
+<p><strong>Artifact</strong>: Lab-05 complete with tests proving all three patterns (double-entry, quarantine, store abstraction).</p>
+<h2>Deep Reference</h2>
+<p>→ <code>reference/module-06-ledger-contracts.md</code> — Full ledger design, Merkle-DAG, sync protocol<br>→ <code>icn/crates/icn-ledger/src/ledger.rs</code> — Source code for validation and quarantine<br>→ <code>icn/crates/icn-ledger/tests/dynamic_limits_integration.rs</code> — Example integration tests</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

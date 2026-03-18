@@ -1,0 +1,941 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>RFC: ICN Commons Evolution | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>COMMONS EVOLUTION</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/COMMONS_EVOLUTION.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>RFC: ICN Commons Evolution</h1>
+<p><strong>Document ID</strong>: ICN-RFC-COMMONS-01
+<strong>Status</strong>: IMPLEMENTED (v0.3.0 Foundation)
+<strong>Author</strong>: Matthew Faherty
+<strong>Created</strong>: 2025-12-14
+<strong>Updated</strong>: 2025-12-14
+<strong>Target Version</strong>: v0.3.0+</p>
+<h3>Implementation Status (2025-12-14)</h3>
+<p><strong>v0.3.0 Foundation - COMPLETE</strong>:</p>
+<ul>
+<li>PersonhoodAnchor, CommonsHolderRecord, Charter structs</li>
+<li>Gateway REST APIs (<code>/v1/commons/*</code>, <code>/v1/charter/*</code>)</li>
+<li>SDIS enrollment creates PersonhoodAnchor + CommonsHolderRecord</li>
+<li>CLI commands (<code>icnctl commons anchor</code>, <code>icnctl charter show/list</code>)</li>
+<li>Integration tests for full enrollment → anchor → holder flow</li>
+</ul>
+<p><strong>v0.4.0 Stewardship - COMPLETE</strong>:</p>
+<ul>
+<li>StewardRecord management in CommonsManager with full lifecycle</li>
+<li>Gateway REST API (<code>/v1/steward/*</code>) with 13 endpoints</li>
+<li>POP attestation workflow integrated with steward validation</li>
+<li>Reputation tracking (attestations issued, disputes, disputes won)</li>
+<li>Term and bond management (extend term, add/slash bond)</li>
+<li>CLI commands (<code>icnctl steward info/list/attesters/register/retire</code>)</li>
+<li>14 steward integration tests</li>
+</ul>
+<p><strong>v0.5.0 Membership &amp; Rights - COMPLETE</strong>:</p>
+<ul>
+<li>RevocationRecord and RevocationRegistry for tracking revocations with appeals</li>
+<li>Membership management API (<code>/v1/membership/*</code>) with 15 endpoints</li>
+<li>Full membership lifecycle: apply, approve, promote, suspend, reinstate, exit</li>
+<li>Capability management: grant, revoke, check capabilities per jurisdiction</li>
+<li>Role management: add/remove roles for members</li>
+<li>Ban/revoke with appeal process and due process support</li>
+<li>Rights enforcement through revocation checks before actions</li>
+</ul>
+<p><strong>v0.6.0 Constitutional Governance - COMPLETE</strong>:</p>
+<ul>
+<li>Amendment types (Charter, Constitutional, Policy, Economic, Governance)</li>
+<li>Amendment lifecycle: Draft → Submitted → UnderReview → Voting → Ratified/Rejected</li>
+<li>Multi-level ratification: jurisdiction, federation, and network scopes</li>
+<li>Ratification requirements with quorum, approval threshold, and jurisdiction/federation minimums</li>
+<li>Appeal types (Revocation, Suspension, GovernanceDecision, DisputeResolution, MembershipDenial, StewardAction)</li>
+<li>Appeal lifecycle: Filed → UnderReview → Hearing → Resolved/Dismissed/Withdrawn</li>
+<li>Appeal outcomes: Upheld, Denied, PartiallyUpheld, Remanded with remedies</li>
+<li>Gateway REST API (<code>/v1/constitutional/*</code>) with 15 endpoints</li>
+<li>Evidence and response management for appeals</li>
+<li>140 governance tests + 195 gateway tests passing</li>
+</ul>
+<hr>
+<h2>Abstract</h2>
+<p>This RFC proposes evolving ICN from a &quot;cooperative coordination tool&quot; to a &quot;global commons infrastructure.&quot; The core insight: <strong>Commons Holder is the root identity; membership is scoped capability grants under that identity.</strong></p>
+<p>This enables:</p>
+<ul>
+<li>Portable identity across jurisdictions</li>
+<li>Baseline rights that can&#39;t be revoked locally</li>
+<li>Constitutional governance at network scale</li>
+<li>True &quot;global participation&quot; without centralized authority</li>
+</ul>
+<hr>
+<h2>Motivation</h2>
+<h3>Current Model (v0.2.x)</h3>
+<pre><code>Person → creates DID → joins Coop → joins Federation
+         (identity)    (membership)  (inter-coop)
+</code></pre>
+<p><strong>Limitations:</strong></p>
+<ul>
+<li>Identity is siloed to cooperative context</li>
+<li>No baseline rights independent of membership</li>
+<li>No formal distinction between &quot;person&quot; and &quot;key&quot;</li>
+<li>No constitutional layer above federations</li>
+</ul>
+<h3>Proposed Model (v0.3.x+)</h3>
+<pre><code>Person → PersonhoodAnchor → CommonsHolder → Affiliations
+         (proof-of-person)   (baseline rights)  (coop/community/federation)
+</code></pre>
+<p><strong>Benefits:</strong></p>
+<ul>
+<li>Identity survives key rotation and organizational changes</li>
+<li>Baseline rights (voice, due process, exit) are network-level</li>
+<li>Cooperatives become &quot;jurisdictions&quot; within a commons</li>
+<li>Constitutional governance enables network-wide decisions</li>
+</ul>
+<hr>
+<h2>Conceptual Framework</h2>
+<h3>The Three Layers</h3>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Concept</th>
+<th>Persistence</th>
+<th>Revocable By</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Layer 0</strong></td>
+<td>PersonhoodAnchor</td>
+<td>Permanent</td>
+<td>Network governance only</td>
+</tr>
+<tr>
+<td><strong>Layer 1</strong></td>
+<td>CommonsHolderRecord</td>
+<td>Long-lived</td>
+<td>Network governance (with appeal)</td>
+</tr>
+<tr>
+<td><strong>Layer 2</strong></td>
+<td>Affiliation/Membership</td>
+<td>Jurisdiction-scoped</td>
+<td>Jurisdiction governance</td>
+</tr>
+</tbody></table>
+<h3>Key Principle</h3>
+<blockquote>
+<p>A cooperative can revoke your membership.
+A cooperative cannot revoke your personhood.</p>
+</blockquote>
+<p>This separation protects individuals from local power abuse while preserving organizational autonomy.</p>
+<hr>
+<h2>New Domain Types</h2>
+<p>Current ICN uses flat domain identifiers. This RFC introduces hierarchical domains:</p>
+<pre><code>network:commons          # Global commons layer
+network:governance       # Network-level constitutional governance
+network:stewards         # Steward registry and oversight
+
+federation:&lt;id&gt;          # Regional/sectoral federations
+coop:&lt;id&gt;                # Economic cooperatives
+community:&lt;id&gt;           # Civic communities (mutual aid, advocacy)
+</code></pre>
+<h3>Domain Relationships</h3>
+<pre><code>network:commons
+    ├── network:governance
+    ├── network:stewards
+    ├── federation:pacific-nw
+    │   ├── coop:food-portland
+    │   ├── coop:housing-seattle
+    │   └── community:mutual-aid-tacoma
+    └── federation:northeast
+        ├── coop:worker-boston
+        └── community:timebank-nyc
+</code></pre>
+<hr>
+<h2>New Core Data Structures</h2>
+<h3>1. PersonhoodAnchor (Layer 0)</h3>
+<p>The cryptographic root of a human&#39;s participation, independent of key rotation.</p>
+<pre><code class="language-rust">/// Proof of personhood anchor - persistent across key rotations
+pub struct PersonhoodAnchor {
+    /// Unique anchor ID (hash of initial attestation bundle)
+    pub anchor_id: Hash,
+
+    /// Current active public key (rotatable)
+    pub current_key: PublicKey,
+
+    /// Key rotation history
+    pub key_history: Vec&lt;KeyRotationEvent&gt;,
+
+    /// Proof-of-personhood attestations
+    pub pop_attestations: Vec&lt;POPAttestation&gt;,
+
+    /// Uniqueness proofs (cross-anchor deduplication)
+    pub uniqueness_proofs: Vec&lt;UniquenessProof&gt;,
+
+    /// Anchor creation timestamp
+    pub created_at: Timestamp,
+
+    /// Current status
+    pub status: AnchorStatus,
+}
+
+pub enum AnchorStatus {
+    Active,
+    Suspended { reason: String, until: Option&lt;Timestamp&gt; },
+    Revoked { reason: String, evidence: Vec&lt;Hash&gt; },
+}
+
+/// Proof-of-personhood attestation from a steward or organization
+pub struct POPAttestation {
+    /// Issuer (steward or organizational DID)
+    pub issuer_did: DID,
+
+    /// Verification method used
+    pub method: POPMethod,
+
+    /// Strength level of verification
+    pub level: POPLevel,
+
+    /// When attestation was issued
+    pub timestamp: Timestamp,
+
+    /// Optional expiry (some methods require renewal)
+    pub expiry: Option&lt;Timestamp&gt;,
+
+    /// Cryptographic signature
+    pub signature: Signature,
+}
+
+pub enum POPMethod {
+    /// In-person verification by steward
+    InPerson,
+    /// Sponsored by existing verified holder
+    Sponsored { sponsor_did: DID },
+    /// Biometric verification (privacy-preserving)
+    Biometric,
+    /// Community ceremony (e.g., key signing party)
+    Ceremony { witnesses: Vec&lt;DID&gt; },
+}
+
+pub enum POPLevel {
+    /// Basic - single attestation, limited capabilities
+    Weak,
+    /// Standard - multiple attestations or strong method
+    Strong,
+    /// High assurance - multiple methods, periodic renewal
+    Verified,
+}
+</code></pre>
+<h3>2. CommonsHolderRecord (Layer 1)</h3>
+<p>A human participant&#39;s record in the global commons.</p>
+<pre><code class="language-rust">/// Record of a Commons Holder - a human participant with baseline rights
+pub struct CommonsHolderRecord {
+    /// The holder&#39;s current DID
+    pub holder_did: DID,
+
+    /// Link to underlying PersonhoodAnchor
+    pub anchor_id: Hash,
+
+    /// Holder status
+    pub status: HolderStatus,
+
+    /// Current personhood verification level
+    pub personhood_level: POPLevel,
+
+    /// Affiliations with jurisdictions
+    pub affiliations: Vec&lt;Affiliation&gt;,
+
+    /// Baseline rights (network-level, non-revocable by jurisdictions)
+    pub baseline_rights: CommonsRights,
+
+    /// When holder entered the commons
+    pub created_at: Timestamp,
+
+    /// Last governance review (for periodic re-verification)
+    pub last_review_at: Option&lt;Timestamp&gt;,
+}
+
+pub enum HolderStatus {
+    Active,
+    Suspended { reason: String, appeal_deadline: Timestamp },
+    Exited { reason: String, exit_timestamp: Timestamp },
+    Revoked { reason: String, evidence: Vec&lt;Hash&gt; },
+}
+
+/// Affiliation with a jurisdiction (coop, community, or federation)
+pub struct Affiliation {
+    /// The jurisdiction domain ID
+    pub jurisdiction_id: DomainId,
+
+    /// Membership status within this jurisdiction
+    pub membership_status: MembershipStatus,
+
+    /// Roles held in this jurisdiction
+    pub roles: Vec&lt;Role&gt;,
+
+    /// When affiliation began
+    pub joined_at: Timestamp,
+}
+
+/// Baseline rights held by all Commons Holders
+/// These CANNOT be revoked by individual jurisdictions
+pub struct CommonsRights {
+    /// Right to vote in commons-level governance
+    pub vote_in_commons: bool,
+
+    /// Right to petition for constitutional changes
+    pub petition: bool,
+
+    /// Guaranteed minimum fuel for civic participation
+    pub minimal_fuel_floor: bool,
+
+    /// Right to due process before suspension/revocation
+    pub due_process: bool,
+
+    /// Right to exit any jurisdiction freely
+    pub exit_freely: bool,
+
+    /// Right to audit public records
+    pub audit_access: bool,
+}
+</code></pre>
+<h3>3. Charter (Organization Genesis)</h3>
+<p>The founding document that creates a cooperative, community, or federation.</p>
+<pre><code class="language-rust">/// Charter - founding document for a jurisdiction
+pub struct Charter {
+    /// Unique charter ID
+    pub charter_id: Hash,
+
+    /// Type of organization
+    pub org_type: OrgType,
+
+    /// Domain ID for this jurisdiction
+    pub domain_id: DomainId,
+
+    /// Human-readable name
+    pub name: String,
+
+    /// Hash of founding document (immutable reference)
+    pub founding_document_hash: Hash,
+
+    /// Founding signatures
+    pub founders: Vec&lt;FounderSignature&gt;,
+
+    /// Governance configuration
+    pub governance_profile: GovernanceProfile,
+
+    /// Membership rules
+    pub membership_policy: MembershipPolicy,
+
+    /// Economic rules (if applicable)
+    pub economic_policy: Option&lt;EconomicPolicy&gt;,
+
+    /// Dispute resolution rules
+    pub dispute_policy: DisputePolicy,
+
+    /// Initial network endpoints
+    pub bootstrap_endpoints: Vec&lt;Endpoint&gt;,
+
+    /// Charter creation timestamp
+    pub created_at: Timestamp,
+
+    /// Amendment history
+    pub amendments: Vec&lt;AmendmentRef&gt;,
+}
+
+pub enum OrgType {
+    /// Economic cooperative (has ledger, treasury)
+    Cooperative,
+    /// Civic community (mutual aid, advocacy, stewardship)
+    Community,
+    /// Federation of coops/communities
+    Federation,
+}
+
+pub struct FounderSignature {
+    pub holder_did: DID,
+    pub signature: Signature,
+    pub timestamp: Timestamp,
+}
+
+pub struct MembershipPolicy {
+    /// Minimum sponsors required
+    pub min_sponsors: u32,
+    /// Probation period for new members
+    pub probation_duration: Option&lt;Duration&gt;,
+    /// Whether membership is open or invite-only
+    pub open_enrollment: bool,
+    /// Required training/orientation
+    pub training_requirements: Vec&lt;TrainingId&gt;,
+}
+</code></pre>
+<h3>4. MembershipRecord (Layer 2)</h3>
+<p>Jurisdiction-scoped membership with capabilities.</p>
+<pre><code class="language-rust">/// Membership record for a specific jurisdiction
+pub struct MembershipRecord {
+    /// The member&#39;s DID
+    pub member_did: DID,
+
+    /// The jurisdiction this membership is in
+    pub jurisdiction_id: DomainId,
+
+    /// Membership status
+    pub status: MembershipStatus,
+
+    /// Capabilities granted by this membership
+    pub capabilities: Vec&lt;Capability&gt;,
+
+    /// Sponsors who vouched for this member
+    pub sponsors: Vec&lt;SponsorSignature&gt;,
+
+    /// Membership conditions (probation, bonds, etc.)
+    pub conditions: MembershipConditions,
+
+    /// When membership began
+    pub start_time: Timestamp,
+
+    /// Optional expiry (for term-limited memberships)
+    pub expiry: Option&lt;Timestamp&gt;,
+
+    /// If revoked, the reason
+    pub revocation_reason: Option&lt;RevocationReason&gt;,
+}
+
+pub enum MembershipStatus {
+    Candidate,    // Applied, not yet approved
+    Provisional,  // Approved, in probation period
+    Member,       // Full member
+    Suspended,    // Temporarily suspended
+    Exited,       // Voluntarily left
+    Banned,       // Removed by governance
+}
+
+pub enum Capability {
+    /// Can vote in jurisdiction governance
+    Vote,
+    /// Can create proposals
+    Propose,
+    /// Can participate in economic transactions
+    Transact,
+    /// Can hold elected/appointed positions
+    HoldOffice,
+    /// Can access private/internal resources
+    AccessPrivate,
+    /// Can invite/sponsor new members
+    Sponsor,
+}
+
+pub struct MembershipConditions {
+    pub probation_duration: Option&lt;Duration&gt;,
+    pub contribution_threshold: Option&lt;u64&gt;,
+    pub bond_requirement: Option&lt;Amount&gt;,
+    pub training_requirements: Vec&lt;TrainingId&gt;,
+}
+</code></pre>
+<h3>5. StewardRecord</h3>
+<p>Trusted operators who perform identity verification and infrastructure maintenance.</p>
+<pre><code class="language-rust">/// Record of a network steward
+pub struct StewardRecord {
+    /// Steward&#39;s operational DID
+    pub steward_did: DID,
+
+    /// Must be a Commons Holder
+    pub holder_did: DID,
+
+    /// Steward status
+    pub status: StewardStatus,
+
+    /// Geographic or sectoral scope (None = global)
+    pub jurisdiction: Option&lt;DomainId&gt;,
+
+    /// Term start
+    pub term_start: Timestamp,
+
+    /// Term end (stewards have limited terms)
+    pub term_end: Timestamp,
+
+    /// Bond posted (stake against misbehavior)
+    pub bond_amount: Amount,
+
+    /// Computed reputation from attestation outcomes
+    pub reputation_score: f64,
+
+    /// Total attestations issued
+    pub attestations_issued: u64,
+
+    /// Disputes filed against this steward
+    pub disputes_against: u64,
+
+    /// Governance approval reference
+    pub governance_approval: GovernanceRef,
+}
+
+pub enum StewardStatus {
+    Active,
+    Suspended { reason: String },
+    Retired,
+    Revoked { reason: String },
+}
+</code></pre>
+<h3>6. RevocationRecord</h3>
+<p>Records of revoked credentials, memberships, or anchors.</p>
+<pre><code class="language-rust">/// Record of a revocation action
+pub struct RevocationRecord {
+    /// Unique revocation ID
+    pub revocation_id: Hash,
+
+    /// What type of thing was revoked
+    pub target_type: RevocationType,
+
+    /// ID of the revoked item
+    pub target_id: Hash,
+
+    /// Scope of revocation
+    pub scope: RevocationScope,
+
+    /// Authority that issued revocation
+    pub authority: DID,
+
+    /// Reason for revocation
+    pub reason: RevocationReason,
+
+    /// Evidence references
+    pub evidence_refs: Vec&lt;Hash&gt;,
+
+    /// Appeal deadline
+    pub appeal_deadline: Timestamp,
+
+    /// Appeal record (if appealed)
+    pub appeal_record: Option&lt;AppealRef&gt;,
+
+    /// When revocation takes effect
+    pub effective_at: Timestamp,
+}
+
+pub enum RevocationType {
+    Anchor,      // PersonhoodAnchor revocation
+    Holder,      // CommonsHolderRecord revocation
+    Membership,  // Jurisdiction membership revocation
+    Credential,  // Specific credential revocation
+}
+
+pub enum RevocationScope {
+    Global,       // Network-wide
+    Federation,   // Within a federation
+    Jurisdiction, // Within a single coop/community
+}
+</code></pre>
+<hr>
+<h2>New CLI Commands</h2>
+<h3>Commons Enrollment</h3>
+<pre><code class="language-bash"># Enroll as Commons Holder (requires steward attestation)
+icnctl commons enroll --steward did:icn:STEWARD_DID
+
+# View your Commons status
+icnctl commons status
+
+# View your affiliations across jurisdictions
+icnctl commons affiliations
+
+# Exit the commons (voluntary, irreversible)
+icnctl commons exit --reason &quot;Moving to different network&quot;
+</code></pre>
+<h3>Charter Management</h3>
+<pre><code class="language-bash"># Create a new cooperative
+icnctl charter create \
+  --type coop \
+  --name &quot;My Food Cooperative&quot; \
+  --domain-id &quot;coop:my-food-coop&quot; \
+  --governance-profile consensus-with-fallback \
+  --founders did:icn:FOUNDER1,did:icn:FOUNDER2,did:icn:FOUNDER3
+
+# Create a community
+icnctl charter create \
+  --type community \
+  --name &quot;Mutual Aid Queens&quot; \
+  --domain-id &quot;community:mutual-aid-queens&quot; \
+  --governance-profile sociocracy-consent
+
+# View charter details
+icnctl charter show --domain-id &quot;coop:my-food-coop&quot;
+
+# Propose charter amendment
+icnctl charter amend \
+  --domain-id &quot;coop:my-food-coop&quot; \
+  --amendment-file ./proposed-amendment.md
+</code></pre>
+<h3>Membership Management</h3>
+<pre><code class="language-bash"># Apply for membership in a jurisdiction
+icnctl membership apply --jurisdiction &quot;coop:my-food-coop&quot;
+
+# View membership status
+icnctl membership status --jurisdiction &quot;coop:my-food-coop&quot;
+
+# Approve membership application (admin)
+icnctl membership approve \
+  --jurisdiction &quot;coop:my-food-coop&quot; \
+  --applicant did:icn:APPLICANT_DID
+
+# Suspend membership (admin, requires due process)
+icnctl membership suspend \
+  --jurisdiction &quot;coop:my-food-coop&quot; \
+  --member did:icn:MEMBER_DID \
+  --reason &quot;Pending dispute resolution&quot; \
+  --dispute-id DISPUTE_ID
+
+# Exit membership voluntarily
+icnctl membership exit --jurisdiction &quot;coop:my-food-coop&quot;
+</code></pre>
+<h3>Steward Operations</h3>
+<pre><code class="language-bash"># Issue proof-of-personhood attestation
+icnctl steward attest-pop \
+  --target did:icn:NEW_HOLDER_DID \
+  --method in_person \
+  --level strong
+
+# View steward statistics
+icnctl steward stats
+
+# List stewards in a jurisdiction
+icnctl steward list --jurisdiction &quot;federation:pacific-nw&quot;
+</code></pre>
+<hr>
+<h2>New CCL Contracts</h2>
+<h3>commons-core-v1.ccl</h3>
+<pre><code>contract CommonsCore {
+    // Commons Holder lifecycle
+    rule enroll_holder(anchor: AnchorId, attestations: Vec&lt;POPAttestation&gt;) {
+        require attestations.len() &gt;= 2;
+        require all_valid_stewards(attestations);
+        create_holder_record(anchor, attestations);
+    }
+
+    rule suspend_holder(holder: DID, reason: String, evidence: Vec&lt;Hash&gt;) {
+        require has_governance_authority(sender);
+        require evidence.len() &gt;= 1;
+        set_holder_status(holder, suspended);
+        create_appeal_window(holder, 30 days);
+    }
+
+    // Baseline rights enforcement
+    query has_right(holder: DID, right: CommonsRight) -&gt; bool {
+        let record = get_holder_record(holder);
+        return record.status == active &amp;&amp; record.baseline_rights.contains(right);
+    }
+}
+</code></pre>
+<h3>charter-v1.ccl</h3>
+<pre><code>contract CharterManagement {
+    rule create_charter(
+        org_type: OrgType,
+        domain_id: DomainId,
+        founders: Vec&lt;DID&gt;,
+        document_hash: Hash,
+        governance_profile: String
+    ) {
+        require founders.len() &gt;= 3;
+        require all_commons_holders(founders);
+        require all_signed(founders, document_hash);
+        create_charter_record(org_type, domain_id, founders, document_hash, governance_profile);
+        register_domain(domain_id);
+    }
+
+    rule amend_charter(domain_id: DomainId, amendment: Amendment) {
+        require has_amendment_authority(sender, domain_id);
+        require amendment_ratified(domain_id, amendment);
+        apply_amendment(domain_id, amendment);
+    }
+}
+</code></pre>
+<h3>membership-v1.ccl</h3>
+<pre><code>contract Membership {
+    rule apply(jurisdiction: DomainId, applicant: DID) {
+        require is_commons_holder(applicant);
+        require jurisdiction_accepting_applications(jurisdiction);
+        create_application(jurisdiction, applicant);
+    }
+
+    rule approve(jurisdiction: DomainId, applicant: DID, sponsors: Vec&lt;DID&gt;) {
+        require has_approval_authority(sender, jurisdiction);
+        require meets_sponsorship_requirements(jurisdiction, sponsors);
+        create_membership_record(jurisdiction, applicant, sponsors);
+        assign_initial_capabilities(jurisdiction, applicant);
+    }
+
+    rule revoke(jurisdiction: DomainId, member: DID, reason: String) {
+        require has_revocation_authority(sender, jurisdiction);
+        require due_process_satisfied(jurisdiction, member, reason);
+        set_membership_status(member, jurisdiction, revoked);
+        // Note: Does NOT affect Commons Holder status
+    }
+}
+</code></pre>
+<h3>commons-governance-v1.ccl</h3>
+<pre><code>contract CommonsGovernance {
+    // Network-level constitutional governance
+
+    rule propose_amendment(amendment: ConstitutionalAmendment) {
+        require is_commons_holder(sender);
+        require fuel_available(sender, 100);
+        create_constitutional_proposal(amendment);
+    }
+
+    rule ratify_amendment(proposal_id: ProposalId) {
+        require holder_vote_threshold(proposal_id, 0.67);
+        require jurisdiction_vote_threshold(proposal_id, 0.67);
+        require federation_balance_check(proposal_id);
+        apply_constitutional_change(proposal_id);
+    }
+
+    rule appoint_steward(candidate: DID, jurisdiction: Option&lt;DomainId&gt;) {
+        require is_commons_holder(candidate);
+        require steward_requirements_met(candidate);
+        require governance_approval(candidate);
+        create_steward_record(candidate, jurisdiction);
+    }
+}
+</code></pre>
+<hr>
+<h2>Glossary Additions</h2>
+<h3>New Terms</h3>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Definition</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>The Commons</strong></td>
+<td>The shared global coordination layer of ICN: identity, rights, governance, and economic participation held in common by all participants</td>
+</tr>
+<tr>
+<td><strong>Commons Holder</strong></td>
+<td>A human participant recognized by the network as holding baseline rights and responsibilities in the commons</td>
+</tr>
+<tr>
+<td><strong>Personhood Anchor</strong></td>
+<td>The cryptographic root of a Commons Holder&#39;s identity, independent of key rotation; proves a unique human behind the keys</td>
+</tr>
+<tr>
+<td><strong>Charter</strong></td>
+<td>The founding document that creates a cooperative, community, or federation as a jurisdiction within the commons</td>
+</tr>
+<tr>
+<td><strong>Jurisdiction</strong></td>
+<td>A coop, community, or federation with its own charter, governance, and membership rules; operates within the commons framework</td>
+</tr>
+<tr>
+<td><strong>Steward</strong></td>
+<td>A trusted operator who performs identity verification, infrastructure maintenance, or governance functions on behalf of the network</td>
+</tr>
+<tr>
+<td><strong>Commons Rights</strong></td>
+<td>The baseline rights held by all Commons Holders: voice, due process, exit, audit access; cannot be revoked by individual jurisdictions</td>
+</tr>
+<tr>
+<td><strong>Affiliation</strong></td>
+<td>A Commons Holder&#39;s membership relationship with a specific jurisdiction, granting additional capabilities within that scope</td>
+</tr>
+<tr>
+<td><strong>Proof-of-Personhood (POP)</strong></td>
+<td>Verification that a Commons Holder represents a unique human, not a bot or duplicate identity</td>
+</tr>
+</tbody></table>
+<h3>Updated Terms</h3>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Old Definition</th>
+<th>New Definition</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Membership</strong></td>
+<td>Relationship with a cooperative</td>
+<td>A Commons Holder&#39;s scoped affiliation with a specific jurisdiction, granting additional capabilities beyond baseline rights</td>
+</tr>
+<tr>
+<td><strong>Governance Domain</strong></td>
+<td>Decision-making context</td>
+<td>A jurisdiction or the commons itself, with defined governance rules and decision authority</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Migration Path</h2>
+<h3>Phase 1: v0.2.x → v0.3.0 (Non-Breaking)</h3>
+<ol>
+<li>Add new structs as optional/parallel to existing</li>
+<li>Existing DIDs continue to work unchanged</li>
+<li>New <code>commons enroll</code> command available but not required</li>
+<li>Charter creation optional for existing coops</li>
+</ol>
+<h3>Phase 2: v0.3.x → v0.4.0 (Soft Migration)</h3>
+<ol>
+<li>Steward network bootstrapped</li>
+<li>POP attestation available</li>
+<li>Existing members can opt-in to Commons Holder status</li>
+<li>New members encouraged to enroll via steward</li>
+</ol>
+<h3>Phase 3: v0.5.0+ (Full Commons)</h3>
+<ol>
+<li>Commons enrollment becomes standard path</li>
+<li>Baseline rights enforcement active</li>
+<li>Constitutional governance operational</li>
+<li>Legacy DID-only mode deprecated (but still functional)</li>
+</ol>
+<hr>
+<h2>Implementation Roadmap</h2>
+<table>
+<thead>
+<tr>
+<th>Version</th>
+<th>Milestone</th>
+<th>Status</th>
+<th>Key Deliverables</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>v0.3.0</strong></td>
+<td>Commons Foundation</td>
+<td><strong>COMPLETE</strong></td>
+<td>PersonhoodAnchor, CommonsHolderRecord, Charter structs; Gateway APIs; SDIS integration; CLI commands</td>
+</tr>
+<tr>
+<td><strong>v0.4.0</strong></td>
+<td>Stewardship</td>
+<td><strong>COMPLETE</strong></td>
+<td>StewardRecord, POP attestation workflow, steward governance, reputation tracking, bond/term management</td>
+</tr>
+<tr>
+<td><strong>v0.5.0</strong></td>
+<td>Membership &amp; Rights</td>
+<td><strong>COMPLETE</strong></td>
+<td>RevocationRecord/Registry, 15 membership API endpoints, full lifecycle management, capability/role system</td>
+</tr>
+<tr>
+<td><strong>v0.6.0</strong></td>
+<td>Constitutional Governance</td>
+<td><strong>COMPLETE</strong></td>
+<td>Amendment types/lifecycle, multi-level ratification, appeal mechanisms, 15 API endpoints</td>
+</tr>
+<tr>
+<td><strong>v1.0.0</strong></td>
+<td>Production Commons</td>
+<td>Planned</td>
+<td>Full steward network, multiple POP pathways, complete economic layer</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Security Considerations</h2>
+<h3>Steward Trust Model</h3>
+<p>Stewards are trusted to verify personhood honestly. Mitigations:</p>
+<ul>
+<li><strong>Multiple attestations required</strong>: No single steward can create a Commons Holder</li>
+<li><strong>Term limits</strong>: Stewards serve fixed terms, preventing entrenchment</li>
+<li><strong>Bonding</strong>: Stewards post bonds that can be slashed for misbehavior</li>
+<li><strong>Reputation tracking</strong>: Historical accuracy affects future trust</li>
+<li><strong>Governance oversight</strong>: Network can remove rogue stewards</li>
+</ul>
+<h3>Sybil Resistance</h3>
+<p>The POP system must prevent one human from having multiple Commons Holder identities:</p>
+<ul>
+<li><strong>Cross-attestation requirements</strong>: Different stewards or methods</li>
+<li><strong>Uniqueness proofs</strong>: Cryptographic commitments that can detect duplicates</li>
+<li><strong>Social graph analysis</strong>: Unusual patterns flag review</li>
+<li><strong>Periodic renewal</strong>: Some verification methods expire</li>
+</ul>
+<h3>Jurisdiction Abuse</h3>
+<p>A jurisdiction cannot:</p>
+<ul>
+<li>Revoke baseline Commons Rights</li>
+<li>Prevent a holder from exiting</li>
+<li>Block access to commons-level governance</li>
+<li>Interfere with other jurisdiction affiliations</li>
+</ul>
+<p>A jurisdiction can:</p>
+<ul>
+<li>Set its own membership criteria</li>
+<li>Revoke membership (with due process)</li>
+<li>Define internal capabilities and roles</li>
+<li>Establish economic policies for its scope</li>
+</ul>
+<hr>
+<h2>Open Questions</h2>
+<ol>
+<li><strong>POP Privacy</strong>: How do we verify personhood without creating a surveillance database?</li>
+<li><strong>Steward Bootstrap</strong>: Who are the first stewards, and how are they selected?</li>
+<li><strong>Cross-Network</strong>: Can a Commons Holder have identity in multiple ICN networks?</li>
+<li><strong>Legal Entity Mapping</strong>: How do jurisdictions map to legal cooperatives?</li>
+<li><strong>Recovery</strong>: If PersonhoodAnchor is compromised, what&#39;s the recovery path?</li>
+</ol>
+<hr>
+<h2>References</h2>
+<ul>
+<li><a href="/docs/ARCHITECTURE">ARCHITECTURE.md</a> - Current system architecture</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/governance/governance-primitives">governance-primitives.md</a> - Existing governance layer</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/multi-device-identity-design">multi-device-identity-design.md</a> - Key rotation patterns</li>
+<li><a href="/docs/security/threat-model">threat-model.md</a> - Security considerations</li>
+</ul>
+<hr>
+<h2>Changelog</h2>
+<ul>
+<li><strong>2025-12-14</strong>: Initial RFC draft</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

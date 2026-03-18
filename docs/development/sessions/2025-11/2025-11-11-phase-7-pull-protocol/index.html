@@ -1,0 +1,448 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Phase 7 - Pull Protocol Implementation | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>development</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>sessions</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>2025 11</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>2025 11 11 phase 7 pull protocol</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/development/sessions/2025-11/2025-11-11-phase-7-pull-protocol.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Phase 7 - Pull Protocol Implementation</h1>
+<p><strong>Date</strong>: 2025-11-11
+<strong>Status</strong>: Complete ✅
+<strong>Effort</strong>: ~2 hours</p>
+<h2>Overview</h2>
+<p>Completed the pull protocol (Request/Response) flow for gossip synchronization, enabling nodes to request missing entries on-demand rather than relying solely on push-based Announce messages.</p>
+<h2>Problem Statement</h2>
+<p>Phase 6 implemented the push-based gossip protocol where nodes broadcast Announce messages when they have new entries. However, the pull mechanism was incomplete:</p>
+<ol>
+<li>When receiving an Announce for a missing entry, nodes didn&#39;t request it</li>
+<li>When receiving a Request, nodes didn&#39;t send back the full entry</li>
+<li>RequestBloomFilter and RequestMissing handlers were stubs</li>
+<li>No bidirectional communication between GossipActor and NetworkActor</li>
+</ol>
+<p>The challenge was that <code>GossipActor</code> had no way to send messages back - it could only receive them via <code>handle_message()</code>.</p>
+<h2>Architecture Challenge: Circular Dependencies</h2>
+<p>The naive approach would be to add <code>NetworkHandle</code> to <code>GossipActor</code>:</p>
+<pre><code class="language-rust">pub struct GossipActor {
+    network_handle: Option&lt;NetworkHandle&gt;,  // ❌ Creates circular dependency
+    // ...
+}
+</code></pre>
+<p>This creates a circular dependency:</p>
+<ul>
+<li><code>icn-gossip</code> would need to depend on <code>icn-net</code> (for NetworkHandle)</li>
+<li><code>icn-net</code> already depends on <code>icn-gossip</code> (for GossipMessage types)</li>
+</ul>
+<h2>Solution: Callback-Based Architecture</h2>
+<p>Instead of tight coupling, we use a callback pattern similar to the existing <code>trust_lookup</code>:</p>
+<pre><code class="language-rust">pub type SendMessageCallback = Arc&lt;dyn Fn(Option&lt;Did&gt;, GossipMessage) + Send + Sync&gt;;
+
+pub struct GossipActor {
+    send_callback: Option&lt;SendMessageCallback&gt;,
+    // ...
+}
+</code></pre>
+<p>Benefits:</p>
+<ol>
+<li><strong>No circular dependency</strong> - gossip doesn&#39;t depend on net</li>
+<li><strong>Flexible</strong> - callback can be any implementation (mock in tests, real network in production)</li>
+<li><strong>Consistent</strong> - matches existing <code>trust_lookup</code> pattern</li>
+<li><strong>Testable</strong> - easy to inject test callbacks to verify messages sent</li>
+</ol>
+<h2>Implementation</h2>
+<h3>1. GossipActor Changes (<a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/crates/icn-gossip/src/gossip.rs#L15-L101#L15-L101">gossip.rs:15-101</a>)</h3>
+<p>Added callback infrastructure:</p>
+<pre><code class="language-rust">pub type SendMessageCallback = Arc&lt;dyn Fn(Option&lt;Did&gt;, GossipMessage) + Send + Sync&gt;;
+
+pub struct GossipActor {
+    // ... existing fields
+    send_callback: Option&lt;SendMessageCallback&gt;,
+}
+
+impl GossipActor {
+    pub fn set_send_callback(&amp;mut self, callback: SendMessageCallback) {
+        self.send_callback = Some(callback);
+    }
+
+    fn send_message(&amp;self, recipient: Option&lt;Did&gt;, message: GossipMessage) {
+        if let Some(callback) = &amp;self.send_callback {
+            callback(recipient, message);
+        } else {
+            debug!(&quot;Cannot send message - no send callback set&quot;);
+        }
+    }
+}
+</code></pre>
+<h3>2. Message Handler Implementation (<a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/crates/icn-gossip/src/gossip.rs#L257-L403#L257-L403">gossip.rs:257-403</a>)</h3>
+<p>Completed all TODO handlers:</p>
+<h4>Announce Handler</h4>
+<pre><code class="language-rust">GossipMessage::Announce { hash, author, .. } =&gt; {
+    // Check if we already have this entry
+    if let Some(entries) = self.entries.get(&amp;topic) {
+        if entries.contains_key(&amp;hash) {
+            return Ok(()); // Already have it
+        }
+    }
+
+    // Request full entry if missing
+    self.send_message(Some(author), GossipMessage::Request { hash });
+    Ok(())
+}
+</code></pre>
+<h4>Request Handler</h4>
+<pre><code class="language-rust">GossipMessage::Request { hash } =&gt; {
+    // Find entry across all topics
+    for (_topic_name, entries) in &amp;self.entries {
+        if let Some(entry) = entries.get(&amp;hash) {
+            // Send Response with the entry
+            self.send_message(None, GossipMessage::Response {
+                entry: entry.clone(),
+            });
+            return Ok(());
+        }
+    }
+    Ok(())
+}
+</code></pre>
+<h4>RequestBloomFilter Handler</h4>
+<pre><code class="language-rust">GossipMessage::RequestBloomFilter { topic } =&gt; {
+    if let Some(filter) = self.bloom_filters.get(&amp;topic) {
+        let filter_data = filter.to_data();
+        self.send_message(None, GossipMessage::SendBloomFilter {
+            topic: topic.clone(),
+            filter: filter_data,
+        });
+    }
+    Ok(())
+}
+</code></pre>
+<h4>RequestMissing Handler</h4>
+<pre><code class="language-rust">GossipMessage::RequestMissing { hashes } =&gt; {
+    for hash in hashes {
+        for (_topic_name, entries) in &amp;self.entries {
+            if let Some(entry) = entries.get(&amp;hash) {
+                self.send_message(None, GossipMessage::Response {
+                    entry: entry.clone(),
+                });
+                break;
+            }
+        }
+    }
+    Ok(())
+}
+</code></pre>
+<h3>3. Supervisor Integration (<a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/crates/icn-core/src/supervisor.rs#L95-L124#L95-L124">supervisor.rs:95-124</a>)</h3>
+<p>Wire up the callback using NetworkHandle:</p>
+<pre><code class="language-rust">// Set send callback on gossip actor to enable request/response
+{
+    let mut gossip = gossip_handle.write().await;
+    let network_handle_clone = network_handle.clone();
+    let own_did_clone = did.clone();
+
+    let send_callback: icn_gossip::SendMessageCallback = Arc::new(move |recipient, gossip_msg| {
+        let net_handle = network_handle_clone.clone();
+        let from_did = own_did_clone.clone();
+
+        // Spawn async task to send message
+        tokio::spawn(async move {
+            let result = if let Some(target_did) = recipient {
+                // Unicast
+                let net_msg = icn_net::NetworkMessage::gossip(from_did, Some(target_did.clone()), gossip_msg);
+                net_handle.send_message(target_did, net_msg).await
+            } else {
+                // Broadcast
+                let net_msg = icn_net::NetworkMessage::gossip(from_did, None, gossip_msg);
+                net_handle.broadcast(net_msg).await
+            };
+
+            if let Err(e) = result {
+                warn!(&quot;Failed to send gossip message: {}&quot;, e);
+            }
+        });
+    });
+
+    gossip.set_send_callback(send_callback);
+}
+</code></pre>
+<p>Key points:</p>
+<ul>
+<li>Callback clones NetworkHandle and DIDs to move into closure</li>
+<li>Spawns async task for each send (callback itself is synchronous)</li>
+<li>Handles both unicast (Some(did)) and broadcast (None) routing</li>
+</ul>
+<h3>4. Integration Tests (<a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/crates/icn-gossip/src/gossip.rs#L554-L668#L554-L668">gossip.rs:554-668</a>)</h3>
+<p>Added two comprehensive tests:</p>
+<h4>test_pull_protocol_request_response</h4>
+<p>Tests the full Announce → Request → Response flow:</p>
+<ol>
+<li>Node 1 publishes entry, Node 2 doesn&#39;t have it</li>
+<li>Node 2 receives Announce and sends Request</li>
+<li>Node 1 receives Request and sends Response</li>
+<li>Verifies correct messages sent at each step</li>
+</ol>
+<h4>test_request_missing_handler</h4>
+<p>Tests RequestMissing message handling:</p>
+<ol>
+<li>Node publishes 3 entries</li>
+<li>Receives RequestMissing for 2 entries</li>
+<li>Sends 2 Response messages</li>
+<li>Verifies responses contain correct entries</li>
+</ol>
+<h2>Message Flow Example</h2>
+<p>Complete pull protocol sequence:</p>
+<pre><code>Node A                                    Node B
+  |                                         |
+  | --- Announce(hash=X, author=A) -----&gt; |
+  |                                         | (checks local store)
+  |                                         | (doesn&#39;t have hash X)
+  | &lt;---- Request(hash=X) ---------------- |
+  |                                         |
+  | (finds entry X in local store)         |
+  | --- Response(entry=X) ---------------&gt; |
+  |                                         | (stores entry X)
+  |                                         | (updates bloom filter)
+</code></pre>
+<h2>Design Decisions</h2>
+<h3>1. Synchronous Callback with Async Spawn</h3>
+<p>The callback itself is <code>Fn</code> (synchronous), but spawns async tasks:</p>
+<pre><code class="language-rust">Arc&lt;dyn Fn(Option&lt;Did&gt;, GossipMessage) + Send + Sync&gt;
+</code></pre>
+<p><strong>Why?</strong></p>
+<ul>
+<li>GossipActor&#39;s <code>handle_message()</code> is <code>&amp;mut self</code> (not async)</li>
+<li>Can&#39;t await in a sync function</li>
+<li>Solution: Spawn async task inside callback</li>
+</ul>
+<p><strong>Alternative considered</strong>: Make callback <code>async Fn</code></p>
+<ul>
+<li>Would require <code>handle_message()</code> to be async</li>
+<li>Would propagate async through entire call chain</li>
+<li>More invasive change</li>
+</ul>
+<h3>2. Broadcast vs. Unicast</h3>
+<p>When to use each:</p>
+<p><strong>Unicast (Some(did))</strong>:</p>
+<ul>
+<li>Request messages (we know who has the data)</li>
+<li>Direct responses to specific peers</li>
+</ul>
+<p><strong>Broadcast (None)</strong>:</p>
+<ul>
+<li>Response messages (we don&#39;t know who requested)</li>
+<li>Anti-entropy messages (everyone should see)</li>
+</ul>
+<p><strong>Future improvement</strong>: Add source DID to Request messages so Response can be unicast.</p>
+<h3>3. SendBloomFilter Limitation</h3>
+<p>Current implementation notes:</p>
+<pre><code class="language-rust">// For a full implementation, we&#39;d need to:
+// 1. Compare our bloom filter with the remote one
+// 2. Identify hashes present in remote but not in ours
+// 3. Request those missing hashes
+//
+// However, bloom filters are probabilistic - they can only tell us
+// &quot;definitely not present&quot; or &quot;might be present&quot;. We can&#39;t extract
+// the actual hashes from a bloom filter.
+//
+// The proper approach is for the sender to also send their entry hashes
+// or we need a different anti-entropy approach.
+</code></pre>
+<p><strong>Why the limitation?</strong></p>
+<ul>
+<li>Bloom filters are one-way: <code>insert(hash)</code> → can&#39;t <code>extract_hashes()</code></li>
+<li>Can only test membership: <code>contains(hash)</code> → bool</li>
+</ul>
+<p><strong>Current anti-entropy approach</strong>:</p>
+<ul>
+<li>Use <code>RequestMissing</code> with explicit hash list</li>
+<li>Anti-entropy task broadcasts RequestBloomFilter</li>
+<li>Peers respond with SendBloomFilter</li>
+<li>Comparison happens externally, then RequestMissing sent</li>
+</ul>
+<h2>Testing Results</h2>
+<p>All tests passing:</p>
+<pre><code class="language-bash">$ cargo test -p icn-gossip --lib
+running 20 tests
+test gossip::tests::test_pull_protocol_request_response ... ok
+test gossip::tests::test_request_missing_handler ... ok
+[18 other tests] ... ok
+
+test result: ok. 20 passed; 0 failed
+</code></pre>
+<pre><code class="language-bash">$ cargo test -p icn-net --lib
+running 15 tests
+[12 tests] ... ok
+[3 tests] ... ignored
+
+test result: ok. 12 passed; 0 failed; 3 ignored
+</code></pre>
+<pre><code class="language-bash">$ cargo build --release
+Finished `release` profile [optimized] target(s) in 19.66s
+</code></pre>
+<h2>Performance Considerations</h2>
+<ol>
+<li><p><strong>Message Overhead</strong></p>
+<ul>
+<li>Each Announce triggers a Request (if missing)</li>
+<li>Each Request triggers a Response</li>
+<li>For N new entries across M nodes: O(N*M) messages</li>
+</ul>
+</li>
+<li><p><strong>Async Spawn Per Message</strong></p>
+<ul>
+<li>Each callback spawns a tokio task</li>
+<li>Lightweight but not free</li>
+<li>Alternative: Use a channel for batching (future optimization)</li>
+</ul>
+</li>
+<li><p><strong>Bloom Filter Efficiency</strong></p>
+<ul>
+<li>1% false positive rate</li>
+<li>~9.6 bits per element</li>
+<li>For 10,000 entries: ~12 KB per topic</li>
+</ul>
+</li>
+</ol>
+<h2>Limitations &amp; Future Work</h2>
+<ol>
+<li><p><strong>No Request Deduplication</strong></p>
+<ul>
+<li>Multiple Announces for same hash → multiple Requests</li>
+<li>Could add &quot;pending requests&quot; cache</li>
+</ul>
+</li>
+<li><p><strong>No Timeout on Requests</strong></p>
+<ul>
+<li>If Request is lost, entry never arrives</li>
+<li>Need retry mechanism with exponential backoff</li>
+</ul>
+</li>
+<li><p><strong>Broadcast Responses</strong></p>
+<ul>
+<li>Response goes to all peers, not just requester</li>
+<li>Wastes bandwidth</li>
+<li>Fix: Add source DID to Request message</li>
+</ul>
+</li>
+<li><p><strong>No Flow Control</strong></p>
+<ul>
+<li>Large RequestMissing (1000+ hashes) → flood of Responses</li>
+<li>Need batching or rate limiting</li>
+</ul>
+</li>
+<li><p><strong>Synchronous Callback</strong></p>
+<ul>
+<li>Spawns task per message</li>
+<li>Could be more efficient with async callback</li>
+</ul>
+</li>
+</ol>
+<h2>Files Changed</h2>
+<ul>
+<li><code>crates/icn-gossip/src/gossip.rs</code> - Added callback, implemented handlers, tests (+115 lines)</li>
+<li><code>crates/icn-gossip/src/lib.rs</code> - Exported SendMessageCallback (+1 line)</li>
+<li><code>crates/icn-core/src/supervisor.rs</code> - Wired send callback (+30 lines)</li>
+<li><code>crates/icn-net/src/actor.rs</code> - Fixed test signature (+1 line)</li>
+<li><code>crates/icn-gossip/src/vector_clock.rs</code> - Fixed unused mut warning (-1 line)</li>
+</ul>
+<p>Total: ~150 lines added/modified</p>
+<h2>Lessons Learned</h2>
+<ol>
+<li><p><strong>Callback Pattern Wins</strong></p>
+<ul>
+<li>Avoided circular dependency elegantly</li>
+<li>Similar to existing <code>trust_lookup</code> pattern</li>
+<li>Easy to test with mock callbacks</li>
+</ul>
+</li>
+<li><p><strong>Spawn Inside Sync Callback</strong></p>
+<ul>
+<li>Enables async operations from sync context</li>
+<li>Alternative to propagating async everywhere</li>
+<li>Common pattern in Tokio applications</li>
+</ul>
+</li>
+<li><p><strong>Message Design Matters</strong></p>
+<ul>
+<li>Not including source in Request → broadcast Response</li>
+<li>Small protocol change → big efficiency impact</li>
+</ul>
+</li>
+<li><p><strong>Bloom Filter Tradeoffs</strong></p>
+<ul>
+<li>Great for &quot;do you have this?&quot; checks</li>
+<li>Can&#39;t extract what&#39;s inside</li>
+<li>Need complementary mechanisms (RequestMissing)</li>
+</ul>
+</li>
+</ol>
+<h2>Next Steps</h2>
+<p>Phase 7 remaining:</p>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> Metrics exporter (Prometheus) ✅</li>
+<li><input checked="" disabled="" type="checkbox"> Complete pull protocol (Request/Response) ✅</li>
+<li><input disabled="" type="checkbox"> Topic subscriptions &amp; routing</li>
+<li><input disabled="" type="checkbox"> Production hardening</li>
+<li><input disabled="" type="checkbox"> Comprehensive documentation</li>
+</ul>
+<p><strong>Update (2025-11-11)</strong>: Metrics implementation complete! See <a href="https://github.com/InterCooperative-Network/icn/blob/main/2025-11-11-metrics-implementation">2025-11-11-metrics-implementation.md</a> for full details.</p>
+<p>Immediate next: <strong>Topic subscriptions &amp; routing</strong> or <strong>Integration testing</strong></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

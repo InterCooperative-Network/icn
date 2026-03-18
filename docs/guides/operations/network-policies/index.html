@@ -1,0 +1,344 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Network Policy Design — ICN K3s Cluster | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>guides</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>operations</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>network policies</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/guides/operations/network-policies.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Network Policy Design — ICN K3s Cluster</h1>
+<p><strong>Status</strong>: Design only — not yet implemented
+<strong>Reason for deferral</strong>: Keep flexible for active development
+<strong>Revisit when</strong>: Moving toward a pilot / hardening sprint
+<strong>Last reviewed</strong>: 2026-03-02</p>
+<hr>
+<h2>Current State</h2>
+<p>The <code>icn</code> namespace has four policies (deployed at cluster creation):</p>
+<table>
+<thead>
+<tr>
+<th>Policy</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>default-deny-ingress</code></td>
+<td>Block all inbound by default</td>
+</tr>
+<tr>
+<td><code>allow-dns-egress</code></td>
+<td>Permit UDP 53 to kube-dns</td>
+</tr>
+<tr>
+<td><code>allow-icn-mesh</code></td>
+<td>Allow mesh traffic between ICN daemon pods</td>
+</tr>
+<tr>
+<td><code>allow-pilot-ui</code></td>
+<td>Allow external access to Pilot UI port 3000</td>
+</tr>
+</tbody></table>
+<p>All other namespaces (<code>icn-coop-*</code>, <code>monitoring</code>, <code>registry</code>) have <strong>no policies</strong> — full open mesh.</p>
+<hr>
+<h2>Port Map (from live cluster inspection)</h2>
+<table>
+<thead>
+<tr>
+<th>Namespace</th>
+<th>QUIC (UDP)</th>
+<th>RPC (TCP)</th>
+<th>Metrics (TCP)</th>
+<th>Health (TCP)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icn</code> (main daemon)</td>
+<td>7777</td>
+<td>5601</td>
+<td>9100</td>
+<td>8080</td>
+</tr>
+<tr>
+<td><code>icn-coop-alpha</code></td>
+<td>7827</td>
+<td>5651</td>
+<td>9150</td>
+<td>8080</td>
+</tr>
+<tr>
+<td><code>icn-coop-beta</code></td>
+<td>7834</td>
+<td>5658</td>
+<td>9157</td>
+<td>8080</td>
+</tr>
+<tr>
+<td><code>icn-coop-gamma</code></td>
+<td>7825</td>
+<td>5649</td>
+<td>9148</td>
+<td>8080</td>
+</tr>
+<tr>
+<td><code>icn-coop-delta</code></td>
+<td>7831</td>
+<td>5655</td>
+<td>9154</td>
+<td>8080</td>
+</tr>
+</tbody></table>
+<p>Each coop also has a NodePort service exposing QUIC and RPC externally for P2P federation.</p>
+<p><strong>mDNS note</strong>: All coop configs have <code>mdns_enabled = true</code>. mDNS uses multicast UDP to <code>224.0.0.251:5353</code>. Kubernetes NetworkPolicies operate on unicast only — multicast bypasses them entirely. Do not rely on NetworkPolicy to control mDNS; it will still broadcast within the node&#39;s subnet regardless.</p>
+<hr>
+<h2>Design: <code>icn-coop-*</code> Namespaces</h2>
+<p>Apply the same policy template to all four coop namespaces. Use a label selector approach so the same manifests work across all coops.</p>
+<h3>What traffic to allow</h3>
+<p><strong>Ingress:</strong></p>
+<ul>
+<li>From other <code>icn-coop-*</code> namespaces → QUIC (UDP) + RPC (TCP) ports
+<em>(P2P ICN mesh: coops form trust relationships with each other)</em></li>
+<li>From <code>icn</code> namespace → QUIC + RPC
+<em>(Main daemon participates in the same mesh)</em></li>
+<li>From <code>monitoring</code> namespace → metrics port only (TCP 9150/9157/9148/9154)
+<em>(Prometheus scraping)</em></li>
+<li>From <code>kube-system</code> namespace → any
+<em>(kubelet probes, health checks)</em></li>
+</ul>
+<p><strong>Egress:</strong></p>
+<ul>
+<li>To <code>kube-system</code> (kube-dns) → UDP 53</li>
+<li>To other <code>icn-coop-*</code> namespaces → QUIC + RPC ports</li>
+<li>To <code>icn</code> namespace → QUIC + RPC</li>
+<li>To <code>0.0.0.0/0</code> → QUIC ports (UDP)
+<em>(External P2P federation — coops need to reach peers outside the cluster)</em></li>
+</ul>
+<p><strong>Do NOT restrict:</strong></p>
+<ul>
+<li>Egress to external internet on QUIC ports — ICN is a P2P system, coops federate with nodes outside the cluster. Blocking external egress breaks real-world federation.</li>
+</ul>
+<h3>Sketch</h3>
+<pre><code class="language-yaml"># Template — apply per-coop with appropriate port numbers
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: icn-coop-alpha   # repeat per namespace
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-icn-mesh-ingress
+  namespace: icn-coop-alpha
+spec:
+  podSelector:
+    matchLabels:
+      app: icn
+  policyTypes: [Ingress]
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          icn-mesh: &quot;true&quot;   # label all coop + icn namespaces with this
+    ports:
+    - port: 7827    # QUIC — varies per coop
+      protocol: UDP
+    - port: 5651    # RPC — varies per coop
+      protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-metrics-scrape
+  namespace: icn-coop-alpha
+spec:
+  podSelector:
+    matchLabels:
+      app: icn
+  policyTypes: [Ingress]
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: monitoring
+    ports:
+    - port: 9150    # metrics — varies per coop
+      protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+  namespace: icn-coop-alpha
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+    ports:
+    - port: 53
+      protocol: UDP
+    - port: 53
+      protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-icn-mesh-egress
+  namespace: icn-coop-alpha
+spec:
+  podSelector:
+    matchLabels:
+      app: icn
+  policyTypes: [Egress]
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          icn-mesh: &quot;true&quot;
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 10.0.0.0/8      # block intra-cluster non-mesh traffic via external path
+        - 192.168.0.0/16
+    ports:
+    - port: 7825    # QUIC range covering all coops + main daemon
+      protocol: UDP
+    - port: 7827
+      protocol: UDP
+    - port: 7831
+      protocol: UDP
+    - port: 7834
+      protocol: UDP
+    - port: 7777
+      protocol: UDP
+</code></pre>
+<p><strong>Implementation note</strong>: Because each coop has a different port number, the QUIC ingress rule needs to be per-coop (no shared port). Consider standardising all coops to the same port in a future refactor — that would make a single policy template work cleanly.</p>
+<hr>
+<h2>Design: <code>monitoring</code> Namespace</h2>
+<p>Prometheus needs to scrape all namespaces — its egress must remain fully open. The main concern is controlling inbound access to Grafana and Prometheus UIs.</p>
+<p><strong>Ingress:</strong></p>
+<ul>
+<li>NodePort access is handled at the node/iptables level, not by NetworkPolicy — no policy needed for NodePort ingress</li>
+<li>Intra-namespace: Prometheus → Alertmanager, Grafana → Prometheus — allow freely</li>
+<li>From <code>kube-system</code> → any (kubelet probes)</li>
+</ul>
+<p><strong>Egress:</strong></p>
+<ul>
+<li>To all namespaces → any port (Prometheus must scrape everything)</li>
+<li>To external internet → TCP 443 (for remote write, alert webhooks if added)</li>
+</ul>
+<p><strong>Assessment</strong>: Restricting monitoring egress is high friction for low security gain in a homelab. Recommend leaving <code>monitoring</code> egress <strong>unrestricted</strong> indefinitely. Only add ingress default-deny if/when Grafana gets real user auth.</p>
+<hr>
+<h2>Design: <code>registry</code> Namespace</h2>
+<p>The in-cluster registry (<code>10.8.30.40:30500</code>) is accessed two ways:</p>
+<ol>
+<li><strong>ci-runner</strong> (external, 10.8.30.46) → NodePort 30500 (Docker push)</li>
+<li><strong>K3s containerd</strong> on each node → NodePort 30500 (image pull via <code>registries.yaml</code>)</li>
+</ol>
+<p>Both paths go through NodePort/iptables at the node level, not through pod-to-pod networking. The registry pod IP (<code>10.43.x.x</code>) is only directly accessed by in-cluster actors (e.g., <code>kubectl</code> commands against the registry API).</p>
+<p><strong>Ingress:</strong></p>
+<ul>
+<li>From <code>icn</code> namespace → TCP 5000 (registry API, for any in-cluster push tooling)</li>
+<li>From <code>kube-system</code> → any (kubelet)</li>
+<li>NodePort access: not controlled by NetworkPolicy</li>
+</ul>
+<p><strong>Egress:</strong></p>
+<ul>
+<li>DNS only (<code>kube-system</code> UDP 53)</li>
+<li>Registry is stateless for egress — it only serves content from its PVC</li>
+</ul>
+<p><strong>Assessment</strong>: Default-deny ingress on the registry namespace is safe and has no development impact, since dev workflow (ci-runner → NodePort → containerd) bypasses pod networking entirely.</p>
+<hr>
+<h2>Implementation Order (when ready)</h2>
+<ol>
+<li><strong>Label namespaces</strong> — add <code>icn-mesh: &quot;true&quot;</code> to <code>icn</code>, <code>icn-coop-alpha/beta/gamma/delta</code></li>
+<li><strong>Registry</strong> — lowest risk, no dev impact. Add default-deny + allow-dns-egress</li>
+<li><strong>icn-coop-</strong>* — medium risk. Requires careful port mapping. Test P2P formation after applying</li>
+<li><strong>monitoring</strong> — low priority. Egress must stay open; only add ingress deny if Grafana gets auth</li>
+</ol>
+<h3>Before implementing, verify</h3>
+<pre><code class="language-bash"># Confirm coops can see each other via mDNS (multicast — won&#39;t be affected by NP)
+kubectl exec -n icn-coop-alpha deploy/icn-alpha -- icnctl peer list
+
+# Confirm Prometheus is scraping all coop metrics endpoints
+curl -s http://10.8.30.40:30090/api/v1/targets | jq &#39;.data.activeTargets | length&#39;
+
+# After applying any policy, immediately recheck mesh formation
+kubectl exec -n icn-coop-alpha deploy/icn-alpha -- icnctl peer list
+</code></pre>
+<hr>
+<h2>Decision: Why Not Now</h2>
+<p>During active development:</p>
+<ul>
+<li>Developers need <code>kubectl exec</code> / <code>kubectl port-forward</code> into any pod freely</li>
+<li>Feature branches may add new ports or communication patterns before they&#39;re documented</li>
+<li>Broken NetworkPolicy is subtle — a misconfigured egress rule silently drops gossip messages with no error visible in app logs</li>
+<li>The cluster is on a private VLAN (10.8.30.0/24) behind OPNsense — the perimeter is already controlled</li>
+</ul>
+<p><strong>Re-evaluate when</strong>: First external pilot participant connects, OR when coop namespaces start holding real identity/ledger data.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

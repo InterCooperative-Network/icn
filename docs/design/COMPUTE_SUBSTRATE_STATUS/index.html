@@ -1,0 +1,522 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Compute Substrate Vertical Slice - Implementation Status | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>COMPUTE SUBSTRATE STATUS</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/COMPUTE_SUBSTRATE_STATUS.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Compute Substrate Vertical Slice - Implementation Status</h1>
+<p><strong>Created</strong>: 2026-02-10<br><strong>Last Updated</strong>: 2026-02-10<br><strong>PR</strong>: #1148 (E1-E7, A1-A4, B1, C1-C3 complete)</p>
+<h2>Overview</h2>
+<p>This document tracks the implementation of compute substrate foundations as part of the ICN vertical slice initiative. The goal is to establish the types and interfaces needed for the complete loop:</p>
+<pre><code>Identity → Standing → Governance → Allocations → Workloads → Receipts → Audit → Future Constraints
+</code></pre>
+<h2>Completed Work</h2>
+<h3>E-Track: Execution Layer (COMPLETE ✅)</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Issue</th>
+<th>Title</th>
+<th>Status</th>
+<th>Key Changes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>E1</td>
+<td>#1128</td>
+<td>Workload Manifest Schema</td>
+<td>✅ Done</td>
+<td><code>inputs_hash</code>, <code>policy_hash</code>, <code>determinism_class</code>, <code>privacy_class</code> on ComputeTask</td>
+</tr>
+<tr>
+<td>E2</td>
+<td>#1129</td>
+<td>Execution Receipt Completion</td>
+<td>✅ Done</td>
+<td><code>ArtifactPointer</code>, <code>VerificationResult</code>, <code>SettlementHook</code> types</td>
+</tr>
+<tr>
+<td>E3</td>
+<td>#1130</td>
+<td>Deterministic vs Advisory</td>
+<td>✅ Done</td>
+<td>Advisory tasks cannot mutate ledger state</td>
+</tr>
+<tr>
+<td>E4</td>
+<td>#1131</td>
+<td>Storage Specification</td>
+<td>✅ Done</td>
+<td><code>StorageClass</code>, <code>DataLocality</code> enums in icn-kernel-api</td>
+</tr>
+<tr>
+<td>E5</td>
+<td>#1132</td>
+<td>Cell Operator Boundary</td>
+<td>✅ Done</td>
+<td><code>cell_operator()</code> method, single-operator-per-cell docs</td>
+</tr>
+<tr>
+<td>E6</td>
+<td>#1133</td>
+<td>Individual Node Ownership</td>
+<td>✅ Done</td>
+<td><code>OperatorMode</code> enum (Organization/Individual)</td>
+</tr>
+<tr>
+<td>E7</td>
+<td>#1134</td>
+<td>Commons Compute Governance</td>
+<td>✅ Done</td>
+<td><code>CharterPriority</code>, <code>CommonsPoolPolicy</code></td>
+</tr>
+</tbody></table>
+<h3>A-Track: Architecture (Kernel/App Separation) (COMPLETE ✅)</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Issue</th>
+<th>Title</th>
+<th>Status</th>
+<th>Key Changes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>A1</td>
+<td>#1135</td>
+<td>State Generalization</td>
+<td>✅ Done</td>
+<td><code>state.rs</code> with Log/Blob/KV service traits, <code>ReplicationPolicy</code></td>
+</tr>
+<tr>
+<td>A2</td>
+<td>#1136</td>
+<td>Governance Extraction</td>
+<td>✅ Done</td>
+<td>Handler infra in apps/governance, executor traits in icn-kernel-api</td>
+</tr>
+<tr>
+<td>A3</td>
+<td>#1137</td>
+<td>Membership Consolidation</td>
+<td>✅ Done</td>
+<td>Federation nesting, treasury DID derivation, unified status</td>
+</tr>
+<tr>
+<td>A4</td>
+<td>#1138</td>
+<td>Kernel Cleanup</td>
+<td>✅ Audited</td>
+<td>17 init files identified, kernel_surface.toml updated</td>
+</tr>
+</tbody></table>
+<h3>B-Track: Business Layer (B1 COMPLETE ✅)</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Issue</th>
+<th>Title</th>
+<th>Status</th>
+<th>Key Changes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>B1</td>
+<td>#1139</td>
+<td>Treasury Integration</td>
+<td>✅ Done</td>
+<td>CreateTreasury message, auto-DID, ledger wiring, disbursement</td>
+</tr>
+<tr>
+<td>B2</td>
+<td>#1140</td>
+<td>Asset Type Definitions</td>
+<td>🚧 Pending</td>
+<td>Blocked on CanonicalReceipt intervention</td>
+</tr>
+<tr>
+<td>B3</td>
+<td>#1141</td>
+<td>Receipt Workflows</td>
+<td>🚧 Pending</td>
+<td>Blocked on CanonicalReceipt + SettlementIntent</td>
+</tr>
+</tbody></table>
+<h3>C-Track: Connectivity/Operations (COMPLETE ✅)</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Issue</th>
+<th>Title</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td>#1142</td>
+<td>Backup Validation</td>
+<td>✅ Audited</td>
+</tr>
+<tr>
+<td>C2</td>
+<td>#1143</td>
+<td>Health Check Suite</td>
+<td>✅ Done</td>
+</tr>
+<tr>
+<td>C3</td>
+<td>#1144</td>
+<td>NAT Traversal</td>
+<td>✅ Done</td>
+</tr>
+</tbody></table>
+<h3>D-Track: Demo/Integration</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Issue</th>
+<th>Title</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>D1</td>
+<td>#1145</td>
+<td>E2E Integration Tests</td>
+<td>🚧 Pending</td>
+</tr>
+<tr>
+<td>D2</td>
+<td>#1147</td>
+<td>Tool Library Demo</td>
+<td>🚧 Pending</td>
+</tr>
+</tbody></table>
+<h2>⚠️ Required Architectural Interventions</h2>
+<p><strong>Before B2/B3, these consolidations must happen:</strong></p>
+<h3>INT-1: CanonicalReceipt Trait (CRITICAL)</h3>
+<p>Receipt types proliferating independently risks parallel audit systems.</p>
+<pre><code class="language-rust">pub trait CanonicalReceipt {
+    fn receipt_id(&amp;self) -&gt; ReceiptId;
+    fn scope(&amp;self) -&gt; ScopeLevel;
+    fn created_at(&amp;self) -&gt; u64;
+    fn subject_hash(&amp;self) -&gt; ContentHash;
+    fn parent_receipts(&amp;self) -&gt; Vec&lt;ReceiptId&gt;;
+    fn verify(&amp;self) -&gt; Result&lt;()&gt;;
+}
+</code></pre>
+<p>All receipts (Decision, Allocation, Execution) implement this trait.</p>
+<h3>INT-2: SettlementIntent Pattern (CRITICAL)</h3>
+<ul>
+<li>Rename <code>SettlementHook</code> → <code>SettlementIntent</code> (declarative)</li>
+<li>LedgerOracle consumes intent (executes)</li>
+<li>Execution NEVER directly mutates ledger</li>
+</ul>
+<h3>INT-3: Governance Firewall Enforcement</h3>
+<p>apps/governance may:</p>
+<ul>
+<li>✅ Produce receipts</li>
+<li>✅ Emit policy deltas</li>
+<li>✅ Call executors via trait</li>
+</ul>
+<p>apps/governance may NOT:</p>
+<ul>
+<li>❌ Import ledger internals</li>
+<li>❌ Mutate ledger state directly</li>
+<li>❌ Bypass ProposalExecutor boundary</li>
+</ul>
+<h2>New Types Added</h2>
+<h3>icn-kernel-api/src/storage.rs (E4)</h3>
+<pre><code class="language-rust">/// Three-tier storage classification
+pub enum StorageClass {
+    Canonical,     // Immutable: ledger, governance, trust
+    ServiceState,  // Mutable: app state, calendars, schedules
+    Blobs,         // Content-addressed: documents, media
+}
+
+/// Data locality constraints
+pub enum DataLocality {
+    CellLocal,           // Must stay in originating cell
+    CoopReplicated,      // Replicated across coop nodes
+    FederationMirrored,  // Cross-entity interoperability
+    CommonsPublic,       // Public indices, shared libraries
+}
+</code></pre>
+<h3>icn-kernel-api/src/state.rs (A1)</h3>
+<pre><code class="language-rust">/// Replication policy for storage
+pub enum ReplicationPolicy {
+    LocalOnly,
+    ClusterStrong,
+    FederationEventual,
+    Archive,
+    Scoped { scope: ScopeLevel, factor: u8 },
+}
+
+/// Service traits for generic state access
+pub trait LogService { ... }
+pub trait BlobService { ... }
+pub trait KvService { ... }
+</code></pre>
+<h3>icn-compute/src/types.rs (E1)</h3>
+<pre><code class="language-rust">/// Determinism classification for workloads
+pub enum DeterminismClass {
+    Canonical,  // Must be deterministic; outputs become constraints
+    Advisory,   // Can be probabilistic; outputs are suggestions
+}
+
+/// Privacy classification for workload data
+pub enum PrivacyClass {
+    Public,      // Open data
+    Member,      // Coop members only
+    NeedToKnow,  // Selective disclosure via ZK
+}
+</code></pre>
+<h3>icn-compute/src/receipt.rs (E2)</h3>
+<pre><code class="language-rust">/// Artifact pointer for execution outputs
+pub struct ArtifactPointer {
+    pub artifact_type: ArtifactType,
+    pub content_hash: ContentHash,
+    pub storage_scope: ScopeLevel,
+}
+
+/// Verification result for execution
+pub enum VerificationResult {
+    Pending,
+    Passed { witnesses: Vec&lt;String&gt; },
+    Failed { reason: String, evidence: ContentHash },
+    Disputed { dispute_id: DisputeId },
+}
+
+/// Settlement hook for ledger integration
+pub struct SettlementHook {
+    pub ledger_entry_type: String,
+    pub amount: u64,
+    pub currency: String,
+    pub from_account: String,
+    pub to_account: String,
+}
+</code></pre>
+<h2>Dependency Graph</h2>
+<pre><code>E1 (Manifest) ─┐
+E2 (Receipt)  ─┼─→ E6 (Individual Node) ─┐
+E3 (Determinism)─┤                        ├─→ D1 (E2E Tests) ─→ D2 (Demo)
+E4 (Storage)  ─┤                        │
+E5 (Cell Op)  ─┘                        │
+                                         │
+A1 (State Gen) ─→ A2 (Gov Extract) ─→ A3 (Membership) ─┤
+                                                        │
+A4 (Cleanup) ─────────────────────────────────────────┤
+                                                        │
+C1 (Backup) ─→ C2 (Health) ──────────────────────────┤
+C3 (NAT) ─────────────────────────────────────────────┤
+                                                        │
+B1 (Treasury) ─┐                                       │
+B2 (Assets)   ─┼─→ B3 (Receipts) ─────────────────────┘
+</code></pre>
+<h2>Sprint Plan</h2>
+<h3>Sprint 1: Parallel Foundations (3-4 days)</h3>
+<p>All tasks can run simultaneously - no dependencies between them.</p>
+<table>
+<thead>
+<tr>
+<th>Task</th>
+<th>Issue</th>
+<th>Effort</th>
+<th>Key Implementation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>E6</strong></td>
+<td>#1133</td>
+<td>1-2d</td>
+<td><code>OperatorMode</code> enum, personal node config</td>
+</tr>
+<tr>
+<td><strong>E7</strong></td>
+<td>#1134</td>
+<td>2d</td>
+<td>Cost validation in scheduler, charter priorities</td>
+</tr>
+<tr>
+<td><strong>C2</strong></td>
+<td>#1143</td>
+<td>1d</td>
+<td>Enhanced <code>/v1/health</code>, K8s probes, <code>icnctl preflight</code></td>
+</tr>
+<tr>
+<td><strong>C3</strong></td>
+<td>#1144</td>
+<td>2-3d</td>
+<td>STUN client, TURN fallback, NAT config section</td>
+</tr>
+</tbody></table>
+<h3>Sprint 2: Governance &amp; Membership (4-5 days)</h3>
+<p>Sequential chain - must complete in order.</p>
+<table>
+<thead>
+<tr>
+<th>Task</th>
+<th>Issue</th>
+<th>Effort</th>
+<th>Depends On</th>
+<th>Key Implementation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>A2</strong></td>
+<td>#1136</td>
+<td>3-4d</td>
+<td>A1 ✅</td>
+<td>Extract GovernanceActor to <code>apps/governance/</code></td>
+</tr>
+<tr>
+<td><strong>A3</strong></td>
+<td>#1137</td>
+<td>3-4d</td>
+<td>A2</td>
+<td>Merge entity/coop/community to <code>apps/membership/</code></td>
+</tr>
+<tr>
+<td><strong>B1</strong></td>
+<td>#1139</td>
+<td>2d</td>
+<td>A3</td>
+<td>Auto-create treasury on coop formation</td>
+</tr>
+</tbody></table>
+<h3>Sprint 3: Economics &amp; Assets (3-4 days)</h3>
+<table>
+<thead>
+<tr>
+<th>Task</th>
+<th>Issue</th>
+<th>Effort</th>
+<th>Depends On</th>
+<th>Key Implementation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>B2</strong></td>
+<td>#1140</td>
+<td>2d</td>
+<td>B1</td>
+<td><code>AssetType</code> enum, <code>AssetMetadata</code> in ledger</td>
+</tr>
+<tr>
+<td><strong>B3</strong></td>
+<td>#1141</td>
+<td>2d</td>
+<td>A2, B1, E2 ✅</td>
+<td><code>AllocationReceipt</code> with provenance chain</td>
+</tr>
+</tbody></table>
+<h3>Sprint 4: Integration &amp; Demo (3-4 days)</h3>
+<table>
+<thead>
+<tr>
+<th>Task</th>
+<th>Issue</th>
+<th>Effort</th>
+<th>Depends On</th>
+<th>Key Implementation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>D1</strong></td>
+<td>#1145</td>
+<td>2d</td>
+<td>A3, B1, B2</td>
+<td><code>vertical_slice_integration.rs</code> - full scenario</td>
+</tr>
+<tr>
+<td><strong>D2</strong></td>
+<td>#1146</td>
+<td>1-2d</td>
+<td>D1</td>
+<td>Demo script, <code>icnctl demo run tool-library</code></td>
+</tr>
+</tbody></table>
+<h2>How to Continue</h2>
+<ol>
+<li><strong>Pick an unblocked task</strong> from Sprint 1 (all parallel) or check dependencies</li>
+<li><strong>Check the GitHub issue</strong> for full context</li>
+<li><strong>Run tests</strong> after implementation:<pre><code class="language-bash">cd icn
+RUSTC_WRAPPER=&quot;&quot; cargo test -p &lt;crate-name&gt;
+RUSTC_WRAPPER=&quot;&quot; cargo clippy -p &lt;crate-name&gt; -- -D warnings
+</code></pre>
+</li>
+<li><strong>Update this doc</strong> when completing work</li>
+<li><strong>Create PR</strong> following ICN conventions (see <code>.github/copilot-instructions.md</code>)</li>
+</ol>
+<h2>Related Documents</h2>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/compute-substrate-design">Compute Substrate Design</a> - Original architecture</li>
+<li><a href="/docs/ARCHITECTURE">ARCHITECTURE.md</a> - System overview</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/kernel_surface.toml">kernel_surface.toml</a> - Kernel boundary tracking</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/AGENTS">AGENTS.md</a> - Agent operating instructions</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

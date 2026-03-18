@@ -1,0 +1,741 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Gossip Message Migration to SignedEnvelope - Analysis Report | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>development</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>gossip signed envelope migration</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/development/gossip-signed-envelope-migration.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Gossip Message Migration to SignedEnvelope - Analysis Report</h1>
+<h2>Executive Summary</h2>
+<p>The ICN gossip system currently sends GossipMessage types (Announce, Request, Response, etc.) wrapped in NetworkMessage envelopes over QUIC. To add cryptographic authentication and replay protection, we need to migrate gossip messages to use SignedEnvelope, which adds:</p>
+<ul>
+<li><strong>64-byte Ed25519 signature</strong> per message</li>
+<li><strong>~40-byte envelope overhead</strong> (from, sequence, timestamp, payload_type)</li>
+<li><strong>Sequence tracking</strong> per sender for replay detection</li>
+<li><strong>Timestamp-based freshness</strong> checks (300s max age)</li>
+</ul>
+<p>This analysis identifies the current architecture, serialization approach, and migration challenges.</p>
+<hr>
+<h2>1. GossipMessage Type Definition</h2>
+<p><strong>Location:</strong> <code>/home/matt/projects/icn/icn/crates/icn-gossip/src/types.rs</code> (lines 111-164)</p>
+<h3>Message Variants</h3>
+<pre><code class="language-rust">pub enum GossipMessage {
+    // Push announcement
+    Announce {
+        hash: ContentHash,        // 32 bytes
+        author: Did,              // ~60 bytes (did:icn:...)
+        clock: VectorClock,       // ~100 bytes (HashMap&lt;Did, u64&gt;)
+        topic: String,            // variable
+    },
+
+    // Pull request
+    Request { hash: ContentHash },
+
+    // Full entry response
+    Response { entry: GossipEntry },
+
+    // Anti-entropy: request Bloom filter
+    RequestBloomFilter { topic: String },
+
+    // Anti-entropy: send Bloom filter
+    SendBloomFilter {
+        topic: String,
+        filter: BloomFilterData,  // ~10KB for 10K entries
+    },
+
+    // Request missing entries by hash
+    RequestMissing { hashes: Vec&lt;ContentHash&gt; },
+
+    // Enhanced anti-entropy: digest with Bloom + vector clock
+    Digest {
+        topic: String,
+        vector: VectorClock,
+        bloom: BloomFilterData,
+        hint_count: u32,
+        nonce: u64,
+    },
+
+    // Targeted pull request
+    PullRequest {
+        topic: String,
+        want_ids: Vec&lt;ContentHash&gt;,
+        max_bytes: u32,
+        nonce: u64,
+    },
+
+    // Pull response (may be truncated)
+    PullResponse {
+        topic: String,
+        entries: Vec&lt;GossipEntry&gt;,
+        truncated: bool,
+        nonce: u64,
+    },
+}
+</code></pre>
+<h3>GossipEntry Structure</h3>
+<pre><code class="language-rust">pub struct GossipEntry {
+    pub hash: ContentHash,           // 32 bytes
+    pub author: Did,                 // ~60 bytes
+    pub clock: VectorClock,          // ~100 bytes
+    pub topic: String,               // variable
+    pub data: Vec&lt;u8&gt;,               // variable (compressed if &gt; 1KB)
+    pub compressed: bool,            // 1 byte
+    pub timestamp: u64,              // 8 bytes
+}
+</code></pre>
+<hr>
+<h2>2. Current Serialization Format</h2>
+<p><strong>Location:</strong> <code>/home/matt/projects/icn/icn/crates/icn-net/src/protocol.rs</code> (lines 146-172)</p>
+<h3>Wire Format</h3>
+<p><strong>Serialization Method:</strong> <code>bincode</code> (binary encoding)</p>
+<pre><code class="language-rust">impl NetworkMessage {
+    /// Serialize to bytes using bincode
+    pub fn to_bytes(&amp;self) -&gt; Result&lt;Vec&lt;u8&gt;&gt; {
+        let bytes = bincode::serialize(self)?;
+        if bytes.len() &gt; MAX_MESSAGE_SIZE {
+            bail!(&quot;Message too large: {} bytes (max {})&quot;, bytes.len(), 10MB);
+        }
+        Ok(bytes)
+    }
+
+    /// Deserialize from bytes using bincode
+    pub fn from_bytes(bytes: &amp;[u8]) -&gt; Result&lt;Self&gt; {
+        bincode::deserialize(bytes)?
+    }
+}
+</code></pre>
+<h3>Payload Structure</h3>
+<pre><code class="language-rust">pub enum MessagePayload {
+    Gossip(GossipMessage),     // Currently unencrypted
+    Ping,
+    Pong,
+    Subscribe { topics: Vec&lt;String&gt; },
+    Unsubscribe { topics: Vec&lt;String&gt; },
+    SubscribeAck { topics: Vec&lt;String&gt; },
+    Hello { binding_info: BindingInfo, topology_info: Option&lt;TopologyInfo&gt; },
+    Handshake { region, cluster_id, role },
+    HandshakeAck,
+    Signed(SignedEnvelope),    // For authenticated messages
+}
+</code></pre>
+<p><strong>Encoding Overview:</strong></p>
+<ul>
+<li>NetworkMessage frame serialized with bincode</li>
+<li>GossipMessage serialized within that frame</li>
+<li>No per-message authentication or sequence tracking yet</li>
+</ul>
+<hr>
+<h2>3. Current Message Flow: Send/Receive</h2>
+<h3>Send Path</h3>
+<p><strong>Location:</strong> <code>/home/matt/projects/icn/icn/crates/icn-core/src/supervisor.rs</code> (lines 314-343)</p>
+<pre><code>GossipActor.publish() 
+    → send_message(recipient, GossipMessage)
+    → SendMessageCallback closure
+    → NetworkMessage::gossip(from, to, gossip_msg)
+    → network_handle.send_message(target, net_msg)
+    → QUIC/TLS transmission
+</code></pre>
+<p><strong>The Send Callback</strong> (set at lines 314-343):</p>
+<pre><code class="language-rust">let send_callback: icn_gossip::SendMessageCallback = 
+    Arc::new(move |recipient, gossip_msg| {
+        // Track metrics
+        match &amp;gossip_msg {
+            GossipMessage::Announce { .. } =&gt; announces_sent_inc(),
+            GossipMessage::Request { .. } =&gt; requests_sent_inc(),
+            GossipMessage::Response { .. } =&gt; responses_sent_inc(),
+            _ =&gt; {}
+        }
+
+        // Spawn async task
+        tokio::spawn(async move {
+            let net_msg = if let Some(target_did) = recipient {
+                // Unicast
+                NetworkMessage::gossip(from_did, Some(target_did), gossip_msg)
+            } else {
+                // Broadcast
+                NetworkMessage::gossip(from_did, None, gossip_msg)
+            };
+
+            net_handle.send_message(target_did, net_msg).await
+        });
+    });
+
+gossip.set_send_callback(send_callback);
+</code></pre>
+<p><strong>Key Observations:</strong></p>
+<ul>
+<li>SendMessageCallback signature: <code>Arc&lt;dyn Fn(Option&lt;Did&gt;, GossipMessage) + Send + Sync&gt;</code></li>
+<li>Messages are wrapped in NetworkMessage immediately before sending</li>
+<li>No sequence tracking per sender</li>
+<li>No signature generation</li>
+</ul>
+<h3>Receive Path</h3>
+<p><strong>Location:</strong> <code>/home/matt/projects/icn/icn/crates/icn-core/src/supervisor.rs</code> (lines 160-174)</p>
+<pre><code>NetworkActor receives bytes via QUIC
+    → NetworkMessage::from_bytes()
+    → incoming_handler callback
+    → MessagePayload::Gossip(gossip_msg)
+    → gossip_handle.write()
+    → gossip.handle_message(sender_did, gossip_msg)
+</code></pre>
+<p><strong>The Incoming Handler</strong> (lines 164-174):</p>
+<pre><code class="language-rust">match net_msg.payload {
+    icn_net::MessagePayload::Gossip(gossip_msg) =&gt; {
+        let gossip_handle = gossip_handle_clone.clone();
+        let sender = sender_did.clone();
+        
+        tokio::spawn(async move {
+            let mut gossip = gossip_handle.write().await;
+            if let Err(e) = gossip.handle_message(&amp;sender, gossip_msg) {
+                warn!(&quot;Failed to handle gossip message: {}&quot;, e);
+            }
+        });
+    }
+    // ... other payload types
+    icn_net::MessagePayload::Signed(ref envelope) =&gt; {
+        info!(&quot;Received verified signed message from {} (seq={})&quot;, 
+              envelope.from, envelope.sequence);
+        // Currently just logged - no payload handling yet
+    }
+}
+</code></pre>
+<p><strong>Key Observations:</strong></p>
+<ul>
+<li>Messages arrive with <code>from</code> field from NetworkMessage (NOT authenticated)</li>
+<li>No replay protection</li>
+<li>No signature verification</li>
+<li>Signed messages exist but are not yet used for gossip</li>
+</ul>
+<hr>
+<h2>4. Message Size Estimation</h2>
+<h3>Typical Message Sizes (Bincode Encoded)</h3>
+<p><strong>Announce Message:</strong></p>
+<pre><code>hash:       32 bytes
+author:     ~60 bytes (DID serialization)
+clock:      ~100 bytes (VectorClock with map entries)
+topic:      variable (e.g., &quot;global:identity&quot; = 16 bytes)
+────────────────────────
+Total:      ~210 bytes + topic length
+Typical:    ~230 bytes
+</code></pre>
+<p><strong>Request Message:</strong></p>
+<pre><code>hash:       32 bytes
+────────────
+Total:      32 bytes
+</code></pre>
+<p><strong>Response Message (small):</strong></p>
+<pre><code>entry.hash:       32 bytes
+entry.author:     ~60 bytes
+entry.clock:      ~100 bytes
+entry.topic:      variable
+entry.data:       variable (usually &gt;1KB, compressed)
+entry.timestamp:  8 bytes
+entry.compressed: 1 byte
+────────────────────────
+Small (512B data): ~210 bytes + data
+Medium (2KB data): ~250 bytes + data
+Large (10KB data): ~300 bytes + compressed_data (~500-1000B after zstd)
+
+Typical range: 300 bytes - 2KB
+</code></pre>
+<p><strong>Digest Message:</strong></p>
+<pre><code>topic:      variable
+vector:     ~100 bytes
+bloom:      ~10KB (for 10K entries)
+hint_count: 4 bytes
+nonce:      8 bytes
+────────────
+Typical:    ~10KB
+</code></pre>
+<p><strong>PullResponse Message:</strong></p>
+<pre><code>Per entry: 300-2000 bytes (as above)
+For N entries: N * (300-2000)
+Typical N=10: 3-20KB
+</code></pre>
+<h3>NetworkMessage Wrapper Overhead</h3>
+<pre><code>version:    4 bytes (u32)
+from:       ~60 bytes (Did)
+to:         ~60 bytes (Option&lt;Did&gt;)
+payload:    bincode variant tag (1-2 bytes) + payload bytes
+────────────────────────
+Overhead:   ~125 bytes
+</code></pre>
+<h3>SignedEnvelope Overhead</h3>
+<pre><code>from:               ~60 bytes (Did)
+sequence:           8 bytes (u64)
+timestamp:          8 bytes (u64)
+payload_type:       1 byte (u8)
+payload:            variable (original message bytes)
+signature:          64 bytes (Ed25519)
+────────────────────────
+Envelope overhead:  141 bytes + payload
+</code></pre>
+<p><strong>Size Impact Examples:</strong></p>
+<ul>
+<li>Announce: 230 → 230 + 141 = 371 bytes (+61%)</li>
+<li>Request: 32 → 32 + 141 = 173 bytes (+441%, but absolute impact small)</li>
+<li>Small Response: 300 → 300 + 141 = 441 bytes (+47%)</li>
+<li>Large Response: 2KB → 2000 + 141 = 2141 bytes (+7%)</li>
+</ul>
+<hr>
+<h2>5. SignedEnvelope Implementation (Existing)</h2>
+<p><strong>Location:</strong> <code>/home/matt/projects/icn/icn/crates/icn-net/src/envelope.rs</code></p>
+<h3>SignedEnvelope Structure</h3>
+<pre><code class="language-rust">#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SignedEnvelope {
+    pub from: Did,                      // Authenticated sender
+    pub sequence: u64,                  // Monotonic per-sender
+    pub timestamp: u64,                 // Milliseconds since Unix epoch
+    pub payload_type: PayloadType,      // Discriminator (Gossip, Ledger, etc.)
+    pub payload: Vec&lt;u8&gt;,               // Serialized payload (bincode)
+    pub signature: Vec&lt;u8&gt;,             // Ed25519 signature (64 bytes)
+}
+
+pub enum PayloadType {
+    Gossip = 1,
+    Ledger = 2,
+    Trust = 3,
+    Contract = 4,
+    Rpc = 5,
+    Control = 6,
+}
+
+impl SignedEnvelope {
+    /// Create and sign a new envelope
+    pub fn new(
+        from: &amp;Did,
+        keypair: &amp;KeyPair,
+        sequence: u64,
+        payload_type: PayloadType,
+        payload: Vec&lt;u8&gt;,
+    ) -&gt; Result&lt;Self&gt; {
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)?
+            .as_millis() as u64;
+
+        let mut envelope = SignedEnvelope {
+            from: from.clone(),
+            sequence,
+            timestamp,
+            payload_type,
+            payload,
+            signature: Vec::new(),
+        };
+
+        let sig_input = envelope.canonical_encoding();
+        envelope.signature = keypair.sign(&amp;sig_input).to_vec();
+        Ok(envelope)
+    }
+
+    /// Verify signature and age
+    pub fn verify(&amp;self, max_age_secs: u64) -&gt; Result&lt;()&gt; {
+        // 1. Verify Ed25519 signature
+        let sig_input = self.canonical_encoding();
+        let verifying_key = self.from.to_verifying_key()?;
+        let signature = ed25519_dalek::Signature::from_slice(&amp;self.signature)?;
+        verifying_key.verify(&amp;sig_input, &amp;signature)?;
+
+        // 2. Verify age (default: 300s clock skew allowed)
+        let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() as u64;
+        let age_ms = now.saturating_sub(self.timestamp);
+        let max_age_ms = max_age_secs * 1000;
+        
+        if age_ms &gt; max_age_ms {
+            bail!(&quot;Message too old: {}ms (max {}ms)&quot;, age_ms, max_age_ms);
+        }
+        if self.timestamp &gt; now + max_age_ms {
+            bail!(&quot;Message from future (clock skew)&quot;);
+        }
+
+        Ok(())
+    }
+
+    /// Canonical encoding for signatures
+    fn canonical_encoding(&amp;self) -&gt; Vec&lt;u8&gt; {
+        // sequence (8 BE) || timestamp (8 BE) || payload_type (1) || payload
+        let mut buf = Vec::with_capacity(17 + self.payload.len());
+        buf.extend_from_slice(&amp;self.sequence.to_be_bytes());
+        buf.extend_from_slice(&amp;self.timestamp.to_be_bytes());
+        buf.push(self.payload_type as u8);
+        buf.extend_from_slice(&amp;self.payload);
+        buf
+    }
+
+    /// Helper to serialize and create envelope
+    pub fn from_payload&lt;T: serde::Serialize&gt;(
+        from: &amp;Did,
+        keypair: &amp;KeyPair,
+        sequence: u64,
+        payload_type: PayloadType,
+        payload: &amp;T,
+    ) -&gt; Result&lt;Self&gt; {
+        let payload_bytes = bincode::serialize(payload)?;
+        Self::new(from, keypair, sequence, payload_type, payload_bytes)
+    }
+}
+</code></pre>
+<h3>Verification Integration in NetworkActor</h3>
+<p>The NetworkActor already verifies SignedEnvelopes when received:</p>
+<pre><code class="language-rust">// In incoming_handler (supervisor.rs):
+icn_net::MessagePayload::Signed(ref envelope) =&gt; {
+    info!(&quot;Received verified signed message from {} (seq={})&quot;, 
+          envelope.from, envelope.sequence);
+    // Verification already done by NetworkActor
+}
+</code></pre>
+<hr>
+<h2>6. ReplayGuard (Existing)</h2>
+<p><strong>Location:</strong> <code>/home/matt/projects/icn/icn/crates/icn-net/src/replay_guard.rs</code></p>
+<h3>How It Works</h3>
+<pre><code class="language-rust">pub struct ReplayGuard {
+    sequences: HashMap&lt;Did, SequenceWindow&gt;,
+    max_clock_skew: u64,
+    max_peer_age_secs: u64,
+}
+
+struct SequenceWindow {
+    max_seq: u64,                          // Highest sequence seen
+    recent: BloomFilter,                   // ~10KB for 10K sequences
+    last_update: Instant,
+}
+
+impl ReplayGuard {
+    pub fn check(&amp;mut self, envelope: &amp;SignedEnvelope) -&gt; Result&lt;()&gt; {
+        // 1. Verify signature and age
+        envelope.verify(self.max_clock_skew)?;
+
+        // 2. Get or create sequence window for sender
+        let window = self.sequences
+            .entry(envelope.from.clone())
+            .or_insert_with(SequenceWindow::new);
+
+        // 3. Check sequence number
+        if envelope.sequence &lt;= window.max_seq {
+            // Out-of-order or replay
+            if window.recent.contains(&amp;hash_sequence(envelope.sequence)) {
+                bail!(&quot;Replay detected: seq {} already seen&quot;, envelope.sequence);
+            }
+            // Not in filter: accept as out-of-order
+        } else {
+            // In-order: update max_seq
+            window.max_seq = envelope.sequence;
+        }
+
+        // 4. Update Bloom filter and timestamp
+        window.recent.insert(&amp;hash_sequence(envelope.sequence));
+        window.last_update = Instant::now();
+
+        Ok(())
+    }
+}
+</code></pre>
+<hr>
+<h2>7. Current Message Flow Architecture</h2>
+<h3>Supervisor Setup (Key Points)</h3>
+<ol>
+<li><p><strong>GossipActor Creation</strong> (line 110):</p>
+<ul>
+<li>Created with trust lookup for access control</li>
+<li>No sequence counter tracking yet</li>
+</ul>
+</li>
+<li><p><strong>Send Callback Setup</strong> (lines 314-343):</p>
+<ul>
+<li>Wraps GossipMessage in NetworkMessage::gossip()</li>
+<li>No signing happens</li>
+<li>Async spawn for network send</li>
+</ul>
+</li>
+<li><p><strong>Receive Handler Setup</strong> (lines 160-174):</p>
+<ul>
+<li>Unwraps MessagePayload::Gossip</li>
+<li>Passes to gossip.handle_message()</li>
+<li>No signature verification for gossip</li>
+</ul>
+</li>
+<li><p><strong>SignedEnvelope Support</strong> (line 265-273):</p>
+<ul>
+<li>Receives and logs verified signed messages</li>
+<li>But doesn&#39;t route payload to gossip yet</li>
+<li>Payload type discriminator exists but unused</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h2>8. Migration Challenges and Requirements</h2>
+<h3>Challenge 1: Sequence Number Management</h3>
+<p><strong>Problem:</strong> GossipActor needs to track outgoing sequence numbers per peer (or globally).</p>
+<p><strong>Current State:</strong> No sequence tracking in GossipActor.</p>
+<p><strong>Solution Required:</strong></p>
+<ul>
+<li>Add <code>sequence_counter: u64</code> to GossipActor</li>
+<li>Increment before sending each message</li>
+<li>Store in a persistent KV store (Sled) for restart recovery</li>
+</ul>
+<h3>Challenge 2: SendMessageCallback Signature Change</h3>
+<p><strong>Current:</strong></p>
+<pre><code class="language-rust">pub type SendMessageCallback = Arc&lt;dyn Fn(Option&lt;Did&gt;, GossipMessage) + Send + Sync&gt;;
+</code></pre>
+<p><strong>Needed for Signed Messages:</strong></p>
+<pre><code class="language-rust">pub type SendMessageCallback = Arc&lt;dyn Fn(Option&lt;Did&gt;, GossipMessage) + Send + Sync&gt;;
+// But the callback needs to sign and wrap in SignedEnvelope
+</code></pre>
+<p><strong>Options:</strong>
+A. Keep callback signature, add signing logic inside callback (requires keypair)
+B. Change callback to return Result, let GossipActor handle signing
+C. Add second callback for signed sends</p>
+<p><strong>Best Option:</strong> Approach C - Keep existing callback, add new signing flow that:</p>
+<ol>
+<li>GossipActor has access to keypair (from IdentityBundle)</li>
+<li>Callback receives already-signed NetworkMessage::Signed(envelope)</li>
+<li>Or: GossipActor constructs SignedEnvelope internally</li>
+</ol>
+<h3>Challenge 3: Backward Compatibility</h3>
+<p><strong>Current:</strong> Gossip messages sent as <code>MessagePayload::Gossip(GossipMessage)</code></p>
+<p><strong>New:</strong> Gossip messages sent as <code>MessagePayload::Signed(SignedEnvelope)</code> with PayloadType::Gossip</p>
+<p><strong>Migration Strategy:</strong></p>
+<ul>
+<li>Phase 1: Accept both formats on receive</li>
+<li>Phase 2: Send all new messages as Signed</li>
+<li>Phase 3: Deprecate raw Gossip messages (after timeout)</li>
+</ul>
+<h3>Challenge 4: Deserialization in Handler</h3>
+<p><strong>Current Receive Path:</strong></p>
+<pre><code class="language-rust">MessagePayload::Gossip(gossip_msg) =&gt; {
+    gossip.handle_message(&amp;sender_did, gossip_msg)?
+}
+</code></pre>
+<p><strong>New Receive Path:</strong></p>
+<pre><code class="language-rust">MessagePayload::Signed(envelope) =&gt; {
+    // Verify signature (already done by NetworkActor)
+    if envelope.payload_type == PayloadType::Gossip {
+        let gossip_msg: GossipMessage = envelope.decode_payload()?;
+        gossip.handle_message(&amp;envelope.from, gossip_msg)?
+    }
+}
+</code></pre>
+<p><strong>Key Issue:</strong> sender_did comes from envelope.from (authenticated), not net_msg.from (untrusted)</p>
+<h3>Challenge 5: Metrics Tracking</h3>
+<p><strong>Current:</strong> Metrics tracked in send_callback before sending</p>
+<p><strong>New:</strong> Need to track in two places:</p>
+<ul>
+<li>After signing (for signed messages)</li>
+<li>Or defer to handle_message (for consistency)</li>
+</ul>
+<h3>Challenge 6: Gossip Actor IdentityBundle Access</h3>
+<p><strong>Problem:</strong> GossipActor doesn&#39;t currently have access to the keypair for signing.</p>
+<p><strong>Current Flow:</strong></p>
+<pre><code>GossipActor.publish() 
+    → send_callback
+    → (callback wraps and sends - but can&#39;t sign)
+</code></pre>
+<p><strong>Solution Required:</strong>
+Either:
+A. Pass IdentityBundle (or just keypair) to GossipActor at creation
+B. Change sender to sign gossip messages (requires supervisor to handle)
+C. Have GossipActor return unsigned messages, let supervisor sign</p>
+<hr>
+<h2>9. Test Coverage Observation</h2>
+<p><strong>Location:</strong> <code>icn/crates/icn-gossip/src/gossip.rs</code> (integration tests)</p>
+<p>Current test pattern:</p>
+<pre><code class="language-rust">#[test]
+fn test_announce_and_request_response() {
+    let sent_messages = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let sent_messages_clone = sent_messages.clone();
+
+    // Set callback to capture messages
+    gossip2.set_send_callback(Arc::new(move |recipient, msg| {
+        sent_messages_clone.lock().unwrap().push((recipient, msg));
+    }));
+
+    // Verify messages sent
+    let messages = sent_messages.lock().unwrap();
+    assert_eq!(messages.len(), 1);
+    if let (Some(recipient), GossipMessage::Request { hash: req_hash }) = &amp;messages[0] {
+        assert_eq!(recipient, &amp;did1);
+    }
+}
+</code></pre>
+<p><strong>Migration Impact:</strong> Tests must be updated to expect SignedEnvelope in callback messages, or callback must transparently handle signing.</p>
+<hr>
+<h2>10. Summary Table</h2>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Current</th>
+<th>With SignedEnvelope</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Serialization</strong></td>
+<td>bincode</td>
+<td>bincode (inside envelope)</td>
+</tr>
+<tr>
+<td><strong>Payload Type</strong></td>
+<td>MessagePayload::Gossip</td>
+<td>MessagePayload::Signed with PayloadType::Gossip</td>
+</tr>
+<tr>
+<td><strong>Authentication</strong></td>
+<td>None (trusts from field)</td>
+<td>Ed25519 signature + verification</td>
+</tr>
+<tr>
+<td><strong>Replay Protection</strong></td>
+<td>None</td>
+<td>ReplayGuard with sequence tracking</td>
+</tr>
+<tr>
+<td><strong>Message Size Overhead</strong></td>
+<td>~125 bytes (NetworkMessage)</td>
+<td>~141 bytes (envelope)</td>
+</tr>
+<tr>
+<td><strong>Send Path</strong></td>
+<td>gossip.publish() → callback → network</td>
+<td>gossip.publish() → sign → callback → network</td>
+</tr>
+<tr>
+<td><strong>Receive Path</strong></td>
+<td>network → unwrap Gossip → handle</td>
+<td>network → verify → unwrap Gossip → handle</td>
+</tr>
+<tr>
+<td><strong>Sequence Tracking</strong></td>
+<td>None</td>
+<td>Per-sender via ReplayGuard</td>
+</tr>
+<tr>
+<td><strong>Metrics</strong></td>
+<td>3 message types tracked</td>
+<td>Need to update for signed variants</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Key Files Involved in Migration</h2>
+<h3>Files to Modify</h3>
+<ol>
+<li><p><strong>icn-gossip/src/gossip.rs</strong></p>
+<ul>
+<li>Add IdentityBundle/keypair field</li>
+<li>Add sequence counter</li>
+<li>Modify send_message() to accept signed envelopes</li>
+<li>Update tests</li>
+</ul>
+</li>
+<li><p><strong>icn-gossip/src/types.rs</strong></p>
+<ul>
+<li>SendMessageCallback signature (or add new callback type)</li>
+</ul>
+</li>
+<li><p><strong>icn-core/src/supervisor.rs</strong></p>
+<ul>
+<li>Pass IdentityBundle to GossipActor</li>
+<li>Update send_callback to handle signed messages</li>
+<li>Update incoming_handler to route Signed messages with PayloadType::Gossip</li>
+</ul>
+</li>
+<li><p><strong>icn-net/src/protocol.rs</strong></p>
+<ul>
+<li>Add NetworkMessage::signed_gossip() helper</li>
+</ul>
+</li>
+<li><p><strong>icn-net/src/actor.rs</strong></p>
+<ul>
+<li>Integrate ReplayGuard verification for gossip messages</li>
+</ul>
+</li>
+</ol>
+<h3>Files Already Supporting This</h3>
+<ol>
+<li><p><strong>icn-net/src/envelope.rs</strong></p>
+<ul>
+<li>SignedEnvelope structure and signing logic (complete)</li>
+</ul>
+</li>
+<li><p><strong>icn-net/src/replay_guard.rs</strong></p>
+<ul>
+<li>ReplayGuard implementation (complete)</li>
+</ul>
+</li>
+<li><p><strong>icn-net/src/protocol.rs</strong></p>
+<ul>
+<li>MessagePayload::Signed variant (exists)</li>
+<li>PayloadType::Gossip discriminator (exists)</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h2>Estimated Effort</h2>
+<ul>
+<li><strong>Sequence tracking</strong>: 2-3 hours</li>
+<li><strong>IdentityBundle integration into GossipActor</strong>: 1-2 hours</li>
+<li><strong>Send path changes</strong>: 2-3 hours</li>
+<li><strong>Receive path integration</strong>: 2-3 hours</li>
+<li><strong>Test updates</strong>: 2-3 hours</li>
+<li><strong>Metrics updates</strong>: 1 hour</li>
+<li><strong>Backward compatibility (if needed)</strong>: 2-3 hours</li>
+<li><strong>Integration testing</strong>: 3-4 hours</li>
+</ul>
+<p><strong>Total: ~16-24 hours of focused development</strong></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

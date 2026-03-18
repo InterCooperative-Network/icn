@@ -1,0 +1,328 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Gateway API Documentation | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>api</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>OPENAPI</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/api/OPENAPI.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Gateway API Documentation</h1>
+<h2>Overview</h2>
+<p>The ICN Gateway provides a comprehensive REST API and WebSocket interface for cooperative applications. Interactive API documentation is available via Swagger UI.</p>
+<h2>Accessing API Documentation</h2>
+<p>When the gateway is running, navigate to:</p>
+<pre><code>http://localhost:3030/swagger-ui/
+</code></pre>
+<p>This provides an interactive interface to:</p>
+<ul>
+<li>Browse all available endpoints</li>
+<li>View request/response schemas</li>
+<li>Try API calls directly from the browser</li>
+<li>Download the OpenAPI specification</li>
+</ul>
+<h2>OpenAPI Specification</h2>
+<p>The OpenAPI 3.0 specification is available at:</p>
+<pre><code>http://localhost:3030/api-docs/openapi.json
+</code></pre>
+<p>You can use this specification with:</p>
+<ul>
+<li>Code generators (e.g., <code>openapi-generator</code>)</li>
+<li>API testing tools (e.g., Postman, Insomnia)</li>
+<li>Documentation generators</li>
+<li>Client SDK generators</li>
+</ul>
+<h2>API Structure</h2>
+<h3>Base URL</h3>
+<pre><code>http://localhost:3030/v1
+</code></pre>
+<h3>Authentication</h3>
+<p>Most endpoints require JWT authentication:</p>
+<ol>
+<li><strong>Get Challenge</strong>: <code>POST /v1/auth/challenge</code></li>
+<li><strong>Verify Challenge</strong>: <code>POST /v1/auth/verify</code></li>
+<li><strong>Use Token</strong>: Include in <code>Authorization: Bearer &lt;token&gt;</code> header</li>
+</ol>
+<h3>Endpoint Categories</h3>
+<h4>Health &amp; Status</h4>
+<ul>
+<li><code>GET /v1/health</code> - Liveness check</li>
+<li><code>GET /v1/health/detailed</code> - Detailed health status</li>
+<li><code>GET /v1/health/ready</code> - Readiness check</li>
+</ul>
+<h4>Authentication</h4>
+<ul>
+<li><code>POST /v1/auth/challenge</code> - Request authentication challenge</li>
+<li><code>POST /v1/auth/verify</code> - Verify challenge and get JWT token</li>
+</ul>
+<h4>Identity Management</h4>
+<ul>
+<li><code>GET /v1/identity/:did</code> - Resolve DID to public key</li>
+<li><code>GET /v1/identity/devices</code> - List registered devices</li>
+<li><code>POST /v1/identity/devices</code> - Register new device</li>
+<li><code>DELETE /v1/identity/devices/:device_id</code> - Remove device</li>
+</ul>
+<h4>Cooperatives</h4>
+<ul>
+<li><code>GET /v1/coops</code> - List cooperatives</li>
+<li><code>POST /v1/coops</code> - Create cooperative</li>
+<li><code>GET /v1/coops/:coop_id</code> - Get cooperative details</li>
+<li><code>POST /v1/coops/:coop_id/join</code> - Join cooperative</li>
+<li><code>DELETE /v1/coops/:coop_id/leave</code> - Leave cooperative</li>
+<li><code>GET /v1/coops/:coop_id/members</code> - List members</li>
+<li><code>GET /v1/coops/:coop_id/stats</code> - Get statistics</li>
+</ul>
+<h4>Ledger Operations</h4>
+<ul>
+<li><code>GET /v1/coops/:coop_id/ledger/balance</code> - Get balance</li>
+<li><code>POST /v1/coops/:coop_id/ledger/transactions</code> - Record transaction</li>
+<li><code>GET /v1/coops/:coop_id/ledger/transactions</code> - List transactions</li>
+<li><code>GET /v1/coops/:coop_id/ledger/transactions/:tx_id</code> - Get transaction details</li>
+<li><code>GET /v1/coops/:coop_id/ledger/audit</code> - Audit log</li>
+</ul>
+<h4>Trust Graph</h4>
+<ul>
+<li><code>GET /v1/trust/score/:did</code> - Get trust score</li>
+<li><code>POST /v1/trust/edge</code> - Set trust edge</li>
+<li><code>GET /v1/trust/network</code> - Get trust network</li>
+<li><code>GET /v1/trust/network/:did</code> - Get trust network for DID</li>
+</ul>
+<h4>Governance</h4>
+<ul>
+<li><code>GET /v1/governance/proposals</code> - List proposals</li>
+<li><code>POST /v1/governance/proposals</code> - Create proposal</li>
+<li><code>GET /v1/governance/proposals/:proposal_id</code> - Get proposal details</li>
+<li><code>POST /v1/governance/proposals/:proposal_id/vote</code> - Vote on proposal</li>
+<li><code>GET /v1/governance/proposals/:proposal_id/votes</code> - List votes</li>
+<li><code>GET /v1/governance/proposals/:proposal_id/votes/:did</code> - Get vote by DID</li>
+</ul>
+<h4>Compute Tasks</h4>
+<ul>
+<li><code>GET /v1/compute/tasks</code> - List tasks</li>
+<li><code>POST /v1/compute/tasks</code> - Submit task</li>
+<li><code>GET /v1/compute/tasks/:task_id</code> - Get task status</li>
+<li><code>DELETE /v1/compute/tasks/:task_id</code> - Cancel task</li>
+<li><code>GET /v1/compute/tasks/:task_id/result</code> - Get task result</li>
+</ul>
+<h4>Federation</h4>
+<ul>
+<li><code>POST /v1/federation/bridges</code> - Register federation bridge</li>
+<li><code>GET /v1/federation/bridges/:federation_id</code> - Get bridge status</li>
+<li><code>POST /v1/federation/route</code> - Route cross-federation message</li>
+</ul>
+<h4>Notifications</h4>
+<ul>
+<li><code>GET /v1/notifications</code> - List notifications</li>
+<li><code>PATCH /v1/notifications/:notification_id/read</code> - Mark as read</li>
+<li><code>POST /v1/notifications/devices</code> - Register device for push notifications</li>
+<li><code>DELETE /v1/notifications/devices/:token</code> - Unregister device</li>
+</ul>
+<h4>WebSocket</h4>
+<ul>
+<li><code>GET /v1/websocket</code> - Establish WebSocket connection for real-time events</li>
+</ul>
+<h2>Rate Limiting</h2>
+<p>The API implements rate limiting:</p>
+<ul>
+<li><strong>Default</strong>: 100 requests per second per user</li>
+<li><strong>Auth endpoints</strong>: 5 requests per minute per IP address</li>
+</ul>
+<p>Rate limit information is included in response headers:</p>
+<ul>
+<li><code>X-RateLimit-Limit</code>: Maximum requests allowed</li>
+<li><code>X-RateLimit-Remaining</code>: Requests remaining in window</li>
+<li><code>X-RateLimit-Reset</code>: Time when limit resets (Unix timestamp)</li>
+</ul>
+<h2>Error Responses</h2>
+<p>All errors follow a consistent format:</p>
+<pre><code class="language-json">{
+  &quot;error&quot;: &quot;Error message&quot;,
+  &quot;code&quot;: &quot;ERROR_CODE&quot;,
+  &quot;details&quot;: {
+    &quot;field&quot;: &quot;Additional context&quot;
+  }
+}
+</code></pre>
+<p>Common HTTP status codes:</p>
+<ul>
+<li><code>400 Bad Request</code> - Invalid request parameters</li>
+<li><code>401 Unauthorized</code> - Missing or invalid authentication</li>
+<li><code>403 Forbidden</code> - Insufficient permissions</li>
+<li><code>404 Not Found</code> - Resource not found</li>
+<li><code>429 Too Many Requests</code> - Rate limit exceeded</li>
+<li><code>500 Internal Server Error</code> - Server error</li>
+</ul>
+<h2>WebSocket Protocol</h2>
+<h3>Connection</h3>
+<p>Connect to <code>/v1/websocket</code> and upgrade to WebSocket protocol.</p>
+<h3>Authentication</h3>
+<p>After connecting, send authentication message:</p>
+<pre><code class="language-json">{
+  &quot;type&quot;: &quot;auth&quot;,
+  &quot;token&quot;: &quot;your-jwt-token&quot;
+}
+</code></pre>
+<h3>Event Subscription</h3>
+<p>Subscribe to events:</p>
+<pre><code class="language-json">{
+  &quot;type&quot;: &quot;subscribe&quot;,
+  &quot;channel&quot;: &quot;ledger&quot;,
+  &quot;coop_id&quot;: &quot;your-coop-id&quot;
+}
+</code></pre>
+<p>Available channels:</p>
+<ul>
+<li><code>ledger</code> - Ledger transaction events</li>
+<li><code>governance</code> - Governance proposal/vote events</li>
+<li><code>compute</code> - Compute task status updates</li>
+<li><code>trust</code> - Trust graph updates</li>
+</ul>
+<h3>Event Messages</h3>
+<p>Events are delivered as JSON:</p>
+<pre><code class="language-json">{
+  &quot;type&quot;: &quot;event&quot;,
+  &quot;channel&quot;: &quot;ledger&quot;,
+  &quot;data&quot;: {
+    &quot;event_type&quot;: &quot;transaction&quot;,
+    &quot;transaction&quot;: { ... }
+  }
+}
+</code></pre>
+<h2>Client SDKs</h2>
+<p>Official SDKs are available:</p>
+<ul>
+<li><strong>TypeScript</strong>: <code>sdk/typescript/</code></li>
+<li><strong>Python</strong>: Coming soon</li>
+<li><strong>Rust</strong>: Use <code>icn-rpc</code> crate directly</li>
+</ul>
+<h2>Development Tools</h2>
+<h3>Generate Client Code</h3>
+<p>Using OpenAPI Generator:</p>
+<pre><code class="language-bash"># Download the OpenAPI spec
+curl http://localhost:3030/api-docs/openapi.json &gt; openapi.json
+
+# Generate TypeScript client
+openapi-generator-cli generate \
+  -i openapi.json \
+  -g typescript-fetch \
+  -o ./generated-client
+</code></pre>
+<h3>Test with cURL</h3>
+<pre><code class="language-bash"># Get challenge
+CHALLENGE=$(curl -s -X POST http://localhost:3030/v1/auth/challenge \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{&quot;did&quot;:&quot;did:icn:abc123&quot;}&#39; | jq -r &#39;.challenge&#39;)
+
+# Sign challenge (using your signing tool)
+SIGNATURE=&quot;...&quot;
+
+# Verify and get token
+TOKEN=$(curl -s -X POST http://localhost:3030/v1/auth/verify \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &quot;{\&quot;did\&quot;:\&quot;did:icn:abc123\&quot;,\&quot;challenge\&quot;:\&quot;$CHALLENGE\&quot;,\&quot;signature\&quot;:\&quot;$SIGNATURE\&quot;}&quot; \
+  | jq -r &#39;.token&#39;)
+
+# Use token for authenticated requests
+curl http://localhost:3030/v1/coops \
+  -H &quot;Authorization: Bearer $TOKEN&quot;
+</code></pre>
+<h2>Monitoring</h2>
+<h3>Metrics</h3>
+<p>Prometheus metrics available at:</p>
+<pre><code>http://localhost:3030/metrics
+</code></pre>
+<h3>Health Checks</h3>
+<ul>
+<li><strong>Liveness</strong>: <code>GET /v1/health</code> - Returns 200 if server is running</li>
+<li><strong>Readiness</strong>: <code>GET /v1/health/ready</code> - Returns 200 if ready to serve traffic</li>
+</ul>
+<p>Use these for Kubernetes health probes.</p>
+<h2>Security</h2>
+<h3>HTTPS</h3>
+<p>In production, always use HTTPS. The gateway should be deployed behind a reverse proxy (nginx, Traefik) that handles TLS termination.</p>
+<h3>CORS</h3>
+<p>CORS is configured based on environment:</p>
+<ul>
+<li><strong>Development</strong>: Permissive (all origins)</li>
+<li><strong>Production</strong>: Strict (configured allowed origins)</li>
+</ul>
+<p>Configure via <code>SecurityConfig</code> when initializing the gateway.</p>
+<h3>Security Headers</h3>
+<p>The gateway automatically adds security headers:</p>
+<ul>
+<li><code>X-Content-Type-Options: nosniff</code></li>
+<li><code>X-Frame-Options: DENY</code></li>
+<li><code>X-XSS-Protection: 1; mode=block</code></li>
+<li><code>Strict-Transport-Security</code> (in production)</li>
+</ul>
+<h2>Examples</h2>
+<p>See <code>examples/</code> directory for:</p>
+<ul>
+<li>Mobile app integration</li>
+<li>Web app integration</li>
+<li>CLI usage</li>
+<li>WebSocket streaming</li>
+</ul>
+<h2>Support</h2>
+<ul>
+<li><strong>Documentation</strong>: <code>docs/</code></li>
+<li><strong>Issues</strong>: <a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">https://github.com/InterCooperative-Network/icn/issues</a></li>
+<li><strong>Discussions</strong>: <a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">https://github.com/InterCooperative-Network/icn/discussions</a></li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

@@ -1,0 +1,679 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN API Versioning Guide | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>reference</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>api</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>api versioning</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/reference/api/api-versioning.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN API Versioning Guide</h1>
+<p><strong>Document</strong>: ICN-DOC-VERSIONING-01
+<strong>Last Updated</strong>: 2025-12-04
+<strong>Status</strong>: Complete</p>
+<p>This guide covers versioning strategies for all ICN interfaces: the REST Gateway API, RPC protocol, and P2P network protocol.</p>
+<hr>
+<h2>Table of Contents</h2>
+<ol>
+<li><a href="#1-overview">Overview</a></li>
+<li><a href="#2-gateway-rest-api-versioning">Gateway REST API Versioning</a></li>
+<li><a href="#3-rpc-protocol-versioning">RPC Protocol Versioning</a></li>
+<li><a href="#4-p2p-protocol-versioning">P2P Protocol Versioning</a></li>
+<li><a href="#5-capability-based-features">Capability-Based Features</a></li>
+<li><a href="#6-migration-strategies">Migration Strategies</a></li>
+<li><a href="#7-deprecation-policy">Deprecation Policy</a></li>
+<li><a href="#8-version-compatibility-matrix">Version Compatibility Matrix</a></li>
+</ol>
+<hr>
+<h2>1. Overview</h2>
+<p>ICN uses semantic versioning (SemVer) for releases and maintains three separate versioned interfaces:</p>
+<table>
+<thead>
+<tr>
+<th>Interface</th>
+<th>Current Version</th>
+<th>Scope</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Gateway REST API</td>
+<td>v1</td>
+<td>External applications</td>
+</tr>
+<tr>
+<td>RPC Protocol</td>
+<td>1.0</td>
+<td>Node-to-node admin</td>
+</tr>
+<tr>
+<td>P2P Protocol</td>
+<td>1</td>
+<td>Network layer</td>
+</tr>
+</tbody></table>
+<p><strong>Versioning Philosophy</strong>:</p>
+<ul>
+<li><strong>Backward compatibility</strong> is prioritized for all interfaces</li>
+<li><strong>Breaking changes</strong> require major version bumps</li>
+<li><strong>Additive changes</strong> (new endpoints, fields) are non-breaking</li>
+<li><strong>Deprecation</strong> precedes removal by at least 2 minor versions</li>
+</ul>
+<hr>
+<h2>2. Gateway REST API Versioning</h2>
+<h3>2.1 URL Path Versioning</h3>
+<p>All Gateway API endpoints use URL path versioning with the <code>/v1/</code> prefix:</p>
+<pre><code>http://localhost:8080/v1/coops
+http://localhost:8080/v1/ledger/{coop_id}/balance/{did}
+http://localhost:8080/v1/compute/submit
+</code></pre>
+<p><strong>Why path versioning?</strong></p>
+<ul>
+<li>Clear and explicit in requests</li>
+<li>Easy to route at load balancer level</li>
+<li>Simple to test with curl/httpie</li>
+</ul>
+<h3>2.2 Version Lifecycle</h3>
+<table>
+<thead>
+<tr>
+<th>State</th>
+<th>Description</th>
+<th>Duration</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Current</strong></td>
+<td>Actively developed, full support</td>
+<td>Until next major</td>
+</tr>
+<tr>
+<td><strong>Supported</strong></td>
+<td>Bug fixes, security patches only</td>
+<td>12 months after deprecation</td>
+</tr>
+<tr>
+<td><strong>Deprecated</strong></td>
+<td>Scheduled for removal</td>
+<td>6 months notice</td>
+</tr>
+<tr>
+<td><strong>Removed</strong></td>
+<td>No longer available</td>
+<td>-</td>
+</tr>
+</tbody></table>
+<h3>2.3 Adding New API Version</h3>
+<p>When adding <code>/v2/</code> endpoints:</p>
+<ol>
+<li><p><strong>Create new API module</strong>:</p>
+<pre><code class="language-rust">// icn-gateway/src/api/v2/mod.rs
+pub mod coops;
+pub mod ledger;
+pub mod compute;
+</code></pre>
+</li>
+<li><p><strong>Register both versions</strong>:</p>
+<pre><code class="language-rust">// server.rs
+App::new()
+    .service(web::scope(&quot;/v1&quot;).configure(v1::config))
+    .service(web::scope(&quot;/v2&quot;).configure(v2::config))
+</code></pre>
+</li>
+<li><p><strong>Maintain parallel implementations</strong> during transition period</p>
+</li>
+</ol>
+<h3>2.4 Response Format Changes</h3>
+<p><strong>Non-breaking additions</strong> (allowed within same version):</p>
+<ul>
+<li>New optional fields in responses</li>
+<li>New optional query parameters</li>
+<li>New endpoints</li>
+</ul>
+<p><strong>Breaking changes</strong> (require version bump):</p>
+<ul>
+<li>Removing fields from responses</li>
+<li>Changing field types</li>
+<li>Changing endpoint paths</li>
+<li>Removing endpoints</li>
+</ul>
+<p><strong>Example: Adding a field</strong></p>
+<pre><code class="language-json">// v1 original response
+{
+  &quot;id&quot;: &quot;coop-123&quot;,
+  &quot;name&quot;: &quot;Food Coop&quot;
+}
+
+// v1 updated response (backward compatible)
+{
+  &quot;id&quot;: &quot;coop-123&quot;,
+  &quot;name&quot;: &quot;Food Coop&quot;,
+  &quot;created_at&quot;: &quot;2025-01-15T10:30:00Z&quot;  // New optional field
+}
+</code></pre>
+<h3>2.5 Request Validation</h3>
+<p>New <strong>optional</strong> request fields can be added without breaking clients:</p>
+<pre><code class="language-json">// v1 original request
+{
+  &quot;id&quot;: &quot;coop-123&quot;,
+  &quot;name&quot;: &quot;Food Coop&quot;
+}
+
+// v1 updated - server accepts both
+{
+  &quot;id&quot;: &quot;coop-123&quot;,
+  &quot;name&quot;: &quot;Food Coop&quot;,
+  &quot;description&quot;: &quot;A local food cooperative&quot;  // Optional, ignored if missing
+}
+</code></pre>
+<hr>
+<h2>3. RPC Protocol Versioning</h2>
+<h3>3.1 JSON-RPC Method Naming</h3>
+<p>RPC methods follow the pattern: <code>namespace.method</code>:</p>
+<pre><code class="language-json">{
+  &quot;jsonrpc&quot;: &quot;2.0&quot;,
+  &quot;method&quot;: &quot;network.peers&quot;,
+  &quot;params&quot;: {},
+  &quot;id&quot;: 1
+}
+</code></pre>
+<p><strong>Current namespaces</strong>:</p>
+<ul>
+<li><code>auth.*</code> - Authentication methods</li>
+<li><code>network.*</code> - Network operations</li>
+<li><code>gossip.*</code> - Gossip protocol</li>
+<li><code>ledger.*</code> - Ledger operations</li>
+<li><code>compute.*</code> - Compute tasks</li>
+<li><code>governance.*</code> - Governance domains/proposals</li>
+<li><code>identity.*</code> - Identity management</li>
+</ul>
+<h3>3.2 Adding RPC Methods</h3>
+<p>New methods can be added without breaking existing clients:</p>
+<pre><code class="language-rust">// Add new method in server.rs
+&quot;compute.cancel&quot; =&gt; self.handle_compute_cancel(params).await,
+</code></pre>
+<h3>3.3 Evolving Method Parameters</h3>
+<p><strong>Non-breaking</strong> (add with defaults):</p>
+<pre><code class="language-json">// Before
+{&quot;method&quot;: &quot;compute.submit&quot;, &quot;params&quot;: {&quot;code&quot;: &quot;...&quot;, &quot;fuel_limit&quot;: 1000}}
+
+// After (priority is optional, defaults to &quot;normal&quot;)
+{&quot;method&quot;: &quot;compute.submit&quot;, &quot;params&quot;: {&quot;code&quot;: &quot;...&quot;, &quot;fuel_limit&quot;: 1000, &quot;priority&quot;: &quot;high&quot;}}
+</code></pre>
+<p><strong>Breaking</strong> (requires new method):</p>
+<pre><code class="language-json">// Don&#39;t change semantics - create new method instead
+{&quot;method&quot;: &quot;compute.submit_v2&quot;, &quot;params&quot;: {...}}
+</code></pre>
+<h3>3.4 RPC Error Codes</h3>
+<p>Standard JSON-RPC error codes are used:</p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>-32700</td>
+<td>Parse error</td>
+</tr>
+<tr>
+<td>-32600</td>
+<td>Invalid request</td>
+</tr>
+<tr>
+<td>-32601</td>
+<td>Method not found</td>
+</tr>
+<tr>
+<td>-32602</td>
+<td>Invalid params</td>
+</tr>
+<tr>
+<td>-32603</td>
+<td>Internal error</td>
+</tr>
+<tr>
+<td>-32001</td>
+<td>Authentication required</td>
+</tr>
+<tr>
+<td>-32002</td>
+<td>Authorization denied</td>
+</tr>
+<tr>
+<td>-32003</td>
+<td>Rate limited</td>
+</tr>
+</tbody></table>
+<p>Custom error codes use -32100 to -32199 range.</p>
+<hr>
+<h2>4. P2P Protocol Versioning</h2>
+<h3>4.1 Protocol Version Negotiation</h3>
+<p>ICN nodes negotiate protocol versions during the Hello handshake:</p>
+<pre><code class="language-rust">pub struct VersionInfo {
+    /// Current protocol version this node is running
+    pub current_version: u32,
+
+    /// Minimum protocol version this node supports
+    pub min_supported: u32,
+
+    /// Maximum protocol version this node supports
+    pub max_supported: u32,
+
+    /// Optional capabilities bitmap for feature detection
+    pub capabilities: CapabilityFlags,
+
+    /// Software version string (e.g., &quot;icnd-0.1.0&quot;)
+    pub software_version: String,
+}
+</code></pre>
+<p><strong>Constants</strong> (defined in <code>icn-net/src/protocol.rs</code>):</p>
+<pre><code class="language-rust">pub const PROTOCOL_VERSION: u32 = 1;      // Current
+pub const MIN_SUPPORTED_VERSION: u32 = 1; // Minimum we accept
+pub const MAX_SUPPORTED_VERSION: u32 = 1; // Maximum we support
+</code></pre>
+<h3>4.2 Negotiation Algorithm</h3>
+<p>Nodes negotiate to the highest mutually supported version:</p>
+<pre><code class="language-rust">fn negotiate_version(local: &amp;VersionInfo, remote: &amp;VersionInfo) -&gt; Result&lt;u32&gt; {
+    // Find the overlap between supported versions
+    let negotiated = std::cmp::min(local.max_supported, remote.max_supported);
+
+    // Verify it&#39;s within both nodes&#39; supported range
+    if negotiated &lt; local.min_supported || negotiated &lt; remote.min_supported {
+        bail!(&quot;No compatible version&quot;);
+    }
+
+    Ok(negotiated)
+}
+</code></pre>
+<p><strong>Example</strong>:</p>
+<pre><code>Node A: min=1, max=2, current=2
+Node B: min=1, max=1, current=1
+
+Negotiated: min(2, 1) = 1 ✓ (both support v1)
+</code></pre>
+<h3>4.3 Handshake Sequence</h3>
+<pre><code>Client                                Server
+   |                                     |
+   |---- Hello + VersionInfo -----------&gt;|
+   |                                     | (validate version)
+   |&lt;--- Hello + VersionInfo ------------|
+   |                                     |
+   | (Both nodes compute negotiated version)
+   |                                     |
+   |&lt;=========== Connection OK ==========&gt;|
+</code></pre>
+<h3>4.4 Incrementing Protocol Version</h3>
+<p>When to increment the protocol version:</p>
+<table>
+<thead>
+<tr>
+<th>Change Type</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>New message type</td>
+<td>No change (additive)</td>
+</tr>
+<tr>
+<td>New field in message</td>
+<td>No change (additive)</td>
+</tr>
+<tr>
+<td>Remove field</td>
+<td>Increment version</td>
+</tr>
+<tr>
+<td>Change field semantics</td>
+<td>Increment version</td>
+</tr>
+<tr>
+<td>Change message format</td>
+<td>Increment version</td>
+</tr>
+</tbody></table>
+<p><strong>Steps to increment</strong>:</p>
+<ol>
+<li><p>Update constants:</p>
+<pre><code class="language-rust">pub const PROTOCOL_VERSION: u32 = 2;
+pub const MAX_SUPPORTED_VERSION: u32 = 2;
+// Keep MIN_SUPPORTED = 1 for backward compat
+</code></pre>
+</li>
+<li><p>Handle both versions in message parsing:</p>
+<pre><code class="language-rust">match negotiated_version {
+    1 =&gt; parse_v1_message(bytes),
+    2 =&gt; parse_v2_message(bytes),
+    _ =&gt; Err(&quot;Unsupported version&quot;),
+}
+</code></pre>
+</li>
+<li><p>Update tests and documentation</p>
+</li>
+</ol>
+<hr>
+<h2>5. Capability-Based Features</h2>
+<h3>5.1 Capability Flags</h3>
+<p>Beyond version numbers, ICN uses capability flags for fine-grained feature detection:</p>
+<pre><code class="language-rust">pub struct CapabilityFlags: u64 {
+    const E2E_ENCRYPTION     = 0b00000001;  // Phase 10
+    const SIGNED_MESSAGES    = 0b00000010;  // Phase 9
+    const GRACEFUL_RESTART   = 0b00000100;  // Track B1
+    const TOPOLOGY_AWARE     = 0b00001000;  // Phase 16C
+    const TRUST_RATE_LIMITING = 0b00010000; // Phase 7
+    const GOSSIP_PULL        = 0b00100000;  // Phase 7
+    const MULTI_DEVICE       = 0b01000000;  // Phase 11
+    const ECONOMIC_SAFETY    = 0b10000000;  // Phase 12
+}
+</code></pre>
+<h3>5.2 Feature Detection Pattern</h3>
+<p>Check peer capabilities before using optional features:</p>
+<pre><code class="language-rust">let common = common_capabilities(&amp;local_version, &amp;peer_version);
+
+if common.contains(CapabilityFlags::E2E_ENCRYPTION) {
+    // Use encrypted envelope
+    send_encrypted_message(peer, payload);
+} else {
+    // Fall back to signed-only envelope
+    send_signed_message(peer, payload);
+}
+</code></pre>
+<h3>5.3 Adding New Capabilities</h3>
+<ol>
+<li><p>Add flag constant:</p>
+<pre><code class="language-rust">const NEW_FEATURE = 0b100000000; // Next available bit
+</code></pre>
+</li>
+<li><p>Update <code>current()</code> when feature is implemented:</p>
+<pre><code class="language-rust">impl CapabilityFlags {
+    pub fn current() -&gt; Self {
+        Self::E2E_ENCRYPTION
+            | Self::SIGNED_MESSAGES
+            | ...
+            | Self::NEW_FEATURE  // Add when ready
+    }
+}
+</code></pre>
+</li>
+<li><p>Document the capability in this guide</p>
+</li>
+</ol>
+<hr>
+<h2>6. Migration Strategies</h2>
+<h3>6.1 Rolling Upgrades</h3>
+<p>For networks with mixed versions:</p>
+<ol>
+<li><strong>Upgrade executors first</strong> - They need newest features</li>
+<li><strong>Upgrade coordinators</strong> - Intermediate nodes</li>
+<li><strong>Upgrade leaf nodes last</strong> - Members, gateways</li>
+</ol>
+<p>During rolling upgrade:</p>
+<ul>
+<li>Maintain backward compatibility window (e.g., support N and N-1)</li>
+<li>Monitor metrics for version distribution</li>
+<li>Set deadline for upgrade completion</li>
+</ul>
+<h3>6.2 Data Migration</h3>
+<p>When storage formats change:</p>
+<pre><code class="language-bash"># Check current version
+icnctl version --data-dir ~/.icn
+
+# Run migration
+icnctl migrate --from 0.1.x --to 0.2.x
+
+# Verify migration
+icnctl verify --data-dir ~/.icn
+</code></pre>
+<p><strong>Migration principles</strong>:</p>
+<ul>
+<li>Always backup before migration</li>
+<li>Migrations are one-way (no downgrade path)</li>
+<li>Test migrations on copy first</li>
+</ul>
+<h3>6.3 API Migration Checklist</h3>
+<p>For Gateway API version transitions:</p>
+<ul>
+<li><input disabled="" type="checkbox"> Create new version endpoints</li>
+<li><input disabled="" type="checkbox"> Update OpenAPI spec</li>
+<li><input disabled="" type="checkbox"> Update TypeScript SDK</li>
+<li><input disabled="" type="checkbox"> Add deprecation warnings to old endpoints</li>
+<li><input disabled="" type="checkbox"> Update documentation</li>
+<li><input disabled="" type="checkbox"> Communicate timeline to API consumers</li>
+<li><input disabled="" type="checkbox"> Monitor usage of deprecated endpoints</li>
+<li><input disabled="" type="checkbox"> Remove old endpoints after sunset period</li>
+</ul>
+<hr>
+<h2>7. Deprecation Policy</h2>
+<h3>7.1 Deprecation Process</h3>
+<ol>
+<li><strong>Announce</strong> - Document deprecation in CHANGELOG, add header to responses</li>
+<li><strong>Warn</strong> - Log warnings when deprecated features used</li>
+<li><strong>Monitor</strong> - Track usage of deprecated features</li>
+<li><strong>Remove</strong> - After sunset period, remove feature</li>
+</ol>
+<h3>7.2 Deprecation Signals</h3>
+<p><strong>REST API</strong>: Add response header</p>
+<pre><code class="language-http">Deprecation: Sun, 01 Jun 2025 00:00:00 GMT
+Sunset: Sun, 01 Dec 2025 00:00:00 GMT
+Link: &lt;/v2/coops&gt;; rel=&quot;successor-version&quot;
+</code></pre>
+<p><strong>RPC</strong>: Return warning in response</p>
+<pre><code class="language-json">{
+  &quot;jsonrpc&quot;: &quot;2.0&quot;,
+  &quot;result&quot;: {...},
+  &quot;id&quot;: 1,
+  &quot;_warning&quot;: &quot;Method &#39;compute.submit&#39; is deprecated. Use &#39;compute.submit_v2&#39; instead.&quot;
+}
+</code></pre>
+<p><strong>P2P</strong>: Log warning, emit metric</p>
+<pre><code class="language-rust">metrics::counter!(&quot;icn_protocol_deprecated_messages_total&quot;).increment(1);
+tracing::warn!(
+    method = %msg.method,
+    peer = %peer_did,
+    &quot;Received deprecated message type&quot;
+);
+</code></pre>
+<h3>7.3 Timeline Guidelines</h3>
+<table>
+<thead>
+<tr>
+<th>Severity</th>
+<th>Notice Period</th>
+<th>Support Period</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Minor (field removal)</td>
+<td>1 minor release</td>
+<td>2 minor releases</td>
+</tr>
+<tr>
+<td>Major (endpoint removal)</td>
+<td>2 minor releases</td>
+<td>6 months</td>
+</tr>
+<tr>
+<td>Critical (security fix)</td>
+<td>Immediate</td>
+<td>Best effort</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>8. Version Compatibility Matrix</h2>
+<h3>8.1 Current Compatibility</h3>
+<table>
+<thead>
+<tr>
+<th>ICN Version</th>
+<th>Protocol</th>
+<th>Gateway API</th>
+<th>RPC</th>
+<th>Min Compatible</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>0.1.x</td>
+<td>1</td>
+<td>v1</td>
+<td>1.0</td>
+<td>0.1.0</td>
+</tr>
+<tr>
+<td>0.2.x (planned)</td>
+<td>1-2</td>
+<td>v1</td>
+<td>1.0</td>
+<td>0.1.0</td>
+</tr>
+</tbody></table>
+<h3>8.2 Feature Availability by Version</h3>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Introduced</th>
+<th>Protocol</th>
+<th>Capability Flag</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Basic networking</td>
+<td>0.1.0</td>
+<td>1</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Signed messages</td>
+<td>0.1.0</td>
+<td>1</td>
+<td>SIGNED_MESSAGES</td>
+</tr>
+<tr>
+<td>E2E encryption</td>
+<td>0.1.0</td>
+<td>1</td>
+<td>E2E_ENCRYPTION</td>
+</tr>
+<tr>
+<td>Graceful restart</td>
+<td>0.1.0</td>
+<td>1</td>
+<td>GRACEFUL_RESTART</td>
+</tr>
+<tr>
+<td>Trust rate limiting</td>
+<td>0.1.0</td>
+<td>1</td>
+<td>TRUST_RATE_LIMITING</td>
+</tr>
+<tr>
+<td>Multi-device</td>
+<td>0.1.0</td>
+<td>1</td>
+<td>MULTI_DEVICE</td>
+</tr>
+<tr>
+<td>Economic safety</td>
+<td>0.1.0</td>
+<td>1</td>
+<td>ECONOMIC_SAFETY</td>
+</tr>
+<tr>
+<td>Topology awareness</td>
+<td>0.1.0</td>
+<td>1</td>
+<td>TOPOLOGY_AWARE</td>
+</tr>
+</tbody></table>
+<h3>8.3 Testing Compatibility</h3>
+<p>Run compatibility tests before deployment:</p>
+<pre><code class="language-bash"># Test against older version
+./scripts/test-compatibility.sh --old-version 0.1.0 --new-version 0.2.0
+
+# Test protocol negotiation
+cargo test -p icn-net test_negotiate
+
+# Test API backward compatibility
+cargo test -p icn-gateway test_v1_compat
+</code></pre>
+<hr>
+<h2>References</h2>
+<ul>
+<li><a href="/docs/ARCHITECTURE">ARCHITECTURE.md</a> - System architecture</li>
+<li><a href="/docs/design/capability-based-features">capability-based-features.md</a> - Detailed capability guide</li>
+<li><a href="/docs/operations/deployment/deployment-guide">deployment-guide.md</a> - Deployment procedures</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CHANGELOG">CHANGELOG.md</a> - Version history</li>
+</ul>
+<hr>
+<h2>Changelog</h2>
+<table>
+<thead>
+<tr>
+<th>Date</th>
+<th>Change</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>2025-12-04</td>
+<td>Initial document creation</td>
+</tr>
+</tbody></table>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

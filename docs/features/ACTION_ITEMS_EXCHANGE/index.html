@@ -1,0 +1,505 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Action Items and Internal Exchange Features | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>features</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ACTION ITEMS EXCHANGE</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/features/ACTION_ITEMS_EXCHANGE.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Action Items and Internal Exchange Features</h1>
+<p>This document describes the architecture and implementation of the Action Item Tracker and Internal Exchange (Listings) features in ICN Gateway.</p>
+<h2>Overview</h2>
+<p>These features address two key cooperative needs:</p>
+<ol>
+<li><strong>Action Items</strong>: Track tasks and commitments from governance meetings</li>
+<li><strong>Internal Exchange</strong>: Post offers/wants before going to external markets, keeping value circulating within the network</li>
+</ol>
+<h2>Action Items</h2>
+<h3>Purpose</h3>
+<p>Action items help cooperatives track tasks that arise from board meetings, proposals, and day-to-day operations. They provide accountability by assigning items to members and tracking completion.</p>
+<h3>Data Model</h3>
+<pre><code class="language-rust">ActionItem {
+    id: ActionItemId,           // Unique identifier (UUID)
+    domain_id: GovernanceDomainId,  // Governance domain this belongs to
+    title: String,              // Short title (max 200 chars)
+    description: Option&lt;String&gt;, // Full description (max 5000 chars)
+    assignee: Option&lt;Did&gt;,      // Who is responsible
+    due_date: Option&lt;u64&gt;,      // Unix timestamp deadline
+    priority: ActionItemPriority, // High, Medium, Low
+    status: ActionItemStatus,   // Pending, InProgress, Completed, Deferred
+    created_by: Did,            // Who created this
+    created_at: u64,            // Creation timestamp
+    updated_at: u64,            // Last update timestamp
+    linked_proposal: Option&lt;ProposalId&gt;, // Associated proposal
+    meeting_context: Option&lt;String&gt;,     // e.g., &quot;2026-01-17 board meeting&quot;
+    tags: Vec&lt;String&gt;,          // Categorization tags
+}
+</code></pre>
+<h3>Storage</h3>
+<p><strong>Sled Key Format</strong>: <code>v1:action_item:{domain_id}:{item_id}</code></p>
+<p>The <code>v1:</code> prefix enables future schema migrations. When the data model changes:</p>
+<ol>
+<li>Increment to <code>v2:</code></li>
+<li>Add migration logic to read <code>v1:</code> keys and convert to <code>v2:</code></li>
+<li>Eventually deprecate <code>v1:</code> support</li>
+</ol>
+<h3>Authorization</h3>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>Who Can Perform</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Create</td>
+<td>Any domain member with <code>governance:write</code> scope</td>
+</tr>
+<tr>
+<td>Read</td>
+<td>Any domain member with <code>governance:read</code> scope</td>
+</tr>
+<tr>
+<td>Update</td>
+<td>Creator only</td>
+</tr>
+<tr>
+<td>Update Status</td>
+<td>Creator OR Assignee</td>
+</tr>
+<tr>
+<td>Delete</td>
+<td>Creator only</td>
+</tr>
+</tbody></table>
+<h3>Filtering &amp; Sorting</h3>
+<p>Action items support filtering by:</p>
+<ul>
+<li><code>status</code>: Pending, InProgress, Completed, Deferred</li>
+<li><code>assignee</code>: Filter by assigned DID</li>
+<li><code>priority</code>: High, Medium, Low</li>
+<li><code>overdue</code>: Boolean flag for items past due date</li>
+<li><code>tag</code>: Filter by specific tag</li>
+<li><code>linked_proposal</code>: Filter by associated proposal</li>
+</ul>
+<p>Default sort order: <code>due_date ASC</code>, then <code>priority DESC</code>, then <code>created_at DESC</code></p>
+<h3>Overdue Logic</h3>
+<p>An item is considered overdue when:</p>
+<pre><code class="language-rust">now &gt; due_date  // Strictly greater than, not at the deadline
+</code></pre>
+<p>This means items are NOT overdue AT the deadline, only AFTER it passes.</p>
+<h2>Internal Exchange (Listings)</h2>
+<h3>Purpose</h3>
+<p>The internal exchange enables cooperatives to post offers and wants before going to external markets. When a coop has an unused asset (equipment, surplus materials, space), they can check if another network coop needs it first, keeping value circulating within the network.</p>
+<h3>Data Model</h3>
+<pre><code class="language-rust">Listing {
+    id: ListingId,              // Unique identifier (UUID)
+    listing_type: ListingType,  // Offer or Want
+    title: String,              // Short title (max 200 chars)
+    description: String,        // Full description (max 5000 chars)
+    category: ListingCategory,  // Equipment, Services, Materials, Space, Other
+    photos: Vec&lt;String&gt;,        // URLs (https:// or ipfs://)
+    offered_by: Did,            // Who posted this
+    coop_id: String,            // Which coop this belongs to
+    seeking: String,            // What they want in exchange (max 1000 chars)
+    visibility: ListingVisibility, // Coop, Federation, Network
+    status: ListingStatus,      // Active, Matched, Completed, Expired, Cancelled
+    created_at: u64,            // Creation timestamp
+    updated_at: u64,            // Last update timestamp
+    expires_at: Option&lt;u64&gt;,    // Optional expiry (max 1 year in future)
+    tags: Vec&lt;String&gt;,          // Searchability tags (max 15)
+}
+
+ListingInterest {
+    id: Uuid,                   // Unique identifier
+    listing_id: ListingId,      // Which listing
+    from_did: Did,              // Who expressed interest
+    from_coop: String,          // Their coop
+    message: String,            // Message to owner (max 2000 chars)
+    offer: Option&lt;String&gt;,      // What they&#39;re offering (max 1000 chars)
+    created_at: u64,            // When expressed
+}
+</code></pre>
+<h3>Storage</h3>
+<p><strong>Sled Key Formats</strong>:</p>
+<ul>
+<li>Listings: <code>v1:listing:{id}</code></li>
+<li>Interests: <code>v1:interest:{listing_id}:{interest_id}</code></li>
+<li>Interest Index: <code>v1:interest_idx:{listing_id}:{from_did}</code> (for duplicate prevention)</li>
+</ul>
+<p>The interest index enables atomic duplicate detection using Sled&#39;s compare-and-swap operation.</p>
+<h3>Authorization</h3>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>Who Can Perform</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Create Listing</td>
+<td>Any member with <code>coop:write</code> scope</td>
+</tr>
+<tr>
+<td>Read Listings</td>
+<td>Any member with <code>coop:read</code> scope</td>
+</tr>
+<tr>
+<td>Update Listing</td>
+<td>Owner only</td>
+</tr>
+<tr>
+<td>Delete Listing</td>
+<td>Owner only</td>
+</tr>
+<tr>
+<td>Express Interest</td>
+<td>Any member except owner</td>
+</tr>
+<tr>
+<td>View Interests</td>
+<td>Listing owner only</td>
+</tr>
+</tbody></table>
+<h3>Privacy</h3>
+<p><strong>Interest Count Privacy</strong>: Interest counts are only visible to listing owners. This prevents competitors from seeing market demand signals.</p>
+<pre><code class="language-rust">// In list_listings: only fetch counts for owned listings
+let owned_listing_ids: Vec&lt;ListingId&gt; = listings
+    .iter()
+    .filter(|l| caller_did.as_ref().is_some_and(|did| did == &amp;l.offered_by))
+    .map(|l| l.id)
+    .collect();
+
+let interest_counts = mgr.get_interest_counts(&amp;owned_listing_ids);
+</code></pre>
+<h3>Race Condition Prevention</h3>
+<p>Duplicate interest prevention uses atomic operations:</p>
+<p><strong>In-Memory Store</strong>: Check and insert under single write lock</p>
+<pre><code class="language-rust">let mut interests = self.interests.write()?;
+let existing = interests.entry(listing_id).or_default();
+if existing.iter().any(|i| &amp;i.from_did == from_did) {
+    return Ok(false); // Duplicate
+}
+existing.push(interest.clone());
+Ok(true)
+</code></pre>
+<p><strong>Sled Store</strong>: Compare-and-swap on index key</p>
+<pre><code class="language-rust">let index_key = format!(&quot;v1:interest_idx:{}:{}&quot;, listing_id, from_did);
+let cas_result = db.compare_and_swap(index_key, None::&lt;&amp;[u8]&gt;, Some(b&quot;1&quot;))?;
+if cas_result.is_err() {
+    return Ok(false); // Key existed, duplicate
+}
+// CAS succeeded, insert actual interest data
+</code></pre>
+<h3>Photo URL Security</h3>
+<p>Photo URLs undergo comprehensive validation:</p>
+<ol>
+<li><strong>Scheme Validation</strong>: Only <code>https://</code> and <code>ipfs://</code> allowed</li>
+<li><strong>SSRF Protection</strong>: Blocks private/internal IP addresses:<ul>
+<li>RFC1918 private ranges (10.x, 172.16-31.x, 192.168.x)</li>
+<li>Loopback (127.x.x.x, ::1)</li>
+<li>Link-local (169.254.x.x, fe80::/10)</li>
+<li>Carrier-grade NAT (100.64.0.0/10)</li>
+<li>Documentation ranges</li>
+</ul>
+</li>
+<li><strong>Hostname Blocking</strong>: Rejects localhost, .local, .internal, .localhost</li>
+<li><strong>Format Validation</strong>: Proper URL parsing, no CRLF injection</li>
+</ol>
+<h3>Pagination</h3>
+<p>Both features support pagination:</p>
+<ul>
+<li><code>limit</code>: Max items per page (default 20, max 100)</li>
+<li><code>offset</code>: Number of items to skip</li>
+</ul>
+<pre><code class="language-rust">pub const MAX_PAGE_SIZE: usize = 100;
+pub const DEFAULT_PAGE_SIZE: usize = 20;
+</code></pre>
+<h2>API Endpoints</h2>
+<h3>Action Items</h3>
+<pre><code>POST   /gov/domains/{domain_id}/action-items     - Create action item
+GET    /gov/domains/{domain_id}/action-items     - List with filters
+GET    /gov/domains/{domain_id}/action-items/{id} - Get by ID
+PUT    /gov/domains/{domain_id}/action-items/{id} - Update
+DELETE /gov/domains/{domain_id}/action-items/{id} - Delete
+</code></pre>
+<h3>Listings</h3>
+<pre><code>POST   /listings                    - Create listing
+GET    /listings                    - Browse (filters: type, category, status, coop, tag)
+GET    /listings/my                 - Get caller&#39;s listings
+GET    /listings/{id}               - Get details
+PUT    /listings/{id}               - Update
+DELETE /listings/{id}               - Delete
+PUT    /listings/{id}/status        - Update status (matched/completed/cancelled)
+POST   /listings/{id}/interest      - Express interest
+GET    /listings/{id}/interests     - Get interests (owner only)
+</code></pre>
+<h2>Storage Abstraction</h2>
+<p>Both features use trait-based storage abstraction:</p>
+<pre><code class="language-rust">pub trait ActionItemStoreBackend: Send + Sync {
+    fn save(&amp;self, item: &amp;ActionItem) -&gt; Result&lt;()&gt;;
+    fn get(&amp;self, domain_id: &amp;GovernanceDomainId, id: &amp;ActionItemId) -&gt; Result&lt;Option&lt;ActionItem&gt;&gt;;
+    fn list(&amp;self, domain_id: &amp;GovernanceDomainId, filter: &amp;ActionItemFilter) -&gt; Result&lt;Vec&lt;ActionItem&gt;&gt;;
+    fn delete(&amp;self, domain_id: &amp;GovernanceDomainId, id: &amp;ActionItemId) -&gt; Result&lt;bool&gt;;
+}
+
+pub trait ListingsStoreBackend: Send + Sync {
+    fn save(&amp;self, listing: &amp;Listing) -&gt; Result&lt;()&gt;;
+    fn get(&amp;self, id: &amp;ListingId) -&gt; Result&lt;Option&lt;Listing&gt;&gt;;
+    fn list(&amp;self, filter: &amp;ListingFilter) -&gt; Result&lt;Vec&lt;Listing&gt;&gt;;
+    fn delete(&amp;self, id: &amp;ListingId) -&gt; Result&lt;bool&gt;;
+    fn add_interest(&amp;self, interest: &amp;ListingInterest) -&gt; Result&lt;()&gt;;
+    fn get_interests(&amp;self, listing_id: &amp;ListingId) -&gt; Result&lt;Vec&lt;ListingInterest&gt;&gt;;
+    fn add_interest_if_not_duplicate(&amp;self, interest: &amp;ListingInterest, from_did: &amp;Did) -&gt; Result&lt;bool&gt;;
+}
+</code></pre>
+<p>This enables:</p>
+<ul>
+<li><strong>In-memory storage</strong> for testing (fast, isolated)</li>
+<li><strong>Sled storage</strong> for production (persistent, crash-safe)</li>
+<li>Future backends (PostgreSQL, etc.) without API changes</li>
+</ul>
+<h2>Performance Considerations</h2>
+<h3>Batch Operations</h3>
+<p>Interest counts are fetched in batch to avoid N+1 queries:</p>
+<pre><code class="language-rust">pub fn get_interest_counts(&amp;self, listing_ids: &amp;[ListingId]) -&gt; HashMap&lt;ListingId, usize&gt;
+</code></pre>
+<h3>Efficient Filtering</h3>
+<p>The <code>offered_by</code> filter enables server-side &quot;my listings&quot; queries instead of fetching all listings and filtering client-side.</p>
+<h3>Sorting</h3>
+<p>Action items are sorted by due_date, priority, then created_at. Listings are sorted by created_at descending (newest first).</p>
+<h3>Future Optimization</h3>
+<p>For datasets exceeding 10K items, consider adding secondary indexes for common filters (status, assignee, category). Current implementation uses <code>scan_prefix</code> which is O(n).</p>
+<h2>Orphan Cleanup</h2>
+<p>When a listing is deleted, associated data is cleaned up:</p>
+<pre><code class="language-rust">pub fn delete(&amp;self, id: &amp;ListingId) -&gt; Result&lt;bool&gt; {
+    // Remove listing
+    let existed = self.db.remove(listing_key)?;
+
+    // Clean up interests
+    for item in self.db.scan_prefix(interest_prefix) {
+        self.db.remove(key)?;
+    }
+
+    // Clean up interest index keys
+    for item in self.db.scan_prefix(interest_idx_prefix) {
+        self.db.remove(key)?;
+    }
+
+    Ok(existed)
+}
+</code></pre>
+<h2>Frontend Integration</h2>
+<p>The pilot-ui implements these features with:</p>
+<ul>
+<li><strong>Action Items Tab</strong>: List view with filters, quick-add, status updates</li>
+<li><strong>Exchange Tab</strong>: Card-based listings, photo galleries, interest forms</li>
+</ul>
+<p>Security measures:</p>
+<ul>
+<li>All user content escaped with <code>escapeHtml()</code> before rendering</li>
+<li>Uses <code>textContent</code> instead of <code>innerHTML</code> for dynamic content</li>
+<li>Input validation mirrors backend constraints</li>
+</ul>
+<h2>Operations</h2>
+<h3>Listing Expiry Management</h3>
+<p>Listings can have optional expiry dates. The system provides two mechanisms for handling expired listings:</p>
+<ol>
+<li><p><strong>Automatic Filtering</strong>: Expired Active listings are automatically filtered out of list queries. Users won&#39;t see stale listings in search results, but the data is preserved.</p>
+</li>
+<li><p><strong>Manual Cleanup</strong>: The <code>expire_stale_listings()</code> method can be called to transition all expired Active listings to Expired status:</p>
+</li>
+</ol>
+<pre><code class="language-rust">// In a maintenance task or admin endpoint
+let count = listings_manager.expire_stale_listings()?;
+tracing::info!(&quot;Expired {} stale listings&quot;, count);
+</code></pre>
+<p>For the pilot phase, this can be triggered manually via an admin endpoint or script. For production, consider adding a background task:</p>
+<pre><code class="language-rust">// Example: hourly expiry check
+tokio::spawn(async move {
+    let mut interval = tokio::time::interval(Duration::from_secs(3600));
+    loop {
+        interval.tick().await;
+        if let Err(e) = listings_manager.expire_stale_listings() {
+            tracing::error!(&quot;Failed to expire listings: {}&quot;, e);
+        }
+    }
+});
+</code></pre>
+<h3>Performance Limits</h3>
+<p><strong>Pilot Phase Limits</strong> (tested and supported):</p>
+<ul>
+<li>Up to 10,000 listings per deployment</li>
+<li>Up to 1,000 interests per listing</li>
+<li>Up to 100 active users per cooperative</li>
+</ul>
+<p><strong>Scaling Considerations</strong>:</p>
+<ul>
+<li>List queries scan all listings matching status filter - O(n) complexity</li>
+<li>For &gt;10K listings, add secondary Sled indexes for status/category/offered_by</li>
+<li>Interest cleanup on listing delete is O(m) where m = interest count</li>
+<li>Batch operations (get_interest_counts) prevent N+1 query patterns</li>
+</ul>
+<h3>Rate Limiting</h3>
+<p>Interest submissions are protected by two layers of rate limiting:</p>
+<ol>
+<li><p><strong>DID-based Rate Limiting</strong>: Applied via middleware to all authenticated endpoints. Uses token bucket algorithm with 60 burst capacity and 6 req/sec sustained rate for write operations.</p>
+</li>
+<li><p><strong>IP-based Rate Limiting</strong>: Applied specifically to the interest submission endpoint (<code>POST /listings/{id}/interest</code>) for additional DoS protection. This prevents attackers from rotating DIDs to spam interest submissions.</p>
+</li>
+</ol>
+<h3>Monitoring</h3>
+<p><strong>Exchange Metrics</strong> (Prometheus):</p>
+<ul>
+<li><code>icn_exchange_listings_created_total{listing_type, category}</code> - Listing creation by type/category</li>
+<li><code>icn_exchange_listings_completed_total</code> - Successful exchanges</li>
+<li><code>icn_exchange_listings_expired_total</code> - Expired listings (from cleanup task)</li>
+<li><code>icn_exchange_interests_expressed_total{listing_type}</code> - Interest expression activity</li>
+<li><code>icn_exchange_listings_active</code> (gauge) - Current active listing count</li>
+<li><code>icn_exchange_listing_time_to_match_seconds</code> (histogram) - Time to first interest match</li>
+</ul>
+<p><strong>Action Item Metrics</strong> (Prometheus):</p>
+<ul>
+<li><code>icn_action_items_created_total{priority}</code> - Action items created by priority</li>
+<li><code>icn_action_items_completed_total</code> - Completed action items</li>
+<li><code>icn_action_items_deferred_total</code> - Deferred action items</li>
+<li><code>icn_action_items_status_changes_total{from_status, to_status}</code> - Status transitions</li>
+<li><code>icn_action_items_pending</code> (gauge) - Current pending items</li>
+<li><code>icn_action_items_in_progress</code> (gauge) - Current in-progress items</li>
+<li><code>icn_action_items_overdue</code> (gauge) - Current overdue items</li>
+<li><code>icn_action_items_time_to_complete_seconds</code> (histogram) - Time to completion</li>
+</ul>
+<h3>Example Prometheus Alert Rules</h3>
+<p>Add these to your Prometheus rules configuration for proactive monitoring:</p>
+<pre><code class="language-yaml">groups:
+  - name: icn_exchange_alerts
+    rules:
+      # Alert if too many active listings accumulate (may indicate cleanup issues)
+      - alert: ExchangeListingsAccumulating
+        expr: icn_exchange_listings_active &gt; 10000
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: &quot;High number of active listings&quot;
+          description: &quot;Active listings ({{ $value }}) exceeds threshold. Check if expiry scheduler is running.&quot;
+
+      # Alert if listings aren&#39;t being completed (exchange not being used)
+      - alert: ExchangeLowCompletionRate
+        expr: |
+          rate(icn_exchange_listings_completed_total[24h]) == 0
+          and icn_exchange_listings_active &gt; 10
+        for: 7d
+        labels:
+          severity: info
+        annotations:
+          summary: &quot;No listings completed in 7 days&quot;
+          description: &quot;No exchange listings have been completed despite active inventory.&quot;
+
+      # Alert if many interests are being blocked as duplicates
+      - alert: ExchangeHighDuplicateInterests
+        expr: |
+          rate(icn_exchange_duplicate_interests_blocked_total[1h])
+          / rate(icn_exchange_interests_expressed_total[1h]) &gt; 0.5
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: &quot;High duplicate interest rate&quot;
+          description: &quot;Over 50% of interests are duplicates. May indicate UI bug or abuse.&quot;
+
+  - name: icn_action_items_alerts
+    rules:
+      # Alert if overdue items are accumulating
+      - alert: ActionItemsOverdueAccumulating
+        expr: icn_action_items_overdue &gt; 50
+        for: 24h
+        labels:
+          severity: warning
+        annotations:
+          summary: &quot;Many overdue action items&quot;
+          description: &quot;{{ $value }} action items are overdue. Review and reschedule or complete.&quot;
+
+      # Alert if action items are being deferred frequently
+      - alert: ActionItemsHighDeferralRate
+        expr: |
+          rate(icn_action_items_deferred_total[7d])
+          / rate(icn_action_items_created_total[7d]) &gt; 0.3
+        for: 7d
+        labels:
+          severity: info
+        annotations:
+          summary: &quot;High action item deferral rate&quot;
+          description: &quot;Over 30% of action items being deferred. May indicate capacity issues.&quot;
+
+      # Alert if high-priority items aren&#39;t being addressed
+      - alert: HighPriorityItemsStale
+        expr: |
+          increase(icn_action_items_completed_total{priority=&quot;high&quot;}[7d]) == 0
+          and icn_action_items_pending{priority=&quot;high&quot;} &gt; 0
+        for: 7d
+        labels:
+          severity: warning
+        annotations:
+          summary: &quot;High-priority action items not being completed&quot;
+          description: &quot;High-priority items exist but none completed in 7 days.&quot;
+</code></pre>
+<p>Adjust thresholds based on your cooperative&#39;s size and activity level.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

@@ -1,0 +1,589 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Future Work | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>vision</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>FUTURE WORK</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/vision/FUTURE_WORK.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Future Work</h1>
+<p><strong>Document</strong>: ICN-DOC-FUTURE-01
+<strong>Last Updated</strong>: 2025-12-04
+<strong>Status</strong>: Historical planning snapshot (2025-12-04)</p>
+<blockquote>
+<p>Historical note: This plan reflects priorities and issue states at 2025-12-04.
+Validate current priorities against latest roadmap/status artifacts before execution.</p>
+</blockquote>
+<p>This document captures all planned and potential future work for ICN, organized by priority and timeline.</p>
+<hr>
+<h2>Table of Contents</h2>
+<ol>
+<li><a href="#1-immediate-pre-pilot">Immediate (Pre-Pilot)</a></li>
+<li><a href="#2-short-term-pilot-phase">Short-Term (Pilot Phase)</a></li>
+<li><a href="#3-medium-term-post-pilot">Medium-Term (Post-Pilot)</a></li>
+<li><a href="#4-long-term-cooperative-cloud-vision">Long-Term (Cooperative Cloud Vision)</a></li>
+<li><a href="#5-technical-debt">Technical Debt</a></li>
+<li><a href="#6-research-topics">Research Topics</a></li>
+</ol>
+<hr>
+<h2>1. Immediate (Pre-Pilot)</h2>
+<h3>1.1 Gap Closure (from GAP_ANALYSIS.md)</h3>
+<p><strong>Status (historical, 2025-12-04)</strong>: ✅ <strong>22/23 gaps fixed (96%)</strong> - all pilot blockers resolved in this planning snapshot.</p>
+<p><strong>Completed Integration Tests</strong> (2025-12-04):</p>
+<table>
+<thead>
+<tr>
+<th>Gap</th>
+<th>Description</th>
+<th>Tests Added</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>#3</td>
+<td>RPC integration tests</td>
+<td>32 tests</td>
+<td>✅ FIXED</td>
+</tr>
+<tr>
+<td>#4</td>
+<td>Privacy crate integration tests</td>
+<td>27 tests</td>
+<td>✅ FIXED</td>
+</tr>
+<tr>
+<td>#5</td>
+<td>Federation integration tests</td>
+<td>22 tests</td>
+<td>✅ FIXED</td>
+</tr>
+<tr>
+<td>#7</td>
+<td>CCL contract integration tests</td>
+<td>24 tests</td>
+<td>✅ FIXED</td>
+</tr>
+<tr>
+<td>#8</td>
+<td>Time synchronization tests</td>
+<td>32 tests</td>
+<td>✅ FIXED</td>
+</tr>
+<tr>
+<td>#10</td>
+<td>Compute endpoint tests</td>
+<td>18 tests</td>
+<td>✅ FIXED</td>
+</tr>
+<tr>
+<td>#12</td>
+<td>WASM executor blob storage</td>
+<td>WasmRegistry + 17 tests</td>
+<td>✅ FIXED</td>
+</tr>
+</tbody></table>
+<p><strong>Remaining TODOs (Gap #6)</strong> - tracked via GitHub Issues:</p>
+<table>
+<thead>
+<tr>
+<th>Issue</th>
+<th>Description</th>
+<th>Location</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>#36</td>
+<td>N-way fork resolution</td>
+<td><code>icn-ledger/src/ledger.rs:411</code></td>
+</tr>
+<tr>
+<td>#37</td>
+<td>TURN relay fallback</td>
+<td><code>icn-core/src/supervisor.rs:1396</code></td>
+</tr>
+<tr>
+<td>#38</td>
+<td>Cooperative treasury DID</td>
+<td><code>icn-core/src/supervisor.rs:1868</code></td>
+</tr>
+<tr>
+<td>#39</td>
+<td>Federated DID resolution</td>
+<td><code>icn-federation/src/resolver.rs:250</code></td>
+</tr>
+<tr>
+<td>#40</td>
+<td>Contract deployment gossip</td>
+<td><code>icn-ccl/src/actor.rs:125</code></td>
+</tr>
+<tr>
+<td>#41</td>
+<td>Governance operations</td>
+<td><code>icn-core/src/supervisor.rs:2033</code></td>
+</tr>
+</tbody></table>
+<p>In this 2025-12-04 snapshot, these were treated as post-pilot features and not blocking pilot deployment.</p>
+<h3>1.2 Entity Model Evolution (Vision Phase 1)</h3>
+<p><strong>Completed</strong>:</p>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> Role migration: Owner→Steward, Admin→Facilitator, Member→Participant (commit <code>4156b09</code>)</li>
+</ul>
+<p><strong>Remaining</strong>:</p>
+<pre><code>[ ] Add Guest role (limited access, probationary)
+    - New MemberRole::Guest variant
+    - has_role() hierarchy update
+    - API validation updates
+
+[ ] Add Member scope (personal context)
+    - Profile (name, bio, skills, preferences)
+    - Device/agent bindings
+    - Cross-scope role summary
+    - Recovery configuration
+
+[ ] Add Network scope (minimal protocol governance)
+    - Protocol versioning decisions
+    - Namespace registries (currencies, service types)
+    - Minimum security requirements
+    - Dispute resolution of last resort
+
+[ ] Agent binding types (for multi-device)
+    - AgentBinding struct with proof signature
+    - DelegatedCapability enum
+    - Principal-agent relationship storage
+</code></pre>
+<h3>1.3 Documentation</h3>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Description</th>
+<th>Location</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Threat model</td>
+<td>Security analysis document</td>
+<td><code>docs/threat-model.md</code></td>
+<td>✅ Complete</td>
+</tr>
+<tr>
+<td>API versioning guide</td>
+<td>How to evolve APIs</td>
+<td><code>docs/api-versioning.md</code></td>
+<td>✅ Complete</td>
+</tr>
+<tr>
+<td>Operator runbook</td>
+<td>Day-2 operations guide</td>
+<td><code>docs/operations-guide.md</code></td>
+<td>✅ Complete</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>2. Short-Term (Pilot Phase)</h2>
+<h3>2.1 Pilot Infrastructure</h3>
+<pre><code>[ ] Pilot cooperative selection criteria
+    - Size (10-50 members recommended)
+    - Technical capacity
+    - Use case alignment
+
+[ ] Monitoring dashboard customization
+    - Per-coop metrics views
+    - Usage analytics
+    - Cost attribution
+
+[ ] Feedback collection system
+    - In-app feedback widget
+    - Usage telemetry (opt-in)
+    - Monthly survey automation
+</code></pre>
+<h3>2.2 Pilot-Driven Features</h3>
+<p>These will be prioritized based on pilot feedback:</p>
+<pre><code>[ ] Mobile-friendly gateway endpoints
+    - Optimized payloads
+    - Push notification support
+    - Offline-first patterns
+
+[ ] Bulk operations
+    - Batch member import
+    - Bulk transaction creation
+    - Mass proposal notifications
+
+[ ] Reporting and export
+    - Transaction history CSV/JSON export
+    - Governance activity reports
+    - Member contribution summaries
+</code></pre>
+<h3>2.3 ServiceOffering Schema (Vision Alignment)</h3>
+<p>Minimal schema for pilot:</p>
+<pre><code class="language-rust">/// A service offered by a cooperative (stub for pilot)
+pub struct ServiceOffering {
+    pub id: OfferingId,
+    pub provider: CoopId,
+    pub service_type: String,        // Free-form for now
+    pub description: String,
+    pub pricing_hint: Option&lt;String&gt;, // Human-readable
+    pub contact: String,              // DID or email
+    pub created_at: Timestamp,
+}
+</code></pre>
+<p>Full schema deferred to post-pilot.</p>
+<hr>
+<h2>3. Medium-Term (Post-Pilot)</h2>
+<h3>3.1 Low Severity Gaps</h3>
+<table>
+<thead>
+<tr>
+<th>Gap</th>
+<th>Description</th>
+<th>Phase</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>#16</td>
+<td>Federation actor in supervisor</td>
+<td>19+</td>
+</tr>
+<tr>
+<td>#17</td>
+<td>Privacy integration in supervisor</td>
+<td>19+</td>
+</tr>
+<tr>
+<td>#18</td>
+<td>Contract gossip completion</td>
+<td>16+</td>
+</tr>
+<tr>
+<td>#19</td>
+<td>N-way fork resolution</td>
+<td>Future</td>
+</tr>
+<tr>
+<td>#20</td>
+<td>Task migration completion</td>
+<td>16D</td>
+</tr>
+</tbody></table>
+<h3>3.2 Identity Evolution</h3>
+<pre><code>[ ] DID Documents with multiple keys
+    - Verification methods per-device
+    - Capability-based permissions
+    - Key rotation protocol
+
+[ ] HD wallet / key hierarchy
+    - Deterministic key derivation
+    - Backup seed phrases
+    - Hardware wallet support
+
+[ ] Cross-device sync
+    - Encrypted sync protocol
+    - Conflict resolution
+    - Device revocation
+</code></pre>
+<h3>3.3 Economic Features</h3>
+<pre><code>[ ] Multi-currency support
+    - Per-coop currency definitions
+    - Exchange rate mechanisms
+    - Cross-currency settlements
+
+[ ] Advanced credit policies
+    - Time-decay credit limits
+    - Seasonal adjustments
+    - Member tier multipliers
+
+[ ] Demurrage implementation
+    - Configurable decay rates
+    - Balance snapshots
+    - Redistribution mechanisms
+</code></pre>
+<h3>3.4 Governance Evolution</h3>
+<pre><code>[ ] Weighted voting
+    - Contribution-weighted votes
+    - Stake-weighted for economic proposals
+    - Configurable per-domain
+
+[ ] Delegation
+    - Vote delegation to representatives
+    - Time-bounded delegations
+    - Delegation chains (with limits)
+
+[ ] Governance templates
+    - Pre-configured domain setups
+    - &quot;Worker coop&quot;, &quot;Consumer coop&quot;, &quot;Platform coop&quot; presets
+    - Customization wizard
+</code></pre>
+<hr>
+<h2>4. Long-Term (Cooperative Cloud Vision)</h2>
+<h3>4.1 Service Coordination Layer</h3>
+<p>ICN as coordination layer for federated cooperative infrastructure:</p>
+<pre><code>[ ] Full ServiceOffering schema
+    - ServiceType enum (Container, Function, Storage, etc.)
+    - Capability declarations
+    - Locality constraints
+    - SLA definitions
+
+[ ] Service registry
+    - Publication and discovery
+    - Trust-filtered matching
+    - Cross-federation search
+
+[ ] Service contracts
+    - ServiceContract as governance proposal subtype
+    - SLA monitoring
+    - Dispute resolution integration
+
+[ ] Settlement automation
+    - Usage metering integration
+    - Periodic settlement jobs
+    - Multi-currency reconciliation
+</code></pre>
+<h3>4.2 Provider Ecosystem</h3>
+<pre><code>[ ] Provider interface trait
+    - Standard provisioning API
+    - Health and usage reporting
+    - Graceful termination
+
+[ ] Reference implementations
+    - Docker provider
+    - Kubernetes provider
+    - Nomad provider
+
+[ ] Provider certification
+    - Capability attestation
+    - Performance benchmarks
+    - Reputation tracking
+</code></pre>
+<h3>4.3 Trust-Gated Access Control</h3>
+<p>Replace traditional IAM with trust + capabilities:</p>
+<pre><code>[ ] AccessDecision framework
+    - Trust score checks
+    - Role-in-scope verification
+    - Capability delegation chains
+
+[ ] Resource tagging
+    - min_trust requirements per resource
+    - Scope-based access policies
+    - Audit logging
+
+[ ] Capability tokens
+    - Short-lived capability grants
+    - Revocation mechanism
+    - Cross-federation delegation
+</code></pre>
+<h3>4.4 Federation Features</h3>
+<pre><code>[ ] Cross-federation services
+    - Trust bridging via attestations
+    - Clearing agreements
+    - Capability delegation chains
+
+[ ] Data locality
+    - Jurisdiction constraints
+    - Provider attestations
+    - Compliance policies
+
+[ ] Pricing discovery
+    - Reference rates (federation-set)
+    - Market-based pricing
+    - Reputation-weighted value
+</code></pre>
+<hr>
+<h2>5. Technical Debt</h2>
+<h3>5.1 Code Quality</h3>
+<pre><code>[x] Reduce clippy warnings
+    - Current: 0 warnings ✅
+    - Target: 0 warnings ✅
+
+[ ] Increase test coverage
+    - Current: 1134 tests (increased from 785)
+    - Target: 90%+ line coverage on core crates
+
+[ ] Documentation coverage
+    - Add rustdoc to all public APIs
+    - Example code in doc comments
+</code></pre>
+<h3>5.2 Architecture Improvements</h3>
+<pre><code>[ ] Actor system formalization
+    - Common Actor trait
+    - Standardized lifecycle management
+    - Health check protocol
+
+[ ] Error handling standardization
+    - Unified error types across crates
+    - Error code registry
+    - User-facing error messages
+
+[ ] Configuration validation
+    - Schema-based config validation
+    - Startup-time checks
+    - Migration tooling
+</code></pre>
+<h3>5.3 Performance</h3>
+<pre><code>[ ] Benchmark suite
+    - Gossip throughput tests
+    - Ledger transaction rate
+    - Compute task latency
+
+[ ] Profiling and optimization
+    - Memory usage analysis
+    - Hot path optimization
+    - Connection pooling
+
+[ ] Caching strategy
+    - Trust graph caching improvements
+    - Query result caching
+    - Invalidation protocol
+</code></pre>
+<hr>
+<h2>6. Research Topics</h2>
+<h3>6.1 Open Design Questions</h3>
+<p><strong>Provider Verification</strong></p>
+<ul>
+<li>How do we verify providers run what they claim?</li>
+<li>Options: attestation, challenge-response, redundant execution, reputation</li>
+<li>Recommendation: attestation + reputation for MVP, redundancy opt-in</li>
+</ul>
+<p><strong>Pricing Discovery</strong></p>
+<ul>
+<li>How do markets form without central price-setting?</li>
+<li>Options: federation reference rates, provider competition, reputation weighting</li>
+</ul>
+<p><strong>Data Locality</strong></p>
+<ul>
+<li>How to express and enforce jurisdiction constraints?</li>
+<li>Options: locality tags, provider attestations, federation policies</li>
+</ul>
+<p><strong>Cross-Federation Services</strong></p>
+<ul>
+<li>How does Coop A member use services from Federation B?</li>
+<li>Options: trust bridging, clearing agreements, capability delegation</li>
+</ul>
+<h3>6.2 Future Protocol Research</h3>
+<pre><code>[ ] Byzantine fault tolerance improvements
+    - Current: Detection and quarantine
+    - Future: Recovery and forgiveness protocols
+
+[ ] Sybil resistance at scale
+    - Current: Trust graph sufficient at cooperative scale
+    - Future: Additional mechanisms for larger networks
+
+[ ] Privacy-preserving computation
+    - Zero-knowledge proofs for certain operations
+    - Encrypted computation for sensitive data
+    - Differential privacy for analytics
+</code></pre>
+<h3>6.3 Economic Research</h3>
+<pre><code>[ ] Mutual credit at scale
+    - Clearing circle optimization
+    - Default contagion analysis
+    - Network topology effects
+
+[ ] Demurrage effectiveness
+    - Optimal decay rates
+    - Redistribution mechanisms
+    - Behavioral impacts
+
+[ ] Cross-currency exchange
+    - Decentralized rate discovery
+    - Arbitrage prevention
+    - Liquidity bootstrapping
+</code></pre>
+<hr>
+<h2>Tracking</h2>
+<p>This document should be updated:</p>
+<ul>
+<li>After each major feature completion</li>
+<li>During sprint planning</li>
+<li>After pilot feedback sessions</li>
+</ul>
+<p>Related documents:</p>
+<ul>
+<li><a href="/docs/internal/status/GAP_ANALYSIS">GAP_ANALYSIS.md</a> - Current gap status</li>
+<li><a href="/docs/development/sessions/undated/ROADMAP">ROADMAP.md</a> - Strategic roadmap</li>
+<li><a href="/docs/ARCHITECTURE">ARCHITECTURE.md</a> - System architecture</li>
+</ul>
+<hr>
+<h2>Changelog</h2>
+<table>
+<thead>
+<tr>
+<th>Date</th>
+<th>Change</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>2025-12-04</td>
+<td>Initial document creation</td>
+</tr>
+<tr>
+<td>2025-12-04</td>
+<td>Marked role migration complete (Steward/Facilitator/Participant)</td>
+</tr>
+<tr>
+<td>2025-12-04</td>
+<td>Marked documentation section complete (threat-model, api-versioning, operations-guide)</td>
+</tr>
+<tr>
+<td>2025-12-04</td>
+<td>Updated Gap Closure section - 22/23 gaps fixed (96%), all pilot blockers resolved</td>
+</tr>
+</tbody></table>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

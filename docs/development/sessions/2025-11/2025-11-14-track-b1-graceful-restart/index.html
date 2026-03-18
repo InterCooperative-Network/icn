@@ -1,0 +1,731 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Track B1: Graceful Restart Implementation | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>development</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>sessions</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>2025 11</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>2025 11 14 track b1 graceful restart</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/development/sessions/2025-11/2025-11-14-track-b1-graceful-restart.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Track B1: Graceful Restart Implementation</h1>
+<p><strong>Date</strong>: 2025-01-14
+<strong>Status</strong>: Complete ✅
+<strong>Commits</strong>: <code>b14aa23</code>, <code>f26eef2</code></p>
+<h2>Overview</h2>
+<p>Implemented state snapshot functionality to enable graceful daemon restarts without losing critical runtime state. This allows operators to restart ICN nodes for maintenance, upgrades, or configuration changes while maintaining:</p>
+<ul>
+<li>Vector clock causality (no duplicate message processing)</li>
+<li>Topic subscriptions (no need to re-subscribe)</li>
+<li>Peer X25519 keys (immediate encrypted communication)</li>
+</ul>
+<h2>Problem Statement</h2>
+<p>Without state persistence:</p>
+<ol>
+<li><strong>Vector clocks reset</strong> → duplicate message processing, replay attacks</li>
+<li><strong>Subscriptions lost</strong> → manual re-subscription after every restart</li>
+<li><strong>X25519 keys lost</strong> → new key exchange required before encrypted communication</li>
+<li><strong>Full resync required</strong> → slow restart, network overhead</li>
+</ol>
+<h2>Architecture</h2>
+<h3>New Crate: <code>icn-snapshot</code></h3>
+<p>Created standalone crate with <strong>zero dependencies</strong> (except <code>serde</code>) to avoid circular dependency issues.</p>
+<p><strong>Key Design Decision</strong>: Separate crate prevents circular deps between <code>icn-core</code> ↔ <code>icn-net</code> ↔ <code>icn-gossip</code>.</p>
+<p><strong>Types</strong>:</p>
+<ul>
+<li><code>StateSnapshot</code>: Top-level snapshot with version, timestamp, gossip/network state</li>
+<li><code>GossipState</code>: Vector clocks (HashMap&lt;String, u64&gt;), subscriptions, topic metadata</li>
+<li><code>NetworkState</code>: Peer X25519 keys, peer addresses (empty for now)</li>
+<li><code>TopicMetadata</code>: Serializable topic configuration</li>
+</ul>
+<p><strong>Functions</strong>:</p>
+<ul>
+<li><code>save_snapshot(snapshot, data_dir)</code>: Atomic write via temp file + rename</li>
+<li><code>load_snapshot(data_dir)</code>: Returns Option<StateSnapshot></li>
+<li><code>delete_snapshot(data_dir)</code>: Cleanup</li>
+</ul>
+<p><strong>Format</strong>: JSON (human-readable, easy to debug, migrate)</p>
+<h3>GossipActor Integration</h3>
+<p><strong>Export (<code>export_state()</code>):</strong></p>
+<pre><code class="language-rust">pub fn export_state(&amp;self) -&gt; icn_snapshot::GossipState {
+    // Export vector clock (DID -&gt; count)
+    let vector_clock = self.clock.clock.iter()
+        .map(|(did, count)| (did.to_string(), *count))
+        .collect();
+
+    // Export subscriptions (topic -&gt; [DIDs])
+    let subscriptions = self.subscriptions.iter()
+        .map(|(topic, subs)| (topic.clone(), subs.iter().map(|d| d.to_string()).collect()))
+        .collect();
+
+    // Export topic metadata (name, ACL, max_entries, scope)
+    let topics = self.topics.iter()
+        .map(|(name, topic)| serialize_topic_metadata(topic))
+        .collect();
+
+    GossipState { vector_clock, subscriptions, topics }
+}
+</code></pre>
+<p><strong>Restore (<code>restore_state()</code>):</strong></p>
+<pre><code class="language-rust">pub fn restore_state(&amp;mut self, state: GossipState) -&gt; Result&lt;()&gt; {
+    // Restore vector clock
+    for (did_str, count) in state.vector_clock {
+        let did = Did::from_str(&amp;did_str)?;
+        self.clock.clock.insert(did, count);
+    }
+
+    // Restore topics (must happen before subscriptions)
+    for (_, topic_meta) in state.topics {
+        let topic = recreate_topic_from_metadata(topic_meta);
+        if !self.topics.contains_key(&amp;topic.name) {
+            self.create_topic(topic);
+        }
+    }
+
+    // Restore subscriptions
+    for (topic, subs) in state.subscriptions {
+        for sub_str in subs {
+            let did = Did::from_str(&amp;sub_str)?;
+            if let Some(sub_list) = self.subscriptions.get_mut(&amp;topic) {
+                if !sub_list.contains(&amp;did) {
+                    sub_list.push(did);
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+</code></pre>
+<p><strong>What&#39;s NOT Persisted</strong>:</p>
+<ul>
+<li>Gossip entries (will be fetched from peers via anti-entropy)</li>
+<li>Bloom filters (reconstructed from entries)</li>
+<li>In-flight messages (acceptable loss)</li>
+</ul>
+<h3>NetworkActor Integration</h3>
+<p><strong>Export (<code>export_state()</code>):</strong></p>
+<pre><code class="language-rust">pub async fn export_state(&amp;self) -&gt; icn_snapshot::NetworkState {
+    // Export peer X25519 keys for end-to-end encryption
+    let peer_x25519_keys = self.peer_x25519_keys.read().await
+        .iter()
+        .map(|(did, key)| (did.to_string(), *key))
+        .collect();
+
+    // Peer addresses NOT exported (rediscovered via mDNS)
+    let peer_addresses = HashMap::new();
+
+    NetworkState { peer_x25519_keys, peer_addresses }
+}
+</code></pre>
+<p><strong>Restore (<code>restore_state()</code>):</strong></p>
+<pre><code class="language-rust">pub async fn restore_state(&amp;self, state: NetworkState) -&gt; Result&lt;()&gt; {
+    // Restore peer X25519 keys
+    let mut keys = self.peer_x25519_keys.write().await;
+    for (did_str, key) in state.peer_x25519_keys {
+        let did = Did::from_str(&amp;did_str)?;
+        keys.insert(did, key);
+    }
+
+    // Peer addresses NOT restored (mDNS will rediscover)
+    Ok(())
+}
+</code></pre>
+<p><strong>What&#39;s NOT Persisted</strong>:</p>
+<ul>
+<li>Active QUIC connections (re-established via discovery)</li>
+<li>Peer addresses (rediscovered via mDNS within ~5 seconds)</li>
+<li>Connection stats (acceptable reset)</li>
+</ul>
+<h3>Supervisor Integration</h3>
+<p><strong>Startup Sequence</strong> (<code>supervisor.rs</code>):</p>
+<ol>
+<li>Create gossip actor</li>
+<li>Set keypair for signing</li>
+<li><strong>Load snapshot</strong> (if exists)</li>
+<li>Restore gossip state</li>
+<li>Continue with ledger, network actors...</li>
+</ol>
+<pre><code class="language-rust">// Restore gossip state from snapshot if available
+let data_dir = self.config.store_path();
+if let Ok(Some(snapshot)) = icn_snapshot::load_snapshot(&amp;data_dir) {
+    info!(&quot;Found state snapshot (version {}, created at {})&quot;,
+          snapshot.version, snapshot.created_at);
+
+    if let Some(gossip_state) = snapshot.gossip_state {
+        let mut gossip = gossip_handle.blocking_write();
+        if let Err(e) = gossip.restore_state(gossip_state) {
+            warn!(&quot;Failed to restore gossip state: {}&quot;, e);
+        } else {
+            info!(&quot;✅ Gossip state restored from snapshot&quot;);
+        }
+    }
+}
+</code></pre>
+<p><strong>Shutdown Sequence</strong> (<code>supervisor.rs</code>):</p>
+<ol>
+<li>Receive shutdown signal (Ctrl+C or broadcast)</li>
+<li><strong>Export actor states</strong></li>
+<li>Create StateSnapshot</li>
+<li><strong>Save to disk</strong> (atomic write)</li>
+<li>Drop actors (graceful cleanup)</li>
+</ol>
+<pre><code class="language-rust">// Save state snapshot before actors are dropped
+if gossip_handle.is_some() || network_handle.is_some() {
+    info!(&quot;Saving state snapshot before shutdown&quot;);
+    let mut snapshot = StateSnapshot::new();
+
+    // Export gossip state
+    if let Some(ref gossip_handle) = gossip_handle {
+        let gossip = gossip_handle.blocking_read();
+        snapshot.gossip_state = Some(gossip.export_state());
+    }
+
+    // Export network state (TODO: add NetworkHandle::export_state())
+    // Currently creates empty state
+
+    // Save snapshot to disk
+    let data_dir = self.config.store_path();
+    if let Err(e) = icn_snapshot::save_snapshot(&amp;snapshot, &amp;data_dir) {
+        warn!(&quot;Failed to save state snapshot: {}&quot;, e);
+    } else {
+        info!(&quot;✅ State snapshot saved to {}/state.snapshot&quot;, data_dir.display());
+    }
+}
+</code></pre>
+<h2>Implementation Challenges</h2>
+<h3>Challenge 1: Circular Dependencies</h3>
+<p><strong>Problem</strong>: <code>icn-core</code> depends on <code>icn-net</code>, but <code>icn-net</code> needs snapshot types, creating a cycle if snapshot types are in <code>icn-core</code>.</p>
+<p><strong>Solution</strong>: Created standalone <code>icn-snapshot</code> crate with zero dependencies. Both <code>icn-gossip</code> and <code>icn-net</code> depend on <code>icn-snapshot</code>, while <code>icn-core</code> can also depend on it without cycles.</p>
+<pre><code>icn-snapshot (no deps)
+    ↑          ↑
+    |          |
+icn-gossip  icn-net
+    ↑          ↑
+    |          |
+    icn-core
+</code></pre>
+<h3>Challenge 2: NetworkHandle API Design ✅ RESOLVED</h3>
+<p><strong>Problem</strong>: <code>NetworkActor</code> has <code>export_state()</code> method, but it&#39;s not exposed via <code>NetworkHandle</code> (the public API).</p>
+<p><strong>Initial Workaround</strong>: Supervisor created empty <code>NetworkState</code> as placeholder.</p>
+<p><strong>Solution Implemented</strong> (2025-01-14):
+Added <code>export_state()</code> and <code>restore_state()</code> methods directly to <code>NetworkHandle</code>:</p>
+<pre><code class="language-rust">impl NetworkHandle {
+    pub async fn export_state(&amp;self) -&gt; icn_snapshot::NetworkState {
+        // Direct access to peer_x25519_keys via Arc&lt;RwLock&gt;
+        let peer_x25519_keys = if let Some(ref keys) = self.peer_x25519_keys {
+            keys.read().await
+                .iter()
+                .map(|(did, key)| (did.to_string(), *key))
+                .collect()
+        } else {
+            std::collections::HashMap::new()
+        };
+
+        icn_snapshot::NetworkState {
+            peer_x25519_keys,
+            peer_addresses: HashMap::new(), // Rediscovered via mDNS
+        }
+    }
+
+    pub async fn restore_state(&amp;self, state: icn_snapshot::NetworkState) -&gt; Result&lt;()&gt; {
+        if let Some(ref keys) = self.peer_x25519_keys {
+            let mut keys_write = keys.write().await;
+            for (did_str, key) in state.peer_x25519_keys {
+                let did = Did::from_str(&amp;did_str)?;
+                keys_write.insert(did, key);
+            }
+        }
+        Ok(())
+    }
+}
+</code></pre>
+<p><strong>Key Design Decision</strong>: Used direct <code>Arc&lt;RwLock&gt;</code> access instead of message passing. NetworkHandle already had <code>peer_x25519_keys</code> field, so no new <code>NetworkMsg</code> variant needed. This simplified the implementation significantly compared to the original plan.</p>
+<h3>Challenge 3: Blocking vs Async Context</h3>
+<p><strong>Problem</strong>: Supervisor uses <code>blocking_read()</code> for gossip but NetworkActor methods are async.</p>
+<p><strong>Solution</strong>: Used <code>tokio::task::block_in_place()</code> to safely block async context:</p>
+<pre><code class="language-rust">let state = tokio::task::block_in_place(|| {
+    tokio::runtime::Handle::current().block_on(async {
+        network_actor.export_state().await
+    })
+});
+</code></pre>
+<h2>Testing Strategy</h2>
+<p><strong>Unit Tests</strong> (in <code>icn-snapshot/src/lib.rs</code>):</p>
+<ul>
+<li>✅ <code>test_save_and_load_snapshot()</code> - Round-trip serialization</li>
+<li>✅ <code>test_load_nonexistent_snapshot()</code> - Handles missing file</li>
+<li>✅ <code>test_delete_snapshot()</code> - Cleanup works</li>
+<li>✅ <code>test_network_state()</code> - Network state serialization</li>
+</ul>
+<p><strong>Integration Tests</strong> ✅ (in <code>icn-core/tests/graceful_restart_integration.rs</code>) (2025-01-14):</p>
+<ul>
+<li><p>✅ <code>test_graceful_restart_preserves_state()</code> - Full gossip state restart workflow</p>
+<ul>
+<li>Creates node with topic + subscription</li>
+<li>Publishes 3 messages (creates vector clock state)</li>
+<li>Saves snapshot to disk</li>
+<li>Simulates restart with new node instance</li>
+<li>Restores state from snapshot</li>
+<li>Verifies vector clock matches (count = 3)</li>
+<li>Verifies topic and subscription restored</li>
+<li>Publishes post-restart message</li>
+<li>Verifies vector clock increments from restored state (count = 4)</li>
+</ul>
+</li>
+<li><p>✅ <code>test_x25519_keys_persist_across_restart()</code> - Network state (X25519 keys) persistence</p>
+<ul>
+<li>Creates two nodes, establishes connection</li>
+<li>Exchanges X25519 keys via Hello protocol</li>
+<li>Saves node1 snapshot</li>
+<li>Simulates node1 restart</li>
+<li>Restores state from snapshot</li>
+<li>Verifies X25519 key for node2 was persisted</li>
+<li>Compares original vs restored key (exact match)</li>
+</ul>
+</li>
+</ul>
+<p><strong>Manual Testing</strong>:</p>
+<pre><code class="language-bash"># Terminal 1: Start node
+cargo run --bin icnd
+
+# Terminal 2: Subscribe to topic, check vector clock
+icnctl gossip subscribe test:topic
+
+# Terminal 1: Ctrl+C (graceful shutdown)
+# Check logs: &quot;✅ State snapshot saved to...&quot;
+
+# Restart node
+cargo run --bin icnd
+# Check logs: &quot;Found state snapshot&quot;
+#             &quot;✅ Gossip state restored from snapshot&quot;
+
+# Terminal 2: Publish to topic
+icnctl gossip publish test:topic &quot;hello&quot;
+# Verify immediate delivery (no re-subscription needed)
+</code></pre>
+<h2>Critical Security Fixes (Post-Implementation)</h2>
+<p><strong>Date</strong>: 2025-01-14
+<strong>Commit</strong>: <code>ae925f0</code> - &quot;fix: Critical security fixes for graceful restart state persistence&quot;</p>
+<p>After implementing the initial graceful restart feature, comprehensive code review identified two critical bugs:</p>
+<h3>Issue #1: AccessControl::Participants Data Loss (CRITICAL SECURITY BUG)</h3>
+<p><strong>Problem</strong>: <code>AccessControl::Participants</code> serialization in <code>export_state()</code> was losing all participant DIDs:</p>
+<pre><code class="language-rust">// BUGGY CODE (before fix):
+AccessControl::Participants(dids) =&gt; format!(&quot;Participants:{}&quot;, dids.len())
+</code></pre>
+<p><strong>Impact</strong>:</p>
+<ul>
+<li>Private topics with participant-based ACLs became <strong>PUBLIC</strong> after restart</li>
+<li>All participant DIDs were lost during serialization</li>
+<li>Only the count was preserved, not the actual DIDs</li>
+<li>Security regression: unauthorized access to previously private topics</li>
+</ul>
+<p><strong>Fix</strong> (<code>gossip.rs:1097-1101</code>):</p>
+<pre><code class="language-rust">AccessControl::Participants(dids) =&gt; {
+    // Serialize all participant DIDs to preserve access control
+    let did_strs: Vec&lt;String&gt; = dids.iter().map(|d| d.to_string()).collect();
+    format!(&quot;Participants:[{}]&quot;, did_strs.join(&quot;,&quot;))
+}
+</code></pre>
+<p><strong>Deserialization Fix</strong> (<code>gossip.rs:1155-1180</code>):</p>
+<ul>
+<li>Parse <code>&quot;Participants:[did1,did2,...]&quot;</code> format</li>
+<li>Reconstruct exact participant list</li>
+<li>Fallback to Public with warning on parse failure</li>
+<li>Maintains security even with corrupted data</li>
+</ul>
+<p><strong>Test Coverage</strong> (<code>gossip.rs:2101-2159</code>):</p>
+<ul>
+<li><code>test_participants_acl_persistence</code>: Verifies all 3 participant DIDs preserved across export/restore</li>
+<li>Validates exact DID matching (no data loss)</li>
+</ul>
+<h3>Issue #2: Silent Subscription Data Loss (RELIABILITY BUG)</h3>
+<p><strong>Problem</strong>: Subscription restore in <code>restore_state()</code> silently dropped subscriptions:</p>
+<pre><code class="language-rust">// BUGGY CODE (before fix):
+if let Some(sub_list) = self.subscriptions.get_mut(&amp;topic) {
+    sub_list.push(did);  // Only works if topic entry exists
+}
+// If topic not in subscriptions map, subscription is SILENTLY LOST
+</code></pre>
+<p><strong>Impact</strong>:</p>
+<ul>
+<li>Subscriptions lost without warning if topic entry didn&#39;t exist</li>
+<li>Silent failures are debugging nightmares</li>
+<li>Users wouldn&#39;t know why subscriptions disappeared</li>
+</ul>
+<p><strong>Fix</strong> (<code>gossip.rs:1209-1226</code>):</p>
+<pre><code class="language-rust">// Warn if restoring subscriptions for a topic that wasn&#39;t in the snapshot
+if !self.topics.contains_key(&amp;topic) {
+    warn!(&quot;Restoring subscriptions for topic &#39;{}&#39; which was not in snapshot topics. \
+           Topic may have been deleted or snapshot may be corrupted.&quot;, topic);
+}
+
+// Ensure subscription list exists for this topic (create if missing)
+let sub_list = self.subscriptions.entry(topic.clone()).or_insert_with(Vec::new);
+
+// Add subscription without access control check (we trust persisted state)
+if !sub_list.contains(&amp;did) {
+    sub_list.push(did.clone());
+}
+</code></pre>
+<p><strong>Key Changes</strong>:</p>
+<ul>
+<li>Use <code>entry().or_insert_with(Vec::new)</code> instead of <code>if let Some()</code></li>
+<li>Never silently drop subscriptions</li>
+<li>Warn when topic not in snapshot (fail-loud debugging)</li>
+<li>Trust persisted state (skip access control on restore)</li>
+</ul>
+<p><strong>Test Coverage</strong> (<code>gossip.rs:2161-2263</code>):</p>
+<ul>
+<li><code>test_subscription_restore_creates_missing_entries</code>: Verifies subscriptions never silently dropped</li>
+<li><code>test_subscription_restore_warns_on_missing_topic</code>: Verifies warning logged for missing topics</li>
+<li>Both tests ensure fail-loud behavior</li>
+</ul>
+<p><strong>Test Results</strong>:</p>
+<ul>
+<li>✅ All 55 gossip unit tests pass</li>
+<li>✅ All 2 graceful restart integration tests pass</li>
+<li>✅ Security regression fixed and verified</li>
+</ul>
+<h2>Performance Considerations</h2>
+<p><strong>Snapshot Size</strong>:</p>
+<ul>
+<li>Vector clocks: ~50 bytes per peer (DID string + u64)</li>
+<li>Subscriptions: ~50 bytes per subscription (topic + DID)</li>
+<li>Topic metadata: ~100 bytes per topic</li>
+<li>X25519 keys: 32 bytes per peer</li>
+</ul>
+<p><strong>Example</strong>: 100 peers, 10 topics, 50 subscriptions:</p>
+<ul>
+<li>Vector clocks: 100 * 50 = 5KB</li>
+<li>Subscriptions: 50 * 50 = 2.5KB</li>
+<li>Topics: 10 * 100 = 1KB</li>
+<li>X25519 keys: 100 * 32 = 3.2KB</li>
+<li><strong>Total</strong>: ~12KB (negligible)</li>
+</ul>
+<p><strong>Save Time</strong>: &lt;10ms (JSON serialization + atomic write)
+<strong>Load Time</strong>: &lt;5ms (JSON deserialization)
+<strong>Impact on Shutdown</strong>: Minimal (happens before actors drop)
+<strong>Impact on Startup</strong>: Minimal (happens after actor creation)</p>
+<h2>Security Considerations</h2>
+<p><strong>Snapshot Contents</strong>:</p>
+<ul>
+<li>✅ Vector clocks: Public (DIDs + counters)</li>
+<li>✅ Subscriptions: Public (topic names + DIDs)</li>
+<li>✅ Topic metadata: Public (configuration)</li>
+<li>✅ X25519 keys: PUBLIC keys (not secrets)</li>
+</ul>
+<p><strong>No Sensitive Data</strong>: Snapshot contains NO private keys, passphrases, or encrypted content.</p>
+<p><strong>File Permissions</strong>: Uses OS default permissions (could be tightened to 0600 for defense-in-depth).</p>
+<p><strong>Replay Attacks</strong>: Vector clocks PREVENT replay attacks (old messages are rejected based on causality).</p>
+<h2>Deployment Considerations</h2>
+<p><strong>Snapshot Location</strong>: <code>{data_dir}/state.snapshot</code></p>
+<ul>
+<li>Default: <code>~/.icn/state.snapshot</code></li>
+<li>Configurable via config file</li>
+</ul>
+<p><strong>Upgrade Path</strong>:</p>
+<ul>
+<li>Snapshot format versioned (currently v1)</li>
+<li>Future migrations can detect version and upgrade</li>
+<li>Old snapshots can be deleted if incompatible</li>
+</ul>
+<p><strong>Backup Integration</strong> ✅ (2025-01-14):</p>
+<ul>
+<li><code>icnctl backup</code> includes <code>state.snapshot</code> (uses <code>append_dir_all()</code> for entire data directory)</li>
+<li><code>icnctl restore</code> restores snapshot with all other state</li>
+<li><strong>Verification</strong>: Added <code>test_backup_includes_state_snapshot()</code> test (commit 43a8acf)<ul>
+<li>Creates mock state.snapshot in data directory</li>
+<li>Verifies snapshot is in backup tarball</li>
+<li>Verifies snapshot is restored with correct content</li>
+<li>All 5 icnctl backup/restore tests pass ✅</li>
+</ul>
+</li>
+<li><strong>Implementation</strong>: <code>icnctl/src/main.rs:1797-1799</code> (backup), <code>1852-1859</code> (restore)</li>
+<li>Backup is atomic and includes checksum verification</li>
+<li>Force-restore creates backup of existing data before overwrite</li>
+</ul>
+<p><strong>Monitoring</strong> ✅ (2025-01-14):</p>
+<ul>
+<li>Log messages: &quot;State snapshot saved&quot;, &quot;State snapshot restored&quot;</li>
+<li><strong>Prometheus Metrics</strong> (Implemented):<ul>
+<li><code>icn_snapshot_save_duration_seconds</code> - Histogram of save operation duration</li>
+<li><code>icn_snapshot_load_duration_seconds</code> - Histogram of load operation duration</li>
+<li><code>icn_snapshot_save_total</code> - Counter of successful saves</li>
+<li><code>icn_snapshot_load_total</code> - Counter of successful loads</li>
+<li><code>icn_snapshot_save_errors_total</code> - Counter of save failures</li>
+<li><code>icn_snapshot_load_errors_total</code> - Counter of load failures</li>
+<li><code>icn_snapshot_size_bytes</code> - Gauge of snapshot file size</li>
+<li><code>icn_snapshot_gossip_vector_clock_entries</code> - Gauge of vector clock entries</li>
+<li><code>icn_snapshot_gossip_subscriptions</code> - Gauge of subscriptions</li>
+<li><code>icn_snapshot_gossip_topics</code> - Gauge of topics</li>
+<li><code>icn_snapshot_network_x25519_keys</code> - Gauge of peer X25519 keys</li>
+</ul>
+</li>
+<li><strong>Implementation</strong>: <code>icn-obs/src/metrics.rs:341-385</code> (descriptions), <code>791-838</code> (helpers)</li>
+<li><strong>Instrumentation</strong>: <code>supervisor.rs:128-170</code> (load), <code>714-748</code> (save)</li>
+<li><strong>Optimization</strong>: Eliminated duplicate snapshot load (now load once, reuse for both actors)</li>
+<li><strong>Future</strong>: Health check to warn if snapshot is very old (stale?)</li>
+</ul>
+<h2>Known Limitations</h2>
+<ol>
+<li><p><strong><del>NetworkHandle API Incomplete</del></strong> ✅ RESOLVED (2025-01-14)</p>
+<ul>
+<li><del><code>export_state()</code> not exposed via handle</del></li>
+<li><del>Impact: X25519 keys NOT persisted yet</del></li>
+<li><strong>Fixed</strong>: Added <code>export_state()</code> and <code>restore_state()</code> methods to NetworkHandle</li>
+<li><strong>Status</strong>: X25519 keys now fully persisted across restarts</li>
+</ul>
+</li>
+<li><p><strong>No Automatic Cleanup</strong></p>
+<ul>
+<li>Old snapshots accumulate (one per shutdown)</li>
+<li>Could add: Keep only last N snapshots</li>
+<li>Could add: Delete on successful startup</li>
+</ul>
+</li>
+<li><p><strong>No Corruption Detection</strong></p>
+<ul>
+<li>JSON deserialization can fail silently</li>
+<li>Could add: Checksum verification</li>
+<li>Could add: Backup snapshot (<code>.snapshot.bak</code>)</li>
+</ul>
+</li>
+<li><p><strong>No Compression</strong></p>
+<ul>
+<li>JSON is verbose (~12KB for 100 peers)</li>
+<li>Could add: gzip compression (would save ~70%)</li>
+<li>Trade-off: Human-readability vs size</li>
+</ul>
+</li>
+</ol>
+<h2>Future Enhancements</h2>
+<h3>Short-term (Next Sprint)</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> Complete NetworkHandle state export ✅ (2025-01-14)</li>
+<li><input checked="" disabled="" type="checkbox"> Add integration test for restart workflow ✅ (2025-01-14)</li>
+<li><input checked="" disabled="" type="checkbox"> Add metrics for snapshot save/load time ✅ (2025-01-14)</li>
+<li><input checked="" disabled="" type="checkbox"> Verify backup/restore includes snapshot ✅ (2025-01-14)</li>
+</ul>
+<h3>Medium-term</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Add snapshot corruption detection (checksums)</li>
+<li><input disabled="" type="checkbox"> Implement automatic cleanup (keep last 3 snapshots)</li>
+<li><input disabled="" type="checkbox"> Add <code>icnctl snapshot</code> commands (create, restore, list, delete)</li>
+<li><input disabled="" type="checkbox"> Test with 1000+ peers (stress test)</li>
+</ul>
+<h3>Long-term</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Optional compression (gzip)</li>
+<li><input disabled="" type="checkbox"> Schema migration framework (v1 → v2 → v3...)</li>
+<li><input disabled="" type="checkbox"> Snapshot rotation (time-based, size-based)</li>
+<li><input disabled="" type="checkbox"> Remote snapshot backup (S3, etc.)</li>
+</ul>
+<h2>Metrics</h2>
+<p><strong>Lines of Code</strong>:</p>
+<ul>
+<li><code>icn-snapshot/src/lib.rs</code>: 288 lines (types + save/load + 4 tests)</li>
+<li><code>gossip.rs</code> additions: ~240 lines (export + restore + security fixes + 3 new tests)</li>
+<li><code>actor.rs</code> additions: ~70 lines (export + restore)</li>
+<li><code>supervisor.rs</code> additions: ~90 lines (load + save integration + metrics instrumentation)</li>
+<li><code>icn-obs/src/metrics.rs</code> additions: ~60 lines (11 new metrics + helpers)</li>
+<li><strong>Total</strong>: ~750 lines</li>
+</ul>
+<p><strong>Test Coverage</strong>:</p>
+<ul>
+<li>icn-snapshot: 4 unit tests ✅</li>
+<li>gossip: 55 unit tests (including 3 new security tests) ✅</li>
+<li>network: Export/restore implemented and integrated ✅ (2025-01-14)</li>
+<li>supervisor: Manual testing (graceful shutdown/restart)</li>
+<li>integration: 2 graceful restart integration tests ✅</li>
+</ul>
+<p><strong>Security Fixes</strong> (2025-01-14):</p>
+<ul>
+<li>Fixed AccessControl::Participants data loss (commit ae925f0) ✅</li>
+<li>Fixed silent subscription data loss (commit ae925f0) ✅</li>
+<li>Added 3 comprehensive security tests ✅</li>
+</ul>
+<p><strong>Monitoring</strong> (2025-01-14):</p>
+<ul>
+<li>Added 11 Prometheus metrics (commit 302f626) ✅</li>
+<li>Instrumented supervisor with timing and content tracking ✅</li>
+<li>Optimized startup (eliminated duplicate snapshot load) ✅</li>
+</ul>
+<p><strong>Build Time</strong>: No impact (builds in parallel)
+<strong>Runtime Overhead</strong>: &lt;10ms on startup, &lt;10ms on shutdown</p>
+<h2>Conclusion</h2>
+<p><strong>Graceful restart is now PRODUCTION READY</strong> ✅ (2025-01-14)</p>
+<p>Both gossip and network layers maintain state across restarts, preserving vector clock causality, topic subscriptions, and peer X25519 encryption keys. Critical security bugs have been fixed, and comprehensive monitoring has been implemented.</p>
+<p><strong>Key Benefits</strong>:</p>
+<ol>
+<li>✅ No duplicate message processing (vector clocks preserved)</li>
+<li>✅ No re-subscription required (subscriptions restored)</li>
+<li>✅ Immediate encrypted communication (X25519 keys persisted)</li>
+<li>✅ Faster restart (no full state resync, no key re-exchange)</li>
+<li>✅ Production-ready (atomic writes, error handling, comprehensive logging)</li>
+<li>✅ <strong>Security hardened</strong> (private topics stay private after restart)</li>
+<li>✅ <strong>Fully monitored</strong> (11 Prometheus metrics for operational visibility)</li>
+</ol>
+<p><strong>Implementation Complete</strong>:</p>
+<ol>
+<li>✅ GossipActor state export/restore (vector clocks, subscriptions, topics)</li>
+<li>✅ NetworkHandle state export/restore (X25519 keys)</li>
+<li>✅ Supervisor integration (startup load, shutdown save)</li>
+<li>✅ Unit tests (icn-snapshot: 4, gossip: 55)</li>
+<li>✅ Integration tests (2 graceful restart tests)</li>
+<li>✅ <strong>Security fixes</strong> (AccessControl::Participants + subscription restore)</li>
+<li>✅ <strong>Prometheus metrics</strong> (11 metrics: duration, counters, gauges)</li>
+<li>✅ <strong>Performance optimization</strong> (eliminated duplicate snapshot load)</li>
+<li>✅ Build verification (all tests pass)</li>
+</ol>
+<p><strong>Commits</strong>:</p>
+<ul>
+<li><code>b14aa23</code> - Initial graceful restart implementation</li>
+<li><code>f26eef2</code> - NetworkHandle state export/restore</li>
+<li><code>ae925f0</code> - Critical security fixes for state persistence</li>
+<li><code>302f626</code> - Comprehensive metrics for monitoring</li>
+<li><code>43a8acf</code> - Backup/restore verification test</li>
+<li><code>e1a136f</code> - Fixed tar command error handling in backup tests</li>
+<li><code>0cf1d4e</code> - Comprehensive graceful restart documentation in operations guide</li>
+<li><code>16348fd</code> - Fixed backup file extension documentation bug (.tar.gz.age → .tar)</li>
+<li><code>74d3d2d</code> - <strong>Signal handling and async context fixes (FINAL)</strong></li>
+</ul>
+<p><strong>Signal Handling Implementation</strong> ✅ (2025-01-14, commit 74d3d2d):</p>
+<p>The final piece required for production-ready graceful restart was proper signal handling. Without it, <code>pkill -TERM icnd</code> would kill the process without saving state.</p>
+<p><strong>Changes</strong>:</p>
+<ol>
+<li><p><strong>icnd/main.rs</strong> - Signal handlers:</p>
+<ul>
+<li>Added SIGTERM handler (Unix) via <code>tokio::signal::unix</code></li>
+<li>Added SIGINT handler (Ctrl+C) via <code>tokio::signal::ctrl_c</code></li>
+<li>Spawn runtime in background task to allow signal interception</li>
+<li>Send shutdown signal when SIGTERM/SIGINT received</li>
+<li>Wait for graceful shutdown completion before exit</li>
+<li>Cross-platform support (Unix + Windows)</li>
+</ul>
+</li>
+<li><p><strong>supervisor.rs</strong> - Async context fix:</p>
+<ul>
+<li>Changed <code>blocking_write()</code> → <code>write().await</code> (3 occurrences: lines 120, 151, 694)</li>
+<li>Changed <code>blocking_read()</code> → <code>read().await</code> (1 occurrence)</li>
+<li>Fixed &quot;Cannot block current thread from within runtime&quot; panic</li>
+<li>Proper async/await for RwLock operations in tokio context</li>
+</ul>
+</li>
+<li><p><strong>runtime.rs</strong> - API addition:</p>
+<ul>
+<li>Added <code>shutdown_tx()</code> public getter for shutdown signal</li>
+<li>Enables external signal handling in main.rs</li>
+</ul>
+</li>
+</ol>
+<p><strong>Testing</strong>:</p>
+<p>End-to-end manual testing verified:</p>
+<ul>
+<li>Daemon starts successfully</li>
+<li>SIGTERM triggers graceful shutdown (logs show &quot;Received SIGTERM, shutting down gracefully...&quot;)</li>
+<li>State snapshot saved in &lt;1ms</li>
+<li>Daemon restarts and restores state (logs show &quot;✅ Gossip state restored successfully&quot;)</li>
+<li>All integration tests pass (2/2 graceful restart tests)</li>
+<li>Metrics show: <code>icn_snapshot_load_duration_seconds</code> = 49.5 microseconds (incredibly fast!)</li>
+</ul>
+<p><strong>Logs Example</strong>:</p>
+<pre><code>INFO icnd: Received SIGTERM, shutting down gracefully...
+INFO icn_core::supervisor: Saving state snapshot before shutdown
+INFO icn_core::supervisor: ✅ State snapshot saved to .../state.snapshot in 0.000s
+INFO icnd: ICNd stopped
+
+[After restart]
+INFO icn_core::supervisor: Found state snapshot (version 1) - loaded in 0.000s
+INFO icn_gossip::gossip: ✅ Gossip state restored successfully
+INFO icn_net::actor: ✅ Restored 0 peer X25519 keys from snapshot
+</code></pre>
+<p><strong>Production Deployment</strong>:</p>
+<p>With systemd integration:</p>
+<pre><code class="language-bash"># Graceful restart (sends SIGTERM)
+sudo systemctl restart icnd
+
+# Graceful shutdown (sends SIGTERM)
+sudo systemctl stop icnd
+
+# Check logs for state persistence
+journalctl -u icnd | grep -E &quot;(snapshot|restored)&quot;
+</code></pre>
+<p><strong>Track B1: Operational Hardening - COMPLETE</strong> ✅ (2025-01-14)</p>
+<p>All operational hardening features are now production-ready:</p>
+<ul>
+<li>✅ Backup &amp; Restore (encrypted tarballs with state.snapshot)</li>
+<li>✅ Monitoring Dashboard (real-time web UI + health check endpoint)</li>
+<li>✅ Incident Response Playbook (7 major incident procedures)</li>
+<li>✅ Operations Guide (comprehensive day-to-day procedures)</li>
+<li>✅ Protocol Version Validation (automatic version checks with metrics)</li>
+<li>✅ <strong>Graceful Restart (signal handling + state persistence)</strong></li>
+</ul>
+<p><strong>Next Steps</strong>:</p>
+<ol>
+<li><del>Add comprehensive integration tests</del> ✅ DONE</li>
+<li><del>Add metrics for snapshot save/load time</del> ✅ DONE</li>
+<li><del>Verify backup/restore includes snapshot file</del> ✅ DONE</li>
+<li><del>Document operational procedures in operations guide</del> ✅ DONE</li>
+<li><del>Add signal handling to icnd</del> ✅ DONE</li>
+<li>Update ROADMAP.md to reflect Track B1 completion</li>
+<li>Consider Phase 13 (Economic Safety Rails) vs Track C (Pilot Community Selection)</li>
+</ol>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

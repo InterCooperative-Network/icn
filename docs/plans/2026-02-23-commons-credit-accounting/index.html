@@ -1,0 +1,861 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Commons Credit Accounting Implementation Plan | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>plans</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>2026 02 23 commons credit accounting</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/plans/2026-02-23-commons-credit-accounting.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Commons Credit Accounting Implementation Plan</h1>
+<blockquote>
+<p><strong>For Claude:</strong> REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.</p>
+</blockquote>
+<p><strong>Goal:</strong> Implement commons credit earning and spending (#948) — executors earn credits proportional to fuel consumed; submitters spend credits; balance cannot go below zero.</p>
+<p><strong>Architecture:</strong> <code>CommonsSettlementRequest</code> DTO feeds <code>SettlementEngine::settle_commons_receipt()</code> which produces a balanced <code>(earn_entry, spend_entry)</code> journal entry pair. <code>ComputeTask</code> gets an optional <code>scope</code> field so submitters can opt into commons-scoped execution. <code>ComputeActor</code> holds an optional <code>LedgerHandle</code>; after a commons task completes, it appends both entries to the ledger. The <code>BalanceCallback</code> used by E7&#39;s credit-ceiling check is wired from the same ledger handle.</p>
+<p><strong>Tech Stack:</strong> Rust 1.88, <code>icn-ledger</code> crate (<code>commons_credits.rs</code>, <code>settlement.rs</code>, <code>ledger.rs</code>), <code>icn-compute</code> crate (<code>types.rs</code>, <code>actor/mod.rs</code>, <code>actor/lifecycle.rs</code>), <code>tokio::sync::RwLock</code></p>
+<p><strong>Worktree:</strong> Before starting, create: <code>just worktree create 948-commons-credits</code> from <code>icn-wt/</code>. Run all commands from within the worktree&#39;s <code>icn/</code> subdirectory.</p>
+<hr>
+<h2>Quick reference</h2>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>COMMONS_CREDIT_CURRENCY</code></td>
+<td><code>&quot;commons-credits&quot;</code> — the currency string for the commons ledger</td>
+</tr>
+<tr>
+<td><code>COMMONS_MINT_DID</code></td>
+<td>Deterministic DID seeded with <code>[0xCC; 32]</code> — the virtual mint/sink</td>
+</tr>
+<tr>
+<td><code>build_earn_entry_with_receipt(contributor, amount, receipt_id)</code></td>
+<td>Debits mint, credits contributor — <code>icn_ledger::build_earn_entry_with_receipt</code></td>
+</tr>
+<tr>
+<td><code>build_spend_entry_with_receipt(consumer, amount, receipt_id)</code></td>
+<td>Debits consumer, credits mint — <code>icn_ledger::build_spend_entry_with_receipt</code></td>
+</tr>
+<tr>
+<td><code>compute_credits_earned(cpu_millis, memory_mb_millis, storage_bytes, egress_bytes)</code></td>
+<td>Returns <code>u64</code> credits — <code>icn_ledger::compute_credits_earned</code></td>
+</tr>
+<tr>
+<td><code>Ledger::append_entry(&amp;mut self, entry)</code></td>
+<td>Async, returns <code>Result&lt;ContentHash&gt;</code></td>
+</tr>
+<tr>
+<td><code>Ledger::get_balance(&amp;self, did, currency)</code></td>
+<td>Returns <code>i64</code></td>
+</tr>
+</tbody></table>
+<p><strong>Key invariants:</strong></p>
+<ul>
+<li><code>SettlementEngine::settle_receipt()</code> explicitly rejects <code>ScopeLevel::Commons</code> — commons must use the NEW <code>settle_commons_receipt()</code> path.</li>
+<li>Credits are non-transferable: only <code>build_earn_entry*</code> and <code>build_spend_entry*</code> may touch the commons mint DID.</li>
+<li>Dedup is by <code>receipt_id</code> nonce in the journal entry — same receipt can&#39;t be settled twice.</li>
+<li>Credit floor is zero: <code>check_sufficient_balance(balance, required)</code> enforces this.</li>
+<li><code>ComputeResult</code> has <code>fuel_used</code> — use this as a proxy for <code>cpu_millis</code> (memory/storage/egress = 0 for now; full metering is a follow-up).</li>
+</ul>
+<hr>
+<h2>Task 1: CommonsSettlementRequest DTO</h2>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>crates/icn-ledger/src/settlement.rs</code></li>
+</ul>
+<h3>Step 1: Write the failing test</h3>
+<p>At the bottom of <code>crates/icn-ledger/src/settlement.rs</code>, inside the <code>#[cfg(test)]</code> block, add:</p>
+<pre><code class="language-rust">#[test]
+fn test_commons_settlement_request_fields() {
+    use icn_identity::Did;
+    let executor: Did = &quot;did:icn:executor001&quot;.parse().unwrap();
+    let submitter: Did = &quot;did:icn:submitter001&quot;.parse().unwrap();
+    let req = CommonsSettlementRequest {
+        receipt_id: [1u8; 32],
+        executor: executor.clone(),
+        submitter: submitter.clone(),
+        cpu_millis: 5000,
+        memory_mb_millis: 0,
+        storage_bytes: 0,
+        egress_bytes: 0,
+        executor_verified: true,
+    };
+    assert_eq!(req.cpu_millis, 5000);
+    assert_ne!(req.executor, req.submitter);
+}
+</code></pre>
+<h3>Step 2: Run to verify it fails</h3>
+<pre><code class="language-bash">cargo test -p icn-ledger --lib test_commons_settlement_request_fields
+</code></pre>
+<p>Expected: <code>error[E0422]: cannot find struct CommonsSettlementRequest</code></p>
+<h3>Step 3: Add the struct</h3>
+<p>In <code>crates/icn-ledger/src/settlement.rs</code>, after the existing <code>SettlementRequest</code> struct, add:</p>
+<pre><code class="language-rust">/// Request DTO for commons credit settlement.
+///
+/// Used with [`SettlementEngine::settle_commons_receipt`] to produce
+/// a balanced (earn, spend) journal entry pair from a completed commons task.
+///
+/// # Metering proxy
+/// Until full resource tracking is wired, set `cpu_millis = fuel_used`
+/// and leave `memory_mb_millis`, `storage_bytes`, `egress_bytes` as `0`.
+#[derive(Debug, Clone)]
+pub struct CommonsSettlementRequest {
+    /// Receipt nonce for dedup — set to `ExecutionReceipt::receipt_id`.
+    pub receipt_id: [u8; 32],
+    /// DID of the executor (earns credits).
+    pub executor: icn_identity::Did,
+    /// DID of the submitter (spends credits).
+    pub submitter: icn_identity::Did,
+    /// CPU time in milliseconds (use `fuel_used` as proxy for now).
+    pub cpu_millis: u64,
+    /// Memory usage in MB-milliseconds (0 until full metering is wired).
+    pub memory_mb_millis: u64,
+    /// Storage bytes (0 until full metering is wired).
+    pub storage_bytes: u64,
+    /// Network egress bytes (0 until full metering is wired).
+    pub egress_bytes: u64,
+    /// Must be `true` — executor has signed the result.
+    pub executor_verified: bool,
+}
+</code></pre>
+<h3>Step 4: Run test to verify it passes</h3>
+<pre><code class="language-bash">cargo test -p icn-ledger --lib test_commons_settlement_request_fields
+</code></pre>
+<p>Expected: PASS</p>
+<h3>Step 5: Commit</h3>
+<pre><code class="language-bash">git add crates/icn-ledger/src/settlement.rs
+git commit -m &quot;feat(ledger): add CommonsSettlementRequest DTO (#948)&quot;
+</code></pre>
+<hr>
+<h2>Task 2: SettlementEngine::settle_commons_receipt()</h2>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>crates/icn-ledger/src/settlement.rs</code></li>
+</ul>
+<h3>Step 1: Write the failing tests</h3>
+<p>Add these tests inside the <code>#[cfg(test)]</code> block:</p>
+<pre><code class="language-rust">#[test]
+fn test_settle_commons_receipt_produces_entry_pair() {
+    use icn_identity::Did;
+    let engine = SettlementEngine::new();
+    let executor: Did = &quot;did:icn:exec001&quot;.parse().unwrap();
+    let submitter: Did = &quot;did:icn:sub001&quot;.parse().unwrap();
+    let req = CommonsSettlementRequest {
+        receipt_id: [42u8; 32],
+        executor: executor.clone(),
+        submitter: submitter.clone(),
+        cpu_millis: 1000,   // → 1000 credits (compute_credits_earned(1000,0,0,0) = 1000)
+        memory_mb_millis: 0,
+        storage_bytes: 0,
+        egress_bytes: 0,
+        executor_verified: true,
+    };
+    let (earn, spend) = engine.settle_commons_receipt(&amp;req).unwrap();
+    // Earn: executor credited, mint debited
+    let executor_credit = earn.accounts.iter()
+        .find(|d| d.account_id == executor &amp;&amp; d.credit.is_some())
+        .expect(&quot;executor should have credit delta&quot;);
+    assert_eq!(executor_credit.credit.unwrap(), 1000);
+    // Spend: submitter debited
+    let submitter_debit = spend.accounts.iter()
+        .find(|d| d.account_id == submitter &amp;&amp; d.debit.is_some())
+        .expect(&quot;submitter should have debit delta&quot;);
+    assert_eq!(submitter_debit.debit.unwrap(), 1000);
+}
+
+#[test]
+fn test_settle_commons_receipt_rejects_unverified() {
+    use icn_identity::Did;
+    let engine = SettlementEngine::new();
+    let req = CommonsSettlementRequest {
+        receipt_id: [1u8; 32],
+        executor: &quot;did:icn:exec&quot;.parse().unwrap(),
+        submitter: &quot;did:icn:sub&quot;.parse().unwrap(),
+        cpu_millis: 500,
+        memory_mb_millis: 0,
+        storage_bytes: 0,
+        egress_bytes: 0,
+        executor_verified: false,   // ← unverified
+    };
+    assert!(engine.settle_commons_receipt(&amp;req).is_err());
+}
+
+#[test]
+fn test_settle_commons_receipt_rejects_self_dealing() {
+    use icn_identity::Did;
+    let engine = SettlementEngine::new();
+    let same: Did = &quot;did:icn:same&quot;.parse().unwrap();
+    let req = CommonsSettlementRequest {
+        receipt_id: [2u8; 32],
+        executor: same.clone(),
+        submitter: same.clone(),   // ← same DID
+        cpu_millis: 500,
+        memory_mb_millis: 0,
+        storage_bytes: 0,
+        egress_bytes: 0,
+        executor_verified: true,
+    };
+    assert!(engine.settle_commons_receipt(&amp;req).is_err());
+}
+
+#[test]
+fn test_settle_commons_receipt_deduplicates() {
+    use icn_identity::Did;
+    let engine = SettlementEngine::new();
+    let req = CommonsSettlementRequest {
+        receipt_id: [7u8; 32],
+        executor: &quot;did:icn:exec2&quot;.parse().unwrap(),
+        submitter: &quot;did:icn:sub2&quot;.parse().unwrap(),
+        cpu_millis: 200,
+        memory_mb_millis: 0,
+        storage_bytes: 0,
+        egress_bytes: 0,
+        executor_verified: true,
+    };
+    assert!(engine.settle_commons_receipt(&amp;req).is_ok());
+    // Second call with same receipt_id → DuplicateEntry error
+    let err = engine.settle_commons_receipt(&amp;req).unwrap_err();
+    assert!(
+        format!(&quot;{err:?}&quot;).contains(&quot;Duplicate&quot;) || format!(&quot;{err:?}&quot;).contains(&quot;duplicate&quot;),
+        &quot;expected duplicate error, got: {err:?}&quot;
+    );
+}
+</code></pre>
+<h3>Step 2: Run to verify they fail</h3>
+<pre><code class="language-bash">cargo test -p icn-ledger --lib &quot;test_settle_commons&quot;
+</code></pre>
+<p>Expected: compile error — <code>settle_commons_receipt</code> not found</p>
+<h3>Step 3: Implement the method</h3>
+<p>Add to the <code>impl SettlementEngine</code> block in <code>settlement.rs</code>:</p>
+<pre><code class="language-rust">/// Settle a commons-scoped execution receipt, producing an earn/spend entry pair.
+///
+/// Returns `(earn_entry, spend_entry)`:
+/// - `earn_entry`: credits the executor&#39;s commons-credits account
+/// - `spend_entry`: debits the submitter&#39;s commons-credits account
+///
+/// Both entries use `receipt_id` as a nonce, preventing silent dedup.
+///
+/// # Errors
+/// - `executor_verified` is false
+/// - `executor == submitter` (self-dealing)
+/// - `cpu_millis == 0` AND all other metering fields are 0 (zero-value settlement)
+/// - Receipt already settled (duplicate)
+pub fn settle_commons_receipt(
+    &amp;self,
+    req: &amp;CommonsSettlementRequest,
+) -&gt; Result&lt;(JournalEntry, JournalEntry), LedgerError&gt; {
+    if !req.executor_verified {
+        return Err(LedgerError::InvalidEntry(
+            &quot;commons settlement requires executor_verified = true&quot;.into(),
+        ));
+    }
+    if req.executor == req.submitter {
+        return Err(LedgerError::InvalidEntry(
+            &quot;commons settlement: executor and submitter must differ (self-dealing)&quot;.into(),
+        ));
+    }
+
+    // Compute credit amount from metering data
+    let credits = crate::commons_credits::compute_credits_earned(
+        req.cpu_millis,
+        req.memory_mb_millis,
+        req.storage_bytes,
+        req.egress_bytes,
+    );
+    if credits == 0 {
+        return Err(LedgerError::InvalidEntry(
+            &quot;commons settlement: computed credit amount is zero&quot;.into(),
+        ));
+    }
+
+    // Dedup check
+    let dedup_key = Self::dedup_key(&amp;req.receipt_id);
+    {
+        let settled = self.settled.read().map_err(|_| {
+            LedgerError::InvalidEntry(&quot;settlement dedup lock poisoned&quot;.into())
+        })?;
+        if settled.contains(&amp;dedup_key) {
+            return Err(LedgerError::DuplicateEntry(hex::encode(req.receipt_id)));
+        }
+    }
+
+    // Build balanced entry pair
+    let amount = credits as i64;
+    let earn_entry = crate::commons_credits::build_earn_entry_with_receipt(
+        &amp;req.executor,
+        amount,
+        req.receipt_id,
+    )
+    .map_err(|e| LedgerError::InvalidEntry(e.to_string()))?;
+
+    let spend_entry = crate::commons_credits::build_spend_entry_with_receipt(
+        &amp;req.submitter,
+        amount,
+        req.receipt_id,
+    )
+    .map_err(|e| LedgerError::InvalidEntry(e.to_string()))?;
+
+    // Record dedup
+    self.settled
+        .write()
+        .map_err(|_| LedgerError::InvalidEntry(&quot;settlement dedup lock poisoned&quot;.into()))?
+        .insert(dedup_key);
+
+    Ok((earn_entry, spend_entry))
+}
+</code></pre>
+<h3>Step 4: Run tests to verify they pass</h3>
+<pre><code class="language-bash">cargo test -p icn-ledger --lib &quot;test_settle_commons&quot;
+</code></pre>
+<p>Expected: 4 tests PASS</p>
+<h3>Step 5: Run all ledger tests</h3>
+<pre><code class="language-bash">cargo test -p icn-ledger --lib
+</code></pre>
+<p>Expected: all tests pass</p>
+<h3>Step 6: Commit</h3>
+<pre><code class="language-bash">git add crates/icn-ledger/src/settlement.rs
+git commit -m &quot;feat(ledger): add settle_commons_receipt() to SettlementEngine (#948)&quot;
+</code></pre>
+<hr>
+<h2>Task 3: Export CommonsSettlementRequest from icn-ledger</h2>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>crates/icn-ledger/src/lib.rs</code></li>
+</ul>
+<h3>Step 1: Write the failing test</h3>
+<p>In a scratch test (add to <code>settlement.rs</code> tests):</p>
+<pre><code class="language-rust">#[test]
+fn test_commons_settlement_request_pub_export() {
+    // This test exists to verify the type is exported from lib.rs.
+    // It will fail to compile if CommonsSettlementRequest is not re-exported.
+    let _: Option&lt;icn_ledger::CommonsSettlementRequest&gt; = None;
+}
+</code></pre>
+<p>Actually, verify by doing:</p>
+<pre><code class="language-bash">grep &quot;CommonsSettlementRequest&quot; crates/icn-ledger/src/lib.rs
+</code></pre>
+<p>Expected: no output (not yet exported)</p>
+<h3>Step 2: Add the export</h3>
+<p>Find the line in <code>crates/icn-ledger/src/lib.rs</code> that reads:</p>
+<pre><code class="language-rust">pub use settlement::{SettlementEngine, SettlementRequest};
+</code></pre>
+<p>Change it to:</p>
+<pre><code class="language-rust">pub use settlement::{CommonsSettlementRequest, SettlementEngine, SettlementRequest};
+</code></pre>
+<h3>Step 3: Verify</h3>
+<pre><code class="language-bash">cargo check -p icn-ledger
+</code></pre>
+<p>Expected: clean</p>
+<h3>Step 4: Commit</h3>
+<pre><code class="language-bash">git add crates/icn-ledger/src/lib.rs
+git commit -m &quot;chore(ledger): export CommonsSettlementRequest from crate root (#948)&quot;
+</code></pre>
+<hr>
+<h2>Task 4: Add scope field to ComputeTask</h2>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>crates/icn-compute/src/types.rs</code></li>
+</ul>
+<p><strong>Why this field:</strong> Submitters need to explicitly opt into commons-scoped execution. <code>scope: Some(ScopeLevel::Commons)</code> signals that the task should be routed through the commons governance checks and that post-execution credits should be settled via the commons ledger path.</p>
+<h3>Step 1: Write the failing test</h3>
+<p>In <code>crates/icn-compute/src/actor/tests.rs</code>, add:</p>
+<pre><code class="language-rust">#[test]
+fn test_compute_task_commons_scope_field() {
+    use icn_kernel_api::ScopeLevel;
+    let task = ComputeTask {
+        scope: Some(ScopeLevel::Commons),
+        ..make_task(&quot;scope-test&quot;, &quot;did:icn:submitter&quot;)
+    };
+    assert_eq!(task.scope, Some(ScopeLevel::Commons));
+}
+
+#[test]
+fn test_compute_task_default_scope_is_none() {
+    let task = make_task(&quot;scope-default&quot;, &quot;did:icn:submitter&quot;);
+    assert!(task.scope.is_none());
+}
+</code></pre>
+<h3>Step 2: Run to verify they fail</h3>
+<pre><code class="language-bash">cargo test -p icn-compute --lib &quot;test_compute_task.*scope&quot;
+</code></pre>
+<p>Expected: compile error — no field <code>scope</code> on <code>ComputeTask</code></p>
+<h3>Step 3: Add the field</h3>
+<p>In <code>crates/icn-compute/src/types.rs</code>, in the <code>ComputeTask</code> struct, add after <code>data_locality</code>:</p>
+<pre><code class="language-rust">/// Execution scope for this task (E5 - #948).
+///
+/// `Some(ScopeLevel::Commons)` opts into commons-scoped execution:
+/// - Commons governance checks apply (standing, credit ceiling via E7)
+/// - Post-execution credits are settled via the commons ledger path
+/// - Executor earns commons credits proportional to fuel consumed
+/// - Submitter&#39;s commons credit balance is debited
+///
+/// `None` means local/cell scope — no commons settlement.
+#[serde(default)]
+pub scope: Option&lt;icn_kernel_api::ScopeLevel&gt;,
+</code></pre>
+<h3>Step 4: Run tests</h3>
+<pre><code class="language-bash">cargo test -p icn-compute --lib &quot;test_compute_task.*scope&quot;
+</code></pre>
+<p>Expected: PASS</p>
+<h3>Step 5: Check workspace still compiles</h3>
+<pre><code class="language-bash">cargo check --workspace
+</code></pre>
+<p>If there are compile errors due to exhaustive struct initialization, add <code>scope: None</code> to any struct literals that fail.</p>
+<h3>Step 6: Commit</h3>
+<pre><code class="language-bash">git add crates/icn-compute/src/types.rs
+git commit -m &quot;feat(compute): add scope field to ComputeTask for commons-scoped execution (#948)&quot;
+</code></pre>
+<hr>
+<h2>Task 5: Add LedgerHandle to ComputeActor</h2>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>crates/icn-compute/src/actor/types.rs</code></li>
+<li>Modify: <code>crates/icn-compute/src/actor/mod.rs</code></li>
+</ul>
+<p><strong>Why:</strong> The actor needs to write credit settlements to the ledger after commons task completion, and provide a <code>BalanceCallback</code> for E7&#39;s credit-ceiling check that reads real ledger balances.</p>
+<h3>Step 1: Write a failing test</h3>
+<p>In <code>crates/icn-compute/src/actor/tests.rs</code>, add:</p>
+<pre><code class="language-rust">#[tokio::test]
+async fn test_compute_actor_accepts_ledger_handle() {
+    use std::sync::Arc;
+    use tokio::sync::RwLock;
+    // Build a minimal in-memory Ledger
+    let store = icn_ledger::MemStore::new();  // adjust import if needed
+    let ledger = icn_ledger::Ledger::new(Arc::new(store)).unwrap();
+    let handle: LedgerHandle = Arc::new(RwLock::new(ledger));
+
+    let trust_cb: TrustCallback = Arc::new(|_| 0.8);
+    let mut actor = ComputeActor::new(&quot;did:icn:executor&quot;.into(), trust_cb);
+    actor.set_ledger(handle); // Should not panic
+}
+</code></pre>
+<p><strong>Note:</strong> Check the actual <code>MemStore</code> import path in <code>icn-ledger</code> — it may be <code>icn_ledger::store::MemStore</code> or similar. Search with <code>grep -r &quot;pub struct MemStore\|MemStore&quot; crates/icn-ledger/src/ | head -5</code>.</p>
+<h3>Step 2: Run to verify it fails</h3>
+<pre><code class="language-bash">cargo test -p icn-compute --lib test_compute_actor_accepts_ledger_handle
+</code></pre>
+<p>Expected: compile error — <code>LedgerHandle</code> and <code>set_ledger</code> not found</p>
+<h3>Step 3: Add LedgerHandle type alias</h3>
+<p>In <code>crates/icn-compute/src/actor/types.rs</code>, add at the end:</p>
+<pre><code class="language-rust">/// Handle to the ICN ledger for commons credit settlement (E5 - #948).
+///
+/// Wrapped in `Arc&lt;RwLock&gt;` so the compute actor can write credit
+/// entries from async task completion handlers without blocking.
+pub type LedgerHandle = std::sync::Arc&lt;tokio::sync::RwLock&lt;icn_ledger::Ledger&gt;&gt;;
+</code></pre>
+<h3>Step 4: Export the type from mod.rs</h3>
+<p>In <code>crates/icn-compute/src/actor/mod.rs</code>, add <code>LedgerHandle</code> to the re-export list:</p>
+<pre><code class="language-rust">pub use types::{
+    BalanceCallback, ComputeEvent, EventCallback, LedgerHandle, LocalityCallback,
+    PaymentCallback, PaymentRequest, SendCallback, TrustCallback,
+};
+</code></pre>
+<h3>Step 5: Add field and setter to ComputeActor</h3>
+<p>In <code>crates/icn-compute/src/actor/mod.rs</code>, add to the <code>ComputeActor</code> struct:</p>
+<pre><code class="language-rust">/// Ledger handle for commons credit settlement (E5 - #948).
+/// When set, completed commons tasks (scope == ScopeLevel::Commons)
+/// earn/spend credits atomically via append_entry.
+ledger: Option&lt;LedgerHandle&gt;,
+</code></pre>
+<p>In <code>ComputeActor::new()</code> initializer, add:</p>
+<pre><code class="language-rust">ledger: None,
+</code></pre>
+<p>Add the setter after <code>set_balance_callback</code>:</p>
+<pre><code class="language-rust">/// Set ledger handle for commons credit settlement (E5 - #948).
+///
+/// Also automatically wires a `BalanceCallback` that reads the submitter&#39;s
+/// `commons-credits` balance from the ledger, activating E7 credit-ceiling
+/// enforcement without a separate `set_balance_callback` call.
+pub fn set_ledger(&amp;mut self, handle: LedgerHandle) {
+    // Auto-wire balance callback from ledger
+    let cb_handle = handle.clone();
+    self.balance_callback = Some(std::sync::Arc::new(move |did: &amp;str| {
+        let ledger = cb_handle.blocking_read();
+        let did_parsed: icn_identity::Did = match did.parse() {
+            Ok(d) =&gt; d,
+            Err(_) =&gt; return 0,
+        };
+        ledger.get_balance(&amp;did_parsed, icn_ledger::COMMONS_CREDIT_CURRENCY)
+    }));
+    self.ledger = Some(handle);
+}
+</code></pre>
+<h3>Step 6: Run tests</h3>
+<pre><code class="language-bash">cargo test -p icn-compute --lib test_compute_actor_accepts_ledger_handle
+cargo check -p icn-compute
+</code></pre>
+<p>Expected: test passes, no compile errors</p>
+<h3>Step 7: Commit</h3>
+<pre><code class="language-bash">git add crates/icn-compute/src/actor/types.rs crates/icn-compute/src/actor/mod.rs
+git commit -m &quot;feat(compute): add LedgerHandle and set_ledger() to ComputeActor (#948)&quot;
+</code></pre>
+<hr>
+<h2>Task 6: Commons credit settlement in complete_task_result()</h2>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>crates/icn-compute/src/actor/lifecycle.rs</code></li>
+</ul>
+<p><strong>What:</strong> After a successful commons task completes, build a <code>CommonsSettlementRequest</code> from the result and task, call <code>settle_commons_receipt</code>, append both entries to the ledger.</p>
+<h3>Step 1: Write the failing integration test</h3>
+<p>In <code>crates/icn-compute/src/actor/tests.rs</code>, add:</p>
+<pre><code class="language-rust">#[tokio::test]
+async fn test_commons_task_earns_credits_on_completion() {
+    use icn_kernel_api::ScopeLevel;
+    use icn_ledger::{Ledger, COMMONS_CREDIT_CURRENCY};
+    use std::sync::Arc;
+    use tokio::sync::RwLock;
+
+    // Setup: ledger + actor
+    let store = icn_ledger::store::MemStore::new(); // adjust path as needed
+    let ledger = Ledger::new(Arc::new(store)).unwrap();
+    let ledger_handle: LedgerHandle = Arc::new(RwLock::new(ledger));
+
+    let trust_cb: TrustCallback = Arc::new(|_| 0.9);
+    let mut actor = ComputeActor::new(&quot;did:icn:executor001&quot;.into(), trust_cb);
+    actor.set_ledger(ledger_handle.clone());
+    let handle = actor.spawn();
+
+    // Submit a commons-scoped task
+    let mut task = make_task(&quot;commons-settle-test&quot;, &quot;did:icn:submitter001&quot;);
+    task.scope = Some(ScopeLevel::Commons);
+    task.fuel_limit = crate::types::FuelLimit(2000);
+    handle.submit(task).await.expect(&quot;submission should succeed&quot;);
+
+    // Wait briefly for execution
+    tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+    // Executor should have earned commons credits
+    let executor_did: icn_identity::Did = &quot;did:icn:executor001&quot;.parse().unwrap();
+    let balance = ledger_handle
+        .read()
+        .await
+        .get_balance(&amp;executor_did, COMMONS_CREDIT_CURRENCY);
+    assert!(
+        balance &gt; 0,
+        &quot;executor should have earned commons credits, got balance = {balance}&quot;
+    );
+}
+
+#[tokio::test]
+async fn test_commons_task_debits_submitter_on_completion() {
+    use icn_kernel_api::ScopeLevel;
+    use icn_ledger::{Ledger, COMMONS_CREDIT_CURRENCY};
+    use std::sync::Arc;
+    use tokio::sync::RwLock;
+
+    let store = icn_ledger::store::MemStore::new();
+    let ledger = Ledger::new(Arc::new(store)).unwrap();
+    let ledger_handle: LedgerHandle = Arc::new(RwLock::new(ledger));
+
+    let trust_cb: TrustCallback = Arc::new(|_| 0.9);
+    let mut actor = ComputeActor::new(&quot;did:icn:executor002&quot;.into(), trust_cb);
+    actor.set_ledger(ledger_handle.clone());
+    let handle = actor.spawn();
+
+    let mut task = make_task(&quot;commons-spend-test&quot;, &quot;did:icn:submitter002&quot;);
+    task.scope = Some(ScopeLevel::Commons);
+    task.fuel_limit = crate::types::FuelLimit(1000);
+    handle.submit(task).await.expect(&quot;submission should succeed&quot;);
+
+    tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+    // Submitter should have a negative commons-credits balance (spent)
+    let submitter_did: icn_identity::Did = &quot;did:icn:submitter002&quot;.parse().unwrap();
+    let balance = ledger_handle
+        .read()
+        .await
+        .get_balance(&amp;submitter_did, COMMONS_CREDIT_CURRENCY);
+    assert!(
+        balance &lt; 0,
+        &quot;submitter should have spent commons credits, got balance = {balance}&quot;
+    );
+}
+</code></pre>
+<p><strong>Note:</strong> If the submitter balance floor is enforced at submission time (E7 credit ceiling), you may need to seed the submitter&#39;s balance first. Adjust the test if the second assertion fails — the intent is that spending decreases balance.</p>
+<h3>Step 2: Run to verify they fail</h3>
+<pre><code class="language-bash">cargo test -p icn-compute --lib &quot;test_commons_task_earns\|test_commons_task_debits&quot;
+</code></pre>
+<p>Expected: compile or runtime failure — settlement not wired yet</p>
+<h3>Step 3: Add settlement logic to complete_task_result()</h3>
+<p>In <code>crates/icn-compute/src/actor/lifecycle.rs</code>, add the following import at the top:</p>
+<pre><code class="language-rust">use icn_kernel_api::ScopeLevel;
+</code></pre>
+<p>In <code>complete_task_result()</code>, after the event callback block (after <code>cb(ComputeEvent::TaskCompleted {...})</code>), add:</p>
+<pre><code class="language-rust">// Commons credit settlement (E5 - #948)
+// For successfully completed commons-scoped tasks, earn credits for executor
+// and debit submitter. Runs after task completion event to avoid blocking.
+if let Some(ref ledger_handle) = self.ledger {
+    // Look up task to get scope and submitter
+    let task_info = {
+        let mgr = self.task_manager.lock().await;
+        mgr.get(&amp;task_hash).map(|t| (t.scope.clone(), t.submitter.clone()))
+    };
+
+    if let Some((Some(ScopeLevel::Commons), submitter)) = task_info {
+        // Only settle successful outcomes
+        if matches!(outcome, crate::types::ExecutionOutcome::Success(_)) {
+            let receipt_id: [u8; 32] = task_hash; // use task_hash as receipt nonce
+            let executor_parsed: Option&lt;icn_identity::Did&gt; =
+                executor_did.parse().ok();
+            let submitter_parsed: Option&lt;icn_identity::Did&gt; =
+                submitter.parse().ok();
+
+            if let (Some(executor_did_parsed), Some(submitter_did_parsed)) =
+                (executor_parsed, submitter_parsed)
+            {
+                let req = icn_ledger::CommonsSettlementRequest {
+                    receipt_id,
+                    executor: executor_did_parsed,
+                    submitter: submitter_did_parsed,
+                    cpu_millis: fuel_used, // fuel_used as cpu_millis proxy
+                    memory_mb_millis: 0,
+                    storage_bytes: 0,
+                    egress_bytes: 0,
+                    executor_verified: true,
+                };
+
+                let engine = icn_ledger::SettlementEngine::new();
+                match engine.settle_commons_receipt(&amp;req) {
+                    Ok((earn_entry, spend_entry)) =&gt; {
+                        let mut ledger = ledger_handle.write().await;
+                        if let Err(e) = ledger.append_entry(earn_entry).await {
+                            tracing::warn!(
+                                task_hash = %hex::encode(task_hash),
+                                error = %e,
+                                &quot;Failed to append commons earn entry&quot;
+                            );
+                        }
+                        if let Err(e) = ledger.append_entry(spend_entry).await {
+                            tracing::warn!(
+                                task_hash = %hex::encode(task_hash),
+                                error = %e,
+                                &quot;Failed to append commons spend entry&quot;
+                            );
+                        }
+                    }
+                    Err(e) =&gt; {
+                        tracing::warn!(
+                            task_hash = %hex::encode(task_hash),
+                            error = %e,
+                            &quot;Commons settlement failed&quot;
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+</code></pre>
+<p><strong>Important:</strong> <code>SettlementEngine::new()</code> creates a fresh engine per call — this means no cross-call dedup. To get persistent dedup, add <code>settlement_engine: SettlementEngine</code> as a field on <code>ComputeActor</code> and use <code>self.settlement_engine</code> instead of a local <code>let engine</code>. Do this if the dedup tests fail.</p>
+<p><strong>Also important:</strong> <code>TaskManager::get()</code> returns a task reference — check the actual method signature and what fields it exposes. If <code>scope</code> is not accessible via the task manager, you may need to also cache the scope+submitter in a separate map (similar to <code>task_scope_map</code> in the actor).</p>
+<h3>Step 4: Check compile</h3>
+<pre><code class="language-bash">cargo check -p icn-compute
+</code></pre>
+<p>Fix any compile errors before running tests.</p>
+<h3>Step 5: Run the settlement tests</h3>
+<pre><code class="language-bash">cargo test -p icn-compute --lib &quot;test_commons_task_earns\|test_commons_task_debits&quot;
+</code></pre>
+<p>Expected: both PASS (may need to adjust timing or task manager access)</p>
+<h3>Step 6: Run all compute tests</h3>
+<pre><code class="language-bash">cargo test -p icn-compute --lib
+</code></pre>
+<p>Expected: all 345+ tests pass</p>
+<h3>Step 7: Run fmt and clippy</h3>
+<pre><code class="language-bash">cargo fmt --all
+cargo clippy --workspace --all-targets -- -D warnings
+</code></pre>
+<p>Fix any warnings.</p>
+<h3>Step 8: Commit</h3>
+<pre><code class="language-bash">git add crates/icn-compute/src/actor/lifecycle.rs
+git commit -m &quot;feat(compute): settle commons credits on task completion (#948)&quot;
+</code></pre>
+<hr>
+<h2>Task 7: Integration test — full earn/spend cycle</h2>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Create: <code>crates/icn-ledger/tests/commons_credit_integration.rs</code></li>
+</ul>
+<h3>Step 1: Write the integration test</h3>
+<pre><code class="language-rust">//! Integration test: full commons credit earn → check → spend cycle.
+//!
+//! Verifies that:
+//! 1. An executor earns credits after settling a commons receipt.
+//! 2. A submitter&#39;s balance decreases after settling a commons receipt.
+//! 3. Duplicate settlement of the same receipt is rejected.
+//! 4. Zero-fuel receipt (no credits) is rejected.
+
+use icn_identity::Did;
+use icn_ledger::{
+    CommonsSettlementRequest, Ledger, SettlementEngine, COMMONS_CREDIT_CURRENCY,
+};
+use std::sync::Arc;
+
+fn test_ledger() -&gt; Ledger {
+    // Use the in-memory store for tests — check the correct import path:
+    // `icn_ledger::store::MemStore` or `icn_ledger::MemStore`
+    let store = icn_ledger::store::MemStore::new();
+    Ledger::new(Arc::new(store)).unwrap()
+}
+
+fn make_request(receipt_id: [u8; 32], fuel: u64) -&gt; CommonsSettlementRequest {
+    CommonsSettlementRequest {
+        receipt_id,
+        executor: &quot;did:icn:executor-alpha&quot;.parse().unwrap(),
+        submitter: &quot;did:icn:submitter-alpha&quot;.parse().unwrap(),
+        cpu_millis: fuel,
+        memory_mb_millis: 0,
+        storage_bytes: 0,
+        egress_bytes: 0,
+        executor_verified: true,
+    }
+}
+
+#[tokio::test]
+async fn test_earn_and_spend_cycle() {
+    let mut ledger = test_ledger();
+    let engine = SettlementEngine::new();
+
+    let req = make_request([1u8; 32], 5000);
+    let executor: Did = req.executor.clone();
+    let submitter: Did = req.submitter.clone();
+
+    let (earn, spend) = engine.settle_commons_receipt(&amp;req).unwrap();
+
+    ledger.append_entry(earn).await.unwrap();
+    ledger.append_entry(spend).await.unwrap();
+
+    let exec_balance = ledger.get_balance(&amp;executor, COMMONS_CREDIT_CURRENCY);
+    let sub_balance = ledger.get_balance(&amp;submitter, COMMONS_CREDIT_CURRENCY);
+
+    assert_eq!(exec_balance, 5000, &quot;executor should earn 5000 credits (fuel=5000, formula: cpu_millis)&quot;);
+    assert_eq!(sub_balance, -5000, &quot;submitter should spend 5000 credits&quot;);
+}
+
+#[tokio::test]
+async fn test_duplicate_receipt_rejected() {
+    let engine = SettlementEngine::new();
+    let req = make_request([2u8; 32], 1000);
+
+    // First settlement succeeds
+    assert!(engine.settle_commons_receipt(&amp;req).is_ok());
+
+    // Second with same receipt_id rejected
+    let err = engine.settle_commons_receipt(&amp;req).unwrap_err();
+    let err_msg = format!(&quot;{err:?}&quot;);
+    assert!(
+        err_msg.contains(&quot;Duplicate&quot;) || err_msg.contains(&quot;duplicate&quot;),
+        &quot;expected DuplicateEntry, got: {err_msg}&quot;
+    );
+}
+
+#[tokio::test]
+async fn test_zero_fuel_rejected() {
+    let engine = SettlementEngine::new();
+    let req = make_request([3u8; 32], 0); // cpu_millis = 0, all others = 0
+    let result = engine.settle_commons_receipt(&amp;req);
+    assert!(result.is_err(), &quot;zero-credit settlement should be rejected&quot;);
+}
+</code></pre>
+<h3>Step 2: Run to verify they compile and pass</h3>
+<pre><code class="language-bash">cargo test -p icn-ledger --test commons_credit_integration
+</code></pre>
+<p>Expected: 3 tests PASS</p>
+<h3>Step 3: Run full ledger test suite</h3>
+<pre><code class="language-bash">cargo test -p icn-ledger
+</code></pre>
+<p>Expected: all tests pass</p>
+<h3>Step 4: Final full workspace check</h3>
+<pre><code class="language-bash">cargo fmt --all --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace --lib
+</code></pre>
+<p>All should pass.</p>
+<h3>Step 5: Final commit</h3>
+<pre><code class="language-bash">git add crates/icn-ledger/tests/commons_credit_integration.rs
+git commit -m &quot;test(ledger): integration test for commons credit earn/spend cycle (#948)&quot;
+</code></pre>
+<hr>
+<h2>Done — open PR</h2>
+<pre><code class="language-bash">git push -u origin feat/948-commons-credits
+gh pr create \
+  --title &quot;feat(ledger/compute): commons credit earning and spending (#948)&quot; \
+  --body &quot;Implements #948.
+
+## What
+- \`CommonsSettlementRequest\` DTO for commons credit settlement
+- \`SettlementEngine::settle_commons_receipt()\` — produces balanced (earn, spend) entry pair
+- \`ComputeTask.scope\` field — submitters opt into \`ScopeLevel::Commons\`
+- \`ComputeActor::set_ledger()\` — wires ledger for settlement and auto-creates BalanceCallback
+- Post-completion settlement hook in \`complete_task_result()\`
+- Integration test: earn → balance check → spend → balance check
+
+## Credit formula
+\`fuel_used\` is used as a proxy for \`cpu_millis\` (1 credit per fuel unit). Full metering (memory, storage, egress) is deferred to a follow-up issue.
+
+## Notes
+- Settles only on \`ExecutionOutcome::Success\`; failed/timeout tasks do not earn/spend credits.
+- Dedup is via \`receipt_id\` nonce in journal entries; see Task 6 note about persistent \`SettlementEngine\`.
+- Balance floor enforcement uses existing E7 credit ceiling check; floor-at-zero is enforced at submission time, not settlement time.
+
+Closes #948&quot;
+</code></pre>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

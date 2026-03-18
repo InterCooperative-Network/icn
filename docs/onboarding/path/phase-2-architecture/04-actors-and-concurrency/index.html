@@ -1,0 +1,318 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>04: Actors and Concurrency | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>onboarding</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>path</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>phase 2 architecture</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>04 actors and concurrency</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/onboarding/path/phase-2-architecture/04-actors-and-concurrency.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>04: Actors and Concurrency</h1>
+<blockquote>
+<p><strong>Phase</strong>: 2 | <strong>Tier</strong>: Fixer<br><strong>Patterns introduced</strong>: <a href="#actor-pattern">Actor</a>, <a href="#async-callbacks">Async Callbacks</a>, <a href="#shutdown-coordination">Shutdown Coordination</a>, <a href="#handle-holder">Handle Holder</a><br><strong>Prerequisite</strong>: Phase 1 complete (Reader tier)</p>
+</blockquote>
+<h2>Why This Matters</h2>
+<p>ICN&#39;s central concurrency model is the <strong>actor pattern</strong> — each subsystem (Network, Gossip, Ledger, Governance, Compute) runs independently, processing messages sequentially from a bounded mailbox. This eliminates data races, simplifies reasoning, and enables graceful shutdown.</p>
+<p>Understanding actors is prerequisite to understanding the Meaning Firewall (Layer 05) — the boundary between kernel and apps is enforced through actor communication, not direct function calls.</p>
+<p>→ See <code>manual.md</code> § &quot;Concurrency via Actors&quot; for the design rationale.</p>
+<h2>What You&#39;ll Read</h2>
+<h3>1. The Actor Template</h3>
+<p><strong>File</strong>: <code>docs/architecture/ARCHITECTURE_MAP.md</code> (search for &quot;Actor Pattern&quot;)</p>
+<p>Every ICN actor follows this template:</p>
+<pre><code class="language-rust">// 1. Message enum
+enum ActorMsg {
+    DoSomething { arg: T, reply: oneshot::Sender&lt;Result&lt;R&gt;&gt; },
+    Shutdown,
+}
+
+// 2. Actor state struct
+struct Actor {
+    state: InternalState,
+}
+
+// 3. Handle for external communication
+pub struct ActorHandle {
+    tx: mpsc::Sender&lt;ActorMsg&gt;,
+}
+
+// 4. Spawn function
+pub fn spawn_actor() -&gt; ActorHandle {
+    let (tx, mut rx) = mpsc::channel(32);  // Bounded mailbox
+    
+    tokio::spawn(async move {
+        let mut actor = Actor::new();
+        while let Some(msg) = rx.recv().await {
+            match msg {
+                ActorMsg::DoSomething { arg, reply } =&gt; {
+                    let result = actor.do_something(arg);
+                    let _ = reply.send(result);
+                }
+                ActorMsg::Shutdown =&gt; break,
+            }
+        }
+    });
+    
+    ActorHandle { tx }
+}
+</code></pre>
+<p><strong>Key properties</strong>:</p>
+<ul>
+<li><strong>Sequential processing</strong>: Messages processed one at a time (no internal locks needed)</li>
+<li><strong>Bounded mailbox</strong>: Backpressure via <code>mpsc::channel(N)</code> prevents unbounded memory growth</li>
+<li><strong>Async API</strong>: Handle provides <code>async fn</code> methods that send messages and await replies</li>
+</ul>
+<h3>2. Real Actors: Simplest to Most Complex</h3>
+<p>Trace these actors in order of complexity:</p>
+<h4><strong>Level 1: CoopActor</strong> (<code>icn-coop/src/actor.rs</code>)</h4>
+<ul>
+<li>Manages cooperative membership and lifecycle</li>
+<li>State: <code>HashMap&lt;CoopId, Coop&gt;</code></li>
+<li>Messages: <code>CreateCoop</code>, <code>AddMember</code>, <code>UpdateStatus</code></li>
+<li>No external callbacks, pure state management</li>
+</ul>
+<h4><strong>Level 2: ContractRegistryActor</strong> (<code>icn/crates/icn-ccl/src/registry.rs</code>)</h4>
+<ul>
+<li>Stores and retrieves CCL contracts</li>
+<li>State: <code>HashMap&lt;ContractId, Contract&gt;</code></li>
+<li>Messages: <code>Register</code>, <code>Get</code>, <code>List</code></li>
+<li>Simple pattern: request/response with no side effects</li>
+</ul>
+<h4><strong>Level 3: CommunityActor</strong> (<code>icn-community/src/actor.rs</code>)</h4>
+<ul>
+<li>Manages communities (groupings of coops/individuals)</li>
+<li>State: <code>HashMap&lt;CommunityId, Community&gt;</code></li>
+<li>Messages: <code>Create</code>, <code>AddMember</code>, <code>ListMembers</code></li>
+<li>Callback: Gossip send for replication</li>
+</ul>
+<h4><strong>Level 4: StewardActor</strong> (<code>icn-steward/src/actor.rs</code>)</h4>
+<ul>
+<li>SDIS steward network for VUI computation</li>
+<li>State: <code>HashMap&lt;Did, StewardInfo&gt;</code>, threshold crypto state</li>
+<li>Messages: <code>EnrollMember</code>, <code>ComputeVui</code>, <code>IssueToken</code></li>
+<li>Complex: cryptographic operations, multi-party coordination</li>
+</ul>
+<h4><strong>Level 5: ComputeActor</strong> (<code>icn-compute/src/actor.rs</code>)</h4>
+<ul>
+<li>Distributed task execution with trust gating</li>
+<li>State: <code>HashMap&lt;TaskId, Task&gt;</code>, execution queue</li>
+<li>Messages: <code>Submit</code>, <code>Cancel</code>, <code>GetResult</code></li>
+<li>Callbacks: PolicyOracle for trust checks, Network for distribution</li>
+<li><strong>Most complex</strong>: scheduling, resource management, result aggregation</li>
+</ul>
+<h4><strong>Level 6: NetworkActor</strong> (<code>icn/crates/icn-net/src/actor/mod.rs</code>)</h4>
+<ul>
+<li>QUIC transport, mDNS discovery, session management</li>
+<li>State: <code>HashMap&lt;Did, Connection&gt;</code>, peer discovery cache</li>
+<li>Messages: <code>Dial</code>, <code>Send</code>, <code>Disconnect</code>, <code>IncomingConnection</code></li>
+<li>Callbacks: Incoming message handlers (routes to Gossip/RPC)</li>
+<li><strong>Deepest</strong>: handles raw network I/O, certificate validation, retry logic</li>
+</ul>
+<h3>3. Four Communication Patterns</h3>
+<h4><strong>Pattern A: Channel-Based (mpsc::Sender<Msg>)</strong></h4>
+<p>Used for: Actor-to-actor messaging within the same process.</p>
+<pre><code class="language-rust">let (tx, rx) = mpsc::channel(32);
+// Send a message
+tx.send(Msg::DoSomething { arg }).await?;
+</code></pre>
+<h4><strong>Pattern B: Shared State (Arc&lt;RwLock<T>&gt;)</strong></h4>
+<p>Used for: Read-heavy state shared across actors.</p>
+<pre><code class="language-rust">let state = Arc::new(RwLock::new(SharedState::new()));
+// Read
+let data = state.read().await;
+// Write
+let mut data = state.write().await;
+</code></pre>
+<p><strong>Warning</strong>: Don&#39;t hold locks across <code>.await</code> points — causes deadlocks.</p>
+<h4><strong>Pattern C: Callbacks</strong></h4>
+<p>Used for: Decoupling actors (e.g., Gossip → Network).</p>
+<pre><code class="language-rust">pub type SendCallback = Arc&lt;dyn Fn(Did, Vec&lt;u8&gt;) -&gt; Result&lt;()&gt; + Send + Sync&gt;;
+
+// Set callback
+gossip_actor.set_send_callback(send_callback);
+
+// Invoke callback
+if let Some(ref cb) = self.send_callback {
+    cb(recipient, data)?;
+}
+</code></pre>
+<h4><strong>Pattern D: Broadcast (Shutdown)</strong></h4>
+<p>Used for: Shutdown signal propagation.</p>
+<pre><code class="language-rust">let (shutdown_tx, shutdown_rx) = broadcast::channel(1);
+
+// In runtime.rs
+shutdown_tx.send(()).ok();
+
+// In each actor
+tokio::select! {
+    msg = rx.recv() =&gt; { /* process */ }
+    _ = shutdown_rx.recv() =&gt; { break; }
+}
+</code></pre>
+<h3>4. Shutdown Coordination</h3>
+<p><strong>File</strong>: <code>icn/crates/icn-core/src/runtime.rs</code></p>
+<p>The runtime waits for shutdown signal or error:</p>
+<pre><code class="language-rust">tokio::select! {
+    result = supervisor.run() =&gt; {
+        // Supervisor exited (error or completed)
+    }
+    _ = tokio::signal::ctrl_c() =&gt; {
+        // User pressed Ctrl+C
+    }
+}
+
+// Broadcast shutdown signal
+shutdown_tx.send(()).ok();
+
+// Wait for actors to finish
+tokio::time::sleep(Duration::from_secs(2)).await;
+</code></pre>
+<p>Each actor receives the signal via <code>broadcast::Receiver</code> and exits gracefully:</p>
+<pre><code class="language-rust">loop {
+    tokio::select! {
+        msg = rx.recv() =&gt; {
+            // Process message
+        }
+        _ = shutdown_rx.recv() =&gt; {
+            tracing::info!(&quot;Shutdown signal received&quot;);
+            break;
+        }
+    }
+}
+// Cleanup: flush buffers, close connections, etc.
+</code></pre>
+<h3>5. The <code>parking_lot::RwLock</code> vs <code>tokio::sync::RwLock</code> Distinction</h3>
+<p>ICN has <strong>two</strong> <code>TrustPolicyOracle</code> implementations:</p>
+<p><strong><code>apps/trust/src/oracle.rs</code></strong> (uses <code>parking_lot::RwLock</code>):</p>
+<pre><code class="language-rust">pub struct TrustPolicyOracle {
+    trust_graph: Arc&lt;parking_lot::RwLock&lt;TrustGraph&gt;&gt;,
+}
+</code></pre>
+<p><strong><code>apps/trust/src/oracle_tokio.rs</code></strong> (uses <code>tokio::sync::RwLock</code>):</p>
+<pre><code class="language-rust">pub struct TrustPolicyOracleTokio {
+    trust_graph: Arc&lt;tokio::sync::RwLock&lt;TrustGraph&gt;&gt;,
+}
+</code></pre>
+<p><strong>Why two versions?</strong></p>
+<table>
+<thead>
+<tr>
+<th>Lock Type</th>
+<th>When to Use</th>
+<th>Trade-offs</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>parking_lot::RwLock</code></td>
+<td>Synchronous code, short critical sections</td>
+<td>Faster, no async overhead, but blocks threads</td>
+</tr>
+<tr>
+<td><code>tokio::sync::RwLock</code></td>
+<td>Async code, long critical sections</td>
+<td>Async-aware, but slower, more overhead</td>
+</tr>
+</tbody></table>
+<p><strong>ICN&#39;s choice</strong>: The trust oracle does <strong>fast in-memory graph queries</strong> (no I/O), so <code>parking_lot::RwLock</code> is appropriate. If the oracle needed to call async functions inside the lock, <code>tokio::sync::RwLock</code> would be required.</p>
+<p><strong>Rule of thumb</strong>: Use <code>parking_lot</code> for pure CPU-bound operations, <code>tokio::sync</code> if you need <code>.await</code> inside the lock.</p>
+<h2>Patterns Introduced</h2>
+<h3>Actor Pattern</h3>
+<p>→ See <code>patterns.md</code> #1 for full template.</p>
+<h3>Async Callbacks</h3>
+<p>→ See <code>patterns.md</code> #3 for full template.</p>
+<h3>Shutdown Coordination</h3>
+<p>→ See <code>patterns.md</code> #9 for full template.</p>
+<h3>Handle Holder</h3>
+<p><strong>Pattern</strong>: <code>Arc&lt;RwLock&lt;Option&lt;Handle&gt;&gt;&gt;</code> for late-bound actors.</p>
+<p><strong>Why</strong>: During supervisor initialization, some actors depend on handles from others. Use <code>Option&lt;Handle&gt;</code> to allow phased initialization.</p>
+<pre><code class="language-rust">let gossip_handle_holder = Arc::new(RwLock::new(None));
+
+// Spawn actor
+let handle = spawn_gossip_actor();
+*gossip_handle_holder.write().await = Some(handle);
+
+// Later use
+if let Some(ref handle) = *gossip_handle_holder.read().await {
+    handle.announce(topic, data).await?;
+}
+</code></pre>
+<p>→ See <code>patterns.md</code> #15 for full template.</p>
+<h2>What You&#39;ll Build</h2>
+<p>→ <strong>Lab</strong>: <code>labs/lab-03-mini-actor/</code></p>
+<p>Build a mini actor runtime:</p>
+<ul>
+<li>Actor with bounded mailbox (<code>mpsc::channel</code>)</li>
+<li>Sequential message processing</li>
+<li><code>tokio::select!</code> shutdown coordination via <code>broadcast::channel</code></li>
+<li>Timeouts + retries to simulate network behavior</li>
+</ul>
+<p><strong>Done when</strong>: Actor processes messages, shuts down gracefully on signal, tests prove ordering.</p>
+<h2>Checkpoint</h2>
+<p>You&#39;ve completed this layer when you can:</p>
+<ol>
+<li><strong>Identify actor boundaries</strong>: Given ICN code, identify which subsystems are actors and which are pure functions</li>
+<li><strong>Trace message flow</strong>: Draw a sequence diagram showing a message from Gateway → GossipActor → NetworkActor</li>
+<li><strong>Explain lock choices</strong>: Justify when to use <code>parking_lot::RwLock</code> vs <code>tokio::sync::RwLock</code></li>
+<li><strong>Implement shutdown</strong>: Add graceful shutdown to your lab actor</li>
+</ol>
+<p><strong>Artifact</strong>: Diagram showing message flow for a gossip announcement (Gateway → Gossip → Network → Peer).</p>
+<h2>Deep Reference</h2>
+<p>→ <code>reference/module-03-runtime-actors.md</code> — Full actor lifecycle, supervisor details<br>→ <a href="https://tokio.rs/tokio/tutorial" target="_blank" rel="noopener">Tokio tutorial</a> — Async Rust fundamentals<br>→ <a href="https://www.brianstorti.com/the-actor-model/" target="_blank" rel="noopener">The Actor Model</a> — Conceptual overview</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

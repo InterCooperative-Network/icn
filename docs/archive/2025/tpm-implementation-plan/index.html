@@ -1,0 +1,675 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>TPM 2.0 Implementation Plan | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>archive</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>2025</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>tpm implementation plan</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/archive/2025/tpm-implementation-plan.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>TPM 2.0 Implementation Plan</h1>
+<blockquote>
+<p><strong>Archived Document Notice (2026-02-12):</strong> This file is retained for historical context and may not reflect current code, APIs, runtime defaults, CI status, or deployment posture.
+Use active documentation under <code>docs/</code> as authoritative.</p>
+</blockquote>
+<p><strong>Status:</strong> Planned - Not Yet Implemented<br><strong>Target:</strong> Production-ready TPM key sealing and signing</p>
+<h2>Overview</h2>
+<p>This document outlines the complete implementation plan for TPM 2.0 backend support in ICN. The goal is to enable production nodes to seal Ed25519 private keys inside TPM hardware, preventing memory extraction and providing platform binding.</p>
+<h2>Background: Why TPM for Ed25519?</h2>
+<p>TPM 2.0 does not natively support Ed25519. However, we can use TPM for:</p>
+<ol>
+<li><strong>Sealed storage</strong> - Key sealed to TPM, bound to platform PCRs</li>
+<li><strong>Software signing</strong> - After unsealing, sign in software with extra protections</li>
+<li><strong>Attestation</strong> - Prove the key is TPM-sealed and platform-bound</li>
+</ol>
+<p>This provides significant security benefits over pure software storage:</p>
+<ul>
+<li>Keys cannot be extracted without TPM hardware access</li>
+<li>Platform binding ensures keys only work on the original machine</li>
+<li>PCR measurement provides boot-time integrity verification</li>
+</ul>
+<h2>Architecture Overview</h2>
+<pre><code>┌─────────────────────────────────────────────────────┐
+│  Application Layer                                   │
+│  ┌─────────────────────────────────────────────┐   │
+│  │ IdentityBundle (uses DidKey::Hardware)      │   │
+│  └──────────────┬──────────────────────────────┘   │
+│                 │                                     │
+│  ┌──────────────▼───────────────────────────────┐   │
+│  │ TpmDidSigner (implements DidSigner trait)    │   │
+│  │  - Unseals key from TPM on demand           │   │
+│  │  - Signs in software with unsealed key      │   │
+│  │  - Re-seals after signing (optional)        │   │
+│  └──────────────┬───────────────────────────────┘   │
+│                 │                                     │
+├─────────────────┼─────────────────────────────────  │
+│  TPM Layer      │                                     │
+│  ┌──────────────▼───────────────────────────────┐   │
+│  │ TpmBackend (implements KeyStoreBackend)      │   │
+│  │  - init(): Seal new key to TPM               │   │
+│  │  - unlock(): Unseal key from TPM             │   │
+│  │  - signing_backend(): Return TpmDidSigner    │   │
+│  └──────────────┬───────────────────────────────┘   │
+│                 │                                     │
+│  ┌──────────────▼───────────────────────────────┐   │
+│  │ tss-esapi (TPM Software Stack)               │   │
+│  │  - SealedData API                            │   │
+│  │  - PCR binding                               │   │
+│  │  - Attestation                               │   │
+│  └──────────────┬───────────────────────────────┘   │
+└─────────────────┼─────────────────────────────────  ┘
+                  │
+         ┌────────▼────────┐
+         │  TPM 2.0 Hardware│
+         └─────────────────┘
+</code></pre>
+<h2>Implementation Phases</h2>
+<h3>Phase 1: Core TPM Sealing/Unsealing ✅ (Prerequisite: IdentityBundle refactor)</h3>
+<p><strong>Blockers:</strong></p>
+<ul>
+<li>IdentityBundle must use <code>DidKey</code> enum instead of embedding <code>KeyPair</code></li>
+<li>This is being implemented in Phase A (IdentityBundle refactor)</li>
+</ul>
+<p><strong>Tasks:</strong></p>
+<ol>
+<li><p>Implement TPM context initialization</p>
+<ul>
+<li>Connect to TPM resource manager (<code>/dev/tpmrm0</code>)</li>
+<li>Handle TCTI (TPM Command Transmission Interface) setup</li>
+<li>Error handling for missing TPM hardware</li>
+</ul>
+</li>
+<li><p>Implement key sealing</p>
+<pre><code class="language-rust">fn seal_key(
+    context: &amp;mut Context,
+    secret_bytes: &amp;[u8; 32],
+    pcr_selection: &amp;[u32],
+) -&gt; Result&lt;SealedData&gt;
+</code></pre>
+<ul>
+<li>Generate sealing key in TPM</li>
+<li>Seal Ed25519 private key with TPM</li>
+<li>Bind to platform PCRs (0, 7 for boot integrity)</li>
+<li>Store sealed blob to disk</li>
+</ul>
+</li>
+<li><p>Implement key unsealing</p>
+<pre><code class="language-rust">fn unseal_key(
+    context: &amp;mut Context,
+    sealed_data: &amp;SealedData,
+) -&gt; Result&lt;Zeroizing&lt;[u8; 32]&gt;&gt;
+</code></pre>
+<ul>
+<li>Load sealed data from disk</li>
+<li>Verify PCR values match sealing time</li>
+<li>Unseal key using TPM</li>
+<li>Return private key (zeroized)</li>
+</ul>
+</li>
+<li><p>Add PCR management</p>
+<ul>
+<li>Read current PCR values</li>
+<li>Verify against expected measurements</li>
+<li>Handle PCR mismatch (unsealing fails)</li>
+</ul>
+</li>
+</ol>
+<p><strong>Deliverables:</strong></p>
+<ul>
+<li><code>TpmContext</code> struct wrapping tss-esapi context</li>
+<li>Seal/unseal functions with PCR binding</li>
+<li>Unit tests with TPM simulator (swtpm)</li>
+<li>Error handling for missing TPM hardware</li>
+</ul>
+<p><strong>Testing:</strong></p>
+<ul>
+<li>Use swtpm (software TPM simulator) for CI</li>
+<li>Manual testing with real TPM 2.0 hardware</li>
+<li>Test PCR binding (unseal fails after PCR change)</li>
+<li>Test persistent storage (seal, reboot, unseal)</li>
+</ul>
+<h3>Phase 2: TpmDidSigner Implementation</h3>
+<p><strong>Tasks:</strong></p>
+<ol>
+<li><p>Implement <code>TpmDidSigner</code> struct</p>
+<pre><code class="language-rust">pub struct TpmDidSigner {
+    did: Did,
+    verifying_key: VerifyingKey,
+    tpm_context: Arc&lt;Mutex&lt;TpmContext&gt;&gt;,
+    sealed_data_path: PathBuf,
+    unsealed_key: Option&lt;Zeroizing&lt;[u8; 32]&gt;&gt;, // Cached unsealed key
+}
+</code></pre>
+</li>
+<li><p>Implement <code>DidSigner</code> trait</p>
+<pre><code class="language-rust">impl DidSigner for TpmDidSigner {
+    fn did(&amp;self) -&gt; &amp;Did;
+    fn verifying_key(&amp;self) -&gt; &amp;VerifyingKey;
+    fn sign(&amp;self, message: &amp;[u8]) -&gt; Result&lt;Signature&gt;;
+    fn is_hardware_backed(&amp;self) -&gt; bool { true }
+    fn backend_type(&amp;self) -&gt; &amp;str { &quot;tpm&quot; }
+}
+</code></pre>
+</li>
+<li><p>Implement signing flow</p>
+<ul>
+<li>Check if key is unsealed (cached)</li>
+<li>If not, unseal from TPM</li>
+<li>Sign with unsealed key in software</li>
+<li>Optionally re-seal (or keep cached for session)</li>
+<li>Zeroize unsealed key on drop</li>
+</ul>
+</li>
+<li><p>Add session management</p>
+<ul>
+<li>Keep key unsealed for duration of session</li>
+<li>Lock/unlock API for explicit control</li>
+<li>Auto-lock on timeout (configurable)</li>
+</ul>
+</li>
+</ol>
+<p><strong>Deliverables:</strong></p>
+<ul>
+<li><code>TpmDidSigner</code> implementing <code>DidSigner</code></li>
+<li>Session management for unsealed keys</li>
+<li>Integration tests with sign operations</li>
+<li>Performance benchmarks (seal/unseal overhead)</li>
+</ul>
+<p><strong>Testing:</strong></p>
+<ul>
+<li>Sign messages with TPM-backed key</li>
+<li>Verify signatures with public key</li>
+<li>Test session caching (unseal once, sign many)</li>
+<li>Test auto-lock timeout</li>
+</ul>
+<h3>Phase 3: TpmBackend Integration</h3>
+<p><strong>Tasks:</strong></p>
+<ol>
+<li><p>Refactor <code>TpmBackend</code> to use real sealing</p>
+<pre><code class="language-rust">impl KeyStoreBackend for TpmBackend {
+    fn init(&amp;mut self, passphrase: &amp;[u8]) -&gt; Result&lt;()&gt; {
+        // Generate new Ed25519 keypair
+        // Seal private key to TPM
+        // Store sealed data to disk
+        // Return DidKey::Hardware with public key
+    }
+
+    fn unlock(&amp;mut self, passphrase: &amp;[u8]) -&gt; Result&lt;()&gt; {
+        // Load sealed data from disk
+        // Unseal key from TPM (PCR verification)
+        // Cache unsealed key in TpmDidSigner
+    }
+
+    fn signing_backend(&amp;self) -&gt; Option&lt;&amp;dyn DidSigner&gt; {
+        // Return TpmDidSigner instance
+    }
+}
+</code></pre>
+</li>
+<li><p>Add persistent storage</p>
+<ul>
+<li>Store sealed data blob to <code>~/.icn/tpm-sealed.dat</code></li>
+<li>Store TPM handle/context info</li>
+<li>Handle multiple identities (one sealed blob per identity)</li>
+</ul>
+</li>
+<li><p>Add configuration</p>
+<pre><code class="language-toml">[identity.tpm]
+enabled = true
+pcrs = [0, 7]  # Boot integrity measurements
+device = &quot;/dev/tpmrm0&quot;
+auto_lock_timeout_secs = 300
+</code></pre>
+</li>
+<li><p>Error handling</p>
+<ul>
+<li>TPM not available → fallback to software or error</li>
+<li>PCR mismatch → require manual intervention</li>
+<li>Sealed data corruption → recovery via backup</li>
+</ul>
+</li>
+</ol>
+<p><strong>Deliverables:</strong></p>
+<ul>
+<li>Complete <code>TpmBackend</code> implementation</li>
+<li>Configuration file support</li>
+<li>Persistent storage for sealed data</li>
+<li>Error handling and recovery procedures</li>
+</ul>
+<p><strong>Testing:</strong></p>
+<ul>
+<li>End-to-end: init → unlock → sign → verify</li>
+<li>Persistence: seal → restart → unseal</li>
+<li>PCR binding: seal → modify PCR → unseal fails</li>
+<li>Multiple identities (if supported)</li>
+</ul>
+<h3>Phase 4: Platform Binding &amp; Attestation</h3>
+<p><strong>Tasks:</strong></p>
+<ol>
+<li><p>Implement PCR measurement</p>
+<ul>
+<li>Read TPM PCRs during sealing</li>
+<li>Store expected PCR values with sealed data</li>
+<li>Verify PCRs match during unsealing</li>
+</ul>
+</li>
+<li><p>Add attestation support</p>
+<pre><code class="language-rust">pub struct TpmAttestation {
+    pub pcr_values: HashMap&lt;u32, Vec&lt;u8&gt;&gt;,
+    pub quote: Vec&lt;u8&gt;,  // TPM quote signature
+    pub quote_sig: Vec&lt;u8&gt;,
+    pub attestation_key: Vec&lt;u8&gt;,
+}
+
+fn attest_identity(tpm: &amp;TpmContext, did: &amp;Did) -&gt; Result&lt;TpmAttestation&gt;
+</code></pre>
+<ul>
+<li>Generate TPM quote over PCRs</li>
+<li>Sign quote with attestation key</li>
+<li>Return attestation proof</li>
+</ul>
+</li>
+<li><p>Add verification API</p>
+<pre><code class="language-rust">fn verify_attestation(
+    attestation: &amp;TpmAttestation,
+    expected_pcrs: &amp;HashMap&lt;u32, Vec&lt;u8&gt;&gt;,
+) -&gt; Result&lt;()&gt;
+</code></pre>
+</li>
+<li><p>Document attestation flow</p>
+<ul>
+<li>When to request attestation</li>
+<li>How to verify attestation</li>
+<li>Trust model for attestation keys</li>
+</ul>
+</li>
+</ol>
+<p><strong>Deliverables:</strong></p>
+<ul>
+<li>TPM attestation generation</li>
+<li>Attestation verification</li>
+<li>Documentation for attestation usage</li>
+<li>Integration with network handshake (optional)</li>
+</ul>
+<p><strong>Testing:</strong></p>
+<ul>
+<li>Generate attestation for TPM-sealed identity</li>
+<li>Verify attestation with expected PCRs</li>
+<li>Test attestation with modified PCRs (should fail)</li>
+</ul>
+<h3>Phase 5: Production Hardening</h3>
+<p><strong>Tasks:</strong></p>
+<ol>
+<li><p>Add comprehensive error handling</p>
+<ul>
+<li>TPM hardware failures</li>
+<li>PCR measurement changes</li>
+<li>Sealed data corruption</li>
+<li>Resource exhaustion</li>
+</ul>
+</li>
+<li><p>Add monitoring &amp; observability</p>
+<ul>
+<li>Metrics: seal/unseal operations, latency</li>
+<li>Logging: TPM operations, PCR values</li>
+<li>Alerts: PCR mismatches, unsealing failures</li>
+</ul>
+</li>
+<li><p>Add recovery procedures</p>
+<ul>
+<li>Backup sealed data (encrypted)</li>
+<li>Emergency unsealing procedure</li>
+<li>PCR update workflow (BIOS updates)</li>
+<li>Identity migration (old TPM → new TPM)</li>
+</ul>
+</li>
+<li><p>Security audit</p>
+<ul>
+<li>Code review for key material handling</li>
+<li>Verify zeroization of unsealed keys</li>
+<li>Test for timing attacks (constant-time operations)</li>
+<li>Fuzz testing for malformed sealed data</li>
+</ul>
+</li>
+<li><p>Performance optimization</p>
+<ul>
+<li>Minimize unseal operations (session caching)</li>
+<li>Batch signing operations when possible</li>
+<li>Profile TPM command latency</li>
+</ul>
+</li>
+</ol>
+<p><strong>Deliverables:</strong></p>
+<ul>
+<li>Production-ready error handling</li>
+<li>Comprehensive documentation</li>
+<li>Monitoring integration</li>
+<li>Recovery procedures</li>
+<li>Security audit report</li>
+</ul>
+<p><strong>Testing:</strong></p>
+<ul>
+<li>Fault injection (TPM failures, PCR changes)</li>
+<li>Load testing (many sign operations)</li>
+<li>Recovery testing (backup restore)</li>
+<li>Security testing (fuzzing, timing attacks)</li>
+</ul>
+<h3>Phase 6: Documentation &amp; Examples</h3>
+<p><strong>Tasks:</strong></p>
+<ol>
+<li><p>Write setup guide</p>
+<ul>
+<li>Hardware requirements (TPM 2.0)</li>
+<li>Linux kernel configuration</li>
+<li>TPM software stack installation</li>
+<li>swtpm setup for testing</li>
+</ul>
+</li>
+<li><p>Write usage guide</p>
+<ul>
+<li>Initializing TPM-backed identity</li>
+<li>Signing operations</li>
+<li>PCR management</li>
+<li>Backup and recovery</li>
+</ul>
+</li>
+<li><p>Write migration guide</p>
+<ul>
+<li>Age-encrypted → TPM-sealed migration</li>
+<li>TPM → TPM migration (hardware replacement)</li>
+<li>Emergency recovery procedures</li>
+</ul>
+</li>
+<li><p>Add examples</p>
+<ul>
+<li>Simple TPM identity creation</li>
+<li>Signing and verification</li>
+<li>Attestation generation</li>
+<li>Configuration examples</li>
+</ul>
+</li>
+</ol>
+<p><strong>Deliverables:</strong></p>
+<ul>
+<li><code>docs/tpm-setup.md</code> - Setup guide</li>
+<li><code>docs/tpm-usage.md</code> - Usage guide</li>
+<li><code>docs/tpm-migration.md</code> - Migration guide</li>
+<li><code>examples/tpm-identity.rs</code> - Example code</li>
+<li>Configuration templates</li>
+</ul>
+<h2>Dependencies</h2>
+<h3>Rust Crates</h3>
+<ul>
+<li><code>tss-esapi</code> (^7.4) - TPM2 Software Stack bindings</li>
+<li><code>zeroize</code> (^1.7) - Secure memory wiping</li>
+</ul>
+<h3>System Requirements</h3>
+<ul>
+<li>TPM 2.0 hardware (or swtpm for testing)</li>
+<li>Linux kernel 4.12+ with TPM 2.0 support</li>
+<li><code>/dev/tpmrm0</code> device (TPM resource manager)</li>
+</ul>
+<h3>Optional for Development</h3>
+<ul>
+<li><code>swtpm</code> - Software TPM simulator for CI</li>
+<li><code>tpm2-tools</code> - Command-line TPM utilities</li>
+<li><code>ibmswtpm2</code> - IBM TPM 2.0 simulator</li>
+</ul>
+<h2>Security Considerations</h2>
+<h3>Threat Model</h3>
+<p><strong>Attacks TPM Sealing Mitigates:</strong></p>
+<ul>
+<li>✅ Memory extraction (keys sealed in TPM)</li>
+<li>✅ Offline key extraction (PCR binding)</li>
+<li>✅ Key material in swap (never in memory long)</li>
+<li>✅ Cold boot attacks (keys not in DRAM)</li>
+</ul>
+<p><strong>Attacks TPM Sealing Does NOT Mitigate:</strong></p>
+<ul>
+<li>❌ Runtime attacks (after unsealing)</li>
+<li>❌ TPM physical access (with advanced tools)</li>
+<li>❌ Supply chain attacks (compromised TPM)</li>
+<li>❌ Side-channel attacks on unsealing</li>
+</ul>
+<h3>Best Practices</h3>
+<ol>
+<li><p><strong>PCR Selection</strong></p>
+<ul>
+<li>PCR 0: BIOS/UEFI firmware</li>
+<li>PCR 7: Secure Boot policy</li>
+<li>Avoid PCRs that change frequently</li>
+</ul>
+</li>
+<li><p><strong>Key Material Handling</strong></p>
+<ul>
+<li>Zeroize unsealed keys immediately after use</li>
+<li>Minimize time key is unsealed</li>
+<li>Use session caching sparingly</li>
+</ul>
+</li>
+<li><p><strong>Backup Strategy</strong></p>
+<ul>
+<li>Encrypt sealed data backup</li>
+<li>Store backup off-system</li>
+<li>Test recovery procedures</li>
+</ul>
+</li>
+<li><p><strong>PCR Management</strong></p>
+<ul>
+<li>Document expected PCR values</li>
+<li>Test unsealing before BIOS updates</li>
+<li>Have recovery procedure for PCR changes</li>
+</ul>
+</li>
+</ol>
+<h2>Testing Strategy</h2>
+<h3>Unit Tests</h3>
+<ul>
+<li>TPM context initialization</li>
+<li>Key sealing/unsealing</li>
+<li>PCR binding</li>
+<li>Error handling</li>
+</ul>
+<h3>Integration Tests</h3>
+<ul>
+<li>End-to-end signing flow</li>
+<li>Persistence across restarts</li>
+<li>Multiple identity management</li>
+<li>Session caching</li>
+</ul>
+<h3>System Tests</h3>
+<ul>
+<li>Real TPM hardware testing</li>
+<li>Performance benchmarks</li>
+<li>Fault injection</li>
+<li>Security testing</li>
+</ul>
+<h3>CI/CD</h3>
+<ul>
+<li>Use swtpm in CI for automated testing</li>
+<li>Manual hardware testing on release</li>
+<li>Security scanning (fuzzing, static analysis)</li>
+</ul>
+<h2>Success Criteria</h2>
+<ol>
+<li><p><strong>Functionality</strong></p>
+<ul>
+<li>✅ Keys sealed to TPM 2.0 hardware</li>
+<li>✅ PCR binding for platform integrity</li>
+<li>✅ Signing operations work correctly</li>
+<li>✅ Attestation generation</li>
+</ul>
+</li>
+<li><p><strong>Performance</strong></p>
+<ul>
+<li>✅ Seal operation &lt; 1 second</li>
+<li>✅ Unseal operation &lt; 1 second</li>
+<li>✅ Sign operation &lt; 100ms (after unseal)</li>
+<li>✅ Session caching reduces unseal overhead</li>
+</ul>
+</li>
+<li><p><strong>Security</strong></p>
+<ul>
+<li>✅ Keys never in cleartext on disk</li>
+<li>✅ PCR mismatch prevents unsealing</li>
+<li>✅ Zeroization of unsealed keys</li>
+<li>✅ Constant-time operations</li>
+</ul>
+</li>
+<li><p><strong>Reliability</strong></p>
+<ul>
+<li>✅ Graceful handling of TPM failures</li>
+<li>✅ Recovery from sealed data corruption</li>
+<li>✅ Migration support for hardware changes</li>
+<li>✅ Comprehensive error messages</li>
+</ul>
+</li>
+<li><p><strong>Usability</strong></p>
+<ul>
+<li>✅ Clear documentation</li>
+<li>✅ Simple configuration</li>
+<li>✅ Good error messages</li>
+<li>✅ Example code</li>
+</ul>
+</li>
+</ol>
+<h2>Timeline Estimate</h2>
+<ul>
+<li>Phase 1: Core Sealing/Unsealing - 2 weeks</li>
+<li>Phase 2: TpmDidSigner - 1 week</li>
+<li>Phase 3: Backend Integration - 1 week</li>
+<li>Phase 4: Attestation - 1 week</li>
+<li>Phase 5: Production Hardening - 2 weeks</li>
+<li>Phase 6: Documentation - 1 week</li>
+</ul>
+<p><strong>Total: ~8 weeks</strong> (with one developer)</p>
+<h2>Current Status</h2>
+<p><strong>Phase 0: Scaffolding</strong> ✅ Complete</p>
+<ul>
+<li>DidSigner trait defined</li>
+<li>DidKey enum defined</li>
+<li>TpmBackend placeholder exists</li>
+<li>Feature flag <code>tpm-experimental</code> in place</li>
+</ul>
+<p><strong>Next: Phase A (Prerequisite)</strong> 🔄 In Progress</p>
+<ul>
+<li>Refactor IdentityBundle to use DidKey</li>
+<li>Remove embedded KeyPair from IdentityBundle</li>
+<li>Enable hardware backend support</li>
+</ul>
+<p><strong>Next: Phase 1</strong> ⏳ Not Started</p>
+<ul>
+<li>Implement real TPM sealing/unsealing</li>
+<li>Depends on Phase A completion</li>
+</ul>
+<h2>Open Questions</h2>
+<ol>
+<li><p><strong>PCR Selection:</strong> Which PCRs should we bind to by default?</p>
+<ul>
+<li>Recommendation: PCR 0 (firmware) + PCR 7 (secure boot)</li>
+</ul>
+</li>
+<li><p><strong>Session Management:</strong> How long should we cache unsealed keys?</p>
+<ul>
+<li>Recommendation: 5 minutes default, configurable</li>
+</ul>
+</li>
+<li><p><strong>Backup Strategy:</strong> How should users backup TPM-sealed keys?</p>
+<ul>
+<li>Recommendation: Encrypted backup with recovery passphrase</li>
+</ul>
+</li>
+<li><p><strong>Migration:</strong> How to migrate between TPM hardware?</p>
+<ul>
+<li>Recommendation: Export/import with intermediate encryption</li>
+</ul>
+</li>
+<li><p><strong>Attestation:</strong> Should attestation be required for network handshake?</p>
+<ul>
+<li>Recommendation: Optional, policy-driven</li>
+</ul>
+</li>
+</ol>
+<h2>References</h2>
+<ul>
+<li><a href="https://trustedcomputinggroup.org/resource/tpm-library-specification/" target="_blank" rel="noopener">TPM 2.0 Specification</a></li>
+<li><a href="https://docs.rs/tss-esapi/latest/tss_esapi/" target="_blank" rel="noopener">tss-esapi Documentation</a></li>
+<li><a href="https://github.com/tpm2-software/tpm2-tss" target="_blank" rel="noopener">TCG TPM2 Software Stack</a></li>
+<li><a href="https://github.com/tpm2-software/tpm2-tools" target="_blank" rel="noopener">Intel TPM2 Tools</a></li>
+<li><a href="https://github.com/stefanberger/swtpm" target="_blank" rel="noopener">swtpm Software TPM</a></li>
+</ul>
+<h2>Pathway from Current Scaffolding</h2>
+<p>The current TPM scaffolding (marked <code>tpm-experimental</code>) provides:</p>
+<ol>
+<li>Backend trait abstraction ✅</li>
+<li>Basic structure (TpmBackend, TpmSigningBackend) ✅</li>
+<li>Placeholder implementations (all bail!) ✅</li>
+<li>Feature flag isolation ✅</li>
+</ol>
+<p><strong>To reach Phase 1, we need:</strong></p>
+<ol>
+<li>IdentityBundle refactor (Phase A) - <strong>In Progress</strong></li>
+<li>Replace placeholder sealing with real tss-esapi calls</li>
+<li>Implement PCR binding logic</li>
+<li>Add persistent storage for sealed data</li>
+<li>Handle TPM initialization errors gracefully</li>
+</ol>
+<p><strong>This document serves as the roadmap from scaffolding to production.</strong></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

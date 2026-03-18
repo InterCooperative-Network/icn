@@ -1,0 +1,373 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Security Testing Guide | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>security</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>SECURITY TESTING GUIDE</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/security/SECURITY_TESTING_GUIDE.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Security Testing Guide</h1>
+<p>This guide explains how to test the security fixes implemented on December 18, 2025.</p>
+<h2>Overview</h2>
+<p>Three critical security vulnerabilities were fixed:</p>
+<ol>
+<li><strong>Client Certificate Verification</strong> - Server now requires client certs</li>
+<li><strong>DID-TLS Binding Verification</strong> - Hello messages verify binding_info</li>
+<li><strong>Scope Allowlist</strong> - Gateway tokens limited to predefined scopes</li>
+</ol>
+<h2>Quick Test Summary</h2>
+<h3>✅ Unit Tests (Fast, Reliable)</h3>
+<p>All unit tests pass successfully:</p>
+<pre><code class="language-bash"># Test scope validation (gateway)
+cd icn &amp;&amp; cargo test -p icn-gateway --test scope_validation_integration
+# Result: 11 passed ✅
+
+# Test TLS configuration (networking)
+cd icn &amp;&amp; cargo test -p icn-net --lib test_create
+# Result: 2 passed ✅
+
+# Test validation module  
+cd icn &amp;&amp; cargo test -p icn-gateway --lib validation::tests
+# Result: All passed ✅
+</code></pre>
+<h3>⚠️ Integration Tests (Slower, Network-Dependent)</h3>
+<p>Integration tests exercise real network connections. Some may fail due to timing/port conflicts:</p>
+<pre><code class="language-bash"># Client cert verification tests (may have timing issues)
+cd icn &amp;&amp; cargo test -p icn-net --test client_cert_verification_integration
+
+# Existing trust-gated TLS tests
+cd icn &amp;&amp; cargo test -p icn-net --test trust_gated_tls_integration --ignored
+
+# DID-TLS binding tests
+cd icn &amp;&amp; cargo test -p icn-net --test did_tls_binding_integration
+</code></pre>
+<h2>Detailed Testing Instructions</h2>
+<h3>1. Scope Allowlist Validation</h3>
+<p><strong>What it tests:</strong> Gateway cannot issue tokens with arbitrary scopes</p>
+<p><strong>Tests:</strong></p>
+<ul>
+<li>✅ Valid scopes (<code>ledger:read</code>, <code>coop:write</code>, etc.) are accepted</li>
+<li>✅ Invalid scopes (<code>admin</code>, <code>root</code>, <code>*</code>) are rejected</li>
+<li>✅ Injection attempts (<code>ledger:read; admin</code>) are blocked</li>
+<li>✅ Wildcards (<code>*:read</code>, <code>ledger:*</code>) are denied</li>
+<li>✅ Case sensitivity enforced (<code>LEDGER:READ</code> != <code>ledger:read</code>)</li>
+<li>✅ Scope count limits enforced (max 20)</li>
+</ul>
+<p><strong>Run tests:</strong></p>
+<pre><code class="language-bash">cd icn
+cargo test -p icn-gateway --test scope_validation_integration --no-fail-fast
+</code></pre>
+<p><strong>Expected output:</strong></p>
+<pre><code>running 11 tests
+test test_all_allowed_scopes_are_valid ... ok
+test test_case_sensitive_scope_validation ... ok
+test test_duplicate_scopes ... ok
+test test_empty_scopes_list ... ok
+test test_scope_allowlist_prevents_privilege_escalation ... ok
+test test_scope_allowlist_validation ... ok
+test test_scope_count_limit ... ok
+test test_scope_injection_attempts ... ok
+test test_scope_namespace_boundaries ... ok
+test test_scope_validation_error_messages ... ok
+test test_wildcard_scope_rejection ... ok
+
+test result: ok. 11 passed
+</code></pre>
+<h3>2. Client Certificate Verification</h3>
+<p><strong>What it tests:</strong> Server requires and validates client certificates</p>
+<p><strong>Scenarios:</strong></p>
+<ol>
+<li><strong>Trusted peer</strong> - Peer with sufficient trust score connects successfully</li>
+<li><strong>Untrusted peer</strong> - Peer with insufficient trust is rejected at TLS handshake</li>
+<li><strong>Dev mode</strong> - Server without trust graph logs warning but allows connections</li>
+</ol>
+<p><strong>Manual testing:</strong></p>
+<pre><code class="language-bash"># Start node A with trust graph (production mode)
+cargo run --bin icnd -- --port 5000 --enable-trust-gating --min-trust 0.1
+
+# Start node B (will attempt to connect to A)
+cargo run --bin icnd -- --port 5001
+
+# Check logs for:
+# - &quot;Client certificate verified&quot; (if trusted)
+# - &quot;Client connection rejected: insufficient trust&quot; (if untrusted)
+# - &quot;Starting session manager WITHOUT client certificate verification&quot; (dev mode warning)
+</code></pre>
+<h3>3. DID-TLS Binding Verification</h3>
+<p><strong>What it tests:</strong> Hello messages verify binding_info matches peer certificate</p>
+<p><strong>Key test:</strong> <code>test_did_tls_binding_verified_on_hello</code></p>
+<p>This test creates two nodes with valid bindings and verifies:</p>
+<ul>
+<li>TLS handshake succeeds</li>
+<li>Hello message is sent with binding_info</li>
+<li>Binding verification passes (checks binding_info.tls_cert_hash matches peer cert)</li>
+<li>Connection is established</li>
+</ul>
+<p><strong>Run test:</strong></p>
+<pre><code class="language-bash">cd icn
+cargo test -p icn-net test_did_tls_binding_verified_on_hello --no-fail-fast
+</code></pre>
+<h2>Manual End-to-End Testing</h2>
+<h3>Scenario 1: Trusted Peers Communicate</h3>
+<pre><code class="language-bash"># Terminal 1: Start Alice with trust graph
+cd icn
+cargo run --bin icnd -- \
+  --port 5000 \
+  --data-dir /tmp/alice \
+  --enable-trust-gating \
+  --min-trust 0.1
+
+# Terminal 2: Add trust edge (Alice trusts Bob)
+cargo run --bin icnctl -- trust add &lt;bob-did&gt; 0.8
+
+# Terminal 3: Start Bob
+cargo run --bin icnd -- \
+  --port 5001 \
+  --data-dir /tmp/bob
+
+# Terminal 4: Bob dials Alice
+cargo run --bin icnctl -- --port 5001 dial 127.0.0.1:5000
+
+# Expected: Connection succeeds, messages exchanged
+</code></pre>
+<h3>Scenario 2: Untrusted Peer Rejected</h3>
+<pre><code class="language-bash"># Terminal 1: Start Alice with strict trust threshold
+cargo run --bin icnd -- \
+  --port 5000 \
+  --data-dir /tmp/alice \
+  --enable-trust-gating \
+  --min-trust 0.5
+
+# Terminal 2: Start Mallory (unknown peer)
+cargo run --bin icnd -- \
+  --port 5002 \
+  --data-dir /tmp/mallory
+
+# Terminal 3: Mallory attempts to dial Alice
+cargo run --bin icnctl -- --port 5002 dial 127.0.0.1:5000
+
+# Expected: Connection REJECTED with TLS handshake error
+# Alice logs: &quot;Client connection rejected: insufficient trust score&quot;
+</code></pre>
+<h3>Scenario 3: Gateway Scope Validation</h3>
+<pre><code class="language-bash"># Start gateway
+cargo run --bin icnd -- --enable-gateway --gateway-port 8080
+
+# Request auth challenge
+curl -X POST http://localhost:8080/v1/auth/challenge \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{&quot;did&quot;: &quot;&lt;your-did&gt;&quot;, &quot;coop_id&quot;: &quot;test_coop&quot;}&#39;
+
+# Try to request invalid scopes
+curl -X POST http://localhost:8080/v1/auth/verify \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+    &quot;did&quot;: &quot;&lt;your-did&gt;&quot;,
+    &quot;signature&quot;: &quot;&lt;signature&gt;&quot;,
+    &quot;coop_id&quot;: &quot;test_coop&quot;,
+    &quot;scopes&quot;: [&quot;admin&quot;, &quot;root&quot;]
+  }&#39;
+
+# Expected: 400 Bad Request - &quot;Invalid scope: &#39;admin&#39;&quot;
+
+# Request valid scopes
+curl -X POST http://localhost:8080/v1/auth/verify \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+    &quot;did&quot;: &quot;&lt;your-did&gt;&quot;,
+    &quot;signature&quot;: &quot;&lt;signature&gt;&quot;,
+    &quot;coop_id&quot;: &quot;test_coop&quot;,
+    &quot;scopes&quot;: [&quot;ledger:read&quot;, &quot;coop:write&quot;]
+  }&#39;
+
+# Expected: 200 OK with JWT token (if signature valid)
+</code></pre>
+<h2>Verification Checklist</h2>
+<p>Use this checklist to verify all security fixes are working:</p>
+<h3>Scope Allowlist</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Valid scopes accepted</li>
+<li><input disabled="" type="checkbox"> Invalid scopes rejected  </li>
+<li><input disabled="" type="checkbox"> Privilege escalation attempts blocked</li>
+<li><input disabled="" type="checkbox"> Wildcard patterns denied</li>
+<li><input disabled="" type="checkbox"> Scope count limits enforced</li>
+</ul>
+<h3>Client Certificate Verification</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Server requires client certificates when trust_graph provided</li>
+<li><input disabled="" type="checkbox"> Trusted peers connect successfully</li>
+<li><input disabled="" type="checkbox"> Untrusted peers rejected at TLS handshake</li>
+<li><input disabled="" type="checkbox"> Dev mode (no trust_graph) logs warning</li>
+<li><input disabled="" type="checkbox"> Trust thresholds enforced correctly</li>
+</ul>
+<h3>DID-TLS Binding</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Hello messages include binding_info</li>
+<li><input disabled="" type="checkbox"> Binding verification called for all Hello messages</li>
+<li><input disabled="" type="checkbox"> Invalid bindings rejected</li>
+<li><input disabled="" type="checkbox"> Valid bindings accepted</li>
+<li><input disabled="" type="checkbox"> Connection fails if cert doesn&#39;t match binding</li>
+</ul>
+<h2>Troubleshooting</h2>
+<h3>Integration Tests Failing</h3>
+<p>Integration tests may fail due to:</p>
+<ul>
+<li><strong>Port conflicts</strong>: Another process using test ports (24000-25400)</li>
+<li><strong>Timing issues</strong>: Network operations take longer than test timeouts</li>
+<li><strong>Resource exhaustion</strong>: Too many simultaneous QUIC connections</li>
+</ul>
+<p><strong>Solutions:</strong></p>
+<pre><code class="language-bash"># Run tests sequentially
+cargo test -p icn-net -- --test-threads=1
+
+# Increase test timeout (in test code)
+tokio::time::sleep(Duration::from_secs(5)).await;
+
+# Check for port usage
+ss -tulpn | grep -E &quot;24[0-9]{3}|25[0-9]{3}&quot;
+</code></pre>
+<h3>TLS Handshake Failures</h3>
+<p>If seeing &quot;TLS handshake failed&quot; errors:</p>
+<ol>
+<li>Verify rustls crypto provider installed: <code>rustls::crypto::aws_lc_rs::default_provider().install_default()</code></li>
+<li>Check trust graph has entries for peers</li>
+<li>Verify min_trust_threshold is appropriate</li>
+<li>Enable debug logging: <code>RUST_LOG=debug</code></li>
+</ol>
+<h3>Scope Validation Not Working</h3>
+<p>If invalid scopes are being accepted:</p>
+<ol>
+<li>Verify gateway is built with latest code: <code>cargo build --release</code></li>
+<li>Check validation is called before token issuance</li>
+<li>Inspect logs for validation errors</li>
+<li>Confirm <code>ALLOWED_SCOPES</code> constant is being used</li>
+</ol>
+<h2>Performance Impact</h2>
+<p>Security fixes have minimal performance impact:</p>
+<ul>
+<li><strong>Client cert verification</strong>: +5-10ms per TLS handshake (one-time)</li>
+<li><strong>Binding verification</strong>: +1-2ms per Hello message (one-time)</li>
+<li><strong>Scope validation</strong>: &lt;1ms per auth request</li>
+</ul>
+<h2>Production Deployment</h2>
+<p>Before deploying to production:</p>
+<ol>
+<li><p><strong>Enable trust gating</strong>:</p>
+<pre><code class="language-rust">session_manager.start(
+    &amp;keypair,
+    listen_addr,
+    Some(trust_graph),      // REQUIRED
+    Some(0.1),               // Minimum trust threshold
+    stun_servers,
+    turn_config,
+).await?;
+</code></pre>
+</li>
+<li><p><strong>Verify client cert verification is active</strong>:</p>
+<ul>
+<li>Look for log: &quot;Client certificate verified&quot;</li>
+<li>Should NOT see: &quot;Starting session manager WITHOUT client certificate verification&quot;</li>
+</ul>
+</li>
+<li><p><strong>Test gateway scope validation</strong>:</p>
+<ul>
+<li>Attempt to request invalid scope</li>
+<li>Verify 400 Bad Request response</li>
+</ul>
+</li>
+<li><p><strong>Monitor metrics</strong>:</p>
+<ul>
+<li><code>icn_network_connections_rejected_untrusted_total</code> - Should increment for untrusted peers</li>
+<li><code>icn_gateway_auth_failures_total{reason=&quot;invalid_scopes&quot;}</code> - Should increment for invalid scopes</li>
+</ul>
+</li>
+</ol>
+<h2>Continuous Testing</h2>
+<p>Add these tests to CI/CD:</p>
+<pre><code class="language-yaml">- name: Security unit tests
+  run: |
+    cargo test -p icn-gateway --test scope_validation_integration
+    cargo test -p icn-net --lib test_create
+    cargo test -p icn-gateway --lib validation::tests
+
+- name: Build release
+  run: cargo build --release
+
+- name: Verify no insecure configurations
+  run: |
+    ! grep -r &quot;with_no_client_auth&quot; crates/icn-net/src/session.rs || echo &quot;WARNING: Dev mode detected&quot;
+</code></pre>
+<h2>Related Documentation</h2>
+<ul>
+<li><code>SECURITY_FIXES_2025-12-18.md</code> - Detailed fix descriptions</li>
+<li><code>docs/ARCHITECTURE.md</code> - Overall system architecture</li>
+<li><code>docs/security/production-hardening.md</code> - Production security guide</li>
+<li><code>icn/crates/icn-net/src/tls.rs</code> - TLS implementation</li>
+<li><code>icn/crates/icn-gateway/src/validation.rs</code> - Scope validation</li>
+</ul>
+<h2>Support</h2>
+<p>If tests fail unexpectedly or security issues are found:</p>
+<ol>
+<li>Check this guide&#39;s troubleshooting section</li>
+<li>Review the security fixes document</li>
+<li>Enable debug logging: <code>RUST_LOG=debug cargo test</code></li>
+<li>File an issue with logs and reproduction steps</li>
+</ol>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

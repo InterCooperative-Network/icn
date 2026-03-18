@@ -1,0 +1,479 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Version Upgrade Guide | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>migration guides</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>version upgrades</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/migration-guides/version-upgrades.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Version Upgrade Guide</h1>
+<p>This guide covers upgrading ICN between major, minor, and patch versions.</p>
+<h2>Versioning Scheme</h2>
+<p>ICN follows <a href="https://semver.org/" target="_blank" rel="noopener">Semantic Versioning</a>:</p>
+<ul>
+<li><strong>MAJOR.MINOR.PATCH</strong> (e.g., 0.2.1)</li>
+<li><strong>MAJOR</strong>: Breaking changes (incompatible API changes)</li>
+<li><strong>MINOR</strong>: New features (backward-compatible)</li>
+<li><strong>PATCH</strong>: Bug fixes (backward-compatible)</li>
+</ul>
+<hr>
+<h2>Pre-Upgrade Checklist</h2>
+<p>Before upgrading <strong>any</strong> version:</p>
+<ul>
+<li><p><input disabled="" type="checkbox"> <strong>Backup your data directory</strong>:</p>
+<pre><code class="language-bash">icnctl backup ~/icn-backup-$(date +%Y%m%d).tar.gz.age
+</code></pre>
+</li>
+<li><p><input disabled="" type="checkbox"> <strong>Read the CHANGELOG</strong>: Check <a href="https://github.com/InterCooperative-Network/icn/blob/main/CHANGELOG">CHANGELOG.md</a> for breaking changes</p>
+</li>
+<li><p><input disabled="" type="checkbox"> <strong>Check system requirements</strong>: Ensure your system meets new requirements</p>
+</li>
+<li><p><input disabled="" type="checkbox"> <strong>Plan maintenance window</strong>: Schedule downtime for node restart</p>
+</li>
+<li><p><input disabled="" type="checkbox"> <strong>Notify cooperative members</strong>: Let them know about upcoming downtime</p>
+</li>
+<li><p><input disabled="" type="checkbox"> <strong>Test on non-production node</strong> (if you have one)</p>
+</li>
+</ul>
+<hr>
+<h2>Upgrade Methods</h2>
+<h3>Method 1: Package Manager (Recommended)</h3>
+<p><strong>If you installed via the installer script:</strong></p>
+<pre><code class="language-bash"># Download and run upgrade script
+curl -fsSL https://raw.githubusercontent.com/InterCooperative-Network/icn/main/scripts/upgrade.sh | bash
+</code></pre>
+<p>This will:</p>
+<ol>
+<li>Download latest binaries</li>
+<li>Stop icnd gracefully</li>
+<li>Replace binaries</li>
+<li>Restart icnd</li>
+<li>Verify successful start</li>
+</ol>
+<h3>Method 2: Build from Source</h3>
+<p><strong>For development or custom builds:</strong></p>
+<pre><code class="language-bash"># 1. Backup
+icnctl backup ~/icn-backup.tar.gz.age
+
+# 2. Stop daemon
+sudo systemctl stop icnd
+
+# 3. Pull latest code
+cd /path/to/icn
+git fetch origin
+git checkout v0.2.0  # Replace with desired version
+
+# 4. Build
+cd icn
+cargo build --release
+
+# 5. Install binaries
+sudo cp target/release/{icnd,icnctl} /usr/local/bin/
+
+# 6. Start daemon
+sudo systemctl start icnd
+
+# 7. Verify
+icnctl --version
+icnctl status
+</code></pre>
+<h3>Method 3: Docker</h3>
+<pre><code class="language-bash"># Pull latest image
+docker pull icn/icnd:latest
+
+# Restart container (preserves volume data)
+docker-compose down
+docker-compose up -d
+
+# Verify
+docker exec icn-node icnctl status
+</code></pre>
+<hr>
+<h2>Version-Specific Upgrade Notes</h2>
+<h3>v0.1.x → v0.2.x (Hypothetical)</h3>
+<p><strong>Breaking Changes:</strong></p>
+<ul>
+<li>Protocol version bump (requires all nodes to upgrade)</li>
+<li>RPC API changes (update client applications)</li>
+</ul>
+<p><strong>Migration Steps:</strong></p>
+<ol>
+<li>Backup data directory</li>
+<li>Stop icnd</li>
+<li>Upgrade binaries</li>
+<li>Run migration tool (if provided):<pre><code class="language-bash">icnctl migrate v0.2
+</code></pre>
+</li>
+<li>Start icnd</li>
+<li>Verify peers reconnect</li>
+</ol>
+<p><strong>Rollback Plan:</strong>
+If upgrade fails:</p>
+<ol>
+<li>Stop icnd</li>
+<li>Restore from backup:<pre><code class="language-bash">icnctl restore ~/icn-backup.tar.gz.age --force
+</code></pre>
+</li>
+<li>Downgrade binaries to v0.1.x</li>
+<li>Restart icnd</li>
+</ol>
+<hr>
+<h2>Upgrade Scenarios</h2>
+<h3>Patch Upgrade (e.g., 0.1.0 → 0.1.1)</h3>
+<p><strong>Risk</strong>: Low
+<strong>Downtime</strong>: ~30 seconds
+<strong>Rollback</strong>: Easy</p>
+<pre><code class="language-bash"># 1. Backup (quick)
+icnctl backup ~/icn-backup.tar.gz.age
+
+# 2. Upgrade
+sudo systemctl stop icnd
+sudo cp /path/to/new/icnd /usr/local/bin/icnd
+sudo systemctl start icnd
+
+# 3. Verify
+icnctl --version
+journalctl -u icnd -f
+</code></pre>
+<p><strong>Rollback</strong>:</p>
+<pre><code class="language-bash">sudo systemctl stop icnd
+sudo cp /path/to/old/icnd /usr/local/bin/icnd
+sudo systemctl start icnd
+</code></pre>
+<h3>Minor Upgrade (e.g., 0.1.0 → 0.2.0)</h3>
+<p><strong>Risk</strong>: Low-Medium
+<strong>Downtime</strong>: ~1-2 minutes
+<strong>Rollback</strong>: Moderate (may require data migration)</p>
+<pre><code class="language-bash"># 1. Backup
+icnctl backup ~/icn-backup.tar.gz.age
+
+# 2. Review CHANGELOG for breaking changes
+cat CHANGELOG.md | grep -A 20 &quot;## [0.2.0]&quot;
+
+# 3. Stop daemon
+sudo systemctl stop icnd
+
+# 4. Upgrade binaries
+sudo cp /path/to/new/{icnd,icnctl} /usr/local/bin/
+
+# 5. Run migration (if required)
+icnctl migrate v0.2
+
+# 6. Start daemon
+sudo systemctl start icnd
+
+# 7. Verify
+icnctl status
+icnctl network peers  # Check peer connectivity
+icnctl ledger balance  # Check data integrity
+</code></pre>
+<h3>Major Upgrade (e.g., 0.x.x → 1.0.0)</h3>
+<p><strong>Risk</strong>: High
+<strong>Downtime</strong>: 5-15 minutes
+<strong>Rollback</strong>: Difficult (coordinate with network)</p>
+<p><strong>Requires coordination</strong>: All nodes in cooperative must upgrade together.</p>
+<pre><code class="language-bash"># 1. Coordinate with cooperative
+# - Set upgrade date/time
+# - Ensure all members are ready
+
+# 2. Comprehensive backup
+icnctl backup ~/icn-backup-major-upgrade.tar.gz.age
+# Copy backup off-site!
+
+# 3. Review upgrade guide
+# Check docs/migration-guides/ for version-specific instructions
+
+# 4. Stop daemon
+sudo systemctl stop icnd
+
+# 5. Upgrade binaries
+sudo cp /path/to/new/{icnd,icnctl} /usr/local/bin/
+
+# 6. Run migration tool
+icnctl migrate v1.0 --verify
+
+# 7. Start daemon
+sudo systemctl start icnd
+
+# 8. Extensive verification
+icnctl status
+icnctl network peers
+icnctl ledger balance
+icnctl trust list
+icnctl gov domain list
+
+# 9. Monitor for 24 hours
+journalctl -u icnd -f
+</code></pre>
+<hr>
+<h2>Post-Upgrade Verification</h2>
+<p>After any upgrade, verify:</p>
+<h3>1. Daemon Status</h3>
+<pre><code class="language-bash">icnctl status
+# Expected: Daemon running, no errors
+</code></pre>
+<h3>2. Network Connectivity</h3>
+<pre><code class="language-bash">icnctl network peers
+# Expected: Peers reconnected within 30 seconds
+</code></pre>
+<h3>3. Data Integrity</h3>
+<pre><code class="language-bash">icnctl id show           # DID unchanged
+icnctl ledger balance    # Balance correct
+icnctl trust list        # Trust relationships intact
+icnctl gov domain list   # Governance domains present
+</code></pre>
+<h3>4. Logs</h3>
+<pre><code class="language-bash">journalctl -u icnd -f
+# Expected: No errors, normal operation
+</code></pre>
+<h3>5. Metrics</h3>
+<pre><code class="language-bash">curl http://localhost:9100/metrics | grep icn_network_connections_active
+# Expected: &gt; 0 connections
+</code></pre>
+<hr>
+<h2>Rollback Procedures</h2>
+<h3>Simple Rollback (Patch/Minor)</h3>
+<p>If new version has issues:</p>
+<pre><code class="language-bash"># 1. Stop new version
+sudo systemctl stop icnd
+
+# 2. Restore old binaries
+sudo cp ~/icn-old-binaries/icnd /usr/local/bin/icnd
+
+# 3. Restore data (if needed)
+icnctl restore ~/icn-backup.tar.gz.age
+
+# 4. Start old version
+sudo systemctl start icnd
+
+# 5. Verify
+icnctl status
+</code></pre>
+<h3>Complex Rollback (Major)</h3>
+<p><strong>Requires network coordination</strong>:</p>
+<ol>
+<li>Stop all nodes</li>
+<li>Restore from backups taken before upgrade</li>
+<li>Downgrade binaries on all nodes</li>
+<li>Restart all nodes simultaneously</li>
+<li>Verify network converges</li>
+</ol>
+<p><strong>Prevention</strong>: Test major upgrades on staging network first!</p>
+<hr>
+<h2>Multi-Node Cooperative Upgrades</h2>
+<h3>Strategy 1: Rolling Upgrade (Minor versions)</h3>
+<p>Upgrade nodes one at a time:</p>
+<ol>
+<li><p><strong>Upgrade Node 1</strong>:</p>
+<ul>
+<li>Backup, stop, upgrade, start</li>
+<li>Verify peers reconnect</li>
+<li>Wait 5 minutes</li>
+</ul>
+</li>
+<li><p><strong>Upgrade Node 2</strong>:</p>
+<ul>
+<li>Same process</li>
+<li>Wait 5 minutes</li>
+</ul>
+</li>
+<li><p><strong>Continue</strong> until all nodes upgraded</p>
+</li>
+</ol>
+<p><strong>Benefit</strong>: Zero downtime for cooperative
+<strong>Requirement</strong>: Backward-compatible protocol</p>
+<h3>Strategy 2: Coordinated Upgrade (Major versions)</h3>
+<p>All nodes upgrade simultaneously:</p>
+<ol>
+<li><p><strong>Pre-coordination</strong>:</p>
+<ul>
+<li>Set upgrade window (e.g., &quot;Saturday 2 AM&quot;)</li>
+<li>All operators ready</li>
+<li>Backups taken</li>
+</ul>
+</li>
+<li><p><strong>Upgrade</strong>:</p>
+<ul>
+<li>Stop all nodes at same time</li>
+<li>Upgrade binaries</li>
+<li>Start all nodes at same time</li>
+</ul>
+</li>
+<li><p><strong>Verification</strong>:</p>
+<ul>
+<li>Nodes discover each other</li>
+<li>Gossip converges</li>
+<li>Ledger syncs</li>
+</ul>
+</li>
+</ol>
+<p><strong>Benefit</strong>: Clean protocol version bump
+<strong>Downside</strong>: Requires downtime</p>
+<hr>
+<h2>Automated Upgrades</h2>
+<p><strong>NOT RECOMMENDED</strong> for production cooperatives.</p>
+<p>If you must automate:</p>
+<pre><code class="language-bash">#!/bin/bash
+# /usr/local/bin/icn-auto-upgrade.sh
+
+# Backup
+icnctl backup /var/backups/icn/backup-$(date +%Y%m%d-%H%M%S).tar.gz.age
+
+# Download latest
+wget https://releases.icn.coop/latest/icnd -O /tmp/icnd.new
+wget https://releases.icn.coop/latest/icnctl -O /tmp/icnctl.new
+
+# Verify checksums
+sha256sum -c /tmp/icn-checksums.txt || exit 1
+
+# Stop daemon
+systemctl stop icnd
+
+# Upgrade
+cp /tmp/icnd.new /usr/local/bin/icnd
+cp /tmp/icnctl.new /usr/local/bin/icnctl
+chmod +x /usr/local/bin/{icnd,icnctl}
+
+# Start daemon
+systemctl start icnd
+
+# Verify
+icnctl status || {
+    # Rollback on failure
+    systemctl stop icnd
+    cp /usr/local/bin/icnd.backup /usr/local/bin/icnd
+    systemctl start icnd
+}
+</code></pre>
+<p><strong>Better</strong>: Use monitoring and alerts, upgrade manually.</p>
+<hr>
+<h2>Troubleshooting</h2>
+<h3>&quot;Version mismatch&quot; errors</h3>
+<p><strong>Symptom</strong>: Peers disconnect after upgrade</p>
+<p><strong>Cause</strong>: Incompatible protocol versions</p>
+<p><strong>Solution</strong>:</p>
+<ol>
+<li>Check all nodes upgraded to same version</li>
+<li>Verify protocol version: <code>icnctl network status</code></li>
+<li>Coordinate upgrade if nodes out of sync</li>
+</ol>
+<h3>&quot;Migration failed&quot;</h3>
+<p><strong>Symptom</strong>: Migration tool exits with error</p>
+<p><strong>Cause</strong>: Corrupted data or incompatible format</p>
+<p><strong>Solution</strong>:</p>
+<ol>
+<li>Restore from backup</li>
+<li>Review migration logs: <code>journalctl -u icnd -b</code></li>
+<li>Report bug with logs if persistent</li>
+</ol>
+<h3>&quot;Daemon won&#39;t start after upgrade&quot;</h3>
+<p><strong>Symptom</strong>: icnd crashes on startup</p>
+<p><strong>Causes</strong>:</p>
+<ul>
+<li>Incompatible data format</li>
+<li>Missing migration step</li>
+<li>Corrupted state</li>
+</ul>
+<p><strong>Solution</strong>:</p>
+<ol>
+<li>Check logs: <code>journalctl -u icnd -xe</code></li>
+<li>Try migration tool: <code>icnctl migrate v0.2</code></li>
+<li>If failing, restore backup and rollback</li>
+</ol>
+<h3>&quot;Ledger out of sync&quot;</h3>
+<p><strong>Symptom</strong>: Different balance on different nodes</p>
+<p><strong>Cause</strong>: Gossip not converged yet</p>
+<p><strong>Solution</strong>:</p>
+<ol>
+<li>Wait 5-10 minutes for anti-entropy</li>
+<li>Force sync: Restart daemon</li>
+<li>Check gossip metrics: <code>curl localhost:9100/metrics | grep gossip</code></li>
+</ol>
+<hr>
+<h2>Best Practices</h2>
+<ol>
+<li><strong>Always backup before upgrading</strong></li>
+<li><strong>Read CHANGELOG before major upgrades</strong></li>
+<li><strong>Test on staging environment if possible</strong></li>
+<li><strong>Schedule upgrades during low-activity periods</strong></li>
+<li><strong>Monitor logs after upgrade for 24 hours</strong></li>
+<li><strong>Keep old binaries</strong> until new version proven stable</li>
+<li><strong>Coordinate with cooperative</strong> for major upgrades</li>
+<li><strong>Document your upgrade process</strong> for your coop</li>
+</ol>
+<hr>
+<h2>Emergency Contacts</h2>
+<p>If upgrade fails and you need help:</p>
+<ol>
+<li><strong>GitHub Issues</strong>: <a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">https://github.com/InterCooperative-Network/icn/issues</a></li>
+<li><strong>Emergency rollback</strong>: Use backups (see <a href="/docs/guides/operations/backup-and-recovery">Backup & Recovery</a>)</li>
+<li><strong>Community support</strong>: Check community channels</li>
+</ol>
+<hr>
+<h2>Related Documentation</h2>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CHANGELOG">CHANGELOG.md</a> - Version history</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/keystore-versions">Keystore Migration</a> - Identity format changes</li>
+<li><a href="/docs/guides/operations/backup-and-recovery">Backup & Recovery</a> - Backup strategies</li>
+<li><a href="/docs/guides/operations/operations-guide">Operations Guide</a> - Day-to-day management</li>
+</ul>
+<hr>
+<p><em>Last Updated: 2025-11-21</em></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

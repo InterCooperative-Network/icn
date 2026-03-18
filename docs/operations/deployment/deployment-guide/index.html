@@ -1,0 +1,609 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Deployment &amp; Operations Guide | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>operations</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>deployment</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>deployment guide</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/operations/deployment/deployment-guide.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Deployment &amp; Operations Guide</h1>
+<p>A practical guide for deploying and operating ICN nodes in production environments.</p>
+<h2>Table of Contents</h2>
+<ol>
+<li><a href="#quick-start">Quick Start</a></li>
+<li><a href="#system-requirements">System Requirements</a></li>
+<li><a href="#installation">Installation</a></li>
+<li><a href="#configuration">Configuration</a></li>
+<li><a href="#running-as-a-service">Running as a Service</a></li>
+<li><a href="#monitoring">Monitoring</a></li>
+<li><a href="#backup--recovery">Backup & Recovery</a></li>
+<li><a href="#troubleshooting">Troubleshooting</a></li>
+<li><a href="#security-best-practices">Security Best Practices</a></li>
+</ol>
+<hr>
+<h2>Quick Start</h2>
+<p>For testing on a local machine:</p>
+<pre><code class="language-bash"># Build release binaries
+cd icn/
+cargo build --release
+
+# Initialize identity
+./target/release/icnctl --data-dir /var/lib/icn id init
+# Enter passphrase when prompted
+
+# Start daemon
+./target/release/icnd --data-dir /var/lib/icn
+</code></pre>
+<p>The daemon will:</p>
+<ol>
+<li>Load identity from <code>{data_dir}/identity.age</code> (for this example: <code>/var/lib/icn/identity.age</code>)</li>
+<li>Start QUIC listener on <code>0.0.0.0:7777</code> (default)</li>
+<li>Enable mDNS discovery on LAN</li>
+<li>Expose Prometheus metrics on <code>:9100/metrics</code></li>
+</ol>
+<hr>
+<h2>System Requirements</h2>
+<h3>Minimum (Development/Testing)</h3>
+<ul>
+<li><strong>CPU:</strong> 2 cores</li>
+<li><strong>RAM:</strong> 512 MB</li>
+<li><strong>Disk:</strong> 1 GB</li>
+<li><strong>Network:</strong> 1 Mbps, low-latency LAN</li>
+</ul>
+<h3>Recommended (Production)</h3>
+<ul>
+<li><strong>CPU:</strong> 4+ cores (for signature verification)</li>
+<li><strong>RAM:</strong> 2 GB (for gossip buffers, connection pools)</li>
+<li><strong>Disk:</strong> 10 GB SSD (for ledger, fast I/O)</li>
+<li><strong>Network:</strong> 10+ Mbps, public IPv4/IPv6</li>
+</ul>
+<h3>Operating System</h3>
+<ul>
+<li><strong>Linux</strong>: Ubuntu 22.04+, Debian 12+, Fedora 38+ (primary)</li>
+<li><strong>macOS</strong>: 12+ (development)</li>
+<li><strong>Windows</strong>: WSL2 (development only)</li>
+</ul>
+<hr>
+<h2>Installation</h2>
+<h3>From Source</h3>
+<pre><code class="language-bash"># Clone repository
+git clone https://github.com/your-org/icn.git
+cd icn/icn
+
+# Build release binaries
+cargo build --release
+
+# Install to /usr/local/bin (optional)
+sudo cp target/release/{icnd,icnctl} /usr/local/bin/
+</code></pre>
+<h3>Using Docker</h3>
+<pre><code class="language-dockerfile"># Dockerfile
+FROM rust:1.75 AS builder
+WORKDIR /app
+COPY icn/ ./
+RUN cargo build --release
+
+FROM debian:bookworm-slim
+RUN apt-get update &amp;&amp; apt-get install -y ca-certificates &amp;&amp; rm -rf /var/lib/apt/lists/*
+COPY --from=builder /app/target/release/icnd /usr/local/bin/
+COPY --from=builder /app/target/release/icnctl /usr/local/bin/
+
+# Data directory
+VOLUME [&quot;/data&quot;]
+EXPOSE 7777/udp 9100/tcp 8080/tcp
+ENTRYPOINT [&quot;icnd&quot;, &quot;--data-dir&quot;, &quot;/data&quot;]
+</code></pre>
+<p>Build and run:</p>
+<pre><code class="language-bash">docker build -t icnd:latest .
+docker run -d \
+  --name icnd \
+  -v icn-data:/data \
+  -p 7777:7777/udp \
+  -p 9100:9100 \
+  -p 8080:8080 \
+  icnd:latest
+</code></pre>
+<hr>
+<h2>Configuration</h2>
+<h3>Environment Variables</h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ICN_KEYSTORE_PASSPHRASE</code></td>
+<td>(none)</td>
+<td>Keystore passphrase for automated deployments (preferred)</td>
+</tr>
+<tr>
+<td><code>ICN_PASSPHRASE</code></td>
+<td>(none)</td>
+<td>Keystore passphrase (legacy, use ICN_KEYSTORE_PASSPHRASE)</td>
+</tr>
+<tr>
+<td><code>ICN_GATEWAY_JWT_SECRET</code></td>
+<td>(none)</td>
+<td>JWT secret for Gateway API authentication</td>
+</tr>
+<tr>
+<td><code>OTEL_EXPORTER_OTLP_ENDPOINT</code></td>
+<td>(none)</td>
+<td>Enable tracing export by setting OTLP endpoint</td>
+</tr>
+<tr>
+<td><code>OTEL_SERVICE_NAME</code></td>
+<td><code>icn-node</code></td>
+<td>Override OpenTelemetry service name</td>
+</tr>
+</tbody></table>
+<p>Note: <code>icnd</code> does not currently read <code>ICN_DATA_DIR</code>, <code>ICN_CONFIG</code>, <code>ICN_LISTEN_ADDR</code>, or <code>ICN_METRICS_PORT</code> directly from environment. Use <code>--data-dir</code>, <code>--config</code>, and config file fields.</p>
+<p><strong>Passphrase for Automated Deployments:</strong></p>
+<p>For systemd, Docker, or Kubernetes deployments where interactive prompts aren&#39;t available:</p>
+<pre><code class="language-bash"># Option 1: Set in environment (preferred)
+export ICN_KEYSTORE_PASSPHRASE=&quot;your-secure-passphrase&quot;
+icnd --config /etc/icn/config.toml
+
+# Option 2: Use systemd EnvironmentFile
+# /etc/icn/icn.env (chmod 600)
+ICN_KEYSTORE_PASSPHRASE=your-secure-passphrase
+
+# Option 3: Docker/K8s secrets
+docker run -e ICN_KEYSTORE_PASSPHRASE=&quot;$(cat /run/secrets/icn_passphrase)&quot; icn:latest
+</code></pre>
+<p><strong>Security Warning:</strong> Store passphrases in secrets management systems (HashiCorp Vault, K8s Secrets, AWS Secrets Manager), not plain text files.</p>
+<h3>Configuration File</h3>
+<p>ICN supports TOML configuration files. See <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/config/README">config/</a> for examples:</p>
+<pre><code class="language-toml"># /etc/icn/config.toml
+data_dir = &quot;/var/lib/icn&quot;
+
+[network]
+listen_addr = &quot;0.0.0.0:7777&quot;
+mdns_enabled = true
+bootstrap_peers = []
+
+[observability]
+metrics_port = 9100
+health_port = 8080
+log_level = &quot;info&quot;
+</code></pre>
+<h3>CLI Flags</h3>
+<pre><code class="language-bash">icnd --help
+
+# Common flags:
+icnd --config /etc/icn/config.toml
+icnd --data-dir /var/lib/icn
+icnd --log-level debug
+</code></pre>
+<hr>
+<h2>Running as a Service</h2>
+<h3>systemd (Linux)</h3>
+<p>Create <code>/etc/systemd/system/icnd.service</code>:</p>
+<pre><code class="language-ini">[Unit]
+Description=ICN Daemon
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=icn
+Group=icn
+ExecStart=/usr/local/bin/icnd --data-dir /var/lib/icn --config /etc/icn/config.toml
+Restart=on-failure
+RestartSec=5s
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/icn
+
+# Environment
+Environment=&quot;ICN_KEYSTORE_PASSPHRASE=REPLACE_ME&quot;
+Environment=&quot;RUST_LOG=icn=info&quot;
+
+# Limits
+LimitNOFILE=65536
+LimitNPROC=512
+
+[Install]
+WantedBy=multi-user.target
+</code></pre>
+<p>Setup and start:</p>
+<pre><code class="language-bash"># Create user
+sudo useradd -r -s /bin/false icn
+sudo mkdir -p /var/lib/icn
+sudo chown icn:icn /var/lib/icn
+
+# Initialize identity (as icn user)
+sudo -u icn /usr/local/bin/icnctl --data-dir /var/lib/icn id init
+
+# Enable and start service
+sudo systemctl daemon-reload
+sudo systemctl enable icnd
+sudo systemctl start icnd
+
+# Check status
+sudo systemctl status icnd
+sudo journalctl -u icnd -f
+</code></pre>
+<h3>Docker Compose</h3>
+<p>See <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/docker/README">docker/</a> for complete Docker Compose examples.</p>
+<pre><code class="language-yaml">version: &#39;3.9&#39;
+
+services:
+  icnd:
+    image: icn:latest
+    container_name: icn-alpha
+    restart: unless-stopped
+    ports:
+      - &quot;7777:7777/udp&quot;
+      - &quot;9100:9100&quot;
+      - &quot;8080:8080&quot;
+    volumes:
+      - icn-data:/data
+    command: [&quot;icnd&quot;, &quot;--data-dir&quot;, &quot;/data&quot;, &quot;--log-level&quot;, &quot;info&quot;]
+    networks:
+      - icn-net
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    ports:
+      - &quot;9091:9090&quot;
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    networks:
+      - icn-net
+
+volumes:
+  icn-data:
+  prometheus-data:
+
+networks:
+  icn-net:
+</code></pre>
+<hr>
+<h2>Monitoring</h2>
+<h3>Prometheus Configuration</h3>
+<p><code>prometheus.yml</code>:</p>
+<pre><code class="language-yaml">global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: &#39;icn&#39;
+    static_configs:
+      - targets: [&#39;icnd:9100&#39;]
+</code></pre>
+<h3>Key Metrics</h3>
+<p><strong>Network Health:</strong></p>
+<pre><code class="language-promql"># Connection rate
+rate(icn_network_connections_total[5m])
+
+# Active connections
+icn_network_connections_active
+
+# Rate limiting events (potential attack)
+rate(icn_network_messages_rate_limited_total[5m]) &gt; 10
+</code></pre>
+<p><strong>Gossip Protocol:</strong></p>
+<pre><code class="language-promql"># Message throughput
+rate(icn_gossip_announces_received_total[5m])
+rate(icn_gossip_requests_received_total[5m])
+
+# Total gossip entries
+icn_gossip_entries_total
+
+# Subscriptions
+icn_gossip_subscriptions_total
+</code></pre>
+<p><strong>Ledger:</strong></p>
+<pre><code class="language-promql"># Transaction rate
+rate(icn_ledger_transactions_total[5m])
+
+# Account count
+icn_ledger_accounts_total
+
+# Currencies in use
+icn_ledger_currencies_total
+</code></pre>
+<h3>Grafana Dashboard (Example)</h3>
+<p>Import this JSON or create panels manually:</p>
+<pre><code class="language-json">{
+  &quot;panels&quot;: [
+    {
+      &quot;title&quot;: &quot;Message Rate&quot;,
+      &quot;targets&quot;: [{
+        &quot;expr&quot;: &quot;rate(icn_network_messages_received_total[5m])&quot;
+      }]
+    },
+    {
+      &quot;title&quot;: &quot;Active Connections&quot;,
+      &quot;targets&quot;: [{
+        &quot;expr&quot;: &quot;icn_network_connections_active&quot;
+      }]
+    },
+    {
+      &quot;title&quot;: &quot;Rate Limited (Security Alert)&quot;,
+      &quot;targets&quot;: [{
+        &quot;expr&quot;: &quot;rate(icn_network_messages_rate_limited_total[5m])&quot;
+      }],
+      &quot;alert&quot;: { &quot;condition&quot;: &quot;&gt; 10&quot; }
+    }
+  ]
+}
+</code></pre>
+<h3>Log Monitoring</h3>
+<pre><code class="language-bash"># Follow logs (systemd)
+journalctl -u icnd -f
+
+# Search for errors
+journalctl -u icnd --priority=err
+
+# Security events
+journalctl -u icnd | grep -E &quot;Rate limited|Certificate verification|SECURITY&quot;
+
+# Export logs (structured JSON)
+journalctl -u icnd -o json &gt; icnd-logs.json
+</code></pre>
+<hr>
+<h2>Backup &amp; Recovery</h2>
+<h3>Identity Backup</h3>
+<p><strong>CRITICAL</strong>: The keystore contains your node&#39;s cryptographic identity. Loss = permanent identity loss.</p>
+<pre><code class="language-bash"># Backup keystore (encrypted with passphrase)
+cp /var/lib/icn/identity.age ~/backup/identity.age
+
+# Or use icnctl
+icnctl id export ~/backup/identity-backup.age
+
+# Store backup in multiple locations:
+# - Encrypted USB drive
+# - Password manager (as attachment)
+# - Offline storage (paper wallet for recovery phrase - future)
+</code></pre>
+<p><strong>Recovery:</strong></p>
+<pre><code class="language-bash"># Restore from backup
+icnctl id import ~/backup/identity-backup.age
+
+# Or copy directly
+cp ~/backup/identity.age /var/lib/icn/identity.age
+chmod 600 /var/lib/icn/identity.age
+</code></pre>
+<h3>Ledger Backup</h3>
+<p>The ledger is a Merkle-DAG synced via gossip, so data is distributed. However, local backups prevent data loss:</p>
+<pre><code class="language-bash"># Backup entire data directory
+tar czf icn-backup-$(date +%F).tar.gz /var/lib/icn/
+
+# Exclude keystore if backing up separately
+tar czf icn-ledger-backup-$(date +%F).tar.gz \
+  --exclude=&#39;identity.age&#39; \
+  /var/lib/icn/
+</code></pre>
+<p><strong>Automated backups (systemd timer):</strong></p>
+<p><code>/etc/systemd/system/icn-backup.service</code>:</p>
+<pre><code class="language-ini">[Unit]
+Description=ICN Backup
+
+[Service]
+Type=oneshot
+User=icn
+ExecStart=/usr/local/bin/icn-backup.sh
+</code></pre>
+<p><code>/etc/systemd/system/icn-backup.timer</code>:</p>
+<pre><code class="language-ini">[Unit]
+Description=ICN Backup Timer
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+</code></pre>
+<p>Enable: <code>sudo systemctl enable --now icn-backup.timer</code></p>
+<hr>
+<h2>Troubleshooting</h2>
+<h3>Node won&#39;t start</h3>
+<p><strong>Symptom:</strong> <code>icnd</code> exits immediately</p>
+<p><strong>Checklist:</strong></p>
+<ol>
+<li>Identity initialized? Run <code>icnctl id init</code></li>
+<li>Port already in use? Check with <code>sudo lsof -i :7777</code></li>
+<li>Permissions? Ensure data directory is readable/writable</li>
+<li>Logs? Check <code>journalctl -u icnd -n 50</code></li>
+</ol>
+<p><strong>Common errors:</strong></p>
+<pre><code>Error: Failed to unlock keystore
+→ Passphrase incorrect or keystore corrupted
+
+Error: Address already in use
+→ Another instance running or port conflict
+
+Error: Permission denied
+→ User lacks write access to data directory
+</code></pre>
+<h3>No peers discovered</h3>
+<p><strong>Symptom:</strong> <code>icnctl status</code> shows 0 peers</p>
+<p><strong>Checklist:</strong></p>
+<ol>
+<li>mDNS working? Check with <code>avahi-browse -a</code> (Linux) or <code>dns-sd -B</code> (macOS)</li>
+<li>Firewall blocking? Open UDP 7777</li>
+<li>Multiple networks? mDNS doesn&#39;t cross subnets</li>
+<li>Docker network mode? Use <code>host</code> mode for mDNS</li>
+</ol>
+<p><strong>Manual peer dialing:</strong></p>
+<pre><code class="language-bash">icnctl network dial did:icn:abc123... 192.168.1.100:7777
+</code></pre>
+<h3>High memory usage</h3>
+<p><strong>Symptom:</strong> <code>icnd</code> using &gt;2GB RAM</p>
+<p><strong>Potential causes:</strong></p>
+<ol>
+<li><strong>Too many gossip entries</strong>: Check <code>icn_gossip_entries_total</code> metric</li>
+<li><strong>Connection leak</strong>: Check <code>icn_network_connections_active</code></li>
+<li><strong>Message flood</strong>: Check <code>icn_network_messages_rate_limited_total</code></li>
+</ol>
+<p><strong>Actions:</strong></p>
+<ol>
+<li>Review Prometheus metrics for anomalies</li>
+<li>Check for misbehaving peers in logs</li>
+<li>Restart daemon (graceful shutdown preserves state)</li>
+</ol>
+<h3>Certificate verification errors</h3>
+<p><strong>Symptom:</strong> Connections failing with TLS errors</p>
+<p><strong>Checklist:</strong></p>
+<ol>
+<li>System clock correct? TLS checks certificate validity</li>
+<li>Certificate expired? Rotate with <code>icnctl id rotate</code></li>
+<li>DID format invalid? Check logs for format errors</li>
+</ol>
+<p><strong>Note:</strong> Trust graph integration pending - currently accepts all valid DIDs.</p>
+<hr>
+<h2>Security Best Practices</h2>
+<h3>1. Secure Keystore</h3>
+<p><strong>DO:</strong></p>
+<ul>
+<li>Use strong passphrase (20+ characters, mix of types)</li>
+<li>Store backup in encrypted location (KeePass, 1Password)</li>
+<li>Use separate passphrase from system password</li>
+<li>Restrict permissions: <code>chmod 600 /var/lib/icn/identity.age</code></li>
+</ul>
+<p><strong>DON&#39;T:</strong></p>
+<ul>
+<li>Share keystore file (contains identity)</li>
+<li>Store passphrase in plain text</li>
+<li>Use weak/common passphrases</li>
+<li>Commit keystore to version control</li>
+</ul>
+<h3>2. Network Exposure</h3>
+<p><strong>DO:</strong></p>
+<ul>
+<li>Use firewall (ufw, iptables) to limit exposure</li>
+<li>Enable rate limiting (on by default)</li>
+<li>Monitor metrics for anomalies</li>
+<li>Use VPN or WireGuard for WAN peers</li>
+</ul>
+<p><strong>DON&#39;T:</strong></p>
+<ul>
+<li>Expose metrics port (9100) publicly</li>
+<li>Disable rate limiting without good reason</li>
+<li>Run as root (use dedicated user)</li>
+</ul>
+<h3>3. Updates</h3>
+<p><strong>DO:</strong></p>
+<ul>
+<li>Subscribe to security announcements (GitHub watch)</li>
+<li>Test updates on staging before production</li>
+<li>Review changelogs for breaking changes</li>
+<li>Use versioned releases (not main branch)</li>
+</ul>
+<p><strong>DON&#39;T:</strong></p>
+<ul>
+<li>Auto-update in production without testing</li>
+<li>Skip patch releases (may contain security fixes)</li>
+<li>Run multiple versions in same network (protocol mismatch)</li>
+</ul>
+<h3>4. Monitoring</h3>
+<p><strong>DO:</strong></p>
+<ul>
+<li>Set up alerts for rate limiting spikes</li>
+<li>Monitor connection count and patterns</li>
+<li>Review logs regularly for suspicious activity</li>
+<li>Track trust graph changes</li>
+</ul>
+<p><strong>DON&#39;T:</strong></p>
+<ul>
+<li>Ignore rate limiting metrics</li>
+<li>Run without monitoring in production</li>
+<li>Expose Prometheus publicly without auth</li>
+</ul>
+<hr>
+<h2>Additional Resources</h2>
+<ul>
+<li><a href="/docs/ARCHITECTURE">Architecture Documentation</a></li>
+<li><a href="/docs/security/production-hardening">Production Hardening Details</a></li>
+<li><a href="/docs/reference/api/topic-subscriptions-api">Topic Subscriptions API</a></li>
+<li><a href="https://github.com/your-org/icn" target="_blank" rel="noopener">GitHub Repository</a></li>
+<li><a href="https://forum.intercooperative.network" target="_blank" rel="noopener">Community Forum</a> (future)</li>
+</ul>
+<hr>
+<h2>Support</h2>
+<p>For issues:</p>
+<ol>
+<li>Check this guide and architecture docs</li>
+<li>Search GitHub issues</li>
+<li>Open new issue with logs and system info</li>
+<li>Security issues: <a href="https://github.com/InterCooperative-Network/icn/blob/main/mailto:security@intercooperative.network">security@intercooperative.network</a> (future)</li>
+</ol>
+<p><strong>Include in bug reports:</strong></p>
+<ul>
+<li>ICN version (<code>icnd --version</code>)</li>
+<li>OS and architecture</li>
+<li>Relevant logs (<code>journalctl -u icnd -n 100</code>)</li>
+<li>Metrics snapshots (if available)</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

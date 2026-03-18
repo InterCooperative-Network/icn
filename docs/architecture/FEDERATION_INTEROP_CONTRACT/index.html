@@ -1,0 +1,1164 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Federation Interoperability Contract | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>FEDERATION INTEROP CONTRACT</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/FEDERATION_INTEROP_CONTRACT.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Federation Interoperability Contract</h1>
+<p><strong>Version:</strong> 1.0<br><strong>Status:</strong> NORMATIVE<br><strong>Last Updated:</strong> 2026-02-02</p>
+<h2>Abstract</h2>
+<p>This document defines the normative protocol-enforced contract for ICN federations. It specifies the kernel invariants, governance proof structure, verification algorithm, and interoperability requirements that enable adversarial interoperability across ICN implementations.</p>
+<p>This specification transforms the ICN federation layer from &quot;interesting architecture&quot; into &quot;protocol law&quot; — a cross-implementation compliance contract that implementations MUST follow to participate in the federation network.</p>
+<h2>Keywords</h2>
+<p>The key words &quot;MUST&quot;, &quot;MUST NOT&quot;, &quot;REQUIRED&quot;, &quot;SHALL&quot;, &quot;SHALL NOT&quot;, &quot;SHOULD&quot;, &quot;SHOULD NOT&quot;, &quot;RECOMMENDED&quot;, &quot;MAY&quot;, and &quot;OPTIONAL&quot; in this document are to be interpreted as described in <a href="https://www.rfc-editor.org/rfc/rfc2119" target="_blank" rel="noopener">RFC 2119</a>.</p>
+<hr>
+<h2>1. Overview</h2>
+<h3>1.1 Purpose</h3>
+<p>The ICN Federation Interoperability Contract defines:</p>
+<ul>
+<li><strong>Kernel invariants</strong>: Non-overridable protocol rules enforced by all implementations</li>
+<li><strong>Governance proofs</strong>: Cryptographic attestations of cooperative governance decisions</li>
+<li><strong>Verification algorithm</strong>: Steps to validate governance proofs across implementations</li>
+<li><strong>Interoperability requirements</strong>: Compliance checklist for cross-implementation compatibility</li>
+</ul>
+<h3>1.2 Design Principles</h3>
+<ol>
+<li><strong>Separation of Concerns</strong>: Kernel enforces invariants; governance (Policy Oracle) determines policies</li>
+<li><strong>Adversarial Interoperability</strong>: Implementations verify proofs without trusting senders</li>
+<li><strong>Deterministic Execution</strong>: Identical inputs produce identical outputs</li>
+<li><strong>Cryptographic Accountability</strong>: All actions are cryptographically attributable</li>
+<li><strong>Anti-Equivocation</strong>: Double-signing is automatically detected and penalized</li>
+</ol>
+<h3>1.3 Terminology</h3>
+<ul>
+<li><strong>Federation</strong>: Group of ≥2 cooperatives coordinating via a shared governance protocol</li>
+<li><strong>Cell</strong>: Distributed gossip topic where federation members synchronize state</li>
+<li><strong>Governance Proof</strong>: Cryptographic attestation of a governance decision</li>
+<li><strong>Action</strong>: Atomic state transition (e.g., settlement, member admission)</li>
+<li><strong>State Root</strong>: Merkle root of governance state at a specific sequence number</li>
+<li><strong>Sequence</strong>: Monotonically increasing counter preventing replay attacks</li>
+<li><strong>Constitution</strong>: Immutable governance rules locked at proposal submission</li>
+</ul>
+<hr>
+<h2>2. Kernel Invariants</h2>
+<p>These are <strong>non-overridable</strong> protocol rules enforced by the ICN kernel. Governance MAY NOT override these invariants.</p>
+<blockquote>
+<p><strong>Architecture Note (Meaning Firewall):</strong> Per ICN&#39;s kernel/app separation, the kernel enforces
+constraints WITHOUT understanding their semantic origin. The invariants below are generic
+safety properties that the kernel can enforce blindly. Domain-specific policies (membership
+rules, governance thresholds, etc.) belong in PolicyOracles and are covered in Section 2.4.</p>
+</blockquote>
+<h3>2.1 Settlement Conservation</h3>
+<p><strong>Invariant 2.1.1:</strong> Cross-cooperative settlements MUST sum to zero per currency.</p>
+<p><strong>Rationale:</strong> Prevents value creation/destruction exploits.</p>
+<p><strong>Enforcement:</strong></p>
+<pre><code class="language-rust">fn validate_settlement_conservation(settlements: &amp;[Settlement]) -&gt; Result&lt;()&gt; {
+    let mut balances: BTreeMap&lt;CurrencyId, i64&gt; = BTreeMap::new();
+    
+    for s in settlements {
+        let from_balance = balances.entry(s.currency.clone()).or_insert(0);
+        *from_balance = from_balance.checked_sub(s.amount)
+            .ok_or(Error::IntegerOverflow)?;
+        
+        let to_balance = balances.entry(s.currency.clone()).or_insert(0);
+        *to_balance = to_balance.checked_add(s.amount)
+            .ok_or(Error::IntegerOverflow)?;
+    }
+    
+    // Verify sum-to-zero per currency
+    for (currency, balance) in balances {
+        if balance != 0 {
+            return Err(Error::ConservationViolation {
+                currency,
+                imbalance: balance,
+            });
+        }
+    }
+    
+    Ok(())
+}
+</code></pre>
+<p><strong>Invariant 2.1.2:</strong> Settlement amounts MUST be positive integers.</p>
+<p><strong>Rationale:</strong> Prevents negative-amount exploits and ambiguous direction.</p>
+<h3>2.2 Anti-Equivocation</h3>
+<p><strong>Invariant 2.2.1:</strong> A cooperative signing two different actions at the same sequence number is AUTOMATICALLY penalized.</p>
+<p><strong>Rationale:</strong> Byzantine fault tolerance requires equivocation detection.</p>
+<p><strong>Penalty Mechanism:</strong></p>
+<ul>
+<li>Equivocating cooperative&#39;s governance weight reduced to 0</li>
+<li>Existing credit balances frozen</li>
+<li>No new settlements accepted from equivocator</li>
+<li>Removal proposal automatically opened</li>
+</ul>
+<p><strong>Detection:</strong></p>
+<pre><code class="language-rust">fn detect_equivocation(
+    proof_a: &amp;GovernanceProof,
+    proof_b: &amp;GovernanceProof,
+) -&gt; Option&lt;Did&gt; {
+    if proof_a.sequence != proof_b.sequence {
+        return None;  // Different sequences, no equivocation
+    }
+    
+    if proof_a.action_hash == proof_b.action_hash {
+        return None;  // Same action, no equivocation
+    }
+    
+    // Find common signer (using signatures map keys)
+    for did in proof_a.signatures.keys() {
+        if proof_b.signatures.contains_key(did) {
+            return Some(did.clone());  // Equivocating signer found
+        }
+    }
+    
+    None
+}
+</code></pre>
+<h3>2.3 Arithmetic Safety</h3>
+<p><strong>Invariant 2.3.1:</strong> All arithmetic operations MUST use checked arithmetic (no overflow/underflow).</p>
+<p><strong>Rationale:</strong> Prevents integer overflow exploits.</p>
+<p><strong>Enforcement:</strong></p>
+<ul>
+<li>Use <code>checked_add</code>, <code>checked_sub</code>, <code>checked_mul</code></li>
+<li>Return <code>Error::IntegerOverflow</code> on overflow</li>
+<li>Use i64 for balances (signed to represent debt/credit)</li>
+</ul>
+<h3>2.4 Default Federation Policies</h3>
+<blockquote>
+<p><strong>Note:</strong> These policies are enforced by the <strong>FederationPolicyOracle</strong> (app layer), not the kernel.
+Federations MAY customize these through their constitution, but the defaults below represent
+recommended practices for cooperative networks.</p>
+</blockquote>
+<p><strong>Policy 2.4.1 (Membership Minimum):</strong> Federations SHOULD have ≥2 member organizations.</p>
+<p><strong>Rationale:</strong> Prevents single-entity &quot;federations&quot; that violate cooperative principles.</p>
+<p><strong>Policy 2.4.2 (Organization-Level Participation):</strong> Federation actions SHOULD involve organization-level
+entities (cooperatives or sub-federations), not individual nodes.</p>
+<p><strong>Rationale:</strong> Federations coordinate between organizations. Individual participation belongs in
+cooperative-level governance.</p>
+<p><strong>Policy 2.4.3 (Cell Operation):</strong> Federations SHOULD operate a Cell (distributed gossip topic) for
+state synchronization.</p>
+<p><strong>Recommended Cell Properties:</strong></p>
+<ul>
+<li><strong>Topic ID</strong>: Derived from federation constitution hash</li>
+<li><strong>Access Control</strong>: TrustGated (only members can write)</li>
+<li><strong>Persistence</strong>: Immutable append-only log</li>
+<li><strong>Replication</strong>: ≥3 nodes per member cooperative</li>
+</ul>
+<hr>
+<h2>3. GovernanceProof Structure</h2>
+<h3>3.1 Field Specification</h3>
+<pre><code class="language-rust">use serde::{Serialize, Deserialize};
+use std::collections::BTreeMap;
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct GovernanceProof {
+    /// Federation identifier (normalized)
+    pub federation_id: String,
+    
+    /// Action type (derived from action, not trusted)
+    pub action_type: ActionType,
+    
+    /// Hash of the action (BLAKE3)
+    pub action_hash: [u8; 32],
+    
+    /// Current governance state root (Merkle root)
+    pub state_root: [u8; 32],
+    
+    /// Previous state root (for chain verification)
+    pub prev_state_root: [u8; 32],
+    
+    /// Sequence number (monotonically increasing)
+    pub sequence: u64,
+    
+    /// Unix timestamp (seconds since epoch)
+    pub timestamp: u64,
+    
+    /// Decision records (proposal IDs -&gt; decision hashes)
+    pub decision_records: BTreeMap&lt;String, Vec&lt;u8&gt;&gt;,
+    
+    /// Ed25519 signatures from confirming cooperatives (DID -&gt; signature)
+    /// Each confirmer signs the canonical payload independently.
+    /// Keys MUST be sorted (BTreeMap ensures this).
+    pub signatures: BTreeMap&lt;String, [u8; 64]&gt;,
+}
+</code></pre>
+<h3>3.2 Field Constraints</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Constraints</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>federation_id</code></td>
+<td>String</td>
+<td>Normalized federation DID or Cell ID</td>
+</tr>
+<tr>
+<td><code>action_type</code></td>
+<td>ActionType</td>
+<td>Derived from action, see §5</td>
+</tr>
+<tr>
+<td><code>action_hash</code></td>
+<td>[u8; 32]</td>
+<td>BLAKE3 hash of canonical action</td>
+</tr>
+<tr>
+<td><code>state_root</code></td>
+<td>[u8; 32]</td>
+<td>Merkle root of governance state</td>
+</tr>
+<tr>
+<td><code>prev_state_root</code></td>
+<td>[u8; 32]</td>
+<td>Previous state root (0x00...00 for genesis)</td>
+</tr>
+<tr>
+<td><code>sequence</code></td>
+<td>u64</td>
+<td>sequence &gt; prev_sequence</td>
+</tr>
+<tr>
+<td><code>timestamp</code></td>
+<td>u64</td>
+<td>Unix seconds, must be ≤ current_time + 300s</td>
+</tr>
+<tr>
+<td><code>decision_records</code></td>
+<td>BTreeMap</td>
+<td>Optional, sorted keys, bounded size ≤ 10MB</td>
+</tr>
+<tr>
+<td><code>signatures</code></td>
+<td>BTreeMap&lt;String, [u8; 64]&gt;</td>
+<td>Multi-sig: DID → Ed25519 signature, ≥ threshold signers</td>
+</tr>
+</tbody></table>
+<h3>3.3 Required Fields</h3>
+<p>All fields are REQUIRED except:</p>
+<ul>
+<li><code>decision_records</code> MAY be empty if no proposals are recorded in this proof</li>
+</ul>
+<hr>
+<h2>4. Canonical Signature Payload</h2>
+<h3>4.1 Payload Construction</h3>
+<p>The signature payload MUST be the canonical CBOR encoding of:</p>
+<pre><code class="language-rust">#[derive(Serialize)]
+struct SignaturePayload {
+    federation_id: String,
+    action_hash: [u8; 32],
+    state_root: [u8; 32],
+    prev_state_root: [u8; 32],
+    sequence: u64,
+    timestamp: u64,
+}
+</code></pre>
+<p><strong>Note:</strong> <code>decision_records</code> and <code>signatures</code> are EXCLUDED from the signature payload to avoid circular dependencies (signatures can&#39;t sign themselves).</p>
+<h3>4.2 Domain Separation</h3>
+<p>The signature MUST use typed hashing with domain separation:</p>
+<p><strong>Domain:</strong> <code>icn-federation:governance-proof:v1</code></p>
+<p><strong>Signature Computation:</strong></p>
+<pre><code class="language-rust">fn compute_signature_payload(proof: &amp;GovernanceProof) -&gt; Vec&lt;u8&gt; {
+    let payload = SignaturePayload {
+        federation_id: proof.federation_id.clone(),
+        action_hash: proof.action_hash,
+        state_root: proof.state_root,
+        prev_state_root: proof.prev_state_root,
+        sequence: proof.sequence,
+        timestamp: proof.timestamp,
+    };
+    
+    // Canonical CBOR encoding
+    let mut buf = Vec::new();
+    ciborium::ser::into_writer(&amp;payload, &amp;mut buf).unwrap();
+    
+    // Typed hash
+    typed_hash(&quot;icn-federation:governance-proof:v1&quot;, &amp;buf)
+}
+
+fn sign_proof(proof: &amp;GovernanceProof, signing_key: &amp;SigningKey) -&gt; [u8; 64] {
+    let payload_hash = compute_signature_payload(proof);
+    signing_key.sign(&amp;payload_hash).to_bytes()
+}
+</code></pre>
+<h3>4.3 Multi-Signature Aggregation</h3>
+<p>For multi-signature proofs:</p>
+<ol>
+<li>Each cooperative signs the SAME payload hash</li>
+<li>Signatures are collected in <code>signatures</code> BTreeMap (keyed by signer DID)</li>
+<li>Verification checks ALL signatures against the payload</li>
+</ol>
+<p><strong>Note:</strong> ICN does not use signature aggregation (e.g., BLS). Each signature is verified independently.</p>
+<hr>
+<h2>5. Consensus-Visible Sequence</h2>
+<h3>5.1 Sequence Commitment</h3>
+<p>The sequence number MUST be:</p>
+<ul>
+<li><strong>Monotonically increasing</strong>: <code>sequence &gt; prev_sequence</code></li>
+<li><strong>Globally visible</strong>: Included in signature payload</li>
+<li><strong>Partition-safe</strong>: Used for anti-replay across network partitions</li>
+</ul>
+<h3>5.2 Sequence Gaps</h3>
+<p>Sequence gaps are PERMITTED if:</p>
+<ul>
+<li>Previous state root is valid (matches known state at prev_sequence)</li>
+<li>Gap does not violate constitution&#39;s max_sequence_gap parameter</li>
+</ul>
+<pre><code class="language-rust">fn validate_sequence_gap(
+    sequence: u64,
+    prev_sequence: u64,
+    max_gap: u64,
+) -&gt; Result&lt;()&gt; {
+    if sequence &lt;= prev_sequence {
+        return Err(Error::NonMonotonicSequence);
+    }
+    
+    let gap = sequence - prev_sequence - 1;
+    if gap &gt; max_gap {
+        return Err(Error::ExcessiveSequenceGap { gap, max_gap });
+    }
+    
+    Ok(())
+}
+</code></pre>
+<h3>5.3 Sequence Reset</h3>
+<p>Sequence numbers MUST NOT reset except:</p>
+<ul>
+<li>Genesis of a new federation (sequence = 1)</li>
+<li>Hard fork with new constitution (constitution_version increments)</li>
+</ul>
+<hr>
+<h2>6. Governance State Chain</h2>
+<h3>6.1 State Root Computation</h3>
+<p>The state root is a Merkle root over:</p>
+<ol>
+<li><strong>Member registry</strong>: <code>{coop_did -&gt; MemberInfo}</code></li>
+<li><strong>Credit balances</strong>: <code>{(coop_did, currency) -&gt; balance}</code></li>
+<li><strong>Constitution hash</strong>: Current constitution hash</li>
+<li><strong>Proposal states</strong>: <code>{proposal_id -&gt; ProposalState}</code></li>
+<li><strong>Sequence metadata</strong>: Current sequence, timestamp</li>
+</ol>
+<pre><code class="language-rust">/// Domain-separated BLAKE3 state-root hash.
+/// 
+/// NOTE: The canonical computation is defined normatively in
+/// `GOVERNANCE_STATE_MACHINE.md` §4.1. This is a summary; implementations
+/// MUST follow the full specification for interoperability.
+fn compute_state_root(state: &amp;GovernanceState) -&gt; [u8; 32] {
+    let mut hasher = blake3::Hasher::new();
+
+    // Domain separation prefix
+    hasher.update(b&quot;icn-federation:state-root:v1&quot;);
+    hasher.update(&amp;[0x00]);
+
+    // Hash federation ID
+    hasher.update(state.federation_id.as_bytes());
+    hasher.update(&amp;[0x00]);
+
+    // Hash members (sorted by DID, via BTreeMap iteration order)
+    for (did, member_info) in &amp;state.members {
+        hasher.update(did.as_bytes());
+        hasher.update(&amp;[0x00]);
+        hasher.update(&amp;member_info.public_key);
+        hasher.update(&amp;member_info.governance_weight.to_le_bytes());
+        hasher.update(&amp;[member_info.status as u8]);
+    }
+    hasher.update(&amp;[0x00]);
+
+    // Hash balances (sorted by (DID, currency), via BTreeMap iteration order)
+    for ((did, currency), balance) in &amp;state.balances {
+        hasher.update(did.as_bytes());
+        hasher.update(&amp;[0x00]);
+        hasher.update(currency.as_bytes());
+        hasher.update(&amp;[0x00]);
+        hasher.update(&amp;balance.to_le_bytes());
+    }
+    hasher.update(&amp;[0x00]);
+
+    // Hash constitution
+    hasher.update(&amp;state.constitution_hash);
+
+    // Hash sequence metadata
+    hasher.update(&amp;state.sequence.to_le_bytes());
+    hasher.update(&amp;state.timestamp.to_le_bytes());
+
+    *hasher.finalize().as_bytes()
+}
+</code></pre>
+<blockquote>
+<p><strong>Normative Reference:</strong> See <a href="https://github.com/InterCooperative-Network/icn/blob/main/GOVERNANCE_STATE_MACHINE#41-state-root-computation#41-state-root-computation">GOVERNANCE_STATE_MACHINE.md §4.1</a> for the complete specification including proposal and decision hashing.</p>
+</blockquote>
+<h3>6.2 State Root Chain</h3>
+<p>State roots form an append-only chain:</p>
+<pre><code>Genesis:  state_root_0 (prev = 0x00...00)
+            ↓
+Proof 1:  state_root_1 (prev = state_root_0)
+            ↓
+Proof 2:  state_root_2 (prev = state_root_1)
+            ↓
+          ...
+</code></pre>
+<p><strong>Chain Validation:</strong></p>
+<pre><code class="language-rust">fn validate_state_chain(
+    proof: &amp;GovernanceProof,
+    known_state_root: [u8; 32],
+    known_sequence: u64,
+) -&gt; Result&lt;()&gt; {
+    if proof.sequence == known_sequence + 1 {
+        // Sequential proof
+        if proof.prev_state_root != known_state_root {
+            return Err(Error::StateRootMismatch);
+        }
+    } else if proof.sequence &gt; known_sequence + 1 {
+        // Gap in sequence (acceptable if constitution allows)
+        // Requires fetching intermediate proofs or trusted state snapshot
+    } else {
+        return Err(Error::NonMonotonicSequence);
+    }
+    
+    Ok(())
+}
+</code></pre>
+<h3>6.3 Fork Detection</h3>
+<p>If two proofs have:</p>
+<ul>
+<li>Same <code>sequence</code></li>
+<li>Same <code>prev_state_root</code></li>
+<li>Different <code>state_root</code> or <code>action_hash</code></li>
+</ul>
+<p>Then a <strong>fork</strong> has occurred. The federation MUST:</p>
+<ol>
+<li>Identify the equivocating signer(s)</li>
+<li>Apply automatic penalty (§2.4)</li>
+<li>Halt new actions until resolution</li>
+</ol>
+<hr>
+<h2>7. Constitution Binding</h2>
+<h3>7.1 Constitution Lock</h3>
+<p>The constitution hash MUST be locked at proposal submission time and included in the governance proof.</p>
+<p><strong>Rationale:</strong> Prevents retroactive rule changes after votes are cast.</p>
+<p><strong>Enforcement:</strong></p>
+<pre><code class="language-rust">struct ProposalContext {
+    pub proposal_id: String,
+    pub constitution_hash: [u8; 32],  // Locked at submission
+    pub submission_timestamp: u64,
+}
+
+fn validate_constitution_binding(
+    proof: &amp;GovernanceProof,
+    proposal_ctx: &amp;ProposalContext,
+) -&gt; Result&lt;()&gt; {
+    // Derive expected constitution hash from state
+    let expected_constitution = derive_constitution_at_sequence(
+        proof.sequence,
+        proposal_ctx.submission_timestamp,
+    )?;
+    
+    if proposal_ctx.constitution_hash != expected_constitution {
+        return Err(Error::ConstitutionMismatch);
+    }
+    
+    Ok(())
+}
+</code></pre>
+<h3>7.2 Constitution Versioning</h3>
+<p>Constitutions MUST include:</p>
+<ul>
+<li><strong>Version number</strong>: Monotonically increasing</li>
+<li><strong>Effective timestamp</strong>: When new constitution takes effect</li>
+<li><strong>Transition rules</strong>: How to migrate from previous version</li>
+</ul>
+<hr>
+<h2>8. Decision Record Handling</h2>
+<h3>8.1 Structure</h3>
+<p>Decision records map proposal IDs to decision hashes:</p>
+<pre><code class="language-rust">pub decision_records: BTreeMap&lt;String, Vec&lt;u8&gt;&gt;
+</code></pre>
+<p><strong>Decision Hash:</strong> BLAKE3 of canonical decision structure:</p>
+<pre><code class="language-rust">#[derive(Serialize)]
+struct Decision {
+    pub proposal_id: String,
+    pub outcome: DecisionOutcome,
+    pub vote_tally: VoteTally,
+    pub timestamp: u64,
+}
+</code></pre>
+<h3>8.2 Size Limits</h3>
+<p>Decision records MUST be bounded:</p>
+<ul>
+<li>Maximum total size: 10 MB per proof</li>
+<li>Maximum decisions per proof: 100</li>
+<li>Maximum decision hash size: 32 bytes (BLAKE3)</li>
+</ul>
+<p><strong>Rationale:</strong> Prevents DoS attacks via oversized proofs.</p>
+<h3>8.3 Verification</h3>
+<p>Implementations MUST verify:</p>
+<ol>
+<li>Decision record keys (proposal IDs) are valid UUIDs or federation-local IDs</li>
+<li>Decision hashes are 32 bytes (BLAKE3)</li>
+<li>Total size ≤ 10 MB</li>
+<li>Decision outcomes are consistent with vote tallies</li>
+</ol>
+<hr>
+<h2>9. Action Type Derivation</h2>
+<h3>9.1 Trust Model</h3>
+<p>The <code>action_type</code> field in GovernanceProof is <strong>informational only</strong> and MUST NOT be trusted.</p>
+<p><strong>Rationale:</strong> Prevents action type spoofing attacks.</p>
+<h3>9.2 Derivation Algorithm</h3>
+<p>Verifiers MUST derive the action type from the action structure:</p>
+<pre><code class="language-rust">impl FederationAction {
+    pub fn action_type(&amp;self) -&gt; ActionType {
+        match self {
+            FederationAction::SettleCrossCoop { .. } =&gt; ActionType::SettleCrossCoop,
+            FederationAction::AdmitMember { .. } =&gt; ActionType::AdmitMember,
+            FederationAction::ExpelMember { .. } =&gt; ActionType::ExpelMember,
+            FederationAction::UpdateConstitution { .. } =&gt; ActionType::UpdateConstitution,
+            FederationAction::AllocateResources { .. } =&gt; ActionType::AllocateResources,
+            FederationAction::RecordExternalTrade { .. } =&gt; ActionType::RecordExternalTrade,
+            FederationAction::UpdateCreditLimits { .. } =&gt; ActionType::UpdateCreditLimits,
+            FederationAction::PauseMember { .. } =&gt; ActionType::PauseMember,
+            FederationAction::ResumeMember { .. } =&gt; ActionType::ResumeMember,
+            FederationAction::RecordDecision { .. } =&gt; ActionType::RecordDecision,
+        }
+    }
+}
+</code></pre>
+<h3>9.3 Verification</h3>
+<pre><code class="language-rust">fn verify_action_type(proof: &amp;GovernanceProof, action: &amp;FederationAction) -&gt; Result&lt;()&gt; {
+    let derived_type = action.action_type();
+    
+    // Compare derived type to claimed type (informational check)
+    if derived_type != proof.action_type {
+        // Log warning but don&#39;t fail verification
+        warn!(&quot;Action type mismatch: claimed {:?}, derived {:?}&quot;, 
+              proof.action_type, derived_type);
+    }
+    
+    // Use derived type for policy enforcement
+    Ok(())
+}
+</code></pre>
+<hr>
+<h2>10. Verification Modes</h2>
+<h3>10.1 Mode Taxonomy</h3>
+<p>Three verification modes are supported:</p>
+<ol>
+<li><strong>Replay Verification</strong>: Full state replay from genesis</li>
+<li><strong>Attested Verification</strong>: Trust bootstrap from signed checkpoint</li>
+<li><strong>ZkProof Verification</strong>: Zero-knowledge proof of valid state transition (future)</li>
+</ol>
+<h3>10.2 Replay Verification</h3>
+<p><strong>Requirements:</strong></p>
+<ul>
+<li>Access to full history from genesis</li>
+<li>Deterministic state transition function</li>
+<li>Computational resources to replay all proofs</li>
+</ul>
+<p><strong>Algorithm:</strong></p>
+<pre><code class="language-rust">fn verify_by_replay(proofs: &amp;[GovernanceProof]) -&gt; Result&lt;GovernanceState&gt; {
+    let mut state = GovernanceState::genesis();
+    
+    for proof in proofs {
+        // Verify proof is valid for current state
+        verify_proof(proof, &amp;state)?;
+        
+        // Apply action to state
+        let action = fetch_action(proof.action_hash)?;
+        state = apply_action(state, &amp;action)?;
+        
+        // Verify new state root matches proof
+        if compute_state_root(&amp;state) != proof.state_root {
+            return Err(Error::StateRootMismatch);
+        }
+    }
+    
+    Ok(state)
+}
+</code></pre>
+<h3>10.3 Attested Verification</h3>
+<p><strong>Requirements:</strong></p>
+<ul>
+<li>Signed checkpoint from trusted quorum</li>
+<li>Proof sequence from checkpoint to current state</li>
+</ul>
+<p><strong>Algorithm:</strong></p>
+<pre><code class="language-rust">fn verify_by_attestation(
+    checkpoint: &amp;SignedCheckpoint,
+    proofs: &amp;[GovernanceProof],
+) -&gt; Result&lt;GovernanceState&gt; {
+    // Verify checkpoint signatures (≥2/3 of governance weight)
+    verify_checkpoint_signatures(checkpoint)?;
+    
+    let mut state = checkpoint.state.clone();
+    let mut sequence = checkpoint.sequence;
+    
+    for proof in proofs {
+        if proof.sequence &lt;= sequence {
+            continue;  // Already included in checkpoint
+        }
+        
+        // Verify proof chain from checkpoint
+        verify_proof(proof, &amp;state)?;
+        
+        let action = fetch_action(proof.action_hash)?;
+        state = apply_action(state, &amp;action)?;
+        
+        if compute_state_root(&amp;state) != proof.state_root {
+            return Err(Error::StateRootMismatch);
+        }
+        
+        sequence = proof.sequence;
+    }
+    
+    Ok(state)
+}
+</code></pre>
+<h3>10.4 ZkProof Verification (Future)</h3>
+<p><strong>Requirements:</strong></p>
+<ul>
+<li>Zero-knowledge proof system (e.g., PLONK, Halo2)</li>
+<li>Circuit for state transition verification</li>
+<li>Trusted setup or transparent proof system</li>
+</ul>
+<p><strong>Status:</strong> Planned for future versions. Not required for initial interoperability.</p>
+<hr>
+<h2>11. Complete Verifier Algorithm</h2>
+<h3>11.1 Entry Point</h3>
+<pre><code class="language-rust">pub fn verify_governance_proof(
+    proof: &amp;GovernanceProof,
+    action: &amp;FederationAction,
+    current_state: &amp;GovernanceState,
+) -&gt; Result&lt;()&gt; {
+    // Step 1: Validate proof structure
+    validate_proof_structure(proof)?;
+    
+    // Step 2: Verify action hash
+    verify_action_hash(proof, action)?;
+    
+    // Step 3: Verify action type
+    verify_action_type(proof, action)?;
+    
+    // Step 4: Verify state chain
+    validate_state_chain(proof, current_state)?;
+    
+    // Step 5: Verify sequence
+    validate_sequence(proof, current_state)?;
+    
+    // Step 6: Verify timestamp
+    validate_timestamp(proof)?;
+    
+    // Step 7: Verify signature
+    verify_signature(proof, current_state)?;
+    
+    // Step 8: Verify action-specific constraints
+    verify_action_constraints(action, current_state)?;
+    
+    // Step 9: Verify decision records
+    verify_decision_records(proof, current_state)?;
+    
+    // Step 10: Verify governance threshold
+    verify_governance_threshold(proof, current_state)?;
+    
+    Ok(())
+}
+</code></pre>
+<h3>11.2 Step-by-Step Breakdown</h3>
+<h4>Step 1: Validate Proof Structure</h4>
+<pre><code class="language-rust">fn validate_proof_structure(proof: &amp;GovernanceProof) -&gt; Result&lt;()&gt; {
+    // Check required fields are present
+    if proof.federation_id.is_empty() {
+        return Err(Error::MissingFederationId);
+    }
+    
+    if proof.sequence == 0 {
+        return Err(Error::InvalidSequence);
+    }
+    
+    if proof.timestamp == 0 {
+        return Err(Error::InvalidTimestamp);
+    }
+    
+    // Extract signers from signatures map (treat as a set; order MUST NOT affect verification)
+    let signers: Vec&lt;&amp;String&gt; = proof.signatures.keys().collect();
+    
+    if signers.is_empty() {
+        return Err(Error::NoSignatures);
+    }
+    
+    // Note: BTreeMap guarantees sorted keys, so signatures.keys() is already canonical
+    
+    // Verify decision records size
+    let decision_records_size: usize = proof.decision_records.iter()
+        .map(|(k, v)| k.len() + v.len())
+        .sum();
+    
+    if decision_records_size &gt; 10 * 1024 * 1024 {
+        return Err(Error::DecisionRecordsTooLarge);
+    }
+    
+    Ok(())
+}
+</code></pre>
+<h4>Step 2: Verify Action Hash</h4>
+<pre><code class="language-rust">fn verify_action_hash(
+    proof: &amp;GovernanceProof,
+    action: &amp;FederationAction,
+) -&gt; Result&lt;()&gt; {
+    let mut action_copy = action.clone();
+    let computed_hash = action_copy.compute_hash();
+    
+    if computed_hash != proof.action_hash {
+        return Err(Error::ActionHashMismatch {
+            expected: proof.action_hash,
+            actual: computed_hash,
+        });
+    }
+    
+    Ok(())
+}
+</code></pre>
+<h4>Step 3: Verify Action Type</h4>
+<pre><code class="language-rust">fn verify_action_type(
+    proof: &amp;GovernanceProof,
+    action: &amp;FederationAction,
+) -&gt; Result&lt;()&gt; {
+    let derived_type = action.action_type();
+    
+    // Informational check only
+    if derived_type != proof.action_type {
+        warn!(&quot;Action type mismatch: claimed {:?}, derived {:?}&quot;,
+              proof.action_type, derived_type);
+    }
+    
+    Ok(())
+}
+</code></pre>
+<h4>Step 4: Verify State Chain</h4>
+<pre><code class="language-rust">fn validate_state_chain(
+    proof: &amp;GovernanceProof,
+    current_state: &amp;GovernanceState,
+) -&gt; Result&lt;()&gt; {
+    let expected_prev_root = compute_state_root(current_state);
+    
+    if proof.prev_state_root != expected_prev_root {
+        return Err(Error::StateRootMismatch {
+            expected: expected_prev_root,
+            actual: proof.prev_state_root,
+        });
+    }
+    
+    Ok(())
+}
+</code></pre>
+<h4>Step 5: Verify Sequence</h4>
+<pre><code class="language-rust">fn validate_sequence(
+    proof: &amp;GovernanceProof,
+    current_state: &amp;GovernanceState,
+) -&gt; Result&lt;()&gt; {
+    if proof.sequence &lt;= current_state.sequence {
+        return Err(Error::NonMonotonicSequence {
+            current: current_state.sequence,
+            proof: proof.sequence,
+        });
+    }
+    
+    let gap = proof.sequence - current_state.sequence - 1;
+    let max_gap = current_state.constitution.max_sequence_gap;
+    
+    if gap &gt; max_gap {
+        return Err(Error::ExcessiveSequenceGap { gap, max_gap });
+    }
+    
+    Ok(())
+}
+</code></pre>
+<h4>Step 6: Verify Timestamp</h4>
+<pre><code class="language-rust">fn validate_timestamp(proof: &amp;GovernanceProof) -&gt; Result&lt;()&gt; {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    
+    // Allow 5 minutes clock skew
+    if proof.timestamp &gt; now + 300 {
+        return Err(Error::FutureTimestamp {
+            proof: proof.timestamp,
+            now,
+        });
+    }
+    
+    // Reject ancient proofs (older than 1 year)
+    if now &gt; proof.timestamp + 31536000 {
+        return Err(Error::ExpiredProof {
+            proof: proof.timestamp,
+            now,
+        });
+    }
+    
+    Ok(())
+}
+</code></pre>
+<h4>Step 7: Verify Signatures (Multi-Sig)</h4>
+<pre><code class="language-rust">fn verify_signatures(
+    proof: &amp;GovernanceProof,
+    current_state: &amp;GovernanceState,
+) -&gt; Result&lt;()&gt; {
+    let payload_hash = compute_signature_payload(proof);
+    
+    // Calculate governance weight of signers
+    let mut total_weight = 0u64;
+    let required_threshold = current_state.constitution.approval_threshold;
+    
+    for (signer_did, signature_bytes) in &amp;proof.signatures {
+        // Lookup public key from state
+        let member_info = current_state.members.get(signer_did)
+            .ok_or(Error::UnknownMember(signer_did.clone()))?;
+        
+        // Verify member is active
+        if member_info.status != MemberStatus::Active {
+            return Err(Error::InactiveSigner(signer_did.clone()));
+        }
+        
+        let verifying_key = VerifyingKey::from_bytes(&amp;member_info.public_key)?;
+        let signature = Signature::from_bytes(signature_bytes)?;
+        
+        // Verify this signer&#39;s signature (Ed25519)
+        verifying_key.verify(&amp;payload_hash, &amp;signature)?;
+        
+        // Accumulate governance weight
+        total_weight = total_weight.checked_add(member_info.governance_weight)
+            .ok_or(Error::IntegerOverflow)?;
+    }
+    
+    // Verify quorum is met
+    if total_weight &lt; required_threshold {
+        return Err(Error::InsufficientQuorum {
+            required: required_threshold,
+            actual: total_weight,
+        });
+    }
+    
+    Ok(())
+}
+</code></pre>
+<p><strong>Note:</strong> Each confirming cooperative signs the canonical payload independently. The <code>signatures</code> field maps signer DID to their Ed25519 signature. Verification ensures:</p>
+<ol>
+<li>Each signature is valid for the signer&#39;s public key</li>
+<li>All signers are active members</li>
+<li>Total governance weight meets the threshold</li>
+</ol>
+<h4>Step 8: Verify Action-Specific Constraints</h4>
+<pre><code class="language-rust">fn verify_action_constraints(
+    action: &amp;FederationAction,
+    current_state: &amp;GovernanceState,
+) -&gt; Result&lt;()&gt; {
+    match action {
+        FederationAction::SettleCrossCoop { settlements } =&gt; {
+            validate_settlement_conservation(settlements)?;
+            
+            for s in settlements {
+                // Verify members exist
+                if !current_state.members.contains_key(&amp;s.from_coop) {
+                    return Err(Error::UnknownMember(s.from_coop.clone()));
+                }
+                if !current_state.members.contains_key(&amp;s.to_coop) {
+                    return Err(Error::UnknownMember(s.to_coop.clone()));
+                }
+                
+                // Verify no self-settlement
+                if s.from_coop == s.to_coop {
+                    return Err(Error::SelfSettlement);
+                }
+                
+                // Verify credit limits
+                let from_balance = current_state.get_balance(&amp;s.from_coop, &amp;s.currency);
+                let new_balance = from_balance.checked_sub(s.amount)
+                    .ok_or(Error::IntegerOverflow)?;
+                
+                let credit_limit = current_state.get_credit_limit(&amp;s.from_coop, &amp;s.currency);
+                if new_balance &lt; -credit_limit {
+                    return Err(Error::CreditLimitExceeded {
+                        coop: s.from_coop.clone(),
+                        balance: new_balance,
+                        limit: credit_limit,
+                    });
+                }
+            }
+        }
+        
+        FederationAction::AdmitMember { coop_did, .. } =&gt; {
+            // Verify not already a member
+            if current_state.members.contains_key(coop_did) {
+                return Err(Error::AlreadyMember(coop_did.clone()));
+            }
+        }
+        
+        // ... other action types
+        _ =&gt; {}
+    }
+    
+    Ok(())
+}
+</code></pre>
+<h4>Step 9: Verify Decision Records</h4>
+<pre><code class="language-rust">fn verify_decision_records(
+    proof: &amp;GovernanceProof,
+    current_state: &amp;GovernanceState,
+) -&gt; Result&lt;()&gt; {
+    for (proposal_id, decision_hash) in &amp;proof.decision_records {
+        // Verify proposal exists
+        let proposal = current_state.proposals.get(proposal_id)
+            .ok_or(Error::UnknownProposal(proposal_id.clone()))?;
+        
+        // Verify proposal is in votable state
+        if !proposal.is_votable() {
+            return Err(Error::ProposalNotVotable(proposal_id.clone()));
+        }
+        
+        // Verify decision hash (fetch and hash decision object)
+        // Implementation depends on where decisions are stored
+    }
+    
+    Ok(())
+}
+</code></pre>
+<h4>Step 10: Verify Governance Threshold</h4>
+<pre><code class="language-rust">fn verify_governance_threshold(
+    proof: &amp;GovernanceProof,
+    current_state: &amp;GovernanceState,
+) -&gt; Result&lt;()&gt; {
+    // Action type is derived from the action structure (see §9 Action Type Derivation)
+    let action_type = proof.action_type;
+    let required_threshold = current_state.constitution.get_threshold(action_type);
+    
+    // Compute governance weight of signers
+    let confirmed_weight: u64 = proof.signatures.keys()
+        .filter_map(|did| {
+            current_state.members.get(did).map(|m| m.governance_weight)
+        })
+        .sum();
+    
+    let total_weight: u64 = current_state.members.values()
+        .map(|m| m.governance_weight)
+        .sum();
+    
+    // Verify threshold (e.g., 2/3 supermajority)
+    if confirmed_weight * required_threshold.denominator 
+       &lt; total_weight * required_threshold.numerator {
+        return Err(Error::InsufficientGovernanceWeight {
+            confirmed: confirmed_weight,
+            total: total_weight,
+            threshold: required_threshold,
+        });
+    }
+    
+    Ok(())
+}
+</code></pre>
+<hr>
+<h2>12. Interop Compliance Checklist</h2>
+<p>Implementations MUST satisfy the following requirements to be interoperable:</p>
+<h3>12.1 Data Structures</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Uses <code>BTreeMap&lt;K, V&gt;</code> for all map fields in signed/hashed objects</li>
+<li><input disabled="" type="checkbox"> Uses <code>BTreeSet&lt;T&gt;</code> for all set fields in signed/hashed objects</li>
+<li><input disabled="" type="checkbox"> Sorts all set-like <code>Vec&lt;T&gt;</code> before canonical encoding</li>
+<li><input disabled="" type="checkbox"> Implements <code>Canonicalize</code> trait for all governance objects</li>
+<li><input disabled="" type="checkbox"> Implements <code>CanonicalEncode</code> trait</li>
+</ul>
+<h3>12.2 Cryptography</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Uses BLAKE3 for content hashing</li>
+<li><input disabled="" type="checkbox"> Uses Ed25519 for signatures</li>
+<li><input disabled="" type="checkbox"> Uses typed hashing with domain separation</li>
+<li><input disabled="" type="checkbox"> Verifies signatures against canonical payloads</li>
+<li><input disabled="" type="checkbox"> Supports ML-DSA (Dilithium) for post-quantum (optional)</li>
+</ul>
+<h3>12.3 Encoding</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Uses CBOR for canonical encoding</li>
+<li><input disabled="" type="checkbox"> Uses definite-length CBOR encoding</li>
+<li><input disabled="" type="checkbox"> Encodes integers in shortest form</li>
+<li><input disabled="" type="checkbox"> Sorts CBOR map keys bytewise lexicographically</li>
+</ul>
+<h3>12.4 Identifiers</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Normalizes DIDs before encoding</li>
+<li><input disabled="" type="checkbox"> Normalizes CurrencyIds before encoding</li>
+<li><input disabled="" type="checkbox"> Validates identifier formats</li>
+</ul>
+<h3>12.5 Arithmetic</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Uses checked arithmetic for all consensus-critical operations</li>
+<li><input disabled="" type="checkbox"> Validates numeric ranges before encoding</li>
+<li><input disabled="" type="checkbox"> Returns errors on overflow/underflow</li>
+</ul>
+<h3>12.6 Protocol Rules</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Enforces ≥2 member federations</li>
+<li><input disabled="" type="checkbox"> Enforces settlement conservation</li>
+<li><input disabled="" type="checkbox"> Detects and penalizes equivocation</li>
+<li><input disabled="" type="checkbox"> Validates state root chain</li>
+<li><input disabled="" type="checkbox"> Validates monotonic sequence</li>
+<li><input disabled="" type="checkbox"> Validates timestamp bounds</li>
+<li><input disabled="" type="checkbox"> Derives action type from structure</li>
+<li><input disabled="" type="checkbox"> Validates governance thresholds</li>
+</ul>
+<h3>12.7 Verification</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Implements complete verifier algorithm (§11)</li>
+<li><input disabled="" type="checkbox"> Supports replay verification mode</li>
+<li><input disabled="" type="checkbox"> Supports attested verification mode</li>
+<li><input disabled="" type="checkbox"> Handles sequence gaps correctly</li>
+<li><input disabled="" type="checkbox"> Detects and reports forks</li>
+</ul>
+<h3>12.8 Test Coverage</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Includes test vectors for all action types</li>
+<li><input disabled="" type="checkbox"> Tests cross-implementation compatibility</li>
+<li><input disabled="" type="checkbox"> Tests edge cases (empty collections, max values)</li>
+<li><input disabled="" type="checkbox"> Tests attack scenarios (conservation violation, equivocation, etc.)</li>
+</ul>
+<hr>
+<h2>13. Security Considerations</h2>
+<h3>13.1 Threat Model</h3>
+<p><strong>Assumptions:</strong></p>
+<ul>
+<li>Adversary controls ≤1/3 of governance weight</li>
+<li>Network may partition temporarily</li>
+<li>Adversary may attempt double-spending, equivocation, replay attacks</li>
+<li>Cryptographic primitives (Ed25519, BLAKE3) are secure</li>
+</ul>
+<h3>13.2 Conservation Violation</h3>
+<p><strong>Threat:</strong> Attacker creates settlement that doesn&#39;t sum to zero.</p>
+<p><strong>Mitigation:</strong></p>
+<ul>
+<li>Kernel enforces conservation check (§2.3)</li>
+<li>All verifiers independently validate</li>
+<li>Invalid proofs are rejected</li>
+</ul>
+<h3>13.3 Equivocation Attack</h3>
+<p><strong>Threat:</strong> Attacker signs two conflicting actions at same sequence.</p>
+<p><strong>Mitigation:</strong></p>
+<ul>
+<li>Automatic detection (§2.4)</li>
+<li>Automatic penalty (governance weight → 0)</li>
+<li>Provable evidence for dispute resolution</li>
+</ul>
+<h3>13.4 Replay Attack</h3>
+<p><strong>Threat:</strong> Attacker reuses old governance proof in new context.</p>
+<p><strong>Mitigation:</strong></p>
+<ul>
+<li>Sequence numbers prevent replay within same federation</li>
+<li>State root chain prevents cross-sequence replay</li>
+<li>Timestamp bounds prevent ancient replays</li>
+</ul>
+<h3>13.5 Fork Attack</h3>
+<p><strong>Threat:</strong> Network partition leads to conflicting state branches.</p>
+<p><strong>Mitigation:</strong></p>
+<ul>
+<li>State root chain enables fork detection</li>
+<li>Conflicting proofs trigger reconciliation protocol</li>
+<li>Manual resolution if automatic reconciliation fails</li>
+</ul>
+<h3>13.6 Timestamp Manipulation</h3>
+<p><strong>Threat:</strong> Attacker claims future or ancient timestamps.</p>
+<p><strong>Mitigation:</strong></p>
+<ul>
+<li>5-minute future tolerance for clock skew</li>
+<li>1-year expiry for ancient proofs</li>
+<li>Reject proofs outside bounds</li>
+</ul>
+<h3>13.7 Signature Malleability</h3>
+<p><strong>Threat:</strong> Attacker modifies signature without invalidating.</p>
+<p><strong>Mitigation:</strong></p>
+<ul>
+<li>Ed25519 signatures are non-malleable</li>
+<li>Canonical encoding prevents payload manipulation</li>
+</ul>
+<h3>13.8 Integer Overflow</h3>
+<p><strong>Threat:</strong> Arithmetic overflow corrupts balances.</p>
+<p><strong>Mitigation:</strong></p>
+<ul>
+<li>Checked arithmetic (§2.3)</li>
+<li>i64 balances support large values (±9 quintillion)</li>
+<li>Explicit overflow errors</li>
+</ul>
+<hr>
+<h2>14. References</h2>
+<ul>
+<li><a href="https://www.rfc-editor.org/rfc/rfc2119" target="_blank" rel="noopener">RFC 2119</a> - Key words for use in RFCs</li>
+<li><a href="https://www.rfc-editor.org/rfc/rfc8949" target="_blank" rel="noopener">RFC 8949</a> - CBOR</li>
+<li><a href="https://www.rfc-editor.org/rfc/rfc8032" target="_blank" rel="noopener">RFC 8032</a> - Ed25519</li>
+<li><a href="https://github.com/BLAKE3-team/BLAKE3-specs/blob/master/blake3.pdf" target="_blank" rel="noopener">BLAKE3 Specification</a></li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CANONICAL_ENCODING">CANONICAL_ENCODING.md</a> - Encoding rules</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/FEDERATION_ACTIONS">FEDERATION_ACTIONS.md</a> - Action specification</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/GOVERNANCE_STATE_MACHINE">GOVERNANCE_STATE_MACHINE.md</a> - State machine</li>
+</ul>
+<hr>
+<p><strong>Document Status:</strong> NORMATIVE - Implementations MUST comply with this specification.</p>
+<p><strong>Change History:</strong></p>
+<ul>
+<li>2026-02-02: Initial version 1.0</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

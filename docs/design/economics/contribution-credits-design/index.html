@@ -1,0 +1,2445 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Contribution Credits: Infrastructure Incentives Design | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>economics</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>contribution credits design</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/economics/contribution-credits-design.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Contribution Credits: Infrastructure Incentives Design</h1>
+<p><strong>Status</strong>: Design Document (RFC)
+<strong>Version</strong>: 0.3.0
+<strong>Last Updated</strong>: 2025-12-05
+<strong>Author</strong>: ICN Foundation</p>
+<hr>
+<h2>Version History</h2>
+<table>
+<thead>
+<tr>
+<th>Version</th>
+<th>Date</th>
+<th>Changes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>0.1.0</td>
+<td>2025-12-05</td>
+<td>Initial draft</td>
+</tr>
+<tr>
+<td>0.2.0</td>
+<td>2025-12-05</td>
+<td>Added unified fuel model, communities as first-class entities, organizational structures, protocol contracts</td>
+</tr>
+<tr>
+<td>0.3.0</td>
+<td>2025-12-05</td>
+<td>Added fuel guarantees, sybil resistance, human labor system, organizational fuel, dispute resolution, issuance principles, anti-capture principles, fraud prevention, demurrage tradeoffs, routing protection, export layer protection</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Executive Summary</h2>
+<p>This document defines how ICN credits infrastructure contributors (compute, storage, bandwidth) in a <strong>non-speculative</strong> way. The core insight: <strong>infrastructure provision is labor directed at the network</strong>. Contributors earn mutual credit that can be used within the cooperative ecosystem, traded for goods/services, or (with governance approval) exchanged externally.</p>
+<p><strong>Key Principles</strong>:</p>
+<ul>
+<li>Credits represent real resource contribution, not speculative value</li>
+<li>No external market = no speculation</li>
+<li>Value flows from reciprocity, not scarcity</li>
+<li>Governance controls exchangeability</li>
+</ul>
+<p><strong>Relationship to Fuel</strong>: Credits are <strong>claims on value</strong>. Fuel is <strong>permission to act</strong>. Contributors earn credits AND receive higher fuel allowances. Both systems work together—fuel is consumed from a single regenerating pool for all network operations including compute execution.</p>
+<p><strong>Crucially, this design does not introduce a tradeable token at the protocol layer.</strong> All accounting uses mutual credit on existing ledgers, governed by cooperatives. There is no ICN coin, no mining, no external exchange.</p>
+<hr>
+<h2>TL;DR</h2>
+<ul>
+<li><strong>Run a node</strong> → Earn credits for compute/storage/bandwidth</li>
+<li><strong>Credits are hours</strong> → Spendable on goods, services, or infrastructure (or your coop&#39;s chosen base currency)</li>
+<li><strong>No speculation</strong> → Demurrage, provenance tracking, governance controls</li>
+<li><strong>Fuel gates actions</strong> → Regenerates over time, scales with contribution</li>
+<li><strong>Two pillars</strong> → Communities (civic) + Cooperatives (economic)</li>
+<li><strong>Start informal</strong> → Individuals → Households → Communities → Coops → Federations</li>
+<li><strong>Rules are contracts</strong> → CCL protocol contracts, governable and auditable</li>
+</ul>
+<hr>
+<h2>Table of Contents</h2>
+<ol>
+<li><a href="#problem-statement">Problem Statement</a></li>
+<li><a href="#design-philosophy">Design Philosophy</a></li>
+<li><a href="#three-tier-credit-system">Three-Tier Credit System</a></li>
+<li><a href="#infrastructure-as-labor">Infrastructure as Labor</a></li>
+<li><a href="#human-labor-credit-system">Human Labor Credit System</a></li>
+<li><a href="#contribution-verification">Contribution Verification</a></li>
+<li><a href="#fuel-system">Fuel System</a></li>
+<li><a href="#organizational-structures">Organizational Structures</a></li>
+<li><a href="#internal-marketplace">Internal Marketplace</a></li>
+<li><a href="#anti-speculation-mechanisms">Anti-Speculation Mechanisms</a></li>
+<li><a href="#credit-issuance-principles">Credit Issuance Principles</a></li>
+<li><a href="#anti-capture-principles">Anti-Capture Principles</a></li>
+<li><a href="#dispute-resolution">Dispute Resolution</a></li>
+<li><a href="#protocol-contracts">Protocol Contracts</a></li>
+<li><a href="#exchange-architecture">Exchange Architecture</a></li>
+<li><a href="#implementation-roadmap">Implementation Roadmap</a></li>
+<li><a href="#technical-specifications">Technical Specifications</a></li>
+<li><a href="#design-invariants">Design Invariants</a></li>
+<li><a href="#non-goals">Non-Goals</a></li>
+<li><a href="#open-questions">Open Questions</a></li>
+<li><a href="#references">References</a></li>
+</ol>
+<hr>
+<h2>Problem Statement</h2>
+<h3>The Challenge</h3>
+<p>ICN needs to:</p>
+<ol>
+<li><strong>Reward infrastructure contributors</strong> (compute, storage, bandwidth providers)</li>
+<li><strong>Avoid speculation</strong> (no tradeable tokens, no mining races)</li>
+<li><strong>Stay true to mutual credit principles</strong> (value comes from reciprocity, not scarcity)</li>
+<li><strong>Enable economic activity</strong> within the cooperative ecosystem</li>
+</ol>
+<h3>Why This Matters</h3>
+<p>People ask: &quot;How can I run an incentivized node?&quot; and &quot;How can I donate resources to the network?&quot;</p>
+<p>Traditional answers create problems:</p>
+<ul>
+<li><strong>Tokens</strong> → speculation, early-adopter wealth concentration</li>
+<li><strong>Mining</strong> → race to the bottom, environmental concerns</li>
+<li><strong>Pure donation</strong> → unsustainable, no reciprocity</li>
+</ul>
+<p>ICN needs a third way: <strong>contribution accounting</strong> that rewards real work without creating speculative assets.</p>
+<hr>
+<h2>Design Philosophy</h2>
+<h3>Core Insight: Infrastructure is Labor</h3>
+<p>Just like members earn hours for providing services to each other, <strong>nodes earn credits for providing infrastructure services to the network</strong>.</p>
+<pre><code>┌─────────────────────────────────────────────────────────────────────┐
+│                    LABOR = LABOR = LABOR                            │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│   Alice tutors Bob      ═══  Alice earns hours                      │
+│   Carol sells tomatoes  ═══  Carol earns hours                      │
+│   Dave runs a node      ═══  Dave earns hours  ← Infrastructure     │
+│   Eve reviews proposals ═══  Eve earns hours                        │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<p>The network itself has a &quot;treasury DID&quot; that issues credits when nodes contribute resources.</p>
+<h3>Why This Isn&#39;t Speculative</h3>
+<table>
+<thead>
+<tr>
+<th>Speculative Token</th>
+<th>ICN Infrastructure Credits</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Tradeable on exchanges</td>
+<td>Only usable within network</td>
+</tr>
+<tr>
+<td>Price determined by market</td>
+<td>Value = resource cost</td>
+</tr>
+<tr>
+<td>Hoarding incentivized</td>
+<td>Hoarding = wasted credits (demurrage)</td>
+</tr>
+<tr>
+<td>Early adopters profit</td>
+<td>All contributors equal</td>
+</tr>
+<tr>
+<td>Deflationary/inflationary games</td>
+<td>Balanced by usage</td>
+</tr>
+<tr>
+<td>&quot;Number go up&quot; narrative</td>
+<td>&quot;How much did we contribute?&quot; narrative</td>
+</tr>
+</tbody></table>
+<p><strong>The key difference</strong>: Credits represent actual resource contribution, not speculative value. You can&#39;t get rich by hoarding them—you can only use them to access network resources or trade for goods/services.</p>
+<hr>
+<h2>Three-Tier Credit System</h2>
+<p>Credits have <strong>graduated exchangeability</strong> based on governance and trust.</p>
+<pre><code>┌─────────────────────────────────────────────────────────────────────┐
+│                     CREDIT TIERS                                     │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  TIER 1: INTERNAL CREDITS (Default)                                 │
+│  ├── Earned by: Contributing resources                              │
+│  ├── Usable for: Network resources only                             │
+│  ├── Transferable: Only within your cooperative                     │
+│  └── Exchangeable: No                                               │
+│                                                                      │
+│  TIER 2: FEDERATED CREDITS (Earned)                                 │
+│  ├── Earned by: Sustained contribution + trust threshold            │
+│  ├── Usable for: Resources across federated cooperatives            │
+│  ├── Transferable: Between federated coops                          │
+│  └── Exchangeable: Coop-to-coop only (not individuals)              │
+│                                                                      │
+│  TIER 3: BRIDGE CREDITS (Governance-controlled)                     │
+│  ├── Earned by: Governance proposal approval                        │
+│  ├── Usable for: External exchange (fiat, other networks)           │
+│  ├── Transferable: Yes, but with cooperative oversight              │
+│  └── Exchangeable: Yes, through approved bridges                    │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<h3>What Members Experience</h3>
+<table>
+<thead>
+<tr>
+<th>Tier</th>
+<th>Member Experience</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>1: Internal</strong></td>
+<td>&quot;My credits work only in my coop&#39;s marketplace &amp; infrastructure. I can pay for compute, buy from fellow members, trade services.&quot;</td>
+</tr>
+<tr>
+<td><strong>2: Federated</strong></td>
+<td>&quot;Some of my credits can pay for services in partner coops. Our federation agreement sets the exchange rates. I can buy food from the Food Coop using credits I earned in Tech Coop.&quot;</td>
+</tr>
+<tr>
+<td><strong>3: Bridge</strong></td>
+<td>&quot;With governance approval, I can convert some credits to external value (fiat, other networks). This is for interfacing with the outside economy when needed, not for speculation.&quot;</td>
+</tr>
+</tbody></table>
+<p><strong>Progression is earned</strong>: Tier 2 requires federation agreements between coops. Tier 3 requires demonstrated governance maturity and explicit proposals.</p>
+<h3>Tier 1: Internal Credits</h3>
+<p>The default tier. Credits stay within a single cooperative.</p>
+<pre><code class="language-rust">pub struct InternalCredit {
+    pub holder: Did,
+    pub amount: u64,
+    pub currency: String,  // e.g., &quot;hours&quot;
+    pub cooperative: CoopId,
+    pub earned_at: Timestamp,
+    // Cannot leave this cooperative
+}
+</code></pre>
+<p><strong>Use cases</strong>:</p>
+<ul>
+<li>Pay for compute jobs within your coop</li>
+<li>Reserve storage quota</li>
+<li>Access bandwidth allocation</li>
+</ul>
+<h3>Tier 2: Federated Credits</h3>
+<p>When cooperatives federate, they can agree to honor each other&#39;s credits.</p>
+<pre><code class="language-rust">pub struct FederationAgreement {
+    pub coops: Vec&lt;CoopId&gt;,
+    pub exchange_rates: HashMap&lt;(Currency, Currency), f64&gt;,
+    pub settlement_period: Duration,  // e.g., monthly
+    pub governance: FederationGovernance,
+}
+</code></pre>
+<p><strong>Key constraint</strong>: This is coop-to-coop, not individual speculation. The coops collectively govern exchange rates.</p>
+<p><strong>Example</strong>: Tech Coop and Food Coop federate</p>
+<ul>
+<li>1 hour of tech support = 2 hours of food coop labor</li>
+<li>Settled monthly via mutual credit between coop treasuries</li>
+</ul>
+<h3>Tier 3: Bridge Credits</h3>
+<p>For interfacing with the external economy. Requires governance approval and guardrails.</p>
+<pre><code class="language-rust">pub struct BridgeCredit {
+    pub holder: Did,
+    pub amount: u64,
+    pub backing: BridgeBacking,
+    pub restrictions: Vec&lt;Restriction&gt;,
+    pub governance_approval: ProposalId,  // Must be approved!
+}
+
+pub enum BridgeBacking {
+    // Backed by actual fiat held in cooperative accounts
+    FiatReserve { currency: FiatCurrency, reserve_ratio: f64 },
+
+    // Backed by real assets (equipment, property)
+    AssetBacked { asset_registry: ContentHash },
+
+    // Backed by future labor commitments
+    LaborCommitment { hours: u64, skills: Vec&lt;Skill&gt; },
+
+    // Backed by other crypto (for interop)
+    CryptoBridge { chain: ChainId, contract: Address },
+}
+</code></pre>
+<hr>
+<h2>Infrastructure as Labor</h2>
+<h3>Currency Model (v1)</h3>
+<p><strong>Default for v1</strong>: All infrastructure contributions convert to the cooperative&#39;s base currency (typically &quot;hours&quot;) at governance-defined rates.</p>
+<pre><code>┌─────────────────────────────────────────────────────────────────────┐
+│  CONTRIBUTION → METRICS → CREDITS                                   │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  Dave&#39;s node provides:                                              │
+│    • 100 CPU-hours                                                  │
+│    • 50 GB-months storage                                           │
+│    • 200 GB bandwidth                                               │
+│                                                                      │
+│  Protocol contract applies rates:                                   │
+│    • 1 CPU-hour = 1.0 hours                                         │
+│    • 1 GB-month = 0.1 hours                                         │
+│    • 1 GB bandwidth = 0.02 hours                                    │
+│                                                                      │
+│  Dave receives: 100 + 5 + 4 = 109 hours                             │
+│  (Metrics recorded for transparency; ledger sees only &quot;hours&quot;)     │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<p><strong>Why single currency for v1</strong>:</p>
+<ul>
+<li>Simpler mental model for members</li>
+<li>Reduces friction in internal marketplace</li>
+<li>Exchange rates are a governance knob, not a system constraint</li>
+<li>Metrics are still recorded for fairness audits</li>
+</ul>
+<p><strong>Future (v2)</strong>: Multi-currency coops may choose to keep infrastructure currencies distinct, using internal exchange pools. This requires the <code>exchange/v1</code> protocol contract.</p>
+<h3>Equity Invariants</h3>
+<p>Infrastructure contribution rates are <strong>political choices</strong>, not neutral market prices. To prevent infrastructure from creating class hierarchies within coops, the following invariants should guide rate-setting:</p>
+<p><strong>It must always be possible for someone with no hardware and no capital to:</strong></p>
+<ul>
+<li>Earn credits through human labor alone</li>
+<li>Attain governance power equal to any infrastructure contributor</li>
+<li>Access shared infrastructure indirectly via their coop/community</li>
+<li>Hold any elected or appointed role</li>
+</ul>
+<p><strong>Coops should consider:</strong></p>
+<ul>
+<li>Capping infrastructure earnings as a percentage of total credit issuance</li>
+<li>Applying slightly higher demurrage to infrastructure-earned credits (optional)</li>
+<li>Establishing hardware lending/grant programs so contribution isn&#39;t wealth-gated</li>
+<li>Regularly reviewing the ratio of infrastructure rates to human labor rates</li>
+</ul>
+<p><strong>The goal</strong>: Infrastructure contribution should be rewarded fairly, but should not create a class of &quot;infrastructure rentiers&quot; who dominate the coop economy through capital ownership rather than labor.</p>
+<h3>Resource Types</h3>
+<p>Infrastructure contributions are measured in concrete units:</p>
+<table>
+<thead>
+<tr>
+<th>Resource Type</th>
+<th>Unit of Measure</th>
+<th>How Verified</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Compute</td>
+<td>CPU-hours</td>
+<td>Job completion proofs + peer attestation</td>
+</tr>
+<tr>
+<td>Storage</td>
+<td>GB-months</td>
+<td>Replica health checks + peer attestation</td>
+</tr>
+<tr>
+<td>Bandwidth</td>
+<td>GB transferred</td>
+<td>Peer attestations</td>
+</tr>
+<tr>
+<td>Uptime</td>
+<td>Node-hours</td>
+<td>Heartbeat consensus</td>
+</tr>
+</tbody></table>
+<h3>The Network Treasury</h3>
+<p>The network itself acts as a member that receives services:</p>
+<pre><code class="language-rust">pub const NETWORK_TREASURY_DID: &amp;str = &quot;did:icn:network:infrastructure&quot;;
+
+// When Dave provides 10 hours of compute:
+let entry = JournalEntryBuilder::new(network_treasury_did.clone())
+    .debit(dave_did.clone(), &quot;hours&quot;.into(), 10)      // Dave is OWED 10 hours
+    .credit(network_treasury_did.clone(), &quot;hours&quot;.into(), 10)  // Network OWES Dave
+    .memo(&quot;Infrastructure: 10 CPU-hours provided&quot;)
+    .build()?;
+</code></pre>
+<p>Now Dave&#39;s infrastructure credits are just hours—<strong>spendable anywhere in the cooperative</strong> for anything. Infrastructure capacity is just another listing type in the marketplace, priced in the same mutual credit system as tutoring, tomatoes, and childcare. Running a node is labor; the marketplace treats it equally.</p>
+<hr>
+<h2>Human Labor Credit System</h2>
+<p>Human labor earning uses the same attestation infrastructure as infrastructure, but with different workflows.</p>
+<h3>Labor Types</h3>
+<pre><code class="language-rust">pub enum LaborContribution {
+    /// Logged via coop/community work tracking
+    OrganizationalLabor {
+        org: OrgId,
+        hours: u64,
+        category: LaborCategory,
+        supervisor_attestation: Option&lt;Attestation&gt;,
+    },
+
+    /// Peer-to-peer service delivery (marketplace)
+    ServiceDelivery {
+        listing: ListingId,
+        recipient: Did,
+        hours: u64,
+        recipient_attestation: Attestation,
+    },
+
+    /// Community service (care work, mutual aid)
+    CommunityService {
+        community: CommunityId,
+        description: String,
+        hours: u64,
+        beneficiary_attestations: Vec&lt;Attestation&gt;,
+    },
+}
+
+pub enum LaborCategory {
+    // Organizational roles
+    Governance,      // Facilitation, coordination, administration
+    Operations,      // Day-to-day coop work
+    Development,     // Software, infrastructure
+    Outreach,        // Community building, marketing
+
+    // Service categories
+    Education,       // Teaching, tutoring, training
+    Care,            // Childcare, eldercare, health support
+    Skilled,         // Trades, professional services
+    Creative,        // Art, design, media
+    Physical,        // Manual labor, agriculture
+}
+</code></pre>
+<h3>Attestation Workflows</h3>
+<p><strong>For organizational labor</strong>:</p>
+<ol>
+<li>Member logs hours in coop/community system</li>
+<li>Supervisor or coordinator attests (single attestation sufficient for orgs with designated roles)</li>
+<li>Credits issued weekly/monthly per org policy</li>
+</ol>
+<p><strong>For marketplace services</strong>:</p>
+<ol>
+<li>Listing defines terms</li>
+<li>Service delivered</li>
+<li>Recipient attests completion and quality</li>
+<li>Credits transfer automatically</li>
+</ol>
+<p><strong>For community service</strong>:</p>
+<ol>
+<li>Member claims hours with description</li>
+<li>Beneficiaries attest (minimum 2 for claims &gt; 10 hours)</li>
+<li>Community reviews and approves</li>
+<li>Credits issued from community treasury or via protocol contract</li>
+</ol>
+<h3>Integration with CCL</h3>
+<p>Labor agreements can be codified in CCL contracts:</p>
+<pre><code class="language-json">{
+  &quot;name&quot;: &quot;WeeklyLabor&quot;,
+  &quot;rules&quot;: [
+    {
+      &quot;name&quot;: &quot;log_hours&quot;,
+      &quot;params&quot;: [&quot;member&quot;, &quot;hours&quot;, &quot;category&quot;],
+      &quot;requires&quot;: [{&quot;MemberOf&quot;: {&quot;member&quot;: {&quot;Var&quot;: &quot;member&quot;}, &quot;org&quot;: &quot;this&quot;}}],
+      &quot;body&quot;: [
+        {&quot;LedgerTransfer&quot;: {
+          &quot;from&quot;: &quot;org_treasury&quot;,
+          &quot;to&quot;: {&quot;Var&quot;: &quot;member&quot;},
+          &quot;amount&quot;: {&quot;Var&quot;: &quot;hours&quot;},
+          &quot;currency&quot;: &quot;hours&quot;
+        }}
+      ]
+    }
+  ]
+}
+</code></pre>
+<h3>Governance Oversight</h3>
+<p>Each coop/community sets:</p>
+<ul>
+<li>Hourly rate equivalencies (if different from 1:1)</li>
+<li>Category-specific rates (e.g., hazardous work pays 1.5x)</li>
+<li>Maximum hours claimable per period</li>
+<li>Attestation requirements per labor type</li>
+<li>Appeals process for disputed hours</li>
+</ul>
+<hr>
+<h2>Contribution Verification</h2>
+<h3>The Hard Problem</h3>
+<p>How do you prove a node actually contributed without trusted third parties?</p>
+<h3>Peer Attestation (Recommended for ICN)</h3>
+<p>Fits ICN&#39;s trust model perfectly.</p>
+<pre><code class="language-rust">pub struct ContributionAttestation {
+    pub contributor: Did,
+    pub resource_type: ResourceType,
+    pub amount: u64,
+    pub period: (Timestamp, Timestamp),
+    pub attesters: Vec&lt;(Did, Signature)&gt;,  // Peers who witnessed
+    pub evidence: ContentHash,              // Proof (e.g., job results)
+}
+
+// Requires M-of-N attestations from trusted peers
+// Weight attestations by trust score
+fn validate_contribution(attestation: &amp;ContributionAttestation) -&gt; bool {
+    let weighted_attestations: f64 = attestation.attesters
+        .iter()
+        .map(|(did, _)| trust_graph.compute_trust_score(did))
+        .sum();
+
+    weighted_attestations &gt;= CONTRIBUTION_THRESHOLD  // e.g., 2.0
+}
+</code></pre>
+<p><strong>Advantages</strong>:</p>
+<ul>
+<li>Uses existing trust graph</li>
+<li>No special hardware or proofs required</li>
+<li>Socially verifiable</li>
+</ul>
+<p><strong>Disadvantages</strong>:</p>
+<ul>
+<li>Requires network of attesters</li>
+<li>Could be gamed by colluding nodes</li>
+</ul>
+<h3>Sybil Resistance Model</h3>
+<p><strong>Important constraint</strong>: &quot;Peer attestation&quot; does not mean &quot;any DID can attest.&quot; In practice, attesters are constrained by:</p>
+<ul>
+<li><strong>Membership status</strong>: Must be a member of the same coop/community or a federated org</li>
+<li><strong>Membership age</strong>: New members may have reduced attestation weight or be ineligible to attest large contributions</li>
+<li><strong>Trust graph thresholds</strong>: Attestations from untrusted or low-trust DIDs carry minimal weight</li>
+<li><strong>Organizational attestation</strong>: Contributions above certain thresholds may require attestation from an organizational DID (coop, community, or household), not just individuals</li>
+</ul>
+<p>This social anchoring is the first line of defense against Sybil attacks. Identity issuance and membership onboarding are the gatekeeping mechanisms; attestation validates within that trust boundary.</p>
+<h3>Attestation Eligibility Requirements</h3>
+<p>To attest contributions above trivial thresholds, an attester must satisfy:</p>
+<table>
+<thead>
+<tr>
+<th>Constraint</th>
+<th>Requirement</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Membership age</strong></td>
+<td>≥ 90 days in good standing</td>
+<td>New members cannot immediately vouch</td>
+</tr>
+<tr>
+<td><strong>Trust score</strong></td>
+<td>≥ 0.3</td>
+<td>Isolated or distrusted members cannot attest</td>
+</tr>
+<tr>
+<td><strong>Attestation budget</strong></td>
+<td>Max 10 attestations per period per attester</td>
+<td>Prevents attestation factories</td>
+</tr>
+<tr>
+<td><strong>Non-reciprocity</strong></td>
+<td>Cannot attest someone who attested you in same period</td>
+<td>Breaks simple collusion rings</td>
+</tr>
+<tr>
+<td><strong>Org anchor</strong></td>
+<td>For claims &gt; 500 credits: requires ≥1 organizational attestation</td>
+<td>Large claims need institutional backing</td>
+</tr>
+</tbody></table>
+<h3>Organizational Attestation</h3>
+<p>For significant contributions, at least one attester must be an <strong>organizational DID</strong>:</p>
+<pre><code class="language-rust">pub enum AttesterType {
+    Individual(Did),
+    Organization(OrgDid),  // Coop, community, or household
+}
+
+pub fn validate_large_contribution(claim: &amp;Claim, attestations: &amp;[Attestation]) -&gt; bool {
+    if claim.amount &gt; LARGE_CLAIM_THRESHOLD {
+        // Requires at least one org attestation
+        let has_org = attestations.iter().any(|a| matches!(a.attester_type, AttesterType::Organization(_)));
+        if !has_org {
+            return false;
+        }
+    }
+    // Normal weighted validation
+    validate_attestation_weights(attestations)
+}
+</code></pre>
+<h3>Trust Graph Depth</h3>
+<p>Attestations are weighted not just by trust score, but by <strong>graph depth from organizational anchors</strong>:</p>
+<pre><code>Org DID (coop/community) ─── depth 0 (weight: 1.0)
+    │
+    ├── Long-standing member ─── depth 1 (weight: 0.9)
+    │       │
+    │       └── Newer member vouched by them ─── depth 2 (weight: 0.7)
+    │
+    └── Another path...
+</code></pre>
+<p>Members with no path to an organizational anchor have zero attestation weight.</p>
+<h3>Attestation Fraud Prevention</h3>
+<h4>Attack Vectors</h4>
+<table>
+<thead>
+<tr>
+<th>Attack</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Collusion ring</strong></td>
+<td>Small group vouches for each other&#39;s fake contributions</td>
+</tr>
+<tr>
+<td><strong>Attestation factory</strong></td>
+<td>One member attests everything without verification</td>
+</tr>
+<tr>
+<td><strong>Org capture</strong></td>
+<td>Corrupt org leadership attests fake member contributions</td>
+</tr>
+<tr>
+<td><strong>Time inflation</strong></td>
+<td>Real work, exaggerated hours</td>
+</tr>
+</tbody></table>
+<h4>Countermeasures</h4>
+<table>
+<thead>
+<tr>
+<th>Measure</th>
+<th>Implementation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Attestation budget</strong></td>
+<td>Max 10 per member per period</td>
+</tr>
+<tr>
+<td><strong>Non-reciprocity</strong></td>
+<td>Can&#39;t attest someone who attested you this period</td>
+</tr>
+<tr>
+<td><strong>Org attestation for large claims</strong></td>
+<td>Claims &gt; 500 require org-level DID</td>
+</tr>
+<tr>
+<td><strong>Membership age threshold</strong></td>
+<td>New members can&#39;t attest for 90 days</td>
+</tr>
+<tr>
+<td><strong>Random audits</strong></td>
+<td>X% of claims randomly selected for deeper review</td>
+</tr>
+<tr>
+<td><strong>Attestation accuracy tracking</strong></td>
+<td>Historical accuracy affects future weight</td>
+</tr>
+</tbody></table>
+<h4>Penalties</h4>
+<table>
+<thead>
+<tr>
+<th>Offense</th>
+<th>Penalty</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>First fraudulent attestation</td>
+<td>Attestation privileges suspended 30 days</td>
+</tr>
+<tr>
+<td>Second offense</td>
+<td>Suspended 180 days, trust score penalty</td>
+</tr>
+<tr>
+<td>Third offense</td>
+<td>Membership review, potential expulsion</td>
+</tr>
+<tr>
+<td>Organized fraud (multiple participants)</td>
+<td>All participants face membership review</td>
+</tr>
+</tbody></table>
+<h4>Detection</h4>
+<pre><code class="language-rust">pub struct AttestationAudit {
+    /// Check for reciprocal attestation patterns
+    pub fn detect_reciprocity_clusters(&amp;self) -&gt; Vec&lt;Cluster&gt;;
+
+    /// Check for attesters who approve everything
+    pub fn detect_rubber_stampers(&amp;self) -&gt; Vec&lt;Did&gt;;
+
+    /// Check for contribution patterns that don&#39;t match observed capacity
+    pub fn detect_implausible_claims(&amp;self) -&gt; Vec&lt;Claim&gt;;
+
+    /// Compare claimed vs measured (for infra)
+    pub fn detect_inflation(&amp;self) -&gt; Vec&lt;DiscrepancyReport&gt;;
+}
+</code></pre>
+<h3>Verification Tiers Based on Value</h3>
+<p>Combine approaches based on contribution size:</p>
+<table>
+<thead>
+<tr>
+<th>Contribution Value</th>
+<th>Verification Method</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Small (&lt;100 credits)</td>
+<td>Peer attestation only</td>
+</tr>
+<tr>
+<td>Medium (100-1000)</td>
+<td>Attestation + spot checks</td>
+</tr>
+<tr>
+<td>Large (&gt;1000)</td>
+<td>Full cryptographic proof + org attestation</td>
+</tr>
+</tbody></table>
+<h3>Provenance Scope</h3>
+<p>Not all credits need full provenance tracking:</p>
+<table>
+<thead>
+<tr>
+<th>Credit Type</th>
+<th>Provenance Requirement</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Tier 1 (Internal)</strong></td>
+<td>Compressed/batched</td>
+<td>Storage efficiency; never leaves coop</td>
+</tr>
+<tr>
+<td><strong>Tier 2 (Federated)</strong></td>
+<td>Origin + last transfer</td>
+<td>Enough for dispute resolution</td>
+</tr>
+<tr>
+<td><strong>Tier 3 (Bridge candidate)</strong></td>
+<td>Full chain</td>
+<td>Required for external auditability</td>
+</tr>
+</tbody></table>
+<p><strong>Implementation note</strong>: Credits start with compressed provenance. When a member requests bridge-out eligibility, the system reconstructs or requires full provenance for the specific units being bridged. Credits that have been transferred internally may not be reconstructible and thus remain Tier 1/2 only.</p>
+<p><strong>Storage philosophy</strong>: ICN will never store full provenance for all credits indefinitely. Full-chain provenance is an opt-in requirement for bridgeable units only.</p>
+<p>For members who may want to bridge credits in the future:</p>
+<ul>
+<li>They may retain their own detailed provenance proofs (encrypted, off-ledger)</li>
+<li>These proofs can be presented when bridge eligibility is requested</li>
+<li>The network validates but does not permanently store the full chain</li>
+</ul>
+<p>For coop-level auditing:</p>
+<ul>
+<li>Coops choose how far back they keep detailed provenance</li>
+<li>The network does not enforce a global retention horizon</li>
+<li>Archived provenance may be compressed or summarized after a governance-set period</li>
+</ul>
+<p>This keeps the ledger from becoming a forever-archive of every micro-transfer while still enabling auditability where it matters.</p>
+<hr>
+<h2>Fuel System</h2>
+<p>Credits are <strong>claims on value</strong>. Fuel is <strong>permission to act</strong>. Both are needed.</p>
+<h3>Why Fuel Exists</h3>
+<p>Fuel prevents:</p>
+<ul>
+<li><strong>Spam</strong>: Can&#39;t flood the network with garbage</li>
+<li><strong>Tragedy of the commons</strong>: Shared resources need rate limiting</li>
+<li><strong>Free riding</strong>: Using without contributing</li>
+</ul>
+<h3>Fuel Is Not a Token</h3>
+<pre><code>┌─────────────────────────────────────────────────────────────────────┐
+│                                                                      │
+│  TRADITIONAL GAS                    ICN FUEL                        │
+│  ────────────────                   ────────                        │
+│                                                                      │
+│  • You buy gas tokens               • Network has fuel capacity     │
+│  • Pay per transaction              • You have fuel allowance       │
+│  • Gas goes to miners               • Fuel regenerates over time    │
+│  • Speculation on gas price         • No speculation possible       │
+│  • Rich users outbid poor           • Fair allocation by trust/need │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<h3>Unified Fuel Model</h3>
+<p>All operations draw from a single regenerating fuel pool—both network operations (posting, trading, voting) and compute execution.</p>
+<pre><code class="language-rust">pub struct FuelAccount {
+    pub did: Did,
+    pub available: u64,
+    pub reserved: u64,   // Fuel set aside for pending compute jobs
+    pub max: u64,
+    pub regen_rate: u64,  // Fuel per hour
+    pub last_update: Timestamp,
+}
+
+impl FuelAccount {
+    pub fn usable(&amp;self) -&gt; u64 {
+        self.available - self.reserved
+    }
+
+    /// Reserve fuel for a compute job (returns unused when job completes)
+    pub fn reserve(&amp;mut self, amount: u64) -&gt; Result&lt;(), FuelError&gt; {
+        self.regenerate();
+        if self.usable() &lt; amount {
+            return Err(FuelError::InsufficientFuel);
+        }
+        self.reserved += amount;
+        Ok(())
+    }
+
+    /// Consume fuel for an operation
+    pub fn consume(&amp;mut self, amount: u64) -&gt; Result&lt;(), FuelError&gt; {
+        self.regenerate();
+        if self.available &lt; amount {
+            return Err(FuelError::Exhausted);
+        }
+        self.available -= amount;
+        Ok(())
+    }
+
+    /// Lazy regeneration on access
+    fn regenerate(&amp;mut self) {
+        let now = now_timestamp();
+        let elapsed_hours = (now - self.last_update) / 3600;
+        let regen = elapsed_hours * self.regen_rate;
+        self.available = (self.available + regen).min(self.max);
+        self.last_update = now;
+    }
+}
+</code></pre>
+<h3>Fuel Pools at Every Layer</h3>
+<pre><code>┌─────────────────────────────────────────────────────────────────────┐
+│  LAYER          │ FUEL POOL         │ USED FOR                      │
+│  ═══════════════╪═══════════════════╪══════════════════════════════ │
+│  Network        │ Global capacity   │ Cross-federation operations   │
+│  Federation     │ Regional capacity │ Cross-coop operations         │
+│  Cooperative    │ Local capacity    │ Internal operations           │
+│  Member         │ Personal allowance│ Individual activity           │
+└─────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<h3>Fuel Allowance Calculation</h3>
+<pre><code class="language-rust">pub const MINIMUM_CIVIC_FUEL: u64 = 50;
+pub const MINIMUM_REGEN_RATE: u64 = 10;  // Per day
+
+impl FuelAllowance {
+    pub fn calculate(
+        did: &amp;Did,
+        trust_score: f64,
+        contribution_history: &amp;ContributionHistory,
+    ) -&gt; Self {
+        let base = 100;  // Everyone gets this
+        let trust_bonus = (trust_score * 500.0) as u64;
+        let contribution_bonus = contribution_history.total_contributed / 10;
+
+        let calculated_max = base + trust_bonus + contribution_bonus;
+        let calculated_regen = calculated_max / 24;  // Fully regenerate in 24 hours
+
+        FuelAllowance {
+            did: did.clone(),
+            available: calculated_max.max(MINIMUM_CIVIC_FUEL),
+            reserved: 0,
+            max: calculated_max.max(MINIMUM_CIVIC_FUEL),
+            regen_rate: calculated_regen.max(MINIMUM_REGEN_RATE),
+            last_update: now()
+        }
+    }
+}
+</code></pre>
+<h3>What Costs Fuel</h3>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>Fuel Cost</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Publish gossip message</td>
+<td>1</td>
+<td>Prevent spam</td>
+</tr>
+<tr>
+<td>Ledger transaction</td>
+<td>10</td>
+<td>Rate limit transfers</td>
+</tr>
+<tr>
+<td>Create proposal</td>
+<td>50</td>
+<td>Prevent proposal spam</td>
+</tr>
+<tr>
+<td>Cast vote</td>
+<td>5</td>
+<td>Encourage participation</td>
+</tr>
+<tr>
+<td>Submit compute job</td>
+<td>Variable</td>
+<td>Reserved upfront, unused returned</td>
+</tr>
+<tr>
+<td>Marketplace listing</td>
+<td>10</td>
+<td>Quality over quantity</td>
+</tr>
+<tr>
+<td>Execute trade</td>
+<td>20</td>
+<td>Meaningful transactions</td>
+</tr>
+</tbody></table>
+<h3>Fuel Guarantees</h3>
+<p>To prevent fuel from becoming a barrier to democratic participation, ICN makes the following guarantees:</p>
+<h4>Minimum Civic Allowance</h4>
+<p>Even members with zero credits and minimal trust receive a base fuel allowance sufficient for:</p>
+<ul>
+<li>Casting votes on proposals they&#39;re eligible for</li>
+<li>Creating at least one proposal per governance period</li>
+<li>Sending basic messages to their coop/community</li>
+<li>Viewing their balances and contribution history</li>
+</ul>
+<h4>Guaranteed Minimum Operations</h4>
+<p>The following operations can <strong>never</strong> be blocked due to fuel exhaustion:</p>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>Guaranteed Minimum</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Cast vote on eligible proposals</td>
+<td>1 per proposal</td>
+<td>Democratic participation is non-negotiable</td>
+</tr>
+<tr>
+<td>Create proposal</td>
+<td>1 per governance period</td>
+<td>Right to raise issues</td>
+</tr>
+<tr>
+<td>Send direct message</td>
+<td>5 per day</td>
+<td>Basic communication</td>
+</tr>
+<tr>
+<td>View own balances/history</td>
+<td>Unlimited</td>
+<td>Transparency is not a privilege</td>
+</tr>
+<tr>
+<td>Respond to disputes involving self</td>
+<td>Unlimited</td>
+<td>Right to defend oneself</td>
+</tr>
+</tbody></table>
+<h4>No Permanent Lockout</h4>
+<p>Fuel always regenerates. A member who exhausts their fuel today will have usable fuel tomorrow. There is no mechanism by which someone can be permanently excluded from participation.</p>
+<h4>Credits ≠ Fuel</h4>
+<p>Having many credits does not grant more fuel. Having zero credits does not prevent fuel regeneration. These are independent resources:</p>
+<ul>
+<li><strong>Credits</strong> = long-term economic power (what you&#39;ve earned and can spend)</li>
+<li><strong>Fuel</strong> = short-term activity budget (permission to act, regenerates daily)</li>
+</ul>
+<h4>Emergency Provisions</h4>
+<p>Coops may establish emergency fuel grants for members facing unusual circumstances (e.g., coordinating disaster response). This is a governance decision, not a protocol feature.</p>
+<h3>Fuel Regeneration Mechanics</h3>
+<p><strong>When regeneration happens</strong>: Fuel is computed <strong>lazily on read</strong>. When a member attempts an action, the system:</p>
+<ol>
+<li>Calculates time since <code>last_update</code></li>
+<li>Adds <code>elapsed_hours × regen_rate</code> to <code>available</code></li>
+<li>Caps at <code>min(member_max, coop_pool_remaining, federation_pool_remaining)</code></li>
+<li>Updates <code>last_update</code> to now</li>
+</ol>
+<p><strong>Pool exhaustion</strong>: When a pool is exhausted:</p>
+<ul>
+<li><strong>Member pool empty</strong>: Member waits for regeneration (hours, not days)</li>
+<li><strong>Coop pool empty</strong>: All coop members are throttled; governance should investigate</li>
+<li><strong>Federation pool empty</strong>: Cross-coop operations blocked; federation governance decides priority</li>
+<li><strong>Network pool empty</strong>: Cross-federation operations blocked (should be rare)</li>
+</ul>
+<p><strong>Priority during scarcity</strong>: Coops define priority policies (e.g., &quot;critical operations first&quot;, &quot;equal degradation&quot;, &quot;contribution-weighted&quot;). This is a governance decision, not hardcoded.</p>
+<h3>Compute Job Fuel Reservation</h3>
+<p>When submitting a compute job, fuel is reserved upfront and unused fuel is returned:</p>
+<pre><code class="language-rust">// When job is submitted
+impl ComputeManager {
+    pub async fn submit_job(&amp;self, job: ComputeJob) -&gt; Result&lt;JobId&gt; {
+        // Reserve fuel from submitter&#39;s account
+        let fuel_account = self.get_fuel_account(&amp;job.submitter)?;
+        fuel_account.reserve(job.fuel_budget)?;
+
+        // Submit job with reserved budget
+        let job_id = self.executor.submit(job)?;
+        Ok(job_id)
+    }
+}
+
+// When job completes
+impl ComputeManager {
+    pub async fn complete_job(&amp;self, job_id: JobId, result: JobResult) -&gt; Result&lt;()&gt; {
+        let job = self.get_job(&amp;job_id)?;
+        let fuel_used = result.fuel_consumed;
+
+        let fuel_account = self.get_fuel_account(&amp;job.submitter)?;
+        fuel_account.unreserve(job.fuel_budget);   // Release reservation
+        fuel_account.consume(fuel_used)?;           // Actually consume what was used
+
+        Ok(())
+    }
+}
+</code></pre>
+<h3>Organizational Fuel</h3>
+<p>Organizations (coops, communities, households) are first-class fuel consumers.</p>
+<h4>Organizational Fuel Pool</h4>
+<pre><code class="language-rust">pub struct OrganizationalFuel {
+    pub org: OrgId,
+    pub available: u64,
+    pub reserved: u64,
+    pub max: u64,
+    pub regen_rate: u64,
+    pub last_update: Timestamp,
+}
+</code></pre>
+<h4>How Organizations Earn Fuel</h4>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Mechanism</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Member contributions routed to org</strong></td>
+<td>Each hour of infra credit routed to org adds to org&#39;s fuel bonus</td>
+</tr>
+<tr>
+<td><strong>Org-owned infrastructure</strong></td>
+<td>Coops running their own nodes earn fuel directly</td>
+</tr>
+<tr>
+<td><strong>Member count</strong></td>
+<td>Base fuel scales with active membership</td>
+</tr>
+<tr>
+<td><strong>Federation membership</strong></td>
+<td>Federated orgs receive federation fuel allocations</td>
+</tr>
+</tbody></table>
+<h4>Organizational Fuel Calculation</h4>
+<pre><code class="language-rust">impl OrganizationalFuel {
+    pub fn calculate(org: &amp;Organization) -&gt; Self {
+        let member_base = org.active_members().len() as u64 * 50;
+        let infra_bonus = org.routed_contributions_this_period() / 10;
+        let federation_bonus = if org.is_federated() { 500 } else { 0 };
+
+        let max = member_base + infra_bonus + federation_bonus;
+        let regen_rate = max / 24;
+
+        OrganizationalFuel { max, regen_rate, /* ... */ }
+    }
+}
+</code></pre>
+<h4>What Organizations Use Fuel For</h4>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>Fuel Cost</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Publish org-wide announcements</td>
+<td>10</td>
+<td>Per message</td>
+</tr>
+<tr>
+<td>Run gateway services</td>
+<td>1/hour</td>
+<td>Continuous cost</td>
+</tr>
+<tr>
+<td>Execute org governance actions</td>
+<td>50</td>
+<td>Per proposal</td>
+</tr>
+<tr>
+<td>Send federation communications</td>
+<td>20</td>
+<td>Cross-org messaging</td>
+</tr>
+<tr>
+<td>Host compute jobs on behalf of members</td>
+<td>Variable</td>
+<td>Reserved like member jobs</td>
+</tr>
+</tbody></table>
+<h4>Rate Limits</h4>
+<p>Even organizations have limits:</p>
+<ul>
+<li>Maximum burst operations per hour</li>
+<li>Fuel exhaustion blocks non-critical operations</li>
+<li>Critical operations (governance, emergency comms) have separate reserve pool</li>
+</ul>
+<hr>
+<h2>Organizational Structures</h2>
+<p>ICN supports multiple forms of collective organization, recognizing that human needs span both <strong>civic life</strong> (belonging, care, stewardship) and <strong>economic life</strong> (livelihood, trade, production).</p>
+<h3>Two Pillars: Communities and Cooperatives</h3>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Community</th>
+<th>Cooperative</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Purpose</strong></td>
+<td>Civic / Public service</td>
+<td>Economic / Livelihood</td>
+</tr>
+<tr>
+<td><strong>Focus</strong></td>
+<td>Mutual aid, care, stewardship, advocacy</td>
+<td>Production, trade, services</td>
+</tr>
+<tr>
+<td><strong>Currency</strong></td>
+<td>Optional (gift, time bank, or own credits)</td>
+<td>Required (coop currency)</td>
+</tr>
+<tr>
+<td><strong>Examples</strong></td>
+<td>Neighborhoods, mutual aid networks, faith groups, advocacy orgs</td>
+<td>Worker coops, consumer coops, producer coops</td>
+</tr>
+<tr>
+<td><strong>Marketplace</strong></td>
+<td>Optional</td>
+<td>Core feature</td>
+</tr>
+</tbody></table>
+<p><strong>Key insight</strong>: These are complementary, not competing. A healthy ecosystem needs both. Individuals can (and should) be members of both communities and cooperatives.</p>
+<h3>The Organizational Spectrum</h3>
+<pre><code>INFORMAL ◄────────────────────────────────────────────────────► FORMAL
+
+┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
+│INDIVIDUAL│ │HOUSEHOLD │ │COMMUNITY │ │COOPERATIVE│ │FEDERATION│
+│          │ │          │ │          │ │          │ │          │
+│ 1 person │ │ Family/  │ │ Civic/   │ │ Economic │ │ Multiple │
+│ 1+ device│ │ friends  │ │ public   │ │ engine   │ │ orgs     │
+│          │ │          │ │ service  │ │          │ │          │
+└──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘
+</code></pre>
+<h3>Community Entity</h3>
+<pre><code class="language-rust">pub struct Community {
+    pub id: CommunityId,
+    pub name: String,
+    pub description: String,
+    pub community_type: CommunityType,
+    pub members: Vec&lt;CommunityMember&gt;,
+    pub governance: CommunityGovernance,
+    pub fuel_pool: FuelPool,
+    pub treasury: Option&lt;CommunityTreasury&gt;,
+    pub coop_partnerships: Vec&lt;CoopPartnership&gt;,
+    pub federation: Option&lt;FederationId&gt;,
+}
+
+pub enum CommunityType {
+    // Geographic
+    Neighborhood { location: Location },
+    Bioregion { region: Region },
+
+    // Identity
+    Cultural { culture: String },
+    Faith { tradition: String },
+    Affinity { affinity: String },
+
+    // Purpose
+    MutualAid { focus: String },
+    EnvironmentalStewardship { scope: String },
+    Advocacy { cause: String },
+    DisasterResponse { region: Region },
+
+    // Commons
+    CommonsManagement { resource: String },
+    DigitalCommons { domain: String },
+}
+</code></pre>
+<h3>Community-Cooperative Partnerships</h3>
+<p>Communities and cooperatives can form partnerships:</p>
+<pre><code class="language-rust">pub enum PartnershipType {
+    /// Community uses coop&#39;s economic infrastructure
+    EconomicServices {
+        marketplace_access: bool,
+        currency_access: bool
+    },
+
+    /// Coop provides services to community
+    ServiceProvider { services: Vec&lt;ServiceAgreement&gt; },
+
+    /// Community provides civic services to coop members
+    CivicServices { services: Vec&lt;CivicService&gt; },
+
+    /// Resource sharing
+    ResourceSharing {
+        infra_for_credits: bool,
+        shared_spaces: Vec&lt;SpaceAgreement&gt;
+    },
+
+    /// Full integration
+    Integrated {
+        auto_membership: bool,
+        benefit_sharing: BenefitSharing
+    },
+}
+
+pub enum CivicService {
+    MutualAid,
+    DisasterResponse,
+    ElderCare,
+    ChildCare,
+    CommunityGarden,
+    ToolLibrary,
+    SkillSharing,
+    Mediation,
+}
+</code></pre>
+<h3>Households</h3>
+<pre><code class="language-rust">pub struct Household {
+    pub id: HouseholdId,
+    pub name: String,
+    pub members: Vec&lt;HouseholdMember&gt;,
+    pub nodes: Vec&lt;NodeId&gt;,
+    pub benefit_sharing: BenefitSharing,
+    pub fuel_pool: FuelPool,  // Shared among household members
+}
+
+pub enum BenefitSharing {
+    Single { recipient: Did },
+    Equal,
+    ProportionalToContribution,
+    Custom { shares: HashMap&lt;Did, f64&gt; },
+}
+</code></pre>
+<h3>Multi-Membership</h3>
+<p>Individuals can belong to multiple organizations simultaneously:</p>
+<pre><code class="language-rust">pub struct IndividualMemberships {
+    pub did: Did,
+    pub household: Option&lt;HouseholdId&gt;,
+    pub communities: Vec&lt;CommunityMembership&gt;,   // Zero or more
+    pub cooperatives: Vec&lt;CoopMembership&gt;,       // Zero or more
+}
+</code></pre>
+<h3>Contribution Routing</h3>
+<p>When contributing infrastructure, individuals specify how to split between their organizations:</p>
+<pre><code class="language-rust">pub struct ContributionRouting {
+    pub allocations: Vec&lt;ContributionAllocation&gt;,
+}
+
+pub struct ContributionAllocation {
+    pub destination: ContributionDestination,
+    pub percentage: f64,
+}
+
+pub enum ContributionDestination {
+    Personal,
+    GlobalCommons,
+    Cooperative(CoopId),
+    Community {
+        community_id: CommunityId,
+        handling: CommunityContributionHandling
+    },
+    Federation(FederationId),
+}
+
+pub enum CommunityContributionHandling {
+    EarnCommunityCurrency,
+    CommunityTreasury,
+    PartnerCoop(CoopId),
+    Gift,  // No credits earned
+}
+</code></pre>
+<h3>Routing Exploitation Prevention</h3>
+<h4>The Attack</h4>
+<p>A wealthy member could:</p>
+<ol>
+<li>Create a &quot;household&quot; they control</li>
+<li>Route 100% of contributions there</li>
+<li>Household routes to a coop treasury they influence</li>
+<li>Use org-level privileges to gain disproportionate influence</li>
+</ol>
+<h4>Countermeasures</h4>
+<table>
+<thead>
+<tr>
+<th>Measure</th>
+<th>Implementation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Real membership requirement</strong></td>
+<td>Households need 2+ real DIDs with independent histories</td>
+</tr>
+<tr>
+<td><strong>Routing audit</strong></td>
+<td>All routing is publicly visible in ledger</td>
+</tr>
+<tr>
+<td><strong>Pass-through ceilings</strong></td>
+<td>Max % of org funds can come from single source</td>
+</tr>
+<tr>
+<td><strong>Velocity limits</strong></td>
+<td>Rapid routing changes trigger review</td>
+</tr>
+<tr>
+<td><strong>Beneficial ownership disclosure</strong></td>
+<td>Orgs must disclose controlling members</td>
+</tr>
+</tbody></table>
+<h4>Detection</h4>
+<pre><code class="language-rust">pub struct RoutingAudit {
+    /// Detect single-source dependency
+    pub fn detect_concentration(&amp;self, org: OrgId) -&gt; ConcentrationReport;
+
+    /// Detect circular routing patterns
+    pub fn detect_loops(&amp;self) -&gt; Vec&lt;RoutingLoop&gt;;
+
+    /// Detect rapid routing changes
+    pub fn detect_velocity_anomalies(&amp;self) -&gt; Vec&lt;VelocityAlert&gt;;
+
+    /// Check household legitimacy
+    pub fn verify_household_independence(&amp;self, household: HouseholdId) -&gt; bool;
+}
+</code></pre>
+<h4>Policy Recommendations</h4>
+<table>
+<thead>
+<tr>
+<th>Policy</th>
+<th>Suggested Default</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Max single-source contribution to org</td>
+<td>25%</td>
+</tr>
+<tr>
+<td>Min household members</td>
+<td>2</td>
+</tr>
+<tr>
+<td>Min member independence (shared history &lt; X%)</td>
+<td>50%</td>
+</tr>
+<tr>
+<td>Routing change cooldown</td>
+<td>30 days</td>
+</tr>
+</tbody></table>
+<h3>Community Currency Options</h3>
+<p>Communities choose their currency model:</p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Description</th>
+<th>Best For</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Gift Economy</strong></td>
+<td>No credits tracked, pure reciprocity</td>
+<td>Small, high-trust groups</td>
+</tr>
+<tr>
+<td><strong>Time Bank</strong></td>
+<td>1 hour = 1 hour (radical equality)</td>
+<td>Egalitarian communities</td>
+</tr>
+<tr>
+<td><strong>Community Credits</strong></td>
+<td>Own currency like coop credits</td>
+<td>Larger, diverse communities</td>
+</tr>
+<tr>
+<td><strong>Partner Currency</strong></td>
+<td>Use partner coop&#39;s currency</td>
+<td>Close coop alignment</td>
+</tr>
+</tbody></table>
+<h3>Incentive Gradient</h3>
+<p>More formalization = more benefits, but informal participation is welcomed:</p>
+<table>
+<thead>
+<tr>
+<th>Destination</th>
+<th>Fuel Access</th>
+<th>Credit Earning</th>
+<th>Trade Access</th>
+<th>Governance</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Personal</td>
+<td>10%</td>
+<td>Minimal</td>
+<td>Limited</td>
+<td>None</td>
+</tr>
+<tr>
+<td>Global Commons</td>
+<td>30%</td>
+<td>Federation Credits</td>
+<td>Network-wide</td>
+<td>None</td>
+</tr>
+<tr>
+<td>Community</td>
+<td>50%</td>
+<td>Community credits</td>
+<td>Local + partners</td>
+<td>Local</td>
+</tr>
+<tr>
+<td>Cooperative</td>
+<td>100%</td>
+<td>Full coop credits</td>
+<td>Coop + federation</td>
+<td>Full</td>
+</tr>
+</tbody></table>
+<h3>Example: Alex&#39;s Multi-Membership</h3>
+<p>Alex lives in a four-person household, belongs to a neighborhood community, and works in a tech worker coop. Here&#39;s how their contributions flow:</p>
+<p><strong>Contribution routing</strong>:</p>
+<pre><code>Alex&#39;s infrastructure contribution: 100 CPU-hours/month
+├── 50% → Tech Workers Coop (livelihood)     → 50 hours as tech-hours
+├── 30% → Smith Household (shared costs)     → 30 hours to household pool
+└── 20% → Oakwood Mutual Aid (community)     → 20 hours as oakwood-credits
+</code></pre>
+<p><strong>Fuel calculation</strong>: Alex&#39;s fuel allowance is based on their <strong>total</strong> contribution (100 hours worth), plus trust bonuses. The credits flow according to routing, but fuel reflects overall network contribution.</p>
+<p><strong>Spending</strong>:</p>
+<ul>
+<li>Alex uses tech-hours to buy services from fellow coop members</li>
+<li>The household pool covers shared subscriptions and childcare exchanges</li>
+<li>Oakwood-credits go to the community garden and tool library</li>
+</ul>
+<p><strong>Governance</strong>: Alex votes in:</p>
+<ul>
+<li>Tech Workers Coop (full member)</li>
+<li>Oakwood Community (full member)</li>
+<li>Their household doesn&#39;t have formal governance (decisions made at the kitchen table)</li>
+</ul>
+<p><strong>Federation access</strong>: Because Tech Workers Coop is in the PNW Federation, Alex can also spend tech-hours at Food Coop (federated) at the agreed exchange rate.</p>
+<hr>
+<h2>Internal Marketplace</h2>
+<p>Credits aren&#39;t just for infrastructure—they enable a full internal economy.</p>
+<h3>Listing Types</h3>
+<pre><code class="language-rust">pub struct Listing {
+    pub id: ListingId,
+    pub seller: Did,
+    pub cooperative: CoopId,
+    pub listing_type: ListingType,
+    pub title: String,
+    pub description: String,
+    pub price: Price,
+    pub availability: Availability,
+    pub trust_requirement: Option&lt;f64&gt;,
+    pub federation_scope: FederationScope,
+}
+
+pub enum ListingType {
+    Service { category: ServiceCategory, duration: Option&lt;Duration&gt; },
+    Good { category: GoodCategory, condition: Condition },
+    Digital { content_hash: ContentHash, license: License },
+    Infrastructure { resource_type: ResourceType, capacity: u64, duration: Duration },
+    Subscription { service: Box&lt;ListingType&gt;, period: Duration },
+}
+</code></pre>
+<h3>Price in Multiple Currencies</h3>
+<pre><code class="language-rust">pub struct Price {
+    pub amount: u64,
+    pub currency: String,  // &quot;hours&quot;, &quot;compute-hours&quot;, &quot;tomatoes&quot;, etc.
+    pub negotiable: bool,
+}
+</code></pre>
+<h3>Trade Proposals</h3>
+<pre><code class="language-rust">pub struct TradeProposal {
+    pub id: TradeId,
+    pub proposer: Did,
+    pub counterparty: Did,
+    pub offer: Vec&lt;TradeItem&gt;,
+    pub request: Vec&lt;TradeItem&gt;,
+    pub expires_at: Timestamp,
+    pub status: TradeStatus,
+}
+</code></pre>
+<h3>Fuel + Credits Together</h3>
+<pre><code class="language-rust">pub async fn execute_trade(&amp;self, trade: &amp;Trade) -&gt; Result&lt;TradeReceipt&gt; {
+    // Step 1: Check and consume FUEL (permission)
+    let fuel_cost = self.fuel_system.get_trade_cost(&amp;trade)?;
+    self.fuel_system.consume(&amp;trade.buyer, fuel_cost)?;
+
+    // Step 2: Check and transfer CREDITS (value)
+    self.ledger.transfer(&amp;trade.buyer, &amp;trade.seller, trade.amount)?;
+
+    Ok(TradeReceipt { /* ... */ })
+}
+</code></pre>
+<hr>
+<h2>Anti-Speculation Mechanisms</h2>
+<h3>1. Demurrage (Circulation Charge)</h3>
+<p>Credits lose value over time if not used. Demurrage may also be called a <strong>&quot;circulation charge&quot;</strong>—a small cost for holding credits idle, encouraging them to flow through the economy rather than accumulate.</p>
+<pre><code class="language-rust">pub struct DemurragePolicy {
+    pub rate: f64,           // e.g., 5% per year
+    pub period: Duration,    // Applied monthly
+    pub exemptions: Vec&lt;ExemptionRule&gt;,
+}
+</code></pre>
+<p><strong>Effect</strong>: Encourages circulation, discourages hoarding.</p>
+<h4>Demurrage Tradeoffs</h4>
+<p>Demurrage is the most politically sensitive economic parameter. It must be understood as a tradeoff, not a pure good.</p>
+<table>
+<thead>
+<tr>
+<th>If demurrage is too weak</th>
+<th>If demurrage is too strong</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Hoarding begins</td>
+<td>Resentment toward the system</td>
+</tr>
+<tr>
+<td>Store-of-value accumulation</td>
+<td>People flee to bridgeable variants</td>
+</tr>
+<tr>
+<td>Proto-capitalist dynamics</td>
+<td>Shadow currencies emerge</td>
+</tr>
+<tr>
+<td>Credit stratification</td>
+<td>Members feel punished for saving</td>
+</tr>
+<tr>
+<td>Circulation slows</td>
+<td>Loophole-seeking behavior</td>
+</tr>
+</tbody></table>
+<h4>Finding Balance</h4>
+<p><strong>Recommended starting point</strong>: 2-5% annually, applied monthly</p>
+<p><strong>Adjustments based on</strong>:</p>
+<ul>
+<li>Circulation velocity (if high, lower demurrage; if low, raise it)</li>
+<li>Member satisfaction surveys</li>
+<li>Credit concentration metrics</li>
+<li>Hoarding detection (large idle balances)</li>
+</ul>
+<h4>Demurrage Governance Layers</h4>
+<p>Demurrage is <strong>not</strong> a single global policy. It operates at multiple levels:</p>
+<table>
+<thead>
+<tr>
+<th>Level</th>
+<th>Sets</th>
+<th>Constraints</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Network</strong></td>
+<td>Maximum allowed rate, minimum review cadence</td>
+<td>e.g., &quot;No coop may set demurrage &gt; 20%/year&quot;</td>
+</tr>
+<tr>
+<td><strong>Federation</strong></td>
+<td>Recommended defaults for member coops</td>
+<td>e.g., &quot;PNW Federation recommends 5%/year&quot;</td>
+</tr>
+<tr>
+<td><strong>Cooperative</strong></td>
+<td>Actual policy via <code>demurrage/v1</code> contract</td>
+<td>Must stay within network constraints</td>
+</tr>
+</tbody></table>
+<h4>Exemptions (Required)</h4>
+<table>
+<thead>
+<tr>
+<th>Exemption</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Emergency reserves</strong></td>
+<td>Safety funds must not decay</td>
+</tr>
+<tr>
+<td><strong>Disaster response pools</strong></td>
+<td>Critical infrastructure</td>
+</tr>
+<tr>
+<td><strong>Committed liquidity</strong></td>
+<td>Already serving circulation</td>
+</tr>
+<tr>
+<td><strong>Short-term savings (&lt; 3 months)</strong></td>
+<td>Normal cash flow management</td>
+</tr>
+<tr>
+<td><strong>Hardship cases</strong></td>
+<td>Governance-approved exemptions</td>
+</tr>
+</tbody></table>
+<h4>Exemptions (Optional, Governance Choice)</h4>
+<table>
+<thead>
+<tr>
+<th>Exemption</th>
+<th>Consideration</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>New member grace period</td>
+<td>Helps onboarding</td>
+</tr>
+<tr>
+<td>Seasonal worker buffers</td>
+<td>Accounts for uneven earning</td>
+</tr>
+<tr>
+<td>Long-term project reserves</td>
+<td>Saving for equipment, property</td>
+</tr>
+</tbody></table>
+<h4>Exemption Examples</h4>
+<p>Demurrage should penalize idle hoarding, not structural precarity. Coops MAY exempt:</p>
+<table>
+<thead>
+<tr>
+<th>Exemption</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Disability flag</strong></td>
+<td>Members with reduced capacity shouldn&#39;t be penalized</td>
+</tr>
+<tr>
+<td><strong>Parental leave</strong></td>
+<td>Temporary absence for caregiving</td>
+</tr>
+<tr>
+<td><strong>Medical crisis</strong></td>
+<td>Illness, hospitalization, recovery</td>
+</tr>
+<tr>
+<td><strong>Seasonal workers</strong></td>
+<td>Some work is inherently cyclical</td>
+</tr>
+<tr>
+<td><strong>New members</strong></td>
+<td>Grace period (e.g., first 6 months)</td>
+</tr>
+</tbody></table>
+<p><strong>What demurrage never applies to</strong>:</p>
+<ul>
+<li>Governance-designated safety reserves (e.g., emergency funds, disaster response pools)</li>
+<li>Community treasuries with explicit mandates for accumulation (e.g., saving for a building purchase)</li>
+<li>Credits actively committed to liquidity pools</li>
+</ul>
+<p>These exemptions require explicit governance designation. The default is that all idle credits are subject to demurrage.</p>
+<h4>Transparency Requirement</h4>
+<p>Demurrage rates, exemptions, and collected fees must be publicly visible:</p>
+<ul>
+<li>How much demurrage collected this period</li>
+<li>Where it went (burned, redistributed, treasury)</li>
+<li>Who received exemptions</li>
+</ul>
+<h3>2. Contribution-Locked Exchange</h3>
+<p>You can only bridge credits you&#39;ve earned, not bought:</p>
+<pre><code class="language-rust">pub struct CreditProvenance {
+    pub original_contributor: Did,
+    pub contribution_type: ContributionType,
+    pub earned_at: Timestamp,
+    pub transfer_count: u32,
+}
+
+// Rule: Only credits with transfer_count == 0 can be bridged to fiat
+fn can_bridge_to_fiat(credit: &amp;Credit) -&gt; bool {
+    credit.provenance.transfer_count == 0 &amp;&amp;
+    credit.provenance.original_contributor == credit.holder
+}
+</code></pre>
+<p><strong>Effect</strong>: Speculators can&#39;t buy low and sell high to fiat. Only original contributors can cash out.</p>
+<p><strong>Important implication</strong>: Once you circulate your credits inside the cooperative economy, that value is locked to the commons; bridgeability is only for direct earned credits.</p>
+<h3>3. Cooperative Approval for Large Exchanges</h3>
+<pre><code class="language-rust">pub async fn request_bridge_out(
+    requester: Did,
+    amount: u64,
+    destination: BridgeDestination,
+) -&gt; Result&lt;BridgeRequest&gt; {
+    if amount &gt; GOVERNANCE_THRESHOLD {
+        let proposal = create_bridge_proposal(requester, amount, destination)?;
+        return Err(Error::RequiresGovernanceApproval(proposal.id));
+    }
+    execute_bridge(requester, amount, destination)
+}
+</code></pre>
+<h3>4. Exchange Rate Anchoring</h3>
+<p>Instead of market-determined prices, anchor to real costs:</p>
+<pre><code class="language-rust">pub struct ExchangeRatePolicy {
+    pub compute_anchor: FiatAmount,  // e.g., $0.05 USD per CPU-hour
+    pub storage_anchor: FiatAmount,  // e.g., $0.02 USD per GB-month
+    pub last_updated: Timestamp,
+    pub update_governance: ProposalId,
+}
+</code></pre>
+<h3>5. Bridge Restrictions</h3>
+<pre><code class="language-rust">pub struct BridgeRestrictions {
+    pub outflow_limit_per_period: u64,
+    pub holding_period: Duration,
+    pub governance_threshold: u64,
+    pub churn_penalty: f64,
+    pub identity_requirement: IdentityRequirement,
+}
+</code></pre>
+<hr>
+<h2>Credit Issuance Principles</h2>
+<h3>Who Can Issue Credits</h3>
+<p>Credits enter the system through:</p>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Mechanism</th>
+<th>Governance</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Infrastructure contribution</strong></td>
+<td>Protocol contract calculates from verified metrics</td>
+<td>Network-level formula</td>
+</tr>
+<tr>
+<td><strong>Human labor</strong></td>
+<td>Attestation workflow + org approval</td>
+<td>Coop/community policy</td>
+</tr>
+<tr>
+<td><strong>Bridge-in</strong></td>
+<td>External value deposited</td>
+<td>Bridge contract terms</td>
+</tr>
+<tr>
+<td><strong>Governance grant</strong></td>
+<td>Explicit proposal + vote</td>
+<td>Coop governance</td>
+</tr>
+</tbody></table>
+<h3>What Cannot Issue Credits</h3>
+<ul>
+<li><strong>Self-attestation alone</strong> (requires peer/org verification)</li>
+<li><strong>Unverified claims</strong> (must pass attestation threshold)</li>
+<li><strong>Protocol exploits</strong> (detected and penalized)</li>
+<li><strong>Off-ledger agreements</strong> (if not recorded, doesn&#39;t exist)</li>
+</ul>
+<h3>Issuance Rate Governance</h3>
+<p>Each coop sets:</p>
+<ul>
+<li>Maximum credits issuable per period</li>
+<li>Ratio of infrastructure vs. labor credits</li>
+<li>Bridge-in limits</li>
+<li>Emergency issuance procedures</li>
+</ul>
+<hr>
+<h2>Anti-Capture Principles</h2>
+<h3>Governance Capture Prevention</h3>
+<table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Wealthy members dominate</strong></td>
+<td>Voting power capped; 1-member-1-vote default</td>
+</tr>
+<tr>
+<td><strong>Infrastructure whales</strong></td>
+<td>Infra earnings capped as % of total issuance</td>
+</tr>
+<tr>
+<td><strong>Bridge arbitrage</strong></td>
+<td>Only original earner can bridge; governance approval for large amounts</td>
+</tr>
+<tr>
+<td><strong>Org treasury capture</strong></td>
+<td>Multi-sig requirements; transparency mandates</td>
+</tr>
+</tbody></table>
+<h3>Economic Capture Prevention</h3>
+<table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Credit hoarding</strong></td>
+<td>Demurrage penalizes idle balances</td>
+</tr>
+<tr>
+<td><strong>Market manipulation</strong></td>
+<td>No external market; internal rates governance-set</td>
+</tr>
+<tr>
+<td><strong>Liquidity drain</strong></td>
+<td>Outflow limits; holding periods</td>
+</tr>
+<tr>
+<td><strong>Sybil accumulation</strong></td>
+<td>Attestation requires real membership + trust</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Dispute Resolution</h2>
+<h3>Dispute Types</h3>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Examples</th>
+<th>Resolution Path</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Contribution disputes</strong></td>
+<td>&quot;They didn&#39;t do the work they claimed&quot;</td>
+<td>Attestation audit → org mediation → governance</td>
+</tr>
+<tr>
+<td><strong>Trade disputes</strong></td>
+<td>&quot;Service wasn&#39;t delivered as described&quot;</td>
+<td>Escrow release → mediation → governance</td>
+</tr>
+<tr>
+<td><strong>Attestation disputes</strong></td>
+<td>&quot;False attestation harmed me&quot;</td>
+<td>Fraud investigation → penalties</td>
+</tr>
+<tr>
+<td><strong>Membership disputes</strong></td>
+<td>&quot;Wrongful expulsion&quot;</td>
+<td>Appeals process → federation arbitration</td>
+</tr>
+</tbody></table>
+<h3>Resolution Process</h3>
+<pre><code class="language-rust">pub enum DisputeStatus {
+    Filed { filed_at: Timestamp, filer: Did },
+    InMediation { mediator: Did, started_at: Timestamp },
+    Escalated { proposal_id: ProposalId, escalation_reason: String, escalated_at: Timestamp },
+    Resolved { mediator: Did, outcome: DisputeOutcome, resolved_at: Timestamp },
+}
+
+pub enum DisputeOutcome {
+    Upheld,           // Filer wins
+    Rejected,         // Respondent wins
+    PartialAdjustment { amount: i64, currency: String },
+    VoidTransaction,  // Undo the disputed action
+}
+</code></pre>
+<h3>Escalation to Governance</h3>
+<p>When disputes cannot be resolved through mediation:</p>
+<ul>
+<li>Value exceeds mediator authority</li>
+<li>Mediator conflict of interest</li>
+<li>Disputed party rejects mediator decision</li>
+<li>Involves community-wide policy</li>
+</ul>
+<p>Escalated disputes become governance proposals for community vote.</p>
+<hr>
+<h2>Protocol Contracts</h2>
+<p>Economic rules are defined in CCL, not hardcoded. This enables:</p>
+<ul>
+<li><strong>Governance</strong>: Communities can update rules through proposals</li>
+<li><strong>Customization</strong>: Coops can extend or replace protocols</li>
+<li><strong>Auditability</strong>: Everyone can read the rules</li>
+<li><strong>Interoperability</strong>: Coops using same protocol are compatible</li>
+</ul>
+<h3>Network Standard Contracts</h3>
+<pre><code>icn://protocol/infrastructure-credit/v1    # Credit calculation
+icn://protocol/fuel-allocation/v1          # Fuel allowance formula
+icn://protocol/exchange/v1                 # AMM exchange pools
+icn://protocol/demurrage/v1                # Credit decay rules
+icn://protocol/membership/v1               # Coop membership rules
+</code></pre>
+<h3>Example: Infrastructure Credit Protocol</h3>
+<pre><code class="language-json">{
+  &quot;name&quot;: &quot;InfrastructureCreditProtocol&quot;,
+  &quot;version&quot;: &quot;1.0.0&quot;,
+  &quot;state_vars&quot;: [
+    {&quot;name&quot;: &quot;compute_rate&quot;, &quot;initial_value&quot;: {&quot;Int&quot;: 100}},
+    {&quot;name&quot;: &quot;storage_rate&quot;, &quot;initial_value&quot;: {&quot;Int&quot;: 10}},
+    {&quot;name&quot;: &quot;bandwidth_rate&quot;, &quot;initial_value&quot;: {&quot;Int&quot;: 5}}
+  ],
+  &quot;rules&quot;: [
+    {
+      &quot;name&quot;: &quot;calculate_credits&quot;,
+      &quot;params&quot;: [&quot;compute_hours&quot;, &quot;storage_gb&quot;, &quot;bandwidth_gb&quot;],
+      &quot;body&quot;: [
+        {&quot;Return&quot;: {&quot;value&quot;: {&quot;BinOp&quot;: {
+          &quot;op&quot;: &quot;Add&quot;,
+          &quot;left&quot;: {&quot;BinOp&quot;: {&quot;op&quot;: &quot;Mul&quot;, &quot;left&quot;: {&quot;Var&quot;: &quot;compute_hours&quot;}, &quot;right&quot;: {&quot;Var&quot;: &quot;compute_rate&quot;}}},
+          &quot;right&quot;: {&quot;BinOp&quot;: {&quot;op&quot;: &quot;Add&quot;,
+            &quot;left&quot;: {&quot;BinOp&quot;: {&quot;op&quot;: &quot;Mul&quot;, &quot;left&quot;: {&quot;Var&quot;: &quot;storage_gb&quot;}, &quot;right&quot;: {&quot;Var&quot;: &quot;storage_rate&quot;}}},
+            &quot;right&quot;: {&quot;BinOp&quot;: {&quot;op&quot;: &quot;Mul&quot;, &quot;left&quot;: {&quot;Var&quot;: &quot;bandwidth_gb&quot;}, &quot;right&quot;: {&quot;Var&quot;: &quot;bandwidth_rate&quot;}}}
+          }}
+        }}}}
+      ]
+    },
+    {
+      &quot;name&quot;: &quot;update_rates&quot;,
+      &quot;params&quot;: [&quot;new_compute&quot;, &quot;new_storage&quot;, &quot;new_bandwidth&quot;],
+      &quot;requires&quot;: [{&quot;Comment&quot;: &quot;Must be called via governance proposal&quot;}],
+      &quot;body&quot;: [
+        {&quot;Assign&quot;: {&quot;var&quot;: &quot;compute_rate&quot;, &quot;value&quot;: {&quot;Var&quot;: &quot;new_compute&quot;}}},
+        {&quot;Assign&quot;: {&quot;var&quot;: &quot;storage_rate&quot;, &quot;value&quot;: {&quot;Var&quot;: &quot;new_storage&quot;}}},
+        {&quot;Assign&quot;: {&quot;var&quot;: &quot;bandwidth_rate&quot;, &quot;value&quot;: {&quot;Var&quot;: &quot;new_bandwidth&quot;}}}
+      ]
+    }
+  ]
+}
+</code></pre>
+<h3>Protocol Adoption</h3>
+<p>Coops can:</p>
+<ol>
+<li><strong>Adopt</strong> protocol contracts as-is</li>
+<li><strong>Extend</strong> with custom rules</li>
+<li><strong>Create</strong> entirely custom contracts</li>
+<li><strong>Require</strong> protocol compliance for federation membership</li>
+</ol>
+<hr>
+<h2>Exchange Architecture</h2>
+<pre><code>┌─────────────────────────────────────────────────────────────────────┐
+│                                                                      │
+│                        ICN INTERNAL                                  │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐             │
+│  │   Coop A    │◄──►│   Coop B    │◄──►│   Coop C    │             │
+│  │  (internal) │    │  (internal) │    │  (internal) │             │
+│  └─────────────┘    └─────────────┘    └─────────────┘             │
+│         │                  │                  │                      │
+│         └──────────────────┼──────────────────┘                     │
+│                            │                                         │
+│                   ┌────────▼────────┐                               │
+│                   │   Federation    │  ◄── Tier 2                   │
+│                   │     Ledger      │      (Coop-to-coop)           │
+│                   └────────┬────────┘                               │
+│                            │                                         │
+│ ═══════════════════════════╪════════════════════════════════════════│
+│                            │                                         │
+│                   ┌────────▼────────┐                               │
+│                   │  Bridge Layer   │  ◄── Tier 3                   │
+│                   │  (Governed)     │      (Requires approval)      │
+│                   └────────┬────────┘                               │
+│                            │                                         │
+└────────────────────────────┼────────────────────────────────────────┘
+                             │
+              ┌──────────────┼──────────────┐
+              │              │              │
+       ┌──────▼──────┐ ┌─────▼─────┐ ┌─────▼─────┐
+       │    Fiat     │ │  Crypto   │ │  Other    │
+       │   (Banks)   │ │ (Bridges) │ │ Networks  │
+       └─────────────┘ └───────────┘ └───────────┘
+</code></pre>
+<h3>Exchange Manager</h3>
+<pre><code class="language-rust">pub struct ExchangeManager {
+    ledger: Arc&lt;RwLock&lt;Ledger&gt;&gt;,
+    trust_graph: Arc&lt;RwLock&lt;TrustGraph&gt;&gt;,
+    governance: Arc&lt;GovernanceManager&gt;,
+    federation_agreements: HashMap&lt;(CoopId, CoopId), FederationAgreement&gt;,
+    bridge_config: BridgeConfig,
+}
+
+impl ExchangeManager {
+    /// Internal transfer (Tier 1) - always allowed within coop
+    pub async fn internal_transfer(&amp;self, from: Did, to: Did, amount: u64, currency: Currency) -&gt; Result&lt;TransferReceipt&gt;;
+
+    /// Federated transfer (Tier 2) - requires federation agreement
+    pub async fn federated_transfer(&amp;self, from: Did, from_coop: CoopId, to_coop: CoopId, amount: u64) -&gt; Result&lt;TransferReceipt&gt;;
+
+    /// Bridge out (Tier 3) - requires governance for large amounts
+    pub async fn bridge_out(&amp;self, requester: Did, amount: u64, destination: BridgeDestination) -&gt; Result&lt;BridgeReceipt&gt;;
+
+    /// Bridge in - convert external value to credits
+    pub async fn bridge_in(&amp;self, depositor: Did, source: BridgeSource, amount: u64) -&gt; Result&lt;DepositReceipt&gt;;
+}
+</code></pre>
+<hr>
+<h2>Implementation Roadmap</h2>
+<h3>Phase 0: Foundations (2 weeks)</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Terminology documentation (glossary)</li>
+<li><input disabled="" type="checkbox"> Protocol contracts v1 (CCL files)<ul>
+<li><code>infrastructure-credit-v1.ccl.json</code></li>
+<li><code>fuel-allocation-v1.ccl.json</code></li>
+</ul>
+</li>
+<li><input disabled="" type="checkbox"> Organization lifecycle RFC</li>
+<li><input disabled="" type="checkbox"> Bootstrapping RFC</li>
+</ul>
+<h3>Phase 1: Contribution &amp; Metering (4 weeks)</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Resource metering (extend <code>icn-obs</code>)</li>
+<li><input disabled="" type="checkbox"> Contribution tracking module</li>
+<li><input disabled="" type="checkbox"> Attestation protocol (extend <code>icn-gossip</code>)</li>
+<li><input disabled="" type="checkbox"> Credit issuance (extend <code>icn-ledger</code>)</li>
+<li><input disabled="" type="checkbox"> CLI: <code>icnctl contribution show/claim/attest</code></li>
+</ul>
+<h3>Phase 2: Fuel System (4 weeks)</h3>
+<ul>
+<li><input disabled="" type="checkbox"> New crate: <code>icn-fuel</code></li>
+<li><input disabled="" type="checkbox"> Operation costs integration</li>
+<li><input disabled="" type="checkbox"> Contribution → fuel bonus</li>
+<li><input disabled="" type="checkbox"> Compute job reservation model</li>
+<li><input disabled="" type="checkbox"> CLI: <code>icnctl fuel status</code></li>
+</ul>
+<h3>Phase 3: Organizations (4 weeks)</h3>
+<ul>
+<li><input disabled="" type="checkbox"> New crate: <code>icn-organization</code></li>
+<li><input disabled="" type="checkbox"> Community entity</li>
+<li><input disabled="" type="checkbox"> Household entity</li>
+<li><input disabled="" type="checkbox"> Multi-membership support</li>
+<li><input disabled="" type="checkbox"> Contribution routing</li>
+<li><input disabled="" type="checkbox"> CLI: <code>icnctl org create/join/leave</code></li>
+</ul>
+<h3>Phase 4: Exchange (6 weeks)</h3>
+<ul>
+<li><input disabled="" type="checkbox"> New crate: <code>icn-exchange</code></li>
+<li><input disabled="" type="checkbox"> Federation credits</li>
+<li><input disabled="" type="checkbox"> Exchange pools (AMM)</li>
+<li><input disabled="" type="checkbox"> Demurrage implementation</li>
+<li><input disabled="" type="checkbox"> Bridge framework</li>
+<li><input disabled="" type="checkbox"> CLI: <code>icnctl exchange swap/provide/bridge</code></li>
+</ul>
+<h3>Phase 5: Marketplace (4 weeks)</h3>
+<ul>
+<li><input disabled="" type="checkbox"> New crate: <code>icn-marketplace</code></li>
+<li><input disabled="" type="checkbox"> Listings</li>
+<li><input disabled="" type="checkbox"> Trade proposals</li>
+<li><input disabled="" type="checkbox"> Search/discovery</li>
+<li><input disabled="" type="checkbox"> CLI: <code>icnctl marketplace list/create/trade</code></li>
+</ul>
+<h3>Phase 6: Hardening (4 weeks)</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Dispute resolution system</li>
+<li><input disabled="" type="checkbox"> Security threat model</li>
+<li><input disabled="" type="checkbox"> Privacy audit</li>
+<li><input disabled="" type="checkbox"> Failure mode testing</li>
+</ul>
+<h3>Phase 7: UX (8 weeks)</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Web dashboard</li>
+<li><input disabled="" type="checkbox"> Mobile client (<code>icn-lite</code>)</li>
+<li><input disabled="" type="checkbox"> Onboarding flows</li>
+<li><input disabled="" type="checkbox"> Admin tools</li>
+</ul>
+<hr>
+<h2>Technical Specifications</h2>
+<h3>Provenance Tracking</h3>
+<pre><code class="language-rust">pub struct CreditUnit {
+    pub id: ContentHash,
+    pub amount: u64,
+    pub currency: Currency,
+    pub provenance: Provenance,
+}
+
+pub struct Provenance {
+    pub origin: Origin,
+    pub history: Vec&lt;Transfer&gt;,
+}
+
+pub enum Origin {
+    Contribution { contributor: Did, resource_type: ResourceType, verified_by: Vec&lt;Did&gt;, timestamp: Timestamp },
+    BridgedIn { source: BridgeSource, original_value: ExternalValue, timestamp: Timestamp },
+    GovernanceCreated { proposal_id: ProposalId, purpose: String },
+}
+</code></pre>
+<h3>Donation Configuration</h3>
+<pre><code class="language-rust">pub struct DonationConfig {
+    pub donor_did: Did,
+    pub resource_types: Vec&lt;ResourceType&gt;,
+    pub credit_destination: CreditDestination,
+}
+
+pub enum CreditDestination {
+    CooperativeTreasury(CoopId),
+    NewMemberPool,
+    Burn,
+    UniversalBasicInfrastructure,
+}
+</code></pre>
+<h3>API Endpoints</h3>
+<pre><code>POST   /v1/contribution/claim           # Submit contribution claim
+GET    /v1/contribution/claims          # List pending claims
+POST   /v1/contribution/attest          # Attest to a claim
+GET    /v1/contribution/balance         # View contribution balance
+GET    /v1/contribution/history         # Contribution history
+
+POST   /v1/marketplace/listing          # Create listing
+GET    /v1/marketplace/listings         # Browse listings
+POST   /v1/marketplace/trade            # Propose trade
+GET    /v1/marketplace/trades           # View trade proposals
+POST   /v1/marketplace/trade/:id/accept # Accept trade
+
+POST   /v1/exchange/internal            # Internal transfer
+POST   /v1/exchange/federated           # Federated transfer
+POST   /v1/exchange/bridge/out          # Request bridge out
+POST   /v1/exchange/bridge/in           # Bridge in external value
+GET    /v1/exchange/rates               # View exchange rates
+
+POST   /v1/fuel/status                  # View fuel status
+GET    /v1/fuel/history                 # Fuel consumption history
+
+POST   /v1/org/create                   # Create organization
+POST   /v1/org/join                     # Join organization
+POST   /v1/org/leave                    # Leave organization
+GET    /v1/org/memberships              # View memberships
+</code></pre>
+<h3>CLI Commands</h3>
+<pre><code class="language-bash"># Contribution
+icnctl contribution show
+icnctl contribution claim --type compute --amount 100 --evidence &lt;hash&gt;
+icnctl contribution attest &lt;claim-hash&gt;
+icnctl contribution balance
+
+# Fuel
+icnctl fuel status
+icnctl fuel history
+
+# Marketplace
+icnctl marketplace list
+icnctl marketplace create --type service --title &quot;Tutoring&quot; --price &quot;10 hours&quot;
+icnctl marketplace trade --offer &quot;20 compute-hours&quot; --request &quot;2 hours&quot;
+
+# Exchange
+icnctl exchange transfer --to &lt;did&gt; --amount 10 --currency hours
+icnctl exchange federate --to-coop &lt;coop-id&gt; --amount 100
+icnctl exchange bridge --amount 50 --destination bank:iban:...
+icnctl exchange rates
+
+# Organization
+icnctl org create --type coop --name &quot;Tech Workers&quot;
+icnctl org create --type community --name &quot;Oakwood Neighbors&quot;
+icnctl org join &lt;org-id&gt;
+icnctl org leave &lt;org-id&gt;
+icnctl org memberships
+
+# Contribution routing
+icnctl contribution route --to coop:tech-workers --percent 70
+icnctl contribution route --to community:oakwood --percent 30
+</code></pre>
+<h3>Prometheus Metrics</h3>
+<pre><code class="language-prometheus"># Contribution
+icn_contribution_claims_total{resource_type}
+icn_contribution_attestations_total{resource_type}
+icn_contribution_verified_total{resource_type}
+icn_contribution_balance{did, currency}
+
+# Fuel
+icn_fuel_consumed_total{operation}
+icn_fuel_available{did}
+icn_fuel_reserved{did}
+icn_fuel_regenerated_total
+icn_fuel_exhausted_total
+
+# Marketplace
+icn_marketplace_listings_total{type}
+icn_marketplace_trades_total{status}
+icn_marketplace_trade_volume{currency}
+
+# Exchange
+icn_exchange_internal_total{currency}
+icn_exchange_federated_total{from_coop, to_coop}
+icn_exchange_bridge_out_total{destination_type}
+icn_exchange_bridge_in_total{source_type}
+
+# Organizations
+icn_org_members_total{org_type, org_id}
+icn_org_partnerships_total{type}
+
+# Anti-speculation
+icn_demurrage_applied_total{currency}
+icn_bridge_blocked_governance_total
+</code></pre>
+<h3>CCL Contract References</h3>
+<table>
+<thead>
+<tr>
+<th>Contract</th>
+<th>Purpose</th>
+<th>Governance Level</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icn://protocol/infrastructure-credit/v1</code></td>
+<td>Credit calculation formulas</td>
+<td>Network-wide</td>
+</tr>
+<tr>
+<td><code>icn://protocol/fuel-allocation/v1</code></td>
+<td>Fuel allowance rules</td>
+<td>Federation/Coop</td>
+</tr>
+<tr>
+<td><code>icn://protocol/exchange/v1</code></td>
+<td>Exchange pool mechanics</td>
+<td>Federation</td>
+</tr>
+<tr>
+<td><code>icn://protocol/demurrage/v1</code></td>
+<td>Credit decay policy</td>
+<td>Coop</td>
+</tr>
+<tr>
+<td><code>icn://protocol/membership/v1</code></td>
+<td>Membership rules</td>
+<td>Coop</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Design Invariants</h2>
+<p>These properties must hold at all times:</p>
+<table>
+<thead>
+<tr>
+<th>Invariant</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>No external token</strong></td>
+<td>There is no ICN coin tradeable on public exchanges</td>
+</tr>
+<tr>
+<td><strong>Fuel always regenerates</strong></td>
+<td>No permanent lockout from participation</td>
+</tr>
+<tr>
+<td><strong>Credits require verification</strong></td>
+<td>Self-attestation alone cannot create credits</td>
+</tr>
+<tr>
+<td><strong>Demurrage exemptions are explicit</strong></td>
+<td>Default is all idle credits decay</td>
+</tr>
+<tr>
+<td><strong>Bridge requires governance</strong></td>
+<td>Large outflows need community approval</td>
+</tr>
+<tr>
+<td><strong>Provenance is reconstructible</strong></td>
+<td>For bridge-eligible credits only</td>
+</tr>
+<tr>
+<td><strong>Orgs are transparent</strong></td>
+<td>Routing, treasury, membership visible</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Non-Goals</h2>
+<p>To maintain focus, this RFC explicitly does <strong>not</strong> cover:</p>
+<ul>
+<li><strong>External token creation</strong> - No ICN token on public exchanges</li>
+<li><strong>Proof-of-work mining</strong> - No competitive hash racing</li>
+<li><strong>Fully anonymous contribution</strong> - DIDs required (pseudonymous OK)</li>
+<li><strong>Unlimited bridging</strong> - External exchange is governed, not permissionless</li>
+<li><strong>Smart contract Turing-completeness</strong> - CCL is intentionally limited</li>
+<li><strong>Non-infrastructure contribution rewards</strong> - Future RFC will address governance participation, care work, etc. via peer endorsement</li>
+</ul>
+<p>These may be revisited in future RFCs based on community needs.</p>
+<hr>
+<h2>Open Questions</h2>
+<h3>Economic</h3>
+<ol>
+<li><p><strong>Credit exchange rates</strong>: Should 1 compute-hour = 1 storage-GB-month? Or let cooperatives set their own rates?</p>
+</li>
+<li><p><strong>Decay/demurrage rate</strong>: What&#39;s the optimal rate? Too high punishes savers, too low doesn&#39;t prevent hoarding.</p>
+</li>
+<li><p><strong>New member bootstrapping</strong>: How do new nodes earn initial trust to have their contributions attested?</p>
+</li>
+<li><p><strong>Cross-cooperative credits</strong>: Can infrastructure credits earned in Coop A be spent in Coop B? (Federation tier handles this, but what are the default policies?)</p>
+</li>
+<li><p><strong>Infrastructure vs human labor equity</strong>: Infra contributors may be wealthier members with hardware, power, and capital. If infra-hours are valued higher than human labor hours, this could create internal class dynamics. Coops should consciously decide relative rates.</p>
+</li>
+<li><p><strong>Hardware access programs</strong>: Should federations facilitate hardware lending/grants so infrastructure contribution isn&#39;t limited to those who can afford equipment?</p>
+</li>
+</ol>
+<h3>Technical</h3>
+<ol start="7">
+<li><p><strong>Verification scaling</strong>: How do we verify contributions from thousands of nodes efficiently?</p>
+</li>
+<li><p><strong>Sybil resistance</strong>: How do we prevent someone from running many fake nodes to game attestations?</p>
+</li>
+<li><p><strong>Storage of provenance</strong>: Do we track full provenance for all credits, or just Tier 3 bridge candidates?</p>
+</li>
+</ol>
+<h3>Governance</h3>
+<ol start="10">
+<li><p><strong>Policy defaults</strong>: What should the default policies be for new cooperatives?</p>
+</li>
+<li><p><strong>Bridge governance</strong>: Who approves bridge requests? Cooperative governance? Federation governance?</p>
+</li>
+<li><p><strong>Exchange rate governance</strong>: How often should anchored exchange rates be updated?</p>
+</li>
+</ol>
+<h3>Fuel System</h3>
+<ol start="13">
+<li><p><strong>Fuel regeneration curve</strong>: Linear? Logarithmic? Based on network load?</p>
+</li>
+<li><p><strong>Cross-federation fuel</strong>: If federations federate, how does fuel work?</p>
+</li>
+<li><p><strong>Emergency fuel</strong>: What if someone legitimately needs to do something but is out of fuel?</p>
+</li>
+<li><p><strong>Fuel vs. credit limits</strong>: How do fuel limits interact with credit limits? Double protection or redundant?</p>
+</li>
+</ol>
+<h3>Organizations</h3>
+<ol start="17">
+<li><p><strong>Organization lifecycle</strong>: How do coops/communities get created, dissolved, merged? (Needs separate RFC)</p>
+</li>
+<li><p><strong>Federation joining</strong>: What are the requirements for joining a federation? (Needs separate RFC)</p>
+</li>
+<li><p><strong>Dispute resolution</strong>: How are disputes between members, between orgs, handled? (Needs separate RFC)</p>
+</li>
+</ol>
+<h3>Privacy</h3>
+<ol start="20">
+<li><p><strong>Contribution surveillance</strong>: How much granularity do we expose in contribution metrics without deanonymizing or surveilling members? What&#39;s the right balance between transparency and privacy?</p>
+</li>
+<li><p><strong>Attestation privacy</strong>: When peers attest to contributions, how much do they learn about each other&#39;s activity patterns?</p>
+</li>
+</ol>
+<h3>Protocol Contracts</h3>
+<ol start="22">
+<li><p><strong>Contract upgrade path</strong>: How do we migrate coops from v1 to v2 of a protocol contract?</p>
+</li>
+<li><p><strong>Custom contract security</strong>: How do we audit/trust custom economic contracts?</p>
+</li>
+<li><p><strong>Cross-coop protocol conflicts</strong>: What if federated coops use incompatible protocol versions?</p>
+</li>
+</ol>
+<h3>Non-Infrastructure Contributions (Future)</h3>
+<ol start="25">
+<li><strong>Peer endorsement system</strong>: How do we recognize governance participation, moderation, care work without enabling spam? Counting activities (proposals created, votes cast) incentivizes quantity over quality. Needs endorsement-based design.</li>
+</ol>
+<hr>
+<h2>References</h2>
+<h3>ICN Documentation</h3>
+<ul>
+<li><a href="/docs/development/sessions/undated/ROADMAP">ROADMAP.md</a> - Strategic roadmap</li>
+<li><a href="/docs/glossary">glossary.md</a> - Authoritative terminology definitions</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/economic-safety">economic-safety.md</a> - Credit limits and disputes</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/econ-modeling">econ-modeling.md</a> - Economic simulation results</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/governance/governance">../governance/governance.md</a> - Governance primitives</li>
+<li><a href="/docs/development/federation-roadmap-implementation">docs/federation-roadmap-implementation.md</a> - Federation layer</li>
+</ul>
+<h3>External References</h3>
+<ul>
+<li>Lietaer, Bernard. &quot;The Future of Money&quot; (2001) - Mutual credit history</li>
+<li>Gesell, Silvio. &quot;The Natural Economic Order&quot; (1916) - Demurrage theory</li>
+<li>North, Peter. &quot;Money and Liberation&quot; (2007) - Cooperative currency philosophy</li>
+</ul>
+<hr>
+<h2>Core Principles</h2>
+<p>The design reflects these foundational beliefs:</p>
+<ol>
+<li><p><strong>Infrastructure is Labor</strong>
+Running a node is work, just like tutoring or growing tomatoes. All labor earns credits in the same mutual credit system.</p>
+</li>
+<li><p><strong>No Speculation</strong>
+No token. No external exchange. Value from reciprocity, not scarcity. Demurrage prevents hoarding. Governance controls bridging.</p>
+</li>
+<li><p><strong>Contribution Enables Action</strong>
+Your fuel (capacity to act) comes from your contribution. More contribution = more fuel = more you can do. But fuel regenerates, so no one is locked out.</p>
+</li>
+<li><p><strong>Two Pillars: Civic + Economic</strong>
+Communities for belonging, care, stewardship. Cooperatives for livelihoods, trade, production. Both are essential. Individuals belong to both.</p>
+</li>
+<li><p><strong>Rules Are Contracts, Not Code</strong>
+Economic parameters live in CCL protocol contracts. Governance can update them. No hard forks needed. Communities can customize.</p>
+</li>
+<li><p><strong>Subsidiarity</strong>
+Decisions at the lowest appropriate level: Member &lt; Coop/Community &lt; Federation &lt; Network. Higher levels only for cross-boundary concerns.</p>
+</li>
+<li><p><strong>Peer Recognition, Not Self-Report</strong>
+You earn credit when others attest to your contribution. Trust comes from the network, not from assertion.</p>
+</li>
+<li><p><strong>Inclusive On-Ramp</strong>
+Start as individual → join community → join coop → federate. Global Commons accepts anyone. Progressive benefits incentivize formalization.</p>
+</li>
+</ol>
+<hr>
+<h2>Conclusion</h2>
+<p>The contribution credit system enables ICN to:</p>
+<ol>
+<li><strong>Reward infrastructure contributors</strong> with fungible credits</li>
+<li><strong>Avoid speculation</strong> through demurrage, provenance tracking, and governance</li>
+<li><strong>Enable internal economic activity</strong> through marketplace and multi-currency support</li>
+<li><strong>Interface with external economy</strong> through governed bridge layer</li>
+<li><strong>Support diverse organizations</strong> through communities and cooperatives as equal pillars</li>
+<li><strong>Rate-limit fairly</strong> through unified, regenerative fuel system</li>
+</ol>
+<p><strong>Philosophy</strong>: Start with Tier 1 (internal credits), add Tier 2 (federation) when multiple coops exist, add Tier 3 (bridges) only after governance processes are battle-tested. Let communities earn exchangeability through demonstrated good governance.</p>
+<hr>
+<p><strong>Status</strong>: Design Document (RFC)
+<strong>Next Steps</strong>: Community review → Governance proposal → Implementation planning
+<strong>Feedback</strong>: Open issues at <a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">https://github.com/InterCooperative-Network/icn/issues</a></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

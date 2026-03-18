@@ -1,0 +1,448 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>IPv6 Dual-Stack Transport and Endpoint Sets Design | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ipv6 endpoint sets design</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/ipv6-endpoint-sets-design.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>IPv6 Dual-Stack Transport and Endpoint Sets Design</h1>
+<p><strong>Status</strong>: Accepted — Phases 21-22
+<strong>Priority</strong>: Tier 1 — Network Connectivity
+<strong>Supersedes</strong>: Portions of <code>nat-traversal-design.md</code> (connection strategy section)</p>
+<hr>
+<h2>Problem Statement</h2>
+<p>ICN currently models each peer as having exactly one network address (<code>SocketAddr</code>). This creates three
+compounding problems:</p>
+<ol>
+<li><strong>NAT fragility</strong>: A peer&#39;s single &quot;best&quot; address is a guess. When it&#39;s wrong, you fall back to relay
+with no middle ground.</li>
+<li><strong>IPv4-only default</strong>: All bind defaults use <code>0.0.0.0</code>, blocking adoption of IPv6-native infrastructure.</li>
+<li><strong>No overlay routing</strong>: Cooperatives and federations operating on private meshes (WireGuard, site VPNs)
+have no way to signal their preferred internal path.</li>
+</ol>
+<h2>Goals</h2>
+<ul>
+<li>Every peer advertises a <strong>typed set</strong> of reachable endpoints (ULA, global v6, public v4, private v4, relay)</li>
+<li>Connection dialing uses a <strong>Happy Eyeballs</strong> strategy: try best candidates in priority order with staggered
+start, first success wins</li>
+<li>All existing IPv4 behavior is preserved — no adoption blocking</li>
+<li>IPv6 is preferred when available, but never required</li>
+<li>ULA addresses (<code>fd::/8</code>) provide a clean internal routing fabric for federation overlays</li>
+<li>Identity remains DID-only — IP addresses are transport hints, never identity or authority</li>
+</ul>
+<h2>Non-Goals</h2>
+<ul>
+<li>Full overlay routing protocol (route exchange, path vector, BGP-like)</li>
+<li>Encoding governance or trust into IP addresses</li>
+<li>Requiring nodes to have IPv6 connectivity</li>
+<li>Changing the DID / capability / governance layers</li>
+</ul>
+<hr>
+<h2>Architecture</h2>
+<h3>Core Type: <code>EndpointCandidate</code></h3>
+<pre><code class="language-rust">/// Classification of a network endpoint by reachability scope
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum EndpointType {
+    /// ULA IPv6 (fd::/8) — internal overlay, highest priority within same mesh
+    UlaV6,
+    /// Globally routable IPv6 (2000::/3)
+    GlobalV6,
+    /// Public IPv4 (internet-reachable, confirmed by STUN)
+    PublicV4,
+    /// Private IPv4 (RFC1918 — useful within LAN)
+    PrivateV4,
+    /// TURN relay fallback (last resort)
+    Relay,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EndpointCandidate {
+    pub endpoint_type: EndpointType,
+    pub addr: SocketAddr,
+    /// Lower = preferred. Defaults: UlaV6=10, GlobalV6=20, PrivateV4=30, PublicV4=40, Relay=100
+    pub priority: u16,
+}
+</code></pre>
+<p><code>EndpointType</code> is auto-derivable from <code>SocketAddr</code>:</p>
+<ul>
+<li><code>fd::/8</code> → <code>UlaV6</code></li>
+<li><code>2000::/3</code> → <code>GlobalV6</code></li>
+<li><code>10/8</code>, <code>172.16/12</code>, <code>192.168/16</code> → <code>PrivateV4</code></li>
+<li>Other v4 → <code>PublicV4</code></li>
+<li>Relay addresses require explicit tagging</li>
+</ul>
+<h3>Updated <code>ConnectionCandidate</code></h3>
+<pre><code class="language-rust">pub struct ConnectionCandidate {
+    pub did: Did,
+    pub endpoints: Vec&lt;EndpointCandidate&gt;,  // sorted by priority
+    pub timestamp: u64,
+    pub version: u8,  // bumped to 2
+
+    // Backward compat — populated for old nodes, deprecated
+    #[serde(default)] pub local_addr: Option&lt;SocketAddr&gt;,
+    #[serde(default)] pub public_addr: Option&lt;SocketAddr&gt;,
+    #[serde(default)] pub relay_addr: Option&lt;SocketAddr&gt;,
+}
+</code></pre>
+<p><code>ConnectionCandidate</code> uses JSON serialization (gossip topic <code>network:candidates</code>). The <code>#[serde(default)]</code>
+on old fields means old nodes silently ignore <code>endpoints</code>; new nodes prefer <code>endpoints</code> when present.</p>
+<hr>
+<h2>Happy Eyeballs Dialer</h2>
+<p>Replaces the current <code>dial_with_fallback()</code> in <code>nat_dial.rs</code>.</p>
+<p><strong>Algorithm:</strong></p>
+<ol>
+<li>Sort endpoints by <code>priority</code> (ascending)</li>
+<li>Start attempt for highest-priority endpoint</li>
+<li>After <code>happy_eyeballs_delay_ms</code> (default: 250ms), start next endpoint attempt</li>
+<li>Continue staggering until all endpoints are in flight or one succeeds</li>
+<li>First successful connection wins; cancel all others</li>
+<li>If all fail, return aggregate error</li>
+</ol>
+<p><strong>Config additions to <code>NatDialConfig</code>:</strong></p>
+<pre><code class="language-toml">[network.nat]
+ula_v6_dial_timeout_ms = 1000
+global_v6_dial_timeout_ms = 5000
+happy_eyeballs_delay_ms = 250
+# existing fields preserved:
+local_dial_timeout_ms = 2000
+public_dial_timeout_ms = 5000
+relay_dial_timeout_ms = 30000
+</code></pre>
+<p><strong>DID-keyed connection map</strong>: The session map is already keyed by DID. When multiple candidates are
+racing, a &quot;already connected&quot; check prevents duplicate connections to the same peer.</p>
+<hr>
+<h2>Wire Protocol Compatibility</h2>
+<h3>Capability Flags</h3>
+<p>Add <code>ENDPOINT_SETS = 0b1_000_000_000_000</code> to the existing <code>CapabilityFlags</code> bitflags in <code>version.rs</code>.
+Peers advertise this flag in the Hello handshake. Both sides check for the flag before sending typed
+endpoint data in <code>KnownPeer</code>.</p>
+<h3>Protocol Version</h3>
+<p>Bump <code>MAX_SUPPORTED_VERSION</code> to 2. Version 1 (current) nodes remain fully supported. Version negotiation
+in the existing Hello handshake handles the transition.</p>
+<h3><code>KnownPeer</code> in <code>PeerExchangeMessage</code></h3>
+<p><code>KnownPeer</code> uses <strong>postcard</strong> (positional encoding). Add new fields <strong>only at the end</strong>, with
+<code>#[serde(default)]</code>:</p>
+<pre><code class="language-rust">pub struct KnownPeer {
+    // existing fields unchanged ...
+    pub did: String,
+    pub addresses: Vec&lt;String&gt;,
+    pub version: String,
+    pub network_name: Option&lt;String&gt;,
+    pub observed_trust: Option&lt;f64&gt;,
+    pub last_seen: u64,
+    pub is_local: bool,
+    // NEW — only sent when both peers have ENDPOINT_SETS capability:
+    #[serde(default)]
+    pub endpoints: Option&lt;Vec&lt;EndpointCandidate&gt;&gt;,
+}
+</code></pre>
+<p><strong>Warning</strong>: postcard uses positional encoding. The capability check gates sending the new field.
+Old nodes that receive the new field will see trailing bytes; this is handled by their version
+rejection path.</p>
+<hr>
+<h2>Storage (<code>CachedPeer</code>)</h2>
+<p><code>CachedPeer</code> is JSON-serialized in sled. Add with <code>#[serde(default)]</code>:</p>
+<pre><code class="language-rust">pub struct CachedPeer {
+    // existing fields unchanged ...
+    #[serde(default)]
+    pub endpoints: Option&lt;Vec&lt;EndpointCandidate&gt;&gt;,
+}
+</code></pre>
+<p>Old sled records deserialize cleanly (<code>endpoints = None</code>). No migration needed. Old <code>address</code> and
+<code>public_address</code> fields are kept until a future cleanup PR removes them.</p>
+<hr>
+<h2>mDNS Multi-Address</h2>
+<p><code>discovery.rs</code> currently takes <code>iter().next()</code> from mDNS resolution results. Change to collect all
+returned addresses and emit one <code>PeerInfo</code> per address (or aggregate into a <code>Vec&lt;SocketAddr&gt;</code>).
+On IPv6-capable networks, mDNS naturally returns both v4 and v6 addresses for the same peer.</p>
+<hr>
+<h2>TURN Relay Proxy IPv6</h2>
+<p><code>relay_proxy.rs</code> has three explicit IPv6 bail-outs and an IPv4-only <code>xor_encode_address_v4()</code>.</p>
+<p>Changes needed:</p>
+<ul>
+<li>Implement <code>xor_encode_address_v6()</code> following RFC 5766 §10.2 (128-bit XOR with magic + transaction ID)</li>
+<li>Update <code>build_send_indication()</code> to dispatch on address family</li>
+<li>Update socket binding to match the peer&#39;s address family</li>
+<li>Remove the three <code>bail!(&quot;IPv6 peer relay addresses are not yet supported&quot;)</code> guards</li>
+</ul>
+<p>The TURN client (<code>turn.rs</code>) already has correct IPv6 XOR decode logic — the proxy just needs to match it.</p>
+<hr>
+<h2>Default Config Changes</h2>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Current default</th>
+<th>New default</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>network.listen_addr</code></td>
+<td><code>0.0.0.0:7777</code></td>
+<td><code>[::]:7777</code></td>
+</tr>
+<tr>
+<td><code>gateway.bind_addr</code></td>
+<td><code>127.0.0.1:8080</code></td>
+<td><code>[::1]:8080</code></td>
+</tr>
+<tr>
+<td>RPC bind</td>
+<td><code>127.0.0.1:&lt;port&gt;</code></td>
+<td><code>[::1]:&lt;port&gt;</code></td>
+</tr>
+<tr>
+<td>Health server</td>
+<td><code>0.0.0.0:&lt;port&gt;</code></td>
+<td><code>[::]:&lt;port&gt;</code></td>
+</tr>
+<tr>
+<td>Metrics server</td>
+<td><code>0.0.0.0:&lt;port&gt;</code></td>
+<td><code>[::]:&lt;port&gt;</code></td>
+</tr>
+</tbody></table>
+<p>CORS trusted origins (<code>security.rs</code>) add <code>http://[::1]:*</code> variants alongside <code>http://127.0.0.1:*</code>.</p>
+<hr>
+<h2>ULA Overlay Convention (Phase C — deferred)</h2>
+<p>When federations operate a shared mesh (WireGuard, site tunnels), they can assign ULA prefixes:</p>
+<pre><code>fd&lt;org-hash-6bytes&gt;::/48   — per organization
+  :&lt;site-id&gt;::/64          — per site within org
+    :&lt;subnet-id&gt;::/80      — per segment
+</code></pre>
+<p>Nodes on the same mesh include their ULA address in <code>endpoints</code> with type <code>UlaV6</code>. The endpoint
+preference rules automatically prefer ULA over global v6 when it&#39;s reachable.</p>
+<p><strong>Invariants:</strong></p>
+<ul>
+<li>ULA = topology routing hint only, not identity</li>
+<li>Endpoint sharing is trust-gated (peers only learn ULA candidates from sufficiently trusted nodes)</li>
+<li>No ULA address is ever treated as authority for governance or capability decisions</li>
+</ul>
+<hr>
+<h2>Implementation Phases</h2>
+<h3>Phase 0 — Config defaults (1-2 days)</h3>
+<ul>
+<li>Change all bind defaults from <code>0.0.0.0</code> / <code>127.0.0.1</code> to <code>[::]</code> / <code>[::1]</code></li>
+<li>Add <code>[::1]</code> CORS variants</li>
+<li>Update deploy configs (TOML, k8s configmap, devnet)</li>
+<li><strong>No behavior change for IPv4-only deployments</strong></li>
+</ul>
+<h3>Phase A — EndpointCandidate type (1 week)</h3>
+<ul>
+<li>Add <code>EndpointType</code>, <code>EndpointCandidate</code> to <code>icn-net/src/candidate.rs</code></li>
+<li>Add <code>EndpointType::from_socket_addr()</code> classifier</li>
+<li>Refactor <code>ConnectionCandidate</code> to carry <code>endpoints: Vec&lt;EndpointCandidate&gt;</code></li>
+<li>Update <code>connection_candidate()</code> in <code>session.rs</code> to build endpoint vec</li>
+<li>Update <code>CachedPeer</code> with <code>endpoints: Option&lt;Vec&lt;EndpointCandidate&gt;&gt;</code></li>
+<li>Update mDNS discovery to collect all addresses</li>
+<li>Add <code>ENDPOINT_SETS</code> capability flag</li>
+</ul>
+<h3>Phase B — Happy Eyeballs dialer (1 week)</h3>
+<ul>
+<li>Refactor <code>dial_with_fallback()</code> → <code>dial_happy_eyeballs(endpoints: Vec&lt;EndpointCandidate&gt;)</code></li>
+<li>Update <code>NetworkMsg::Dial</code> to carry endpoints</li>
+<li>Update <code>handle_dial()</code> in actor</li>
+<li>Update <code>KnownPeer</code> with optional <code>endpoints</code> field (capability-gated)</li>
+<li>Add per-type timeout config to <code>NatDialConfig</code></li>
+<li>Update bootstrap peer parsing for multi-address support</li>
+</ul>
+<h3>Phase C — TURN relay IPv6 (1-2 days)</h3>
+<ul>
+<li>Implement <code>xor_encode_address_v6()</code> in <code>relay_proxy.rs</code></li>
+<li>Update <code>build_send_indication()</code> for both address families</li>
+<li>Update socket binding to be address-family-aware</li>
+<li>Remove IPv6 bail-outs</li>
+<li>Add IPv6 relay integration tests</li>
+</ul>
+<hr>
+<h2>Success Criteria</h2>
+<ul>
+<li><input disabled="" type="checkbox"> Two nodes on a dual-stack network connect via IPv6 by default</li>
+<li><input disabled="" type="checkbox"> IPv4-only nodes continue to work without configuration</li>
+<li><input disabled="" type="checkbox"> A peer with both ULA and public IPv4 prefers ULA when on the same mesh</li>
+<li><input disabled="" type="checkbox"> If IPv6 connection fails, fallback to IPv4 completes within <code>happy_eyeballs_delay_ms * n_candidates</code></li>
+<li><input disabled="" type="checkbox"> TURN relay works for IPv6 relay addresses</li>
+<li><input disabled="" type="checkbox"> No regression on existing NAT traversal tests</li>
+<li><input disabled="" type="checkbox"> <code>cargo test --workspace --lib</code> passes</li>
+<li><input disabled="" type="checkbox"> Meaning firewall CI gate passes (no kernel/app boundary violations)</li>
+</ul>
+<hr>
+<h2>Files Requiring Changes</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Change</th>
+<th>Phase</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icn-net/src/candidate.rs</code></td>
+<td>Add <code>EndpointCandidate</code>, <code>EndpointType</code>; refactor <code>ConnectionCandidate</code></td>
+<td>A</td>
+</tr>
+<tr>
+<td><code>icn-net/src/version.rs</code></td>
+<td>Add <code>ENDPOINT_SETS</code> capability flag</td>
+<td>A</td>
+</tr>
+<tr>
+<td><code>icn-net/src/session.rs</code></td>
+<td><code>connection_candidate()</code> builds endpoint vec</td>
+<td>A</td>
+</tr>
+<tr>
+<td><code>icn-net/src/discovery.rs</code></td>
+<td>Collect all mDNS addresses</td>
+<td>A</td>
+</tr>
+<tr>
+<td><code>icn-store/src/peer_cache.rs</code></td>
+<td>Add <code>endpoints</code> field to <code>CachedPeer</code></td>
+<td>A</td>
+</tr>
+<tr>
+<td><code>icn-core/src/supervisor/background_tasks.rs</code></td>
+<td>Build endpoint vec in candidate announcement</td>
+<td>A</td>
+</tr>
+<tr>
+<td><code>icn-core/src/supervisor/nat_dial.rs</code></td>
+<td>Happy Eyeballs dialer</td>
+<td>B</td>
+</tr>
+<tr>
+<td><code>icn-net/src/actor/mod.rs</code></td>
+<td><code>NetworkMsg::Dial</code> takes endpoints</td>
+<td>B</td>
+</tr>
+<tr>
+<td><code>icn-net/src/actor/messages.rs</code></td>
+<td><code>handle_dial</code> iterates endpoints</td>
+<td>B</td>
+</tr>
+<tr>
+<td><code>icn-net/src/protocol.rs</code></td>
+<td><code>KnownPeer</code> optional <code>endpoints</code> field</td>
+<td>B</td>
+</tr>
+<tr>
+<td><code>icn-net/src/handlers/peer_exchange.rs</code></td>
+<td>Populate multiple addresses</td>
+<td>B</td>
+</tr>
+<tr>
+<td><code>icn-core/src/config/network.rs</code></td>
+<td>Per-type timeout config + happy_eyeballs_delay_ms</td>
+<td>B</td>
+</tr>
+<tr>
+<td><code>icn-core/src/supervisor/bridge.rs</code></td>
+<td>Bootstrap peer multi-address parsing</td>
+<td>B</td>
+</tr>
+<tr>
+<td><code>icn-net/src/relay_proxy.rs</code></td>
+<td>IPv6 XOR encode + remove bail-outs</td>
+<td>C</td>
+</tr>
+<tr>
+<td><code>icn-core/src/config/mod.rs</code></td>
+<td>Default <code>listen_addr</code> → <code>[::]:7777</code></td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>icn-core/src/config/gateway.rs</code></td>
+<td>Default <code>bind_addr</code> → <code>[::1]:8080</code></td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>icn-core/src/supervisor/init_rpc.rs</code></td>
+<td>RPC bind → <code>[::1]</code></td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>icn-obs/src/health.rs</code></td>
+<td>Health bind → <code>[::]</code></td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>icn-obs/src/lib.rs</code></td>
+<td>Metrics bind → <code>[::]</code></td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>icn-gateway/src/security.rs</code></td>
+<td>CORS <code>[::1]</code> variants</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>deploy/config/icn.toml</code></td>
+<td>Config defaults</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>deploy/k8s/configmap.yaml</code></td>
+<td>K8s config defaults</td>
+<td>0</td>
+</tr>
+</tbody></table>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

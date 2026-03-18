@@ -1,0 +1,589 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>SDIS + Steward System Status | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>sdis</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>SDIS STATUS</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/sdis/SDIS_STATUS.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>SDIS + Steward System Status</h1>
+<p><strong>Date:</strong> 2025-12-12<br><strong>Status:</strong> ✅ Infrastructure Deployed, ⚠️ Steward System Pending</p>
+<blockquote>
+<p>Historical snapshot from 2025-12-12.
+Route truth source: <code>icn/crates/icn-gateway/src/api/sdis/mod.rs</code> and <code>icn/crates/icn-gateway/src/api/sdis/simple_enrollment.rs</code>.</p>
+</blockquote>
+<h2>Overview</h2>
+<p>The Secure Distributed Identity System (SDIS) has its <strong>infrastructure deployed</strong> on the ICN K3s cluster. API endpoints are live, but <strong>end-to-end enrollment requires the Steward system</strong>, which is not yet implemented (see <a href="https://github.com/InterCooperative-Network/icn/blob/main/SDIS_DEPLOYMENT_STATUS">SDIS_DEPLOYMENT_STATUS.md</a> for details). This document provides the current status, what works, what&#39;s in progress, and next steps.</p>
+<hr>
+<h2>✅ What&#39;s Working</h2>
+<h3>1. SDIS Core API (wired in this snapshot)</h3>
+<p>Base route: <strong><code>/v1/sdis</code></strong></p>
+<p><strong>Enrollment + Steward workflow endpoints (wired):</strong></p>
+<ul>
+<li>✅ <code>POST /v1/sdis/enrollment/start</code> - Start new enrollment</li>
+<li>✅ <code>POST /v1/sdis/enrollment/verify/level1</code> - Verify device proof</li>
+<li>✅ <code>POST /v1/sdis/enrollment/verify/level2</code> - Steward-level verification</li>
+<li>✅ <code>POST /v1/sdis/enrollment/complete</code> - Complete enrollment</li>
+<li>✅ <code>GET /v1/sdis/status/{enrollment_id}</code> - Enrollment status</li>
+<li>✅ <code>GET /v1/sdis/pending</code> - Pending enrollments</li>
+<li>✅ <code>POST /v1/sdis/vouch/{enrollment_id}</code> - Steward vouch action</li>
+<li>✅ <code>POST /v1/sdis/reject/{enrollment_id}</code> - Steward reject action</li>
+<li>✅ <code>GET /v1/sdis/steward/stats</code> - Steward metrics</li>
+<li>✅ <code>GET /v1/sdis/steward/history</code> - Steward history</li>
+</ul>
+<p><strong>Verification + utility endpoints (wired):</strong></p>
+<ul>
+<li>✅ <code>POST /v1/sdis/verify/level1</code> - QR/device verification</li>
+<li>✅ <code>POST /v1/sdis/verify/level2</code> - Binding verification</li>
+<li>✅ <code>POST /v1/sdis/ephemeral/generate</code> - Generate ephemeral DID proof</li>
+<li>✅ <code>GET /v1/sdis/health</code> - Health check</li>
+</ul>
+<p><strong>Anchor management endpoints (wired):</strong></p>
+<ul>
+<li>✅ <code>GET /v1/sdis/anchor/{anchor_id}</code> - Get anchor details</li>
+<li>✅ <code>POST /v1/sdis/anchor/rotate-keys</code> - Rotate anchor keys</li>
+<li>✅ <code>GET /v1/sdis/anchor/{anchor_id}/history</code> - Rotation history</li>
+<li>✅ <code>POST /v1/sdis/anchor/devices/add</code> - Add device to anchor</li>
+<li>✅ <code>GET /v1/sdis/anchor/{anchor_id}/devices</code> - List anchor devices</li>
+</ul>
+<p><strong>Recovery endpoints (wired):</strong></p>
+<ul>
+<li>✅ <code>POST /v1/sdis/recovery/start</code> - Start recovery ceremony</li>
+<li>✅ <code>GET /v1/sdis/recovery/{recovery_id}</code> - Recovery status</li>
+<li>✅ <code>POST /v1/sdis/recovery/{recovery_id}/approve</code> - Steward approval</li>
+<li>✅ <code>POST /v1/sdis/recovery/{recovery_id}/complete</code> - Complete recovery</li>
+</ul>
+<p><strong>Known naming drift in older docs:</strong></p>
+<ul>
+<li>⚠️ Some older docs use <code>/v1/sdis/anchors/*</code> or <code>/v1/sdis/recovery/initiate</code>; current wired paths use <code>/v1/sdis/anchor/*</code> and <code>/v1/sdis/recovery/start</code>.</li>
+</ul>
+<p><strong>Verified Working:</strong></p>
+<pre><code class="language-bash">$ curl http://10.8.10.40:30080/v1/sdis/health
+{&quot;status&quot;:&quot;healthy&quot;,&quot;timestamp&quot;:&quot;2025-12-12T22:00:00Z&quot;}
+</code></pre>
+<h3>2. Backend Implementation (WIRED WITH MIXED MATURITY)</h3>
+<p><strong>Location:</strong> <code>icn/crates/icn-gateway/src/api/sdis/</code></p>
+<ul>
+<li>✅ <code>enrollment.rs</code> - Enrollment flow handlers</li>
+<li>✅ <code>verify.rs</code> - Multi-level verification</li>
+<li>✅ <code>anchor.rs</code> - Anchor device management handlers (wired)</li>
+<li>✅ <code>recovery.rs</code> - Identity recovery handlers (wired)</li>
+<li>✅ <code>ephemeral.rs</code> - Ephemeral DID generation</li>
+<li>✅ <code>qr.rs</code> - QR code generation</li>
+<li>✅ <code>mod.rs</code> - Route configuration</li>
+</ul>
+<p><strong>Server Integration:</strong></p>
+<ul>
+<li>✅ Routes registered in <code>server.rs</code></li>
+<li>✅ SDIS state management configured</li>
+<li>✅ Authentication middleware integrated</li>
+</ul>
+<h3>3. Identity System (V4 SDIS)</h3>
+<p><strong>Location:</strong> <code>icn/crates/icn-identity/</code></p>
+<ul>
+<li>✅ Multi-device key management</li>
+<li>✅ Anchor device tracking</li>
+<li>✅ Ephemeral DID generation</li>
+<li>✅ Recovery code management</li>
+<li>✅ Age-encrypted keystore (v4)</li>
+<li>✅ Ed25519 + X25519 key pairs</li>
+</ul>
+<h3>4. Trust Graph Integration</h3>
+<p><strong>Location:</strong> <code>icn/crates/icn-trust/</code></p>
+<ul>
+<li>✅ Trust score computation</li>
+<li>✅ Transitive trust calculation</li>
+<li>✅ Steward vouching mechanism</li>
+<li>✅ Trust-gated access control</li>
+</ul>
+<h3>5. Documentation</h3>
+<ul>
+<li>✅ <code>SDIS_API_GUIDE.md</code> - Complete API documentation</li>
+<li>✅ <code>SDIS_STEWARD_ROADMAP.md</code> - System architecture</li>
+<li>✅ <code>SDIS_SYSTEM.md</code> - Technical design</li>
+</ul>
+<hr>
+<h2>🚧 In Progress</h2>
+<h3>1. Pilot UI Integration</h3>
+<p><strong>Location:</strong> <code>web/pilot-ui/</code></p>
+<p><strong>Existing Components:</strong></p>
+<ul>
+<li>✅ <code>sdis-enrollment.js</code> - Enrollment wizard (needs testing)</li>
+<li>⏳ Identity viewer component - Needs deployment testing</li>
+<li>⏳ Anchor manager UI - Needs deployment testing</li>
+<li>⏳ Steward dashboard - In development</li>
+</ul>
+<p><strong>What&#39;s Needed:</strong></p>
+<ul>
+<li>Test enrollment flow end-to-end</li>
+<li>Add QR code display in UI</li>
+<li>Implement recovery code display</li>
+<li>Add device management interface</li>
+</ul>
+<h3>2. Mobile App Integration</h3>
+<p><strong>Location:</strong> <code>sdk/react-native/examples/CoopWallet/</code></p>
+<p><strong>Status:</strong></p>
+<ul>
+<li>⏳ QR scanning for enrollment</li>
+<li>⏳ Ephemeral DID generation</li>
+<li>⏳ Device verification flow</li>
+<li>⏳ Anchor management screens</li>
+</ul>
+<p><strong>Blocked On:</strong></p>
+<ul>
+<li>Need to test mobile-gateway communication</li>
+<li>Need to implement secure key storage on device</li>
+</ul>
+<h3>3. Steward System</h3>
+<p><strong>What Exists:</strong></p>
+<ul>
+<li>✅ Backend API for steward vouching (<code>verify/level2</code>)</li>
+<li>✅ Trust graph integration</li>
+<li>⏳ Steward role assignment (manual via CLI)</li>
+<li>⏳ Steward dashboard UI</li>
+<li>⏳ Vouching workflow UI</li>
+</ul>
+<p><strong>What&#39;s Needed:</strong></p>
+<ul>
+<li>Steward invitation/promotion flow</li>
+<li>Steward dashboard with pending enrollments</li>
+<li>Notification system for vouching requests</li>
+<li>Audit log of steward actions</li>
+</ul>
+<hr>
+<h2>📋 Next Steps (Priority Order)</h2>
+<h3>Phase 1: Basic Enrollment Flow (IMMEDIATE)</h3>
+<ol>
+<li><p><strong>Test SDIS API end-to-end:</strong></p>
+<pre><code class="language-bash"># Test enrollment
+curl -X POST http://10.8.10.40:30080/v1/sdis/enrollment/start \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{&quot;identity_name&quot;:&quot;TestUser&quot;,&quot;coop_id&quot;:&quot;test-coop&quot;}&#39;
+</code></pre>
+</li>
+<li><p><strong>Verify Pilot UI enrollment wizard:</strong></p>
+<ul>
+<li>Access Pilot UI at <code>http://10.8.10.40:30030</code></li>
+<li>Test enrollment flow</li>
+<li>Verify QR code generation</li>
+<li>Test verification levels</li>
+</ul>
+</li>
+<li><p><strong>Create test steward:</strong></p>
+<pre><code class="language-bash"># On K3s cluster
+POD=$(kubectl get pods -n icn -l component=daemon -o jsonpath=&#39;{.items[0].metadata.name}&#39;)
+kubectl exec -it -n icn $POD -- icnctl id show
+# Use this DID as steward for testing
+</code></pre>
+</li>
+</ol>
+<h3>Phase 2: Steward Dashboard (NEXT SPRINT)</h3>
+<ol>
+<li><p><strong>Build steward UI components:</strong></p>
+<ul>
+<li>Pending enrollments list</li>
+<li>Vouch action buttons</li>
+<li>Vouch statement input</li>
+<li>Audit log viewer</li>
+</ul>
+</li>
+<li><p><strong>Add notifications:</strong></p>
+<ul>
+<li>WebSocket events for new enrollments</li>
+<li>Browser notifications for stewards</li>
+<li>Email notifications (optional)</li>
+</ul>
+</li>
+<li><p><strong>Steward management:</strong></p>
+<ul>
+<li>Promote member to steward</li>
+<li>Revoke steward status</li>
+<li>View steward activity</li>
+</ul>
+</li>
+</ol>
+<h3>Phase 3: Mobile Integration (NEXT SPRINT)</h3>
+<ol>
+<li><p><strong>QR Code Scanning:</strong></p>
+<ul>
+<li>Implement camera permissions</li>
+<li>Parse enrollment QR codes</li>
+<li>Extract challenge data</li>
+</ul>
+</li>
+<li><p><strong>Device Verification:</strong></p>
+<ul>
+<li>Generate ephemeral DID on device</li>
+<li>Sign challenge with ephemeral key</li>
+<li>Submit verification proof</li>
+</ul>
+</li>
+<li><p><strong>Anchor Management:</strong></p>
+<ul>
+<li>List user&#39;s anchor devices</li>
+<li>Add/remove anchors</li>
+<li>Promote primary anchor</li>
+</ul>
+</li>
+</ol>
+<h3>Phase 4: Recovery &amp; Advanced Features (FUTURE)</h3>
+<ol>
+<li><p><strong>Recovery Flow:</strong></p>
+<ul>
+<li>Recovery code input UI</li>
+<li>Challenge-response flow</li>
+<li>New device binding</li>
+</ul>
+</li>
+<li><p><strong>Multi-Device Sync:</strong></p>
+<ul>
+<li>Identity state synchronization</li>
+<li>Conflict resolution</li>
+<li>Anchor consensus</li>
+</ul>
+</li>
+<li><p><strong>Advanced Verification:</strong></p>
+<ul>
+<li>Level 3: Multi-steward vouching</li>
+<li>Biometric commitment (future)</li>
+<li>Government ID verification (future)</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h2>🧪 Testing Guide</h2>
+<h3>Manual API Testing</h3>
+<pre><code class="language-bash"># 1. Health check
+curl http://10.8.10.40:30080/v1/sdis/health
+
+# 2. Start enrollment
+ENROLLMENT=$(curl -X POST http://10.8.10.40:30080/v1/sdis/enrollment/start \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{&quot;identity_name&quot;:&quot;Alice&quot;,&quot;coop_id&quot;:&quot;test-coop&quot;}&#39; \
+  | jq -r &#39;.enrollment_id&#39;)
+
+echo &quot;Enrollment ID: $ENROLLMENT&quot;
+
+# 3. Generate ephemeral DID
+EPHEMERAL=$(curl -X POST http://10.8.10.40:30080/v1/sdis/ephemeral/generate \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{&quot;purpose&quot;:&quot;enrollment&quot;,&quot;ttl_seconds&quot;:3600}&#39; \
+  | jq -r &#39;.ephemeral_did&#39;)
+
+echo &quot;Ephemeral DID: $EPHEMERAL&quot;
+
+# 4. Get steward token (requires existing identity)
+POD=$(kubectl get pods -n icn -l component=daemon -o jsonpath=&#39;{.items[0].metadata.name}&#39;)
+TOKEN=$(kubectl exec -it -n icn $POD -- icnctl auth token \
+  --coop-id test-coop \
+  --gateway http://localhost:8080)
+
+# 5. Steward vouches for enrollment
+curl -X POST http://10.8.10.40:30080/v1/sdis/verify/level2 \
+  -H &quot;Content-Type: application/json&quot; \
+  -H &quot;Authorization: Bearer $TOKEN&quot; \
+  -d &quot;{\&quot;enrollment_id\&quot;:\&quot;$ENROLLMENT\&quot;,\&quot;vouch_statement\&quot;:\&quot;I vouch for Alice\&quot;}&quot;
+</code></pre>
+<h3>UI Testing</h3>
+<ol>
+<li><p><strong>Access Pilot UI:</strong></p>
+<pre><code>http://10.8.10.40:30030
+</code></pre>
+</li>
+<li><p><strong>Test enrollment flow:</strong></p>
+<ul>
+<li>Click &quot;New Enrollment&quot; button</li>
+<li>Fill in identity name</li>
+<li>View generated QR code</li>
+<li>Verify QR contains enrollment data</li>
+</ul>
+</li>
+<li><p><strong>Test anchor management:</strong></p>
+<ul>
+<li>Login with existing DID</li>
+<li>Navigate to &quot;Devices&quot; tab</li>
+<li>View anchor devices</li>
+<li>Test add/remove/promote actions</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h2>📊 Architecture Diagram</h2>
+<pre><code>┌─────────────────────────────────────────────────────────────┐
+│                        User Devices                         │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
+│  │ Mobile App   │  │  Web UI      │  │  Desktop App │     │
+│  │ (CoopWallet) │  │ (Pilot UI)   │  │  (Future)    │     │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘     │
+│         │                 │                 │              │
+│         └─────────────────┼─────────────────┘              │
+│                           │                                │
+└───────────────────────────┼────────────────────────────────┘
+                            │
+                            │ HTTP/WS
+                            │
+┌───────────────────────────▼────────────────────────────────┐
+│                    Gateway API Layer                       │
+├────────────────────────────────────────────────────────────┤
+│                                                            │
+│  ┌──────────────────────────────────────────────────────┐ │
+│  │           SDIS API Endpoints (/v1/sdis/)             │ │
+│  ├──────────────────────────────────────────────────────┤ │
+│  │  • Enrollment (start, complete)                      │ │
+│  │  • Verification (level1, level2, level3)             │ │
+│  │  • Anchor Management (list, add, remove, promote)    │ │
+│  │  • Recovery (initiate, complete)                     │ │
+│  │  • Ephemeral DIDs (generate)                         │ │
+│  └──────────────────────────────────────────────────────┘ │
+│                                                            │
+└───────────────────────────┬────────────────────────────────┘
+                            │
+                            │
+┌───────────────────────────▼────────────────────────────────┐
+│                   Core Actor System                        │
+├────────────────────────────────────────────────────────────┤
+│                                                            │
+│  ┌────────────────┐  ┌────────────────┐  ┌─────────────┐ │
+│  │  Identity      │  │  Trust Graph   │  │  Ledger     │ │
+│  │  Manager       │  │  Engine        │  │  Actor      │ │
+│  │                │  │                │  │             │ │
+│  │  • V4 Keystore │  │  • Trust Scores│  │  • Credits  │ │
+│  │  • Multi-device│  │  • Vouching    │  │  • History  │ │
+│  │  • Anchors     │  │  • Transitive  │  │             │ │
+│  └────────────────┘  └────────────────┘  └─────────────┘ │
+│                                                            │
+│  ┌────────────────┐  ┌────────────────┐                   │
+│  │  Gossip        │  │  Storage       │                   │
+│  │  Protocol      │  │  (Sled)        │                   │
+│  │                │  │                │                   │
+│  │  • P2P Sync    │  │  • Persistence │                   │
+│  │  • Events      │  │  • Replication │                   │
+│  └────────────────┘  └────────────────┘                   │
+│                                                            │
+└────────────────────────────────────────────────────────────┘
+
+Enrollment Flow:
+1. User → Start enrollment (QR generated)
+2. Device → Scan QR, generate ephemeral DID
+3. Device → Level 1 verification (device proof)
+4. Steward → Level 2 verification (vouch)
+5. User → Complete enrollment (receive DID + recovery codes)
+6. Identity → Stored in keystore, synced via gossip
+</code></pre>
+<hr>
+<h2>🔐 Security Considerations</h2>
+<h3>Current Implementation</h3>
+<p>✅ <strong>Cryptography:</strong></p>
+<ul>
+<li>Ed25519 for signing</li>
+<li>X25519-ChaCha20-Poly1305 for encryption</li>
+<li>Age-encrypted keystores</li>
+</ul>
+<p>✅ <strong>Authentication:</strong></p>
+<ul>
+<li>Bearer token authentication</li>
+<li>Token expiry tracking</li>
+<li>Per-request authorization</li>
+</ul>
+<p>✅ <strong>Verification Levels:</strong></p>
+<ul>
+<li>Level 0: Unverified (enrollment started)</li>
+<li>Level 1: Device verified (QR scanned)</li>
+<li>Level 2: Steward vouched (trusted member)</li>
+<li>Level 3: Multi-steward (future)</li>
+</ul>
+<h3>TODO: Security Hardening</h3>
+<p>⏳ <strong>Rate Limiting:</strong></p>
+<ul>
+<li>Enrollment attempts per IP</li>
+<li>Verification attempts per enrollment</li>
+<li>Recovery attempts per identity</li>
+</ul>
+<p>⏳ <strong>Audit Logging:</strong></p>
+<ul>
+<li>All steward vouching actions</li>
+<li>Recovery attempts</li>
+<li>Anchor device changes</li>
+</ul>
+<p>⏳ <strong>Expiry Management:</strong></p>
+<ul>
+<li>Enrollment expiry (24 hours default)</li>
+<li>Ephemeral DID expiry (1 hour default)</li>
+<li>Recovery code rotation</li>
+</ul>
+<hr>
+<h2>📁 Key Files &amp; Locations</h2>
+<h3>Backend (Rust)</h3>
+<pre><code>icn/crates/
+├── icn-gateway/src/api/sdis/    # SDIS API endpoints
+│   ├── enrollment.rs             # Enrollment handlers
+│   ├── verify.rs                 # Verification logic
+│   ├── anchor.rs                 # Anchor management
+│   ├── recovery.rs               # Recovery handlers
+│   ├── ephemeral.rs              # Ephemeral DIDs
+│   └── qr.rs                     # QR generation
+│
+├── icn-identity/                 # Identity system
+│   ├── keystore.rs               # Age-encrypted keystore
+│   ├── anchor.rs                 # Anchor devices
+│   └── recovery.rs               # Recovery codes
+│
+└── icn-trust/                    # Trust graph
+    ├── sybil.rs                  # Sybil detection &amp; vouching
+    └── computation.rs            # Trust computation
+</code></pre>
+<h3>Frontend (JavaScript)</h3>
+<pre><code>web/pilot-ui/
+├── sdis-enrollment.js            # Enrollment wizard
+├── identity-viewer.js            # Identity display (WIP)
+├── anchor-manager.js             # Device management (WIP)
+└── steward-dashboard.js          # Steward UI (TODO)
+</code></pre>
+<h3>Documentation</h3>
+<pre><code>docs/
+├── SDIS_API_GUIDE.md            # API documentation
+├── SDIS_STEWARD_ROADMAP.md      # Architecture &amp; roadmap
+└── sdis-architecture.md         # Technical design
+</code></pre>
+<hr>
+<h2>🎯 Success Criteria</h2>
+<h3>Minimum Viable SDIS (CURRENT TARGET)</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> SDIS API deployed and accessible</li>
+<li><input checked="" disabled="" type="checkbox"> Enrollment endpoints functional</li>
+<li><input checked="" disabled="" type="checkbox"> Verification levels implemented</li>
+<li><input checked="" disabled="" type="checkbox"> Anchor device management working</li>
+<li><input disabled="" type="checkbox"> End-to-end enrollment test passing</li>
+<li><input disabled="" type="checkbox"> Steward can vouch for new users</li>
+<li><input disabled="" type="checkbox"> UI shows enrollment QR code</li>
+<li><input disabled="" type="checkbox"> Recovery flow tested</li>
+</ul>
+<h3>Full SDIS v1.0 (NEXT MILESTONE)</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Mobile app enrollment working</li>
+<li><input disabled="" type="checkbox"> Steward dashboard deployed</li>
+<li><input disabled="" type="checkbox"> Multi-device sync operational</li>
+<li><input disabled="" type="checkbox"> Recovery flow fully tested</li>
+<li><input disabled="" type="checkbox"> Audit logging implemented</li>
+<li><input disabled="" type="checkbox"> Rate limiting active</li>
+<li><input disabled="" type="checkbox"> Production security hardening complete</li>
+</ul>
+<hr>
+<h2>🐛 Known Issues</h2>
+<ol>
+<li><p><strong>Port 30080 NodePort:</strong> Sometimes conflicts on deployment</p>
+<ul>
+<li>Workaround: Delete old service before redeploying</li>
+</ul>
+</li>
+<li><p><strong>Token expiry:</strong> No automatic refresh mechanism yet</p>
+<ul>
+<li>Workaround: Manual re-authentication required</li>
+</ul>
+</li>
+<li><p><strong>QR code display:</strong> May not render in all browsers</p>
+<ul>
+<li>Workaround: Use modern browser (Chrome/Firefox)</li>
+</ul>
+</li>
+<li><p><strong>Mobile app:</strong> Not yet connected to gateway</p>
+<ul>
+<li>Status: In development</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h2>📞 How to Get Help</h2>
+<p><strong>API not responding?</strong></p>
+<pre><code class="language-bash"># Check pod status
+kubectl get pods -n icn
+
+# Check logs
+POD=$(kubectl get pods -n icn -l component=daemon -o jsonpath=&#39;{.items[0].metadata.name}&#39;)
+kubectl logs -n icn $POD | grep sdis
+</code></pre>
+<p><strong>Enrollment failing?</strong></p>
+<ul>
+<li>Verify gateway URL is correct</li>
+<li>Check SDIS health endpoint</li>
+<li>Review API response for error details</li>
+<li>Check if coop-id exists</li>
+</ul>
+<p><strong>Need steward token?</strong></p>
+<pre><code class="language-bash"># Get token from pod
+POD=$(kubectl get pods -n icn -l component=daemon -o jsonpath=&#39;{.items[0].metadata.name}&#39;)
+kubectl exec -it -n icn $POD -- icnctl auth token \
+  --coop-id test-coop \
+  --gateway http://localhost:8080
+</code></pre>
+<hr>
+<h2>📚 References</h2>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/SDIS_API_GUIDE">SDIS API Guide</a> - Complete API documentation</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/SDIS_STEWARD_ROADMAP">SDIS Steward Roadmap</a> - System architecture</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/SDIS_DEPLOYMENT_STATUS">SDIS Deployment Status</a> - Deployment and steward status</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/deploy/k8s/README">Deployment Guide</a> - K8s deployment</li>
+<li><a href="/docs/ARCHITECTURE">Architecture Doc</a> - Overall ICN architecture</li>
+</ul>
+<hr>
+<p><strong>Last Updated:</strong> 2025-12-12<br><strong>Next Review:</strong> After Phase 1 completion</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

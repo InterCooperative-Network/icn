@@ -1,0 +1,534 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Regulatory-Safe Verifiable State Architecture | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>regulatory safe verifiable state</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/regulatory-safe-verifiable-state.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Regulatory-Safe Verifiable State Architecture</h1>
+<p><strong>Status</strong>: Accepted — Phases 22-24
+<strong>Priority</strong>: Tier 1 — Foundational positioning
+<strong>Companion</strong>: <code>nat-traversal-design.md</code>, <code>ipv6-endpoint-sets-design.md</code></p>
+<hr>
+<h2>Core Thesis</h2>
+<p>This document is already implicit in the codebase. From <code>icn-kernel-api/src/economics.rs</code>:</p>
+<blockquote>
+<p><em>&quot;ICN&#39;s thesis: money is not value, it&#39;s a claim on value.&quot;</em></p>
+</blockquote>
+<p>The <code>AssetType::Claim</code> variant, <code>ExecutionReceipt</code>, and <code>GovernanceDecisionReceipt</code> already exist.
+<code>receipt</code> and <code>attestation</code> appear 800+ times across the codebase. The settlement engine is already
+a neutral kernel-level enforcer that understands nothing about what balanced entries &quot;mean.&quot;</p>
+<p><strong>The problem is not the architecture. The problem is that the surface language still says
+&quot;currency&quot;, &quot;payment&quot;, and &quot;balance&quot;</strong> — creating regulatory exposure where none is architecturally
+necessary, and obscuring what ICN actually is: communications infrastructure for verifiable cooperative
+coordination.</p>
+<hr>
+<h2>Problem Statement</h2>
+<p>Any decentralized coordination network that tracks the exchange of labor and resources faces three
+regulatory classification risks if its surface behavior resembles financial infrastructure:</p>
+<ol>
+<li><p><strong>FinCEN MSB classification</strong> — triggered by <em>intermediation + custody</em>. If any ICN-operated
+component &quot;accepts value from A and transmits it to B,&quot; or maintains hosted accounts with unilateral
+operator control, it qualifies as a Money Services Business with full BSA/AML compliance obligations.</p>
+</li>
+<li><p><strong>IRS barter exchange classification</strong> — triggered by operating as a <em>brokered commercial marketplace</em>.
+If ICN acts as an exchange operator (centralized matching, scrip issuance, Form 1099-B obligations),
+it assumes heavy reporting requirements.</p>
+</li>
+<li><p><strong>Regulatory drift</strong> — even if the initial architecture is clean, future features can accidentally
+introduce custody, operator-mediated settlement, or market-making semantics. Without explicit invariants
+enforced at the PR level, the system will drift toward the regulated pattern.</p>
+</li>
+</ol>
+<h3>The Trigger Is Intermediation, Not Ledgers</h3>
+<p>A ledger is not inherently regulated. Cryptography is not inherently regulated. The trigger is:</p>
+<ul>
+<li>Does the network operator <strong>accept</strong> value from one party?</li>
+<li>Does the operator <strong>transmit</strong> that value to another?</li>
+<li>Does the operator maintain <strong>custody</strong> of keys or accounts and control balances unilaterally?</li>
+</ul>
+<p>If the answer to all three is <em>no</em>, and state transitions are peer-signed and non-custodial, the system
+is a communications and records platform — not a financial intermediary.</p>
+<hr>
+<h2>Threat Model: What Triggers Regulatory Attention</h2>
+<table>
+<thead>
+<tr>
+<th>Behavior</th>
+<th>Risk level</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Operator routes &quot;transfers&quot; between accounts</td>
+<td>HIGH — MSB</td>
+<td>Intermediation + custody</td>
+</tr>
+<tr>
+<td>Hosted accounts where operator can move balances</td>
+<td>HIGH — MSB</td>
+<td>Unilateral operator control</td>
+</tr>
+<tr>
+<td>Protocol embeds exchange rates, USD pegs, &quot;redeem for cash&quot;</td>
+<td>HIGH — MSB + securities</td>
+<td>Convertibility claims</td>
+</tr>
+<tr>
+<td>Centralized service-matching / order book</td>
+<td>HIGH — barter exchange</td>
+<td>Operator-run marketplace</td>
+</tr>
+<tr>
+<td>Issuing &quot;scrip&quot; or &quot;trade dollars&quot; that behave like currency</td>
+<td>MEDIUM — barter exchange</td>
+<td>Commercial scrip</td>
+</tr>
+<tr>
+<td>Operator-controlled clearing of net obligations</td>
+<td>MEDIUM — MSB</td>
+<td>Clearing = intermediation</td>
+</tr>
+<tr>
+<td>User-signed state transitions, peer-to-peer</td>
+<td>LOW — software provider</td>
+<td>No custody, no intermediation</td>
+</tr>
+<tr>
+<td>Non-custodial keys, local computation, broadcast of signed state</td>
+<td>LOW — software provider</td>
+<td>Unhosted wallet pattern</td>
+</tr>
+<tr>
+<td>Derived balance views computed from attestations</td>
+<td>LOW</td>
+<td>Interpretation, not primitive</td>
+</tr>
+<tr>
+<td>Membership-scoped, governance-authorized allocations</td>
+<td>LOW</td>
+<td>Internal capital accounts</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>The Seven Architecture Invariants</h2>
+<p>These are the &quot;don&#39;t accidentally become a bank&quot; invariants. They must be enforced in code review,
+CI, and architectural decisions.</p>
+<h3>Invariant 1: User-Signed Transitions Only</h3>
+<p>Every state transition that could be interpreted as &quot;value movement&quot; must be signed by the
+participant(s) whose obligations change. ICN infrastructure may <em>broadcast</em> these signed transitions;
+it must never <em>originate</em> them on behalf of a user.</p>
+<p><strong>Code implication</strong>: No gateway endpoint that initiates an obligation change without a user-provided
+signature over the specific transition.</p>
+<h3>Invariant 2: No Hosted Balances</h3>
+<p>ICN nodes do not maintain custodial accounts where the operator can move balances unilaterally.
+The ledger state is a Merkle-DAG of content-addressed, peer-signed entries. The &quot;balance&quot; of a member
+is a derived view computed from those entries — not a value stored under operator control.</p>
+<p><strong>Code implication</strong>: No endpoint that accepts &quot;move X from account A to account B&quot; with operator-side
+authorization. Transfers require the signing key of the originating account.</p>
+<h3>Invariant 3: No Operator Routing of Value</h3>
+<p>Gateways route <em>messages</em>, not <em>transfers</em>. If a message carries what looks like &quot;send,&quot; it is
+broadcasting a user-signed state transition — not the gateway executing a transfer on a user&#39;s behalf.</p>
+<p><strong>Code implication</strong>: The gateway&#39;s ledger endpoints are read/write proxies to the peer&#39;s own signed
+entries. The gateway does not hold the signing keys.</p>
+<h3>Invariant 4: Derived Views Are Not Protocol Primitives</h3>
+<p>&quot;Balance,&quot; &quot;credit,&quot; &quot;net position&quot; are computed from the attestation/obligation graph. They are
+<em>interpretations</em>, not the protocol&#39;s source of truth. The source of truth is the set of signed
+receipts and accepted obligations.</p>
+<p><strong>Code implication</strong>: <code>JournalEntry</code> (and its future <code>Obligation</code> successor) is the primitive.
+<code>AccountState</code>/<code>position</code> is a view derived from it. APIs that return balances must not accept
+balance-modifying writes — those go through the signed entry path.</p>
+<h3>Invariant 5: No Embedded Convertibility</h3>
+<p>The protocol must not embed &quot;redeem for cash,&quot; &quot;pegged to USD,&quot; &quot;exchange rate for external currency,&quot;
+or any claim of convertibility to fiat or external assets. If communities establish social conventions
+around unit values, that is outside protocol scope and outside ICN&#39;s operational surface.</p>
+<p><strong>Code implication</strong>: No <code>exchange_rate</code> field, no <code>fiat_equivalent</code>, no <code>redemption</code> semantics in
+any kernel or API type. If CCL governance wants to define custom exchange rates between internal units,
+that is a governance policy — not a protocol primitive.</p>
+<h3>Invariant 6: Matching and Market Features Are Opt-In, Scoped, and Governance-Authorized</h3>
+<p>Service discovery, offer matching, resource scheduling, and allocation proposals must be:</p>
+<ul>
+<li>Explicitly scoped to a federation or organization (not global)</li>
+<li>Authorized by member governance (not operator decision)</li>
+<li>Fully auditable</li>
+<li>Never operated as a clearinghouse by the ICN node itself</li>
+</ul>
+<p><strong>Code implication</strong>: Service discovery endpoints return data; they do not execute matches. Any
+&quot;allocation&quot; is a governance proposal result, not an operator function.</p>
+<h3>Invariant 7: Execution Receipts Close the Loop</h3>
+<p>Governance decisions must be coupled to cryptographic proof of execution. &quot;We voted to allocate
+resources to Project X&quot; must produce a verifiable receipt proving the allocation actually occurred.
+This is Digital Public Infrastructure behavior, not fintech behavior.</p>
+<p><strong>Code implication</strong>: The <code>decision_receipt_id</code> field on <code>JournalEntry</code> must become <em>required</em>, not
+optional. Accepted proposals that involve resource allocation must generate a linked <code>ExecutionReceipt</code>.</p>
+<hr>
+<h2>Protocol Primitives</h2>
+<p>The base layer of ICN economics models these — not payments:</p>
+<h3>Receipt Attestation</h3>
+<p><em>&quot;X delivered service Y at time T under scope S&quot;</em></p>
+<p>Signed by the recipient of the service. Unforgeable because it requires the recipient&#39;s key.
+Authorizes a corresponding obligation acknowledgement. Already exists as <code>ExecutionReceipt</code>.</p>
+<h3>Obligation Acceptance</h3>
+<p><em>&quot;I accept obligation O under terms T, in exchange for Receipt R&quot;</em></p>
+<p>Signed by the party accepting the obligation. Tracks a future claim on cooperative capacity.
+Currently implicit in <code>JournalEntry</code> — needs a first-class <code>Obligation</code> type.</p>
+<h3>Governance Action</h3>
+<p><em>&quot;Proposal → Deliberation → Vote → Execution Receipt&quot;</em></p>
+<p>Full lifecycle with cryptographic proof at each step. <code>GovernanceDecisionReceipt</code> already exists.
+Missing: enforcement that accepted proposals produce linked <code>ExecutionReceipt</code>s.</p>
+<h3>Allocation Decision</h3>
+<p><em>&quot;Members voted to allocate N units of capacity to purpose P&quot;</em></p>
+<p>Participatory budgeting as resource scheduling, not payments. Not yet implemented. Phase B.</p>
+<h3>Dispute / Appeal</h3>
+<p><em>&quot;I contest attestation A; here is counter-evidence E&quot;</em></p>
+<p>Mechanism for contesting receipts before they generate obligations.
+<code>DisputeResolution</code> proposal type exists; needs linking to the receipt/obligation lifecycle.</p>
+<hr>
+<h2>Anti-Features: Explicitly Forbidden in Protocol Design</h2>
+<p>These behaviors must not appear in ICN protocol definitions, gateway APIs, or SDK types:</p>
+<table>
+<thead>
+<tr>
+<th>Anti-feature</th>
+<th>Why forbidden</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>send_funds(from, to, amount)</code> semantics</td>
+<td>Operator-mediated transfer</td>
+</tr>
+<tr>
+<td><code>redeem()</code> or <code>exchange_for_fiat()</code></td>
+<td>Convertibility claim</td>
+</tr>
+<tr>
+<td><code>operator_adjust_balance()</code></td>
+<td>Custodial control</td>
+</tr>
+<tr>
+<td>Currency symbols that match or imply fiat equivalence</td>
+<td>Regulatory confusion</td>
+</tr>
+<tr>
+<td>Global service marketplace with operator-side matching</td>
+<td>Barter exchange operation</td>
+</tr>
+<tr>
+<td><code>CreatePaymentRequest</code> or <code>PaymentOrder</code> types</td>
+<td>Money-like naming in public API</td>
+</tr>
+<tr>
+<td>Any type named <code>Wallet</code> that the operator controls</td>
+<td>Hosted wallet classification</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Semantic Mapping: Current → Target</h2>
+<table>
+<thead>
+<tr>
+<th>Current</th>
+<th>Target</th>
+<th>Scope of change</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>currency</code> field on <code>AccountDelta</code></td>
+<td><code>unit</code></td>
+<td>Moderate — touches core types</td>
+</tr>
+<tr>
+<td><code>Currency</code> struct</td>
+<td><code>UnitOfAccount</code></td>
+<td>Moderate</td>
+</tr>
+<tr>
+<td><code>balance</code> in gateway API</td>
+<td><code>position</code></td>
+<td>Low — API surface only</td>
+</tr>
+<tr>
+<td><code>CreatePaymentRequest</code></td>
+<td><code>RecordTransferRequest</code></td>
+<td>Low — gateway models</td>
+</tr>
+<tr>
+<td><code>payment</code> endpoint</td>
+<td><code>settlement</code> or <code>record</code></td>
+<td>Low — gateway routes</td>
+</tr>
+<tr>
+<td><code>CreditLimit</code></td>
+<td><code>ObligationCeiling</code></td>
+<td>Low-moderate</td>
+</tr>
+<tr>
+<td><code>commons-credits</code> currency string</td>
+<td><code>commons-capacity</code> or <code>participation-units</code></td>
+<td>Low — constant</td>
+</tr>
+<tr>
+<td><code>AccountBalances</code></td>
+<td><code>AccountState</code></td>
+<td>Moderate</td>
+</tr>
+<tr>
+<td><code>TransactionHistoryEntry</code></td>
+<td><code>LedgerRecord</code></td>
+<td>Low</td>
+</tr>
+<tr>
+<td><code>mutual_credit()</code> constructor</td>
+<td><code>reciprocal_account()</code></td>
+<td>Low</td>
+</tr>
+<tr>
+<td><code>debit</code>/<code>credit</code> in <code>AccountDelta</code></td>
+<td><strong>Keep</strong> — standard bookkeeping mechanics</td>
+<td>None</td>
+</tr>
+<tr>
+<td><code>JournalEntry</code></td>
+<td><strong>Keep</strong> — standard bookkeeping term</td>
+<td>None</td>
+</tr>
+<tr>
+<td><code>SettlementEngine</code></td>
+<td><strong>Keep</strong> — already good</td>
+<td>None</td>
+</tr>
+<tr>
+<td><code>receipt</code>, <code>attestation</code>, <code>obligation</code> terms</td>
+<td><strong>Keep and expand</strong> — already aligned</td>
+<td>Expand</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Structural Gaps to Address</h2>
+<p>Beyond terminology, these structural gaps must be closed for the architecture to match the thesis:</p>
+<h3>Gap 1: Optional Provenance (Phase A)</h3>
+<p><code>decision_receipt_id</code> and <code>decision_hash</code> on <code>JournalEntry</code> are currently optional fields.
+For verifiable state, every ledger change must be traceable to an authorization.
+<strong>Fix</strong>: Make provenance required on <code>JournalEntry</code>. Add a <code>ProvenanceRef</code> enum:
+<code>{ Governance(receipt_id), DirectMember(signature), SystemGenerated(reason) }</code>.</p>
+<h3>Gap 2: No First-Class Obligation Type (Phase A)</h3>
+<p>The implicit model is: journal entries encode net position changes, obligations are inferred.
+The <code>AssetType::Claim</code> variant in <code>icn-kernel-api</code> already defines the shape.
+<strong>Fix</strong>: Implement <code>Obligation { id, creditor, debtor, unit, amount, authorizing_receipt, due_by, state: ObligationState }</code> using <code>AssetType::Claim</code> as the kernel primitive.</p>
+<h3>Gap 3: No PatronageTracker (Phase A)</h3>
+<p>NY Corp Law §93 requires capital accounts based on patronage (contribution), not capital.
+The CCL schema has <code>patronage_refund</code> as an allocation target but nothing accumulates patronage.
+<strong>Fix</strong>: <code>PatronageTracker</code> that accumulates per-member contribution epochs, queried by capital account calculations.</p>
+<h3>Gap 4: Commons Formula in Kernel (Phase A)</h3>
+<p><code>commons_credits.rs</code> has the credit formula (<code>cpu_millis + memory_mb_millis/1000 + ...</code>) hardcoded
+in the kernel layer. The existing <code>// TODO(governance)</code> comment says this should be a CCL parameter.
+<strong>Fix</strong>: Extract to a <code>CommonsResourcePolicy</code> CCL parameter, evaluated by a PolicyOracle.</p>
+<h3>Gap 5: Delegation State Is In-Memory (Phase B)</h3>
+<p><code>DelegationManager</code> is not persisted and not gossip-synced. Liquid democracy breaks on node restart.
+<strong>Fix</strong>: Persist to <code>icn-store</code>, add gossip sync for delegation events, add query API.</p>
+<h3>Gap 6: No Execution Receipt Enforcement (Phase B)</h3>
+<p>Accepted governance proposals don&#39;t automatically link to the economic events they authorize.
+<strong>Fix</strong>: Add <code>ExecutionReceiptGate</code> middleware — allocations blocked until linked to a valid
+<code>GovernanceDecisionReceipt</code>. Track &quot;open&quot; vs &quot;closed&quot; governance decisions.</p>
+<h3>Gap 7: No Participatory Budgeting (Phase B)</h3>
+<p><code>ProposalPayload::Budget</code> is a single-item allocation. No allocation-across-competing-proposals.
+<strong>Fix</strong>: <code>AllocationProposal</code> type with <code>BudgetPool</code> and <code>AllocationOptions</code>, processed through
+the existing tally engine with ranked-choice or conviction semantics.</p>
+<hr>
+<h2>Implementation Phases</h2>
+<h3>Phase 0 — Terminology and Surface Positioning (1-2 weeks)</h3>
+<p><em>Minimum needed for pilot/funding applications.</em></p>
+<ul>
+<li>Rename <code>CreatePaymentRequest</code> → <code>RecordTransferRequest</code> in gateway models</li>
+<li>Rename <code>payment</code> API route to <code>settlement</code></li>
+<li>Rename <code>balance</code> response fields to <code>position</code> in gateway API</li>
+<li>Change <code>commons-credits</code> constant to <code>commons-capacity</code></li>
+<li>Add UX language rules to <code>docs/dev/language-guide.md</code></li>
+<li>Extract <code>docs/design/regulatory-safe-verifiable-state.md</code> (this document)</li>
+<li>Add code review checklist to <code>CONTRIBUTING.md</code></li>
+</ul>
+<h3>Phase A — Structural Attestation Model (4-6 weeks)</h3>
+<ul>
+<li>Make <code>JournalEntry</code> provenance required (<code>ProvenanceRef</code>)</li>
+<li>Implement <code>Obligation</code> type using <code>AssetType::Claim</code></li>
+<li>Add <code>PatronageTracker</code> for NY-CC §93</li>
+<li>Extract commons credit formula to CCL PolicyOracle parameter</li>
+<li>Wire <code>Obligation</code> into settlement paths (alongside existing journal entries)</li>
+</ul>
+<h3>Phase B — Governance Completeness (2-3 months)</h3>
+<ul>
+<li>Persist <code>DelegationManager</code> with gossip sync</li>
+<li>Add delegation query API (<code>/v1/governance/{id}/delegations</code>)</li>
+<li>Implement <code>ExecutionReceiptGate</code> (enforce governance → execution linkage)</li>
+<li>Add <code>AllocationProposal</code> (participatory budgeting)</li>
+<li>Add <code>DisputeResolution</code> → receipt/obligation lifecycle linkage</li>
+</ul>
+<h3>Phase C — CI Guardrails (alongside Phase A/B)</h3>
+<ul>
+<li>Add <code>cargo-deny</code> or custom clippy lint forbidding custodial patterns in public API types</li>
+<li>Add forbidden-terminology check to CI for gateway API surface</li>
+<li>Add <code>docs/dev/review-checklists.md</code> with the seven invariants as a PR checklist item</li>
+</ul>
+<hr>
+<h2>Compliance Posture Language</h2>
+<p>Use this framing in all external-facing documentation and grant applications:</p>
+<p><strong>Use</strong>: &quot;reduces risk by avoiding trigger behaviors&quot;
+<strong>Not</strong>: &quot;is legally compliant&quot; or &quot;is legally bulletproof&quot;</p>
+<p>Compliance posture is a <em>behavioral invariant</em>, not a label. The architecture enforces non-intermediating
+behaviors; legal interpretation of those behaviors is context-dependent and must be verified by counsel.</p>
+<hr>
+<h2>Connection to the IPv6 Work</h2>
+<p>The same separation-of-concerns principle drives both major architectural threads:</p>
+<table>
+<thead>
+<tr>
+<th>Change</th>
+<th>Separation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>IPv6 endpoint sets</td>
+<td>Separate <em>identity</em> (DID) from <em>transport</em> (address)</td>
+</tr>
+<tr>
+<td>Verifiable state</td>
+<td>Separate <em>coordination</em> (obligations/receipts) from <em>money</em> (payment semantics)</td>
+</tr>
+</tbody></table>
+<p>Both changes make ICN more honest about what it actually is: a substrate for cryptographically
+verifiable peer coordination — not a financial network, and not a single-transport system.</p>
+<hr>
+<h2>Files Requiring Changes</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Change</th>
+<th>Phase</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icn-gateway/src/models.rs</code></td>
+<td>Rename <code>CreatePaymentRequest</code>, <code>BalanceResponse</code></td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>icn-gateway/src/api/ledger.rs</code></td>
+<td>Rename <code>payment</code> route to <code>settlement</code>/<code>record</code></td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>icn-ledger/src/commons_credits.rs</code></td>
+<td>Extract formula to CCL parameter</td>
+<td>A</td>
+</tr>
+<tr>
+<td><code>icn-ledger/src/types.rs</code></td>
+<td>Make provenance required; add <code>ProvenanceRef</code></td>
+<td>A</td>
+</tr>
+<tr>
+<td><code>icn-kernel-api/src/economics.rs</code></td>
+<td>Implement <code>Obligation</code> using <code>AssetType::Claim</code></td>
+<td>A</td>
+</tr>
+<tr>
+<td><code>icn-ledger/src/settlement.rs</code></td>
+<td>Wire <code>Obligation</code> into settlement paths</td>
+<td>A</td>
+</tr>
+<tr>
+<td><code>icn-coop/src/membership.rs</code></td>
+<td>Add <code>PatronageTracker</code></td>
+<td>A</td>
+</tr>
+<tr>
+<td><code>icn-governance/src/delegation.rs</code></td>
+<td>Add persistence + gossip sync</td>
+<td>B</td>
+</tr>
+<tr>
+<td><code>icn-governance/src/amendment.rs</code></td>
+<td>Add <code>ExecutionReceiptGate</code></td>
+<td>B</td>
+</tr>
+<tr>
+<td><code>icn-governance/src/proposal.rs</code></td>
+<td>Add <code>AllocationProposal</code> type</td>
+<td>B</td>
+</tr>
+<tr>
+<td><code>CONTRIBUTING.md</code></td>
+<td>Add regulatory invariants checklist</td>
+<td>C</td>
+</tr>
+<tr>
+<td><code>docs/dev/language-guide.md</code></td>
+<td>UX language rules (new file)</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>docs/dev/review-checklists.md</code></td>
+<td>PR review checklist (new file)</td>
+<td>C</td>
+</tr>
+</tbody></table>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

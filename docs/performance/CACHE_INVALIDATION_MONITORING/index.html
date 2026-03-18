@@ -1,0 +1,343 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Trust Cache Invalidation Monitoring &amp; Optimization | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>performance</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>CACHE INVALIDATION MONITORING</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/performance/CACHE_INVALIDATION_MONITORING.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Trust Cache Invalidation Monitoring &amp; Optimization</h1>
+<p><strong>Issue</strong>: #998<br><strong>Status</strong>: Implemented<br><strong>Date</strong>: 2026-02-02</p>
+<h2>Overview</h2>
+<p>This document describes the monitoring and optimization strategy for high-fanout cache invalidation in the trust system, implemented as part of issue #998.</p>
+<h2>Background</h2>
+<p>The transitive cache invalidation fix (issue #878, PR #988) invalidates cached trust scores when edges change. For nodes with high fanout (many outgoing edges), this could trigger 100+ cache invalidations per edge mutation.</p>
+<p><strong>Performance Characteristic</strong>: O(1 + fanout(target)) per edge mutation</p>
+<h2>Monitoring Metrics</h2>
+<h3>Core Metrics</h3>
+<ol>
+<li><p><strong><code>icn_trust_cache_transitive_invalidations_total</code></strong> (counter)</p>
+<ul>
+<li>Total fanout volume (all downstream edges from mutated targets)</li>
+<li>Counts every outgoing edge regardless of whether it&#39;s cached</li>
+<li>Use for capacity planning and fanout rate tracking</li>
+<li><code>rate()</code> gives fanout volume per second</li>
+</ul>
+</li>
+<li><p><strong><code>icn_trust_cache_actual_invalidations_total</code></strong> (counter)</p>
+<ul>
+<li>Number of cache entries actually invalidated (subset of fanout)</li>
+<li>Incremented only for downstream DIDs that had cached entries</li>
+<li>Use to measure cache hit rate effectiveness</li>
+<li>Compare with transitive_invalidations_total to see selective optimization impact</li>
+</ul>
+</li>
+<li><p><strong><code>icn_trust_cache_downstream_count</code></strong> (histogram)</p>
+<ul>
+<li>Distribution of downstream fanout per edge mutation</li>
+<li>Records total outgoing edges from each mutated target</li>
+<li>Use percentiles to detect high-fanout &quot;hub&quot; nodes</li>
+<li><code>histogram_quantile(0.99, ...)</code> reveals maximum observed fanout</li>
+</ul>
+</li>
+<li><p><strong><code>icn_trust_cache_max_downstream_count</code></strong> (gauge)</p>
+<ul>
+<li>Most recent downstream fanout count observed</li>
+<li>Note: tracks latest value, not all-time maximum (use histogram p99 instead)</li>
+<li>Kept for dashboard compatibility; prefer histogram for accurate max detection</li>
+</ul>
+</li>
+<li><p><strong><code>icn_trust_cache_selective_skips_total</code></strong> (counter)</p>
+<ul>
+<li>Number of downstream DIDs skipped (no cached entry)</li>
+<li>High skip rate = selective optimization is effective</li>
+<li>Formula: skips / (skips + actual_invalidations) = optimization efficiency</li>
+</ul>
+</li>
+</ol>
+<h3>Derived Metrics</h3>
+<p><strong>Cache Hit Rate During Invalidation</strong> (PromQL):</p>
+<pre><code class="language-promql">rate(icn_trust_cache_actual_invalidations_total[5m]) / 
+rate(icn_trust_cache_transitive_invalidations_total[5m])
+</code></pre>
+<p>Interpretation: 0.20 = 20% of downstream nodes were cached</p>
+<p><strong>Selective Invalidation Efficiency</strong> (PromQL):</p>
+<pre><code class="language-promql">rate(icn_trust_cache_selective_skips_total[5m]) / 
+(rate(icn_trust_cache_selective_skips_total[5m]) + rate(icn_trust_cache_actual_invalidations_total[5m]))
+</code></pre>
+<p>Interpretation: 0.80 = 80% of invalidation checks were skipped (good)</p>
+<p><strong>Fanout Distribution</strong> (PromQL):</p>
+<pre><code class="language-promql">histogram_quantile(0.95, rate(icn_trust_cache_downstream_count_bucket[5m]))
+</code></pre>
+<h2>Optimization Strategy: Selective Invalidation</h2>
+<h3>Implementation</h3>
+<p>The selective invalidation optimization checks if a cache entry exists before invalidating it:</p>
+<pre><code class="language-rust">pub fn invalidate_if_cached(&amp;self, did: &amp;Did) -&gt; bool {
+    if let Ok(mut cache) = self.cache.lock() {
+        if cache.peek(did).is_some() {
+            cache.pop(did);
+            // ... increment metrics ...
+            true
+        } else {
+            trust_cache_selective_skips_inc();
+            false
+        }
+    } else {
+        false
+    }
+}
+</code></pre>
+<h3>Benefits</h3>
+<ol>
+<li><strong>Reduced Lock Contention</strong>: Fewer unnecessary cache operations</li>
+<li><strong>Lower Metric Overhead</strong>: Skip tracking for non-existent entries</li>
+<li><strong>Better Performance</strong>: For low cache hit rates (&lt;20%), saves 80% of invalidation work</li>
+</ol>
+<h3>When Optimization is Effective</h3>
+<ul>
+<li><strong>Low cache hit rate</strong> (&lt;20%): Most downstream nodes aren&#39;t cached</li>
+<li><strong>High fanout</strong> (&gt;50): Many downstream invalidations per mutation</li>
+<li><strong>Hub nodes</strong>: Central nodes with 100+ outgoing edges</li>
+</ul>
+<h3>Performance Impact</h3>
+<p>For a hub with 100 outgoing edges and 20% cache hit rate:</p>
+<ul>
+<li><strong>Without optimization</strong>: 100 cache operations (95 unnecessary)</li>
+<li><strong>With optimization</strong>: 20 invalidations + 80 skips (5x fewer operations)</li>
+</ul>
+<h2>Thresholds &amp; Alerts</h2>
+<h3>Detection Threshold</h3>
+<p><strong>High-fanout logging trigger</strong>: Downstream count &gt;= 50</p>
+<p>When this threshold is met or exceeded, the system logs detailed information:</p>
+<ul>
+<li>Total downstream count</li>
+<li>Actual invalidations performed</li>
+<li>Cache hit rate for this invalidation event</li>
+</ul>
+<h3>Recommended Alert Rules</h3>
+<p><strong>Alert 1: High Fanout Detected</strong></p>
+<pre><code class="language-yaml">alert: HighFanoutCacheInvalidation
+expr: |
+  histogram_quantile(
+    0.99,
+    sum(rate(icn_trust_cache_downstream_count_bucket[5m])) by (le)
+  ) &gt; 50
+for: 5m
+labels:
+  severity: info
+annotations:
+  summary: &quot;High-fanout cache invalidation detected&quot;
+  description: &quot;Recent downstream fanout (p99) is {{ $value }}, which may impact performance.&quot;
+</code></pre>
+<p><strong>Alert 2: Low Selective Efficiency</strong></p>
+<pre><code class="language-yaml">alert: LowSelectiveInvalidationEfficiency
+expr: |
+  (
+    rate(icn_trust_cache_selective_skips_total[5m]) / 
+    (rate(icn_trust_cache_selective_skips_total[5m]) + rate(icn_trust_cache_actual_invalidations_total[5m]))
+  ) &lt; 0.5
+for: 10m
+labels:
+  severity: warning
+annotations:
+  summary: &quot;Selective invalidation efficiency is low&quot;
+  description: &quot;Skip rate is {{ $value | humanizePercentage }}, indicating high cache hit rates where selective optimization provides less benefit.&quot;
+</code></pre>
+<h2>Grafana Dashboard Panels</h2>
+<h3>Panel 1: Downstream Count Distribution (Histogram)</h3>
+<pre><code class="language-json">{
+  &quot;title&quot;: &quot;Cache Invalidation Fanout Distribution&quot;,
+  &quot;type&quot;: &quot;timeseries&quot;,
+  &quot;targets&quot;: [
+    {
+      &quot;expr&quot;: &quot;histogram_quantile(0.50, rate(icn_trust_cache_downstream_count_bucket[5m]))&quot;,
+      &quot;legendFormat&quot;: &quot;p50&quot;
+    },
+    {
+      &quot;expr&quot;: &quot;histogram_quantile(0.95, rate(icn_trust_cache_downstream_count_bucket[5m]))&quot;,
+      &quot;legendFormat&quot;: &quot;p95&quot;
+    },
+    {
+      &quot;expr&quot;: &quot;histogram_quantile(0.99, rate(icn_trust_cache_downstream_count_bucket[5m]))&quot;,
+      &quot;legendFormat&quot;: &quot;p99&quot;
+    }
+  ]
+}
+</code></pre>
+<h3>Panel 2: Max Fanout (Gauge)</h3>
+<pre><code class="language-json">{
+  &quot;title&quot;: &quot;Max Downstream Count (Hub Detection)&quot;,
+  &quot;type&quot;: &quot;stat&quot;,
+  &quot;targets&quot;: [
+    {
+      &quot;expr&quot;: &quot;max(icn_trust_cache_max_downstream_count)&quot;
+    }
+  ],
+  &quot;fieldConfig&quot;: {
+    &quot;thresholds&quot;: {
+      &quot;steps&quot;: [
+        { &quot;color&quot;: &quot;green&quot;, &quot;value&quot;: null },
+        { &quot;color&quot;: &quot;yellow&quot;, &quot;value&quot;: 50 },
+        { &quot;color&quot;: &quot;red&quot;, &quot;value&quot;: 100 }
+      ]
+    }
+  }
+}
+</code></pre>
+<h3>Panel 3: Selective Optimization Effectiveness</h3>
+<pre><code class="language-json">{
+  &quot;title&quot;: &quot;Selective Invalidation Efficiency&quot;,
+  &quot;type&quot;: &quot;timeseries&quot;,
+  &quot;targets&quot;: [
+    {
+      &quot;expr&quot;: &quot;rate(icn_trust_cache_selective_skips_total[5m])&quot;,
+      &quot;legendFormat&quot;: &quot;Skips/sec&quot;
+    },
+    {
+      &quot;expr&quot;: &quot;rate(icn_trust_cache_transitive_invalidations_total[5m])&quot;,
+      &quot;legendFormat&quot;: &quot;Invalidations/sec&quot;
+    }
+  ]
+}
+</code></pre>
+<h2>Interpretation Guide</h2>
+<h3>Scenario 1: Low Fanout Network (Normal)</h3>
+<ul>
+<li>Max downstream count: &lt;10</li>
+<li>p95 downstream count: &lt;5</li>
+<li>Selective skip rate: Low (most nodes are cached)</li>
+<li><strong>Action</strong>: No optimization needed</li>
+</ul>
+<h3>Scenario 2: Moderate Fanout with Low Cache Hit Rate</h3>
+<ul>
+<li>Max downstream count: 20-50</li>
+<li>p95 downstream count: 10-20</li>
+<li>Selective skip rate: 60-80%</li>
+<li><strong>Action</strong>: Selective optimization is working well</li>
+</ul>
+<h3>Scenario 3: High Fanout Hub Detected</h3>
+<ul>
+<li>Max downstream count: &gt;100</li>
+<li>p95 downstream count: &gt;50</li>
+<li>Selective skip rate: 70-90%</li>
+<li><strong>Action</strong>: Monitor for performance impact; consider additional optimizations if needed</li>
+</ul>
+<h2>Future Optimizations (If Needed)</h2>
+<p>If selective invalidation proves insufficient, consider:</p>
+<ol>
+<li><p><strong>Batch Invalidation</strong>: Collect all affected DIDs, deduplicate, then invalidate once</p>
+<ul>
+<li>Reduces lock contention for overlapping invalidations</li>
+<li>Most effective when multiple edges change rapidly</li>
+</ul>
+</li>
+<li><p><strong>Lazy Invalidation</strong>: Mark entries as &quot;dirty&quot; without removing them</p>
+<ul>
+<li>Validate on read (check if trust edges have changed since cache time)</li>
+<li>Reduces invalidation overhead at the cost of read-time validation</li>
+</ul>
+</li>
+<li><p><strong>Tiered Caching</strong>: Different TTLs for different fanout levels</p>
+<ul>
+<li>Hub nodes: Shorter TTL (e.g., 1 minute)</li>
+<li>Leaf nodes: Longer TTL (e.g., 5 minutes)</li>
+<li>Reduces invalidation frequency for hubs</li>
+</ul>
+</li>
+</ol>
+<h2>Testing</h2>
+<h3>Unit Tests</h3>
+<ul>
+<li><code>test_selective_invalidation</code>: Verifies skip behavior</li>
+<li><code>test_selective_invalidation_skip_count</code>: Validates metric recording</li>
+</ul>
+<h3>Integration Tests</h3>
+<ul>
+<li><code>test_high_fanout_cache_invalidation</code>: 100-node fanout scenario</li>
+<li><code>test_selective_invalidation_reduces_work</code>: 50-node fanout with low hit rate</li>
+<li><code>test_fanout_threshold_logging</code>: Verifies &gt;50 threshold logging</li>
+</ul>
+<h2>Implementation Details</h2>
+<h3>Code Locations</h3>
+<ul>
+<li><strong>Metrics definitions</strong>: <code>icn-obs/src/metrics_legacy.rs</code></li>
+<li><strong>Selective invalidation</strong>: <code>icn-trust/src/trust_cache.rs</code></li>
+<li><strong>Transitive invalidation</strong>: <code>icn-trust/src/lib.rs:invalidate_affected()</code></li>
+<li><strong>Tests</strong>: <code>icn-trust/tests/trust_integration.rs</code></li>
+</ul>
+<h3>Key Design Decisions</h3>
+<ol>
+<li><strong>Selective by default</strong>: Always use <code>invalidate_if_cached()</code> for transitive targets</li>
+<li><strong>Direct invalidation non-selective</strong>: The target node itself is always invalidated (correctness over performance)</li>
+<li><strong>Metric granularity</strong>: Track both total downstream count (for monitoring) and actual invalidations (for efficiency measurement)</li>
+</ol>
+<h2>Acceptance Criteria Status</h2>
+<p>✅ Metric dashboard showing invalidation volume exists
+✅ Selective invalidation implemented for when avg downstream count &gt; 50
+✅ High-fanout logging triggers at &gt;50 downstream count
+✅ Tests validate optimization behavior</p>
+<h2>Related Issues</h2>
+<ul>
+<li>#878: Trust cache invalidation bug (fixed in PR #988)</li>
+<li>#988: Transitive cache invalidation PR</li>
+<li>#996: Fault injection + stress tests (tier:3)</li>
+<li>#1001: Benchmark trust_score_detailed (tier:3)</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

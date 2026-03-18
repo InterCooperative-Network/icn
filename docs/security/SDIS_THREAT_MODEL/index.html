@@ -1,0 +1,432 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>SDIS Threat Model | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>security</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>SDIS THREAT MODEL</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/security/SDIS_THREAT_MODEL.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>SDIS Threat Model</h1>
+<p><strong>Version</strong>: 1.0
+<strong>Status</strong>: Pre-audit preparation
+<strong>Last Updated</strong>: 2025-12-10</p>
+<h2>1. System Overview</h2>
+<p>SDIS (Sovereign Digital Identity System) provides a three-tier identity verification system built on ICN&#39;s infrastructure:</p>
+<pre><code>┌─────────────────────────────────────────────────────────────────┐
+│                     SDIS Architecture                            │
+├─────────────────────────────────────────────────────────────────┤
+│  Layer 5: Applications         │ Mobile apps, PoS terminals    │
+│  Layer 4: Presentation         │ QR, NFC, BLE, HTTP            │
+│  Layer 3: Verification         │ L1/L2/L3 verification tiers   │
+│  Layer 2: Cryptography         │ Ed25519, ML-DSA, STARK        │
+│  Layer 1: Identity             │ Anchors, KeyBundles, VUI      │
+│  Layer 0: Network              │ ICN gossip, steward network   │
+└─────────────────────────────────────────────────────────────────┘
+</code></pre>
+<h2>2. Trust Boundaries</h2>
+<h3>2.1 Holder Trust Boundary</h3>
+<ul>
+<li>User&#39;s device (phone, wallet)</li>
+<li>Local keystore (Age-encrypted)</li>
+<li>Ephemeral key generation</li>
+</ul>
+<h3>2.2 Verifier Trust Boundary</h3>
+<ul>
+<li>Verifier&#39;s device (scanner, terminal)</li>
+<li>Replay cache (local LRU)</li>
+<li>Network connectivity (for L3)</li>
+</ul>
+<h3>2.3 Steward Network Trust Boundary</h3>
+<ul>
+<li>Threshold secret sharing (pepper shares)</li>
+<li>VUI computation</li>
+<li>Enrollment token issuance</li>
+<li>Key recovery ceremonies</li>
+</ul>
+<h3>2.4 External Systems</h3>
+<ul>
+<li>Mobile OS security model</li>
+<li>NFC/BLE hardware</li>
+<li>Network infrastructure</li>
+</ul>
+<h2>3. Assets</h2>
+<h3>3.1 Critical Assets</h3>
+<table>
+<thead>
+<tr>
+<th>Asset</th>
+<th>Sensitivity</th>
+<th>Impact if Compromised</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Anchor ID</td>
+<td>High</td>
+<td>Identity takeover</td>
+</tr>
+<tr>
+<td>KeyBundle private keys</td>
+<td>Critical</td>
+<td>Full impersonation</td>
+</tr>
+<tr>
+<td>VUI</td>
+<td>Critical</td>
+<td>Sybil attacks possible</td>
+</tr>
+<tr>
+<td>Steward pepper shares</td>
+<td>Critical</td>
+<td>VUI linkability</td>
+</tr>
+<tr>
+<td>Enrollment tokens</td>
+<td>High</td>
+<td>Unauthorized identity creation</td>
+</tr>
+</tbody></table>
+<h3>3.2 Moderate Assets</h3>
+<table>
+<thead>
+<tr>
+<th>Asset</th>
+<th>Sensitivity</th>
+<th>Impact if Compromised</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Ephemeral proofs</td>
+<td>Low</td>
+<td>Short-term impersonation</td>
+</tr>
+<tr>
+<td>Replay cache</td>
+<td>Low</td>
+<td>DoS via replay</td>
+</tr>
+<tr>
+<td>Steward stats</td>
+<td>Low</td>
+<td>Reputation gaming</td>
+</tr>
+</tbody></table>
+<h2>4. Threat Actors</h2>
+<h3>4.1 External Attackers</h3>
+<ul>
+<li><strong>Capability</strong>: Network access, commodity hardware</li>
+<li><strong>Motivation</strong>: Identity fraud, credential theft</li>
+<li><strong>Examples</strong>: Credential stuffing, phishing, replay attacks</li>
+</ul>
+<h3>4.2 Malicious Verifiers</h3>
+<ul>
+<li><strong>Capability</strong>: Physical access to verification devices</li>
+<li><strong>Motivation</strong>: Privacy violation, tracking</li>
+<li><strong>Examples</strong>: Harvesting credentials, building profiles</li>
+</ul>
+<h3>4.3 Rogue Stewards</h3>
+<ul>
+<li><strong>Capability</strong>: Steward node access, pepper share</li>
+<li><strong>Motivation</strong>: Financial gain, targeted attacks</li>
+<li><strong>Examples</strong>: VUI linkage, enrollment manipulation</li>
+</ul>
+<h3>4.4 Nation-State Actors</h3>
+<ul>
+<li><strong>Capability</strong>: Advanced resources, quantum computing</li>
+<li><strong>Motivation</strong>: Mass surveillance, targeted individuals</li>
+<li><strong>Examples</strong>: Cryptographic attacks, infrastructure compromise</li>
+</ul>
+<h3>4.5 Insiders</h3>
+<ul>
+<li><strong>Capability</strong>: Code access, operational knowledge</li>
+<li><strong>Motivation</strong>: Various</li>
+<li><strong>Examples</strong>: Backdoors, key exfiltration</li>
+</ul>
+<h2>5. Threat Categories</h2>
+<h3>5.1 Cryptographic Threats</h3>
+<h4>T-CRYPTO-1: Quantum Attack on Ed25519</h4>
+<ul>
+<li><strong>Description</strong>: Future quantum computer breaks Ed25519 signatures</li>
+<li><strong>Affected</strong>: L1 verification (QR only)</li>
+<li><strong>Likelihood</strong>: Medium (5-15 years)</li>
+<li><strong>Impact</strong>: Critical</li>
+<li><strong>Mitigation</strong>: Hybrid signatures (Ed25519 + ML-DSA) at L2/L3</li>
+<li><strong>Residual Risk</strong>: L1 remains classical-only by design (speed tradeoff)</li>
+</ul>
+<h4>T-CRYPTO-2: ML-DSA Implementation Vulnerability</h4>
+<ul>
+<li><strong>Description</strong>: Bug in post-quantum signature implementation</li>
+<li><strong>Affected</strong>: L2/L3 verification</li>
+<li><strong>Likelihood</strong>: Low</li>
+<li><strong>Impact</strong>: High</li>
+<li><strong>Mitigation</strong>: Use audited library (pqcrypto-dilithium), fallback to classical</li>
+<li><strong>Residual Risk</strong>: Accept for FIPS-certified library</li>
+</ul>
+<h4>T-CRYPTO-3: STARK Soundness Error</h4>
+<ul>
+<li><strong>Description</strong>: Zero-knowledge proof accepts invalid witness</li>
+<li><strong>Affected</strong>: L3 attribute verification</li>
+<li><strong>Likelihood</strong>: Low</li>
+<li><strong>Impact</strong>: High (false attribute claims)</li>
+<li><strong>Mitigation</strong>: Conservative parameters, multiple proof systems</li>
+<li><strong>Residual Risk</strong>: Accept with 128-bit security margin</li>
+</ul>
+<h3>5.2 Protocol Threats</h3>
+<h4>T-PROTO-1: Replay Attack</h4>
+<ul>
+<li><strong>Description</strong>: Captured proof reused at different verifier</li>
+<li><strong>Affected</strong>: All verification levels</li>
+<li><strong>Likelihood</strong>: High (easy to attempt)</li>
+<li><strong>Impact</strong>: Medium (limited by expiry)</li>
+<li><strong>Mitigation</strong>: 16-byte nonces, LRU replay cache, short expiry</li>
+<li><strong>Residual Risk</strong>: Window of validity (default 1 hour)</li>
+</ul>
+<h4>T-PROTO-2: Proof Sharing</h4>
+<ul>
+<li><strong>Description</strong>: User shares QR code with unauthorized party</li>
+<li><strong>Affected</strong>: L1 verification</li>
+<li><strong>Likelihood</strong>: Medium</li>
+<li><strong>Impact</strong>: Medium (impersonation)</li>
+<li><strong>Mitigation</strong>: L2 binding verification, short expiry</li>
+<li><strong>Residual Risk</strong>: L1 intentionally allows transfer (design choice)</li>
+</ul>
+<h4>T-PROTO-3: Man-in-the-Middle on NFC/BLE</h4>
+<ul>
+<li><strong>Description</strong>: Attacker intercepts L2 binding transfer</li>
+<li><strong>Affected</strong>: L2 verification channel</li>
+<li><strong>Likelihood</strong>: Low (requires proximity)</li>
+<li><strong>Impact</strong>: Medium</li>
+<li><strong>Mitigation</strong>: Binding includes nonce from proof, signature verification</li>
+<li><strong>Residual Risk</strong>: Relay attacks possible in theory</li>
+</ul>
+<h4>T-PROTO-4: Denial of Service via Replay Cache</h4>
+<ul>
+<li><strong>Description</strong>: Attacker fills replay cache with garbage</li>
+<li><strong>Affected</strong>: All verification</li>
+<li><strong>Likelihood</strong>: Medium</li>
+<li><strong>Impact</strong>: Low (performance degradation)</li>
+<li><strong>Mitigation</strong>: LRU eviction, rate limiting per source</li>
+<li><strong>Residual Risk</strong>: Accept with monitoring</li>
+</ul>
+<h3>5.3 Identity Threats</h3>
+<h4>T-ID-1: Sybil Attack (Multiple Identities)</h4>
+<ul>
+<li><strong>Description</strong>: One person creates multiple VUIs</li>
+<li><strong>Affected</strong>: Identity uniqueness</li>
+<li><strong>Likelihood</strong>: Low (steward verification)</li>
+<li><strong>Impact</strong>: Critical</li>
+<li><strong>Mitigation</strong>: VUI via threshold PRF, steward attestation</li>
+<li><strong>Residual Risk</strong>: Depends on steward integrity</li>
+</ul>
+<h4>T-ID-2: Anchor Takeover</h4>
+<ul>
+<li><strong>Description</strong>: Attacker gains control of victim&#39;s anchor</li>
+<li><strong>Affected</strong>: Identity ownership</li>
+<li><strong>Likelihood</strong>: Low</li>
+<li><strong>Impact</strong>: Critical</li>
+<li><strong>Mitigation</strong>: Hybrid signatures, recovery ceremonies</li>
+<li><strong>Residual Risk</strong>: Social engineering of stewards</li>
+</ul>
+<h4>T-ID-3: Key Compromise</h4>
+<ul>
+<li><strong>Description</strong>: Private key extracted from device</li>
+<li><strong>Affected</strong>: All user operations</li>
+<li><strong>Likelihood</strong>: Medium</li>
+<li><strong>Impact</strong>: High</li>
+<li><strong>Mitigation</strong>: Age encryption, key rotation, recovery</li>
+<li><strong>Residual Risk</strong>: Device security dependent</li>
+</ul>
+<h3>5.4 Steward Network Threats</h3>
+<h4>T-STEWARD-1: Collusion Attack</h4>
+<ul>
+<li><strong>Description</strong>: Threshold of stewards collude to compute arbitrary VUI</li>
+<li><strong>Affected</strong>: VUI uniqueness</li>
+<li><strong>Likelihood</strong>: Low (requires 3+ stewards)</li>
+<li><strong>Impact</strong>: Critical</li>
+<li><strong>Mitigation</strong>: Geographic distribution, bond requirements, term limits</li>
+<li><strong>Residual Risk</strong>: Governance monitoring required</li>
+</ul>
+<h4>T-STEWARD-2: Pepper Share Leakage</h4>
+<ul>
+<li><strong>Description</strong>: Steward&#39;s pepper share is compromised</li>
+<li><strong>Affected</strong>: VUI privacy</li>
+<li><strong>Likelihood</strong>: Medium</li>
+<li><strong>Impact</strong>: Medium (one share insufficient)</li>
+<li><strong>Mitigation</strong>: Threshold scheme (t-of-n), share rotation</li>
+<li><strong>Residual Risk</strong>: Multiple compromises required</li>
+</ul>
+<h4>T-STEWARD-3: Enrollment Token Forgery</h4>
+<ul>
+<li><strong>Description</strong>: Attacker creates valid enrollment token</li>
+<li><strong>Affected</strong>: Identity issuance</li>
+<li><strong>Likelihood</strong>: Low (requires blind signature break)</li>
+<li><strong>Impact</strong>: High</li>
+<li><strong>Mitigation</strong>: Blind signatures, token expiry (7 days)</li>
+<li><strong>Residual Risk</strong>: Accept with auditing</li>
+</ul>
+<h3>5.5 Implementation Threats</h3>
+<h4>T-IMPL-1: Side-Channel Attack</h4>
+<ul>
+<li><strong>Description</strong>: Timing/power analysis reveals secrets</li>
+<li><strong>Affected</strong>: Key operations</li>
+<li><strong>Likelihood</strong>: Medium</li>
+<li><strong>Impact</strong>: High</li>
+<li><strong>Mitigation</strong>: Constant-time operations, zeroize on drop</li>
+<li><strong>Residual Risk</strong>: Hardware-dependent</li>
+</ul>
+<h4>T-IMPL-2: Memory Safety Vulnerability</h4>
+<ul>
+<li><strong>Description</strong>: Buffer overflow, use-after-free in Rust code</li>
+<li><strong>Affected</strong>: All components</li>
+<li><strong>Likelihood</strong>: Low (Rust safety)</li>
+<li><strong>Impact</strong>: Critical</li>
+<li><strong>Mitigation</strong>: Safe Rust, minimal unsafe blocks, fuzzing</li>
+<li><strong>Residual Risk</strong>: Unsafe blocks in crypto libs</li>
+</ul>
+<h2>6. Attack Trees</h2>
+<h3>6.1 Impersonate Identity</h3>
+<pre><code>Goal: Impersonate victim&#39;s identity
+├── Obtain valid ephemeral proof [OR]
+│   ├── Steal proof from victim&#39;s device
+│   ├── Intercept proof in transit
+│   └── Social engineer victim to share
+├── Compromise KeyBundle [OR]
+│   ├── Extract from encrypted keystore
+│   │   ├── Guess passphrase
+│   │   └── Memory dump while unlocked
+│   └── Obtain backup recovery
+└── Take over anchor [OR]
+    ├── Collude with stewards for recovery
+    └── Compromise multiple steward nodes
+</code></pre>
+<h3>6.2 Create False Identity</h3>
+<pre><code>Goal: Create identity without valid personhood
+├── Bypass VUI uniqueness [OR]
+│   ├── Collude with t stewards (hard)
+│   ├── Find VUI collision (infeasible)
+│   └── Exploit Bloom filter false positive
+└── Forge enrollment token [OR]
+    ├── Break blind signature scheme
+    └── Compromise steward signing key
+</code></pre>
+<h2>7. Security Requirements</h2>
+<h3>7.1 Authentication Requirements</h3>
+<ul>
+<li>REQ-AUTH-1: L1 provides 128-bit classical security</li>
+<li>REQ-AUTH-2: L2 provides 128-bit post-quantum security</li>
+<li>REQ-AUTH-3: Replay window ≤ proof validity period</li>
+</ul>
+<h3>7.2 Privacy Requirements</h3>
+<ul>
+<li>REQ-PRIV-1: VUI reveals no identity information</li>
+<li>REQ-PRIV-2: Proofs are unlinkable across sessions</li>
+<li>REQ-PRIV-3: Stewards cannot link enrollment to identity</li>
+</ul>
+<h3>7.3 Availability Requirements</h3>
+<ul>
+<li>REQ-AVAIL-1: L1/L2 work fully offline</li>
+<li>REQ-AVAIL-2: Single steward failure doesn&#39;t block enrollment</li>
+</ul>
+<h3>7.4 Integrity Requirements</h3>
+<ul>
+<li>REQ-INT-1: Anchors are immutable after creation</li>
+<li>REQ-INT-2: KeyBundle rotation is monotonic</li>
+</ul>
+<h2>8. Recommended Mitigations</h2>
+<h3>8.1 High Priority</h3>
+<ol>
+<li>Implement rate limiting on verification endpoints</li>
+<li>Add steward monitoring and alerting</li>
+<li>Conduct cryptographic library audit</li>
+</ol>
+<h3>8.2 Medium Priority</h3>
+<ol start="4">
+<li>Add hardware security module (HSM) support for stewards</li>
+<li>Implement proof-of-work for enrollment (anti-spam)</li>
+<li>Add geographic diversity requirements for stewards</li>
+</ol>
+<h3>8.3 Future Considerations</h3>
+<ol start="7">
+<li>Hardware attestation for key storage</li>
+<li>Formal verification of protocol</li>
+<li>Threshold signatures for anchor operations</li>
+</ol>
+<h2>9. Audit Scope</h2>
+<h3>9.1 In Scope</h3>
+<ul>
+<li><code>icn-crypto-pq</code>: Hybrid signatures, threshold PRF</li>
+<li><code>icn-identity</code>: Anchor, KeyBundle, VUI types</li>
+<li><code>icn-zkp</code>: STARK proof generation/verification</li>
+<li><code>icn-gateway/sdis</code>: Ephemeral proof system</li>
+<li><code>icn-steward</code>: Enrollment ceremonies</li>
+<li><code>icn-governance/sdis</code>: SDIS governance proposals</li>
+</ul>
+<h3>9.2 Out of Scope</h3>
+<ul>
+<li>Mobile app implementations</li>
+<li>Third-party cryptographic libraries (pqcrypto-*)</li>
+<li>ICN networking layer (covered separately)</li>
+</ul>
+<h2>10. References</h2>
+<ul>
+<li><a href="https://csrc.nist.gov/pubs/fips/204/final" target="_blank" rel="noopener">NIST FIPS 204</a> - ML-DSA Standard</li>
+<li><a href="https://tools.ietf.org/html/rfc8032" target="_blank" rel="noopener">RFC 8032</a> - Ed25519 Signatures</li>
+<li><a href="https://eprint.iacr.org/2018/046" target="_blank" rel="noopener">STARK Paper</a> - Scalable Zero-Knowledge</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

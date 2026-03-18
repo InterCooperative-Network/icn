@@ -1,0 +1,316 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>NAT Traversal Operations Guide | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>guides</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>operations</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>nat traversal</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/guides/operations/nat-traversal.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>NAT Traversal Operations Guide</h1>
+<p>This guide covers configuring and operating ICN nodes behind NAT (Network Address Translation) devices. It applies to pilot deployments where nodes communicate across different networks.</p>
+<h2>How NAT Traversal Works in ICN</h2>
+<p>ICN uses a <strong>direct-then-relay</strong> strategy for peer connections:</p>
+<ol>
+<li><strong>Direct dial</strong> — the node tries to connect directly to the peer&#39;s advertised address via QUIC/TLS</li>
+<li><strong>TURN relay fallback</strong> — if direct dial fails and a relay path is available, the node creates a per-peer relay proxy that transparently wraps QUIC traffic in TURN framing</li>
+</ol>
+<p>The relay path is entirely data-plane: Quinn (the QUIC implementation) sends raw UDP to a local proxy socket, the proxy wraps packets as TURN SEND-INDICATION messages, and the TURN server relays them to the peer. Quinn is unaware that TURN is involved.</p>
+<h3>Connection flow</h3>
+<pre><code class="language-text">Node A (Quinn) → [local proxy 127.0.0.1:X] → [TURN server] → Node B (Quinn)
+</code></pre>
+<h3>What triggers relay fallback</h3>
+<p>Relay fallback activates when ALL of the following are true:</p>
+<ul>
+<li>Direct dial to the peer failed (timeout, connection refused, unreachable)</li>
+<li>The peer advertised a <code>peer_relay_addr</code> (their TURN relay allocation)</li>
+<li>This node has a TURN allocation (<code>relay_addr</code> is set)</li>
+<li>This node has a TURN server configured (<code>turn_server_addr</code> is set)</li>
+</ul>
+<p>If any condition is missing, the dial fails with an operator-readable hint (e.g., &quot;no peer relay candidate provided&quot;, &quot;no TURN allocation&quot;, &quot;no TURN server configured&quot;).</p>
+<h2>Monitoring NAT Status</h2>
+<h3><code>icnctl network status</code></h3>
+<p>The NAT Traversal section shows:</p>
+<pre><code>NAT Traversal:
+  Public endpoint:  203.0.113.5:4433
+  TURN relay:       198.51.100.1:49152 (allocated)
+  Active relays:    1
+  Last traversal:   Relayed
+  Last direct err:  Timeout dialing peer (direct): deadline has elapsed
+  Last relay err:   none
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Public endpoint</strong></td>
+<td>STUN-discovered public IP:port. <code>none</code> if STUN failed or is disabled.</td>
+</tr>
+<tr>
+<td><strong>TURN relay</strong></td>
+<td>TURN-allocated relay address on the TURN server. <code>none</code> if no TURN allocation.</td>
+</tr>
+<tr>
+<td><strong>Active relays</strong></td>
+<td>Number of per-peer relay proxies currently running. One proxy per relayed peer.</td>
+</tr>
+<tr>
+<td><strong>Last traversal</strong></td>
+<td>How the most recent dial was established: <code>Direct</code>, <code>Relayed</code>, or <code>Unknown</code> (no dial yet).</td>
+</tr>
+<tr>
+<td><strong>Last direct err</strong></td>
+<td>Error from the most recent direct dial attempt. <code>none</code> if the last direct dial succeeded.</td>
+</tr>
+<tr>
+<td><strong>Last relay err</strong></td>
+<td>Error from the most recent relay attempt. <code>none</code> if relay succeeded or was not attempted.</td>
+</tr>
+</tbody></table>
+<h3>Interpreting the output</h3>
+<ul>
+<li><strong>Public endpoint = none, Relay address = none</strong>: Node has no NAT traversal configured. It can only reach peers on the local network (mDNS discovery).</li>
+<li><strong>Public endpoint = X, Relay address = none</strong>: STUN discovered the public address, but no TURN server is configured. Direct dial to peers behind symmetric NAT will fail.</li>
+<li><strong>Last traversal = Relayed, Active relays &gt;= 1</strong>: At least one peer connection is going through TURN. Check if direct connectivity can be restored (firewall rules, port forwarding).</li>
+<li><strong>Last direct err = &quot;Timeout...&quot;</strong>: Direct connection attempts are timing out. This is expected when peers are behind restrictive NATs. The 30-second timeout is hardcoded.</li>
+</ul>
+<h2>Configuring TURN for Pilot Deployments</h2>
+<h3>Setting up coturn</h3>
+<p><a href="https://github.com/coturn/coturn" target="_blank" rel="noopener">coturn</a> is the recommended TURN server for pilot deployments.</p>
+<p><strong>Minimal coturn configuration</strong> (<code>/etc/turnserver.conf</code>):</p>
+<pre><code class="language-ini"># Listen on all interfaces
+listening-port=3478
+
+# The public IP of this server (replace with your actual IP)
+external-ip=YOUR_PUBLIC_IP
+
+# Relay address range
+min-port=49152
+max-port=65535
+
+# Simple static credentials (acceptable for pilot only)
+user=icn:icnpilot
+realm=icn.coop
+
+# Disable TLS for initial testing (add TLS for production)
+no-tls
+no-dtls
+
+# Logging
+log-file=/var/log/turnserver.log
+verbose
+</code></pre>
+<p><strong>Start coturn</strong>:</p>
+<pre><code class="language-bash"># Install
+sudo apt install coturn
+
+# Enable service
+sudo systemctl enable coturn
+echo &#39;TURNSERVER_ENABLED=1&#39; | sudo tee /etc/default/coturn
+
+# Start
+sudo systemctl start coturn
+
+# Verify it&#39;s listening
+ss -ulnp | grep 3478
+</code></pre>
+<h3>Configuring ICN nodes to use TURN</h3>
+<p>TURN configuration is passed to the network actor at startup via <code>TurnConfig</code>:</p>
+<pre><code class="language-rust">use icn_net::TurnConfig;
+
+let turn_config = TurnConfig::new(&quot;YOUR_TURN_SERVER:3478&quot;.parse()?)
+    .with_username(Some(&quot;icn&quot;.to_string()))
+    .with_password(Some(&quot;icnpilot&quot;.to_string()))
+    .with_timeout(std::time::Duration::from_secs(10));
+</code></pre>
+<p>This is passed to <code>NetworkActor::spawn()</code> as the <code>turn_config</code> parameter. The session manager will attempt TURN allocation on startup.</p>
+<h3>STUN configuration</h3>
+<p>STUN servers are passed as <code>stun_servers: Option&lt;Vec&lt;SocketAddr&gt;&gt;</code> to <code>NetworkActor::spawn()</code>. Default public STUN servers can be used for discovery:</p>
+<pre><code class="language-rust">let stun_servers = vec![
+    &quot;stun.l.google.com:19302&quot;.parse()?,
+    &quot;stun1.l.google.com:19302&quot;.parse()?,
+];
+</code></pre>
+<h2>Pilot Validation Procedure</h2>
+<h3>Prerequisites</h3>
+<ul>
+<li>Two hosts on different networks (different NATs)</li>
+<li>One coturn server reachable by both hosts</li>
+<li>ICN built from the <code>feat/c3-nat-traversal</code> branch or later</li>
+</ul>
+<h3>Steps</h3>
+<ol>
+<li><p><strong>Start coturn</strong> on a publicly reachable server (see above)</p>
+</li>
+<li><p><strong>Start Node A</strong> with TURN config pointing to coturn (programmatic — CLI flags planned):</p>
+<pre><code class="language-rust">// In your icnd startup code:
+let turn_config = TurnConfig::new(&quot;YOUR_COTURN_IP:3478&quot;.parse()?)
+    .with_username(Some(&quot;icn&quot;.to_string()))
+    .with_password(Some(&quot;icnpilot&quot;.to_string()));
+let stun_servers = vec![&quot;stun.l.google.com:19302&quot;.parse()?];
+</code></pre>
+</li>
+<li><p><strong>Start Node B</strong> on a different network with the same TURN/STUN config.</p>
+</li>
+<li><p><strong>Check NAT status</strong> on both nodes:</p>
+<pre><code class="language-bash">icnctl network status
+</code></pre>
+<p>Both should show a <code>Relay address</code> (TURN allocation succeeded).</p>
+</li>
+<li><p><strong>Trigger a dial</strong> from Node A to Node B. If direct connectivity fails, the relay fallback should activate. Check:</p>
+<ul>
+<li><code>Last traversal: Relayed</code> on Node A</li>
+<li><code>Active relays: 1</code> on Node A</li>
+<li>Messages are exchanged between the nodes</li>
+</ul>
+</li>
+</ol>
+<h3>What to look for in logs</h3>
+<ul>
+<li><code>TURN relay fallback enabled</code> — TURN config was accepted</li>
+<li><code>TURN allocation successful</code> — TURN allocation from coturn worked</li>
+<li><code>Direct dial failed, checking relay fallback</code> — direct path failed, relay logic activated</li>
+<li><code>TURN relay connection established</code> — relay QUIC handshake completed</li>
+<li><code>TURN relay proxy started</code> — per-peer proxy is running</li>
+</ul>
+<h3>Common failures</h3>
+<table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Cause</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>TURN allocate request timed out</code></td>
+<td>coturn unreachable or firewall blocking UDP 3478</td>
+<td>Check firewall rules, verify coturn is running</td>
+</tr>
+<tr>
+<td><code>no TURN allocation</code></td>
+<td>TURN allocation failed at startup</td>
+<td>Check coturn logs, verify credentials</td>
+</tr>
+<tr>
+<td><code>no peer relay candidate provided</code></td>
+<td>Peer didn&#39;t advertise a relay address</td>
+<td>Ensure both nodes have TURN configured</td>
+</tr>
+<tr>
+<td><code>relay QUIC handshake failed</code></td>
+<td>TURN relay working but QUIC handshake failed through it</td>
+<td>Check coturn relay port range, ensure UDP relay ports are open</td>
+</tr>
+</tbody></table>
+<h2>VPN Fallback</h2>
+<p>If TURN is unavailable or unreliable, a VPN provides guaranteed connectivity:</p>
+<h3>WireGuard</h3>
+<pre><code class="language-bash"># On each node, create a WireGuard interface
+# Peers see each other on the WireGuard subnet (e.g., 10.10.0.0/24)
+# ICN nodes listen on the WireGuard IP instead of the public interface
+
+icnd --listen 10.10.0.1:4433  # Node A on WireGuard IP
+icnd --listen 10.10.0.2:4433  # Node B on WireGuard IP
+</code></pre>
+<p>With a VPN, nodes appear to be on the same network. No STUN or TURN is needed — direct dial works because the VPN handles NAT traversal at the network layer.</p>
+<h3>Tailscale</h3>
+<pre><code class="language-bash"># After installing Tailscale on both nodes:
+icnd --listen $(tailscale ip -4):4433
+</code></pre>
+<p>Tailscale assigns stable IPs and handles NAT traversal transparently.</p>
+<h3>When to use VPN vs TURN</h3>
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Recommendation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Pilot with 2-5 nodes</td>
+<td>VPN (simpler, guaranteed connectivity)</td>
+</tr>
+<tr>
+<td>Production with many cooperatives</td>
+<td>TURN (no central VPN infrastructure needed)</td>
+</tr>
+<tr>
+<td>Mixed environment</td>
+<td>Both — TURN as primary, VPN as fallback for stubborn NATs</td>
+</tr>
+<tr>
+<td>Symmetric NAT on both sides</td>
+<td>VPN (TURN may not help if both sides are symmetric)</td>
+</tr>
+</tbody></table>
+<h2>Current Limitations</h2>
+<ul>
+<li><strong>No ICE</strong>: ICN does not implement full ICE (Interactive Connectivity Establishment). The strategy is direct → TURN relay, with no STUN hole-punching attempts.</li>
+<li><strong>IPv4 only</strong>: TURN relay proxy currently supports IPv4 peer addresses only.</li>
+<li><strong>No CLI flags yet</strong>: TURN/STUN config is passed programmatically. CLI flags (<code>--turn</code>, <code>--stun</code>) are planned but not yet implemented.</li>
+<li><strong>Single TURN server</strong>: Each node can be configured with one TURN server. Multi-server failover is not implemented.</li>
+<li><strong>30-second direct dial timeout</strong>: The default direct dial timeout is 30 seconds (configurable via <code>NetworkHandle::set_dial_timeout()</code>). In environments where direct connectivity is known to be impossible, this adds latency to the first connection.</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

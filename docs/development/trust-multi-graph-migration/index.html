@@ -1,0 +1,404 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Trust Multi-Graph Migration Guide | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>development</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>trust multi graph migration</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/development/trust-multi-graph-migration.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Trust Multi-Graph Migration Guide</h1>
+<p>This guide documents how to migrate ICN components from the single <code>TrustGraph</code> to the new multi-graph architecture introduced in Phase 21.</p>
+<h2>Overview</h2>
+<p>ICN now uses three orthogonal trust graphs to prevent any single clique from gaining cross-domain influence:</p>
+<table>
+<thead>
+<tr>
+<th>Graph Type</th>
+<th>Purpose</th>
+<th>Scoring Weights</th>
+<th>Key Consumers</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Social</strong></td>
+<td>&quot;I know you, we&#39;ve worked together&quot;</td>
+<td>60% direct / 40% transitive</td>
+<td>icn-net, icn-gossip, icn-governance</td>
+</tr>
+<tr>
+<td><strong>EconomicReliability</strong></td>
+<td>&quot;You clear obligations consistently&quot;</td>
+<td>80% direct / 20% transitive</td>
+<td>icn-ledger, icn-federation</td>
+</tr>
+<tr>
+<td><strong>TechnicalReliability</strong></td>
+<td>&quot;Your node behaves correctly&quot;</td>
+<td>90% direct / 10% transitive</td>
+<td>icn-compute, icn-security</td>
+</tr>
+</tbody></table>
+<h2>Migration Strategies</h2>
+<h3>Strategy 1: Drop-in Replacement (Zero Code Changes)</h3>
+<p>Replace <code>TrustGraph</code> with <code>TrustGraphFacade</code>. All existing code continues to work:</p>
+<pre><code class="language-rust">// Before
+use icn_trust::TrustGraph;
+let trust = TrustGraph::new(store, own_did);
+
+// After (no other changes needed)
+use icn_trust::TrustGraphFacade;
+let trust = TrustGraphFacade::new(store, own_did);
+</code></pre>
+<p>The facade provides:</p>
+<ul>
+<li><code>add_edge()</code> → Routes to appropriate graph based on <code>edge.graph_type</code></li>
+<li><code>compute_trust_score()</code> → Returns combined score (50% social + 30% economic + 20% technical)</li>
+<li><code>trust_class()</code> → Uses combined score</li>
+</ul>
+<h3>Strategy 2: Typed Access (Recommended for New Code)</h3>
+<p>Use typed access for domain-appropriate scoring:</p>
+<pre><code class="language-rust">use icn_trust::{TrustGraphFacade, TrustGraphType};
+
+let facade = TrustGraphFacade::new(store, own_did);
+
+// Domain-specific scoring
+let credit_score = facade.economic().compute_trust_score(&amp;member)?;
+let node_reliability = facade.technical().compute_trust_score(&amp;executor)?;
+let social_trust = facade.social().compute_trust_score(&amp;peer)?;
+</code></pre>
+<h3>Strategy 3: Direct MultiTrustGraph (Advanced)</h3>
+<p>For components that need full control:</p>
+<pre><code class="language-rust">use icn_trust::{MultiTrustGraph, TrustGraphType, TrustEdge};
+
+let mut multi = MultiTrustGraph::new(store, own_did);
+
+// Add typed edges
+multi.economic_mut().add_edge(
+    TrustEdge::new_typed(alice, bob, 0.8, TrustGraphType::EconomicReliability)
+)?;
+
+// Query specific graphs
+let score = multi.economic().compute_trust_score(&amp;target)?;
+</code></pre>
+<hr>
+<h2>Consumer Migration Reference</h2>
+<h3>icn-ledger (Priority: HIGH)</h3>
+<p><strong>Current</strong>: Uses combined trust score for credit limits.</p>
+<p><strong>Target</strong>: Use <code>EconomicReliability</code> graph for credit decisions.</p>
+<pre><code class="language-rust">// Before
+let trust_score = trust_graph.compute_trust_score(&amp;member)?;
+let credit_limit = baseline + (baseline * trust_score * multiplier);
+
+// After
+let econ_score = trust.economic().compute_trust_score(&amp;member)?;
+let credit_limit = baseline + (baseline * econ_score * multiplier);
+</code></pre>
+<p><strong>Files to update</strong>:</p>
+<ul>
+<li><code>icn-ledger/src/credit_policy.rs</code> - Credit limit calculations</li>
+<li><code>icn-ledger/src/dispute.rs</code> - Dispute weighting</li>
+</ul>
+<p><strong>Evidence sources for EconomicReliability</strong>:</p>
+<ul>
+<li>Cleared transactions count</li>
+<li>On-time payment rate</li>
+<li>Dispute outcomes (wins/losses)</li>
+<li>Debt-to-credit ratio</li>
+</ul>
+<hr>
+<h3>icn-compute (Priority: HIGH)</h3>
+<p><strong>Current</strong>: Uses combined trust for task scheduling thresholds.</p>
+<p><strong>Target</strong>: Use <code>TechnicalReliability</code> graph for executor selection.</p>
+<pre><code class="language-rust">// Before
+let trust = (self.trust_callback)(&amp;task.submitter);
+if trust &lt; MIN_TRUST_SUBMIT { return Err(...) }
+
+// After
+let tech_trust = trust.technical().compute_trust_score(&amp;task.submitter)?;
+if tech_trust &lt; MIN_TRUST_SUBMIT { return Err(...) }
+</code></pre>
+<p><strong>Files to update</strong>:</p>
+<ul>
+<li><code>icn-compute/src/actor.rs</code> - Task submission/claiming thresholds</li>
+<li><code>icn-compute/src/scheduler.rs</code> - Executor selection scoring</li>
+</ul>
+<p><strong>Evidence sources for TechnicalReliability</strong>:</p>
+<ul>
+<li>Node uptime percentage</li>
+<li>Task completion rate</li>
+<li>Byzantine violation history</li>
+<li>Resource usage accuracy</li>
+</ul>
+<hr>
+<h3>icn-net (Priority: MEDIUM)</h3>
+<p><strong>Current</strong>: Uses trust for rate limiting decisions.</p>
+<p><strong>Target</strong>: Use <code>Social</code> graph for connection priority and rate limits.</p>
+<pre><code class="language-rust">// Before
+let trust_score = trust_graph.compute_trust_score(&amp;peer_did)?;
+let rate_limit = calculate_rate_limit(trust_score);
+
+// After
+let social_score = trust.social().compute_trust_score(&amp;peer_did)?;
+let rate_limit = calculate_rate_limit(social_score);
+</code></pre>
+<p><strong>Files to update</strong>:</p>
+<ul>
+<li><code>icn-net/src/rate_limit.rs</code> - Trust-based rate limiting</li>
+<li><code>icn-net/src/actor.rs</code> - Connection acceptance</li>
+</ul>
+<p><strong>Evidence sources for Social</strong>:</p>
+<ul>
+<li>Peer endorsements</li>
+<li>Shared governance participation</li>
+<li>Organization membership</li>
+<li>Community activity</li>
+</ul>
+<hr>
+<h3>icn-gossip (Priority: MEDIUM)</h3>
+<p><strong>Current</strong>: Uses trust for topic access control.</p>
+<p><strong>Target</strong>: Use <code>Social</code> graph for topic gating.</p>
+<pre><code class="language-rust">// Before
+let trust = self.trust_graph.compute_trust_score(&amp;subscriber)?;
+if trust &lt; topic.min_trust { return Err(AccessDenied) }
+
+// After
+let social_trust = self.trust.social().compute_trust_score(&amp;subscriber)?;
+if social_trust &lt; topic.min_trust { return Err(AccessDenied) }
+</code></pre>
+<p><strong>Files to update</strong>:</p>
+<ul>
+<li><code>icn-gossip/src/gossip.rs</code> - Topic subscription access control</li>
+<li><code>icn-gossip/src/acl.rs</code> - Access control list evaluation</li>
+</ul>
+<hr>
+<h3>icn-security (Priority: MEDIUM)</h3>
+<p><strong>Current</strong>: Penalties affect unified trust score.</p>
+<p><strong>Target</strong>: Byzantine violations should penalize <code>TechnicalReliability</code>.</p>
+<pre><code class="language-rust">// Before
+trust_graph.update_score(&amp;violator, current_score * 0.5)?;
+
+// After
+// Penalty affects Technical graph specifically
+trust.technical_mut().add_edge(
+    TrustEdge::new_typed(own_did, violator, 0.0, TrustGraphType::TechnicalReliability)
+)?;
+</code></pre>
+<p><strong>Files to update</strong>:</p>
+<ul>
+<li><code>icn-security/src/misbehavior.rs</code> - Violation penalties</li>
+</ul>
+<p><strong>Evidence sources for TechnicalReliability penalties</strong>:</p>
+<ul>
+<li>Invalid signature attempts</li>
+<li>Replay attacks detected</li>
+<li>Conflicting signed statements</li>
+<li>Excessive resource consumption</li>
+</ul>
+<hr>
+<h3>icn-governance (Priority: LOW)</h3>
+<p><strong>Current</strong>: Uses trust for membership resolution.</p>
+<p><strong>Target</strong>: Use <code>Social</code> graph for governance membership.</p>
+<pre><code class="language-rust">// Before
+let trusted_dids = trust_graph.get_dids_above_threshold(0.3)?;
+
+// After
+let trusted_dids = trust.social().get_dids_above_threshold(0.3)?;
+</code></pre>
+<p><strong>Files to update</strong>:</p>
+<ul>
+<li><code>icn-governance/src/membership.rs</code> - Trust-based membership resolution</li>
+</ul>
+<hr>
+<h3>icn-federation (Priority: LOW)</h3>
+<p><strong>Current</strong>: Federation attestations use single trust context.</p>
+<p><strong>Target</strong>: Map <code>TrustContext</code> to appropriate <code>TrustGraphType</code>.</p>
+<pre><code class="language-rust">// Mapping from federation TrustContext to TrustGraphType
+fn map_context_to_graph(ctx: TrustContext) -&gt; TrustGraphType {
+    match ctx {
+        TrustContext::Social =&gt; TrustGraphType::Social,
+        TrustContext::Economic =&gt; TrustGraphType::EconomicReliability,
+        TrustContext::Governance =&gt; TrustGraphType::Social, // Derived from social
+        TrustContext::General =&gt; TrustGraphType::Social,    // Default to social
+    }
+}
+</code></pre>
+<p><strong>Files to update</strong>:</p>
+<ul>
+<li><code>icn-federation/src/attestation.rs</code> - Trust attestation mapping</li>
+</ul>
+<hr>
+<h3>icn-rpc (Priority: LOW)</h3>
+<p><strong>Current</strong>: Trust RPC returns single score.</p>
+<p><strong>Target</strong>: Expose all three graph types via RPC.</p>
+<pre><code class="language-rust">// New RPC methods
+trust.get_score(did, graph_type: Option&lt;TrustGraphType&gt;) -&gt; f64
+trust.get_all_scores(did) -&gt; { social: f64, economic: f64, technical: f64 }
+</code></pre>
+<p><strong>Files to update</strong>:</p>
+<ul>
+<li><code>icn-rpc/src/trust.rs</code> - Trust query handlers</li>
+</ul>
+<hr>
+<h3>icn-core (Priority: HIGH)</h3>
+<p><strong>Current</strong>: Supervisor creates single <code>TrustGraph</code>.</p>
+<p><strong>Target</strong>: Supervisor creates <code>TrustGraphFacade</code> or <code>MultiTrustGraph</code>.</p>
+<pre><code class="language-rust">// Before
+let trust_graph = Arc::new(RwLock::new(TrustGraph::new(store.clone(), own_did.clone())));
+
+// After (Option A: Facade for gradual migration)
+let trust = Arc::new(RwLock::new(TrustGraphFacade::new(store.clone(), own_did.clone())));
+
+// After (Option B: Direct multi-graph)
+let trust = Arc::new(RwLock::new(MultiTrustGraph::new(store.clone(), own_did.clone())));
+</code></pre>
+<p><strong>Files to update</strong>:</p>
+<ul>
+<li><code>icn-core/src/supervisor.rs</code> - Trust graph initialization</li>
+<li><code>icn-core/src/trust_propagation.rs</code> - Attestation routing by graph type</li>
+</ul>
+<hr>
+<h2>Adding Evidence to Trust Graphs</h2>
+<p>Trust edges should include evidence for auditability:</p>
+<pre><code class="language-rust">let edge = TrustEdge::new_typed(
+    issuer,
+    subject,
+    0.75,
+    TrustGraphType::EconomicReliability
+)
+.with_label(&quot;cleared_transactions&quot;)
+.with_evidence(&quot;tx:abc123&quot;)  // Reference to transaction
+.with_evidence(&quot;tx:def456&quot;);
+
+trust.economic_mut().add_edge(edge)?;
+</code></pre>
+<hr>
+<h2>Attestation Propagation</h2>
+<p>Trust attestations now include <code>graph_type</code> for proper routing:</p>
+<pre><code class="language-rust">let attestation = TrustAttestation::new_typed(
+    issuer,
+    subject,
+    0.8,
+    TrustGraphType::EconomicReliability
+);
+
+// Sign and broadcast
+attestation.sign(&amp;keypair)?;
+gossip.publish(&quot;trust:attestations&quot;, attestation)?;
+</code></pre>
+<p>Receiving nodes route attestations to the correct graph:</p>
+<pre><code class="language-rust">fn handle_attestation(att: TrustAttestation) {
+    let edge = att.to_trust_edge();
+    trust.graph_mut(att.graph_type).add_edge(edge)?;
+}
+</code></pre>
+<hr>
+<h2>Testing Migration</h2>
+<p>Each component should have tests verifying:</p>
+<ol>
+<li><strong>Backward compatibility</strong>: Old code paths still work</li>
+<li><strong>Typed access</strong>: Domain-specific graphs return correct scores</li>
+<li><strong>Edge routing</strong>: Edges go to the right graph</li>
+<li><strong>Scoring weights</strong>: Different weights per graph type</li>
+</ol>
+<p>Example test:</p>
+<pre><code class="language-rust">#[test]
+fn test_credit_policy_uses_economic_graph() {
+    let mut trust = TrustGraphFacade::new(store, alice.clone());
+
+    // Add different scores to each graph
+    trust.social_mut().add_edge(TrustEdge::new(alice.clone(), bob.clone(), 0.9))?;
+    trust.economic_mut().add_edge(TrustEdge::new(alice.clone(), bob.clone(), 0.3))?;
+
+    // Credit policy should use economic score (0.3 * 0.8 = 0.24), not social
+    let limit = calculate_credit_limit(&amp;trust, &amp;bob)?;
+    assert!(limit &lt; high_trust_limit); // Low economic trust = low limit
+}
+</code></pre>
+<hr>
+<h2>Metrics</h2>
+<p>New Prometheus metrics for multi-graph monitoring:</p>
+<pre><code>icn_trust_edges_total{graph_type=&quot;social|economic|technical&quot;}
+icn_trust_score_computed_total{graph_type=&quot;social|economic|technical&quot;}
+icn_trust_attestations_received_total{graph_type=&quot;social|economic|technical&quot;}
+</code></pre>
+<hr>
+<h2>Rollout Plan</h2>
+<ol>
+<li><strong>Week 1</strong>: Deploy <code>TrustGraphFacade</code> in supervisor (zero consumer changes)</li>
+<li><strong>Week 2</strong>: Migrate high-priority consumers (icn-ledger, icn-compute, icn-core)</li>
+<li><strong>Week 3</strong>: Migrate medium-priority consumers (icn-net, icn-gossip, icn-security)</li>
+<li><strong>Week 4</strong>: Migrate low-priority consumers (icn-governance, icn-federation, icn-rpc)</li>
+<li><strong>Week 5</strong>: Remove facade, use <code>MultiTrustGraph</code> directly</li>
+</ol>
+<hr>
+<h2>FAQ</h2>
+<p><strong>Q: What happens to existing trust edges without <code>graph_type</code>?</strong></p>
+<p>A: They default to <code>Social</code> via <code>#[serde(default)]</code>. This maintains backward compatibility.</p>
+<p><strong>Q: Can I query combined score after migration?</strong></p>
+<p>A: Yes, <code>TrustGraphFacade::compute_trust_score()</code> returns the combined score. Use typed access (<code>social()</code>, <code>economic()</code>, <code>technical()</code>) for domain-specific queries.</p>
+<p><strong>Q: How do I add edges to a specific graph?</strong></p>
+<p>A: Either use <code>TrustEdge::new_typed()</code> with explicit graph type, or access the graph directly via <code>trust.economic_mut().add_edge()</code>.</p>
+<p><strong>Q: What if a consumer needs scores from multiple graphs?</strong></p>
+<p>A: Query each graph separately and combine as needed for your use case:</p>
+<pre><code class="language-rust">let social = trust.social().compute_trust_score(&amp;did)?;
+let economic = trust.economic().compute_trust_score(&amp;did)?;
+let custom_score = social * 0.7 + economic * 0.3;
+</code></pre>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

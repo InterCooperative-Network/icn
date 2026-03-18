@@ -1,0 +1,336 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Feature Sprint Handoff Document | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>development</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>sessions</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>undated</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>SPRINT HANDOFF</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/development/sessions/undated/SPRINT_HANDOFF.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Feature Sprint Handoff Document</h1>
+<p><strong>Date</strong>: 2024-12-15
+<strong>Sprint</strong>: Pilot-Ready Platform Features
+<strong>Status</strong>: 13/17 tasks completed (76%)</p>
+<h2>Sprint Overview</h2>
+<p>This sprint implements pilot-ready features across four areas:</p>
+<ul>
+<li>Notification System (Push, Email, In-App)</li>
+<li>Governance UI Support (Charter, Amendments, Appeals)</li>
+<li>Economic Features (Recurring Payments, Escrow, Budgets)</li>
+<li>Infrastructure (Events, Pagination, Device Signing)</li>
+</ul>
+<p><strong>Plan File</strong>: <code>/home/matt/.claude/plans/streamed-hatching-stardust.md</code></p>
+<hr>
+<h2>Completed Tasks</h2>
+<h3>Phase 1: Infrastructure ✅</h3>
+<h4>Task 1.1: Transaction Event Emission</h4>
+<ul>
+<li><strong>Commit</strong>: <code>3fd16cf</code></li>
+<li><strong>Files</strong>: <code>icn-ledger/src/events.rs</code>, <code>icn-gateway/src/ledger_events.rs</code></li>
+<li><strong>What</strong>: Ledger emits events on transactions; gateway bridges to WebSocket</li>
+</ul>
+<h4>Task 1.2: Cursor-Based Pagination</h4>
+<ul>
+<li><strong>Commit</strong>: <code>3fd16cf</code></li>
+<li><strong>Files</strong>: <code>icn-gateway/src/pagination.rs</code></li>
+<li><strong>What</strong>: <code>Cursor</code>, <code>PaginatedList</code>, <code>PaginationRequest</code> types for efficient list APIs</li>
+</ul>
+<h4>Task 1.3: Device Signing Support</h4>
+<ul>
+<li><strong>Commit</strong>: <code>0b6a729</code></li>
+<li><strong>Files</strong>: <code>icn-gateway/src/api/devices.rs</code>, <code>icn-gateway/src/identity_mgr.rs</code></li>
+<li><strong>What</strong>: Multi-device key registration, device signatures accepted on transactions</li>
+</ul>
+<h3>Phase 2: Notifications ✅</h3>
+<h4>Task 2.1: Notification Infrastructure Core</h4>
+<ul>
+<li><strong>Commit</strong>: <code>87f3dab</code></li>
+<li><strong>Files</strong>:<ul>
+<li><code>icn-gateway/src/notification_queue.rs</code> - Queue with priority, channels, retry logic</li>
+<li><code>icn-gateway/src/notification_processor.rs</code> - Processes queue, delivers to channels</li>
+<li><code>icn-gateway/src/notification_triggers.rs</code> - Event-driven notification creation</li>
+</ul>
+</li>
+<li><strong>What</strong>: Multi-channel notification system (Push, Email, InApp)</li>
+</ul>
+<h4>Task 2.2: Push Notification Delivery</h4>
+<ul>
+<li><strong>Commit</strong>: <code>99bc15b</code></li>
+<li><strong>Files</strong>: <code>icn-gateway/src/fcm_client.rs</code></li>
+<li><strong>What</strong>: FCM HTTP v1 API client with OAuth2 token management, Android/iOS support</li>
+</ul>
+<h4>Task 2.3: Email Notification Delivery</h4>
+<ul>
+<li><strong>Commit</strong>: <code>03aa4e3</code></li>
+<li><strong>Files</strong>: <code>icn-gateway/src/email_client.rs</code></li>
+<li><strong>What</strong>: SMTP client with HTML/text templates for all notification types</li>
+</ul>
+<h4>Task 2.4: In-App Notification Center</h4>
+<ul>
+<li><strong>Commit</strong>: <code>fd16d62</code></li>
+<li><strong>Files</strong>: <code>icn-gateway/src/api/notifications.rs</code> (extended)</li>
+<li><strong>Endpoints</strong>:<ul>
+<li><code>GET /v1/notifications</code> - List with filtering/pagination</li>
+<li><code>GET /v1/notifications/count</code> - Total and unread counts</li>
+<li><code>POST /v1/notifications/{id}/read</code> - Mark as read</li>
+<li><code>POST /v1/notifications/read-all</code> - Mark all read</li>
+<li><code>DELETE /v1/notifications/{id}</code> - Delete notification</li>
+</ul>
+</li>
+</ul>
+<h3>Phase 3: Governance UI (Partial)</h3>
+<h4>Task 3.1: Charter Viewing API Enhancement</h4>
+<ul>
+<li><strong>Commit</strong>: <code>fab5614</code></li>
+<li><strong>Files</strong>: <code>icn-gateway/src/api/charter/mod.rs</code></li>
+<li><strong>Endpoints</strong>:<ul>
+<li><code>GET /v1/charter/{id}/summary</code> - Lightweight summary</li>
+<li><code>GET /v1/charter/{id}/founders</code> - Detailed founder info with activation status</li>
+<li><code>GET /v1/charter/{id}/timeline</code> - Chronological event timeline</li>
+</ul>
+</li>
+</ul>
+<h4>Task 3.2: Amendment Voting UI Support</h4>
+<ul>
+<li><strong>Commit</strong>: <code>feaf96a</code></li>
+<li><strong>Files</strong>: <code>icn-gateway/src/api/constitutional/voting.rs</code></li>
+<li><strong>Endpoints</strong>:<ul>
+<li><code>POST /v1/constitutional/amendments/{id}/votes</code> - Cast vote (approve/reject/abstain)</li>
+<li><code>GET /v1/constitutional/amendments/{id}/votes</code> - List all votes</li>
+<li><code>GET /v1/constitutional/amendments/{id}/results</code> - Vote results with percentages</li>
+<li><code>GET /v1/constitutional/amendments/{id}/my-vote</code> - User&#39;s vote status</li>
+</ul>
+</li>
+</ul>
+<h4>Task 3.3: Appeals Management UI Support</h4>
+<ul>
+<li><strong>Commit</strong>: <code>8e847d6</code></li>
+<li><strong>Files</strong>: <code>icn-gateway/src/api/constitutional/appeals_ui.rs</code></li>
+<li><strong>Endpoints</strong>:<ul>
+<li><code>GET /v1/constitutional/appeals/{id}/timeline</code> - Event timeline with all appeal history</li>
+<li><code>GET /v1/constitutional/appeals/{id}/status</code> - Detailed status with next steps</li>
+<li><code>POST /v1/constitutional/appeals/{id}/assign-reviewer</code> - Assign reviewer (admin)</li>
+<li><code>GET /v1/constitutional/appeals/dashboard</code> - Dashboard stats</li>
+</ul>
+</li>
+</ul>
+<h4>Task 3.4: Governance Dashboard Data</h4>
+<ul>
+<li><strong>Commit</strong>: <code>83f98ac</code></li>
+<li><strong>Files</strong>: <code>icn-gateway/src/api/governance_dashboard.rs</code></li>
+<li><strong>Endpoint</strong>:<ul>
+<li><code>GET /v1/governance/{charter_id}/dashboard</code> - Aggregate statistics (amendments, appeals breakdown, recent activity)</li>
+</ul>
+</li>
+</ul>
+<h3>Phase 4: Economic Features (Partial)</h3>
+<h4>Task 4.1: Recurring Payments</h4>
+<ul>
+<li><strong>Commit</strong>: <code>66db8bb</code></li>
+<li><strong>Files</strong>: <code>icn-gateway/src/api/recurring_payments.rs</code></li>
+<li><strong>Endpoints</strong>:<ul>
+<li><code>POST /v1/payments/recurring</code> - Create recurring payment</li>
+<li><code>GET /v1/payments/recurring</code> - List payments with status filtering</li>
+<li><code>GET /v1/payments/recurring/{id}</code> - Get payment details</li>
+<li><code>PUT /v1/payments/recurring/{id}</code> - Update payment (amount, frequency, status)</li>
+<li><code>DELETE /v1/payments/recurring/{id}</code> - Cancel payment</li>
+</ul>
+</li>
+<li><strong>Features</strong>: Daily/weekly/monthly/yearly frequency, status management (active/paused/cancelled/completed)</li>
+</ul>
+<hr>
+<h2>Remaining Tasks</h2>
+<h3>Task 4.2: Payment Escrow (P2, 10-12 hours)</h3>
+<p><strong>Goal</strong>: Hold funds for conditional release</p>
+<p><strong>Suggested Implementation</strong>:</p>
+<ol>
+<li>Create <code>icn-gateway/src/api/escrow.rs</code></li>
+<li>Add endpoints:<ul>
+<li><code>POST /v1/escrow</code> - Create escrow</li>
+<li><code>GET /v1/escrow/{id}</code> - Get escrow details</li>
+<li><code>POST /v1/escrow/{id}/release</code> - Release funds (authorized)</li>
+<li><code>POST /v1/escrow/{id}/refund</code> - Refund to sender</li>
+</ul>
+</li>
+<li>Integrate with ledger for fund locking</li>
+</ol>
+<h3>Task 4.3: Budget Limits (P2, 8-10 hours)</h3>
+<p><strong>Goal</strong>: Spending controls for cooperative accounts</p>
+<p><strong>Suggested Implementation</strong>:</p>
+<ol>
+<li>Create <code>icn-gateway/src/api/ledger/budgets.rs</code></li>
+<li>Add endpoints:<ul>
+<li><code>POST /v1/budgets</code> - Create budget limit</li>
+<li><code>GET /v1/budgets</code> - List budgets</li>
+<li><code>PUT /v1/budgets/{id}</code> - Update budget</li>
+</ul>
+</li>
+<li>Enforce limits in transaction processing</li>
+<li>Add notification triggers at 80% and 100% thresholds</li>
+</ol>
+<h3>Task 5.1: Integration Tests (P1, 8-10 hours)</h3>
+<p><strong>Goal</strong>: End-to-end tests for new features</p>
+<p><strong>Tests needed</strong>:</p>
+<ul>
+<li>Notification delivery (push, email, in-app)</li>
+<li>Amendment voting workflow</li>
+<li>Recurring payment execution</li>
+<li>Escrow create/release/refund</li>
+<li>Budget limit enforcement</li>
+</ul>
+<h3>Task 5.2: SDK Documentation (P1, 4-6 hours)</h3>
+<p><strong>Goal</strong>: Update TypeScript/React Native SDK docs</p>
+<p><strong>Files to update</strong>:</p>
+<ul>
+<li><code>sdk/typescript/README.md</code></li>
+<li><code>sdk/react-native/README.md</code></li>
+<li>Add examples for new notification and voting hooks</li>
+</ul>
+<h3>Task 5.3: Mobile App Examples (P2, 6-8 hours)</h3>
+<p><strong>Goal</strong>: Example code for mobile apps</p>
+<p><strong>Examples needed</strong>:</p>
+<ul>
+<li>Notification handling (push registration, in-app display)</li>
+<li>Voting screen component</li>
+<li>Recurring payment setup UI</li>
+</ul>
+<hr>
+<h2>Key Architecture Decisions</h2>
+<h3>Notification System</h3>
+<ul>
+<li><strong>Multi-channel</strong>: Single queue dispatches to Push/Email/InApp</li>
+<li><strong>Retry logic</strong>: Exponential backoff (1s, 2s, 4s, 8s, 16s), max 5 retries</li>
+<li><strong>Email addresses</strong>: Stored in notification data as <code>recipient_email</code> field</li>
+<li><strong>FCM</strong>: Uses HTTP v1 API with OAuth2 (not legacy server key)</li>
+</ul>
+<h3>Voting System</h3>
+<ul>
+<li><strong>Votes = Ratifications</strong>: Built on existing ratification infrastructure</li>
+<li><strong>Abstain</strong>: Stored as ratification with <code>[ABSTAIN]</code> comment prefix</li>
+<li><strong>Quorum</strong>: Simplified to 3+ votes; production needs eligible voter count</li>
+</ul>
+<h3>Timeline Events</h3>
+<ul>
+<li>Built from existing data (founders timestamps, amendments, status)</li>
+<li>Timestamps formatted with simplified UTC string (no chrono dependency)</li>
+</ul>
+<hr>
+<h2>File Structure Reference</h2>
+<pre><code>icn/crates/icn-gateway/src/
+├── api/
+│   ├── charter/
+│   │   └── mod.rs          # Charter + viewing endpoints
+│   ├── constitutional/
+│   │   ├── mod.rs          # Amendments + Appeals
+│   │   └── voting.rs       # NEW: UI-friendly voting
+│   ├── notifications.rs    # Device reg + in-app center
+│   ├── ledger.rs           # Payments (extend for recurring/escrow)
+│   └── ...
+├── email_client.rs         # NEW: SMTP + templates
+├── fcm_client.rs           # NEW: FCM HTTP v1 API
+├── notification_queue.rs   # NEW: Multi-channel queue
+├── notification_processor.rs # NEW: Queue processor
+├── notification_triggers.rs  # NEW: Event-driven triggers
+├── pagination.rs           # Cursor-based pagination
+└── ...
+</code></pre>
+<hr>
+<h2>Build &amp; Test Commands</h2>
+<pre><code class="language-bash">cd /home/matt/projects/icn/icn
+
+# Build
+cargo build -p icn-gateway
+
+# Test
+cargo test -p icn-gateway
+
+# Run specific test
+cargo test -p icn-gateway test_notification_count
+</code></pre>
+<hr>
+<h2>Current Git State</h2>
+<pre><code>Branch: main
+Ahead of origin by: 8 commits
+All tests passing: Yes (304+ tests)
+</code></pre>
+<p>To push changes:</p>
+<pre><code class="language-bash">git push origin main
+</code></pre>
+<hr>
+<h2>Dependencies Added</h2>
+<p>In <code>icn-gateway/Cargo.toml</code>:</p>
+<pre><code class="language-toml">reqwest = { version = &quot;0.11&quot;, features = [&quot;json&quot;] }  # For FCM HTTP client
+</code></pre>
+<hr>
+<h2>Notes for Continuation</h2>
+<ol>
+<li><p><strong>Email sending</strong>: <code>EmailClient::send()</code> is a stub - needs actual SMTP implementation (consider <code>lettre</code> crate)</p>
+</li>
+<li><p><strong>FCM JWT signing</strong>: <code>sign_jwt()</code> returns error - needs <code>jsonwebtoken</code> crate integration or use <code>with_access_token()</code> constructor</p>
+</li>
+<li><p><strong>Quorum calculation</strong>: Voting results use simplified quorum (3+ votes) - production needs total eligible voter lookup</p>
+</li>
+<li><p><strong>Notification persistence</strong>: In-app notifications are in-memory (<code>DashMap</code>) - production needs database persistence</p>
+</li>
+<li><p><strong>Scheduler</strong>: Recurring payments need a background scheduler - consider <code>tokio-cron-scheduler</code> crate</p>
+</li>
+</ol>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

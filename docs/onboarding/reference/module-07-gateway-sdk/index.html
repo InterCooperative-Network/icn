@@ -1,0 +1,1077 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Module 7: Gateway API and SDK | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>onboarding</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>reference</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>module 07 gateway sdk</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/onboarding/reference/module-07-gateway-sdk.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Module 7: Gateway API and SDK</h1>
+<h2>Learning Objectives</h2>
+<p>By the end of this module, you will:</p>
+<ul>
+<li>Understand the gateway&#39;s role as system boundary</li>
+<li>Master the DID-based authentication flow</li>
+<li>Configure and use JWT scopes for authorization</li>
+<li>Implement rate limiting and security policies</li>
+<li>Use the TypeScript SDK for client applications</li>
+<li>Subscribe to real-time events via WebSocket</li>
+</ul>
+<h2>Prerequisites</h2>
+<ul>
+<li>Module 6 (Ledger and Contracts)</li>
+<li>Basic understanding of HTTP/REST APIs</li>
+<li>Familiarity with JWT tokens</li>
+</ul>
+<h2>Key Reading</h2>
+<ul>
+<li><code>icn/crates/icn-gateway/src/server.rs</code></li>
+<li><code>icn/crates/icn-gateway/src/api/auth.rs</code></li>
+<li><code>icn/crates/icn-gateway/src/api/ledger.rs</code></li>
+<li><code>sdk/typescript/src/index.ts</code></li>
+</ul>
+<hr>
+<h2>Concepts (Textbook Style)</h2>
+<h3>The Gateway as System Boundary</h3>
+<p>The gateway serves as ICN&#39;s <strong>integration surface</strong> - the boundary between external applications
+and the internal ICN runtime. This architectural decision provides several important guarantees:</p>
+<pre><code>External World                    ICN Runtime
+
+  Mobile Apps    ─┐               ┌─ Actors
+  Web Apps       ─┼── Gateway ────┼─ Ledger
+  Third-Party    ─┼── (Actix)     ├─ Governance
+  Services       ─┘               └─ Trust Graph
+
+        HTTP/WS          Actor Handles
+        JSON             Native Types
+        JWT Auth         DID Identity
+</code></pre>
+<p><strong>Why a dedicated gateway?</strong></p>
+<ol>
+<li><p><strong>Protocol Translation</strong>: External apps speak HTTP/JSON; ICN actors communicate via typed
+messages and channels. The gateway translates between these worlds.</p>
+</li>
+<li><p><strong>Security Boundary</strong>: All external requests pass through authentication, authorization,
+rate limiting, and validation before touching internal systems.</p>
+</li>
+<li><p><strong>API Stability</strong>: Internal actor interfaces can evolve independently of the external API.
+The gateway provides a stable contract for application developers.</p>
+</li>
+<li><p><strong>Observability</strong>: Centralized request handling enables consistent logging, metrics, and
+tracing across all API operations.</p>
+</li>
+</ol>
+<h3>Gateway Architecture</h3>
+<p>The gateway is built on Actix-web, Rust&#39;s high-performance async web framework:</p>
+<pre><code>                    ┌─────────────────────────────────────────┐
+                    │              GatewayServer              │
+                    │                                         │
+    HTTP Request    │  ┌─────────┐   ┌─────────┐   ┌──────┐ │
+    ─────────────── ▶  │ Tracing │──▶│  CORS   │──▶│ Auth │ │
+                    │  └─────────┘   └─────────┘   └──────┘ │
+                    │       │                          │     │
+                    │       ▼                          ▼     │
+                    │  ┌─────────┐   ┌─────────┐   ┌──────┐ │
+                    │  │Compress │   │Security │   │ Rate │ │
+                    │  │         │   │ Headers │   │Limit │ │
+                    │  └─────────┘   └─────────┘   └──────┘ │
+                    │                      │               │
+                    │                      ▼               │
+                    │              ┌──────────────┐        │
+                    │              │   API Route  │        │
+                    │              │   Handler    │        │
+                    │              └──────────────┘        │
+                    │                      │               │
+                    │                      ▼               │
+                    │  ┌─────────────────────────────────┐ │
+                    │  │          Manager Layer          │ │
+                    │  │  Auth │ Coop │ Ledger │ Gov    │ │
+                    │  └─────────────────────────────────┘ │
+                    │                      │               │
+                    │                      ▼               │
+                    │  ┌─────────────────────────────────┐ │
+                    │  │     Actor Handles (Optional)    │ │
+                    │  │  TrustGraph │ Governance │ Coop │ │
+                    │  └─────────────────────────────────┘ │
+                    └─────────────────────────────────────────┘
+</code></pre>
+<p><strong>Key Components</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>AuthManager</strong></td>
+<td>Challenge/nonce generation, JWT issuance and validation</td>
+</tr>
+<tr>
+<td><strong>CoopManager</strong></td>
+<td>Cooperative CRUD, membership management</td>
+</tr>
+<tr>
+<td><strong>LedgerManager</strong></td>
+<td>Payment creation, balance queries, history</td>
+</tr>
+<tr>
+<td><strong>GovernanceManager</strong></td>
+<td>Proposals, voting, domains</td>
+</tr>
+<tr>
+<td><strong>TrustManager</strong></td>
+<td>Trust score queries, attestation management</td>
+</tr>
+<tr>
+<td><strong>EventBroadcaster</strong></td>
+<td>WebSocket event distribution</td>
+</tr>
+</tbody></table>
+<p><strong>Manager Modes</strong>:</p>
+<p>Managers can operate in two modes:</p>
+<ol>
+<li><strong>Standalone</strong> (in-memory): For testing or isolated deployments</li>
+<li><strong>Actor-backed</strong>: Delegates to daemon actors for persistence and gossip sync</li>
+</ol>
+<pre><code class="language-rust">// Actor-backed mode - delegates to daemon&#39;s TrustGraph
+let trust_manager = if let Some(handle) = self.trust_graph_handle {
+    info!(&quot;Trust manager connected to daemon (using TrustGraph actor)&quot;);
+    Arc::new(TrustManager::with_handle(handle))
+} else {
+    info!(&quot;Trust manager running standalone (in-memory only)&quot;);
+    Arc::new(TrustManager::new())
+};
+</code></pre>
+<hr>
+<h2>Authentication Flow</h2>
+<p>ICN uses DID-based authentication via challenge-response. This proves identity without
+transmitting private keys.</p>
+<h3>Auth Flow Diagram</h3>
+<pre><code class="language-mermaid">sequenceDiagram
+    participant Client
+    participant Gateway
+    participant AuthService
+    participant Store
+
+    rect rgb(240, 240, 255)
+        Note over Client,Store: Challenge Phase
+        Client-&gt;&gt;Gateway: POST /v1/auth/challenge&lt;br/&gt;{did: &quot;did:icn:...&quot;}
+        Gateway-&gt;&gt;Gateway: Rate limit check (IP)
+        Gateway-&gt;&gt;AuthService: create_challenge(did)
+        AuthService-&gt;&gt;Store: Store nonce (5min TTL)
+        AuthService--&gt;&gt;Gateway: {nonce, expires_in}
+        Gateway--&gt;&gt;Client: 200 OK {nonce, expires_in}
+    end
+
+    Note over Client: Sign nonce with&lt;br/&gt;Ed25519 private key
+
+    rect rgb(240, 255, 240)
+        Note over Client,Store: Verify Phase
+        Client-&gt;&gt;Gateway: POST /v1/auth/verify&lt;br/&gt;{did, signature, coop_id, scopes}
+        Gateway-&gt;&gt;AuthService: verify_challenge(did, sig, ...)
+        AuthService-&gt;&gt;Store: Get stored nonce
+        AuthService-&gt;&gt;AuthService: Verify Ed25519 signature
+        AuthService-&gt;&gt;AuthService: Validate scopes
+        AuthService-&gt;&gt;AuthService: Generate JWT
+        AuthService--&gt;&gt;Gateway: {token, expires_in}
+        Gateway--&gt;&gt;Client: 200 OK {token, expires_in}
+    end
+
+    rect rgb(255, 240, 240)
+        Note over Client,Store: Authenticated Request
+        Client-&gt;&gt;Gateway: GET /v1/ledger/balance&lt;br/&gt;Authorization: Bearer &lt;jwt&gt;
+        Gateway-&gt;&gt;Gateway: Validate JWT
+        Gateway-&gt;&gt;Gateway: Check scopes
+        Gateway--&gt;&gt;Client: 200 OK {balance: 100}
+    end
+</code></pre>
+<h3>Step 1: Challenge Request</h3>
+<p>The client requests a challenge for their DID:</p>
+<pre><code>POST /v1/auth/challenge
+{
+  &quot;did&quot;: &quot;did:icn:5Kd8xJz...&quot;
+}
+
+Response:
+{
+  &quot;nonce&quot;: &quot;a7f3b2c1d4e5...&quot;,  // 32-byte hex-encoded random nonce
+  &quot;expires_in&quot;: 300            // 5 minutes
+}
+</code></pre>
+<p><strong>Security considerations</strong>:</p>
+<ul>
+<li>IP-based rate limiting prevents brute-force attacks</li>
+<li>Nonces expire after 5 minutes</li>
+<li>Each nonce can only be used once</li>
+</ul>
+<pre><code class="language-rust">// IP-based rate limiting for unauthenticated endpoints
+let client_ip = get_client_ip(&amp;http_req);
+ip_limiter.check_rate_limit(&amp;client_ip)?;
+
+let did = req.did.parse()
+    .map_err(|e| GatewayError::BadRequest(format!(&quot;Invalid DID: {e}&quot;)))?;
+
+let nonce = auth.create_challenge(&amp;did)?;
+</code></pre>
+<h3>Step 2: Challenge Verification</h3>
+<p>The client signs the nonce with their Ed25519 private key and submits for verification:</p>
+<pre><code>POST /v1/auth/verify
+{
+  &quot;did&quot;: &quot;did:icn:5Kd8xJz...&quot;,
+  &quot;signature&quot;: &quot;3a4b5c6d...&quot;,    // hex-encoded Ed25519 signature
+  &quot;coop_id&quot;: &quot;food-coop&quot;,        // cooperative context
+  &quot;scopes&quot;: [&quot;ledger:read&quot;, &quot;ledger:write&quot;]
+}
+
+Response:
+{
+  &quot;token&quot;: &quot;eyJhbGciOiJIUzI1NiIs...&quot;,
+  &quot;expires_in&quot;: 3600             // 1 hour
+}
+</code></pre>
+<p><strong>Validation sequence</strong>:</p>
+<pre><code class="language-rust">// 1. Validate DID format
+let did = req.did.parse()?;
+
+// 2. Validate requested scopes
+validation::validate_scopes(&amp;req.scopes)?;
+
+// 3. Validate cooperative ID format
+validation::validate_coop_id(&amp;req.coop_id)?;
+
+// 4. Decode signature from hex
+let signature = hex::decode(&amp;req.signature)?;
+
+// 5. Validate signature length (Ed25519 = 64 bytes)
+if signature.len() != 64 {
+    return Err(GatewayError::BadRequest(
+        format!(&quot;Invalid signature length: expected 64, got {}&quot;, signature.len())
+    ));
+}
+
+// 6. Verify signature against challenge
+let token = auth.verify_challenge(&amp;did, &amp;signature, &amp;req.coop_id, req.scopes)?;
+</code></pre>
+<h3>JWT Token Structure</h3>
+<p>The issued JWT contains claims for authorization:</p>
+<pre><code class="language-json">{
+  &quot;sub&quot;: &quot;did:icn:5Kd8xJz...&quot;,   // Subject (DID)
+  &quot;coop_id&quot;: &quot;food-coop&quot;,        // Cooperative context
+  &quot;scopes&quot;: [&quot;ledger:read&quot;, &quot;ledger:write&quot;],
+  &quot;iat&quot;: 1704067200,             // Issued at
+  &quot;exp&quot;: 1704070800              // Expires (1 hour)
+}
+</code></pre>
+<h3>Step 3: Authenticated Requests</h3>
+<p>Include the token in subsequent requests:</p>
+<pre><code>GET /v1/ledger/food-coop/balance/did:icn:5Kd8xJz...
+Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
+</code></pre>
+<hr>
+<h2>Scopes and Authorization</h2>
+<p>Scopes define what operations a token can perform. ICN follows a <code>resource:action</code> pattern.</p>
+<h3>Available Scopes</h3>
+<table>
+<thead>
+<tr>
+<th>Scope</th>
+<th>Permissions</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ledger:read</code></td>
+<td>Query balances and transaction history</td>
+</tr>
+<tr>
+<td><code>ledger:write</code></td>
+<td>Create payments</td>
+</tr>
+<tr>
+<td><code>coop:read</code></td>
+<td>View cooperative details and members</td>
+</tr>
+<tr>
+<td><code>coop:write</code></td>
+<td>Modify cooperative settings, manage members</td>
+</tr>
+<tr>
+<td><code>gov:read</code></td>
+<td>View proposals, domains, votes</td>
+</tr>
+<tr>
+<td><code>gov:write</code></td>
+<td>Create proposals, cast votes</td>
+</tr>
+<tr>
+<td><code>trust:read</code></td>
+<td>Query trust scores and edges</td>
+</tr>
+<tr>
+<td><code>trust:write</code></td>
+<td>Create/revoke trust attestations</td>
+</tr>
+<tr>
+<td><code>compute:submit</code></td>
+<td>Submit compute tasks</td>
+</tr>
+<tr>
+<td><code>oracle:read</code></td>
+<td>Query exchange rates</td>
+</tr>
+<tr>
+<td><code>oracle:write</code></td>
+<td>Set manual exchange rates</td>
+</tr>
+</tbody></table>
+<h3>Scope Enforcement</h3>
+<p>Handlers enforce scopes via middleware:</p>
+<pre><code class="language-rust">// In ledger.rs - payment endpoint
+pub async fn create_payment(
+    http_req: HttpRequest,
+    // ...
+) -&gt; Result&lt;HttpResponse&gt; {
+    // Verify scope
+    require_scope(&amp;http_req, &quot;ledger:write&quot;)?;
+
+    // Verify cooperative access
+    require_coop_access(&amp;http_req, &amp;coop_id)?;
+
+    // Verify sender identity matches authenticated DID
+    let claims = get_claims(&amp;http_req)?;
+    if claims.sub != req.from {
+        return Err(GatewayError::AuthorizationFailed(
+            format!(&quot;Cannot create payments from other accounts&quot;)
+        ));
+    }
+
+    // ... proceed with payment
+}
+</code></pre>
+<hr>
+<h2>Rate Limiting</h2>
+<p>ICN implements multiple layers of rate limiting to protect against abuse.</p>
+<h3>IP-Based Rate Limiting</h3>
+<p>Unauthenticated endpoints (challenge, verify) use IP-based limits:</p>
+<pre><code class="language-rust">pub struct IpRateLimiter {
+    buckets: DashMap&lt;String, TokenBucket&gt;,
+    config: RateLimitConfig,
+}
+
+impl IpRateLimiter {
+    pub fn check_rate_limit(&amp;self, ip: &amp;str) -&gt; Result&lt;(), GatewayError&gt; {
+        let mut bucket = self.buckets
+            .entry(ip.to_string())
+            .or_insert_with(|| TokenBucket::new(self.config.capacity));
+
+        if !bucket.consume(self.config.cost_per_request) {
+            return Err(GatewayError::RateLimited(
+                &quot;Too many requests from this IP&quot;.to_string()
+            ));
+        }
+        Ok(())
+    }
+}
+</code></pre>
+<p><strong>Default limits</strong>:</p>
+<ul>
+<li>Burst capacity: 20 requests</li>
+<li>Refill rate: 2 tokens/second</li>
+<li>Cost per request: 1 token</li>
+</ul>
+<h3>Trust-Gated Velocity Limiting</h3>
+<p>Transaction endpoints use trust-based velocity limits:</p>
+<pre><code>Trust Class      │ Transactions/Hour │ Trust Score Range
+─────────────────┼───────────────────┼──────────────────
+Isolated         │        10         │    &lt; 0.1
+Known            │        50         │  0.1 - 0.4
+Partner          │       100         │  0.4 - 0.7
+Federated        │       200         │    &gt; 0.7
+</code></pre>
+<pre><code class="language-rust">pub struct VelocityLimiter {
+    windows: DashMap&lt;String, VelocityWindow&gt;,
+    config: VelocityLimitConfig,
+}
+
+impl VelocityLimiter {
+    pub fn check_velocity(&amp;self, did: &amp;str, trust_score: f64) -&gt; Result&lt;(), GatewayError&gt; {
+        let limit = self.config.limit_for_trust_class(trust_score);
+        let mut window = self.windows
+            .entry(did.to_string())
+            .or_insert_with(VelocityWindow::new);
+
+        if window.count &gt;= limit {
+            return Err(GatewayError::RateLimited(
+                format!(&quot;Velocity limit exceeded: {}/{} tx/hour&quot;, window.count, limit)
+            ));
+        }
+
+        window.increment();
+        Ok(())
+    }
+}
+</code></pre>
+<h3>Authenticated Rate Limiting</h3>
+<p>Authenticated endpoints use DID-based rate limiting:</p>
+<pre><code class="language-rust">// Middleware extracts DID from JWT and applies rate limit
+pub async fn rate_limit_middleware(
+    req: ServiceRequest,
+    next: Next&lt;Body&gt;,
+) -&gt; Result&lt;ServiceResponse&lt;Body&gt;, Error&gt; {
+    if let Some(claims) = get_claims(&amp;req) {
+        let limiter = req.app_data::&lt;Data&lt;Arc&lt;RateLimiter&gt;&gt;&gt;()?;
+        limiter.check_rate_limit(&amp;claims.sub)?;
+    }
+    next.call(req).await
+}
+</code></pre>
+<hr>
+<h2>WebSocket Events</h2>
+<p>The gateway provides real-time event streaming via WebSocket.</p>
+<h3>Connection Flow</h3>
+<pre><code>Client                          Gateway
+   │                               │
+   │──── Connect /v1/ws/{coop} ───▶│
+   │                               │
+   │◀────── Connection Open ───────│
+   │                               │
+   │──── { type: &quot;Auth&quot;,      ────▶│
+   │       token: &quot;eyJ...&quot; }       │
+   │                               │
+   │◀────── { type: &quot;AuthOk&quot;,  ────│
+   │          did: &quot;did:icn:..&quot;,   │
+   │          current_seq: 42 }    │
+   │                               │
+   │◀──── { type: &quot;Event&quot;,    ─────│  (real-time events)
+   │        seq: 43,               │
+   │        event: {...} }         │
+   │                               │
+</code></pre>
+<h3>Event Types</h3>
+<pre><code class="language-typescript">type CoopEventType =
+  | &#39;PaymentCreated&#39;
+  | &#39;MemberAdded&#39;
+  | &#39;MemberRemoved&#39;
+  | &#39;RoleUpdated&#39;
+  | &#39;SettingsUpdated&#39;
+  | &#39;GovernanceDomainCreated&#39;
+  | &#39;GovernanceProposalCreated&#39;
+  | &#39;GovernanceProposalOpened&#39;
+  | &#39;GovernanceProposalClosed&#39;
+  | &#39;GovernanceVoteCast&#39;
+  | &#39;ComputeTaskSubmitted&#39;
+  | &#39;ComputeTaskClaimed&#39;
+  | &#39;ComputeTaskCompleted&#39;
+  | &#39;ComputeTaskCancelled&#39;
+  | &#39;Shutdown&#39;;
+</code></pre>
+<h3>Sequence Numbers and Backfill</h3>
+<p>Events have sequence numbers for reliable delivery:</p>
+<pre><code class="language-typescript">// AuthOk includes current sequence
+interface WsAuthOkMessage {
+  type: &#39;AuthOk&#39;;
+  did: string;
+  current_seq: number;  // Highest sequence number
+}
+
+// Events include their sequence
+interface WsEventMessage {
+  type: &#39;Event&#39;;
+  seq: number;          // Event sequence number
+  event: GatewayEventPayload;
+}
+
+// Request missed events after reconnection
+interface WsBackfillMessage {
+  type: &#39;Backfill&#39;;
+  after_seq: number;    // Get events after this sequence
+}
+</code></pre>
+<h3>Graceful Shutdown</h3>
+<p>The gateway notifies clients before shutdown:</p>
+<pre><code class="language-typescript">interface WsShutdownMessage {
+  type: &#39;Shutdown&#39;;
+  reason: string;
+  reconnect_after_ms: number | null;  // Suggested reconnect delay
+}
+</code></pre>
+<hr>
+<h2>TypeScript SDK</h2>
+<p>The SDK provides a typed client for the gateway API.</p>
+<h3>Client Creation</h3>
+<pre><code class="language-typescript">import { ICNClient } from &#39;@icn/client&#39;;
+
+const client = new ICNClient({
+  baseUrl: &#39;https://gateway.icn.example.com&#39;,
+  timeout: 30000,        // Request timeout (ms)
+  retry: {
+    maxRetries: 3,       // Retry failed requests
+    initialDelayMs: 1000,
+    backoffMultiplier: 2,
+  },
+  autoRefresh: true,     // Auto-refresh expired tokens
+});
+</code></pre>
+<h3>Authentication</h3>
+<p><strong>Manual flow</strong>:</p>
+<pre><code class="language-typescript">// 1. Get challenge
+const challenge = await client.getChallenge(&#39;did:icn:abc123&#39;);
+
+// 2. Sign with your Ed25519 private key
+const signature = await signWithEd25519(challenge.nonce, privateKey);
+
+// 3. Verify and get token
+const auth = await client.verify(
+  &#39;did:icn:abc123&#39;,
+  signature,
+  &#39;food-coop&#39;,
+  [&#39;ledger:read&#39;, &#39;ledger:write&#39;]
+);
+
+// 4. Set token for future requests
+client.setToken(auth.token, auth.expires_at);
+</code></pre>
+<p><strong>Using SignatureProvider</strong> (cleaner):</p>
+<pre><code class="language-typescript">// Create a signature provider
+const signer: SignatureProvider = {
+  async sign(challenge: string): Promise&lt;string&gt; {
+    const signature = await ed25519.sign(
+      new TextEncoder().encode(challenge),
+      privateKey
+    );
+    return Buffer.from(signature).toString(&#39;hex&#39;);
+  }
+};
+
+// Authenticate (handles full flow)
+const auth = await client.authenticate(
+  &#39;did:icn:abc123&#39;,
+  signer,
+  &#39;food-coop&#39;,
+  [&#39;ledger:read&#39;, &#39;ledger:write&#39;]
+);
+</code></pre>
+<h3>Ledger Operations</h3>
+<pre><code class="language-typescript">// Get balance
+const balance = await client.getBalance(&#39;food-coop&#39;, &#39;did:icn:alice&#39;);
+console.log(`Balance: ${balance.balance} ${balance.currency}`);
+
+// Create payment
+const payment = await client.pay(&#39;food-coop&#39;, {
+  from: &#39;did:icn:alice&#39;,
+  to: &#39;did:icn:bob&#39;,
+  amount: 2.5,
+  currency: &#39;hours&#39;,
+  memo: &#39;Garden help&#39;,
+});
+
+// Get transaction history
+const history = await client.getHistory(&#39;food-coop&#39;, {
+  offset: 0,
+  limit: 50,
+});
+
+// Query builder for complex filters
+const filtered = await client.queryHistory(&#39;food-coop&#39;)
+  .fromDid(&#39;did:icn:alice&#39;)
+  .lastDays(30)
+  .limit(100)
+  .execute();
+</code></pre>
+<h3>Cross-Currency Payments</h3>
+<pre><code class="language-typescript">// Get a quote first
+const quote = await client.getCrossPaymentQuote(&#39;food-coop&#39;, {
+  amount: 10,
+  from_currency: &#39;hours&#39;,
+  to_currency: &#39;USD&#39;,
+});
+
+console.log(`10 hours = ${quote.net_target_amount} USD`);
+console.log(`Rate: ${quote.rate}, Valid until: ${quote.valid_until}`);
+
+// Execute with slippage protection
+const result = await client.crossPay(&#39;food-coop&#39;, {
+  from: &#39;did:icn:alice&#39;,
+  to: &#39;did:icn:bob&#39;,
+  amount: 10,
+  from_currency: &#39;hours&#39;,
+  to_currency: &#39;USD&#39;,
+  max_target_amount: Math.floor(quote.net_target_amount * 1.01), // 1% slippage
+});
+</code></pre>
+<h3>Governance</h3>
+<pre><code class="language-typescript">// Create a domain
+const domain = await client.createDomain({
+  domain_id: &#39;budget-2025&#39;,
+  name: &#39;Budget Decisions 2025&#39;,
+  members: [&#39;did:icn:alice&#39;, &#39;did:icn:bob&#39;, &#39;did:icn:carol&#39;],
+});
+
+// Create a proposal
+const proposal = await client.createProposal({
+  domain_id: &#39;budget-2025&#39;,
+  title: &#39;Allocate funds for community garden&#39;,
+  description: &#39;Proposal to allocate 500 hours for garden renovation&#39;,
+  kind: &#39;budget&#39;,
+});
+
+// Open for voting
+await client.openProposal(proposal.id);
+
+// Cast vote
+await client.vote(proposal.id, { choice: &#39;for&#39; });
+
+// Get results
+const tally = await client.getVotes(proposal.id);
+console.log(`For: ${tally.votes_for}, Against: ${tally.votes_against}`);
+
+// Close and get outcome
+const outcome = await client.closeProposal(proposal.id);
+if (outcome.accepted) {
+  console.log(&#39;Proposal passed!&#39;);
+}
+</code></pre>
+<h3>Vote Delegation</h3>
+<pre><code class="language-typescript">// Blanket delegation - delegate can vote on all proposals
+await client.createDelegation({
+  delegate: &#39;did:icn:trusted-delegate&#39;,
+  scope: &#39;blanket&#39;,
+});
+
+// Domain-scoped delegation
+await client.createDelegation({
+  delegate: &#39;did:icn:budget-expert&#39;,
+  scope: &#39;domain:budget-2025&#39;,
+  expires_at: Math.floor(Date.now() / 1000) + 86400 * 30, // 30 days
+});
+
+// Single-proposal delegation
+await client.createDelegation({
+  delegate: &#39;did:icn:advisor&#39;,
+  scope: &#39;proposal:prop-123&#39;,
+});
+
+// Revoke delegation
+await client.revokeDelegation(&#39;delegation-456&#39;);
+</code></pre>
+<h3>WebSocket Subscriptions</h3>
+<p><strong>Basic connection</strong>:</p>
+<pre><code class="language-typescript">const ws = client.connectWebSocket(&#39;food-coop&#39;, {
+  onOpen: () =&gt; console.log(&#39;Connected&#39;),
+  onMessage: (msg) =&gt; console.log(&#39;Event:&#39;, msg),
+  onError: (err) =&gt; console.error(&#39;Error:&#39;, err),
+  onClose: () =&gt; console.log(&#39;Disconnected&#39;),
+});
+</code></pre>
+<p><strong>Managed subscription with auto-reconnect</strong>:</p>
+<pre><code class="language-typescript">const subscription = client.subscribe(&#39;food-coop&#39;, {
+  onEvent: (event) =&gt; {
+    if (event.type === &#39;Event&#39;) {
+      console.log(&#39;Received event:&#39;, event.seq, event.event);
+    }
+  },
+  onAuthOk: (did, seq) =&gt; {
+    console.log(`Authenticated as ${did}, current seq: ${seq}`);
+  },
+  onReconnect: (attempt) =&gt; {
+    console.log(`Reconnecting... attempt ${attempt}`);
+  },
+  onBackfillComplete: (count) =&gt; {
+    console.log(`Backfilled ${count} missed events`);
+  },
+  onStateChange: (state) =&gt; {
+    console.log(`Connection state: ${state}`);
+  },
+}, {
+  autoReconnect: true,
+  maxReconnectAttempts: 10,
+  autoBackfill: true,        // Request missed events after reconnect
+  gapDetection: true,        // Detect and fill sequence gaps
+});
+
+// Later: close subscription
+subscription.close();
+</code></pre>
+<p><strong>Event filtering</strong>:</p>
+<pre><code class="language-typescript">import { EventFilter } from &#39;@icn/client&#39;;
+
+// Filter by event type
+const paymentFilter = EventFilter.payments();
+
+// Filter by DID
+const aliceFilter = EventFilter.byDid(&#39;did:icn:alice&#39;);
+
+// Combine filters
+const alicePayments = EventFilter.and(paymentFilter, aliceFilter);
+
+subscription = client.subscribe(&#39;food-coop&#39;, {
+  onEvent: (event) =&gt; {
+    if (alicePayments(event)) {
+      console.log(&#39;Alice payment:&#39;, event);
+    }
+  },
+});
+</code></pre>
+<h3>Batch Operations</h3>
+<pre><code class="language-typescript">// Batch payments
+const results = await client.batchPay(&#39;food-coop&#39;, [
+  { from: &#39;did:icn:alice&#39;, to: &#39;did:icn:bob&#39;, amount: 2, currency: &#39;hours&#39; },
+  { from: &#39;did:icn:alice&#39;, to: &#39;did:icn:carol&#39;, amount: 1, currency: &#39;hours&#39; },
+  { from: &#39;did:icn:alice&#39;, to: &#39;did:icn:dave&#39;, amount: 3, currency: &#39;hours&#39; },
+]);
+
+console.log(`${results.succeeded} succeeded, ${results.failed} failed`);
+for (const r of results.results) {
+  if (!r.success) {
+    console.error(&#39;Failed:&#39;, r.error);
+  }
+}
+</code></pre>
+<h3>Error Handling</h3>
+<pre><code class="language-typescript">import {
+  ICNError,
+  AuthenticationError,
+  AuthorizationError,
+  ValidationError,
+  RateLimitError,
+  NotFoundError,
+} from &#39;@icn/client&#39;;
+
+try {
+  await client.pay(&#39;food-coop&#39;, { ... });
+} catch (e) {
+  if (e instanceof AuthenticationError) {
+    // Token expired - re-authenticate
+    await client.authenticate(did, signer, coopId, scopes);
+
+  } else if (e instanceof AuthorizationError) {
+    console.error(&#39;Insufficient permissions:&#39;, e.requiredPermissions);
+
+  } else if (e instanceof ValidationError) {
+    // Field-level errors
+    for (const [field, errors] of Object.entries(e.fields)) {
+      console.error(`${field}: ${errors.join(&#39;, &#39;)}`);
+    }
+
+  } else if (e instanceof RateLimitError) {
+    console.error(`Rate limited. Retry after ${e.retryAfter}s`);
+
+  } else if (e instanceof NotFoundError) {
+    console.error(`${e.resourceType} not found: ${e.resourceId}`);
+
+  } else if (e instanceof ICNError &amp;&amp; e.isRetryable()) {
+    // Server error - SDK will auto-retry based on config
+    console.error(&#39;Temporary error, retrying...&#39;);
+  }
+}
+</code></pre>
+<hr>
+<h2>Security Configuration</h2>
+<h3>Security Headers</h3>
+<p>The gateway adds security headers to all responses:</p>
+<pre><code class="language-rust">pub struct SecurityHeaders {
+    config: SecurityConfig,
+}
+
+impl SecurityHeaders {
+    fn add_headers(&amp;self, resp: &amp;mut Response) {
+        resp.headers_mut().insert(
+            &quot;X-Content-Type-Options&quot;,
+            HeaderValue::from_static(&quot;nosniff&quot;)
+        );
+        resp.headers_mut().insert(
+            &quot;X-Frame-Options&quot;,
+            HeaderValue::from_static(&quot;DENY&quot;)
+        );
+        resp.headers_mut().insert(
+            &quot;Content-Security-Policy&quot;,
+            HeaderValue::from_static(&quot;default-src &#39;self&#39;&quot;)
+        );
+        // ... more headers
+    }
+}
+</code></pre>
+<h3>CORS Configuration</h3>
+<pre><code class="language-rust">pub fn configure_cors(config: &amp;SecurityConfig) -&gt; Cors {
+    if config.is_development() {
+        // Permissive for development
+        Cors::permissive()
+    } else {
+        // Strict for production
+        Cors::default()
+            .allowed_origin(&quot;https://app.icn.example.com&quot;)
+            .allowed_methods(vec![&quot;GET&quot;, &quot;POST&quot;, &quot;PUT&quot;, &quot;DELETE&quot;])
+            .allowed_headers(vec![&quot;Authorization&quot;, &quot;Content-Type&quot;])
+            .max_age(3600)
+    }
+}
+</code></pre>
+<h3>JWT Secret Requirements</h3>
+<pre><code class="language-rust">// JWT secret validation at startup
+if self.jwt_secret.is_empty() {
+    return Err(GatewayError::InternalError(
+        &quot;SECURITY: Gateway cannot start with empty JWT secret&quot;.to_string()
+    ));
+}
+
+if self.jwt_secret.len() &lt; 32 {
+    warn!(
+        &quot;SECURITY WARNING: JWT secret is only {} bytes. \
+         Recommended minimum is 32 bytes for HS256.&quot;,
+        self.jwt_secret.len()
+    );
+}
+</code></pre>
+<hr>
+<h2>API Reference</h2>
+<h3>Public Endpoints (No Auth)</h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GET</td>
+<td><code>/v1/health</code></td>
+<td>Health check</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/v1/auth/challenge</code></td>
+<td>Request auth challenge</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/v1/auth/verify</code></td>
+<td>Verify challenge and get token</td>
+</tr>
+<tr>
+<td>WS</td>
+<td><code>/v1/ws/{coop_id}</code></td>
+<td>WebSocket connection</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/v1/coops/{id}/stats</code></td>
+<td>Public cooperative statistics</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/v1/identity/resolve/{did}</code></td>
+<td>Resolve DID</td>
+</tr>
+</tbody></table>
+<h3>Protected Endpoints</h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Scope</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GET</td>
+<td><code>/v1/ledger/{coop}/balance/{did}</code></td>
+<td><code>ledger:read</code></td>
+<td>Get balance</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/v1/ledger/{coop}/payment</code></td>
+<td><code>ledger:write</code></td>
+<td>Create payment</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/v1/ledger/{coop}/history</code></td>
+<td><code>ledger:read</code></td>
+<td>Transaction history</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/v1/gov/proposals</code></td>
+<td><code>gov:write</code></td>
+<td>Create proposal</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/v1/gov/proposals/{id}/vote</code></td>
+<td><code>gov:write</code></td>
+<td>Cast vote</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/v1/trust/{did}/score</code></td>
+<td><code>trust:read</code></td>
+<td>Get trust score</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/v1/compute/submit</code></td>
+<td><code>compute:submit</code></td>
+<td>Submit task</td>
+</tr>
+</tbody></table>
+<h3>API Documentation</h3>
+<p>The gateway provides OpenAPI documentation:</p>
+<ul>
+<li>Swagger UI: <code>http://localhost:8080/swagger-ui/</code></li>
+<li>OpenAPI JSON: <code>http://localhost:8080/api-docs/openapi.json</code></li>
+</ul>
+<hr>
+<h2>Code Map</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icn-gateway/src/server.rs</code></td>
+<td>Main server setup, middleware chain</td>
+</tr>
+<tr>
+<td><code>icn-gateway/src/api/auth.rs</code></td>
+<td>Challenge/verify endpoints</td>
+</tr>
+<tr>
+<td><code>icn-gateway/src/api/ledger.rs</code></td>
+<td>Balance, payment, history endpoints</td>
+</tr>
+<tr>
+<td><code>icn-gateway/src/api/governance.rs</code></td>
+<td>Proposal, voting endpoints</td>
+</tr>
+<tr>
+<td><code>icn-gateway/src/api/websocket.rs</code></td>
+<td>WebSocket handler</td>
+</tr>
+<tr>
+<td><code>icn-gateway/src/auth.rs</code></td>
+<td>AuthManager implementation</td>
+</tr>
+<tr>
+<td><code>icn-gateway/src/rate_limit.rs</code></td>
+<td>Rate limiter implementations</td>
+</tr>
+<tr>
+<td><code>icn-gateway/src/middleware.rs</code></td>
+<td>JWT auth middleware</td>
+</tr>
+<tr>
+<td><code>sdk/typescript/src/index.ts</code></td>
+<td>ICNClient implementation</td>
+</tr>
+<tr>
+<td><code>sdk/typescript/src/types.ts</code></td>
+<td>TypeScript type definitions</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Exercises</h2>
+<h3>Exercise 1: Implement Custom SignatureProvider</h3>
+<p>Create a SignatureProvider that uses the <code>@noble/ed25519</code> library:</p>
+<pre><code class="language-typescript">import * as ed25519 from &#39;@noble/ed25519&#39;;
+
+// Your implementation here:
+async function createSigner(privateKey: Uint8Array): Promise&lt;SignatureProvider&gt; {
+  // ...
+}
+</code></pre>
+<h3>Exercise 2: Build Event Dashboard</h3>
+<p>Create a React component that displays real-time cooperative events:</p>
+<pre><code class="language-typescript">function EventDashboard({ coopId }: { coopId: string }) {
+  // Use client.subscribe() to display live events
+  // Show payment amounts, new members, proposal updates
+}
+</code></pre>
+<h3>Exercise 3: Implement Token Refresh</h3>
+<p>Modify this code to handle token expiration gracefully:</p>
+<pre><code class="language-typescript">async function fetchBalanceWithRetry(client: ICNClient, coopId: string, did: string) {
+  // Handle AuthenticationError by re-authenticating
+  // Use the autoRefresh feature or manual refresh
+}
+</code></pre>
+<hr>
+<h2>Checkpoints</h2>
+<p>Before proceeding to Module 8, verify you can:</p>
+<ul>
+<li><input disabled="" type="checkbox"> Explain why the gateway serves as system boundary</li>
+<li><input disabled="" type="checkbox"> Describe the challenge-response authentication flow</li>
+<li><input disabled="" type="checkbox"> List the available JWT scopes and their permissions</li>
+<li><input disabled="" type="checkbox"> Explain the three layers of rate limiting (IP, velocity, authenticated)</li>
+<li><input disabled="" type="checkbox"> Use the TypeScript SDK to authenticate and make API calls</li>
+<li><input disabled="" type="checkbox"> Subscribe to real-time events via WebSocket</li>
+<li><input disabled="" type="checkbox"> Handle SDK errors appropriately (retry, re-auth, validation)</li>
+<li><input disabled="" type="checkbox"> Configure CORS and security headers for production</li>
+</ul>
+<hr>
+<h2>Next Steps</h2>
+<p>In <strong>Module 8: Web UI</strong>, you&#39;ll build user interfaces that consume the gateway API,
+implementing the cooperative dashboard, governance interfaces, and real-time updates
+using the SDK patterns learned here.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

@@ -1,0 +1,278 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Workshop 4: Identity and Trust Hands-On | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>onboarding</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>workshops</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>workshop 04 identity trust</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/onboarding/workshops/workshop-04-identity-trust.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Workshop 4: Identity and Trust Hands-On</h1>
+<h2>Goal</h2>
+<p>Practice creating identities, understanding the keystore, and exploring trust
+graph operations.</p>
+<h2>Prerequisites</h2>
+<ul>
+<li>Completed Module 4 reading</li>
+<li>ICN binaries built (<code>cargo build --release</code>)</li>
+</ul>
+<h2>Estimated time</h2>
+<p>2-3 hours</p>
+<h2>Part 1: Create and Inspect an Identity</h2>
+<h3>Steps</h3>
+<ol>
+<li><p>Create a temporary data directory:</p>
+<pre><code class="language-bash">export ICN_DATA=$(mktemp -d)
+export ICN_PASSPHRASE=&quot;workshop-test-passphrase&quot;
+</code></pre>
+</li>
+<li><p>Initialize a new identity:</p>
+<pre><code class="language-bash">./target/release/icnctl --data-dir &quot;$ICN_DATA&quot; id init
+</code></pre>
+</li>
+<li><p>Show the identity:</p>
+<pre><code class="language-bash">./target/release/icnctl --data-dir &quot;$ICN_DATA&quot; id show
+</code></pre>
+</li>
+</ol>
+<h3>Expected output</h3>
+<p>You should see:</p>
+<ul>
+<li>A DID in the format <code>did:icn:&lt;base58-public-key&gt;</code></li>
+<li>The public key fingerprint</li>
+<li>Keystore version information</li>
+</ul>
+<h3>Questions to answer</h3>
+<ol>
+<li>What cryptographic algorithm is used for the keypair?</li>
+<li>Where is the encrypted keystore file stored?</li>
+<li>What happens if you run <code>id show</code> without setting <code>ICN_PASSPHRASE</code>?</li>
+</ol>
+<h3>Checkpoint</h3>
+<ul>
+<li><input disabled="" type="checkbox"> You created a new identity successfully</li>
+<li><input disabled="" type="checkbox"> You can explain the DID format</li>
+</ul>
+<h2>Part 2: Explore the Keystore Code</h2>
+<h3>Steps</h3>
+<ol>
+<li>Open <code>icn/crates/icn-identity/src/keystore.rs</code></li>
+<li>Find the <code>KeyStore</code> trait definition</li>
+<li>Locate the encryption implementation</li>
+</ol>
+<h3>Questions to answer</h3>
+<ol>
+<li>What encryption scheme is used for the keystore?</li>
+<li>What is the purpose of the <code>lock()</code> method?</li>
+<li>How does the code handle invalid passphrases?</li>
+</ol>
+<h3>Code snippet to find</h3>
+<p>Look for the Age encryption usage:</p>
+<pre><code class="language-rust">// The keystore uses Age encryption
+let encryptor = age::Encryptor::with_user_passphrase(...);
+</code></pre>
+<h3>Checkpoint</h3>
+<ul>
+<li><input disabled="" type="checkbox"> You found the encryption implementation</li>
+<li><input disabled="" type="checkbox"> You can explain the security boundary the keystore provides</li>
+</ul>
+<h2>Part 3: Identity Bundle Deep Dive</h2>
+<h3>Steps</h3>
+<ol>
+<li>Open <code>icn/crates/icn-identity/src/bundle.rs</code></li>
+<li>Find the <code>IdentityBundle</code> struct</li>
+<li>Trace how the TLS binding signature is created</li>
+</ol>
+<h3>Questions to answer</h3>
+<ol>
+<li>What does <code>tls_binding_sig</code> prove?</li>
+<li>Why is the TLS cert bound to the DID key?</li>
+<li>What happens during key rotation?</li>
+</ol>
+<h3>Checkpoint</h3>
+<ul>
+<li><input disabled="" type="checkbox"> You understand DID-TLS binding</li>
+<li><input disabled="" type="checkbox"> You can explain why binding is important for transport security</li>
+</ul>
+<h2>Part 4: Trust Graph Exploration</h2>
+<h3>Steps</h3>
+<ol>
+<li>Open <code>icn/crates/icn-trust/src/types.rs</code></li>
+<li>List all <code>TrustGraphType</code> variants</li>
+<li>Open <code>icn/crates/icn-trust/src/lib.rs</code></li>
+<li>Find the methods for adding/querying trust edges</li>
+</ol>
+<h3>Expected findings</h3>
+<p>Trust graph types:</p>
+<ul>
+<li>Social: relationships between members</li>
+<li>EconomicReliability: payment history, creditworthiness</li>
+<li>TechnicalReliability: uptime, network behavior</li>
+</ul>
+<h3>Questions to answer</h3>
+<ol>
+<li>Why are trust dimensions modeled separately?</li>
+<li>How would a &quot;well-known partner&quot; differ from a &quot;new member&quot; in trust scores?</li>
+<li>What is transitive trust and how is it computed?</li>
+</ol>
+<h3>Checkpoint</h3>
+<ul>
+<li><input disabled="" type="checkbox"> You can list all trust dimensions</li>
+<li><input disabled="" type="checkbox"> You understand why dimensions are independent</li>
+</ul>
+<h2>Part 5: Trust-Gated Rate Limiting</h2>
+<h3>Steps</h3>
+<ol>
+<li><p>Search for rate limit usage in the codebase:</p>
+<pre><code class="language-bash">grep -r &quot;rate_limit&quot; icn/crates/ --include=&quot;*.rs&quot; | head -20
+</code></pre>
+</li>
+<li><p>Find where trust class determines rate limits</p>
+</li>
+<li><p>Map trust levels to their rate limits:</p>
+</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th>Trust Class</th>
+<th>Trust Score Range</th>
+<th>Rate Limit</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Isolated</td>
+<td>&lt; 0.1</td>
+<td>? msg/sec</td>
+</tr>
+<tr>
+<td>Known</td>
+<td>0.1 - 0.4</td>
+<td>? msg/sec</td>
+</tr>
+<tr>
+<td>Partner</td>
+<td>0.4 - 0.7</td>
+<td>? msg/sec</td>
+</tr>
+<tr>
+<td>Federated</td>
+<td>&gt; 0.7</td>
+<td>? msg/sec</td>
+</tr>
+</tbody></table>
+<h3>Expected values</h3>
+<p>From <code>docs/security/production-hardening.md</code>:</p>
+<ul>
+<li>Isolated: 10 msg/sec</li>
+<li>Known: 50 msg/sec</li>
+<li>Partner: 100 msg/sec</li>
+<li>Federated: 200 msg/sec</li>
+</ul>
+<h3>Checkpoint</h3>
+<ul>
+<li><input disabled="" type="checkbox"> You found the trust-gated rate limiting code</li>
+<li><input disabled="" type="checkbox"> You understand how trust influences system access</li>
+</ul>
+<h2>Part 6: Key Rotation Exercise</h2>
+<h3>Steps</h3>
+<ol>
+<li><p>Using your test identity from Part 1, rotate the key:</p>
+<pre><code class="language-bash">./target/release/icnctl --data-dir &quot;$ICN_DATA&quot; id rotate
+</code></pre>
+</li>
+<li><p>Show the identity again:</p>
+<pre><code class="language-bash">./target/release/icnctl --data-dir &quot;$ICN_DATA&quot; id show
+</code></pre>
+</li>
+</ol>
+<h3>Questions to answer</h3>
+<ol>
+<li>Did the DID change after rotation?</li>
+<li>What happens to old signatures after rotation?</li>
+<li>Where is the key history stored?</li>
+</ol>
+<h3>Checkpoint</h3>
+<ul>
+<li><input disabled="" type="checkbox"> You successfully rotated a key</li>
+<li><input disabled="" type="checkbox"> You understand the implications of key rotation</li>
+</ul>
+<h2>Cleanup</h2>
+<p>Remove the temporary data directory:</p>
+<pre><code class="language-bash">rm -rf &quot;$ICN_DATA&quot;
+</code></pre>
+<h2>Summary</h2>
+<p>After completing this workshop you should be able to:</p>
+<ul>
+<li>Create and manage ICN identities via CLI</li>
+<li>Navigate the keystore and bundle code</li>
+<li>Understand trust graph dimensions and their purposes</li>
+<li>Explain how trust influences system behavior</li>
+</ul>
+<h2>Troubleshooting</h2>
+<h3>&quot;Failed to unlock keystore&quot;</h3>
+<p>Ensure <code>ICN_PASSPHRASE</code> environment variable is set correctly.</p>
+<h3>&quot;Keystore not found&quot;</h3>
+<p>The <code>--data-dir</code> path must match where you initialized the identity.</p>
+<h3>&quot;Permission denied&quot;</h3>
+<p>Check file permissions on the data directory.</p>
+<h2>Next steps</h2>
+<p>Proceed to Module 5: Network and Gossip</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

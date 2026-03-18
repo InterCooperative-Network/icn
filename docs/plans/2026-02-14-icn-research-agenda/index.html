@@ -1,0 +1,831 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Formal Research Agenda: Architectural Hurdles and Track Briefs | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>plans</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>2026 02 14 icn research agenda</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/plans/2026-02-14-icn-research-agenda.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Formal Research Agenda: Architectural Hurdles and Track Briefs</h1>
+<p><strong>Date</strong>: 2026-02-14
+<strong>Companion to</strong>: <code>docs/plans/2026-02-14-icn-consensus-stack-a-to-b.md</code>
+<strong>Scope</strong>: 13 research tracks covering kernel through federation, with formalization targets, prototype targets, failure modes, and pseudocode for core algorithms.</p>
+<hr>
+<h1>ICN Architectural Hurdles and Formal Research Agenda</h1>
+<h2>Framing and evidence basis</h2>
+<p>ICN is a coordination substrate for cooperatives (economic engine), communities (civic engine), and their federations (scale bridge) that enforces generic constraints without understanding domain meaning. This &quot;Meaning Firewall&quot; is the core architectural commitment: policy oracles/apps compile human meaning (law, governance, entitlements, budget policy, etc.) into constraints; the kernel validates and executes constraints <em>blindly</em> with audit-grade receipts.</p>
+<p>The project&#39;s current public artifacts already encode many of the needed primitives and &quot;hard edges&quot;:</p>
+<ul>
+<li>Kernel ↔ app boundary and invariants (the separation itself is treated as a design object).</li>
+<li>Multi-device identity and social recovery designs, plus SDIS threat modeling and TOFU posture.</li>
+<li>Multi-scope (&quot;cells and scopes&quot;) model and scope types in the kernel API.</li>
+<li>Governance primitives as CCL-invokable capabilities with explicit state machines (and explicit open questions).</li>
+<li>Economic safety rails for mutual credit (dynamic credit limits, new member throttling, dispute lifecycles) treated as deployable, testable defenses.</li>
+<li>Compute substrate &quot;vertical slice&quot; status and receipt stage work items.</li>
+<li>Pilot UI operator/treasurer guides that expose present-day onboarding and governance/economics workflows to non-technical users.</li>
+<li>The threat model assumes a hostile environment and includes concrete gaps and mitigations (especially in identity, networking, and trust).</li>
+</ul>
+<p>External standards relevant to ICN&#39;s hostile-network and self-sovereign-identity posture include:</p>
+<ul>
+<li>DID core spec from W3C for identifier document semantics and resolution model.</li>
+<li>Ed25519/EdDSA as specified in RFC 8032 (for signatures and canonical signing procedures).</li>
+<li>IETF RFC 9000 (QUIC transport) for secure, migration-capable transport in adversarial networks.</li>
+<li>NAT traversal tools STUN (RFC 8489) and TURN (RFC 8656) for real-world connectivity behind consumer routers/firewalls.</li>
+<li>Append-only &quot;accountability log&quot; idea exemplified by Certificate Transparency (RFC 6962), useful as a design analogue for &quot;government with receipts.&quot;</li>
+</ul>
+<h2>Research track map</h2>
+<p>The research program decomposes ICN&#39;s architectural hurdles into thirteen tracks (10–15 requested), organized around the coop/community/federation stack and the Meaning Firewall boundary:</p>
+<ul>
+<li>Kernel constraint model and Meaning Firewall boundary</li>
+<li>Identity and personhood under hostile conditions</li>
+<li>Scope and jurisdiction formal model</li>
+<li>Authorization, delegations, and effective rights computation</li>
+<li>Governance mechanisms and receipts lifecycle</li>
+<li>Economics: mutual credit, treasuries, settlement, and safety rails</li>
+<li>CCL: contract semantics, compilation, determinism, and capability safety</li>
+<li>Disputes, evidence, and appeals across scopes</li>
+<li>Naming, discovery, and navigable provenance without DNS</li>
+<li>Networking, NAT traversal, and censorship resistance posture</li>
+<li>Receipts datastore: provenance graph, sharding, retention, query UX</li>
+<li>Compute fabric: placement, verification, disputes, and metered execution</li>
+<li>Federation theory: inter-scope treaties, cross-scope settlement, and escalation</li>
+</ul>
+<h2>Track briefs with questions, formal targets, prototypes, failure modes, dependencies</h2>
+<h3>Kernel constraint model and Meaning Firewall boundary</h3>
+<p><strong>Core research questions</strong></p>
+<ul>
+<li>What is the <em>minimal</em> kernel action interface required to enforce constraints blindly while remaining sufficient for governance/economics/compute? (Define <code>ActionIntent</code>, <code>ConstraintSet</code>, <code>PreState</code>, <code>Effect</code>, <code>Receipt</code>.)</li>
+<li>How are constraints represented so that they are: (a) auditable, (b) deterministic, (c) verifiable by third parties, and (d) composable across scopes?</li>
+<li>What are the kernel-level invariants that must never be violated (e.g., receipt immutability, scope isolation, capability non-forgeability), and what is the smallest &quot;trusted computing base&quot; that enforces them?</li>
+<li>How does the kernel <em>refuse</em> semantic capture? Concretely: how do you prevent oracles from smuggling semantics into kernel paths (e.g., bespoke &quot;special cases&quot;)?</li>
+<li>What is the kernel-level upgrade story: what changes require coordinated upgrades, what can be versioned at oracle level, and how are receipts kept backward-verifiable?</li>
+</ul>
+<p><strong>Formalization targets</strong></p>
+<ul>
+<li><strong>Kernel action algebra</strong>: a typed, spec-level definition of <code>Action</code> and <code>Constraint</code> evaluation order (including failure semantics).</li>
+<li><strong>Kernel/app separation spec</strong>: normative list of kernel primitives + non-goals + forbidden APIs (&quot;semantic leakage&quot; list).</li>
+<li><strong>Determinism proof obligations</strong>: for any oracle-compiled constraint, define what makes it deterministic (inputs, allowed syscalls, time sources, randomness constraints).</li>
+</ul>
+<p><strong>Prototype targets</strong></p>
+<ul>
+<li>Minimal &quot;constraint VM&quot; that evaluates a tiny constraint language (boolean formulas and bounded comparisons) and emits canonical receipts for accept/reject decisions.</li>
+<li>A &quot;policy oracle sandbox&quot; harness: compile a simple governance rule → generic constraints → kernel enforces without understanding semantics; test that swapping oracle doesn&#39;t change kernel logic.</li>
+</ul>
+<p><strong>Failure modes and adversarial considerations</strong></p>
+<ul>
+<li>Semantic capture via &quot;convenience exceptions&quot; in kernel.</li>
+<li>Oracle ambiguity causing multiple honest nodes to compile different constraints.</li>
+<li>Constraint DoS (pathological constraints that are expensive to verify).</li>
+<li>Kernel upgrade forks where old receipts become unverifiable or ambiguous.</li>
+</ul>
+<p><strong>Dependencies</strong></p>
+<ul>
+<li>Scope and jurisdiction formal model (scoping is a kernel boundary)</li>
+<li>Receipts datastore and canonicalization</li>
+<li>Authorization/effective rights</li>
+</ul>
+<hr>
+<h3>Identity and personhood under hostile conditions</h3>
+<p><strong>Core research questions</strong></p>
+<ul>
+<li>What constitutes &quot;personhood&quot; for ICN&#39;s threat model: unique human, unique coop, unique node operator, or all of these? How do requirements differ across coops vs civic communities?</li>
+<li>How do multi-device identities bind devices to a root identity, and what is the minimum proof chain to prevent rogue-device enrollment?</li>
+<li>Social recovery: what must be true for M-of-N trustee recovery to be robust against collusion, coercion, and trustee Sybils?</li>
+<li>How are DID documents and recovery events broadcast and validated in hostile networking conditions (partition, eclipse, replay)?</li>
+<li>Selective disclosure: when a community must prove entitlement (housing, benefits, voting eligibility), what is the minimal disclosure model consistent with explainability and receipts? (DID-based claims vs credential proofs.)</li>
+</ul>
+<p><strong>Formalization targets</strong></p>
+<ul>
+<li>DID document / key rotation / recovery event state machines (including revocation and mapping old→new DID after recovery).</li>
+<li>Signature and canonicalization rules for identity operations (Ed25519/EdDSA verification).</li>
+<li>Threat-model-backed requirements for enrollment challenges, replay windows, and TOFU pinning rules.</li>
+</ul>
+<p><strong>Prototype targets</strong></p>
+<ul>
+<li>End-to-end SDIS simulation: enroll second device → revoke device → attempt forged enrollment → verify refusal.</li>
+<li>Social recovery tabletop + implementation test: lose all devices → collect attestations → delay window cancellation case → finalize mapping and verify ledger continuity.</li>
+</ul>
+<p><strong>Failure modes and adversarial considerations</strong></p>
+<ul>
+<li>&quot;Recovery capture&quot; (trustees collude; user&#39;s identity transferred).</li>
+<li>Long-range replay of old attestations; mitigation via time bounds and challenge freshness.</li>
+<li>Admission Sybils (fake trustees / fake members) undermining community governance and economic credit.</li>
+<li>Censorship via blocking enrollment or recovery messages; requires transport redundancy and gossip strategy.</li>
+</ul>
+<p><strong>Dependencies</strong></p>
+<ul>
+<li>Networking/NAT/censorship posture</li>
+<li>Authorization and membership model</li>
+<li>Receipts and provenance (identity operations must yield receipts)</li>
+</ul>
+<hr>
+<h3>Scope and jurisdiction formal model</h3>
+<p><strong>Core research questions</strong></p>
+<ul>
+<li>What is the minimal formal definition of &quot;scope&quot; in ICN: a DID, a cell identifier, a tuple (scope-id, scope-level, parent linkage), or something else?</li>
+<li>How do scope boundaries reflect the societal model: individual ↔ coop ↔ community ↔ federation ↔ commons, and how do rights vary per scope?</li>
+<li>What does it mean for an action to occur &quot;within a scope&quot; if it touches multiple scopes (e.g., cross-coop settlement, inter-community service entitlement)?</li>
+<li>How are cross-scope references resolved deterministically under partitions (e.g., &quot;current charter version of scope X&quot;)?</li>
+<li>How do scopes compose: can a community scope delegate some domains to a coop scope without mixing jurisdiction?</li>
+</ul>
+<p><strong>Formalization targets</strong></p>
+<ul>
+<li>Scope identity and parent/child resolution algorithm (including &quot;effective scope&quot; when actions target nested scopes).</li>
+<li>Cross-scope reference semantics (&quot;treaties&quot; and &quot;delegations&quot; as first-class objects; see federation track).</li>
+<li>A formal consistency model: per-scope append-only decision log vs causal DAG vs quorum-based consensus <em>per scope</em> (explicitly rejecting global consensus).</li>
+</ul>
+<p><strong>Prototype targets</strong></p>
+<ul>
+<li>&quot;Scope explorer&quot; UI: show a scope graph, memberships, and rights computation for a user across scopes (human-legible).</li>
+<li>Minimal multi-scope event issuance: same identity acts in two scopes; verify receipts correctly annotate scope and can be queried by scope.</li>
+</ul>
+<p><strong>Failure modes and adversarial considerations</strong></p>
+<ul>
+<li>Jurisdiction confusion attacks (malicious actors route actions through &quot;wrong&quot; scope to gain rights).</li>
+<li>Scope squatting (creating similar-looking scopes to confuse users).</li>
+<li>Cross-scope downgrade: federation forces local scopes to adopt rules via protocol pressure rather than agreements.</li>
+</ul>
+<p><strong>Dependencies</strong></p>
+<ul>
+<li>Identity/personhood</li>
+<li>Kernel constraint model</li>
+<li>Naming/discovery and receipt graph query (for legible scope navigation)</li>
+</ul>
+<hr>
+<h3>Authorization, delegations, and effective rights computation</h3>
+<p><strong>Core research questions</strong></p>
+<ul>
+<li>What is the canonical representation of capabilities: role-based? capability tokens? CCL capabilities? hybrid?</li>
+<li>How is &quot;effective rights&quot; computed across memberships, roles, delegations, and trust thresholds in a way that is deterministic and auditable?</li>
+<li>How do you represent revocation (membership removed; delegation cancelled; trustee revoked) so that old receipts remain verifiable but future actions are blocked?</li>
+<li>How do you prevent &quot;delegation loops&quot; and &quot;role escalation&quot; without introducing centralized adjudication?</li>
+<li>How do authorization checks remain explainable: can the UI always answer &quot;why can/can&#39;t I do this?&quot; with a navigable proof trail?</li>
+</ul>
+<p><strong>Formalization targets</strong></p>
+<ul>
+<li>Effective rights algorithm spec (including cycle detection, scope inheritance rules, and time/version scoping).</li>
+<li>Delegation object schema and validation rules.</li>
+<li>Capability safety contract: which capability implies which kernel actions are allowed, and what constraints must accompany them.</li>
+</ul>
+<p><strong>Prototype targets</strong></p>
+<ul>
+<li>A reference <code>explain_rights(actor, scope, action)</code> function that returns a proof graph: memberships → delegations → capability → constraints.</li>
+<li>&quot;Role escalation red team&quot;: attempt to craft delegations that bypass rules; confirm kernel refuses.</li>
+</ul>
+<p><strong>Failure modes and adversarial considerations</strong></p>
+<ul>
+<li>Delegation laundering: federation delegates a right that local scope did not intend.</li>
+<li>Coercion-based delegation (&quot;sign this or lose membership&quot;).</li>
+<li>Stale authorization caches in partitioned networks causing temporary escalation.</li>
+</ul>
+<p><strong>Dependencies</strong></p>
+<ul>
+<li>Scope/jurisdiction model</li>
+<li>Identity and recovery mappings</li>
+<li>Kernel constraint model and receipt format</li>
+</ul>
+<hr>
+<h3>Governance mechanisms and receipts lifecycle</h3>
+<p><strong>Core research questions</strong></p>
+<ul>
+<li>What is the canonical governance lifecycle state machine that all governance models can map onto (proposal → deliberation → decision → execution → archival), while still allowing diverse patterns (consensus, sociocracy, councils)?</li>
+<li>Where is the &quot;Meaning Firewall&quot; boundary: does governance output produce constraints directly, or does it produce CCL code that later produces constraints?</li>
+<li>How are votes represented: public (auditable) vs private (coercion-resistant)? What&#39;s the local-scope tradeoff? (This is explicitly called out as an open question in governance primitives.)</li>
+<li>How do proposal outcomes translate into <em>machine-legible outputs</em> that cause effects (treasury transfers, membership changes) with receipts?</li>
+<li>What are minimal dispute hooks: how can governance decisions themselves be appealed, and how does the system represent that appeal path?</li>
+</ul>
+<p><strong>Formalization targets</strong></p>
+<ul>
+<li>Governance receipt schema: proposal ID, scope, eligibility set, tally evidence, rule set identifier, and &quot;execution plan.&quot;</li>
+<li>Deterministic tallying requirements (inputs, deadlines, time sources).</li>
+<li>&quot;Decision registry&quot; spec: canonical mapping from governance decisions → executable actions (for &quot;government with receipts&quot;).</li>
+</ul>
+<p><strong>Prototype targets</strong></p>
+<ul>
+<li>Implement the governance templates described in governance primitives (e.g., consensus-with-fallback majority, emergency lock) and demonstrate: proposal → pass → automatic effect execution.</li>
+<li>Governance UI that exposes receipts: show &quot;intent → constraints → decision → effect → receipt&quot; for a single budget vote.</li>
+</ul>
+<p><strong>Failure modes and adversarial considerations</strong></p>
+<ul>
+<li>Governance capture via spam proposals and shallow participation.</li>
+<li>&quot;Receipt forgery&quot; (fake tally proofs) if eligibility sets are ambiguous.</li>
+<li>Time attacks: inconsistent clocks across nodes change deadline evaluation.</li>
+<li>Social engineering: malicious proposal payloads with misleading human text but benign machine constraints (or vice versa).</li>
+</ul>
+<p><strong>Dependencies</strong></p>
+<ul>
+<li>Authorization/effective rights</li>
+<li>Receipts format and datastore query</li>
+<li>CCL semantics (if governance compiles to executable contracts)</li>
+</ul>
+<hr>
+<h3>Economics: mutual credit, treasuries, settlement, and safety rails</h3>
+<p><strong>Core research questions</strong></p>
+<ul>
+<li>Mutual credit invariants: what kernel-level constraints maintain ledger integrity (double-entry, sum-to-zero, non-negative treasury rules) in a partitioned network?</li>
+<li>Economic safety rails: how do dynamic credit limits and new member throttling interact with governance changes and trust graph updates (to avoid sudden &quot;limit jumps&quot; that enable grab-and-run)?</li>
+<li>Treasury execution: how are allocations authorized (governance) and executed (ledger) with receipts that treasurers and members can audit?</li>
+<li>Settlement across scopes: what is the minimal inter-scope settlement primitive that allows coop↔community↔federation exchanges without global consensus? (Receipt clearing, routing, dispute use.)</li>
+<li>Economic censorship resistance: how does a community continue transacting when some nodes are blocked or coerced?</li>
+</ul>
+<p><strong>Formalization targets</strong></p>
+<ul>
+<li>Ledger entry canonicalization + validation rules (including conflict detection and resolution policy).</li>
+<li>Credit policy formal model: dynamic limit function based on trust, history, tenure, plus ramping for new members.</li>
+<li>Settlement protocol spec: receipt clearing semantics and idempotency (deduplication), plus dispute hooks.</li>
+</ul>
+<p><strong>Prototype targets</strong></p>
+<ul>
+<li>Adversarial economics sim: synthetic coop with attackers (free rider, grab-and-run, limit gaming) and measured failure thresholds under different policy parameters. (The &quot;economic safety&quot; doc already enumerates attacks; the prototype must quantify.)</li>
+<li>Treasurer workflow test: export receipts + balances; verify audit properties (sum-to-zero) and show explanation path in UI.</li>
+</ul>
+<p><strong>Failure modes and adversarial considerations</strong></p>
+<ul>
+<li>Coordinated default attacks; mitigation via conservative limits + governance emergency lock.</li>
+<li>Frivolous dispute spam blocks transactions.</li>
+<li>Partition-induced accounting forks; settlement &quot;double spend&quot; at federation boundary.</li>
+</ul>
+<p><strong>Dependencies</strong></p>
+<ul>
+<li>Trust and authorization (for credit limits, treasuries)</li>
+<li>Receipts datastore</li>
+<li>Dispute/appeal model</li>
+<li>Scope/jurisdiction</li>
+</ul>
+<hr>
+<h3>CCL: contract semantics, compilation, determinism, and capability safety</h3>
+<p><strong>Core research questions</strong></p>
+<ul>
+<li>What is the minimal semantic core of CCL required to express cooperatives&#39; bylaws and policies without turning CCL into a general-purpose language (which increases attack surface)?</li>
+<li>Determinism classes: how are time, randomness, external data, and oracle calls controlled so that contract outcomes are reproducible? (Compute dispute resolution assumes determinism classes.)</li>
+<li>Capability safety: what is the smallest set of privileged primitives CCL can invoke (ledger read/write, proposal management, role changes), and how are they constrained?</li>
+<li>What is the formal compile target: constraints directly, or WASM + constraint receipts, or both? (Repo docs discuss CCL determinism and enforcement.)</li>
+<li>How do you make CCL explainable to non-technical users: is there a required &quot;human-readable charter layer&quot; with canonical diffs and enactment proofs?</li>
+</ul>
+<p><strong>Formalization targets</strong></p>
+<ul>
+<li>CCL operational semantics subset (expressions, state updates, capability calls) + canonical serialization for hashing/receipt anchoring.</li>
+<li>Capability specification: preconditions, postconditions, and receipt fields required per call (e.g., ledger transfer must emit balance delta and policy reference).</li>
+<li>Determinism constraints: define allowed host environment, time sources, and I/O model.</li>
+</ul>
+<p><strong>Prototype targets</strong></p>
+<ul>
+<li>&quot;Governance primitives in CCL&quot; MVP: implement two templates and validate with integration tests matching real coop workflow.</li>
+<li>Fuzz and negative testing for capability boundaries (attempt unauthorized ledger writes, ensure kernel enforcement).</li>
+</ul>
+<p><strong>Failure modes and adversarial considerations</strong></p>
+<ul>
+<li>Contract gas/fuel griefing (complexity blowups).</li>
+<li>Nondeterminism leaks (wall clock/timezone, unordered maps, floating-point).</li>
+<li>Policy oracle capture: a contract looks legitimate to humans but encodes abusive constraints.</li>
+</ul>
+<p><strong>Dependencies</strong></p>
+<ul>
+<li>Kernel constraint model and receipt schema</li>
+<li>Authorization/effective rights</li>
+<li>Economics and governance tracks</li>
+</ul>
+<hr>
+<h3>Disputes, evidence, and appeals across scopes</h3>
+<p><strong>Core research questions</strong></p>
+<ul>
+<li>What is the unified dispute object model that can cover: ledger disputes, compute result disputes, and governance/rights appeals?</li>
+<li>What evidence types are admissible, and how are evidence objects stored, hashed, and privacy-controlled?</li>
+<li>Mediator selection: what trust thresholds and conflict-of-interest rules are required, and how does a community change them? (CCL dispute module already encodes mediator selection and penalties.)</li>
+<li>Cross-scope escalation: when does a coop dispute escalate to a community or federation scope, and what is the canonical &quot;escalation receipt&quot;?</li>
+<li>How do disputes interact with economics (penalties, write-offs, quarantines) without letting mediators become unaccountable mini-sovereigns?</li>
+</ul>
+<p><strong>Formalization targets</strong></p>
+<ul>
+<li>Dispute lifecycle state machines for each dispute class + a shared envelope (status, parties, scope, deadlines, evidence references, resolution).</li>
+<li>Mediator selection and penalty rules spec (trust-weighted selection, escalation multipliers).</li>
+<li>Appeals routing spec (cross-scope escalation rules).</li>
+</ul>
+<p><strong>Prototype targets</strong></p>
+<ul>
+<li>End-to-end ledger dispute scenario + governance escalation: file dispute → add evidence → assign mediator → escalate to governance vote → resolution receipt.</li>
+<li>Compute dispute scenario across verification modes (single, multi-executor, optimistic) with automated penalties and quarantine option.</li>
+</ul>
+<p><strong>Failure modes and adversarial considerations</strong></p>
+<ul>
+<li>Dispute spam (DoS via contesting everything).</li>
+<li>Mediator cartel capture (a small group monopolizes dispute power).</li>
+<li>Evidence poisoning and leak (sensitive evidence posted publicly).</li>
+<li>Escalation griefing: malicious actors force cross-scope escalation to overload federations.</li>
+</ul>
+<p><strong>Dependencies</strong></p>
+<ul>
+<li>Identity/personhood (who can file/mediate)</li>
+<li>Trust/authorization</li>
+<li>Receipts datastore and evidence storage semantics</li>
+<li>Governance (appeal votes; mediator removal)</li>
+</ul>
+<hr>
+<h3>Naming, discovery, and navigable provenance without DNS</h3>
+<p><strong>Core research questions</strong></p>
+<ul>
+<li>What is the minimum naming primitive that lets users find &quot;their coop services&quot; without relying on global DNS, while staying explainable?</li>
+<li>How do service endpoint advertisements get authenticated, rotated, expired, and trust-gated? (Repo includes service endpoint models and discovery logic.)</li>
+<li>What is the human navigation model for receipts: how do users traverse &quot;intent → constraints → decision → effect → receipt&quot; across services and scopes without developer tools?</li>
+<li>Offline-first: what discovery and provenance queries must work on mobile with intermittent connectivity?</li>
+<li>How do you mitigate naming-level censorship (e.g., blocking specific bootstrap nodes or known service endpoints)?</li>
+</ul>
+<p><strong>Formalization targets</strong></p>
+<ul>
+<li>Service-evidence signed record format (endpoint, scope, capabilities served, expiry, signature) and verification rules.</li>
+<li>A &quot;receipt graph query protocol&quot; spec: minimal query language for receipts by scope, actor, action type, and dependency edges.</li>
+<li>Human-facing naming schema: stable identifiers for scopes/services that are not DNS-hostnames, plus UI mapping rules.</li>
+</ul>
+<p><strong>Prototype targets</strong></p>
+<ul>
+<li>&quot;Receipts explorer&quot; that can answer: &quot;Why does Alice have the right to submit this proposal?&quot; and &quot;Where did this treasury transfer originate?&quot; using only receipts + scope graph.</li>
+<li>Service discovery demo across 3 nodes on LAN, including key rotation and endpoint expiry.</li>
+</ul>
+<p><strong>Failure modes and adversarial considerations</strong></p>
+<ul>
+<li>Endpoint spoofing (malicious node advertises as coop gateway).</li>
+<li>Eclipse attacks via discovery poisoning.</li>
+<li>UX capture: users can&#39;t distinguish &quot;official coop service&quot; vs &quot;phishing mirror.&quot;</li>
+</ul>
+<p><strong>Dependencies</strong></p>
+<ul>
+<li>Identity and auth (signing service ads)</li>
+<li>Receipts datastore and canonicalization</li>
+<li>Networking posture</li>
+</ul>
+<hr>
+<h3>Networking, NAT traversal, and censorship resistance posture</h3>
+<p><strong>Core research questions</strong></p>
+<ul>
+<li>What connectivity assumptions are required for real coops/communities (home routers, CGNAT, mobile networks), and what protocols are needed for success? (MVC track flags NAT traversal as a pilot-critical gap.)</li>
+<li>What is the baseline secure transport: QUIC+TLS? How is identity bound to transport sessions (DID-TLS pattern)?</li>
+<li>NAT traversal: what subset of STUN/TURN is needed to reach &quot;works for non-technical users,&quot; and how is relay selection governed by trust?</li>
+<li>How is censorship resistance expressed in architecture: multi-transport, relays, opportunistic routing, and &quot;trust until proven&quot; defaults?</li>
+<li>What is the network-level receipt: do we receipt-sign communications (envelopes) to support later audits and dispute evidence?</li>
+</ul>
+<p><strong>Formalization targets</strong></p>
+<ul>
+<li>Transport security profile: handshake, key schedule use, session resumption rules, node identity binding rules.</li>
+<li>NAT traversal spec: STUN discovery + TURN relay fallback + relay authorization model.</li>
+<li>Gossip topic authorization and rate limiting as a formal policy (to avoid spam and infiltration).</li>
+</ul>
+<p><strong>Prototype targets</strong></p>
+<ul>
+<li>NAT traversal integration test matrix: (home NAT↔home NAT), (mobile↔home), (CGNAT↔public), with and without TURN.</li>
+<li>Censorship simulation: block direct connections; verify relay fallback; measure leak of metadata and availability.</li>
+</ul>
+<p><strong>Failure modes and adversarial considerations</strong></p>
+<ul>
+<li>Relay capture coerces traffic analysis.</li>
+<li>Denial of service on discovery channels.</li>
+<li>Partition-driven inconsistent state; must rely on receipts and conflict resolution.</li>
+</ul>
+<p><strong>Dependencies</strong></p>
+<ul>
+<li>Identity/personhood (transport binding)</li>
+<li>Discovery and naming</li>
+<li>Threat model and operational posture</li>
+</ul>
+<hr>
+<h3>Receipts datastore: provenance graph, sharding, retention, query UX</h3>
+<p><strong>Core research questions</strong></p>
+<ul>
+<li>What is the canonical receipt format that supports &quot;government with receipts&quot; and remains human-navigable?</li>
+<li>How do receipts link: do they form a DAG (edges to prior receipts), per-scope append-only logs, or both? What minimal structure enables audits without global consensus?</li>
+<li>What is the data retention policy across coops and communities: infinite ledger vs bounded receipts vs archival proofs? (Pilot operator docs already propose retention norms; formalize them.)</li>
+<li>How is the &quot;receipt query surface&quot; exposed securely to mobile clients while preventing information leakage across scopes?</li>
+<li>What is the sharding strategy: by scope, by receipt type, by time, by content hash?</li>
+</ul>
+<p><strong>Formalization targets</strong></p>
+<ul>
+<li>Receipt canonicalization and hashing rules (encoding, field ordering, signature scheme).</li>
+<li>Provenance graph semantics: edge types (&quot;caused-by&quot;, &quot;authorized-by&quot;, &quot;disputed-by&quot;, &quot;superseded-by&quot;).</li>
+<li>&quot;Accountability log&quot; spec per scope: append-only log + inclusion proofs, following CT-like design patterns adapted to multi-scope sovereignty (no global log).</li>
+</ul>
+<p><strong>Prototype targets</strong></p>
+<ul>
+<li>Receipts browser with graph view for a coop&#39;s last 30 actions, emphasizing non-developer comprehension.</li>
+<li>Storage benchmark: store and query 1M receipts partitioned by scope; validate worst-case query latencies and retention pruning.</li>
+</ul>
+<p><strong>Failure modes and adversarial considerations</strong></p>
+<ul>
+<li>Receipt flood DoS.</li>
+<li>&quot;Receipts not usable&quot;: information overload; users cannot find causality.</li>
+<li>Privacy leaks (receipts reveal sensitive relationships or service usage).</li>
+</ul>
+<p><strong>Dependencies</strong></p>
+<ul>
+<li>Kernel constraint and receipt generation</li>
+<li>Scope model and naming/discovery</li>
+<li>UI architecture</li>
+</ul>
+<hr>
+<h3>Compute fabric: placement, verification, disputes, and metered execution</h3>
+<p><strong>Core research questions</strong></p>
+<ul>
+<li>What is the minimal compute model that coops/communities can use early (hosting services, simple jobs) while preserving local sovereignty and avoiding global consensus?</li>
+<li>Placement: how are tasks assigned (bidding, scheduling), and what trust thresholds gate execution?</li>
+<li>Verification: what are the supported verification modes (single executor, multi-executor, optimistic challenge), and what triggers disputes?</li>
+<li>How do compute receipts relate to economic settlement (pay executor, penalize misbehavior), and what is the minimum set of receipt fields required?</li>
+<li>How do communities prevent compute capture (a few nodes become &quot;cloud landlords&quot;)?</li>
+</ul>
+<p><strong>Formalization targets</strong></p>
+<ul>
+<li>Compute job lifecycle state machine (submit → assign → execute → attest → settle → archive) plus dispute paths.</li>
+<li>Verifiable execution profile: deterministic execution requirements and receipt structure for output hash, fuel, timestamps.</li>
+<li>Economic settlement and penalty spec tied to compute disputes and trust score adjustments.</li>
+</ul>
+<p><strong>Prototype targets</strong></p>
+<ul>
+<li>Vertical slice demo: submit deterministic job → execute → emit receipt → settle payment → challenge incorrect result and apply penalty.</li>
+<li>Executor diversity experiment: enforce placement constraints (e.g., &quot;no single org executes &gt;30% of jobs&quot;) and measure throughput impact.</li>
+</ul>
+<p><strong>Failure modes and adversarial considerations</strong></p>
+<ul>
+<li>Fake execution receipts.</li>
+<li>Colluding executors in multi-executor verification.</li>
+<li>Arbiter capture in re-execution mode.</li>
+<li>Economic drain attacks via spammy cheap jobs; requires metering and admission controls.</li>
+</ul>
+<p><strong>Dependencies</strong></p>
+<ul>
+<li>Identity and trust model</li>
+<li>Receipts datastore</li>
+<li>Economics settlement and dispute</li>
+<li>Networking posture</li>
+</ul>
+<hr>
+<h3>Federation theory: inter-scope treaties, cross-scope settlement, and escalation</h3>
+<p><strong>Core research questions</strong></p>
+<ul>
+<li>What is the minimal &quot;treaty&quot; object that represents an inter-scope agreement (services, settlements, recognition of credentials, dispute escalation routes) without global consensus?</li>
+<li>How does a federation scope enforce treaties while preserving local sovereignty (local scopes can exit; treaties are versioned; effects are scoped)?</li>
+<li>Cross-scope settlement: what is the minimal clearing mechanism for receipts across scopes (federation receipt clearing exists in code).</li>
+<li>Who arbitrates federation-level disputes, and how do lower scopes appeal or exit?</li>
+<li>How are global commons formed: what is the &quot;composition rule&quot; for federations of federations?</li>
+</ul>
+<p><strong>Formalization targets</strong></p>
+<ul>
+<li>Treaty schema: parties (scope IDs), obligations (constraint sets), settlement terms, termination conditions, and escalation paths.</li>
+<li>Cross-scope receipt clearing protocol: inclusion rules, deduplication, dispute marking, and local acceptance policies.</li>
+<li>Exit/withdrawal protocol: what receipts constitute &quot;exit has been exercised&quot; and how do dependent rights/economics unwind?</li>
+</ul>
+<p><strong>Prototype targets</strong></p>
+<ul>
+<li>Two-coop federation pilot: shared infrastructure service hosted by one coop, paid by another, with federation-level receipts and dispute escalation.</li>
+<li>&quot;Treaty violation detector&quot;: automatically detect when treaty constraints are violated (missing receipts, late payments) and file dispute in federation scope.</li>
+</ul>
+<p><strong>Failure modes and adversarial considerations</strong></p>
+<ul>
+<li>Federation capture (a large coop dominates treaty terms).</li>
+<li>&quot;Protocol imperialism&quot;: federation pushes kernel-level changes via treaties instead of oracle-level.</li>
+<li>Cross-scope spoofed receipts and settlement replay.</li>
+</ul>
+<p><strong>Dependencies</strong></p>
+<ul>
+<li>Scope/jurisdiction model</li>
+<li>Governance lifecycle and receipt format</li>
+<li>Economics settlement and dispute mechanisms</li>
+<li>Discovery and naming (federation services)</li>
+</ul>
+<hr>
+<h3>Threat model and security posture</h3>
+<p><strong>Core research questions</strong></p>
+<ul>
+<li>What is the explicit attacker taxonomy: state actor (censorship, seizure), capital actor (capture, coercion), insider (infiltration), outsider (spam/Sybil)?</li>
+<li>What must be assumed adversarial-by-default (external nodes) vs socially trusted (local coop) and how does that map to default policies in the kernel and UI?</li>
+<li>What are the key &quot;security receipts&quot; needed for auditability (key rotations, recovery events, treaty changes, governance upgrades)?</li>
+<li>How is TOFU justified and where must it be replaced with explicit trust establishment?</li>
+<li>How do you test semantic capture as a <em>security</em> threat (not just a governance problem)?</li>
+</ul>
+<p><strong>Formalization targets</strong></p>
+<ul>
+<li>Security posture doc: required controls, threat mitigations, and explicit non-goals, tied to each track.</li>
+<li>Attack-surface inventory across kernel, oracle, UI, and network.</li>
+</ul>
+<p><strong>Prototype targets</strong></p>
+<ul>
+<li>Red-team test suite:<ul>
+<li>Sybil trust graph injection attempts</li>
+<li>Governance capture via proposal flooding</li>
+<li>Discovery poisoning / endpoint spoofing</li>
+<li>Receipt tampering attempts</li>
+</ul>
+</li>
+<li>&quot;Receipts under attack&quot; drill: ensure auditing continues even during partial outages and partitions.</li>
+</ul>
+<p><strong>Failure modes and adversarial considerations</strong></p>
+<ul>
+<li>Security-by-configuration (too complex for coops to operate).</li>
+<li>Hidden centralization (a small number of relay/bootstrap nodes become chokepoints).</li>
+<li>Privacy breaches via receipts metadata.</li>
+</ul>
+<p><strong>Dependencies</strong></p>
+<ul>
+<li>All tracks; this is cross-cutting and should be maintained as a living spec.</li>
+</ul>
+<hr>
+<h3>Migration, adoption, and mobile-first explainability</h3>
+<p><strong>Core research questions</strong></p>
+<ul>
+<li>What is the minimal onboarding flow that non-technical members can complete safely (identity, membership, token acquisition, first transaction, first vote), and what must be automated?</li>
+<li>What must the UI always surface: current scope, effective rights, applicable law/policy, and receipts trail, in human terms?</li>
+<li>What is the incremental adoption path for existing coops/communities (start with timebank ledger; add governance; add compute; add federation)? The MVC plan outlines a pilot path for a 10-person worker coop.</li>
+<li>How is operational continuity handled: backups, recoveries, upgrades, succession for admins/treasurers?</li>
+<li>What &quot;hard stops&quot; force product work before federation scaling (NAT, recovery, conflict resolution, UX)? MVC doc enumerates these as critical pilot blockers.</li>
+</ul>
+<p><strong>Formalization targets</strong></p>
+<ul>
+<li>UX invariants: required explainability elements (rights reasoner output, scope breadcrumb, receipt drill-down).</li>
+<li>Operational runbooks and &quot;failure receipts&quot; (incident receipts, recovery receipts).</li>
+<li>Minimum viable coop/community reference profile: required roles, policies, and services.</li>
+</ul>
+<p><strong>Prototype targets</strong></p>
+<ul>
+<li>Phase 0 LAN demo: run a coop timebank with Pilot UI using the existing onboarding steps, then add a receipts explorer panel and scope breadcrumbs.</li>
+<li>Pilot readiness simulation: 30-day operation including device loss recovery, node failure, and dispute filing.</li>
+</ul>
+<p><strong>Failure modes and adversarial considerations</strong></p>
+<ul>
+<li>&quot;Usability collapse&quot;: security requirements overwhelm non-technical users.</li>
+<li>Social recovery misconfiguration leads to lockouts or theft.</li>
+<li>Operator capture: a single admin becomes de facto sovereign because only they can operate the system.</li>
+</ul>
+<p><strong>Dependencies</strong></p>
+<ul>
+<li>Identity/recovery</li>
+<li>Receipts datastore and explainability</li>
+<li>Governance and economics tracks</li>
+<li>Networking/NAT traversal</li>
+</ul>
+<h2>Prioritized dependency graph and phase plan</h2>
+<p>Phase sequencing is based on one principle: <strong>Phase 0 must prove legible sovereignty and receipts without requiring trust in the developers</strong> (&quot;government with receipts&quot;), on a LAN with non-dev users. Phase 1 must survive real-world networking and operational failures for a single coop/community. Phase 2+ generalizes to federations and the universal commons without global consensus.</p>
+<h3>Phase 0 LAN demo viability</h3>
+<p><strong>Goal criteria:</strong> non-dev onboarding works, scope is legible, receipts are visible and navigable, basic governance and mutual credit operate on a LAN.</p>
+<p><strong>Tracks to complete (minimum)</strong></p>
+<ul>
+<li>Kernel constraint model and Meaning Firewall boundary (freeze early kernel primitives; forbid semantic leakage).</li>
+<li>Identity and personhood (basic DID + multi-device enrollment; minimal recovery path or at least safe backup workflow; SDIS baseline).</li>
+<li>Scope and jurisdiction model (scope graph visible; actions always scoped).</li>
+<li>Authorization and effective rights (UI can answer &quot;why can I do X&quot;).</li>
+<li>Governance lifecycle (simple proposal + vote + receipts, even if execution is manual).</li>
+<li>Economics minimal (log transactions + audit + basic limits).</li>
+<li>Receipts datastore + UI drill-down (receipt graph and breadcrumb navigation).</li>
+</ul>
+<p><strong>Why these are Phase 0</strong></p>
+<ul>
+<li>If scope, rights, and receipts are not legible early, ICN becomes indistinguishable from either a centralized admin tool or an opaque protocol. The operator/treasurer UI docs already reflect what non-dev users need to do; Phase 0 must add receipt legibility to those flows.</li>
+</ul>
+<h3>Phase 1 Real community or coop pilot</h3>
+<p><strong>Goal criteria:</strong> a real coop/community can operate for months, including device loss, NAT conditions, disputes, and upgrades. The MVC track explicitly frames a 10-person worker coop pilot and flags recovery, NAT traversal, and conflict resolution/UX as blocking gaps.</p>
+<p><strong>Tracks to complete (additions and hardening)</strong></p>
+<ul>
+<li>Networking, NAT traversal, and censorship posture (move from LAN to real-world).</li>
+<li>Economic safety rails fully enabled and monitored (dynamic limits, new member protections, dispute workflows).</li>
+<li>Disputes/evidence/appeals (ledger disputes and governance escalation path).</li>
+<li>Identity recovery: ship social recovery M-of-N with delay and mapping old→new DID, because key loss is guaranteed.</li>
+<li>Migration/adoption &amp; ops: backups, runbooks, admin succession, upgrade procedures are required for pilot survival.</li>
+<li>Naming/discovery beyond LAN (bootstrap under hostile conditions and spoofing defense).</li>
+</ul>
+<p><strong>Why these are Phase 1</strong></p>
+<ul>
+<li>A LAN demo can ignore NAT, long-lived reliability, and coercive environments; a pilot cannot. STUN/TURN are standard tools for NAT traversal and must be integrated into the threat+ops posture.</li>
+<li>Economic and dispute safeguards are specifically called out as defenses against common mutual credit failure patterns; pilots are where these must prove themselves under real user behavior.</li>
+</ul>
+<h3>Phase 2+ Federation scale and global commons</h3>
+<p><strong>Goal criteria:</strong> multiple coops and communities coordinate through federations, with inter-scope treaties, settlement, and compute scaling—without requiring global consensus.</p>
+<p><strong>Tracks to scale</strong></p>
+<ul>
+<li>Federation treaties and inter-scope settlement (treaties as first-class, exit/appeal semantics, receipt clearing).</li>
+<li>Receipts datastore sharding/retention at scale (million+ receipts; privacy partitioning).</li>
+<li>Compute fabric (verifiable execution and disputes at federation scale).</li>
+<li>Naming/discovery without DNS at internet scale under censorship (stronger anti-eclipse, reputation-weighted discovery).</li>
+<li>Advanced privacy (selective disclosure and minimized receipts) consistent with explainability.</li>
+</ul>
+<p><strong>Why these are Phase 2+</strong></p>
+<ul>
+<li>Treaty semantics and cross-scope settlement are inherently multi-party and require careful compositional reasoning; they should be informed by pilot experience (what agreements and failures actually occur).</li>
+<li>Large-scale data/compute introduce new centralization vectors; the system must prove sovereignty-preserving economics and governance first.</li>
+</ul>
+<h2>Minimal formal core proposal</h2>
+<p>The &quot;Minimal Formal Core&quot; is what ICN must define correctly early so that everything else can be layered while respecting the Meaning Firewall. Kernel-level items are <em>generic</em> and semantics-blind; oracle/app-level items encode domain meaning (coops/community/federation law).</p>
+<h3>Kernel-level primitives</h3>
+<p>These belong in the kernel because they define sovereignty boundaries, non-forgeable authority, and audit-grade receipts:</p>
+<ul>
+<li><p><strong>Scope identity and resolution</strong></p>
+<ul>
+<li><code>ScopeID</code> (stable identifier) + <code>ScopeLevel</code> (individual/coop/community/federation/commons) + parent linkage.</li>
+<li>Deterministic resolution rules for &quot;effective scope&quot; of an action.</li>
+</ul>
+</li>
+<li><p><strong>Actor identity and key state</strong></p>
+<ul>
+<li>DID format and signed operation envelope rules (key rotation, recovery pointer).</li>
+</ul>
+</li>
+<li><p><strong>Authorization evaluation contract</strong></p>
+<ul>
+<li>A deterministic <code>EffectiveRights</code> function that maps (actor, scope, time/version) → capabilities, plus explainable proof path.</li>
+</ul>
+</li>
+<li><p><strong>Canonical governance and receipts lifecycle hooks</strong></p>
+<ul>
+<li>The kernel does <em>not</em> implement governance semantics; it must implement:<ul>
+<li>receiptable state transitions (proposal created, vote cast, tally accepted, execution applied),</li>
+<li>and a canonical receipt format for &quot;decision produced&quot; and &quot;effect applied.&quot;</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p><strong>Receipt canonicalization and anchoring</strong></p>
+<ul>
+<li>Canonical serialization and hashing rules, signature rules, and provenance edge rules.</li>
+</ul>
+</li>
+<li><p><strong>Inter-scope agreement representation (treaty envelope)</strong></p>
+<ul>
+<li>A treaty is a typed object whose semantics are evaluated by oracles; the kernel must only validate identity, scope references, signatures, and receipt anchoring.</li>
+</ul>
+</li>
+<li><p><strong>Naming and discovery primitives</strong></p>
+<ul>
+<li>Signed service endpoint advertisements with TTL, scope binding, and trust gating hooks.</li>
+</ul>
+</li>
+</ul>
+<h3>Oracle/app-level primitives</h3>
+<p>These must remain above the Meaning Firewall (domain meaning lives here):</p>
+<ul>
+<li>Governance models (consensus, sociocracy, council delegation, emergency locks) implemented as CCL templates and community-specific oracles.</li>
+<li>Economic instruments beyond minimal ledger safety (multi-currency, demurrage, cross-ledger swaps, policy presets).</li>
+<li>Dispute mediation policy (mediator pools, penalty schedules, evidence admissibility).</li>
+<li>Compute placement policy (bidding, reputation weighting, locality constraints).</li>
+<li>UI experiences, onboarding wizards, and organizational workflows.</li>
+</ul>
+<h3>Pseudocode sketches for minimal core algorithms</h3>
+<h4>Scope resolution</h4>
+<pre><code class="language-pseudo">// Kernel-level deterministic scope resolution
+function resolve_scope(target_scope_ref, local_state) -&gt; ScopeID:
+    // target_scope_ref can be (scope_id) or (scope_id, version) or alias
+    s = lookup_scope(target_scope_ref.scope_id)
+    assert s.exists
+
+    if target_scope_ref.version is present:
+        assert version_exists(s, target_scope_ref.version)
+        return (s.id, target_scope_ref.version)
+    else:
+        return (s.id, s.current_version)
+</code></pre>
+<p>Hard requirement: <strong>actions must be rejected if scope cannot be resolved deterministically</strong> (no &quot;best effort&quot; in kernel).</p>
+<h4>Effective rights computation with delegations</h4>
+<pre><code class="language-pseudo">// Kernel-level: outputs both capabilities and an explanation DAG
+function effective_rights(actor_did, scope_id, at_time) -&gt; (Caps, ProofGraph):
+    memberships = query_memberships(actor_did, scope_id, at_time)
+    roles = union(m.role for m in memberships if m.active)
+
+    // Delegations are edges: grantor -&gt; grantee, scoped and time-bounded
+    del_edges = query_delegations(target=actor_did, scope_id, at_time)
+
+    // Compute closure with cycle detection
+    caps = caps_from_roles(roles)
+    proof = new_graph()
+
+    queue = del_edges
+    visited = set()
+    while queue not empty:
+        e = queue.pop()
+        if e.id in visited: continue
+        visited.add(e.id)
+
+        if not delegation_valid(e, at_time): continue
+        if not grantor_has_cap(e.grantor, e.cap, scope_id, at_time): continue
+
+        caps.add(e.cap)
+        proof.add_edge(e.grantor, actor_did, label=&quot;delegates:&quot;+e.cap, receipt=e.receipt_id)
+
+        // Support multi-hop delegation but enforce max depth to avoid DoS
+        if proof.depth(actor_did) &lt; MAX_DELEGATION_DEPTH:
+            queue.extend(query_delegations(target=e.grantor, scope_id, at_time))
+
+    return (caps, proof)
+</code></pre>
+<p>The explainability property (&quot;why can I do this&quot;) falls out of <code>ProofGraph</code>.</p>
+<h4>Governance lifecycle receipts</h4>
+<pre><code class="language-pseudo">state Proposal { Draft, Open, Closed, Executed, Disputed }
+
+on create_proposal(intent, scope):
+    require cap(actor, scope, &quot;CreateProposal&quot;)
+    receipt = make_receipt(type=&quot;proposal.created&quot;, intent, scope, actor)
+    store(receipt)
+    return proposal_id
+
+on cast_vote(proposal_id, vote):
+    require cap(actor, scope_of(proposal_id), &quot;VoteProposal&quot;)
+    receipt = make_receipt(type=&quot;proposal.vote_cast&quot;, proposal_id, vote, actor)
+    store(receipt)
+
+on close_and_tally(proposal_id):
+    require cap(actor, scope, &quot;CloseProposal&quot;) or time_expired(proposal_id)
+    tally = deterministic_tally(votes(proposal_id), eligibility_set(proposal_id))
+    receipt = make_receipt(type=&quot;proposal.closed&quot;, proposal_id, tally)
+    store(receipt)
+    if tally.passed:
+        emit EffectPlan receipt (type=&quot;proposal.effect_plan&quot;, refs=[constraints...])
+</code></pre>
+<p>Key: <strong>the kernel does not interpret vote meaning</strong>; it verifies that the receipts form a valid, deterministic state machine and that the effect plan references constraints that can be checked.</p>
+<h4>Receipt structure for &quot;intent → constraints → decision → effect&quot;</h4>
+<pre><code class="language-pseudo">Receipt {
+  receipt_id: Hash(canonical_bytes(this_receipt_without_signature))
+  type: enum
+  scope: ScopeID
+  actor: DID
+  intent: IntentRef or inline intent
+  constraints: [ConstraintHash] // compiled by oracle/app
+  decision: {accepted|rejected|tally|...}
+  effects: [EffectRef] // concrete state transitions or ledger deltas
+  parents: [ReceiptID] // causal or authorization dependencies
+  timestamp: u64 // policy: trusted time source class
+  signature: Ed25519(actor_key, canonical_bytes)
+}
+</code></pre>
+<p>Use Ed25519/EdDSA rules from RFC 8032 for signature verification and canonical signing inputs.</p>
+<h4>Naming and discovery (signed endpoint announcements)</h4>
+<pre><code class="language-pseudo">function verify_service_ad(ad):
+    require now &lt;= ad.expires_at
+    require resolve_scope(ad.scope_ref) exists
+    require verify_signature(ad.publisher_did, ad.signature, ad.signing_bytes)
+    require trust_policy_allows(ad.publisher_did, ad.scope_ref)
+    return true
+
+function choose_endpoint(service_name, scope):
+    ads = query_ads(service_name, scope)
+    valid = filter(verify_service_ad, ads)
+    // rank by trust score, recency, and latency measurements
+    return argmax(valid, score(ad.publisher, ad.updated_at, rtt))
+</code></pre>
+<p>Transport runs over QUIC (RFC 9000), with real-world NAT traversal via STUN (RFC 8489) and TURN (RFC 8656) when needed.</p>
+<h2>Closing synthesis: what &quot;hard edges&quot; dominate the research agenda</h2>
+<p>Across all tracks, the same non-negotiable hard edge appears: <strong>ICN must remain legible to humans while treating external nodes as adversarial and refusing global consensus as a default tool</strong>. The research agenda therefore prioritizes:</p>
+<ul>
+<li>Formal kernel minimalism and Meaning Firewall enforcement (no semantic creep).</li>
+<li>Deterministic, explainable rights and provenance—even when the network is hostile and partitions occur.</li>
+<li>Pilot-ready survivability (identity recovery, NAT traversal, economic safeguards, disputes) before federation scale, consistent with the MVC plan.</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

@@ -1,0 +1,204 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Pilot Deployment Limitations | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>internal</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>pilots</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>pilot limitations</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/internal/pilots/pilot-limitations.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Pilot Deployment Limitations</h1>
+<p>This document describes known limitations and constraints in the current ICN pilot deployment. These are intentional scope boundaries for the initial pilot phase, with plans to address them in future iterations.</p>
+<h2>Overview</h2>
+<p>In the assessment snapshot captured by this document, the ICN pilot was considered deployable with broad infrastructure coverage. The following limitations are documented to set expectations and guide post-pilot priorities.</p>
+<p><strong>Snapshot Date</strong>: 2026-02-11.</p>
+<hr>
+<h2>Security Limitations</h2>
+<h3>ZKP Circuits (Stubbed)</h3>
+<p><strong>Status</strong>: Feature-gated behind <code>simulated</code> flag</p>
+<p><strong>Files</strong>: <code>icn/crates/icn-zkp/src/circuit/{age,citizenship,membership,non_revocation}.rs</code></p>
+<p><strong>Limitation</strong>: All zero-knowledge proof circuits use simulation mode with NO cryptographic security. This means:</p>
+<ul>
+<li>Age proofs do not provide privacy guarantees</li>
+<li>Citizenship verification is not cryptographically sound</li>
+<li>Membership proofs are simulated</li>
+</ul>
+<p><strong>Impact</strong>: Do not rely on ZKP-based privacy for sensitive operations in the pilot.</p>
+<p><strong>Tracking</strong>: Issues #196-199</p>
+<p><strong>Mitigation</strong>: ZKP is disabled by default in pilot configuration. Attempting to generate proofs returns an error indicating the feature is not available.</p>
+<hr>
+<h2>Scalability Constraints</h2>
+<h3>Single-Node SDIS Enrollment</h3>
+<p><strong>Status</strong>: No distributed locking</p>
+<p><strong>File</strong>: <code>icn/crates/icn-gateway/src/api/sdis/simple_enrollment.rs:530-533</code></p>
+<p><strong>Limitation</strong>: VUI (Verifiable Unique Identifier) registration does not use distributed locking, meaning:</p>
+<ul>
+<li>Concurrent registration from multiple nodes could cause conflicts</li>
+<li>Single-node deployment works correctly</li>
+</ul>
+<p><strong>Impact</strong>: Multi-node deployments should coordinate VUI registration through a single gateway node or implement application-level coordination.</p>
+<p><strong>Future Work</strong>: Add optimistic locking for multi-node deployment (sled transactions or distributed lock).</p>
+<h3>Governance Pagination</h3>
+<p><strong>Status</strong>: In-memory filtering</p>
+<p><strong>File</strong>: <code>icn/crates/icn-gateway/src/api/governance.rs:208</code></p>
+<p><strong>Limitation</strong>: Governance domain queries load all matching domains into memory before filtering/pagination.</p>
+<p><strong>Impact</strong>: Performance may degrade with very large numbers of governance domains (&gt;10,000).</p>
+<p><strong>Future Work</strong>: Implement cursor-based pagination at the storage layer.</p>
+<hr>
+<h2>Infrastructure Considerations</h2>
+<h3>Gateway Module Size</h3>
+<p><strong>Status</strong>: Architectural debt (non-blocking)</p>
+<p><strong>Path</strong>: <code>icn/crates/icn-gateway/src/</code> (75 files, 18+ dependencies)</p>
+<p><strong>Limitation</strong>: The gateway crate has grown to encompass many concerns, making it harder to:</p>
+<ul>
+<li>Understand request flow</li>
+<li>Test components in isolation</li>
+<li>Deploy subset functionality</li>
+</ul>
+<p><strong>Impact</strong>: Development velocity on gateway features may be slower than other crates.</p>
+<p><strong>Future Work</strong>: Document dependency graph, then extract managers into separate crates.</p>
+<h3>Supervisor Initialization Complexity</h3>
+<p><strong>Status</strong>: Documentation needed</p>
+<p><strong>Path</strong>: <code>icn/crates/icn-core/src/supervisor/</code> (20+ init_* modules)</p>
+<p><strong>Limitation</strong>: The supervisor initialization sequence involves many interconnected modules with implicit ordering dependencies.</p>
+<p><strong>Impact</strong>: Adding new actors or modifying initialization order requires careful analysis.</p>
+<p><strong>Future Work</strong>: Add initialization sequence documentation and consider dependency injection patterns.</p>
+<hr>
+<h2>Test Coverage Notes</h2>
+<h3>Ignored Tests</h3>
+<p><strong>Count</strong>: ~20 tests marked <code>#[ignore]</code></p>
+<p><strong>Distribution</strong>:</p>
+<ul>
+<li>7 tests: &quot;Requires network interfaces&quot; (CI environment limitations)</li>
+<li>5 tests: &quot;Uses hardcoded ports&quot; (port conflict in parallel test runs)</li>
+<li>3 tests: &quot;Stress test&quot; (too slow for CI)</li>
+<li>5 tests: Various environment-specific reasons</li>
+</ul>
+<p><strong>Impact</strong>: These scenarios are not verified in automated CI.</p>
+<p><strong>Future Work</strong>:</p>
+<ul>
+<li>Use <code>port_picker</code> crate for dynamic port allocation</li>
+<li>Add network-aware test fixtures</li>
+<li>Move stress tests to separate profile (<code>cargo test --profile stress</code>)</li>
+</ul>
+<hr>
+<h2>Protocol Limitations</h2>
+<h3>Community State Sync</h3>
+<p><strong>Status</strong>: Implemented with last-write-wins</p>
+<p><strong>Limitation</strong>: Community state synchronization uses last-write-wins based on <code>updated_at</code> timestamp. This means:</p>
+<ul>
+<li>Concurrent member operations on different nodes may lose updates</li>
+<li>The node with the most recent timestamp wins</li>
+</ul>
+<p><strong>Impact</strong>: In high-contention scenarios, some member operations may need to be retried.</p>
+<p><strong>Future Work</strong>: Consider CRDT-based merge for member lists if contention becomes problematic.</p>
+<h3>Trust Graph Computation Fallback</h3>
+<p><strong>Status</strong>: Returns fallback score on errors</p>
+<p><strong>File</strong>: <code>icn/crates/icn-trust/src/multi_graph.rs</code></p>
+<p><strong>Limitation</strong>: When trust computation encounters storage errors, it returns a small fallback score (0.05) rather than failing the request.</p>
+<p><strong>Impact</strong>:</p>
+<ul>
+<li>Temporary storage issues won&#39;t completely block peer interactions</li>
+<li>Peers may briefly have lower-than-expected trust during transient failures</li>
+<li>Errors are logged and metrics incremented for monitoring</li>
+</ul>
+<p><strong>Mitigation</strong>: Monitor <code>trust_computation_errors_total</code> metric for storage health.</p>
+<hr>
+<h2>Memory Management</h2>
+<h3>Vector Clock Bounds</h3>
+<p><strong>Status</strong>: Fixed in Phase 19</p>
+<p><strong>Limitation</strong>: Vector clocks are limited to 10,000 entries with LRU eviction at 8,000 entries.</p>
+<p><strong>Impact</strong>: In networks with more than 10,000 active nodes, older node entries will be evicted.</p>
+<p><strong>Mitigation</strong>: The 10,000 limit is suitable for pilot scale. For larger deployments, consider:</p>
+<ul>
+<li>Increasing <code>MAX_ENTRIES</code> constant</li>
+<li>Implementing hierarchical vector clocks</li>
+<li>Using epoch-based compaction</li>
+</ul>
+<h3>Bloom Filter Rotation</h3>
+<p><strong>Status</strong>: Fixed in Phase 19</p>
+<p><strong>Limitation</strong>: Replay protection Bloom filters rotate at 8,000 insertions to prevent false positive saturation.</p>
+<p><strong>Impact</strong>:</p>
+<ul>
+<li>Rotation clears recent message tracking</li>
+<li><code>max_seq</code> threshold still provides replay protection</li>
+<li>Brief window where very old replays might not be detected (mitigated by sequence number checks)</li>
+</ul>
+<hr>
+<h2>What&#39;s NOT Limited</h2>
+<p>As of this pilot-readiness snapshot, the following systems were assessed as ready for pilot usage:</p>
+<ol>
+<li><strong>Identity &amp; Cryptography</strong>: Full Ed25519 DID implementation, Age-encrypted keystore</li>
+<li><strong>Trust Graph</strong>: Multi-graph computation (Social/Economic/Technical) with caching</li>
+<li><strong>Mutual Credit Ledger</strong>: Double-entry accounting with Merkle-DAG integrity</li>
+<li><strong>Gossip Protocol</strong>: Vector clocks, anti-entropy, compression</li>
+<li><strong>Byzantine Fault Tolerance</strong>: MisbehaviorDetector, reputation system, quarantine</li>
+<li><strong>Network Security</strong>: QUIC/TLS, DID-TLS binding, trust-gated rate limiting</li>
+<li><strong>Monitoring</strong>: Prometheus metrics, structured logging, distributed tracing</li>
+<li><strong>Deployment</strong>: K3s Helm charts, CI/CD pipeline, backup/recovery</li>
+</ol>
+<hr>
+<h2>Feedback</h2>
+<p>Please report any issues encountered during the pilot:</p>
+<ul>
+<li>GitHub Issues: <a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">https://github.com/InterCooperative-Network/icn/issues</a></li>
+<li>Use the <code>pilot-feedback</code> label for pilot-specific observations</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

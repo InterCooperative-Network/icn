@@ -1,0 +1,843 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>CooperativeEntity Type Specification | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>development</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>sessions</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>undated</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>COOPERATIVE ENTITY SPEC</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/development/sessions/undated/COOPERATIVE_ENTITY_SPEC.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>CooperativeEntity Type Specification</h1>
+<hr>
+<p><strong>Status</strong>: IMPLEMENTED
+<strong>Created</strong>: 2025-12-24
+<strong>Updated</strong>: 2025-12-24
+<strong>Phase</strong>: 19 - Cooperative Entity Foundation
+<strong>Authors</strong>: fahertym, Claude Code
+<strong>Crate</strong>: <code>icn-entity</code> (32 tests passing)</p>
+<hr>
+<p><strong>Related</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/COOPERATIVE_MIDDLE_LAYER_GAP_ANALYSIS">COOPERATIVE_MIDDLE_LAYER_GAP_ANALYSIS.md</a></p>
+<h2>Implementation Status</h2>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Status</th>
+<th>File</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>EntityId</td>
+<td>Complete</td>
+<td><code>entity.rs</code></td>
+</tr>
+<tr>
+<td>EntityType</td>
+<td>Complete</td>
+<td><code>entity.rs</code></td>
+</tr>
+<tr>
+<td>CooperativeEntity</td>
+<td>Complete</td>
+<td><code>entity.rs</code></td>
+</tr>
+<tr>
+<td>EntityStatus</td>
+<td>Complete</td>
+<td><code>entity.rs</code></td>
+</tr>
+<tr>
+<td>AccountId</td>
+<td>Complete</td>
+<td><code>entity.rs</code></td>
+</tr>
+<tr>
+<td>Membership</td>
+<td>Complete</td>
+<td><code>membership.rs</code></td>
+</tr>
+<tr>
+<td>MembershipRole</td>
+<td>Complete</td>
+<td><code>membership.rs</code></td>
+</tr>
+<tr>
+<td>MembershipCapability</td>
+<td>Complete</td>
+<td><code>membership.rs</code></td>
+</tr>
+<tr>
+<td>MembershipStatus</td>
+<td>Complete</td>
+<td><code>membership.rs</code></td>
+</tr>
+<tr>
+<td>EntityRegistry trait</td>
+<td>Complete</td>
+<td><code>registry.rs</code></td>
+</tr>
+<tr>
+<td>InMemoryRegistry</td>
+<td>Complete</td>
+<td><code>registry.rs</code></td>
+</tr>
+<tr>
+<td>EntityRegistryHandle</td>
+<td>Complete</td>
+<td><code>registry.rs</code></td>
+</tr>
+<tr>
+<td>LifecycleEvent</td>
+<td>Complete</td>
+<td><code>lifecycle.rs</code></td>
+</tr>
+<tr>
+<td>EntityLifecycle trait</td>
+<td>Complete</td>
+<td><code>lifecycle.rs</code></td>
+</tr>
+</tbody></table>
+<p><strong>Note</strong>: The implementation uses a simplified model compared to the original spec below. Key differences:</p>
+<ul>
+<li>EntityId format: <code>entity:icn:&lt;type&gt;:&lt;identifier&gt;</code> (vs <code>entity:&lt;type&gt;:&lt;namespace&gt;:&lt;local_id&gt;</code>)</li>
+<li>Three entity types: Individual, Cooperative, Federation (vs Person, WorkingGroup, Cooperative, Federation, Commons)</li>
+<li>No EntityAnchor yet (deferred to full SDIS integration)</li>
+<li>No GovernanceConfig/EconomicConfig/TrustConfig embedded (linked via domain_id instead)</li>
+</ul>
+<h2>Overview</h2>
+<p>This document specifies the <code>CooperativeEntity</code> type - a unified recursive model for all participants in the ICN ecosystem. The goal is to replace the current fragmented types (DIDs for individuals, CooperativeInfo for coops, implicit federation relationships) with a single composable type that works at every scale.</p>
+<h2>Design Principles</h2>
+<ol>
+<li><strong>Recursive Composition</strong>: Entities contain entities - individuals form coops, coops form federations</li>
+<li><strong>Uniform Interface</strong>: Same governance, economic, and trust APIs work at every level</li>
+<li><strong>Identity Anchoring</strong>: Each entity has a cryptographic anchor (DID or threshold-derived)</li>
+<li><strong>Explicit Membership</strong>: Relationships between entities are first-class, not implicit</li>
+<li><strong>Audit Trail</strong>: All entity state changes are logged with timestamps and attestations</li>
+</ol>
+<hr>
+<h2>Core Types</h2>
+<h3>EntityId (Implemented)</h3>
+<p>A universally unique identifier for any cooperative entity.</p>
+<pre><code class="language-rust">/// Unique identifier for a cooperative entity
+/// Format: &quot;entity:icn:{type}:{identifier}&quot;
+/// Examples:
+///   - &quot;entity:icn:individual:z5TrA8Qk...&quot; (wraps DID public key)
+///   - &quot;entity:icn:cooperative:food-coop-2024&quot;
+///   - &quot;entity:icn:federation:midwest-fed&quot;
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct EntityId(String);
+
+impl EntityId {
+    /// Create from an existing DID (for individuals)
+    pub fn from_did(did: &amp;Did) -&gt; Self;
+
+    /// Create a cooperative entity ID from slug
+    pub fn cooperative(slug: &amp;str) -&gt; Result&lt;Self&gt;;
+
+    /// Create a federation entity ID from slug
+    pub fn federation(slug: &amp;str) -&gt; Result&lt;Self&gt;;
+
+    /// Get entity type from the ID
+    pub fn entity_type(&amp;self) -&gt; EntityType;
+
+    /// Convert back to DID (only for individuals)
+    pub fn to_did(&amp;self) -&gt; Option&lt;Did&gt;;
+
+    /// Get the raw identifier portion
+    pub fn identifier(&amp;self) -&gt; &amp;str;
+}
+</code></pre>
+<p><strong>Slug Validation Rules</strong>:</p>
+<ul>
+<li>4-64 characters (minimum 4 to avoid namespace collisions)</li>
+<li>Lowercase letters, numbers, hyphens only</li>
+<li>Must start with a letter</li>
+<li>No consecutive hyphens</li>
+</ul>
+<h3>EntityType (Implemented)</h3>
+<p>The level in the cooperative hierarchy.</p>
+<pre><code class="language-rust">/// The type/level of a cooperative entity
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EntityType {
+    /// Individual backed by a DID
+    Individual,
+
+    /// Cooperative organization
+    Cooperative,
+
+    /// Federation of cooperatives
+    Federation,
+
+    /// Unknown type (parsing fallback)
+    Unknown,
+}
+</code></pre>
+<p><strong>Design Decision</strong>: The implementation uses three core types (Individual, Cooperative, Federation) rather than the five originally proposed. WorkingGroup can be modeled as a Cooperative with a parent_id, and Commons can be modeled as a top-level Federation.</p>
+<h3>CooperativeEntity (Implemented)</h3>
+<p>The core entity type representing any participant at any level.</p>
+<pre><code class="language-rust">/// A cooperative entity at any level of the hierarchy
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CooperativeEntity {
+    /// Unique identifier for this entity
+    pub id: EntityId,
+
+    /// Human-readable name
+    pub name: String,
+
+    /// Type/level in the hierarchy
+    pub entity_type: EntityType,
+
+    /// Entity lifecycle state
+    pub status: EntityStatus,
+
+    /// Parent entity (if any)
+    pub parent_id: Option&lt;EntityId&gt;,
+
+    /// Link to governance domain (if governance enabled)
+    pub governance_domain_id: Option&lt;String&gt;,
+
+    /// Link to treasury account (if treasury enabled)
+    pub treasury_account: Option&lt;AccountReference&gt;,
+
+    /// Creation timestamp (Unix seconds)
+    pub created_at: u64,
+
+    /// Last modification timestamp (Unix seconds)
+    pub updated_at: u64,
+
+    /// Human-readable description
+    pub description: Option&lt;String&gt;,
+
+    /// Arbitrary key-value metadata
+    pub metadata: HashMap&lt;String, String&gt;,
+}
+
+impl CooperativeEntity {
+    /// Create an individual entity from a DID
+    pub fn individual(did: &amp;Did, name: &amp;str) -&gt; Self;
+
+    /// Create a cooperative entity (builder pattern)
+    pub fn cooperative(slug: &amp;str, name: &amp;str) -&gt; Result&lt;Self&gt;;
+
+    /// Create a federation entity (builder pattern)
+    pub fn federation(slug: &amp;str, name: &amp;str) -&gt; Result&lt;Self&gt;;
+
+    /// Builder methods
+    pub fn with_description(self, description: &amp;str) -&gt; Self;
+    pub fn with_governance_domain(self, domain_id: &amp;str) -&gt; Self;
+    pub fn with_metadata(self, key: &amp;str, value: &amp;str) -&gt; Self;
+}
+</code></pre>
+<p><strong>Design Decision</strong>: Governance/Economic/Trust configurations are linked via IDs rather than embedded. This reduces coupling and allows the entity crate to remain lightweight.</p>
+<h3>EntityAnchor (Deferred)</h3>
+<p>The cryptographic anchor for entity identity. <strong>Not yet implemented</strong> - deferred to full SDIS integration in Phase 22.</p>
+<p>The original design proposed:</p>
+<ul>
+<li><code>Personal</code>: Individual anchor with VUI commitment and ceremony proof</li>
+<li><code>Cooperative</code>: Threshold-derived anchor from member signatures</li>
+<li><code>Federation</code>: Anchor derived from member cooperatives</li>
+<li><code>Genesis</code>: For the ICN Protocol Commons</li>
+</ul>
+<p><strong>Current Implementation</strong>: Individuals link to DIDs via <code>EntityId::from_did()</code>. Cooperatives and federations have no cryptographic anchor yet - they are identified by their EntityId slug. Multi-party signing will be added when threshold signatures are implemented.</p>
+<h3>EntityStatus (Implemented)</h3>
+<p>The lifecycle state of an entity.</p>
+<pre><code class="language-rust">/// Entity lifecycle status
+#[derive(Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum EntityStatus {
+    /// Entity is being formed (pre-charter ratification)
+    #[default]
+    Forming,
+
+    /// Entity is active and operational
+    Active,
+
+    /// Entity is suspended (frozen)
+    Suspended {
+        reason: String,
+        suspended_at: u64,
+    },
+
+    /// Entity is in the process of dissolving
+    Dissolving {
+        started_at: u64,
+    },
+
+    /// Entity has been dissolved
+    Dissolved {
+        dissolved_at: u64,
+    },
+
+    /// Entity has merged into another entity
+    Merged {
+        into: EntityId,
+        merged_at: u64,
+    },
+
+    /// Entity has split into multiple entities
+    Split {
+        into: Vec&lt;EntityId&gt;,
+        split_at: u64,
+    },
+}
+
+impl EntityStatus {
+    /// Check if entity is operational
+    pub fn is_operational(&amp;self) -&gt; bool;
+
+    /// Check if entity lifecycle has ended
+    pub fn is_terminated(&amp;self) -&gt; bool;
+}
+</code></pre>
+<p><strong>Valid State Transitions</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>From</th>
+<th>To</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Forming</td>
+<td>Active</td>
+</tr>
+<tr>
+<td>Active</td>
+<td>Suspended, Dissolving, Merged, Split</td>
+</tr>
+<tr>
+<td>Suspended</td>
+<td>Active, Dissolving</td>
+</tr>
+<tr>
+<td>Dissolving</td>
+<td>Dissolved, Merged, Split</td>
+</tr>
+</tbody></table>
+<p><strong>Design Decision</strong>: FormationStep tracking is deferred. The <code>Forming</code> state is simple for now; detailed formation requirements can be tracked externally or added later.</p>
+<hr>
+<h2>Membership Model (Implemented)</h2>
+<h3>Membership</h3>
+<p>Represents the relationship between an entity and its parent.</p>
+<pre><code class="language-rust">/// Membership of an entity within another entity
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Membership {
+    /// The member entity (individual OR cooperative)
+    pub member_id: EntityId,
+
+    /// The containing entity (parent)
+    pub parent_id: EntityId,
+
+    /// Role within the parent entity
+    pub role: MembershipRole,
+
+    /// Current membership status
+    pub status: MembershipStatus,
+
+    /// When membership was created (Unix timestamp)
+    pub joined_at: u64,
+
+    /// When membership was last updated
+    pub updated_at: u64,
+
+    /// Voting shares (for weighted voting, 0 = no vote)
+    pub shares: u64,
+
+    /// Capabilities granted by this membership
+    pub capabilities: Vec&lt;MembershipCapability&gt;,
+
+    /// Optional notes
+    pub notes: Option&lt;String&gt;,
+}
+
+impl Membership {
+    /// Create a new pending membership
+    pub fn new(member_id: EntityId, parent_id: EntityId, role: MembershipRole) -&gt; Self;
+
+    /// Create an active membership (bypass pending state)
+    pub fn active(member_id: EntityId, parent_id: EntityId, role: MembershipRole) -&gt; Self;
+
+    /// Check if member can vote
+    pub fn can_vote(&amp;self) -&gt; bool;  // requires: active + shares &gt; 0 + Vote capability
+
+    /// Check if member can create proposals
+    pub fn can_propose(&amp;self) -&gt; bool;
+}
+</code></pre>
+<h3>MembershipRole</h3>
+<pre><code class="language-rust">pub enum MembershipRole {
+    // Individual Roles (for people)
+    Founder,             // All capabilities
+    Member,              // Vote, Propose
+    Worker,              // Vote, Propose
+    Consumer,            // Vote, Propose
+    Producer,            // Vote, Propose
+    BoardMember,         // Vote, Propose, Treasury, Invite
+    Officer { title: String },  // Vote, Propose, Treasury
+
+    // Entity Roles (for organizations)
+    FederatedMember,     // Vote, Propose, Sign
+    AssociateMember,     // Propose
+    ObserverMember,      // None
+    ProvisionalMember,   // Propose
+
+    // Custom
+    Custom { name: String },  // Vote, Propose
+}
+</code></pre>
+<h3>MembershipStatus</h3>
+<pre><code class="language-rust">pub enum MembershipStatus {
+    Pending,    // Application pending
+    Active,     // In good standing
+    Suspended,  // Temporarily frozen
+    Inactive,   // Not participating
+    Resigned,   // Voluntarily left
+    Removed,    // Governance removal
+    Expelled,   // Serious violation
+}
+</code></pre>
+<h3>MembershipCapability</h3>
+<pre><code class="language-rust">pub enum MembershipCapability {
+    Vote,               // Can vote on proposals
+    Propose,            // Can create proposals
+    TreasuryAccess,     // Can perform treasury operations
+    Invite,             // Can invite new members
+    ManageSubEntities,  // Can manage child entities
+    Sign,               // Can sign on behalf of entity
+    Configure,          // Can modify entity settings
+    ViewSensitive,      // Can view confidential info
+    Custom(String),     // User-defined capability
+}
+</code></pre>
+<p><strong>Key Insight</strong>: Capabilities are explicit, not derived from roles. Each role has default capabilities, but they can be overridden with <code>membership.with_capabilities()</code>.</p>
+<hr>
+<h2>Configuration (Linked, Not Embedded)</h2>
+<p>The original spec proposed embedding GovernanceConfig, EconomicConfig, and TrustConfig directly in CooperativeEntity. The implementation uses <strong>linked references</strong> instead:</p>
+<pre><code class="language-rust">pub struct CooperativeEntity {
+    // ...
+    pub governance_domain_id: Option&lt;String&gt;,  // Links to icn-governance
+    pub treasury_account: Option&lt;AccountReference&gt;,  // Links to icn-ledger
+    // Trust is implicit via the entity&#39;s DIDs in the trust graph
+}
+</code></pre>
+<p><strong>Benefits</strong>:</p>
+<ul>
+<li>Reduced coupling between crates</li>
+<li>Configuration lives in its natural home (governance in icn-governance, treasury in icn-ledger)</li>
+<li>Entity crate stays lightweight</li>
+<li>Easier to evolve configurations independently</li>
+</ul>
+<p><strong>Deferred to Phase 19+ Integration</strong>:</p>
+<ul>
+<li>GovernanceConfig (voting models, quorum, constraints)</li>
+<li>EconomicConfig (credit policy, inter-entity agreements)</li>
+<li>TrustConfig (entity-level trust thresholds)</li>
+</ul>
+<p>See the original spec sections below for the envisioned designs.</p>
+<hr>
+<h2>Entity Registry (Implemented)</h2>
+<p>The entity registry maintains the global state of all entities.</p>
+<pre><code class="language-rust">/// Entity registry for storing and querying entities
+pub trait EntityRegistry: Send + Sync {
+    // Entity CRUD
+    fn register(&amp;mut self, entity: CooperativeEntity) -&gt; Result&lt;()&gt;;
+    fn get(&amp;self, id: &amp;EntityId) -&gt; Result&lt;Option&lt;CooperativeEntity&gt;&gt;;
+    fn update(&amp;mut self, entity: CooperativeEntity) -&gt; Result&lt;()&gt;;
+    fn delete(&amp;mut self, id: &amp;EntityId) -&gt; Result&lt;()&gt;;
+
+    // Queries
+    fn list_by_type(&amp;self, entity_type: EntityType) -&gt; Result&lt;Vec&lt;EntityId&gt;&gt;;
+    fn list_children(&amp;self, parent_id: &amp;EntityId) -&gt; Result&lt;Vec&lt;EntityId&gt;&gt;;
+
+    // Membership operations
+    fn add_membership(&amp;mut self, membership: Membership) -&gt; Result&lt;()&gt;;
+    fn remove_membership(&amp;mut self, member_id: &amp;EntityId, parent_id: &amp;EntityId) -&gt; Result&lt;()&gt;;
+    fn get_membership(&amp;self, member_id: &amp;EntityId, parent_id: &amp;EntityId)
+        -&gt; Result&lt;Option&lt;Membership&gt;&gt;;
+    fn get_members(&amp;self, parent_id: &amp;EntityId) -&gt; Result&lt;Vec&lt;Membership&gt;&gt;;
+    fn get_memberships(&amp;self, member_id: &amp;EntityId) -&gt; Result&lt;Vec&lt;Membership&gt;&gt;;
+}
+</code></pre>
+<h3>EntityRegistryHandle</h3>
+<p>Thread-safe async wrapper for concurrent access:</p>
+<pre><code class="language-rust">pub struct EntityRegistryHandle {
+    inner: Arc&lt;RwLock&lt;InMemoryRegistry&gt;&gt;,
+}
+
+impl EntityRegistryHandle {
+    pub fn new() -&gt; Self;
+
+    // Async versions of all trait methods
+    pub async fn register(&amp;self, entity: CooperativeEntity) -&gt; Result&lt;()&gt;;
+    pub async fn get(&amp;self, id: &amp;EntityId) -&gt; Result&lt;Option&lt;CooperativeEntity&gt;&gt;;
+    // ... etc
+}
+</code></pre>
+<h3>InMemoryRegistry</h3>
+<p>Reference implementation for testing and development:</p>
+<pre><code class="language-rust">pub struct InMemoryRegistry {
+    entities: HashMap&lt;String, CooperativeEntity&gt;,
+    memberships: Vec&lt;Membership&gt;,
+}
+</code></pre>
+<p><strong>Constraints Enforced</strong>:</p>
+<ul>
+<li>Duplicate entity IDs rejected</li>
+<li>Cannot update non-existent entities</li>
+<li>Cannot delete entities with active memberships</li>
+<li>Both member and parent must exist to add membership</li>
+</ul>
+<hr>
+<h2>Entity Lifecycle (Implemented)</h2>
+<h3>LifecycleEvent</h3>
+<p>Events that mark entity state transitions:</p>
+<pre><code class="language-rust">pub enum LifecycleEvent {
+    Created {
+        entity_id: EntityId,
+        created_by: EntityId,
+        timestamp: u64,
+    },
+    Activated {
+        entity_id: EntityId,
+        charter_hash: String,
+        activated_by: EntityId,
+        timestamp: u64,
+    },
+    Suspended {
+        entity_id: EntityId,
+        reason: String,
+        suspended_by: EntityId,
+        timestamp: u64,
+    },
+    Resumed {
+        entity_id: EntityId,
+        resumed_by: EntityId,
+        timestamp: u64,
+    },
+    DissolutionStarted {
+        entity_id: EntityId,
+        started_by: EntityId,
+        timestamp: u64,
+    },
+    Dissolved {
+        entity_id: EntityId,
+        timestamp: u64,
+    },
+    Merged {
+        source_id: EntityId,
+        target_id: EntityId,
+        merger_proposal_id: Option&lt;String&gt;,
+        timestamp: u64,
+    },
+    Split {
+        source_id: EntityId,
+        new_entity_ids: Vec&lt;EntityId&gt;,
+        split_proposal_id: Option&lt;String&gt;,
+        timestamp: u64,
+    },
+}
+</code></pre>
+<h3>EntityLifecycle Trait</h3>
+<pre><code class="language-rust">pub trait EntityLifecycle {
+    fn create(&amp;mut self, entity: CooperativeEntity, created_by: &amp;EntityId)
+        -&gt; Result&lt;LifecycleEvent&gt;;
+
+    fn activate(&amp;mut self, entity_id: &amp;EntityId, charter_hash: String, by: &amp;EntityId)
+        -&gt; Result&lt;LifecycleEvent&gt;;
+
+    fn suspend(&amp;mut self, entity_id: &amp;EntityId, reason: String, by: &amp;EntityId)
+        -&gt; Result&lt;LifecycleEvent&gt;;
+
+    fn resume(&amp;mut self, entity_id: &amp;EntityId, by: &amp;EntityId)
+        -&gt; Result&lt;LifecycleEvent&gt;;
+
+    fn begin_dissolution(&amp;mut self, entity_id: &amp;EntityId, by: &amp;EntityId)
+        -&gt; Result&lt;LifecycleEvent&gt;;
+
+    fn dissolve(&amp;mut self, entity_id: &amp;EntityId)
+        -&gt; Result&lt;LifecycleEvent&gt;;
+
+    fn merge(&amp;mut self, source_id: &amp;EntityId, target_id: &amp;EntityId, by: &amp;EntityId)
+        -&gt; Result&lt;LifecycleEvent&gt;;
+
+    fn split(&amp;mut self, source_id: &amp;EntityId, new_entities: Vec&lt;CooperativeEntity&gt;, by: &amp;EntityId)
+        -&gt; Result&lt;Vec&lt;LifecycleEvent&gt;&gt;;
+}
+</code></pre>
+<h3>State Transition Validation</h3>
+<pre><code class="language-rust">pub fn validate_transition(from: &amp;EntityStatus, to: &amp;EntityStatus) -&gt; Result&lt;()&gt;;
+</code></pre>
+<p><strong>Note</strong>: FormationCeremony, Charter, and DissolutionProcess are deferred to full Phase 19 integration. The current implementation provides the event types and trait interface.</p>
+<hr>
+<h2>Migration Strategy</h2>
+<h3>AccountId - The Bridge Type</h3>
+<p>The <code>AccountId</code> enum provides backward compatibility:</p>
+<pre><code class="language-rust">pub enum AccountId {
+    Did(Did),           // Legacy DID-based accounts
+    Entity(EntityId),   // New entity-based accounts
+}
+
+impl AccountId {
+    pub fn as_did(&amp;self) -&gt; Option&lt;&amp;Did&gt;;
+    pub fn as_entity(&amp;self) -&gt; Option&lt;&amp;EntityId&gt;;
+}
+</code></pre>
+<p>This allows gradual migration - existing code uses <code>AccountId::Did</code>, new code can use <code>AccountId::Entity</code>.</p>
+<h3>Phase 1: Type Introduction (Current - Sprint 3)</h3>
+<ol>
+<li>✅ Create <code>icn-entity</code> crate with core types</li>
+<li>✅ Implement EntityId, CooperativeEntity, Membership</li>
+<li>✅ Implement EntityRegistry trait</li>
+<li>✅ Implement LifecycleEvent and EntityLifecycle trait</li>
+<li>No breaking changes - new types exist alongside old</li>
+</ol>
+<h3>Phase 2: Subsystem Integration (Phase 19)</h3>
+<ol>
+<li>Add <code>AccountId</code> to ledger types (replace <code>account_id: Did</code>)</li>
+<li>Add <code>entity_id</code> field to governance domains</li>
+<li>Update treasury to use <code>EntityId</code> for cooperative accounts</li>
+<li>Add entity registry actor to runtime</li>
+</ol>
+<h3>Phase 3: Full Integration (Phase 19+)</h3>
+<ol>
+<li>Update icn-governance to accept EntityId</li>
+<li>Update icn-ledger to support entity-level accounts</li>
+<li>Update icn-trust to support entity-to-entity edges</li>
+<li>Add gateway entity endpoints</li>
+</ol>
+<h3>Phase 4: Migration &amp; Cleanup (Future)</h3>
+<ol>
+<li>Create <code>Did</code> → <code>EntityId</code> mapping for existing data</li>
+<li>Build migration scripts</li>
+<li>Dual-write during transition period</li>
+<li>Deprecate DID-only APIs</li>
+</ol>
+<hr>
+<h2>Compatibility Notes</h2>
+<h3>Backward Compatibility</h3>
+<ul>
+<li><code>Did</code> remains valid as <code>EntityId::Person(did)</code></li>
+<li>Existing governance domains map to entity-scoped governance</li>
+<li>Existing ledger accounts map to entity accounts</li>
+<li>Existing trust edges map to entity trust relationships</li>
+</ul>
+<h3>Wire Protocol</h3>
+<ul>
+<li>New entity types use existing gossip topics with extended message types</li>
+<li>Entity announcements extend current <code>CooperativeInfo</code> messages</li>
+<li>Membership changes gossiped via new <code>entity:membership</code> topic</li>
+</ul>
+<hr>
+<h2>Open Questions</h2>
+<ol>
+<li><p><strong>Anchor Rotation</strong>: How do cooperative anchors rotate when membership changes?</p>
+<ul>
+<li><em>Deferred to Phase 22 SDIS integration</em></li>
+</ul>
+</li>
+<li><p><strong>Cross-Federation Trust</strong>: How does trust propagate across federation boundaries?</p>
+<ul>
+<li><em>Will require entity-level edges in trust graph</em></li>
+</ul>
+</li>
+<li><p><strong>Conflict Resolution</strong>: When parent and child entity rules conflict, which wins?</p>
+<ul>
+<li><em>Proposed: Subsidiarity principle - local unless explicitly delegated up</em></li>
+</ul>
+</li>
+<li><p><strong>Privacy</strong>: Which entity information should be public vs. member-only?</p>
+<ul>
+<li><em>Current: All public. Future: Add visibility field</em></li>
+</ul>
+</li>
+<li><p><strong>Multi-Federation Membership</strong>: Can a cooperative belong to multiple federations?</p>
+<ul>
+<li><em>Current implementation: Yes. Question: Scope capabilities per-federation?</em></li>
+</ul>
+</li>
+<li><p><strong>Entity Recovery</strong>: What happens if an entity loses all authorized members?</p>
+<ul>
+<li><em>Not yet addressed</em></li>
+</ul>
+</li>
+</ol>
+<hr>
+<h2>Next Steps (Updated)</h2>
+<ol>
+<li>✅ Review spec with stakeholders</li>
+<li>✅ Create <code>icn-entity</code> crate with core types</li>
+<li>✅ Implement EntityRegistry trait</li>
+<li>✅ Implement LifecycleEvent and EntityLifecycle trait</li>
+<li><input disabled="" type="checkbox"> <strong>Phase 19</strong>: Integrate with icn-ledger (AccountId)</li>
+<li><input disabled="" type="checkbox"> <strong>Phase 19</strong>: Integrate with icn-governance (entity domains)</li>
+<li><input disabled="" type="checkbox"> <strong>Phase 19</strong>: Add entity actor to runtime</li>
+<li><input disabled="" type="checkbox"> <strong>Phase 19</strong>: Add gateway entity endpoints</li>
+<li><input disabled="" type="checkbox"> Write migration plan for existing data</li>
+</ol>
+<hr>
+<h2>Appendix: Implemented Type Summary</h2>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Purpose</th>
+<th>File</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>EntityId</code></td>
+<td>Unique identifier (<code>entity:icn:&lt;type&gt;:&lt;id&gt;</code>)</td>
+<td><code>entity.rs</code></td>
+</tr>
+<tr>
+<td><code>EntityType</code></td>
+<td>Individual, Cooperative, Federation</td>
+<td><code>entity.rs</code></td>
+</tr>
+<tr>
+<td><code>CooperativeEntity</code></td>
+<td>Core entity record</td>
+<td><code>entity.rs</code></td>
+</tr>
+<tr>
+<td><code>EntityStatus</code></td>
+<td>Lifecycle state (Forming → Active → ...)</td>
+<td><code>entity.rs</code></td>
+</tr>
+<tr>
+<td><code>AccountId</code></td>
+<td>DID or EntityId (migration bridge)</td>
+<td><code>entity.rs</code></td>
+</tr>
+<tr>
+<td><code>AccountReference</code></td>
+<td>Link to ledger account</td>
+<td><code>entity.rs</code></td>
+</tr>
+<tr>
+<td><code>Membership</code></td>
+<td>Entity-to-parent relationship</td>
+<td><code>membership.rs</code></td>
+</tr>
+<tr>
+<td><code>MembershipRole</code></td>
+<td>Founder, Worker, FederatedMember, etc.</td>
+<td><code>membership.rs</code></td>
+</tr>
+<tr>
+<td><code>MembershipStatus</code></td>
+<td>Pending, Active, Suspended, etc.</td>
+<td><code>membership.rs</code></td>
+</tr>
+<tr>
+<td><code>MembershipCapability</code></td>
+<td>Vote, Propose, Treasury, etc.</td>
+<td><code>membership.rs</code></td>
+</tr>
+<tr>
+<td><code>EntityRegistry</code></td>
+<td>Storage trait</td>
+<td><code>registry.rs</code></td>
+</tr>
+<tr>
+<td><code>InMemoryRegistry</code></td>
+<td>Reference implementation</td>
+<td><code>registry.rs</code></td>
+</tr>
+<tr>
+<td><code>EntityRegistryHandle</code></td>
+<td>Async wrapper</td>
+<td><code>registry.rs</code></td>
+</tr>
+<tr>
+<td><code>LifecycleEvent</code></td>
+<td>State transition events</td>
+<td><code>lifecycle.rs</code></td>
+</tr>
+<tr>
+<td><code>EntityLifecycle</code></td>
+<td>Lifecycle operations trait</td>
+<td><code>lifecycle.rs</code></td>
+</tr>
+<tr>
+<td><code>EntityError</code></td>
+<td>Error type</td>
+<td><code>error.rs</code></td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Changelog</h2>
+<table>
+<thead>
+<tr>
+<th>Date</th>
+<th>Change</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>2025-12-24</td>
+<td>Initial implementation complete (Sprint 3)</td>
+</tr>
+<tr>
+<td>2025-12-24</td>
+<td>Updated spec to reflect actual implementation</td>
+</tr>
+</tbody></table>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

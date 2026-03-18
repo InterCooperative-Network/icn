@@ -1,0 +1,461 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN UX Language Guide | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>dev</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>language guide</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/dev/language-guide.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN UX Language Guide</h1>
+<p><strong>Status</strong>: Enforced — Phase 0 of <a href="/docs/design/regulatory-safe-verifiable-state">Regulatory-Safe Verifiable State Architecture</a></p>
+<p>ICN is communications infrastructure for verifiable cooperative coordination — not a financial
+intermediary. The surface language in API endpoints, SDK types, documentation, and UI must
+reflect this accurately. Mismatched terminology creates regulatory exposure and confuses what
+ICN actually is.</p>
+<p>This guide lists terms that are <strong>forbidden</strong> in public-facing API surfaces, SDK types, and
+user-visible text, alongside the approved alternatives.</p>
+<hr>
+<h2>Forbidden Terms and Approved Alternatives</h2>
+<h3><code>payment</code> / <code>pay</code></h3>
+<table>
+<thead>
+<tr>
+<th>Context</th>
+<th>Forbidden</th>
+<th>Approved</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>API endpoint</td>
+<td><code>POST /ledger/{id}/payment</code></td>
+<td><code>POST /ledger/{id}/settle</code></td>
+</tr>
+<tr>
+<td>API endpoint</td>
+<td><code>POST /payments/recurring</code></td>
+<td><code>POST /settlements/recurring</code></td>
+</tr>
+<tr>
+<td>Request type</td>
+<td><code>CreatePaymentRequest</code></td>
+<td><code>RecordTransferRequest</code></td>
+</tr>
+<tr>
+<td>SDK method</td>
+<td><code>client.pay()</code></td>
+<td><code>client.settle()</code></td>
+</tr>
+<tr>
+<td>SDK method</td>
+<td><code>client.batchPay()</code></td>
+<td><code>client.batchSettle()</code></td>
+</tr>
+<tr>
+<td>Event type</td>
+<td><code>PaymentCreated</code></td>
+<td><code>SettlementCreated</code></td>
+</tr>
+<tr>
+<td>Scope string</td>
+<td><code>payments:read</code> / <code>payments:write</code></td>
+<td><code>settlements:read</code> / <code>settlements:write</code></td>
+</tr>
+<tr>
+<td>UI label</td>
+<td>&quot;Make a payment&quot;</td>
+<td>&quot;Record a settlement&quot;</td>
+</tr>
+<tr>
+<td>UI label</td>
+<td>&quot;Payment history&quot;</td>
+<td>&quot;Settlement history&quot;</td>
+</tr>
+</tbody></table>
+<p><strong>Why</strong>: &quot;Payment&quot; implies the operator is routing value between accounts (Money Services Business
+trigger). ICN records user-signed state transitions; it does not process payments.</p>
+<hr>
+<h3><code>currency</code></h3>
+<table>
+<thead>
+<tr>
+<th>Context</th>
+<th>Forbidden</th>
+<th>Approved</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Request field</td>
+<td><code>{&quot;currency&quot;: &quot;hours&quot;}</code></td>
+<td><code>{&quot;unit&quot;: &quot;hours&quot;}</code></td>
+</tr>
+<tr>
+<td>SDK type field</td>
+<td><code>currency: string</code></td>
+<td><code>unit: string</code></td>
+</tr>
+<tr>
+<td>UI label</td>
+<td>&quot;Currency&quot;</td>
+<td>&quot;Unit of account&quot;</td>
+</tr>
+<tr>
+<td>Variable name</td>
+<td><code>let currency = ...</code></td>
+<td><code>let unit = ...</code></td>
+</tr>
+</tbody></table>
+<p><strong>Why</strong>: &quot;Currency&quot; implies a fiat-like regulated instrument. ICN units are locally-defined measures
+of cooperative capacity (hours, compute-units, participation-units). They are not currencies.</p>
+<p><strong>Exception</strong>: The FX oracle (<code>icn-ledger/src/oracle/</code>) uses <code>CurrencyPair</code> and <code>ExchangeRate</code>
+internally to model rates between external systems. This is a technical adapter, not a user-facing
+concept. Do not expose these types in gateway APIs or SDK types.</p>
+<hr>
+<h3><code>balance</code></h3>
+<table>
+<thead>
+<tr>
+<th>Context</th>
+<th>Forbidden</th>
+<th>Approved</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>API endpoint</td>
+<td><code>GET /ledger/{id}/balance/{did}</code></td>
+<td><code>GET /ledger/{id}/position/{did}</code></td>
+</tr>
+<tr>
+<td>API endpoint</td>
+<td><code>GET /treasury/{id}/balance</code></td>
+<td><code>GET /treasury/{id}/position</code></td>
+</tr>
+<tr>
+<td>Response field</td>
+<td><code>{&quot;balance&quot;: 42}</code></td>
+<td><code>{&quot;position&quot;: 42}</code></td>
+</tr>
+<tr>
+<td>Response field</td>
+<td><code>{&quot;balances&quot;: {...}}</code></td>
+<td><code>{&quot;positions&quot;: {...}}</code></td>
+</tr>
+<tr>
+<td>SDK method</td>
+<td><code>client.getBalance()</code></td>
+<td><code>client.getPosition()</code></td>
+</tr>
+<tr>
+<td>SDK type field</td>
+<td><code>balance: number</code></td>
+<td><code>position: number</code></td>
+</tr>
+<tr>
+<td>Handler name</td>
+<td><code>get_balance()</code></td>
+<td><code>get_position()</code></td>
+</tr>
+<tr>
+<td>UI label</td>
+<td>&quot;Balance&quot;</td>
+<td>&quot;Net position&quot;</td>
+</tr>
+</tbody></table>
+<p><strong>Why</strong>: A &quot;balance&quot; is a stored value under operator control — the MSB custody trigger. A
+&quot;position&quot; is a derived view computed from the set of signed receipts and accepted obligations.
+The protocol primitive is the signed entry; the position is interpretation.</p>
+<hr>
+<h3><code>wallet</code></h3>
+<table>
+<thead>
+<tr>
+<th>Context</th>
+<th>Forbidden</th>
+<th>Approved</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>UI component</td>
+<td>&quot;My Wallet&quot;</td>
+<td>&quot;My Account&quot; or &quot;My Accounts&quot;</td>
+</tr>
+<tr>
+<td>SDK type</td>
+<td><code>Wallet</code> interface</td>
+<td><code>Account</code> interface</td>
+</tr>
+<tr>
+<td>API concept</td>
+<td>&quot;wallet address&quot;</td>
+<td>&quot;member account&quot; or &quot;DID&quot;</td>
+</tr>
+</tbody></table>
+<p><strong>Why</strong>: &quot;Wallet&quot; in a hosted context implies the operator controls the keys and can move balances
+unilaterally. ICN accounts are identified by DID; the member controls the signing key.</p>
+<p><strong>Exception</strong>: &quot;Unhosted wallet&quot; in regulatory/legal documentation is acceptable — it describes
+ICN&#39;s non-custodial architecture relative to the regulatory concept.</p>
+<hr>
+<h3><code>send funds</code> / <code>transfer funds</code></h3>
+<table>
+<thead>
+<tr>
+<th>Context</th>
+<th>Forbidden</th>
+<th>Approved</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>UI button</td>
+<td>&quot;Send funds&quot;</td>
+<td>&quot;Create settlement&quot; or &quot;Record transfer&quot;</td>
+</tr>
+<tr>
+<td>UI button</td>
+<td>&quot;Transfer funds&quot;</td>
+<td>&quot;Propose transfer&quot;</td>
+</tr>
+<tr>
+<td>Documentation</td>
+<td>&quot;send funds to...&quot;</td>
+<td>&quot;settle an obligation with...&quot;</td>
+</tr>
+</tbody></table>
+<p><strong>Why</strong>: &quot;Send funds&quot; describes an operator-mediated transfer. ICN broadcasts user-signed state
+transitions — the gateway does not move anything on the user&#39;s behalf.</p>
+<hr>
+<h3><code>exchange rate</code> (in user-facing contexts)</h3>
+<table>
+<thead>
+<tr>
+<th>Context</th>
+<th>Forbidden</th>
+<th>Approved</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>API field</td>
+<td><code>exchange_rate: f64</code></td>
+<td><em>(omit entirely; use governance proposals)</em></td>
+</tr>
+<tr>
+<td>UI label</td>
+<td>&quot;Exchange rate&quot;</td>
+<td><em>(not applicable to internal units)</em></td>
+</tr>
+<tr>
+<td>SDK type</td>
+<td><code>exchangeRate</code> field</td>
+<td><em>(not applicable)</em></td>
+</tr>
+</tbody></table>
+<p><strong>Why</strong>: Embedding exchange rates in the protocol implies convertibility — a securities/MSB trigger.
+Unit conversion between internal cooperative units is a governance decision, not a protocol primitive.
+If a CCL policy defines a conversion, it is policy output, not a gateway API field.</p>
+<hr>
+<h3><code>redeem</code></h3>
+<table>
+<thead>
+<tr>
+<th>Context</th>
+<th>Forbidden</th>
+<th>Approved</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>API endpoint</td>
+<td><code>POST /redeem</code></td>
+<td><em>(not applicable)</em></td>
+</tr>
+<tr>
+<td>UI button</td>
+<td>&quot;Redeem credits&quot;</td>
+<td><em>(not applicable; describe the actual action)</em></td>
+</tr>
+<tr>
+<td>Documentation</td>
+<td>&quot;redeem your hours for...&quot;</td>
+<td><em>(reframe as fulfillment of an obligation)</em></td>
+</tr>
+</tbody></table>
+<p><strong>Why</strong>: &quot;Redeem&quot; implies convertibility to an external asset (cash, fiat). ICN units fulfill
+cooperative obligations — they are not redeemable instruments.</p>
+<hr>
+<h3><code>money</code> / <code>funds</code></h3>
+<table>
+<thead>
+<tr>
+<th>Context</th>
+<th>Forbidden</th>
+<th>Approved</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Documentation</td>
+<td>&quot;move money&quot;</td>
+<td>&quot;settle obligations&quot;</td>
+</tr>
+<tr>
+<td>Documentation</td>
+<td>&quot;hold funds&quot;</td>
+<td>&quot;track obligations&quot;</td>
+</tr>
+<tr>
+<td>UI</td>
+<td>&quot;your money&quot;</td>
+<td>&quot;your participation credits&quot; or &quot;your net position&quot;</td>
+</tr>
+<tr>
+<td>Commit message</td>
+<td>&quot;payment of funds&quot;</td>
+<td>&quot;settlement of obligation&quot;</td>
+</tr>
+</tbody></table>
+<p><strong>Why</strong>: &quot;Money&quot; and &quot;funds&quot; trigger financial-services classification. ICN tracks obligations and
+attestations — the economic relationship between participants — not money.</p>
+<hr>
+<h2>Terms That Are Explicitly Approved</h2>
+<p>These terms are architecturally accurate and should be used freely:</p>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>settlement</code> / <code>settle</code></td>
+<td>Recording a bilateral obligation acknowledgement</td>
+</tr>
+<tr>
+<td><code>position</code></td>
+<td>Derived net view computed from signed entries</td>
+</tr>
+<tr>
+<td><code>unit</code> (of account)</td>
+<td>Locally-defined cooperative measure</td>
+</tr>
+<tr>
+<td><code>obligation</code></td>
+<td>A signed commitment between participants</td>
+</tr>
+<tr>
+<td><code>attestation</code></td>
+<td>A signed statement by one DID about another</td>
+</tr>
+<tr>
+<td><code>receipt</code></td>
+<td>Cryptographic proof of execution</td>
+</tr>
+<tr>
+<td><code>journal entry</code> / <code>JournalEntry</code></td>
+<td>Standard double-entry bookkeeping term</td>
+</tr>
+<tr>
+<td><code>debit</code> / <code>credit</code></td>
+<td>Standard bookkeeping mechanics — keep as-is</td>
+</tr>
+<tr>
+<td><code>account</code></td>
+<td>A member&#39;s ledger context within a cooperative</td>
+</tr>
+<tr>
+<td><code>transfer</code></td>
+<td>The act of recording a bilateral entry (not operator routing)</td>
+</tr>
+<tr>
+<td><code>allocation</code></td>
+<td>A governance-authorized resource assignment</td>
+</tr>
+<tr>
+<td><code>proposal</code></td>
+<td>A governance action requiring member vote</td>
+</tr>
+<tr>
+<td><code>provenance</code></td>
+<td>The authorization chain behind a state change</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Scope of This Guide</h2>
+<p><strong>In scope</strong> (enforced):</p>
+<ul>
+<li>Gateway REST API endpoints (<code>/v1/...</code>)</li>
+<li>WebSocket event type names</li>
+<li>OAuth scope strings</li>
+<li>SDK method names and type fields (<code>sdk/typescript/</code>, <code>sdk/react-native/</code>)</li>
+<li>User-visible UI text in <code>web/pilot-ui/</code></li>
+<li>Public documentation in <code>docs/</code></li>
+</ul>
+<p><strong>Out of scope</strong> (internal, not enforced here):</p>
+<ul>
+<li><code>icn-ledger</code> internals (<code>get_balance()</code>, <code>recompute_balances()</code>) — standard bookkeeping</li>
+<li>FX oracle types (<code>CurrencyPair</code>, <code>ExchangeRate</code>, <code>is_same_currency()</code>) — technical adapter</li>
+<li>Bond accounting in <code>labor_shares.rs</code> (<code>BondPayment</code>, <code>record_payment()</code>)</li>
+<li>Test fixture names and internal variable names that never surface to users</li>
+</ul>
+<hr>
+<h2>Enforcement</h2>
+<ol>
+<li><strong>PR checklist</strong> — the CONTRIBUTING.md regulatory invariants checklist includes a language check.</li>
+<li><strong>Code review</strong> — reviewers should flag forbidden terms in any changed API, SDK, or UI file.</li>
+<li><strong>Future CI gate</strong> — a compliance linter (<code>s14-t19</code>) will automate detection of forbidden terms
+in public API surface files.</li>
+</ol>
+<p><strong>See also</strong>: <a href="/docs/design/regulatory-safe-verifiable-state">Regulatory-Safe Verifiable State Architecture</a></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

@@ -1,0 +1,856 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN + SDIS Integrated Vision | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>development</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>sessions</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>undated</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ICN SDIS INTEGRATED VISION</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/development/sessions/undated/ICN_SDIS_INTEGRATED_VISION.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN + SDIS Integrated Vision</h1>
+<h2>The Cooperative Operating System for Human Civilization</h2>
+<p><strong>Version</strong>: 1.0 Draft
+<strong>Date</strong>: 2025-12-23
+<strong>Status</strong>: Vision Document</p>
+<hr>
+<h2>Executive Summary</h2>
+<p>The InterCooperative Network (ICN) and the Sovereign Digital Identity System (SDIS) are not separate projects—they are two halves of one whole. Together they form a complete <strong>cooperative operating system</strong>:</p>
+<ul>
+<li><strong>SDIS provides identity</strong>: proof of personhood, selective disclosure, accountability without surveillance</li>
+<li><strong>ICN provides coordination</strong>: economic settlement, governance, compute, trust relationships</li>
+</ul>
+<p>Neither is complete without the other. SDIS without ICN is identity without economy. ICN without SDIS is economy without verified humans.</p>
+<h3>The Core Insight: ICN as Cooperative Middle Layer</h3>
+<p><strong>ICN is not infrastructure FOR cooperatives—it IS cooperative infrastructure that is itself democratically governed.</strong></p>
+<p>This makes ICN a &quot;cooperative middle layer&quot; like a secondary/tertiary cooperative, where:</p>
+<ul>
+<li>The protocols are adjustable by the organizations using them</li>
+<li>Governance rules, economic parameters, capability tiers—all democratically modifiable</li>
+<li>Different federations can customize within limits set by their parent level</li>
+<li>The system governs itself using the same patterns it provides to users</li>
+</ul>
+<hr>
+<h2>Part 1: The Unified Recursive Model</h2>
+<h3>Everything is the Same Structure</h3>
+<p>The breakthrough insight: <strong>every level of organization follows the same pattern</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Scale</th>
+<th>Entity</th>
+<th>Members</th>
+<th>Governance</th>
+<th>Economy</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Individual</strong></td>
+<td>Person</td>
+<td>Devices</td>
+<td>Personal policies</td>
+<td>Personal accounts</td>
+</tr>
+<tr>
+<td><strong>Cooperative</strong></td>
+<td>Coop</td>
+<td>Workers/Members</td>
+<td>Bylaws, votes</td>
+<td>Internal ledger</td>
+</tr>
+<tr>
+<td><strong>Federation</strong></td>
+<td>Regional Fed</td>
+<td>Cooperatives</td>
+<td>Federation charter</td>
+<td>Inter-coop clearing</td>
+</tr>
+<tr>
+<td><strong>Meta-Federation</strong></td>
+<td>National/Continental</td>
+<td>Federations</td>
+<td>Alliance treaty</td>
+<td>Cross-regional settlement</td>
+</tr>
+<tr>
+<td><strong>Global Commons</strong></td>
+<td>ICN Protocol</td>
+<td>All meta-federations</td>
+<td>Protocol governance</td>
+<td>Universal settlement</td>
+</tr>
+</tbody></table>
+<p>This means <strong>identity/multi-device IS the same pattern as coop/federation</strong>, just at different scales.</p>
+<h3>The CooperativeEntity: Universal Building Block</h3>
+<pre><code class="language-rust">/// Universal entity structure - same at every scale
+pub struct CooperativeEntity {
+    // === SDIS Identity Layer ===
+    anchor: Anchor,                        // Permanent identity (from SDIS L0)
+    key_bundle: KeyBundle,                 // Rotatable keys (SDIS)
+    credentials: Vec&lt;Credential&gt;,          // L2 proofs + L3 seals
+    citizenship: Option&lt;CitizenshipCredential&gt;, // SDIS L1 (network participation)
+
+    // === Recursive Membership ===
+    entity_type: EntityType,
+    members: Vec&lt;EntityRef&gt;,               // Can be people OR other entities
+    membership_rules: MembershipRules,     // Who can join, how
+    parent_federation: Option&lt;EntityRef&gt;,  // Who we federate UP to
+
+    // === ICN Governance ===
+    governance_config: GovernanceConfig,
+    voting_power: VotingPowerScheme,       // One person one vote (enforced by SDIS)
+    delegation_rules: DelegationRules,
+    proposals: Vec&lt;Proposal&gt;,
+
+    // === ICN Economics ===
+    treasury: Option&lt;Treasury&gt;,            // For coops and above
+    accounts: Vec&lt;Account&gt;,
+    clearing_agreements: Vec&lt;ClearingAgreement&gt;,
+    contribution_ledger: ContributionLedger,
+
+    // === ICN Trust ===
+    trust_endorsements: Vec&lt;Endorsement&gt;,  // L3 seals from other entities
+    trust_delegations: Vec&lt;Delegation&gt;,
+    trust_scores: HashMap&lt;TrustDomain, f64&gt;,
+
+    // === ICN Compute ===
+    executors: Vec&lt;EntityRef&gt;,             // Nodes that can execute for this entity
+    compute_policies: Vec&lt;SchedulingPolicy&gt;,
+}
+
+pub enum EntityType {
+    Individual,          // A person (SDIS anchor required)
+    Device,              // A device bound to a person
+    Cooperative,         // A single coop (workers, housing, etc.)
+    Federation,          // Multiple coops federated
+    MetaFederation,      // Multiple federations federated
+    ProtocolCommons,     // The ICN protocol itself
+}
+</code></pre>
+<h3>How Multi-Device Identity Works</h3>
+<p>Your personal identity is a federation of devices, governed by YOU:</p>
+<pre><code>You (SDIS Anchor: did:sdis:alice...)
+│
+├── Your Governance Rules:
+│   ├── Key rotation: I approve
+│   ├── New device: requires 2FA + approval
+│   └── Recovery: 3-of-5 trusted contacts
+│
+├── Devices (each has sub-keys derived from your L0):
+│   ├── Phone (subkey, limited capabilities)
+│   │   └── Can: sign transactions &lt; 100 credits
+│   │   └── Cannot: governance votes, large transfers
+│   │
+│   ├── Laptop (subkey, full capabilities)
+│   │   └── Can: all operations
+│   │
+│   └── Hardware Key (recovery, high-security ops)
+│       └── Required for: key rotation, large governance
+│
+└── SDIS Properties:
+    ├── Anchor is permanent (survives key rotation)
+    ├── Each device key derived from L0 seed
+    └── Credentials reference Anchor, not device keys
+</code></pre>
+<p><strong>Key insight</strong>: The same pattern that governs your devices is the same pattern that governs a cooperative&#39;s members, or a federation&#39;s cooperatives. <strong>It&#39;s recursive all the way down.</strong></p>
+<hr>
+<h2>Part 2: SDIS as ICN&#39;s Identity Foundation</h2>
+<h3>SDIS Layers Map to ICN Entities</h3>
+<p>SDIS defines four identity layers. These map directly to ICN&#39;s recursive entity model:</p>
+<table>
+<thead>
+<tr>
+<th>SDIS Layer</th>
+<th>What It Proves</th>
+<th>ICN Integration</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>L0: Proof of Personhood</strong></td>
+<td>&quot;I am a unique human&quot;</td>
+<td>Root identity anchor for all ICN entities</td>
+</tr>
+<tr>
+<td><strong>L1: Digital Citizenship</strong></td>
+<td>&quot;I can participate in networks&quot;</td>
+<td>Membership in cooperatives, federations</td>
+</tr>
+<tr>
+<td><strong>L2: Attribute Proofs</strong></td>
+<td>&quot;I have property X&quot; (age, location, skills)</td>
+<td>Trust domains, capability unlocks</td>
+</tr>
+<tr>
+<td><strong>L3: Institutional Seals</strong></td>
+<td>&quot;Authority Y vouches for me&quot;</td>
+<td>Cooperative endorsements, federation attestations</td>
+</tr>
+</tbody></table>
+<h3>One Person, One Vote (Sybil-Resistant Democracy)</h3>
+<p>ICN governance REQUIRES SDIS identity because:</p>
+<ul>
+<li><strong>One person, one vote</strong> only works if each identity is one person</li>
+<li>Democratic participation requires verified humans (not bots)</li>
+<li>Accountability requires traceable-if-fraudulent identities</li>
+<li>Privacy requires selective disclosure (vote without revealing who you are)</li>
+</ul>
+<h3>Zero-Knowledge Voting</h3>
+<pre><code>ZK_Vote_Structure:
+    Private Inputs (known only to voter):
+        - Voter&#39;s SDIS anchor
+        - Membership proof (I belong to this coop)
+        - Vote choice (yes/no/abstain)
+
+    Public Inputs:
+        - Proposal ID
+        - Coop&#39;s member accumulator root
+        - Current revocation accumulator root
+        - Voting period bounds
+
+    Proof Statement:
+        &quot;I know anchor A and membership witness M such that:
+         1. A is a valid, non-revoked SDIS anchor
+         2. A is a member of coop C (membership accumulator check)
+         3. I have not already voted on this proposal (nullifier check)
+         4. My vote is V&quot;
+
+    Output:
+        - STARK proof (~50-100 KB)
+        - Nullifier (prevents double-voting without revealing voter)
+        - Encrypted vote (revealed in tally phase)
+</code></pre>
+<hr>
+<h2>Part 3: The Cooperative Middle Layer</h2>
+<h3>ICN Governs Itself Cooperatively</h3>
+<p>The ICN protocol itself is a CooperativeEntity—the &quot;Protocol Commons&quot;—democratically governed by its users:</p>
+<pre><code>┌─────────────────────────────────────────┐
+│          ICN Protocol Commons            │
+│  (The cooperative that governs ICN)     │
+├─────────────────────────────────────────┤
+│  Members: All meta-federations          │
+│  Governance: Protocol-level decisions   │
+│  Economy: Cross-meta-federation settle  │
+│                                         │
+│  What Can Be Changed:                   │
+│  ├── Protocol versions and upgrades    │
+│  ├── Base capability tier thresholds   │
+│  ├── Settlement currency standards     │
+│  ├── Security parameter minimums       │
+│  └── Federation admission criteria     │
+│                                         │
+│  What Cannot Be Changed:                │
+│  ├── One person one vote principle     │
+│  ├── Data sovereignty rights           │
+│  ├── Member exit rights                │
+│  └── Anti-extraction guarantees        │
+└─────────────────────────────────────────┘
+</code></pre>
+<h3>Subsidiarity: Decisions at the Lowest Appropriate Level</h3>
+<pre><code class="language-rust">pub enum DecisionScope {
+    /// Decided by the individual
+    Personal,
+    /// Decided by the cooperative
+    Local,
+    /// Decided by the federation
+    Regional,
+    /// Decided by the meta-federation
+    Continental,
+    /// Decided by the Protocol Commons
+    Global,
+}
+
+pub struct ProtocolParameter {
+    name: String,
+    current_value: ParameterValue,
+
+    /// Who can modify this parameter
+    modification_scope: DecisionScope,
+
+    /// Constraints from higher levels
+    constraints: Vec&lt;ParameterConstraint&gt;,
+
+    /// Last modification
+    last_changed: ChangeRecord,
+}
+</code></pre>
+<h3>Customizable Parameters at Each Level</h3>
+<table>
+<thead>
+<tr>
+<th>Level</th>
+<th>Customizable</th>
+<th>Constrained By</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Individual</strong></td>
+<td>Device permissions, delegation prefs</td>
+<td>Cooperative policies</td>
+</tr>
+<tr>
+<td><strong>Cooperative</strong></td>
+<td>Credit limits, voting rules, pricing</td>
+<td>Federation minimums</td>
+</tr>
+<tr>
+<td><strong>Federation</strong></td>
+<td>Settlement terms, admission criteria</td>
+<td>Meta-federation standards</td>
+</tr>
+<tr>
+<td><strong>Meta-Federation</strong></td>
+<td>Regional policies, exchange rates</td>
+<td>Protocol guarantees</td>
+</tr>
+<tr>
+<td><strong>Protocol</strong></td>
+<td>Base parameters, upgrade cadence</td>
+<td>Constitutional principles</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Part 4: Real Economics - Enabling the Cooperative Ecosystem</h2>
+<h3>The Three-Layer Economic Stack</h3>
+<pre><code>┌─────────────────────────────────────────┐
+│  Layer 3: External Interface            │
+│  (Transition to/from capitalist economy)│
+│  - Fiat on/off ramps                   │
+│  - Exchange with credit unions          │
+│  - Tax compliance interfaces            │
+└─────────────────────────────────────────┘
+           ↑ Minimal, regulated ↑
+┌─────────────────────────────────────────┐
+│  Layer 2: Inter-Cooperative             │
+│  (Federation-level coordination)        │
+│  - Bilateral clearing agreements        │
+│  - Federation settlement credits        │
+│  - Netting and batch settlement         │
+│  - Cross-coop group purchasing          │
+└─────────────────────────────────────────┘
+           ↑ Democratic governance ↑
+┌─────────────────────────────────────────┐
+│  Layer 1: Internal (within a coop)      │
+│  (Use whatever accounting works)        │
+│  - Labor hours, points, internal credit │
+│  - Work tracking, contribution records  │
+│  - Tailored to cooperative&#39;s culture    │
+└─────────────────────────────────────────┘
+</code></pre>
+<h3>Value Extraction FROM Capitalism, INTO Cooperatives</h3>
+<p>The cooperative ecosystem extracts value that capitalism normally captures as profit:</p>
+<table>
+<thead>
+<tr>
+<th>Value Source</th>
+<th>Traditional Capture</th>
+<th>Cooperative Capture</th>
+<th>Estimated Savings</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Group Purchasing</strong></td>
+<td>Retailer margins</td>
+<td>Bulk discounts stay in coop</td>
+<td>15-25%</td>
+</tr>
+<tr>
+<td><strong>Shared Services</strong></td>
+<td>Duplicate overhead</td>
+<td>Pooled infrastructure</td>
+<td>20-40%</td>
+</tr>
+<tr>
+<td><strong>Direct Trade</strong></td>
+<td>Intermediary fees</td>
+<td>Peer-to-peer exchange</td>
+<td>10-30%</td>
+</tr>
+<tr>
+<td><strong>Labor Exchange</strong></td>
+<td>Platform extraction</td>
+<td>Reciprocal credit</td>
+<td>20-35%</td>
+</tr>
+<tr>
+<td><strong>Financing</strong></td>
+<td>Bank interest</td>
+<td>Mutual credit, internal loans</td>
+<td>5-15%</td>
+</tr>
+<tr>
+<td><strong>Insurance</strong></td>
+<td>Corporate profits</td>
+<td>Mutual coverage pools</td>
+<td>10-20%</td>
+</tr>
+</tbody></table>
+<p><strong>This value stays in the cooperative ecosystem</strong> instead of leaking to shareholders, landlords, and bankers.</p>
+<h3>Coop-to-Coop Agreements</h3>
+<p>The foundation of real cooperative economics:</p>
+<pre><code class="language-rust">pub struct InterCoopAgreement {
+    /// Parties to the agreement
+    party_a: EntityRef,  // e.g., FoodCoop
+    party_b: EntityRef,  // e.g., TechCoop
+
+    /// What&#39;s being exchanged
+    exchange_terms: ExchangeTerms,
+
+    /// Settlement mechanics
+    settlement: SettlementConfig,
+
+    /// Governance
+    modification_rules: ModificationRules,
+    dispute_resolution: DisputeResolution,
+
+    /// Status
+    status: AgreementStatus,
+    signed_at: Timestamp,
+    signatures: Vec&lt;EntitySignature&gt;,
+}
+
+pub enum ExchangeTerms {
+    /// Direct barter: X hours of tech support for Y produce credits
+    DirectExchange { a_provides: Offer, b_provides: Offer },
+
+    /// Credit clearing: net positions settled periodically
+    ClearingAgreement { clearing_frequency: Duration, currency: CreditCurrency },
+
+    /// Group purchasing: pooled buying power
+    GroupPurchasing { categories: Vec&lt;ProductCategory&gt;, discount_sharing: SharingRule },
+
+    /// Shared service: jointly operated resource
+    SharedService { service: ServiceDefinition, cost_sharing: SharingRule },
+
+    /// Labor exchange: workers available across coops
+    LaborExchange { skill_categories: Vec&lt;Skill&gt;, hourly_rates: RateSchedule },
+}
+</code></pre>
+<h3>Group Purchasing Networks</h3>
+<pre><code>┌─────────────────────────────────────────┐
+│     Food Cooperative Federation         │
+│           (15 coops, 50K members)       │
+├─────────────────────────────────────────┤
+│  Pooled Purchasing Power:               │
+│  ├── Organic produce: $2M/year          │
+│  ├── Dry goods: $500K/year              │
+│  └── Equipment: $200K/year              │
+│                                         │
+│  Negotiating Leverage:                  │
+│  ├── Direct farmer relationships        │
+│  ├── Volume discounts (15-25%)          │
+│  └── Quality standards enforcement      │
+│                                         │
+│  Value Distribution:                    │
+│  ├── Savings → member patronage refunds │
+│  ├── Surplus → federation development   │
+│  └── Reserve → new coop startup fund    │
+└─────────────────────────────────────────┘
+</code></pre>
+<h3>Contribution-Based Credit</h3>
+<p>Instead of paying for compute/services, you <strong>earn credit by contributing</strong>:</p>
+<pre><code class="language-rust">pub struct ContributionRecord {
+    contributor: EntityRef,
+    contribution_type: ContributionType,
+    amount: ContributionAmount,
+    timestamp: Timestamp,
+    verified_by: Vec&lt;EntityRef&gt;,
+    decay_rate: f64,  // Contributions decay over time
+}
+
+pub enum ContributionType {
+    /// Running executor node
+    ComputeProvision { fuel_processed: u64, uptime_hours: f64 },
+    /// Storing data for the network
+    StorageProvision { gb_hours: f64 },
+    /// Participating in governance
+    GovernanceParticipation { votes_cast: u32, proposals_reviewed: u32 },
+    /// Providing labor to cooperatives
+    LaborContribution { hours: f64, skill_level: SkillLevel },
+    /// Providing capital/resources
+    ResourceContribution { resource_type: String, value: CreditAmount },
+}
+
+// Credit limit calculation
+impl CreditPolicy {
+    fn calculate_limit(&amp;self, entity: &amp;CooperativeEntity) -&gt; CreditAmount {
+        let base = self.base_limit;
+        let trust_bonus = entity.trust_score() * self.trust_multiplier;
+        let history_bonus = entity.cleared_obligations() / 10;
+        let contribution_bonus = entity.contribution_score() * self.contribution_multiplier;
+
+        base + trust_bonus + history_bonus + contribution_bonus
+    }
+}
+</code></pre>
+<h3>Anti-Extraction Policies</h3>
+<p>Prevent exploitation while enabling cooperation:</p>
+<pre><code class="language-rust">pub struct AntiExtractionPolicy {
+    /// Can&#39;t consume more than N times what you contribute
+    max_consumption_ratio: f64,  // e.g., 5.0
+
+    /// Must contribute before consuming
+    min_contribution_before_consumption: ContributionAmount,
+
+    /// Velocity limits prevent draining
+    max_consumption_per_day: f64,  // As fraction of credit limit
+
+    /// New member ramp period
+    new_member_ramp_days: u32,
+
+    /// Surplus redistribution
+    surplus_distribution: SurplusDistribution,
+}
+
+pub enum SurplusDistribution {
+    /// Equal to all members
+    EqualDistribution,
+    /// Proportional to contribution
+    ContributionWeighted,
+    /// Into infrastructure fund
+    InfrastructureReserve,
+    /// Hybrid approach
+    Hybrid { members: f64, infrastructure: f64, development: f64 },
+}
+</code></pre>
+<hr>
+<h2>Part 5: Recursive Federation Architecture</h2>
+<h3>The Vision: Unlimited Scale Through Hierarchy</h3>
+<p>ICN must scale beyond any single network. The answer is <strong>recursive federation</strong>—cooperatives form federations, federations form meta-federations, ad infinitum.</p>
+<pre><code>                            ┌─────────────────────────────────────┐
+                            │       Global Cooperative Commons     │
+                            │      (Meta-Meta-Federation)          │
+                            └────────────────┬────────────────────┘
+                                             │
+                   ┌─────────────────────────┼─────────────────────────┐
+                   │                         │                         │
+        ┌──────────▼──────────┐   ┌──────────▼──────────┐   ┌──────────▼──────────┐
+        │   Americas Alliance  │   │   European Commons   │   │   Asia-Pacific Net  │
+        │   (Meta-Federation)  │   │   (Meta-Federation)  │   │   (Meta-Federation)  │
+        └──────────┬──────────┘   └──────────┬──────────┘   └──────────┬──────────┘
+                   │                         │                         │
+         ┌─────────┼─────────┐     ┌─────────┼─────────┐     ┌─────────┼─────────┐
+         │         │         │     │         │         │     │         │         │
+      ┌──▼──┐   ┌──▼──┐   ┌──▼──┐ ┌──▼──┐   ┌──▼──┐   ┌──▼──┐ ┌──▼──┐   ┌──▼──┐   ┌──▼──┐
+      │ US  │   │ MX  │   │ BR  │ │ UK  │   │ DE  │   │ FR  │ │ JP  │   │ AU  │   │ IN  │
+      │ Fed │   │ Fed │   │ Fed │ │ Fed │   │ Fed │   │ Fed │ │ Fed │   │ Fed │   │ Fed │
+      └──┬──┘   └──┬──┘   └──┬──┘ └──┬──┘   └──┬──┘   └──┬──┘ └──┬──┘   └──┬──┘   └──┬──┘
+         │         │         │     │         │         │     │         │         │
+       coops     coops     coops  coops     coops     coops  coops     coops     coops
+</code></pre>
+<h3>How Recursive Trust Works</h3>
+<p>Trust flows up AND down the hierarchy:</p>
+<pre><code>Trust UP (Delegation):
+└── Coop trusts Federation to represent it in meta-federation
+└── Implies: Federation can sign on coop&#39;s behalf (scoped)
+
+Trust DOWN (Endorsement):
+└── Federation endorses coop to external parties
+└── Implies: Coop inherits some of federation&#39;s reputation
+
+Trust ACROSS (Peer):
+└── Coops in same federation trust each other (transitively)
+└── Implies: Can transact without explicit bilateral trust
+</code></pre>
+<p><strong>Example Trust Calculation</strong>:</p>
+<pre><code>Alice (individual) in FoodCoop
+FoodCoop in Northeast Federation
+Northeast in Americas Alliance
+
+External party queries: &quot;Do I trust Alice?&quot;
+
+1. Americas Alliance trust = 0.9 (well-known)
+2. Northeast trust = 0.8 × 0.9 = 0.72
+3. FoodCoop trust = 0.7 × 0.72 = 0.504
+4. Alice trust = 0.6 × 0.504 = 0.302
+
+Result: Alice has 0.302 effective trust to external party
+(Even though external party never met Alice directly)
+</code></pre>
+<h3>Recursive Governance: Proposals Bubble Up</h3>
+<pre><code>Local Issue → Local Vote
+  └── 50% quorum, 50% approval at coop level
+
+Regional Issue → Federation Vote
+  └── Each coop gets weighted vote (by membership)
+  └── 40% quorum of coops, 60% approval
+
+Cross-Regional → Meta-Federation Vote
+  └── Each federation gets weighted vote
+  └── 30% quorum of federations, 70% approval
+
+Global Protocol Change → Global Commons Vote
+  └── All meta-federations participate
+  └── 25% quorum, 80% supermajority required
+</code></pre>
+<h3>Recursive Economic Settlement</h3>
+<p>Multi-level clearing with netting at each level:</p>
+<pre><code>Level 1: Intra-Coop
+└── Alice pays Bob (same coop)
+└── Instant settlement in coop ledger
+
+Level 2: Intra-Federation
+└── Alice (FoodCoop) pays Carol (TechCoop)
+└── Both in Northeast Fed
+└── Daily batch settlement via federation clearing
+
+Level 3: Cross-Federation
+└── Alice (Northeast) pays Dave (Midwest)
+└── Both in Americas Alliance
+└── Weekly settlement via meta-federation clearing
+
+Level 4: Cross-Meta-Federation
+└── Alice (Americas) pays Eve (European Commons)
+└── Monthly settlement via Global Commons
+└── Exchange rate governance at global level
+</code></pre>
+<hr>
+<h2>Part 6: What This Enables</h2>
+<h3>Replacing Traditional Enterprise</h3>
+<p>The cooperative ecosystem can replace every function currently performed by capitalist enterprises:</p>
+<table>
+<thead>
+<tr>
+<th>Capitalist Function</th>
+<th>Cooperative Replacement</th>
+<th>ICN Enabler</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Banks</td>
+<td>Credit unions + mutual credit</td>
+<td>Ledger + clearing agreements</td>
+</tr>
+<tr>
+<td>Insurance</td>
+<td>Mutual coverage pools</td>
+<td>Smart contracts + risk pooling</td>
+</tr>
+<tr>
+<td>Platforms (Uber, etc.)</td>
+<td>Worker-owned cooperatives</td>
+<td>Compute + governance</td>
+</tr>
+<tr>
+<td>Supply chains</td>
+<td>Federation purchasing</td>
+<td>Group purchasing + settlement</td>
+</tr>
+<tr>
+<td>HR/Payroll</td>
+<td>Member contribution tracking</td>
+<td>Contribution ledger</td>
+</tr>
+<tr>
+<td>Logistics</td>
+<td>Federated coordination</td>
+<td>Compute + cross-coop agreements</td>
+</tr>
+</tbody></table>
+<h3>Rendering the State Less Necessary</h3>
+<p>As cooperatives provide more services democratically:</p>
+<table>
+<thead>
+<tr>
+<th>State Function</th>
+<th>Cooperative Alternative</th>
+<th>How</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Welfare</td>
+<td>Mutual aid networks</td>
+<td>Contribution-based credit, reciprocity</td>
+</tr>
+<tr>
+<td>Regulation</td>
+<td>Self-governance + transparency</td>
+<td>Democratic policies, audit trails</td>
+</tr>
+<tr>
+<td>Courts</td>
+<td>Dispute resolution</td>
+<td>Multi-stage arbitration, federation appeals</td>
+</tr>
+<tr>
+<td>Currency</td>
+<td>Mutual credit networks</td>
+<td>Democratic monetary policy</td>
+</tr>
+<tr>
+<td>Property records</td>
+<td>Distributed ledger</td>
+<td>Immutable, transparent records</td>
+</tr>
+</tbody></table>
+<p><strong>Not &quot;no governance&quot;—but governance by those affected, not distant bureaucrats.</strong></p>
+<hr>
+<h2>Part 7: Implementation Path</h2>
+<h3>Phase 1: Foundation (Current)</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> Basic identity (DID)</li>
+<li><input checked="" disabled="" type="checkbox"> Trust graph</li>
+<li><input checked="" disabled="" type="checkbox"> Mutual credit ledger</li>
+<li><input checked="" disabled="" type="checkbox"> CCL contracts</li>
+<li><input checked="" disabled="" type="checkbox"> Gateway API</li>
+<li><input checked="" disabled="" type="checkbox"> Treasury management</li>
+<li><input disabled="" type="checkbox"> SDIS integration (in progress)</li>
+</ul>
+<h3>Phase 2: Cooperative Middle Layer</h3>
+<ul>
+<li><input disabled="" type="checkbox"> CooperativeEntity as universal primitive</li>
+<li><input disabled="" type="checkbox"> Recursive membership model</li>
+<li><input disabled="" type="checkbox"> Inter-coop agreements</li>
+<li><input disabled="" type="checkbox"> Protocol governance framework</li>
+<li><input disabled="" type="checkbox"> Subsidiarity enforcement</li>
+</ul>
+<h3>Phase 3: Real Economics</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Group purchasing support</li>
+<li><input disabled="" type="checkbox"> Bilateral clearing</li>
+<li><input disabled="" type="checkbox"> Contribution tracking</li>
+<li><input disabled="" type="checkbox"> Anti-extraction policies</li>
+<li><input disabled="" type="checkbox"> Federation settlement</li>
+</ul>
+<h3>Phase 4: Scale</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Multi-level federation</li>
+<li><input disabled="" type="checkbox"> Cross-federation trust</li>
+<li><input disabled="" type="checkbox"> Global commons governance</li>
+<li><input disabled="" type="checkbox"> Exchange rate governance</li>
+<li><input disabled="" type="checkbox"> Planetary-scale deployment</li>
+</ul>
+<hr>
+<h2>Part 8: Open Questions</h2>
+<p>These require community input and experimentation:</p>
+<ol>
+<li><strong>Exchange Rate Governance</strong>: How do different credit systems exchange value fairly?</li>
+<li><strong>Capital Formation</strong>: How do cooperatives accumulate capital without recreating capitalist finance?</li>
+<li><strong>Asymmetric Federations</strong>: How to prevent larger coops from dominating smaller ones?</li>
+<li><strong>Existing Coop Integration</strong>: How do established credit unions and grocery coops join?</li>
+<li><strong>Legal Recognition</strong>: How does this map to existing cooperative law?</li>
+<li><strong>Transition Economics</strong>: How to interface with fiat while building alternative?</li>
+<li><strong>Dispute Escalation</strong>: When do disputes escalate vs. stay local?</li>
+<li><strong>Protocol Amendments</strong>: What requires supermajority vs. simple majority?</li>
+<li><strong>Emergency Powers</strong>: How to handle crises without creating permanent authorities?</li>
+<li><strong>Exit Rights</strong>: How can coops/federations exit cleanly?</li>
+</ol>
+<hr>
+<h2>Appendix: SDIS Integration Details</h2>
+<h3>Stewards as Cooperative Members</h3>
+<p>SDIS Stewards (who issue POPs) are integrated into the cooperative structure:</p>
+<pre><code>Steward Network = A specialized cooperative within ICN
+
+Members: Individual Stewards (each has personal POP)
+Governance: Democratic (SDIS governance rules + ICN governance)
+Economics:
+  - Stewards compensated via ICN economic layer
+  - Enrollment fees flow through ICN clearing
+  - Steward bonds held in ICN-managed escrow
+
+Benefits:
+  - Steward compensation uses same economics as other work
+  - Steward governance uses same patterns as other coops
+  - Steward accountability enforced by cooperative norms
+</code></pre>
+<h3>Cooperative SDIS Enrollment</h3>
+<p>A cooperative is not a person, but it needs identity for:</p>
+<ul>
+<li>Signing agreements with other coops</li>
+<li>Receiving institutional attestations</li>
+<li>Endorsing its members to external parties</li>
+<li>Participating in federation governance</li>
+</ul>
+<pre><code>Cooperative_Enrollment:
+    Prerequisites:
+        - Founding members have valid POPs
+        - Articles of incorporation registered (L3 seal from legal authority)
+        - Governance structure defined
+
+    Process:
+        1. Founding ceremony: 3-of-5 founding members present
+        2. Each signs coop formation document with personal SDIS keys
+        3. Coop generates organizational Anchor:
+           Anchor = SHA3-256(
+               Member_1_Anchor || Member_2_Anchor || ... ||
+               Formation_Document_Hash ||
+               Timestamp
+           )
+        4. Coop generates KeyBundle (threshold-controlled by officers)
+        5. Steward network attests: &quot;This coop exists with these founding members&quot;
+
+    Result:
+        - Coop has SDIS Anchor (permanent identifier)
+        - Coop has KeyBundle (requires threshold of officers to sign)
+        - Coop can receive L3 seals (business licenses, certifications)
+        - Coop can endorse members (issue L3 attestations)
+</code></pre>
+<hr>
+<h2>Conclusion</h2>
+<p>ICN + SDIS together form something unprecedented: a <strong>cooperative operating system</strong> that is itself cooperatively governed. It enables:</p>
+<ul>
+<li><strong>Real economics</strong> without capitalist extraction</li>
+<li><strong>Real democracy</strong> with verified humans and delegation</li>
+<li><strong>Real scale</strong> through recursive federation</li>
+<li><strong>Real sovereignty</strong> with data that stays home</li>
+<li><strong>Real transition</strong> from capitalist to cooperative economy</li>
+</ul>
+<p>The path forward is not to build infrastructure <em>for</em> cooperatives, but to build infrastructure <em>as</em> a cooperative—one that governs itself using the same democratic principles it enables for others.</p>
+<p><strong>The medium is the message. The infrastructure is the movement.</strong></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

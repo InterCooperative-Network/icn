@@ -1,0 +1,1281 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Internal Testing Plan: Multi-Node Network Validation | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>development</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>testing</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>INTERNAL TESTING PLAN</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/development/testing/INTERNAL_TESTING_PLAN.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Internal Testing Plan: Multi-Node Network Validation</h1>
+<p><strong>Status</strong>: Ready to Execute
+<strong>Phase</strong>: Pre-Pilot Internal Testing
+<strong>Timeline</strong>: 1-2 weeks
+<strong>Prerequisites</strong>: Phase 18 Complete ✅</p>
+<hr>
+<h2>Objectives</h2>
+<p>Validate the ICN system in realistic multi-node scenarios before pilot deployment:</p>
+<ol>
+<li><strong>Functional Correctness</strong>: All components work together as designed</li>
+<li><strong>Byzantine Detection</strong>: Misbehavior is detected and isolated correctly</li>
+<li><strong>Performance</strong>: System handles realistic workloads efficiently</li>
+<li><strong>Resilience</strong>: Recovers gracefully from failures and network partitions</li>
+<li><strong>Monitoring</strong>: Metrics and alerts provide actionable operational visibility</li>
+<li><strong>Stability</strong>: System runs continuously without crashes or memory leaks</li>
+</ol>
+<hr>
+<h2>Test Environment Architecture</h2>
+<h3>Network Topology</h3>
+<pre><code>                  ┌─────────────┐
+                  │   Metrics   │
+                  │  (Prometheus│
+                  │  + Grafana) │
+                  └──────┬──────┘
+                         │
+        ┌────────────────┼────────────────┐
+        │                │                │
+   ┌────▼────┐      ┌────▼────┐     ┌────▼────┐
+   │ Node 1  │◄────►│ Node 2  │◄───►│ Node 3  │
+   │(Honest) │      │(Honest) │     │(Honest) │
+   └────┬────┘      └────┬────┘     └────┬────┘
+        │                │                │
+        └────────────────┼────────────────┘
+                         │
+                    ┌────▼────┐
+                    │ Node 4  │
+                    │(Byzantine│
+                    │ Attacker)│
+                    └─────────┘
+</code></pre>
+<p><strong>Node Configuration</strong>:</p>
+<ul>
+<li><strong>Nodes 1-3</strong>: Honest nodes with full trust relationships</li>
+<li><strong>Node 4</strong>: Byzantine node for attack simulation</li>
+<li><strong>Metrics Server</strong>: Centralized Prometheus + Grafana on separate host</li>
+</ul>
+<h3>Infrastructure Setup</h3>
+<p><strong>Option 1: Docker Compose (Recommended for Development)</strong></p>
+<p>Use the production-like configuration in <code>docker-compose.test.yml</code>:</p>
+<pre><code class="language-bash"># Build and start
+docker build -t icn:latest -f Dockerfile icn/
+docker compose -f docker-compose.test.yml up -d
+
+# Check status
+docker compose -f docker-compose.test.yml ps
+</code></pre>
+<p><strong>Port mapping summary</strong> (see <code>docker-compose.test.yml</code> for complete config):</p>
+<table>
+<thead>
+<tr>
+<th>Service</th>
+<th>P2P</th>
+<th>Metrics (host:container)</th>
+<th>Gateway</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>node1</td>
+<td>5001</td>
+<td>9091:9100</td>
+<td>8081</td>
+</tr>
+<tr>
+<td>node2</td>
+<td>5002</td>
+<td>9092:9100</td>
+<td>8082</td>
+</tr>
+<tr>
+<td>node3</td>
+<td>5003</td>
+<td>9093:9100</td>
+<td>8083</td>
+</tr>
+<tr>
+<td>node4</td>
+<td>5004</td>
+<td>9094:9100</td>
+<td>8084</td>
+</tr>
+<tr>
+<td>prometheus</td>
+<td>-</td>
+<td>9095:9090</td>
+<td>-</td>
+</tr>
+<tr>
+<td>grafana</td>
+<td>-</td>
+<td>-</td>
+<td>3000</td>
+</tr>
+</tbody></table>
+<p><strong>Note</strong>: ICN daemon runs metrics on port 9100 internally.</p>
+<p><strong>Option 2: Local Processes (Quick Start)</strong></p>
+<pre><code class="language-bash"># Terminal 1: Node 1
+cat &gt; /tmp/icn-node1.toml &lt;&lt;EOF
+data_dir = &quot;/tmp/icn-node1&quot;
+[network]
+listen_addr = &quot;127.0.0.1:5001&quot;
+[observability]
+metrics_port = 9101
+health_port = 18081
+log_level = &quot;info&quot;
+EOF
+cargo run --release --bin icnd -- --config /tmp/icn-node1.toml
+
+# Terminal 2: Node 2
+cat &gt; /tmp/icn-node2.toml &lt;&lt;EOF
+data_dir = &quot;/tmp/icn-node2&quot;
+[network]
+listen_addr = &quot;127.0.0.1:5002&quot;
+[observability]
+metrics_port = 9102
+health_port = 18082
+log_level = &quot;info&quot;
+EOF
+cargo run --release --bin icnd -- --config /tmp/icn-node2.toml
+
+# Terminal 3: Node 3
+cat &gt; /tmp/icn-node3.toml &lt;&lt;EOF
+data_dir = &quot;/tmp/icn-node3&quot;
+[network]
+listen_addr = &quot;127.0.0.1:5003&quot;
+[observability]
+metrics_port = 9103
+health_port = 18083
+log_level = &quot;info&quot;
+EOF
+cargo run --release --bin icnd -- --config /tmp/icn-node3.toml
+
+# Terminal 4: Node 4 (Byzantine)
+cat &gt; /tmp/icn-node4.toml &lt;&lt;EOF
+data_dir = &quot;/tmp/icn-node4&quot;
+[network]
+listen_addr = &quot;127.0.0.1:5004&quot;
+[observability]
+metrics_port = 9104
+health_port = 18084
+log_level = &quot;info&quot;
+EOF
+cargo run --release --bin icnd -- --config /tmp/icn-node4.toml
+
+# Terminal 5: Prometheus
+prometheus --config.file=monitoring/prometheus.yml
+
+# Terminal 6: Grafana
+grafana-server --config monitoring/grafana.ini
+</code></pre>
+<p><strong>Option 3: Kubernetes (Production-like)</strong></p>
+<ul>
+<li>Deploy to local k8s cluster (minikube/kind)</li>
+<li>4 ICN pods with persistent volumes</li>
+<li>Prometheus operator for metrics</li>
+<li>Grafana for dashboards</li>
+</ul>
+<hr>
+<h2>Test Scenarios</h2>
+<h3>1. Baseline Functionality Tests (2 days)</h3>
+<p><strong>Goal</strong>: Verify all components work correctly in normal operation</p>
+<h4>1.1 Network Formation</h4>
+<ul>
+<li><strong>Setup</strong>: Start all 4 nodes sequentially</li>
+<li><strong>Test</strong>:<ul>
+<li>Nodes discover each other via mDNS</li>
+<li>QUIC/TLS connections established</li>
+<li>DID-TLS binding verified</li>
+<li>X25519 key exchange completed</li>
+</ul>
+</li>
+<li><strong>Success Criteria</strong>:<ul>
+<li>All nodes see 3 peers in <code>icnctl network peers</code></li>
+<li>No connection errors in logs</li>
+<li><code>icn_network_connections_active</code> = 3 per node</li>
+</ul>
+</li>
+</ul>
+<h4>1.2 Trust Graph Sync</h4>
+<ul>
+<li><strong>Setup</strong>: Node1 sets trust edges</li>
+<li><strong>Test</strong>:<ul>
+<li>Node1: Trust Node2=0.8, Node3=0.7, Node4=0.3</li>
+<li>Wait for gossip propagation (30s)</li>
+<li>Query trust from other nodes</li>
+</ul>
+</li>
+<li><strong>Success Criteria</strong>:<ul>
+<li>All nodes have consistent trust graph</li>
+<li>Trust class calculations correct (Partner, Federated, Isolated)</li>
+<li><code>icn_trust_edges_total</code> matches across nodes</li>
+</ul>
+</li>
+</ul>
+<h4>1.3 Gossip Message Propagation</h4>
+<ul>
+<li><strong>Setup</strong>: Nodes 1-3 subscribed to topic &quot;test:messages&quot;</li>
+<li><strong>Test</strong>:<ul>
+<li>Node1 publishes 100 messages to &quot;test:messages&quot;</li>
+<li>Measure time to convergence</li>
+</ul>
+</li>
+<li><strong>Success Criteria</strong>:<ul>
+<li>All nodes receive all 100 messages within 5 seconds</li>
+<li>Vector clocks show correct causal ordering</li>
+<li>No duplicate message processing</li>
+<li><code>icn_gossip_announces_received_total</code> = 100 on nodes 2-3</li>
+</ul>
+</li>
+</ul>
+<h4>1.4 Ledger Transaction Sync</h4>
+<ul>
+<li><strong>Setup</strong>: Initialize ledgers on all nodes</li>
+<li><strong>Test</strong>:<ul>
+<li>Node1 → Node2: Transfer 50 credits</li>
+<li>Node2 → Node3: Transfer 30 credits</li>
+<li>Node3 → Node1: Transfer 20 credits</li>
+<li>Wait for gossip sync (60s)</li>
+</ul>
+</li>
+<li><strong>Success Criteria</strong>:<ul>
+<li>All nodes have identical ledger state</li>
+<li>Balances correct: Node1=-30, Node2=+20, Node3=+10</li>
+<li>No quarantined entries</li>
+<li><code>icn_ledger_entries_total</code> = 3 on all nodes</li>
+</ul>
+</li>
+</ul>
+<h4>1.5 Compute Task Execution</h4>
+<ul>
+<li><strong>Setup</strong>: Node1 submits task, Node2 configured as executor</li>
+<li><strong>Test</strong>:<ul>
+<li>Submit CCL contract: <code>rule example() { return 42; }</code></li>
+<li>Node2 claims and executes</li>
+<li>Result propagated via gossip</li>
+</ul>
+</li>
+<li><strong>Success Criteria</strong>:<ul>
+<li>Task completes within 10 seconds</li>
+<li>Result verified: output = 42</li>
+<li>Payment settled: Node1 → Node2</li>
+<li><code>icn_compute_tasks_completed_total</code> = 1</li>
+</ul>
+</li>
+</ul>
+<h4>1.6 Governance Domain Creation &amp; Sync</h4>
+<ul>
+<li><strong>Setup</strong>: All nodes running</li>
+<li><strong>Test</strong>:<ul>
+<li>Node1 creates governance domain &quot;test-coop&quot; with members: Node1, Node2, Node3</li>
+<li>Wait for gossip propagation (30s)</li>
+<li>Query domain from all nodes</li>
+</ul>
+</li>
+<li><strong>Success Criteria</strong>:<ul>
+<li>All nodes see the same domain configuration</li>
+<li>Membership list correct (3 members)</li>
+<li>Governance profile = cooperative_default (1-member-1-vote)</li>
+<li>Domain created event in gossip logs</li>
+</ul>
+</li>
+</ul>
+<h4>1.7 Proposal Lifecycle (Simple Majority)</h4>
+<ul>
+<li><strong>Setup</strong>: Governance domain &quot;test-coop&quot; with 3 members</li>
+<li><strong>Test</strong>:<ul>
+<li>Node1 creates text proposal: &quot;Should we upgrade to Protocol v2?&quot;</li>
+<li>Node1 opens proposal for voting</li>
+<li>Node1 votes: For</li>
+<li>Node2 votes: For</li>
+<li>Node3 votes: Against</li>
+<li>Node1 closes proposal</li>
+<li>Check outcome</li>
+</ul>
+</li>
+<li><strong>Success Criteria</strong>:<ul>
+<li>Proposal created and synced to all nodes</li>
+<li>All votes recorded (3 total)</li>
+<li>Tally: 2 For, 1 Against, 0 Abstain</li>
+<li>Outcome: Accepted (66% approval &gt; 50% threshold)</li>
+<li>Proposal state transitions: Draft → Open → Voting → Closed</li>
+<li>All events propagated via governance gossip</li>
+</ul>
+</li>
+</ul>
+<h4>1.8 Proposal Lifecycle (Quorum Failure)</h4>
+<ul>
+<li><strong>Setup</strong>: Governance domain &quot;test-coop&quot; with 3 members, quorum = 100%</li>
+<li><strong>Test</strong>:<ul>
+<li>Node1 creates budget proposal</li>
+<li>Node1 opens proposal</li>
+<li>Only Node1 and Node2 vote (2/3 = 66% turnout)</li>
+<li>Node1 closes proposal</li>
+</ul>
+</li>
+<li><strong>Success Criteria</strong>:<ul>
+<li>Tally recorded correctly</li>
+<li>Outcome: Rejected (failed quorum requirement)</li>
+<li>Rejection reason: &quot;quorum not met (66% &lt; 100%)&quot;</li>
+<li>All nodes see consistent outcome</li>
+</ul>
+</li>
+</ul>
+<h4>1.9 Governance WebSocket Events</h4>
+<ul>
+<li><strong>Setup</strong>: Gateway running, WebSocket client connected</li>
+<li><strong>Test</strong>:<ul>
+<li>Create domain, proposal, cast votes</li>
+<li>Monitor WebSocket for events</li>
+</ul>
+</li>
+<li><strong>Success Criteria</strong>:<ul>
+<li>Client receives: GovernanceDomainCreated event</li>
+<li>Client receives: GovernanceProposalCreated event</li>
+<li>Client receives: GovernanceProposalOpened event</li>
+<li>Client receives: GovernanceVoteCast events (3 total)</li>
+<li>Client receives: GovernanceProposalClosed event</li>
+<li>All events have correct timestamps and payload</li>
+</ul>
+</li>
+</ul>
+<h4>1.10 Graceful Restart</h4>
+<ul>
+<li><strong>Setup</strong>: Nodes running with active workload</li>
+<li><strong>Test</strong>:<ul>
+<li>Send SIGTERM to Node2</li>
+<li>Wait for graceful shutdown</li>
+<li>Restart Node2</li>
+<li>Resume workload</li>
+</ul>
+</li>
+<li><strong>Success Criteria</strong>:<ul>
+<li>State snapshot saved (vector clocks, subscriptions, X25519 keys)</li>
+<li>Node2 rejoins network within 30 seconds</li>
+<li>No message loss or duplicates</li>
+<li><code>icn_snapshot_save_duration_seconds</code> &lt; 0.1s</li>
+</ul>
+</li>
+</ul>
+<hr>
+<h3>2. Byzantine Behavior Detection Tests (3 days)</h3>
+<p><strong>Goal</strong>: Verify misbehavior is detected and isolated correctly</p>
+<h4>2.1 Invalid Signature Attack</h4>
+<ul>
+<li><strong>Setup</strong>: Node4 (Byzantine) attempts to forge signatures</li>
+<li><strong>Test</strong>:<ul>
+<li>Modify Node4 to send messages with invalid Ed25519 signatures</li>
+<li>Send 5 forged messages to Node1</li>
+</ul>
+</li>
+<li><strong>Expected Behavior</strong>:<ul>
+<li>Node1 detects InvalidSignature violations (5 total)</li>
+<li>Node1&#39;s misbehavior detector records violations</li>
+<li>Node4&#39;s reputation drops (1.0 → 0.75 after 5 violations)</li>
+<li>Node4 NOT quarantined yet (threshold = 0.5)</li>
+</ul>
+</li>
+<li><strong>Success Criteria</strong>:<ul>
+<li><code>icn_misbehavior_violations_total{violation_type=&quot;InvalidSignature&quot;}</code> = 5</li>
+<li>Node1 reputation for Node4 = 0.75 ± 0.01</li>
+<li>Grafana panel shows violations</li>
+</ul>
+</li>
+</ul>
+<h4>2.2 Replay Attack Detection</h4>
+<ul>
+<li><strong>Setup</strong>: Node4 attempts to replay captured messages</li>
+<li><strong>Test</strong>:<ul>
+<li>Capture signed message from Node2</li>
+<li>Node4 replays same message 3 times to Node1</li>
+</ul>
+</li>
+<li><strong>Expected Behavior</strong>:<ul>
+<li>First message accepted (valid)</li>
+<li>Subsequent replays detected by sequence number tracking</li>
+<li>ReplayAttack violation recorded (severity 10, auto-ban)</li>
+<li>Node4 immediately banned (reputation → 0.0)</li>
+</ul>
+</li>
+<li><strong>Success Criteria</strong>:<ul>
+<li><code>icn_misbehavior_violations_total{violation_type=&quot;ReplayAttack&quot;}</code> ≥ 1</li>
+<li><code>icn_misbehavior_banned_peers</code> = 1</li>
+<li><code>icn_misbehavior_auto_bans_total</code> = 1</li>
+<li>Node4 isolated from network (no further messages accepted)</li>
+</ul>
+</li>
+</ul>
+<h4>2.3 Ledger Fork Attack</h4>
+<ul>
+<li><strong>Setup</strong>: Node4 attempts double-spending</li>
+<li><strong>Test</strong>:<ul>
+<li>Node4 creates two conflicting ledger entries with same parent</li>
+<li>Entry A: Transfer 100 credits to Node1</li>
+<li>Entry B: Transfer 100 credits to Node2 (conflicting)</li>
+<li>Gossip both entries to network</li>
+</ul>
+</li>
+<li><strong>Expected Behavior</strong>:<ul>
+<li>First entry accepted by honest nodes</li>
+<li>Second entry detected as conflict</li>
+<li>ConflictingLedgerEntries violation (severity 10, auto-ban)</li>
+<li>Conflicting entry quarantined</li>
+<li>Node4 auto-banned</li>
+</ul>
+</li>
+<li><strong>Success Criteria</strong>:<ul>
+<li><code>icn_ledger_entries_quarantined</code> = 1</li>
+<li><code>icn_misbehavior_violations_total{violation_type=&quot;ConflictingLedgerEntries&quot;}</code> = 1</li>
+<li>Node4 banned on all honest nodes</li>
+<li>Ledger state consistent across Node1-3</li>
+</ul>
+</li>
+</ul>
+<h4>2.4 Compute Result Forgery</h4>
+<ul>
+<li><strong>Setup</strong>: Node4 claims task but returns forged result</li>
+<li><strong>Test</strong>:<ul>
+<li>Node1 submits task with known result (e.g., hash computation)</li>
+<li>Node4 claims task, returns incorrect result with invalid signature</li>
+<li>Node1 verifies result</li>
+</ul>
+</li>
+<li><strong>Expected Behavior</strong>:<ul>
+<li>Signature verification fails</li>
+<li>FailedComputeVerification violation recorded (severity 5)</li>
+<li>Node4&#39;s reputation decreases</li>
+<li>No payment issued (verification failed)</li>
+</ul>
+</li>
+<li><strong>Success Criteria</strong>:<ul>
+<li><code>icn_compute_signatures_invalid_total</code> = 1</li>
+<li><code>icn_misbehavior_violations_total{violation_type=&quot;FailedComputeVerification&quot;}</code> = 1</li>
+<li>Node4 reputation reduced</li>
+<li>Task remains in &quot;failed&quot; state</li>
+</ul>
+</li>
+</ul>
+<h4>2.5 ACL Violation Spam</h4>
+<ul>
+<li><strong>Setup</strong>: Node4 attempts rapid unauthorized subscriptions</li>
+<li><strong>Test</strong>:<ul>
+<li>Node1 creates private topic (TrustClass::Partner, requires trust &gt; 0.9)</li>
+<li>Node4 (trust 0.3) attempts 15 subscription requests in 10 seconds</li>
+</ul>
+</li>
+<li><strong>Expected Behavior</strong>:<ul>
+<li>All subscription attempts rejected (ACL violation)</li>
+<li>15 violations recorded</li>
+<li>After 10 violations in 1 hour: Node4 quarantined</li>
+<li>Node4&#39;s trust reduced via trust penalty callback</li>
+</ul>
+</li>
+<li><strong>Success Criteria</strong>:<ul>
+<li><code>icn_misbehavior_violations_total</code> = 15</li>
+<li><code>icn_misbehavior_quarantined_peers</code> = 1</li>
+<li>Node4 quarantined (reputation &lt; 0.5)</li>
+<li>Grafana shows rate-limit quarantine event</li>
+</ul>
+</li>
+</ul>
+<h4>2.6 Multi-Node Byzantine Isolation</h4>
+<ul>
+<li><strong>Setup</strong>: Node4 sends conflicting statements to different nodes</li>
+<li><strong>Test</strong>:<ul>
+<li>Node4 → Node1: &quot;Balance(Alice) = 100&quot;</li>
+<li>Node4 → Node2: &quot;Balance(Alice) = 200&quot; (conflicting)</li>
+<li>Nodes gossip received statements</li>
+</ul>
+</li>
+<li><strong>Expected Behavior</strong>:<ul>
+<li>Both Node1 and Node2 independently detect conflict</li>
+<li>ConflictingSignedStatements violation (severity 10, auto-ban)</li>
+<li>Node4 banned on both nodes</li>
+<li>Node3 learns of ban via reputation gossip (future Phase 19)</li>
+</ul>
+</li>
+<li><strong>Success Criteria</strong>:<ul>
+<li>Node1 and Node2 both ban Node4 independently</li>
+<li><code>icn_misbehavior_auto_bans_total</code> ≥ 2 (across network)</li>
+<li>Node4 isolated from all honest nodes</li>
+</ul>
+</li>
+</ul>
+<h4>2.7 Governance Vote Manipulation</h4>
+<ul>
+<li><strong>Setup</strong>: Governance domain with Node1, Node2, Node3; Node4 NOT a member</li>
+<li><strong>Test</strong>:<ul>
+<li>Node1 creates proposal</li>
+<li>Node1 opens proposal</li>
+<li>Node4 attempts to vote (not a member)</li>
+</ul>
+</li>
+<li><strong>Expected Behavior</strong>:<ul>
+<li>Node4&#39;s vote rejected (not in membership list)</li>
+<li>Vote not recorded in tally</li>
+<li>Potential violation recorded (attempted unauthorized action)</li>
+</ul>
+</li>
+<li><strong>Success Criteria</strong>:<ul>
+<li>Vote count remains 0</li>
+<li>Node4&#39;s vote not in proposal.votes map</li>
+<li>Error logged: &quot;unauthorized voter&quot;</li>
+<li>Proposal outcome unaffected</li>
+</ul>
+</li>
+</ul>
+<h4>2.8 Governance Double Voting Attack</h4>
+<ul>
+<li><strong>Setup</strong>: Governance domain with Node1, Node2, Node3</li>
+<li><strong>Test</strong>:<ul>
+<li>Node1 creates proposal</li>
+<li>Node1 opens proposal</li>
+<li>Node2 votes: For</li>
+<li>Node2 attempts to vote again: Against (double vote)</li>
+</ul>
+</li>
+<li><strong>Expected Behavior</strong>:<ul>
+<li>First vote accepted and recorded</li>
+<li>Second vote rejected (already voted)</li>
+<li>Tally shows only 1 vote from Node2</li>
+<li>Warning logged: &quot;double vote attempt&quot;</li>
+</ul>
+</li>
+<li><strong>Success Criteria</strong>:<ul>
+<li>Vote count = 1 for Node2 (not 2)</li>
+<li>Tally: 1 For, 0 Against (first vote wins)</li>
+<li>Double vote attempt logged</li>
+<li>No violation recorded (benign error, could be network duplicate)</li>
+</ul>
+</li>
+</ul>
+<h4>2.9 Governance Proposal Spam</h4>
+<ul>
+<li><strong>Setup</strong>: Node4 (low trust) creates governance domain</li>
+<li><strong>Test</strong>:<ul>
+<li>Node4 creates 50 proposals in 60 seconds</li>
+<li>All proposals in same domain</li>
+</ul>
+</li>
+<li><strong>Expected Behavior</strong>:<ul>
+<li>Proposals accepted (governance has no built-in rate limit yet)</li>
+<li>Gossip propagates all proposals</li>
+<li>Note: This validates current behavior; Phase 19 may add rate limits</li>
+</ul>
+</li>
+<li><strong>Success Criteria</strong>:<ul>
+<li>50 proposals created successfully</li>
+<li>No crashes or out-of-memory errors</li>
+<li>Gossip convergence time measured (should be &lt; 2 minutes)</li>
+<li>Resource usage within acceptable bounds</li>
+</ul>
+</li>
+</ul>
+<h4>2.10 Governance Conflicting Outcomes</h4>
+<ul>
+<li><strong>Setup</strong>: Network partition scenario with governance</li>
+<li><strong>Test</strong>:<ul>
+<li>Create governance domain with Node1, Node2, Node3</li>
+<li>Create proposal</li>
+<li>Partition: [Node1, Node2] vs [Node3]</li>
+<li>Node1 and Node2 vote: For (2/3 = 66%)</li>
+<li>Node1 closes proposal (sees Accepted with 2/3 votes)</li>
+<li>Node3 (in partition) votes: Against</li>
+<li>Heal partition</li>
+<li>Both sides have different tallies</li>
+</ul>
+</li>
+<li><strong>Expected Behavior</strong>:<ul>
+<li>Before healing: Both partitions see different state</li>
+<li>After healing: Gossip reconciles votes</li>
+<li>Final tally: 2 For, 1 Against</li>
+<li>Outcome recalculated if needed (may require manual review)</li>
+</ul>
+</li>
+<li><strong>Success Criteria</strong>:<ul>
+<li>All votes eventually recorded (3 total after healing)</li>
+<li>Conflicting outcomes detected (if any)</li>
+<li>Operator alerted to review proposal</li>
+<li>Note: This is a known edge case; Phase 19 may add partition-aware voting</li>
+</ul>
+</li>
+</ul>
+<hr>
+<h3>3. Performance &amp; Load Tests (2 days)</h3>
+<p><strong>Goal</strong>: Validate system performance under realistic and stress conditions</p>
+<h4>3.1 Gossip Throughput</h4>
+<ul>
+<li><strong>Setup</strong>: 3-node network</li>
+<li><strong>Test</strong>:<ul>
+<li>Node1 publishes 1000 messages/sec to 5 topics</li>
+<li>Measure propagation latency and throughput</li>
+<li>Run for 10 minutes</li>
+</ul>
+</li>
+<li><strong>Success Criteria</strong>:<ul>
+<li>Median latency &lt; 100ms</li>
+<li>P99 latency &lt; 500ms</li>
+<li>No message loss</li>
+<li>CPU usage &lt; 50% per node</li>
+<li>Memory growth &lt; 100 MB over 10 minutes</li>
+</ul>
+</li>
+</ul>
+<h4>3.2 Ledger Transaction Volume</h4>
+<ul>
+<li><strong>Setup</strong>: 3-node network</li>
+<li><strong>Test</strong>:<ul>
+<li>Simulate 100 concurrent users making transactions</li>
+<li>50 transactions/sec sustained for 5 minutes</li>
+<li>Random transaction amounts and participants</li>
+</ul>
+</li>
+<li><strong>Success Criteria</strong>:<ul>
+<li>All transactions processed without conflicts</li>
+<li>Ledger convergence within 60 seconds</li>
+<li>No quarantined entries (all valid)</li>
+<li><code>icn_ledger_entries_total</code> = 15,000 (50 tx/s × 300s)</li>
+<li>Balances sum to zero (double-entry invariant)</li>
+</ul>
+</li>
+</ul>
+<h4>3.3 Compute Task Queue</h4>
+<ul>
+<li><strong>Setup</strong>: 1 submitter (Node1), 2 executors (Node2, Node3)</li>
+<li><strong>Test</strong>:<ul>
+<li>Submit 500 compute tasks with varying fuel limits</li>
+<li>Tasks include: math operations, string parsing, conditional logic</li>
+<li>Measure task completion rate and latency</li>
+</ul>
+</li>
+<li><strong>Success Criteria</strong>:<ul>
+<li>All 500 tasks complete successfully</li>
+<li>Median completion time &lt; 5 seconds</li>
+<li>Tasks distributed evenly (Node2 ≈ 250, Node3 ≈ 250)</li>
+<li>No task timeouts or executor crashes</li>
+<li>All payments settled correctly</li>
+</ul>
+</li>
+</ul>
+<h4>3.4 Byzantine Detection Under Load</h4>
+<ul>
+<li><strong>Setup</strong>: 3 honest nodes + 1 Byzantine node</li>
+<li><strong>Test</strong>:<ul>
+<li>Normal workload: 100 tx/sec + 50 compute tasks/min</li>
+<li>Byzantine workload: 10 violations/sec (mixed types)</li>
+<li>Run for 30 minutes</li>
+</ul>
+</li>
+<li><strong>Success Criteria</strong>:<ul>
+<li>Byzantine node quarantined within 1 minute</li>
+<li>Byzantine node auto-banned after critical violation</li>
+<li>Honest nodes maintain throughput (&lt; 10% degradation)</li>
+<li>No false positives (honest nodes not flagged)</li>
+<li><code>icn_misbehavior_violations_total</code> &gt; 600 (10/s × 60s)</li>
+</ul>
+</li>
+</ul>
+<h4>3.5 Governance Load Test</h4>
+<ul>
+<li><strong>Setup</strong>: 3-node network with 1 governance domain (3 members)</li>
+<li><strong>Test</strong>:<ul>
+<li>Create 100 proposals concurrently</li>
+<li>Each node opens 33-34 proposals</li>
+<li>All 3 nodes vote on all proposals (300 votes total)</li>
+<li>Close all proposals</li>
+<li>Measure convergence time</li>
+</ul>
+</li>
+<li><strong>Success Criteria</strong>:<ul>
+<li>All 100 proposals created successfully</li>
+<li>All 300 votes recorded correctly</li>
+<li>All proposals reach consistent outcome across nodes</li>
+<li>Convergence time &lt; 5 minutes</li>
+<li>No vote loss or duplication</li>
+<li>Gossip overhead acceptable (&lt; 50% CPU)</li>
+</ul>
+</li>
+</ul>
+<h4>3.6 Memory Leak Detection</h4>
+<ul>
+<li><strong>Setup</strong>: 4-node network with continuous workload</li>
+<li><strong>Test</strong>:<ul>
+<li>Run for 24 hours with:<ul>
+<li>10 tx/sec ledger transactions</li>
+<li>5 compute tasks/min</li>
+<li>100 gossip messages/sec</li>
+</ul>
+</li>
+<li>Monitor memory usage every hour</li>
+</ul>
+</li>
+<li><strong>Success Criteria</strong>:<ul>
+<li>Memory growth &lt; 500 MB over 24 hours</li>
+<li>No unbounded growth (linear or exponential)</li>
+<li>Resident set size (RSS) stable after initial ramp-up</li>
+<li>No out-of-memory crashes</li>
+</ul>
+</li>
+</ul>
+<hr>
+<h3>4. Resilience &amp; Fault Tolerance Tests (2 days)</h3>
+<p><strong>Goal</strong>: Verify system recovers gracefully from failures</p>
+<h4>4.1 Node Crash Recovery</h4>
+<ul>
+<li><strong>Setup</strong>: 4-node network with active workload</li>
+<li><strong>Test</strong>:<ul>
+<li>Kill Node2 with SIGKILL (unclean shutdown)</li>
+<li>Wait 2 minutes</li>
+<li>Restart Node2</li>
+<li>Verify recovery</li>
+</ul>
+</li>
+<li><strong>Success Criteria</strong>:<ul>
+<li>Node2 rejoins network within 60 seconds</li>
+<li>Gossip anti-entropy fetches missed messages</li>
+<li>Ledger state restored via sync</li>
+<li>No data loss or corruption</li>
+<li>Workload resumes normally</li>
+</ul>
+</li>
+</ul>
+<h4>4.2 Network Partition</h4>
+<ul>
+<li><strong>Setup</strong>: 4-node network split into 2 partitions</li>
+<li><strong>Test</strong>:<ul>
+<li>Partition 1: Node1, Node2</li>
+<li>Partition 2: Node3, Node4</li>
+<li>Block traffic between partitions for 5 minutes</li>
+<li>Heal partition</li>
+<li>Measure convergence time</li>
+</ul>
+</li>
+<li><strong>Success Criteria</strong>:<ul>
+<li>Nodes detect partition via heartbeat timeouts</li>
+<li>Both partitions continue operating independently</li>
+<li>After healing: gossip anti-entropy reconciles state</li>
+<li>Ledger conflicts detected and quarantined (if any)</li>
+<li>Full convergence within 2 minutes of healing</li>
+</ul>
+</li>
+</ul>
+<h4>4.3 Byzantine Node Recovery</h4>
+<ul>
+<li><strong>Setup</strong>: Node4 quarantined due to violations</li>
+<li><strong>Test</strong>:<ul>
+<li>Stop Node4</li>
+<li>Upgrade Node4 to honest behavior</li>
+<li>Restart Node4</li>
+<li>Wait for reputation decay</li>
+</ul>
+</li>
+<li><strong>Expected Behavior</strong>:<ul>
+<li>Node4 starts with quarantined reputation (loaded from snapshot - Phase 19)</li>
+<li>Reputation decays at 0.01 points/hour</li>
+<li>After ~50 hours: reputation &gt; 0.5 (out of quarantine)</li>
+<li>Node4 regains network privileges gradually</li>
+</ul>
+</li>
+<li><strong>Success Criteria</strong>:<ul>
+<li>Reputation decay works as expected</li>
+<li>Node4 can rejoin network after sufficient decay</li>
+<li>No manual intervention required (automatic recovery)</li>
+</ul>
+</li>
+</ul>
+<h4>4.4 Disk Full Scenario</h4>
+<ul>
+<li><strong>Setup</strong>: Node2 with limited disk quota (1 GB)</li>
+<li><strong>Test</strong>:<ul>
+<li>Fill disk with gossip entries, ledger data</li>
+<li>Monitor behavior as disk approaches full</li>
+</ul>
+</li>
+<li><strong>Expected Behavior</strong>:<ul>
+<li>Node logs disk space warnings</li>
+<li>Gossip entries evicted (LRU) to free space</li>
+<li>Node does NOT crash</li>
+<li>Graceful degradation (may miss some gossip entries)</li>
+</ul>
+</li>
+<li><strong>Success Criteria</strong>:<ul>
+<li>No crashes or panics</li>
+<li>Node continues operating with reduced capacity</li>
+<li>Alerts triggered in Grafana</li>
+<li>Operator notified to add capacity</li>
+</ul>
+</li>
+</ul>
+<h4>4.5 Prometheus/Grafana Failure</h4>
+<ul>
+<li><strong>Setup</strong>: Running network with monitoring</li>
+<li><strong>Test</strong>:<ul>
+<li>Stop Prometheus server</li>
+<li>Continue workload for 10 minutes</li>
+<li>Restart Prometheus</li>
+</ul>
+</li>
+<li><strong>Success Criteria</strong>:<ul>
+<li>ICN nodes continue operating normally (monitoring is non-critical)</li>
+<li>No crashes due to metrics export failures</li>
+<li>After Prometheus restart: metrics collection resumes</li>
+<li>No data loss (metrics buffered or dropped gracefully)</li>
+</ul>
+</li>
+</ul>
+<hr>
+<h3>5. Operational Procedures Tests (1 day)</h3>
+<p><strong>Goal</strong>: Validate operational workflows documented in deployment guide</p>
+<h4>5.1 Backup &amp; Restore</h4>
+<ul>
+<li><strong>Test</strong>:<ul>
+<li>Create backup using <code>icnctl backup create /tmp/backup.tar.gz.age</code></li>
+<li>Verify backup contains: keystore, store, config, state.snapshot</li>
+<li>Corrupt Node2&#39;s data directory</li>
+<li>Restore using <code>icnctl backup restore /tmp/backup.tar.gz.age</code></li>
+</ul>
+</li>
+<li><strong>Success Criteria</strong>:<ul>
+<li>Backup completes without errors</li>
+<li>Restore recovers all data</li>
+<li>Node2 rejoins network successfully</li>
+<li>No data loss (ledger, trust graph, gossip subscriptions)</li>
+</ul>
+</li>
+</ul>
+<h4>5.2 Version Upgrade</h4>
+<ul>
+<li><strong>Test</strong>:<ul>
+<li>Build new version with protocol version bump</li>
+<li>Rolling upgrade: Node1 → Node2 → Node3 → Node4</li>
+<li>Verify version negotiation and compatibility</li>
+</ul>
+</li>
+<li><strong>Success Criteria</strong>:<ul>
+<li>Nodes negotiate correct protocol version</li>
+<li>Backward compatibility maintained (if within compatibility window)</li>
+<li>No downtime for network (rolling upgrade successful)</li>
+<li><code>icn_network_version_negotiation_success_total</code> increments</li>
+</ul>
+</li>
+</ul>
+<h4>5.3 Security Incident Response</h4>
+<ul>
+<li><strong>Test</strong>:<ul>
+<li>Detect Node4 compromised (simulated via intentional violations)</li>
+<li>Follow incident response playbook:<ol>
+<li>Identify compromised node via Grafana alerts</li>
+<li>Investigate logs and violation records</li>
+<li>Confirm Byzantine behavior</li>
+<li>Verify automatic isolation (ban)</li>
+<li>Document incident</li>
+</ol>
+</li>
+</ul>
+</li>
+<li><strong>Success Criteria</strong>:<ul>
+<li>Incident detected within 1 minute (via alert)</li>
+<li>Compromised node automatically banned</li>
+<li>No manual intervention required for isolation</li>
+<li>Playbook steps executable and accurate</li>
+</ul>
+</li>
+</ul>
+<h4>5.4 Capacity Planning</h4>
+<ul>
+<li><strong>Test</strong>:<ul>
+<li>Monitor resource usage under load</li>
+<li>Calculate capacity limits:<ul>
+<li>Max transactions/sec before latency degrades</li>
+<li>Max gossip topics before memory pressure</li>
+<li>Max concurrent compute tasks per executor</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><strong>Success Criteria</strong>:<ul>
+<li>Baseline capacity metrics documented</li>
+<li>Recommendations for scaling (add nodes, increase resources)</li>
+<li>Grafana dashboards show capacity utilization</li>
+</ul>
+</li>
+</ul>
+<hr>
+<h2>Monitoring Setup</h2>
+<h3>Prometheus Configuration</h3>
+<pre><code class="language-yaml"># monitoring/prometheus.yml
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: &#39;icn-nodes&#39;
+    static_configs:
+      - targets:
+          - &#39;node1:9090&#39;
+          - &#39;node2:9090&#39;
+          - &#39;node3:9090&#39;
+          - &#39;node4:9090&#39;
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        regex: &#39;([^:]+):.*&#39;
+        replacement: &#39;$1&#39;
+</code></pre>
+<h3>Key Metrics to Monitor</h3>
+<p><strong>Byzantine Detection</strong>:</p>
+<ul>
+<li><code>icn_misbehavior_violations_total</code> (by violation_type, did)</li>
+<li><code>icn_misbehavior_quarantined_peers</code></li>
+<li><code>icn_misbehavior_banned_peers</code></li>
+<li><code>icn_misbehavior_auto_bans_total</code></li>
+</ul>
+<p><strong>Network Health</strong>:</p>
+<ul>
+<li><code>icn_network_connections_active</code></li>
+<li><code>icn_network_messages_sent_total</code></li>
+<li><code>icn_network_messages_received_total</code></li>
+<li><code>icn_network_messages_rate_limited_total</code></li>
+</ul>
+<p><strong>Gossip Performance</strong>:</p>
+<ul>
+<li><code>icn_gossip_announces_sent_total</code></li>
+<li><code>icn_gossip_requests_sent_total</code></li>
+<li><code>icn_gossip_entries_total</code> (per topic)</li>
+<li><code>icn_gossip_vector_clock_updates_total</code></li>
+</ul>
+<p><strong>Ledger Consistency</strong>:</p>
+<ul>
+<li><code>icn_ledger_entries_total</code></li>
+<li><code>icn_ledger_entries_quarantined</code></li>
+<li><code>icn_ledger_balances_total</code></li>
+</ul>
+<p><strong>Compute Layer</strong>:</p>
+<ul>
+<li><code>icn_compute_tasks_submitted_total</code></li>
+<li><code>icn_compute_tasks_completed_total</code></li>
+<li><code>icn_compute_task_duration_seconds</code></li>
+<li><code>icn_compute_signatures_invalid_total</code></li>
+</ul>
+<p><strong>Governance</strong>:</p>
+<ul>
+<li><code>icn_governance_domains_total</code></li>
+<li><code>icn_governance_proposals_total</code> (by state: draft, open, closed)</li>
+<li><code>icn_governance_votes_total</code></li>
+<li><code>icn_governance_proposals_accepted_total</code></li>
+<li><code>icn_governance_proposals_rejected_total</code></li>
+</ul>
+<h3>Alert Rules</h3>
+<pre><code class="language-yaml"># monitoring/alert_rules.yml
+groups:
+  - name: byzantine_detection
+    interval: 10s
+    rules:
+      - alert: ByzantineNodeDetected
+        expr: icn_misbehavior_quarantined_peers &gt; 0
+        for: 1m
+        annotations:
+          summary: &quot;Byzantine node quarantined&quot;
+          description: &quot;{{ $value }} nodes have been quarantined due to misbehavior&quot;
+
+      - alert: AutoBanTriggered
+        expr: increase(icn_misbehavior_auto_bans_total[5m]) &gt; 0
+        annotations:
+          summary: &quot;Critical violation auto-ban&quot;
+          description: &quot;A node has been auto-banned for critical violations&quot;
+
+      - alert: HighViolationRate
+        expr: rate(icn_misbehavior_violations_total[5m]) &gt; 1
+        for: 5m
+        annotations:
+          summary: &quot;High violation rate detected&quot;
+          description: &quot;{{ $value }} violations/sec detected&quot;
+
+  - name: network_health
+    interval: 10s
+    rules:
+      - alert: NetworkPartition
+        expr: icn_network_connections_active &lt; 2
+        for: 2m
+        annotations:
+          summary: &quot;Possible network partition&quot;
+          description: &quot;Node has less than 2 active connections&quot;
+
+      - alert: HighMessageLoss
+        expr: rate(icn_network_messages_failed_total[5m]) &gt; 0.1
+        for: 5m
+        annotations:
+          summary: &quot;High message failure rate&quot;
+          description: &quot;{{ $value }} messages/sec failing&quot;
+
+  - name: ledger_consistency
+    interval: 30s
+    rules:
+      - alert: LedgerConflict
+        expr: icn_ledger_entries_quarantined &gt; 0
+        annotations:
+          summary: &quot;Ledger entries quarantined&quot;
+          description: &quot;{{ $value }} ledger entries in quarantine (possible fork attack)&quot;
+</code></pre>
+<hr>
+<h2>Test Execution Plan</h2>
+<h3>Week 1: Infrastructure &amp; Baseline Tests</h3>
+<p><strong>Day 1-2</strong>: Environment Setup</p>
+<ul>
+<li>Create Docker Compose configuration</li>
+<li>Build ICN Docker image</li>
+<li>Set up Prometheus + Grafana</li>
+<li>Deploy 4-node test network</li>
+<li>Verify metrics collection</li>
+</ul>
+<p><strong>Day 3-4</strong>: Baseline Functionality Tests</p>
+<ul>
+<li>Network formation (1.1)</li>
+<li>Trust graph sync (1.2)</li>
+<li>Gossip propagation (1.3)</li>
+<li>Ledger sync (1.4)</li>
+<li>Compute execution (1.5)</li>
+<li>Graceful restart (1.6)</li>
+</ul>
+<p><strong>Day 5</strong>: Performance Baseline</p>
+<ul>
+<li>Gossip throughput (3.1)</li>
+<li>Ledger transaction volume (3.2)</li>
+<li>Establish performance baselines</li>
+</ul>
+<h3>Week 2: Byzantine Detection &amp; Stress Tests</h3>
+<p><strong>Day 6-8</strong>: Byzantine Behavior Tests</p>
+<ul>
+<li>Invalid signature attack (2.1)</li>
+<li>Replay attack detection (2.2)</li>
+<li>Ledger fork attack (2.3)</li>
+<li>Compute result forgery (2.4)</li>
+<li>ACL violation spam (2.5)</li>
+<li>Multi-node isolation (2.6)</li>
+</ul>
+<p><strong>Day 9</strong>: Performance Under Load</p>
+<ul>
+<li>Compute task queue (3.3)</li>
+<li>Byzantine detection under load (3.4)</li>
+</ul>
+<p><strong>Day 10</strong>: Resilience Tests</p>
+<ul>
+<li>Node crash recovery (4.1)</li>
+<li>Network partition (4.2)</li>
+<li>Byzantine node recovery (4.3)</li>
+</ul>
+<p><strong>Day 11</strong>: Operational Procedures</p>
+<ul>
+<li>Backup &amp; restore (5.1)</li>
+<li>Security incident response (5.3)</li>
+<li>Capacity planning (5.4)</li>
+</ul>
+<p><strong>Day 12</strong>: Soak Test</p>
+<ul>
+<li>Memory leak detection (3.5)</li>
+<li>24-hour stability test</li>
+<li>Final validation</li>
+</ul>
+<hr>
+<h2>Success Criteria</h2>
+<h3>Mandatory Requirements (Blockers for Pilot)</h3>
+<ul>
+<li>[  ] All 38 test scenarios pass without failures (10 baseline + 10 Byzantine + 6 performance + 5 resilience + 4 operational + 3 governance)</li>
+<li>[  ] No crashes or panics during any test</li>
+<li>[  ] Byzantine nodes detected and isolated within SLA (1 minute for critical violations)</li>
+<li>[  ] No false positives (honest nodes never quarantined/banned)</li>
+<li>[  ] Ledger consistency maintained across all nodes (no undetected forks)</li>
+<li>[  ] Governance voting works correctly (no vote loss, correct outcomes)</li>
+<li>[  ] Graceful restart preserves all critical state</li>
+<li>[  ] Network recovers from partitions within 2 minutes</li>
+<li>[  ] 24-hour soak test completes with stable memory usage</li>
+</ul>
+<h3>Performance Benchmarks (Targets)</h3>
+<ul>
+<li>[  ] Gossip latency: median &lt; 100ms, P99 &lt; 500ms</li>
+<li>[  ] Ledger transactions: 50 tx/sec sustained</li>
+<li>[  ] Compute tasks: 10 tasks/min per executor</li>
+<li>[  ] Byzantine detection overhead: &lt; 0.1% CPU</li>
+<li>[  ] Memory overhead: &lt; 500 MB growth over 24 hours</li>
+<li>[  ] Network partition recovery: &lt; 2 minutes to full convergence</li>
+</ul>
+<h3>Optional Goals (Nice-to-Have)</h3>
+<ul>
+<li>[  ] 1000 tx/sec ledger throughput (stretch goal)</li>
+<li>[  ] 1-week soak test (extended stability validation)</li>
+<li>[  ] Chaos testing with random node failures</li>
+<li>[  ] Performance comparison vs. baseline (pre-Phase 18)</li>
+</ul>
+<hr>
+<h2>Test Artifacts</h2>
+<h3>Required Deliverables</h3>
+<ol>
+<li><strong>Test Execution Log</strong> - Detailed results for each scenario</li>
+<li><strong>Performance Report</strong> - Throughput, latency, resource usage metrics</li>
+<li><strong>Bug Report</strong> - Any issues discovered with severity classification</li>
+<li><strong>Grafana Screenshots</strong> - Key metrics during Byzantine attacks</li>
+<li><strong>Incident Timeline</strong> - Step-by-step analysis of Byzantine detection events</li>
+<li><strong>Capacity Recommendations</strong> - Resource requirements for pilot deployment</li>
+<li><strong>Go/No-Go Decision</strong> - Final readiness assessment</li>
+</ol>
+<h3>Bug Tracking Template</h3>
+<pre><code class="language-markdown">## Bug Report: [Title]
+
+**Severity**: Critical / Major / Minor
+**Test Scenario**: [e.g., 2.2 Replay Attack Detection]
+**Environment**: [Docker Compose / Local Processes]
+
+**Steps to Reproduce**:
+1. Start 4-node network
+2. ...
+
+**Expected Behavior**:
+[What should happen]
+
+**Actual Behavior**:
+[What actually happened]
+
+**Logs**:
+</code></pre>
+<p>[Relevant log excerpts]</p>
+<pre><code>
+**Metrics**:
+[Screenshots or PromQL queries]
+
+**Impact**:
+[Pilot blocker? Workaround available?]
+
+**Root Cause Analysis**:
+[If known]
+
+**Proposed Fix**:
+[If known]
+</code></pre>
+<hr>
+<h2>Risk Assessment</h2>
+<h3>High-Risk Areas</h3>
+<ol>
+<li><p><strong>Reputation Persistence</strong> (Known Limitation)</p>
+<ul>
+<li><strong>Risk</strong>: Reputation reset on restart enables attackers to rejoin</li>
+<li><strong>Mitigation</strong>: Phase 19 will add persistent storage; for testing, document workaround (manual ban via config)</li>
+</ul>
+</li>
+<li><p><strong>Cross-Node Reputation Sync</strong> (Known Limitation)</p>
+<ul>
+<li><strong>Risk</strong>: Byzantine node could exploit different reputations on different nodes</li>
+<li><strong>Mitigation</strong>: Test multi-node isolation (scenario 2.6) validates independent detection</li>
+</ul>
+</li>
+<li><p><strong>Network Partition Handling</strong></p>
+<ul>
+<li><strong>Risk</strong>: Ledger forks during partition may not be detected immediately</li>
+<li><strong>Mitigation</strong>: Quarantine mechanism catches conflicts on partition healing</li>
+</ul>
+</li>
+<li><p><strong>Compute Task Timeouts</strong></p>
+<ul>
+<li><strong>Risk</strong>: Long-running tasks may not be killed after timeout</li>
+<li><strong>Mitigation</strong>: Verify timeout enforcement in scenario 3.3</li>
+</ul>
+</li>
+</ol>
+<h3>Medium-Risk Areas</h3>
+<ol>
+<li><p><strong>Gossip Convergence Time</strong></p>
+<ul>
+<li><strong>Risk</strong>: Large networks may have slow convergence</li>
+<li><strong>Mitigation</strong>: Measure and document convergence time in scenario 1.3</li>
+</ul>
+</li>
+<li><p><strong>Trust Graph Scalability</strong></p>
+<ul>
+<li><strong>Risk</strong>: Trust computation may be slow with many edges</li>
+<li><strong>Mitigation</strong>: Performance test with realistic trust graph size</li>
+</ul>
+</li>
+<li><p><strong>Metrics Export Overhead</strong></p>
+<ul>
+<li><strong>Risk</strong>: High-cardinality metrics may impact performance</li>
+<li><strong>Mitigation</strong>: Monitor CPU usage during load tests</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h2>Timeline</h2>
+<p><strong>Week 1</strong>: Infrastructure setup + baseline tests
+<strong>Week 2</strong>: Byzantine detection + stress tests</p>
+<p><strong>Total Duration</strong>: 2 weeks (12 working days)</p>
+<p><strong>Go/No-Go Decision</strong>: End of Week 2</p>
+<hr>
+<h2>Next Steps</h2>
+<ol>
+<li><strong>Create Docker Compose setup</strong> - Start with Option 1 (recommended)</li>
+<li><strong>Build test automation scripts</strong> - Bash scripts for each test scenario</li>
+<li><strong>Set up CI/CD integration</strong> - Automated nightly test runs</li>
+<li><strong>Establish baseline metrics</strong> - Run baseline tests first to set performance targets</li>
+<li><strong>Execute test plan systematically</strong> - Follow day-by-day schedule</li>
+<li><strong>Document all findings</strong> - Comprehensive test report</li>
+<li><strong>Make Go/No-Go decision</strong> - Ready for pilot or additional hardening needed?</li>
+</ol>
+<hr>
+<p><strong>Status</strong>: Ready to Execute
+<strong>Owner</strong>: [Assign owner]
+<strong>Start Date</strong>: [TBD]
+<strong>Target Completion</strong>: [Start Date + 2 weeks]</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

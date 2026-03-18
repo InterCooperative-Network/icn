@@ -1,0 +1,436 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>SDIS: Secure Distributed Identity System | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>sdis</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>SDIS SYSTEM</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/sdis/SDIS_SYSTEM.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>SDIS: Secure Distributed Identity System</h1>
+<blockquote>
+<p>Design snapshot: this document mixes implemented flows and planned endpoint models.
+For currently wired gateway routes, use <code>icn/crates/icn-gateway/src/api/sdis/mod.rs</code>.</p>
+</blockquote>
+<h2>Overview</h2>
+<p>SDIS is ICN&#39;s multi-device identity management and recovery system. It allows users to:</p>
+<ul>
+<li>Enroll new devices securely</li>
+<li>Manage trusted recovery anchors</li>
+<li>Recover identities after device loss</li>
+<li>Maintain cryptographic proof chains</li>
+<li>Delegate recovery authority to trusted contacts</li>
+</ul>
+<h2>Architecture</h2>
+<h3>Components</h3>
+<ol>
+<li><strong>Enrollment System</strong>: Secure device onboarding with challenge-response</li>
+<li><strong>Anchor Management</strong>: Trusted device/contact registration for recovery</li>
+<li><strong>Proof System</strong>: Cryptographic verification of identity claims</li>
+<li><strong>Recovery Mechanism</strong>: Multi-anchor identity restoration</li>
+</ol>
+<h3>Data Model</h3>
+<h4>Enrollment Record</h4>
+<pre><code class="language-rust">struct EnrollmentRecord {
+    enrollment_id: String,          // Unique enrollment identifier
+    root_did: String,               // Primary identity DID
+    device_did: String,             // New device DID
+    device_label: String,           // Human-readable device name
+    device_pubkey: Vec&lt;u8&gt;,         // Ed25519 public key
+    challenge: Vec&lt;u8&gt;,             // Enrollment challenge
+    challenge_expires_at: u64,      // Challenge expiration timestamp
+    approved: bool,                 // Enrollment approval status
+    approved_at: Option&lt;u64&gt;,       // Approval timestamp
+    created_at: u64,                // Creation timestamp
+}
+</code></pre>
+<h4>Recovery Anchor</h4>
+<pre><code class="language-rust">struct RecoveryAnchor {
+    anchor_id: String,              // Unique anchor identifier
+    owner_did: String,              // Identity owning this anchor
+    anchor_type: AnchorType,        // Device or Contact
+    label: String,                  // Human-readable label
+    pubkey: Vec&lt;u8&gt;,                // Ed25519 public key
+    contact_did: Option&lt;String&gt;,    // DID if contact anchor
+    created_at: u64,                // Creation timestamp
+    revoked_at: Option&lt;u64&gt;,        // Revocation timestamp
+}
+
+enum AnchorType {
+    Device,                         // User&#39;s own device
+    Contact,                        // Trusted contact&#39;s device
+}
+</code></pre>
+<h4>Proof Chain</h4>
+<pre><code class="language-rust">struct ProofRecord {
+    proof_id: String,               // Unique proof identifier
+    claim_type: ClaimType,          // Type of claim being proven
+    subject_did: String,            // DID making the claim
+    issuer_did: String,             // DID verifying the claim
+    signature: Vec&lt;u8&gt;,             // Ed25519 signature
+    created_at: u64,                // Creation timestamp
+    expires_at: Option&lt;u64&gt;,        // Optional expiration
+}
+
+enum ClaimType {
+    DeviceOwnership,                // Claim: &quot;I own this device&quot;
+    DeviceEnrollment,               // Claim: &quot;This device is enrolled&quot;
+    RecoveryCapability,             // Claim: &quot;I can recover this identity&quot;
+    IdentityBinding,                // Claim: &quot;These DIDs belong together&quot;
+}
+</code></pre>
+<h2>Enrollment Flow</h2>
+<blockquote>
+<p>Route note: some endpoint examples in this design section use legacy naming.
+For currently wired route shapes, see <code>docs/sdis/SDIS_API_GUIDE.md</code> and <code>docs/sdis/SDIS_STATUS.md</code>.</p>
+</blockquote>
+<h3>1. Initiate Enrollment (New Device)</h3>
+<p>The new device generates a keypair and requests enrollment:</p>
+<pre><code>POST /v1/sdis/enroll
+{
+  &quot;root_did&quot;: &quot;did:icn:z6Mk...&quot;,
+  &quot;device_did&quot;: &quot;did:icn:z6Mk...&quot;,
+  &quot;device_label&quot;: &quot;My Laptop&quot;,
+  &quot;device_pubkey&quot;: &quot;base64_encoded_public_key&quot;
+}
+
+Response:
+{
+  &quot;enrollment_id&quot;: &quot;enr_abc123&quot;,
+  &quot;challenge&quot;: &quot;base64_encoded_challenge&quot;,
+  &quot;expires_at&quot;: 1704067200
+}
+</code></pre>
+<h3>2. Approve Enrollment (Existing Device)</h3>
+<p>User approves on an already-enrolled device:</p>
+<pre><code>POST /v1/sdis/enroll/{enrollment_id}/approve
+{
+  &quot;signature&quot;: &quot;base64_ed25519_signature&quot;
+}
+
+Response:
+{
+  &quot;status&quot;: &quot;approved&quot;,
+  &quot;proof_id&quot;: &quot;proof_xyz789&quot;
+}
+</code></pre>
+<h3>3. Complete Enrollment (New Device)</h3>
+<p>New device verifies and saves the approval:</p>
+<pre><code>GET /v1/sdis/enroll/{enrollment_id}
+
+Response:
+{
+  &quot;enrollment_id&quot;: &quot;enr_abc123&quot;,
+  &quot;root_did&quot;: &quot;did:icn:z6Mk...&quot;,
+  &quot;device_did&quot;: &quot;did:icn:z6Mk...&quot;,
+  &quot;approved&quot;: true,
+  &quot;approved_at&quot;: 1704063600
+}
+</code></pre>
+<h2>Anchor Management</h2>
+<h3>Add Recovery Anchor</h3>
+<pre><code>POST /v1/sdis/anchors
+{
+  &quot;anchor_type&quot;: &quot;device&quot;,          // or &quot;contact&quot;
+  &quot;label&quot;: &quot;My Phone&quot;,
+  &quot;pubkey&quot;: &quot;base64_encoded_key&quot;,
+  &quot;contact_did&quot;: &quot;did:icn:z6Mk...&quot;  // optional, for contact anchors
+}
+
+Response:
+{
+  &quot;anchor_id&quot;: &quot;anc_def456&quot;,
+  &quot;created_at&quot;: 1704063600
+}
+</code></pre>
+<h3>List Anchors</h3>
+<pre><code>GET /v1/sdis/anchors
+
+Response:
+{
+  &quot;anchors&quot;: [
+    {
+      &quot;anchor_id&quot;: &quot;anc_def456&quot;,
+      &quot;owner_did&quot;: &quot;did:icn:z6Mk...&quot;,
+      &quot;anchor_type&quot;: &quot;device&quot;,
+      &quot;label&quot;: &quot;My Phone&quot;,
+      &quot;pubkey&quot;: &quot;...&quot;,
+      &quot;created_at&quot;: 1704063600,
+      &quot;revoked_at&quot;: null
+    }
+  ]
+}
+</code></pre>
+<h3>Revoke Anchor</h3>
+<pre><code>POST /v1/sdis/anchors/{anchor_id}/revoke
+
+Response:
+{
+  &quot;status&quot;: &quot;revoked&quot;,
+  &quot;revoked_at&quot;: 1704067200
+}
+</code></pre>
+<h2>Recovery Process</h2>
+<h3>1. Initiate Recovery</h3>
+<p>Lost device or new device initiates recovery:</p>
+<pre><code>POST /v1/sdis/recover/initiate
+{
+  &quot;root_did&quot;: &quot;did:icn:z6Mk...&quot;,
+  &quot;new_device_did&quot;: &quot;did:icn:z6Mk...&quot;,
+  &quot;new_device_pubkey&quot;: &quot;...&quot;,
+  &quot;anchor_pubkeys&quot;: [&quot;...&quot;, &quot;...&quot;]   // Public keys of recovery anchors
+}
+
+Response:
+{
+  &quot;recovery_id&quot;: &quot;rec_ghi789&quot;,
+  &quot;required_approvals&quot;: 2,            // Threshold (e.g., 2 of 3)
+  &quot;pending_approvals&quot;: []
+}
+</code></pre>
+<h3>2. Approve Recovery (Anchor Devices)</h3>
+<p>Each recovery anchor approves:</p>
+<pre><code>POST /v1/sdis/recover/{recovery_id}/approve
+{
+  &quot;anchor_id&quot;: &quot;anc_def456&quot;,
+  &quot;signature&quot;: &quot;base64_signature&quot;     // Sign recovery_id + new_device_did
+}
+
+Response:
+{
+  &quot;approvals&quot;: 1,
+  &quot;required&quot;: 2,
+  &quot;status&quot;: &quot;pending&quot;                 // or &quot;approved&quot; when threshold met
+}
+</code></pre>
+<h3>3. Complete Recovery</h3>
+<p>Once threshold is met, new device completes recovery:</p>
+<pre><code>GET /v1/sdis/recover/{recovery_id}
+
+Response:
+{
+  &quot;recovery_id&quot;: &quot;rec_ghi789&quot;,
+  &quot;status&quot;: &quot;approved&quot;,
+  &quot;new_device_did&quot;: &quot;did:icn:z6Mk...&quot;,
+  &quot;approvals&quot;: [
+    {
+      &quot;anchor_id&quot;: &quot;anc_def456&quot;,
+      &quot;approved_at&quot;: 1704063600
+    },
+    {
+      &quot;anchor_id&quot;: &quot;anc_xyz123&quot;,
+      &quot;approved_at&quot;: 1704063700
+    }
+  ]
+}
+</code></pre>
+<h2>Security Model</h2>
+<h3>Challenge-Response Protocol</h3>
+<ol>
+<li>Server generates random challenge (32 bytes)</li>
+<li>Approving device signs challenge with its private key</li>
+<li>Server verifies signature against stored public key</li>
+<li>Prevents replay attacks with short-lived challenges (5 minutes)</li>
+</ol>
+<h3>Multi-Anchor Recovery</h3>
+<ul>
+<li>Threshold signatures required (e.g., 2 of 3 anchors)</li>
+<li>Prevents single point of failure</li>
+<li>Balances security and usability</li>
+<li>Anchors can be device OR trusted contacts</li>
+</ul>
+<h3>Proof Chains</h3>
+<p>Every identity operation creates a cryptographic proof:</p>
+<ul>
+<li>Enrollment proof: Root device → New device</li>
+<li>Recovery proof: Anchor devices → Recovered device</li>
+<li>Anchor registration proof: Root device → Anchor device</li>
+</ul>
+<p>Proofs are:</p>
+<ul>
+<li>Signed with Ed25519</li>
+<li>Timestamped</li>
+<li>Immutable once created</li>
+<li>Optionally expirable</li>
+</ul>
+<h3>Revocation</h3>
+<ul>
+<li>Anchors can be revoked at any time</li>
+<li>Revoked anchors cannot approve new recoveries</li>
+<li>Existing approvals from revoked anchors remain valid</li>
+<li>Consider compromised device scenarios</li>
+</ul>
+<h2>Integration Points</h2>
+<h3>Gateway API</h3>
+<ul>
+<li><strong>Enrollment</strong>: <code>/v1/sdis/enrollment/*</code> and steward workflow routes (<code>/v1/sdis/status/*</code>, <code>/v1/sdis/vouch/*</code>, <code>/v1/sdis/reject/*</code>)</li>
+<li><strong>Anchors</strong>: <code>/v1/sdis/anchor/*</code></li>
+<li><strong>Recovery</strong>: <code>/v1/sdis/recovery/*</code></li>
+<li><strong>Proofs</strong>: <code>/v1/sdis/ephemeral/*</code> and verification routes (<code>/v1/sdis/verify/*</code>)</li>
+</ul>
+<h3>Pilot UI</h3>
+<ul>
+<li><strong>Enrollment Wizard</strong>: <code>components/enrollment-wizard.js</code></li>
+<li><strong>Identity Viewer</strong>: <code>components/identity-viewer.js</code></li>
+<li><strong>Anchor Manager</strong>: <code>components/anchor-manager.js</code></li>
+<li><strong>Recovery Assistant</strong>: <code>components/recovery-assistant.js</code> (TODO)</li>
+</ul>
+<h3>Mobile SDK</h3>
+<ul>
+<li><strong>iOS/Android</strong>: React Native integration via SDK</li>
+<li><strong>Secure Enclave</strong>: Hardware-backed key storage</li>
+<li><strong>Biometric Auth</strong>: Face ID / Fingerprint for approvals</li>
+<li><strong>QR Code Scanning</strong>: For enrollment challenges</li>
+</ul>
+<h2>Best Practices</h2>
+<h3>For Users</h3>
+<ol>
+<li><strong>Register Multiple Anchors</strong>: At least 2-3 recovery anchors</li>
+<li><strong>Mix Anchor Types</strong>: Combine devices AND trusted contacts</li>
+<li><strong>Label Clearly</strong>: Use descriptive names for devices</li>
+<li><strong>Review Regularly</strong>: Audit anchor list monthly</li>
+<li><strong>Revoke Promptly</strong>: Remove lost/stolen devices immediately</li>
+</ol>
+<h3>For Developers</h3>
+<ol>
+<li><strong>Validate Signatures</strong>: Always verify Ed25519 signatures</li>
+<li><strong>Check Expiration</strong>: Enforce challenge expiration</li>
+<li><strong>Rate Limit</strong>: Prevent enrollment spam</li>
+<li><strong>Audit Log</strong>: Record all SDIS operations</li>
+<li><strong>Secure Storage</strong>: Encrypt private keys at rest</li>
+</ol>
+<h3>For Operators</h3>
+<ol>
+<li><strong>Monitor Metrics</strong>: Track enrollment success rate</li>
+<li><strong>Set Thresholds</strong>: Configure anchor approval requirements</li>
+<li><strong>Backup Proofs</strong>: Replicate proof chains across nodes</li>
+<li><strong>Alert on Anomalies</strong>: Detect unusual recovery patterns</li>
+<li><strong>Provide Support</strong>: Help users with recovery failures</li>
+</ol>
+<h2>Status Snapshot</h2>
+<p><strong>Phase 1 Complete</strong> ✅</p>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> Data models defined</li>
+<li><input checked="" disabled="" type="checkbox"> Enrollment flow implemented</li>
+<li><input checked="" disabled="" type="checkbox"> Anchor management implemented</li>
+<li><input checked="" disabled="" type="checkbox"> Gateway API endpoints</li>
+<li><input checked="" disabled="" type="checkbox"> Pilot UI components (enrollment, anchors)</li>
+<li><input checked="" disabled="" type="checkbox"> Basic security measures</li>
+</ul>
+<p><strong>Phase 2 In Progress</strong> 🚧</p>
+<ul>
+<li><input disabled="" type="checkbox"> Recovery flow implementation</li>
+<li><input disabled="" type="checkbox"> Proof chain verification</li>
+<li><input disabled="" type="checkbox"> Mobile SDK integration</li>
+<li><input disabled="" type="checkbox"> QR code enrollment</li>
+<li><input disabled="" type="checkbox"> Biometric approval</li>
+</ul>
+<p><strong>Phase 3 Planned</strong> 📋</p>
+<ul>
+<li><input disabled="" type="checkbox"> Threshold signatures</li>
+<li><input disabled="" type="checkbox"> Hardware security module support</li>
+<li><input disabled="" type="checkbox"> Cross-coop recovery</li>
+<li><input disabled="" type="checkbox"> Social recovery protocols</li>
+<li><input disabled="" type="checkbox"> Advanced auditing</li>
+</ul>
+<h2>API Reference</h2>
+<p>See <code>docs/api/sdis.md</code> for complete API documentation.</p>
+<h2>Testing</h2>
+<pre><code class="language-bash"># Run SDIS tests
+cd icn
+cargo test -p icn-identity sdis
+cargo test -p icn-gateway sdis
+
+# Integration tests
+cd web/pilot-ui
+npm test -- sdis
+</code></pre>
+<h2>Troubleshooting</h2>
+<h3>Enrollment Fails</h3>
+<p><strong>Problem</strong>: Challenge expired
+<strong>Solution</strong>: Re-initiate enrollment within 5 minutes</p>
+<p><strong>Problem</strong>: Signature verification failed
+<strong>Solution</strong>: Ensure device_pubkey matches signing key</p>
+<h3>Recovery Fails</h3>
+<p><strong>Problem</strong>: Insufficient approvals
+<strong>Solution</strong>: Ensure threshold anchors approve</p>
+<p><strong>Problem</strong>: Anchor revoked
+<strong>Solution</strong>: Use different anchor or re-register</p>
+<h3>General Issues</h3>
+<ul>
+<li>Check node logs: <code>kubectl logs -n icn &lt;pod-name&gt;</code></li>
+<li>Verify DID format: Must be <code>did:icn:z6Mk...</code></li>
+<li>Confirm network connectivity between devices</li>
+</ul>
+<h2>Future Enhancements</h2>
+<ol>
+<li><strong>Hardware Tokens</strong>: YubiKey, Ledger support</li>
+<li><strong>Social Recovery</strong>: N-of-M friend recovery</li>
+<li><strong>Time-Locked Recovery</strong>: Delayed recovery for security</li>
+<li><strong>Cross-Network Recovery</strong>: Recover across different ICN networks</li>
+<li><strong>Biometric Enrollment</strong>: Passwordless onboarding</li>
+</ol>
+<h2>References</h2>
+<ul>
+<li><a href="https://www.w3.org/TR/did-core/" target="_blank" rel="noopener">DID Specification</a></li>
+<li><a href="https://ed25519.cr.yp.to/" target="_blank" rel="noopener">Ed25519 Signatures</a></li>
+<li><a href="/docs/design/multi-device-identity-design">SDIS Design Doc</a></li>
+<li><a href="/docs/security/threat-model">Security Model</a></li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

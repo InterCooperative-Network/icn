@@ -1,0 +1,1173 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN: Complete Architecture Synthesis | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>archive</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>2025</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ICN COMPLETE ARCHITECTURE SYNTHESIS</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/archive/2025/ICN_COMPLETE_ARCHITECTURE_SYNTHESIS.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><p>⚠️ <strong>ARCHIVED</strong> - This summary document from 2025 has been archived.</p>
+<p>For current information, see:</p>
+<ul>
+<li><a href="/docs/STATE">STATE.md</a> - Current project state</li>
+<li><a href="/docs/ARCHITECTURE">ARCHITECTURE.md</a> - Current architecture</li>
+</ul>
+<hr>
+<h1>ICN: Complete Architecture Synthesis</h1>
+<p><strong>Last Updated</strong>: 2026-01-23
+<strong>Status</strong>: Reference Document
+<strong>Authors</strong>: Claude Code, fahertym</p>
+<hr>
+<h2>The Mission</h2>
+<p>ICN is infrastructure for a <strong>parallel political economy</strong> where democratic organizations outcompete capitalism through better coordination, not ideology.</p>
+<p><strong>Why capitalism wins</strong>: Fast decisions, easy capital, trivial federation via contracts, price signals aggregate information.</p>
+<p><strong>Why cooperatives lose</strong>: High coordination costs, slow capital formation, bespoke inter-org relationships, siloed information.</p>
+<p><strong>ICN&#39;s answer</strong>: Protocol-level infrastructure that makes cooperation cheaper than capitalism.</p>
+<hr>
+<h2>Implementation Status</h2>
+<p>Features throughout this document are marked with status indicators:</p>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>✅</td>
+<td><strong>Implemented</strong> - Merged, tested, deployed</td>
+</tr>
+<tr>
+<td>🚧</td>
+<td><strong>Partial</strong> - Core functionality exists, edge cases pending</td>
+</tr>
+<tr>
+<td>📋</td>
+<td><strong>Designed</strong> - Architecture defined, implementation planned</td>
+</tr>
+<tr>
+<td>🔮</td>
+<td><strong>Future</strong> - Conceptual, not yet designed in detail</td>
+</tr>
+</tbody></table>
+<p><strong>Current overall status</strong>: ~75% implemented (272K LOC, 2,287 tests across 27 crates)</p>
+<hr>
+<h2>Invariants (Non-Negotiables)</h2>
+<p>These are the protocol&#39;s hard constraints. They prevent scope drift and define what ICN <em>is</em>.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Invariant</th>
+<th>Why It Matters</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td><strong>No global chain</strong></td>
+<td>Eventual consistency via gossip + Merkle-DAG auditability. No single ledger to capture.</td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>Entity-scoped governance</strong></td>
+<td>No &quot;world government&quot; baked in. Recursion, not centralization. Each entity controls itself.</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>Trust gates resources</strong></td>
+<td>Credit, compute, federation routing, rate limits—all flow through the trust graph.</td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>Deterministic contracts</strong></td>
+<td>Bounded execution, capability-based permissions. No Turing-completeness, no oracles.</td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>Members own keys</strong></td>
+<td>Hardware + keys belong to individuals. Gateways are infrastructure, not custodians.</td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>Zero-sum mutual credit</strong></td>
+<td>Every credit creates a matching debit. No monetary expansion without real contribution.</td>
+</tr>
+<tr>
+<td>7</td>
+<td><strong>Portable identity</strong></td>
+<td>DIDs work across cooperatives. Credentials travel; you don&#39;t start from zero.</td>
+</tr>
+<tr>
+<td>8</td>
+<td><strong>Auditable by default</strong></td>
+<td>Merkle-DAG ledger, signed messages, governance logs—full traceability without surveillance.</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>The Entity Model</h2>
+<p><strong>Recursive self-similar structure</strong> at every scale:</p>
+<pre><code>Individual (did:icn:...)
+    ↓ joins
+Cooperative/Community (entity:icn:coop:... / entity:icn:community:...)
+    ↓ federates
+Federation (entity:icn:federation:...)
+    ↓ federates
+Meta-Federation
+    ↓ ultimately governed by
+Protocol Commons (ICN itself)
+</code></pre>
+<p><strong>Key insight</strong>: ICN governs itself using ICN. The &quot;Protocol Commons&quot; is the top-level entity that democratically governs protocol parameters.</p>
+<hr>
+<h2>Identity → Membership → Authorization</h2>
+<p><strong>The handshake from &quot;I have a DID&quot; to &quot;I can do things&quot;:</strong></p>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────────┐
+│  1. IDENTITY: Create DID                                                     │
+│     did:icn:&lt;base58-ed25519-pubkey&gt;                                         │
+│     ├── Generate keypair (Secure Enclave / hardware)                        │
+│     └── Optionally: complete VUI ceremony for proof-of-personhood           │
+└───────────────────────────────────────┬─────────────────────────────────────┘
+                                        │
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  2. MEMBERSHIP: Obtain Verifiable Credential (VC)                            │
+│     Issued by: entity (coop, community, federation)                         │
+│     ├── VC contains: issuer, subject (your DID), roles, expiry              │
+│     ├── Signed by entity&#39;s keypair                                          │
+│     └── Stored in wallet, presented on demand                               │
+└───────────────────────────────────────┬─────────────────────────────────────┘
+                                        │
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  3. AUTHORIZATION: Gateway checks at every request                           │
+│     ├── DID Auth: Challenge/response proves you control the key             │
+│     ├── Membership VC: Proves you belong to this entity                     │
+│     ├── Capability scope: VC specifies what roles you have                  │
+│     └── Trust threshold: Your trust score gates resource limits             │
+└─────────────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<p><strong>Roles/Capabilities in Membership VC</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Role</th>
+<th>Capabilities Granted</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>member</code></td>
+<td>View balances, make payments, vote on proposals</td>
+</tr>
+<tr>
+<td><code>proposer</code></td>
+<td>Create governance proposals</td>
+</tr>
+<tr>
+<td><code>moderator</code></td>
+<td>Approve/reject pending members, manage listings</td>
+</tr>
+<tr>
+<td><code>treasurer</code></td>
+<td>Budget operations, credit limit adjustments</td>
+</tr>
+<tr>
+<td><code>steward</code></td>
+<td>VUI ceremonies, key recovery participation</td>
+</tr>
+<tr>
+<td><code>admin</code></td>
+<td>Full entity management, role assignment</td>
+</tr>
+</tbody></table>
+<p><strong>Why this matters</strong>: The entity doesn&#39;t become a mini-state because:</p>
+<ol>
+<li><strong>You own your keys</strong> - the entity can revoke membership VC, not your identity</li>
+<li><strong>Credentials are portable</strong> - other entities can accept your membership proof</li>
+<li><strong>Trust is earned</strong> - roles give permissions, but trust gates actual resource access</li>
+<li><strong>Appeals exist</strong> - governance can reverse role decisions</li>
+</ol>
+<hr>
+<h2>Identity Lifecycle</h2>
+<p><strong>Key Rotation</strong> (old keys deprecated, new keys linked):</p>
+<pre><code>1. Generate new keypair
+2. Create KeyRotation message signed by OLD key:
+   { old_did, new_did, timestamp, reason }
+3. Publish to identity gossip topic
+4. Grace period: both keys valid for 7 days
+5. After grace: old key rejected, new key canonical
+6. Membership VCs re-issued to new DID by entities
+</code></pre>
+<p><strong>Device Revocation</strong> (entity revokes device, not person):</p>
+<pre><code>1. User reports device lost/stolen via another device
+2. Entity revokes device credential (not membership)
+3. Device credential added to revocation list
+4. Gateway rejects auth from revoked device
+5. User registers replacement device
+6. Membership VC remains valid (tied to person, not device)
+</code></pre>
+<p><strong>Membership Revocation</strong> (entity removes member):</p>
+<pre><code>1. Governance proposal or admin action
+2. Membership VC added to revocation accumulator
+3. Member can no longer prove non-revocation
+4. Gateway rejects membership proofs
+5. Trust graph attestations decay
+6. Appeal process available via governance
+</code></pre>
+<p><strong>Compromise Handling</strong> (phone stolen and unlocked):</p>
+<pre><code>1. IMMEDIATE: Report via any trusted channel
+   - Another device, trusted contact, direct to steward
+2. Entity revokes all device credentials for that person
+3. If VUI compromised: steward network initiates recovery
+   - Threshold key shares reconstruct identity anchor
+   - New keypair issued after verification ceremony
+4. Old DID marked compromised, new DID linked via recovery proof
+5. Membership VCs re-issued to new DID
+</code></pre>
+<hr>
+<h2>Layer-by-Layer Architecture</h2>
+<h3>Layer 0: Identity (icn-identity, icn-steward, icn-zkp) ✅</h3>
+<p><strong>DIDs</strong>: <code>did:icn:&lt;base58-ed25519-pubkey&gt;</code></p>
+<p><strong>SDIS (Self-Sovereign Distributed Identity System)</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Level</th>
+<th>Purpose</th>
+<th>Implementation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>L0</td>
+<td>Personhood Anchor</td>
+<td>VUI via threshold PRF, steward network</td>
+</tr>
+<tr>
+<td>L1</td>
+<td>Digital Citizenship</td>
+<td>Commons membership credentials</td>
+</tr>
+<tr>
+<td>L2</td>
+<td>Attribute Proofs</td>
+<td>Age, location, capability attestations</td>
+</tr>
+<tr>
+<td>L3</td>
+<td>Institutional Seals</td>
+<td>Cooperative endorsements</td>
+</tr>
+</tbody></table>
+<p><strong>Steward Network</strong> (icn-steward):</p>
+<ul>
+<li>Distributed key generation</li>
+<li>VUI (Verifiable Unique Identity) computation</li>
+<li>Enrollment ceremonies for proof-of-personhood</li>
+<li>Key recovery via threshold shares</li>
+</ul>
+<p><strong>Zero-Knowledge Proofs</strong> (icn-zkp):</p>
+<ul>
+<li>Age proofs (prove &gt;18 without revealing DOB)</li>
+<li>Membership proofs (prove membership without revealing identity)</li>
+<li>Non-revocation proofs (prove credential not revoked)</li>
+<li>RSA and Merkle accumulators for efficient verification</li>
+</ul>
+<p><strong>Threats</strong>:</p>
+<ul>
+<li><strong>Sybil</strong>: Fake identities → mitigated by VUI (proof-of-personhood via steward ceremonies)</li>
+<li><strong>Collusion</strong>: Stewards conspire → threshold signatures require k-of-n, steward reputation tracking</li>
+<li><strong>Coercion</strong>: Forced enrollment → ceremony requires in-person verification, abuse reporting channel</li>
+</ul>
+<hr>
+<h3>Layer 1: Trust (icn-trust) ✅</h3>
+<p><strong>Web-of-participation</strong> with transitive computation:</p>
+<table>
+<thead>
+<tr>
+<th>Trust Class</th>
+<th>Score</th>
+<th>Capabilities</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Isolated</td>
+<td>&lt; 0.1</td>
+<td>Receive only</td>
+</tr>
+<tr>
+<td>Known</td>
+<td>0.1-0.4</td>
+<td>Basic exchange</td>
+</tr>
+<tr>
+<td>Partner</td>
+<td>0.4-0.7</td>
+<td>Full participation</td>
+</tr>
+<tr>
+<td>Federated</td>
+<td>0.7+</td>
+<td>Cross-federation operations</td>
+</tr>
+</tbody></table>
+<p><strong>Multi-Graph Trust</strong>: Separate graphs for contexts:</p>
+<ul>
+<li><code>financial</code> - Credit relationships</li>
+<li><code>governance</code> - Voting weight</li>
+<li><code>identity</code> - Vouching</li>
+<li><code>network</code> - Connection reliability</li>
+</ul>
+<p><strong>Threats</strong>:</p>
+<ul>
+<li><strong>Spam attestations</strong>: Inflate trust artificially → rate limiting, attestation cost, decay over time</li>
+<li><strong>Reputation gaming</strong>: Strategic vouching rings → transitive trust decay, outlier detection</li>
+<li><strong>Trust graph poisoning</strong>: Coordinated bad actors → cross-context verification, slow trust accrual</li>
+</ul>
+<hr>
+<h3>Layer 2: Cooperative Contract Language (icn-ccl) ✅</h3>
+<p><strong>Purpose</strong>: Express cooperative agreements in deterministic, auditable code.</p>
+<p><strong>Design Principles</strong>:</p>
+<ol>
+<li><strong>Deterministic</strong> - Same inputs always produce same outputs</li>
+<li><strong>Capability-based</strong> - Explicit permissions required</li>
+<li><strong>Fuel-metered</strong> - Bounded execution, no infinite loops</li>
+<li><strong>Auditable</strong> - Full traceability</li>
+</ol>
+<p><strong>Contract Structure</strong>:</p>
+<pre><code class="language-rust">Contract {
+    name: String,                    // e.g., &quot;MembershipAgreement&quot;
+    participants: Vec&lt;Did&gt;,          // 1-100 participants
+    currency: Option&lt;String&gt;,        // e.g., &quot;hours&quot;
+    state_vars: Vec&lt;StateVar&gt;,       // Max 100 state variables
+    rules: Vec&lt;Rule&gt;,                // Max 50 rules (functions)
+    triggers: Vec&lt;Trigger&gt;,          // Scheduled actions
+}
+</code></pre>
+<p><strong>Capabilities</strong> (explicit permissions):</p>
+<table>
+<thead>
+<tr>
+<th>Capability</th>
+<th>Allows</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ReadLedger</code></td>
+<td>Query balances</td>
+</tr>
+<tr>
+<td><code>WriteLedger</code></td>
+<td>Execute transfers</td>
+</tr>
+<tr>
+<td><code>WriteState</code></td>
+<td>Persist contract state</td>
+</tr>
+<tr>
+<td><code>ReadTrust</code></td>
+<td>Query trust scores</td>
+</tr>
+<tr>
+<td><code>GovernancePropose</code></td>
+<td>Create proposals</td>
+</tr>
+</tbody></table>
+<p><strong>Safety Bounds</strong>:</p>
+<ul>
+<li>Max 5 loop nesting depth</li>
+<li>Max 50 expression depth</li>
+<li>Max 100 participants per contract</li>
+<li>Max 100 state variables</li>
+<li>Max 50 rules</li>
+<li>Reserved keywords protected</li>
+</ul>
+<p><strong>Statements</strong> (Stmt enum):</p>
+<pre><code class="language-rust">Assign { name, value }           // Local variable
+SetState { key, value }          // Persist to storage
+LedgerTransfer { from, to, amount, currency }
+SetCreditLimit { account, currency, limit }
+If { condition, then_block, else_block }
+For { var, iterable, body }
+Return { value }
+</code></pre>
+<p><strong>Threats</strong>:</p>
+<ul>
+<li><strong>Resource exhaustion</strong>: Infinite loops → fuel metering, bounded execution</li>
+<li><strong>Capability escalation</strong>: Unauthorized actions → explicit capability grants, auditable permissions</li>
+<li><strong>State manipulation</strong>: Corrupted contract state → signed state transitions, Merkle proofs</li>
+</ul>
+<hr>
+<h3>Layer 3: Distributed Compute (icn-compute) ✅</h3>
+<p><strong>The most sophisticated layer</strong> - trust-gated task distribution with BFT verification.</p>
+<p><strong>Architecture</strong>:</p>
+<pre><code>┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│  Submitter  │────▶│   Gossip    │────▶│  Executor   │
+│  (Task)     │     │  (Routing)  │     │  (Result)   │
+└─────────────┘     └─────────────┘     └─────────────┘
+      │                   │                   │
+      └───────────────────┴───────────────────┘
+                    Trust Graph
+                (Access Control)
+</code></pre>
+<p><strong>Trust Thresholds</strong>:</p>
+<pre><code class="language-rust">MIN_TRUST_SUBMIT: 0.1   // Minimum trust to submit tasks
+MIN_TRUST_EXECUTE: 0.3  // Minimum trust to execute tasks
+</code></pre>
+<p><strong>Gossip Topics</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Topic</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>compute:submit</code></td>
+<td>Task submission</td>
+</tr>
+<tr>
+<td><code>compute:claim</code></td>
+<td>Executor claims task</td>
+</tr>
+<tr>
+<td><code>compute:result</code></td>
+<td>Execution results</td>
+</tr>
+<tr>
+<td><code>compute:cancel</code></td>
+<td>Cancellation</td>
+</tr>
+<tr>
+<td><code>compute:checkpoint</code></td>
+<td>Actor checkpointing</td>
+</tr>
+<tr>
+<td><code>compute:migration</code></td>
+<td>Actor migration</td>
+</tr>
+<tr>
+<td><code>compute:dispute</code></td>
+<td>Dispute resolution</td>
+</tr>
+<tr>
+<td><code>compute:federation</code></td>
+<td>Cross-coop compute</td>
+</tr>
+</tbody></table>
+<h4>BFT Verification (result_quorum.rs)</h4>
+<p><strong>Task Value Classification</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Value Level</th>
+<th>Required Executors</th>
+<th>Consensus</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Low (&lt;100 credits)</td>
+<td>1</td>
+<td>N/A</td>
+</tr>
+<tr>
+<td>Medium (100-1000)</td>
+<td>2</td>
+<td>2/2</td>
+</tr>
+<tr>
+<td>High (1000-10000)</td>
+<td>3</td>
+<td>2/3 (67%)</td>
+</tr>
+<tr>
+<td>Critical (&gt;10000)</td>
+<td>5</td>
+<td>4/5 (80%)</td>
+</tr>
+</tbody></table>
+<p><strong>Quorum Process</strong>:</p>
+<ol>
+<li>Task submitted with <code>verification_config</code></li>
+<li>Scheduler assigns multiple executors based on value</li>
+<li>Results collected from all executors (30s window)</li>
+<li>Results grouped by output hash (blake3)</li>
+<li>Majority determines canonical result</li>
+<li>Divergent results escalate to dispute</li>
+</ol>
+<p><strong>Quorum Status</strong>:</p>
+<pre><code class="language-rust">enum QuorumStatus {
+    Collecting { received, required },
+    Consensus { result_hash, agreeing, total },
+    Divergent { result_groups, total },
+    Timeout { received, required },
+}
+</code></pre>
+<h4>Dispute Resolution (dispute.rs)</h4>
+<p><strong>Verification Modes</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>SingleExecutor</td>
+<td>Default, fastest, cheapest</td>
+</tr>
+<tr>
+<td>MultiExecutor</td>
+<td>N executors, majority consensus</td>
+</tr>
+<tr>
+<td>Optimistic</td>
+<td>One executor, challengeable window</td>
+</tr>
+</tbody></table>
+<p><strong>Dispute Workflow</strong>:</p>
+<ol>
+<li>Differing results detected → Create <code>ComputeDispute</code></li>
+<li>Evidence collection (24h window)</li>
+<li>Types: ExecutionLogs, InputData, EnvironmentSnapshot, WitnessStatement</li>
+<li>Re-execution by arbiter (high-trust node, min 0.7 trust)</li>
+<li>Resolution: Consensus, Reexecution, or Quarantine</li>
+<li>Correct executors paid, incorrect penalized</li>
+</ol>
+<h4>Scheduler (scheduler.rs)</h4>
+<p><strong>Resource Profiles</strong>:</p>
+<pre><code class="language-rust">ResourceProfile {
+    cpu_cores: Option&lt;f64&gt;,       // 0.1 = 10% of one core
+    memory_mb: Option&lt;u64&gt;,       // RAM required
+    storage_mb: Option&lt;u64&gt;,      // Temp storage
+    network_mbps: Option&lt;f64&gt;,    // Bandwidth
+    gpu_spec: Option&lt;GpuSpec&gt;,    // GPU requirements
+    duration_estimate: Option&lt;Duration&gt;,
+}
+</code></pre>
+<p><strong>Placement Scoring</strong> (7 factors):</p>
+<ol>
+<li>Trust (25%) - Higher trust = better</li>
+<li>Capacity (20%) - Available resources</li>
+<li>Queue depth (15%) - Shorter queue = better</li>
+<li>Network latency (15%) - Lower RTT = better</li>
+<li>Data locality (15%) - Local blobs = better</li>
+<li>Locality hints (10%) - Match preferences</li>
+<li>Random jitter (10%) - Break ties</li>
+</ol>
+<p><strong>Federation Policies</strong>:</p>
+<pre><code class="language-rust">enum FederationPolicy {
+    PreferLocal,                    // Score bonus for local
+    AllowFederated,                 // Equal consideration
+    FederatedWhitelist { coops },   // Only specific coops
+    LocalOnly,                      // Block all federated
+}
+</code></pre>
+<h4>Actor Migration (migration_manager.rs)</h4>
+<p><strong>Migration Flow</strong>:</p>
+<pre><code>Source Executor                     Target Executor
+===============                     ===============
+1. Evaluate migration
+   (policy.should_migrate)
+        |
+        v
+2. Create checkpoint
+        |
+        v
+3. Send MigrationRequest --------&gt;  4. Evaluate capacity
+        |                               (policy.should_accept)
+        |                                     |
+        |                                     v
+        |                          5. Send Accept/Reject
+        |  &lt;-----------------------------    |
+        v
+6. Pause actor
+        |
+        v
+7. Final checkpoint
+        |
+        v
+8. Send MigrationComplete ------&gt;  9. Resume actor
+        |                               |
+        v                               v
+10. Cleanup                        11. Acknowledge
+</code></pre>
+<p><strong>Migration Triggers</strong>:</p>
+<ul>
+<li>Load balancing (executor &gt;80% utilized)</li>
+<li>Data locality (inputs on different node)</li>
+<li>Fault tolerance (node going offline)</li>
+<li>Resource availability (better match elsewhere)</li>
+</ul>
+<h4>WASM Execution (wasm_executor.rs)</h4>
+<ul>
+<li>Sandboxed WebAssembly execution</li>
+<li>Fuel metering (bounded computation)</li>
+<li>Deterministic execution</li>
+<li>WASM registry with hash verification</li>
+</ul>
+<p><strong>Threats</strong>:</p>
+<ul>
+<li><strong>Wrong results</strong>: Malicious/buggy executor → BFT quorum verification (67-80% agreement)</li>
+<li><strong>Bribed executors</strong>: Collusion for false results → random executor selection, trust-weighted placement</li>
+<li><strong>Resource cheating</strong>: Claiming work not done → result hash verification, re-execution by arbiter</li>
+</ul>
+<hr>
+<h3>Layer 4: Privacy (icn-privacy) ✅</h3>
+<p><strong>Purpose</strong>: Protect metadata, prevent traffic analysis, ensure plausible deniability.</p>
+<h4>Topic Encryption (topic_encryption.rs)</h4>
+<ul>
+<li><strong>Algorithm</strong>: ChaCha20-Poly1305 AEAD</li>
+<li><strong>Purpose</strong>: Encrypt topic names so observers can&#39;t see what you subscribe to</li>
+<li><strong>Discovery</strong>: Bloom filter-based (privacy-preserving)</li>
+<li><strong>Property</strong>: False positives provide plausible deniability</li>
+</ul>
+<pre><code class="language-rust">// Create encryptor with shared cooperative key
+let encryptor = TopicEncryptor::new(shared_key);
+
+// Encrypt topic name
+let encrypted = encryptor.encrypt(&quot;ledger:sync&quot;)?;
+
+// Subscriber checks match without decrypting
+let mut filter = TopicBloomFilter::new();
+filter.insert(&quot;ledger:sync&quot;);
+assert!(filter.matches(&amp;encrypted));
+</code></pre>
+<h4>Onion Routing (onion_routing.rs)</h4>
+<ul>
+<li><strong>Purpose</strong>: Multi-hop message routing (Tor-like)</li>
+<li><strong>Protection</strong>: Hides sender/receiver relationships</li>
+<li><strong>Architecture</strong>: 3-hop circuits through relay nodes</li>
+<li><strong>Defense</strong>: Traffic analysis resistance</li>
+</ul>
+<h4>Traffic Obfuscation (traffic_obfuscation.rs)</h4>
+<ul>
+<li><strong>Random delays</strong>: Timing attack resistance</li>
+<li><strong>Message padding</strong>: Hide content size patterns</li>
+<li><strong>Cover traffic</strong>: Decoy messages at configurable rate</li>
+</ul>
+<pre><code class="language-rust">ObfuscationConfig {
+    min_delay_ms: 50,
+    max_delay_ms: 500,
+    padding_target: 1024,    // Pad to 1KB
+    cover_traffic_rate: 0.1, // 10% decoy messages
+}
+</code></pre>
+<p><strong>Threats</strong>:</p>
+<ul>
+<li><strong>Metadata leakage</strong>: Subscription patterns reveal activity → encrypted topic names, Bloom filter discovery</li>
+<li><strong>Traffic analysis</strong>: Timing/size correlation → random delays, message padding, cover traffic</li>
+<li><strong>Relay compromise</strong>: Malicious circuit node → 3-hop routing, no single node sees both endpoints</li>
+</ul>
+<hr>
+<h3>Layer 5: Security (icn-security) ✅</h3>
+<p><strong>Purpose</strong>: Detect Byzantine faults, manage reputation, quarantine bad actors.</p>
+<h4>Violation Types (misbehavior.rs)</h4>
+<table>
+<thead>
+<tr>
+<th>Violation</th>
+<th>Severity</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ConflictingLedgerEntries</td>
+<td>10 (Critical)</td>
+<td>Double-spend attempt</td>
+</tr>
+<tr>
+<td>ConflictingSignedStatements</td>
+<td>10</td>
+<td>Generic Byzantine</td>
+</tr>
+<tr>
+<td>ReplayAttack</td>
+<td>10</td>
+<td>Sequence number reuse</td>
+</tr>
+<tr>
+<td>FailedComputeVerification</td>
+<td>5 (Major)</td>
+<td>Wrong compute result</td>
+</tr>
+<tr>
+<td>InvalidSignature</td>
+<td>5</td>
+<td>Forged message</td>
+</tr>
+<tr>
+<td>ExcessiveResourceUse</td>
+<td>1 (Minor)</td>
+<td>Rate limit violation</td>
+</tr>
+<tr>
+<td>TrustGraphSpam</td>
+<td>1</td>
+<td>Attestation flooding</td>
+</tr>
+<tr>
+<td>FailedStorageChallenge</td>
+<td>1-8</td>
+<td>Storage proof failure</td>
+</tr>
+</tbody></table>
+<h4>Reputation Scoring</h4>
+<pre><code class="language-rust">ReputationScore: 0.0 - 1.0
+
+// Automatic actions
+score &lt; 0.5 → Auto-quarantine (restricted operations)
+score &lt; 0.2 → Auto-ban (blocked entirely)
+Critical violation → Immediate ban
+
+// Recovery
+Violations decay over time (configurable half-life)
+Good behavior gradually restores score
+</code></pre>
+<p><strong>Threats</strong>:</p>
+<ul>
+<li><strong>False accusations</strong>: Frame innocent nodes → evidence required for violations, appeals process</li>
+<li><strong>Reputation laundering</strong>: Create new identity after ban → VUI ties reputation to personhood</li>
+<li><strong>Slow attacks</strong>: Stay below detection thresholds → statistical anomaly detection, long-term tracking</li>
+</ul>
+<hr>
+<h3>Layer 6: Gossip (icn-gossip) ✅</h3>
+<p><strong>Protocol</strong>: Hybrid push/pull with causal ordering.</p>
+<p><strong>Note</strong>: Most gossip topics are dynamically constructed at runtime with parameters (coop_id, domain_id, etc.). Only a few topics like <code>key:rotation</code>, <code>steward:announce</code>, and <code>steward:vui-sync</code> are hardcoded constants.</p>
+<h4>Vector Clocks (vector_clock.rs)</h4>
+<ul>
+<li>Causal ordering of events</li>
+<li>10K entry limit with LRU eviction</li>
+<li>Compressed representation for bandwidth</li>
+</ul>
+<h4>Bloom Filters (bloom.rs)</h4>
+<ul>
+<li>Efficient anti-entropy sync</li>
+<li>Configurable false positive rate</li>
+<li>Auto-resizing based on entries</li>
+</ul>
+<h4>Topic Access Control</h4>
+<pre><code class="language-rust">enum AccessControl {
+    Public,                         // Anyone can publish/subscribe
+    TrustClass(TrustClass),         // Requires minimum trust class
+    Participants(Vec&lt;Did&gt;),         // Only specific participants (whitelist)
+}
+</code></pre>
+<h4>Trust-Gated Resource Limits</h4>
+<table>
+<thead>
+<tr>
+<th>Trust Class</th>
+<th>Msg/sec</th>
+<th>Max Msg Size</th>
+<th>Window Limit</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Isolated</td>
+<td>10</td>
+<td>1KB</td>
+<td>100KB</td>
+</tr>
+<tr>
+<td>Known</td>
+<td>50</td>
+<td>10KB</td>
+<td>1MB</td>
+</tr>
+<tr>
+<td>Partner</td>
+<td>100</td>
+<td>100KB</td>
+<td>10MB</td>
+</tr>
+<tr>
+<td>Federated</td>
+<td>200</td>
+<td>1MB</td>
+<td>100MB</td>
+</tr>
+</tbody></table>
+<p><strong>Threats</strong>:</p>
+<ul>
+<li><strong>Eclipse attack</strong>: Isolate node from honest peers → peer diversity requirements, multiple bootstrap sources</li>
+<li><strong>Flooding</strong>: Overwhelm with messages → trust-gated rate limits, per-peer quotas</li>
+<li><strong>Partition attack</strong>: Split network view → vector clocks detect causality, anti-entropy reconciliation</li>
+</ul>
+<hr>
+<h3>Layer 7: Ledger (icn-ledger) ✅</h3>
+<p><strong>Double-entry mutual credit</strong> with cryptographic auditability.</p>
+<p><strong>Properties</strong>:</p>
+<ul>
+<li>Zero-sum: Every credit creates matching debit</li>
+<li>Merkle-DAG: Full history, cryptographic integrity</li>
+<li>Multi-currency: Hours, community tokens, custom units</li>
+<li>Gossip-synced: Eventual consistency across nodes</li>
+</ul>
+<p><strong>Credit Limits</strong>:</p>
+<pre><code class="language-rust">credit_limit = f(
+    participation_history,    // How long active
+    attestations_received,    // Vouches from others
+    contracts_fulfilled,      // Track record
+    dispute_record           // History of problems
+)
+</code></pre>
+<p><strong>Threats</strong>:</p>
+<ul>
+<li><strong>Double-spend</strong>: Same credits spent twice → Merkle-DAG with causal ordering, conflict detection</li>
+<li><strong>Replay attack</strong>: Resubmit old transactions → sequence numbers, signed envelopes</li>
+<li><strong>Credit inflation</strong>: Spend beyond limit → real-time balance checking, limit enforcement</li>
+</ul>
+<hr>
+<h3>Layer 8: Governance (icn-governance) ✅</h3>
+<p><strong>25,438 LOC, 347 tests</strong> - Comprehensive governance primitives.</p>
+<p><strong>Proposal Types</strong>: Constitutional, Economic, Operational, Membership, Federation</p>
+<p><strong>Voting Methods</strong>:</p>
+<ul>
+<li>Simple majority</li>
+<li>Supermajority (2/3, 3/4)</li>
+<li>Quadratic voting (diminishing marginal voice)</li>
+<li>Liquid democracy (transitive delegation)</li>
+</ul>
+<p><strong>Entity-Scoped</strong>: Governance is scoped to entity level (coop, community, federation).</p>
+<p><strong>Threats</strong>:</p>
+<ul>
+<li><strong>Vote buying</strong>: Pay for votes → quadratic voting reduces marginal power, anonymous voting</li>
+<li><strong>Sybil voting</strong>: Fake members vote → VUI-backed membership, one-person-one-vote enforcement</li>
+<li><strong>Governance capture</strong>: Minority seizes control → quorum requirements, supermajority for critical changes</li>
+</ul>
+<hr>
+<h3>Layer 9: Federation (icn-federation) 🚧</h3>
+<p><strong>Multi-level hierarchy</strong> with trust bridging.</p>
+<p><strong>Features</strong>:</p>
+<ul>
+<li>Arbitrary depth (coop → regional → sector → global)</li>
+<li>Transitive trust calculation across boundaries</li>
+<li>Multi-level settlement with netting</li>
+<li>Proposal escalation rules</li>
+</ul>
+<p><strong>Threats</strong>:</p>
+<ul>
+<li><strong>Cross-org fraud</strong>: Exploit trust bridges → clearing limits, bond requirements, dispute arbitration</li>
+<li><strong>Settlement disputes</strong>: Refuse to honor clearing → escrow for large transactions, federation-level governance</li>
+<li><strong>Federation capture</strong>: One coop dominates → weighted voting by membership, separation of powers</li>
+</ul>
+<hr>
+<h2>The Economic Vision</h2>
+<p><strong>Three-Layer Economy</strong>:</p>
+<pre><code>┌────────────────────────────────────────────────────────────┐
+│  LAYER 3: FIAT BRIDGES                                     │
+│  Treasury coops hold reserves, governed gateways,          │
+│  rate bands not markets. For: taxes, imports, medical.     │
+└────────────────────────────────────────────────────────────┘
+                              ↑↓
+┌────────────────────────────────────────────────────────────┐
+│  LAYER 2: ASSET TOKENS                                     │
+│  Real goods with provenance chains, attested creation,     │
+│  negotiated exchange within guardrails, optional demurrage │
+└────────────────────────────────────────────────────────────┘
+                              ↑↓
+┌────────────────────────────────────────────────────────────┐
+│  LAYER 1: MUTUAL CREDIT                                    │
+│  Hours or community units, reputation-gated limits,        │
+│  zero-sum coordination, no backing required                │
+└────────────────────────────────────────────────────────────┘
+</code></pre>
+<p><strong>Value Retention Flywheel</strong>:</p>
+<pre><code>More coops → More internal trade → Less leakage →
+Capital accumulates → More new coop formation →
+More coops → [compound forever]
+</code></pre>
+<hr>
+<h2>The 27 Crates</h2>
+<table>
+<thead>
+<tr>
+<th>Category</th>
+<th>Crates</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Core</strong></td>
+<td>icn-core</td>
+</tr>
+<tr>
+<td><strong>Identity</strong></td>
+<td>icn-identity, icn-steward, icn-zkp, icn-crypto-pq</td>
+</tr>
+<tr>
+<td><strong>Trust</strong></td>
+<td>icn-trust</td>
+</tr>
+<tr>
+<td><strong>Network</strong></td>
+<td>icn-net, icn-gossip</td>
+</tr>
+<tr>
+<td><strong>Storage</strong></td>
+<td>icn-store, icn-encoding, icn-snapshot</td>
+</tr>
+<tr>
+<td><strong>Compute</strong></td>
+<td>icn-compute</td>
+</tr>
+<tr>
+<td><strong>Economy</strong></td>
+<td>icn-ledger, icn-ccl</td>
+</tr>
+<tr>
+<td><strong>Governance</strong></td>
+<td>icn-governance</td>
+</tr>
+<tr>
+<td><strong>Organization</strong></td>
+<td>icn-entity, icn-coop, icn-community, icn-federation</td>
+</tr>
+<tr>
+<td><strong>Security</strong></td>
+<td>icn-security, icn-privacy</td>
+</tr>
+<tr>
+<td><strong>API</strong></td>
+<td>icn-gateway, icn-rpc, icn-api</td>
+</tr>
+<tr>
+<td><strong>Observability</strong></td>
+<td>icn-obs</td>
+</tr>
+<tr>
+<td><strong>Infrastructure</strong></td>
+<td>icn-time</td>
+</tr>
+<tr>
+<td><strong>Testing</strong></td>
+<td>icn-testkit</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Summary</h2>
+<p>ICN is a <strong>complete civilizational substrate</strong> with:</p>
+<ol>
+<li><strong>Recursive Entity Model</strong> - Same patterns at every scale</li>
+<li><strong>Self-Governance</strong> - ICN governs itself using ICN</li>
+<li><strong>Trust as Infrastructure</strong> - Gates resources, compute, credit, federation</li>
+<li><strong>Distributed Compute</strong> - BFT verification, actor migration, WASM execution</li>
+<li><strong>Privacy by Design</strong> - Topic encryption, onion routing, traffic obfuscation</li>
+<li><strong>Byzantine Fault Tolerance</strong> - Misbehavior detection, reputation, quarantine</li>
+<li><strong>Economic Autonomy</strong> - Value circulates internally, fiat bridge minimized</li>
+<li><strong>Speculation Resistance</strong> - Demurrage, clearing bands, guardrails</li>
+</ol>
+<p>Every layer integrates with every other layer through the trust graph. The compute layer uses trust for scheduling. The ledger uses trust for credit limits. The gossip layer uses trust for rate limiting. The governance uses trust for voting weight. This is <strong>trust-as-infrastructure</strong>, not trust-as-afterthought.</p>
+<hr>
+<h2>Glossary</h2>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Definition</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>DID</strong></td>
+<td>Decentralized Identifier. Format: <code>did:icn:&lt;base58-ed25519-pubkey&gt;</code>. Self-sovereign identity anchor.</td>
+</tr>
+<tr>
+<td><strong>VC</strong></td>
+<td>Verifiable Credential. Signed attestation (e.g., membership) issued by an entity, stored in wallet.</td>
+</tr>
+<tr>
+<td><strong>VUI</strong></td>
+<td>Verifiable Unique Identity. Proof-of-personhood via steward ceremony. Prevents Sybil attacks.</td>
+</tr>
+<tr>
+<td><strong>Entity</strong></td>
+<td>Any ICN participant: Individual, Cooperative, Community, Federation. Recursive structure. Not to be confused with Jurisdiction.</td>
+</tr>
+<tr>
+<td><strong>EntityId</strong></td>
+<td>Identifier for entities. Format: <code>entity:icn:&lt;type&gt;:&lt;identifier&gt;</code> (e.g., <code>entity:icn:coop:food-coop-123</code>).</td>
+</tr>
+<tr>
+<td><strong>Jurisdiction</strong></td>
+<td>Governance domain within an entity. Not an entity type itself—it&#39;s where governance decisions are scoped.</td>
+</tr>
+<tr>
+<td><strong>Gateway</strong></td>
+<td>HTTP/WebSocket API server. Bridges client apps to ICN daemon. Not a custodian.</td>
+</tr>
+<tr>
+<td><strong>Full Node</strong></td>
+<td>Complete ICN daemon with ledger, gossip, compute. Run by cooperatives.</td>
+</tr>
+<tr>
+<td><strong>Light Client</strong></td>
+<td>Wallet app that signs locally, calls gateway APIs. No local ledger copy.</td>
+</tr>
+<tr>
+<td><strong>Steward</strong></td>
+<td>Trusted member who conducts VUI ceremonies and participates in key recovery.</td>
+</tr>
+<tr>
+<td><strong>Trust Class</strong></td>
+<td>Category based on trust score: Isolated (&lt;0.1), Known (0.1-0.4), Partner (0.4-0.7), Federated (0.7+).</td>
+</tr>
+<tr>
+<td><strong>Trust Graph</strong></td>
+<td>Directed weighted graph of trust relationships. Multiple contexts (financial, governance, etc.).</td>
+</tr>
+<tr>
+<td><strong>CCL</strong></td>
+<td>Cooperative Contract Language. Deterministic, capability-based, fuel-metered agreement execution.</td>
+</tr>
+<tr>
+<td><strong>Capability</strong></td>
+<td>Explicit permission granted to a contract or user (e.g., <code>ReadLedger</code>, <code>WriteLedger</code>).</td>
+</tr>
+<tr>
+<td><strong>Capability Token</strong></td>
+<td>Scoped access token. Subset of full permissions for specific operations.</td>
+</tr>
+<tr>
+<td><strong>Mutual Credit</strong></td>
+<td>Zero-sum accounting where credits and debits always balance. No external backing required.</td>
+</tr>
+<tr>
+<td><strong>Credit Limit</strong></td>
+<td>Maximum negative balance allowed. Gated by trust, participation history, vouches.</td>
+</tr>
+<tr>
+<td><strong>Merkle-DAG</strong></td>
+<td>Directed acyclic graph where each node references parents by hash. Ensures auditability.</td>
+</tr>
+<tr>
+<td><strong>Clearing Entry</strong></td>
+<td>Inter-cooperative balance. Settled periodically via clearing house.</td>
+</tr>
+<tr>
+<td><strong>Clearing House</strong></td>
+<td>Federation service that nets inter-coop balances and coordinates settlement.</td>
+</tr>
+<tr>
+<td><strong>Quorum</strong></td>
+<td>Minimum agreement threshold for BFT verification (e.g., 67% for high-value compute).</td>
+</tr>
+<tr>
+<td><strong>Arbiter</strong></td>
+<td>High-trust node (≥0.7) that re-executes disputed compute tasks.</td>
+</tr>
+<tr>
+<td><strong>Actor Migration</strong></td>
+<td>Moving a running compute actor from one executor to another with state preservation.</td>
+</tr>
+<tr>
+<td><strong>Gossip</strong></td>
+<td>Epidemic protocol for propagating messages. Push announcements, pull requests, anti-entropy.</td>
+</tr>
+<tr>
+<td><strong>Vector Clock</strong></td>
+<td>Logical clock for causal ordering of distributed events.</td>
+</tr>
+<tr>
+<td><strong>Topic</strong></td>
+<td>Named channel for gossip messages. Access controlled (Open, TrustGated, MembersOnly, CooperativeOnly).</td>
+</tr>
+<tr>
+<td><strong>Scope</strong></td>
+<td>Gossip propagation range: LocalCluster, Regional, Global.</td>
+</tr>
+<tr>
+<td><strong>Federation</strong></td>
+<td>Network of cooperatives with shared trust, clearing, and governance.</td>
+</tr>
+<tr>
+<td><strong>Meta-Federation</strong></td>
+<td>Federation of federations. Enables arbitrary hierarchy depth.</td>
+</tr>
+<tr>
+<td><strong>Protocol Commons</strong></td>
+<td>Top-level ICN entity that governs protocol parameters democratically.</td>
+</tr>
+<tr>
+<td><strong>Subsidiarity</strong></td>
+<td>Principle: decisions made at lowest appropriate level. Higher levels constrain, not dictate.</td>
+</tr>
+<tr>
+<td><strong>Demurrage</strong></td>
+<td>Negative interest on holdings. Encourages circulation, discourages hoarding.</td>
+</tr>
+<tr>
+<td><strong>Fuel</strong></td>
+<td>Metering unit for contract execution. Prevents infinite loops.</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Related Documents</h2>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/ICN_REAL_WORLD_DEPLOYMENT">ICN_REAL_WORLD_DEPLOYMENT.md</a> - How ICN works at scale</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/ICN_MINIMUM_VERTICAL_SLICE">ICN_MINIMUM_VERTICAL_SLICE.md</a> - End-to-end operation traces</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/ECONOMIC_ARCHITECTURE">ECONOMIC_ARCHITECTURE.md</a> - Economic system details</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/ECONOMIC_VISION">ECONOMIC_VISION.md</a> - Strategic framing</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/dev-journal/ROADMAP">dev-journal/ROADMAP.md</a> - Implementation roadmap</li>
+</ul>
+<hr>
+<h2>Document History</h2>
+<ul>
+<li>2026-01-23: Added Invariants, Threat Models, Identity→Membership→Authorization, Lifecycle, Glossary</li>
+<li>2026-01-23: Initial creation from comprehensive codebase analysis</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

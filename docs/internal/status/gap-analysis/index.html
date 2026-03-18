@@ -1,0 +1,881 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Gap Analysis | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>internal</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>status</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>gap analysis</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/internal/status/gap-analysis.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Gap Analysis</h1>
+<p><strong>Date</strong>: 2025-11-18 (Updated from 2025-01-15)
+<strong>Purpose</strong>: Comprehensive analysis of implementation status vs vision
+<strong>Status</strong>: Historical analysis snapshot (2025-11-18)</p>
+<blockquote>
+<p>Historical note: This document reflects a point-in-time assessment from 2025-11-18.
+Validate current readiness against latest status reports and live CI results.</p>
+</blockquote>
+<hr>
+<h2>Executive Summary</h2>
+<p>ICN&#39;s protocol substrate was assessed as production-ready in this 2025-11-18 snapshot (Phase 14 complete). The primary identified gap was the <strong>livability layer</strong> - the things that make it usable for humans and legible as an ecosystem.</p>
+<p><strong>Core thesis</strong>: Engine/transmission/frame present; dashboard/seatbelts/driving school missing.</p>
+<h3>What Exists</h3>
+<ul>
+<li><strong>Identity</strong>: DIDs, Age-encrypted keystore, multi-device support, social recovery logic</li>
+<li><strong>Trust</strong>: Trust graph, transitive scoring, trust classes, rate limiting</li>
+<li><strong>Network</strong>: QUIC/TLS, mDNS discovery, signed messages, E2E encryption, replay protection</li>
+<li><strong>Gossip</strong>: Topic-based pub/sub, vector clocks, Bloom filters, anti-entropy</li>
+<li><strong>Ledger</strong>: Double-entry mutual credit, Merkle-DAG, economic safety (credit limits, disputes)</li>
+<li><strong>Contracts</strong>: CCL interpreter with fuel metering</li>
+<li><strong>Governance</strong>: Domains, proposals, voting, membership resolution</li>
+<li><strong>Gateway</strong>: REST API + WebSocket, JWT auth, rate limiting, scope-based authorization</li>
+<li><strong>Operations</strong>: Graceful restart, metrics, health checks, backup/restore</li>
+</ul>
+<h3>What&#39;s Missing</h3>
+<ol>
+<li><strong>Protocol-level</strong>: Identity actor, programmable trust, contract wiring, federation semantics</li>
+<li><strong>Product/UX</strong>: Co-op Console, installer, first-run wizard</li>
+<li><strong>Ecosystem</strong>: Reference apps, legal templates, federation playbooks</li>
+<li><strong>Operations</strong>: Monitoring dashboards, incident automation, key management</li>
+<li><strong>Developer experience</strong>: SDKs, local dev harness, example workflows</li>
+<li><strong>Compute substrate</strong>: Capacity registry, job scheduling, metering, execution harness</li>
+<li><strong>Fundamental</strong>: Conflict resolution, offline support, mobile-first, i18n</li>
+</ol>
+<hr>
+<h2>1. Protocol-Level Gaps</h2>
+<h3>1.1 Identity as First-Class Actor</h3>
+<p><strong>Current state</strong>: Identity is library code in <code>icn-identity</code>, not a running actor.</p>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Status</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>DID generation</td>
+<td>✅</td>
+<td>Ed25519-based DIDs</td>
+</tr>
+<tr>
+<td>Encrypted keystore</td>
+<td>✅</td>
+<td>Age-encrypted, passphrase-protected</td>
+</tr>
+<tr>
+<td>Multi-device identity</td>
+<td>✅</td>
+<td>Phase 11: DID Document v2</td>
+</tr>
+<tr>
+<td>Key rotation</td>
+<td>✅</td>
+<td>RotationEvent chain with audit</td>
+</tr>
+<tr>
+<td>Device capabilities</td>
+<td>✅</td>
+<td>Sign, AddDevice, RevokeDevice, etc.</td>
+</tr>
+<tr>
+<td>Social recovery</td>
+<td>🚧</td>
+<td>Logic exists, not wired as actor</td>
+</tr>
+<tr>
+<td>IdentityActor</td>
+<td>❌</td>
+<td>Not in supervisor</td>
+</tr>
+<tr>
+<td>Hardware key support</td>
+<td>❌</td>
+<td>No YubiKey/FIDO2</td>
+</tr>
+<tr>
+<td>Capability tokens</td>
+<td>❌</td>
+<td>No scoped credentials per DID</td>
+</tr>
+</tbody></table>
+<p><strong>Missing</strong>:</p>
+<ul>
+<li><strong>IdentityActor as running thing</strong>: Device enrollment/revocation as gossip-aware events, identity sync via <code>identity:updates</code> topic</li>
+<li><strong>Hardware key support as default</strong>: YubiKey/FIDO2 so default story is &quot;secure device + recovery&quot;</li>
+<li><strong>Capability tokens</strong>: Scoped credentials tied to DIDs instead of &quot;DID can do everything&quot;</li>
+</ul>
+<h3>1.2 Trust Graph as Programmable Substrate</h3>
+<p><strong>Current state</strong>: Trust graph provides scoring and rate limiting by trust class.</p>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Status</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Weighted adjacency</td>
+<td>✅</td>
+<td>Basic graph storage</td>
+</tr>
+<tr>
+<td>Trust computation</td>
+<td>✅</td>
+<td>Transitive scoring</td>
+</tr>
+<tr>
+<td>Trust classes</td>
+<td>✅</td>
+<td>Isolated, Known, Partner, Federated</td>
+</tr>
+<tr>
+<td>Trust-gated features</td>
+<td>✅</td>
+<td>Rate limiting, topic access</td>
+</tr>
+<tr>
+<td>Trust decay</td>
+<td>❌</td>
+<td>No time-based decay</td>
+</tr>
+<tr>
+<td>Domain-specific trust</td>
+<td>❌</td>
+<td>Single scalar only</td>
+</tr>
+<tr>
+<td>Programmable consequences</td>
+<td>❌</td>
+<td>Trust doesn&#39;t auto-adjust limits</td>
+</tr>
+</tbody></table>
+<p><strong>Missing</strong>:</p>
+<ul>
+<li><strong>Trust decay and recency</strong>: Scores should fade without ongoing participation</li>
+<li><strong>Domain-specific trust</strong>: &quot;Trust financially but not for governance&quot; vs single scalar</li>
+<li><strong>Programmable consequences</strong>: Trust auto-adjusts credit limits, federation visibility, governance weight</li>
+</ul>
+<h3>1.3 Contracts/CCL as Nervous System</h3>
+<p><strong>Current state</strong>: CCL interpreter exists with fuel metering and basic integration.</p>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Status</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>AST-based interpreter</td>
+<td>✅</td>
+<td>Core execution engine</td>
+</tr>
+<tr>
+<td>Fuel metering</td>
+<td>✅</td>
+<td>Bounded execution</td>
+</tr>
+<tr>
+<td>Capability system</td>
+<td>✅</td>
+<td>ReadLedger, WriteLedger, ReadTrust</td>
+</tr>
+<tr>
+<td>Deterministic execution</td>
+<td>✅</td>
+<td>No randomness, no syscalls</td>
+</tr>
+<tr>
+<td>Standard contract libraries</td>
+<td>❌</td>
+<td>No templates</td>
+</tr>
+<tr>
+<td>Event wiring</td>
+<td>❌</td>
+<td>Loose governance→contracts→ledger</td>
+</tr>
+<tr>
+<td>DSL syntax</td>
+<td>❌</td>
+<td>AST only, no parser</td>
+</tr>
+</tbody></table>
+<p><strong>Missing</strong>:</p>
+<ul>
+<li><strong>Standard contract libraries</strong>: Worker share distribution, timebank exchange, CSA subscription, mutual aid reimbursement</li>
+<li><strong>Tight event wiring</strong>: Governance decisions → contracts, ledger entries → contracts (escrow), trust attestations → capabilities</li>
+<li><strong>Policy layer</strong>: &quot;Contracts can&#39;t do X without Y consent/trust/governance&quot;</li>
+</ul>
+<h3>1.4 Topology &amp; Federation Semantics</h3>
+<p><strong>Current state</strong>: Topology modes exist (standalone/regional/clustered), fanout works.</p>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Status</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Topology modes</td>
+<td>✅</td>
+<td>Standalone, regional, clustered</td>
+</tr>
+<tr>
+<td>mDNS discovery</td>
+<td>✅</td>
+<td>Local network</td>
+</tr>
+<tr>
+<td>Bootstrap peers</td>
+<td>✅</td>
+<td>Config-driven</td>
+</tr>
+<tr>
+<td>Federation namespaces</td>
+<td>❌</td>
+<td>No human-usable names</td>
+</tr>
+<tr>
+<td>Discovery directories</td>
+<td>❌</td>
+<td>Beyond mDNS</td>
+</tr>
+<tr>
+<td>Inter-federation policy</td>
+<td>❌</td>
+<td>No trust policies</td>
+</tr>
+</tbody></table>
+<p><strong>Missing</strong>:</p>
+<ul>
+<li><strong>Federation-level namespaces</strong>: Human-usable &quot;this coop is part of NYCN federation&quot;</li>
+<li><strong>Discovery beyond mDNS</strong>: Cooperative directories/rendezvous services</li>
+<li><strong>Inter-federation policy</strong>: &quot;Federation A trusts Federation B at score X&quot;</li>
+</ul>
+<hr>
+<h2>2. Product/UX Gaps</h2>
+<h3>2.1 Cooperative Admin Dashboard (CRITICAL - Blocks Pilot)</h3>
+<p><strong>Current state</strong>: Gateway API ready (14 endpoints, WebSocket, auth). No UI.</p>
+<p><strong>Missing - &quot;Co-op Console&quot;</strong>:</p>
+<ul>
+<li>Member list with roles</li>
+<li>Balance view per member</li>
+<li>Active proposals with vote buttons</li>
+<li>Simple payment form</li>
+<li>Invite/onboarding flow</li>
+<li>Credit policy configuration</li>
+<li>Trust relationship visualization</li>
+</ul>
+<p><strong>Minimum viable console</strong> (single-page React/Vue app):</p>
+<ul>
+<li>Auth flow (challenge → sign → JWT)</li>
+<li>Member management</li>
+<li>Balance display</li>
+<li>Create payment</li>
+<li>View/vote on proposals</li>
+</ul>
+<p><strong>Impact</strong>: #1 blocker. Pilot coop cannot see balances, vote, or manage members.</p>
+<h3>2.2 Human-Friendly Ledger &amp; Governance UX</h3>
+<p><strong>Current state</strong>: Primitives exist, CLI access via icnctl.</p>
+<p><strong>Missing</strong>:</p>
+<ul>
+<li><strong>Wallet-style views</strong>: &quot;My balance with this coop&quot;, &quot;My obligations&quot;, &quot;My trust lines&quot;</li>
+<li><strong>Governance timeline</strong>: &quot;What your org is deciding this month&quot;, &quot;How you voted&quot;</li>
+<li><strong>Notifications</strong>: New proposals, pending payments, limit increases</li>
+</ul>
+<h3>2.3 Installer &amp; Operations UX</h3>
+<p><strong>Current state</strong>: Manual installation, config, service setup.</p>
+<p><strong>Missing</strong>:</p>
+<ul>
+<li><strong>One-line installer</strong>: <code>curl | bash</code> that detects OS, installs, writes config, sets up systemd</li>
+<li><strong>First-run wizard</strong>: <code>icnctl init-coop</code> that creates identity, domain, member, starts daemon</li>
+<li><strong>Upgrade/migration tooling</strong>: Safe upgrades, clear restore steps for non-nerds</li>
+</ul>
+<hr>
+<h2>3. Ecosystem &amp; Social Gaps</h2>
+<h3>3.1 Reference Applications</h3>
+<p><strong>Current state</strong>: No end-to-end applications.</p>
+<p><strong>Missing 2-3 &quot;solves real thing today&quot; apps</strong>:</p>
+<ol>
+<li><strong>Timebank / skill exchange</strong>: Members log hours, exchange services</li>
+<li><strong>Shared expense / mutual aid pot</strong>: Pool funds, reimburse needs</li>
+<li><strong>Worker co-op revenue distribution</strong>: Revenue → member shares</li>
+</ol>
+<p>Each should be opinionated, deployable, documented as &quot;recipes.&quot;</p>
+<h3>3.2 Legal &amp; Governance Alignment</h3>
+<p><strong>Current state</strong>: Governance primitives work.</p>
+<p><strong>Missing</strong>:</p>
+<ul>
+<li><strong>Templates</strong>: Mapping governance domains → bylaws, resolutions, agreements</li>
+<li><strong>Playbooks</strong>: &quot;US worker co-op → ICN governance mapping&quot;</li>
+</ul>
+<h3>3.3 Federation Playbook</h3>
+<p><strong>Current state</strong>: Federation technically possible.</p>
+<p><strong>Missing</strong>:</p>
+<ul>
+<li><strong>&quot;How federations form on ICN&quot;</strong>: Example with member coops, federated domain, shared ledger</li>
+<li><strong>Onboarding steps</strong>: Single node, regional federation, multi-region network</li>
+</ul>
+<hr>
+<h2>4. Operations, Safety &amp; Reliability Gaps</h2>
+<h3>4.1 Default Monitoring Stack</h3>
+<p><strong>Current state</strong>: Prometheus metrics on :9090, health endpoint, monitoring dashboard.</p>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Status</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Prometheus exporter</td>
+<td>✅</td>
+<td>/metrics endpoint</td>
+</tr>
+<tr>
+<td>Key metrics</td>
+<td>✅</td>
+<td>Gossip, network, ledger</td>
+</tr>
+<tr>
+<td>Health endpoint</td>
+<td>✅</td>
+<td>JSON on :8080/health</td>
+</tr>
+<tr>
+<td>Web dashboard</td>
+<td>✅</td>
+<td>Real-time UI on :8080/</td>
+</tr>
+<tr>
+<td>Incident runbooks</td>
+<td>✅</td>
+<td>7 incident types documented</td>
+</tr>
+<tr>
+<td>Operations guide</td>
+<td>✅</td>
+<td>1035 lines</td>
+</tr>
+<tr>
+<td>Grafana dashboards</td>
+<td>❌</td>
+<td>Not shipped</td>
+</tr>
+<tr>
+<td>Alert rules</td>
+<td>🚧</td>
+<td>Examples documented, not shipped as YAML</td>
+</tr>
+</tbody></table>
+<p><strong>Missing</strong>:</p>
+<ul>
+<li><strong>Grafana dashboards</strong>: Pre-built for gossip health, ledger activity, gateway errors</li>
+<li><strong>Prometheus alerting config</strong>: Ship as .yaml, not just documentation</li>
+</ul>
+<h3>4.2 Incident Automation Hooks</h3>
+<p><strong>Current state</strong>: Manual incident response.</p>
+<p><strong>Missing</strong>:</p>
+<ul>
+<li><strong>Webhooks/scripts</strong> for: Replay attack spikes, trust anomalies, quarantine fills</li>
+<li><strong>&quot;Red button&quot; workflows</strong>: Quarantine peer across network/trust/governance</li>
+</ul>
+<h3>4.3 Key Management Helpers</h3>
+<p><strong>Current state</strong>: Keystore works, rotation via icnctl.</p>
+<p><strong>Missing</strong>:</p>
+<ul>
+<li><strong>Guided rotation flows</strong>: Reminders, step-by-step help</li>
+<li><strong>Social recovery as first-class path</strong>: Not power-user only</li>
+</ul>
+<hr>
+<h2>5. Developer Experience Gaps</h2>
+<h3>5.1 SDKs / Client Libraries</h3>
+<p><strong>Current state</strong>: Gateway REST API exists. No client libraries.</p>
+<p><strong>Missing</strong>:</p>
+<ul>
+<li>TypeScript (highest priority)</li>
+<li>Python</li>
+<li>Go/Rust for services</li>
+</ul>
+<h3>5.2 Mock / Local Dev Harness</h3>
+<p><strong>Current state</strong>: Manual multi-node setup.</p>
+<p><strong>Missing</strong>:</p>
+<ul>
+<li><strong><code>icn-dev up</code></strong>: Spin up 3-5 nodes + gateway + dashboard, hot-reload</li>
+</ul>
+<h3>5.3 Example Contracts &amp; Workflows</h3>
+<p><strong>Current state</strong>: CCL docs exist, no end-to-end examples.</p>
+<p><strong>Missing</strong>:</p>
+<ul>
+<li>&quot;Contract sets up membership dues + ledger + votes&quot;</li>
+<li>&quot;Trust edge triggers increased credit limit via CCL&quot;</li>
+</ul>
+<hr>
+<h2>6. Additional Protocol Gaps</h2>
+<h3>6.1 Conflict Resolution Semantics</h3>
+<p><strong>Current state</strong>: Ledger has quarantine. Governance has no equivalent.</p>
+<p><strong>Missing</strong>:</p>
+<ul>
+<li>Handling competing governance proposals (same ID)</li>
+<li>Handling proposal close during voting</li>
+<li>General conflict resolution for non-ledger data</li>
+</ul>
+<h3>6.2 Offline/Intermittent Connectivity</h3>
+<p><strong>Current state</strong>: Assumes always-on nodes.</p>
+<p><strong>Missing</strong>:</p>
+<ul>
+<li><strong>Queue-and-sync</strong>: Buffer operations while offline</li>
+<li><strong>Conflict resolution on reconnect</strong>: After extended offline</li>
+<li><strong>Catch-up protocol</strong>: Beyond anti-entropy for long disconnections</li>
+</ul>
+<h3>6.3 Mobile-First Considerations</h3>
+<p><strong>Current state</strong>: REST/WebSocket is mobile-friendly transport.</p>
+<p><strong>Missing</strong>:</p>
+<ul>
+<li>Push notification integration</li>
+<li>Mobile wallet reference app</li>
+<li>JWT token refresh for long-lived sessions</li>
+</ul>
+<h3>6.4 Data Portability</h3>
+<p><strong>Current state</strong>: Backup creates encrypted tarballs.</p>
+<p><strong>Missing</strong>:</p>
+<ul>
+<li>Human-readable export (ledger entries, votes, attestations)</li>
+<li>Migration path to different node/federation</li>
+<li>Tax-year / legal archive format</li>
+</ul>
+<h3>6.5 Audit Trails for Compliance</h3>
+<p><strong>Current state</strong>: Merkle-DAG ledger is good foundation.</p>
+<p><strong>Missing</strong>:</p>
+<ul>
+<li>Immutable audit logs</li>
+<li>Signatures on every governance decision</li>
+<li>Tax-year report generation</li>
+</ul>
+<h3>6.6 Internationalization</h3>
+<p><strong>Current state</strong>: All strings hardcoded English.</p>
+<p><strong>Missing</strong>:</p>
+<ul>
+<li>i18n infrastructure</li>
+<li>Locale-aware formatting</li>
+<li>RTL support</li>
+</ul>
+<hr>
+<h2>7. Compute Substrate Gaps (MAJOR)</h2>
+<h3>7.1 Vision</h3>
+<p>Compute in ICN should be:</p>
+<ul>
+<li><strong>Shared cooperative resource</strong>: Homelabs, co-op servers, community data centers</li>
+<li><strong>Economic input</strong>: Contributing compute regenerates credit</li>
+<li><strong>Workload substrate</strong>: Schedule data processing, AI, media encoding, batch jobs</li>
+</ul>
+<p>ICN should be both <strong>accounting + governance brain</strong> and <strong>coordination spine</strong> for distributed compute.</p>
+<h3>7.2 Current State</h3>
+<ul>
+<li>CCL fuel metering exists (local sandboxing)</li>
+<li>No network-wide compute accounting</li>
+<li>No job scheduling, capacity registry, or metering</li>
+<li>No integration with K8s/Nomad/Slurm</li>
+</ul>
+<p>ICN can <strong>represent</strong> a compute economy but cannot:</p>
+<ul>
+<li>Discover compute nodes</li>
+<li>Send them jobs</li>
+<li>Verify execution</li>
+<li>Credit them based on usage</li>
+</ul>
+<h3>7.3 Missing Sub-systems</h3>
+<h4>A. Node Capacity &amp; Capability Registry</h4>
+<p>Nodes advertise capabilities:</p>
+<pre><code class="language-rust">struct ComputeProfile {
+    cpu_cores: u32,
+    ram_gb: u32,
+    disk_gb: u32,
+    gpu: Option&lt;GpuProfile&gt;,
+    capabilities: Vec&lt;ComputeCapability&gt;, // wasm, containers, sgx
+    network_mbps: u32,
+    region: String,
+    legal_profile: String,
+}
+</code></pre>
+<p>Delivered via:</p>
+<ul>
+<li>Gossip topic <code>compute:nodes</code></li>
+<li>Stored for scheduler queries</li>
+<li>Governable (org policy controls pool membership)</li>
+</ul>
+<h4>B. Compute Metering &amp; Telemetry → Ledger</h4>
+<p><strong>Telemetry model</strong> (per-job):</p>
+<ul>
+<li>CPU-seconds, RAM peak/avg, disk/network IO, duration, exit code</li>
+</ul>
+<p><strong>ComputeUsageReport</strong> (gossip topic):</p>
+<ul>
+<li>Origin node attests usage</li>
+</ul>
+<p><strong>Ledger integration</strong>:</p>
+<ul>
+<li>CCL contract: &quot;For each CPU-second, credit X&quot;</li>
+<li>Transparent, auditable conversion</li>
+</ul>
+<h4>C. Job Model &amp; Scheduling</h4>
+<p><strong>Job spec</strong>:</p>
+<pre><code class="language-rust">struct ComputeJob {
+    id: JobId,
+    owner: Did,
+    image: ImageRef,
+    resources: ResourceRequest,
+    constraints: PlacementConstraints,
+    input_refs: Vec&lt;DataRef&gt;,
+    settlement_contract: Option&lt;ContractRef&gt;,
+}
+</code></pre>
+<p><strong>Placement logic</strong> using trust, capacity, topology.</p>
+<p><strong>Scheduling patterns</strong>: Best-fit, fair rotation based on contributions/governance.</p>
+<h4>D. Execution Harness</h4>
+<p><strong>Adapters for</strong>: Kubernetes, Nomad, Proxmox, WASM</p>
+<p><strong>ComputeAgent</strong> (sidecar on each node):</p>
+<ul>
+<li>Listens for jobs, provisions workloads, collects telemetry, reports back</li>
+</ul>
+<h4>E. Verification &amp; Anti-Cheating</h4>
+<ul>
+<li><strong>Random redundancy</strong>: Run same job on multiple nodes</li>
+<li><strong>Spot checks + trust integration</strong>: Divergence → trust drops</li>
+<li><strong>Determinism</strong>: Prefer deterministic workloads</li>
+</ul>
+<h4>F. Governance of Compute Pools</h4>
+<p><strong>Decisions</strong>:</p>
+<ul>
+<li>Capacity reserved for local vs federation</li>
+<li>Pricing policies</li>
+<li>Data sensitivity tiers</li>
+</ul>
+<p><strong>Implementation</strong>: Domains like <code>coop.compute.policy</code>, proposals for pricing/pools</p>
+<h4>G. UX for Compute</h4>
+<p><strong>Console - Compute tab</strong>:</p>
+<ul>
+<li>Capacity charts, utilization, jobs in flight</li>
+<li>Settings: share %, pricing, pools</li>
+<li>Node list with status</li>
+</ul>
+<p><strong>Job submission</strong>: Form for image, constraints, who pays; history/logs/cost view</p>
+<h3>7.4 Phased Implementation</h3>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Scope</th>
+<th>Deliverables</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>C0</strong></td>
+<td>Representation</td>
+<td>ComputeProfile, <code>compute:nodes</code> topic, gateway endpoints, icnctl commands</td>
+</tr>
+<tr>
+<td><strong>C1</strong></td>
+<td>Off-chain integration</td>
+<td>External scheduler prototype, flat-rate ledger entries</td>
+</tr>
+<tr>
+<td><strong>C2</strong></td>
+<td>Metering &amp; contracts</td>
+<td>UsageReport, CCL billing contracts, basic verification</td>
+</tr>
+<tr>
+<td><strong>C3</strong></td>
+<td>Full compute pools</td>
+<td>Governance domains, federation placement, Console UX</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>8. Critical Path to First Pilot</h2>
+<h3>Phase 1: Pilot Readiness (Immediate Priority)</h3>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>What</th>
+<th>Effort</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>Installer script (<code>install.sh</code>)</td>
+<td>Low</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>icnctl init-coop</code> wizard</td>
+<td>Low</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Minimal Co-op Console</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Pilot playbook (10-page doc)</td>
+<td>Low</td>
+</tr>
+</tbody></table>
+<h3>Phase 2: Pilot Support</h3>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>What</th>
+<th>Effort</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>5</td>
+<td>Monitoring dashboard (Grafana)</td>
+<td>Low</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Incident runbook for pilot</td>
+<td>Low</td>
+</tr>
+</tbody></table>
+<h3>Phase 3: Post-Pilot</h3>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>What</th>
+<th>Effort</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>7</td>
+<td>Reference app #1 (timebank)</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>8</td>
+<td>TypeScript SDK</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>9</td>
+<td>IdentityActor as real actor</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>10</td>
+<td>Compute C0</td>
+<td>Medium</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>9. Priority Matrix</h2>
+<table>
+<thead>
+<tr>
+<th>Gap</th>
+<th>Blocks Pilot?</th>
+<th>Effort</th>
+<th>Impact</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Co-op Console</td>
+<td><strong>YES</strong></td>
+<td>Medium</td>
+<td>Critical</td>
+</tr>
+<tr>
+<td><code>icnctl init-coop</code></td>
+<td><strong>YES</strong></td>
+<td>Low</td>
+<td>High</td>
+</tr>
+<tr>
+<td>Installer script</td>
+<td><strong>YES</strong></td>
+<td>Low</td>
+<td>High</td>
+</tr>
+<tr>
+<td>Pilot playbook</td>
+<td><strong>YES</strong></td>
+<td>Low</td>
+<td>High</td>
+</tr>
+<tr>
+<td>Monitoring dashboard</td>
+<td>No</td>
+<td>Low</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>TypeScript SDK</td>
+<td>No</td>
+<td>Medium</td>
+<td>High</td>
+</tr>
+<tr>
+<td>IdentityActor</td>
+<td>No</td>
+<td>Medium</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Compute C0</td>
+<td>No</td>
+<td>Medium</td>
+<td>High</td>
+</tr>
+<tr>
+<td>Reference app</td>
+<td>No</td>
+<td>Medium</td>
+<td>High</td>
+</tr>
+<tr>
+<td>Federation playbook</td>
+<td>No</td>
+<td>Low</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Offline support</td>
+<td>No</td>
+<td>High</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Mobile app</td>
+<td>No</td>
+<td>High</td>
+<td>High</td>
+</tr>
+<tr>
+<td>i18n</td>
+<td>No</td>
+<td>High</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Conflict resolution</td>
+<td>No</td>
+<td>Medium</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Data portability</td>
+<td>No</td>
+<td>Medium</td>
+<td>Medium</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>10. Narrative &amp; Onboarding Gaps</h2>
+<h3>Different Tiers of Explanation Needed</h3>
+<ol>
+<li><strong>Organizer level</strong>: &quot;We&#39;re sick of Google Sheets and SurveyMonkey; ICN fixes that.&quot;</li>
+<li><strong>Tech ally level</strong>: &quot;Not blockchain - mutual credit with gossip and trust graphs.&quot;</li>
+<li><strong>Movement level</strong>: &quot;This is the substrate for a parallel, cooperative economy.&quot;</li>
+</ol>
+<h3>&quot;Path to First Pilot&quot; Guide</h3>
+<p>Step-by-step from:</p>
+<ul>
+<li>&quot;We&#39;re a small coop with messy spreadsheets&quot;</li>
+<li>to &quot;We&#39;re using ICN for membership, money flows, and decisions&quot;</li>
+</ul>
+<hr>
+<h2>11. Success Criteria</h2>
+<h3>30-Day Validation</h3>
+<ul>
+<li>Real cooperative deployed and operational</li>
+<li>100+ transactions without manual intervention</li>
+<li>Survives 1 node failure without data loss</li>
+<li>Members can join/leave without technical support</li>
+</ul>
+<h3>6-Month Trial</h3>
+<ul>
+<li>Pilot operates continuously without catastrophic failure</li>
+<li>Community provides actionable feedback</li>
+</ul>
+<hr>
+<h2>12. Summary</h2>
+<p>ICN has the <strong>protocol substrate</strong> complete. What&#39;s missing:</p>
+<ol>
+<li><strong>Dashboard</strong>: Co-op Console for humans to use it</li>
+<li><strong>Seatbelts</strong>: Monitoring, incident automation, key management</li>
+<li><strong>Driving school</strong>: Pilot playbook, reference apps, federation guides</li>
+<li><strong>Compute layer</strong>: Infrastructure-as-cooperative-resource</li>
+</ol>
+<p>Once there&#39;s a clean Co-op Console, a few reference apps, and a pilot playbook, ICN stops being &quot;incredible substrate&quot; and starts being &quot;obvious next step&quot; for any serious cooperative project.</p>
+<hr>
+<p><em>Document created: 2025-01-15</em>
+<em>Last updated: 2025-11-18</em>
+<em>Status: Phase 14 (Gateway + Production Hardening) complete</em></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

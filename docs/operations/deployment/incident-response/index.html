@@ -1,0 +1,1374 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Incident Response Playbook | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>operations</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>deployment</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>incident response</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/operations/deployment/incident-response.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Incident Response Playbook</h1>
+<p>This document provides operational procedures for responding to common incidents in ICN deployments. While some responses are currently manual or crude in v0.1, having documented procedures is critical for operational readiness.</p>
+<p><strong>Audience</strong>: ICN node operators, cooperative system administrators, incident responders</p>
+<p><strong>Status</strong>: Living document - procedures will evolve as ICN matures</p>
+<hr>
+<h2>Table of Contents</h2>
+<ol>
+<li><a href="#general-incident-response-framework">General Incident Response Framework</a></li>
+<li><a href="#k3s-deployment-quick-reference">K3s Deployment Quick Reference</a></li>
+<li><a href="#incident-node-compromise">Incident: Node Compromise</a></li>
+<li><a href="#incident-ledger-corruption-detected">Incident: Ledger Corruption Detected</a></li>
+<li><a href="#incident-key-suspected-stolen">Incident: Key Suspected Stolen</a></li>
+<li><a href="#incident-network-partition">Incident: Network Partition</a></li>
+<li><a href="#incident-pod-failure-k3s">Incident: Pod Failure (K3s)</a></li>
+<li><a href="#incident-gossip-storm">Incident: Gossip Storm</a></li>
+<li><a href="#incident-quarantine-growth">Incident: Quarantine Growth</a></li>
+<li><a href="#incident-storage-issues-k3s">Incident: Storage Issues (K3s)</a></li>
+<li><a href="#incident-backup-verification-failure">Incident: Backup Verification Failure</a></li>
+<li><a href="#monitoring-and-detection">Monitoring and Detection</a></li>
+<li><a href="#communication-templates">Communication Templates</a></li>
+</ol>
+<hr>
+<h2>General Incident Response Framework</h2>
+<h3>Severity Levels</h3>
+<p><strong>P0 - Critical</strong>: Identity compromise, data loss, complete service outage</p>
+<ul>
+<li>Response time: Immediate</li>
+<li>Escalation: All hands</li>
+</ul>
+<p><strong>P1 - High</strong>: Partial service degradation, security concern</p>
+<ul>
+<li>Response time: Within 1 hour</li>
+<li>Escalation: On-call operator</li>
+</ul>
+<p><strong>P2 - Medium</strong>: Non-critical issues, performance degradation</p>
+<ul>
+<li>Response time: Within 4 hours</li>
+<li>Escalation: Normal channels</li>
+</ul>
+<p><strong>P3 - Low</strong>: Minor issues, cosmetic problems</p>
+<ul>
+<li>Response time: Next business day</li>
+<li>Escalation: Ticket queue</li>
+</ul>
+<h3>Response Steps</h3>
+<ol>
+<li><strong>Detect</strong>: Monitoring alerts, user reports, health checks</li>
+<li><strong>Assess</strong>: Determine severity and scope</li>
+<li><strong>Contain</strong>: Prevent further damage</li>
+<li><strong>Recover</strong>: Restore normal operations</li>
+<li><strong>Document</strong>: Record what happened and how it was resolved</li>
+<li><strong>Review</strong>: Post-mortem and process improvement</li>
+</ol>
+<hr>
+<h2>K3s Deployment Quick Reference</h2>
+<p>This section provides K3s-specific commands for the live homelab deployment.</p>
+<blockquote>
+<p><strong>Note</strong>: Paths like <code>/home/matt/projects/icn</code> are specific to the current deployment.
+Adjust paths according to your local setup.</p>
+</blockquote>
+<h3>Cluster Access</h3>
+<pre><code class="language-bash"># SSH to control plane
+ssh ubuntu@10.8.10.40
+
+# All kubectl commands require sudo on control plane
+sudo kubectl -n icn &lt;command&gt;
+</code></pre>
+<h3>Quick Diagnosis Commands</h3>
+<pre><code class="language-bash"># Check pod status
+sudo kubectl -n icn get pods -o wide
+
+# View pod logs (live)
+sudo kubectl -n icn logs -f deployment/icn-daemon
+
+# View pod logs (last 100 lines)
+sudo kubectl -n icn logs deployment/icn-daemon --tail=100
+
+# Describe pod for events and status
+sudo kubectl -n icn describe pod -l app=icn
+
+# Check resource usage
+sudo kubectl -n icn top pods
+
+# View all ICN resources
+sudo kubectl -n icn get all
+
+# Check PVC status
+sudo kubectl -n icn get pvc
+</code></pre>
+<h3>Health Checks</h3>
+<pre><code class="language-bash"># ICN health endpoint
+curl http://10.8.10.40:30080/v1/health
+
+# Prometheus metrics
+curl http://10.8.10.40:30100/metrics | head -50
+
+# Grafana dashboard
+# Open: http://10.8.10.40:30300
+
+# Check node identity
+sudo kubectl -n icn exec deploy/icn-daemon -- /usr/local/bin/icnctl id show
+</code></pre>
+<h3>Restart Procedures</h3>
+<pre><code class="language-bash"># Restart ICN daemon (graceful)
+sudo kubectl -n icn rollout restart deployment/icn-daemon
+
+# Wait for rollout to complete
+sudo kubectl -n icn rollout status deployment/icn-daemon
+
+# Force delete stuck pod
+sudo kubectl -n icn delete pod -l app=icn --force --grace-period=0
+
+# Full redeploy from local
+cd /home/matt/projects/icn/deploy/k8s &amp;&amp; make full-deploy-dev
+</code></pre>
+<h3>Backup &amp; Recovery</h3>
+<pre><code class="language-bash"># Backup current state (from within pod)
+sudo kubectl -n icn exec deploy/icn-daemon -- /usr/local/bin/icnctl backup /data/backup.tar
+
+# Copy backup from pod to local (get pod name first)
+POD=$(sudo kubectl -n icn get pod -l app=icn -o jsonpath=&#39;{.items[0].metadata.name}&#39;)
+sudo kubectl -n icn cp $POD:/data/backup.tar /tmp/icn-backup.tar
+
+# View backup location (NFS on Atlas)
+ssh atlas &quot;ls -la /mnt/storage/k8s/icn-data/&quot;
+</code></pre>
+<h3>Network Diagnostics</h3>
+<pre><code class="language-bash"># Check service endpoints
+sudo kubectl -n icn get endpoints
+
+# Test internal connectivity
+sudo kubectl -n icn exec deploy/icn-daemon -- curl localhost:9100/metrics
+
+# View network policies
+sudo kubectl -n icn get networkpolicies
+
+# Check node port exposure
+sudo kubectl -n icn get svc
+</code></pre>
+<h3>Alertmanager</h3>
+<pre><code class="language-bash"># View active alerts
+curl -s http://10.8.10.40:30093/api/v1/alerts | jq &#39;.data[] | {labels: .labels, state: .status.state}&#39;
+
+# Silence an alert (for maintenance)
+# Use Alertmanager UI: http://10.8.10.40:30093
+</code></pre>
+<hr>
+<h2>Incident: Node Compromise</h2>
+<p><strong>Severity</strong>: P0 - Critical</p>
+<h3>Symptoms</h3>
+<ul>
+<li>Unauthorized access to node detected</li>
+<li>Suspicious processes running</li>
+<li>Unexpected network traffic</li>
+<li>Alerts from intrusion detection systems</li>
+<li>DID signing messages you didn&#39;t authorize</li>
+</ul>
+<h3>Immediate Actions (First 15 Minutes)</h3>
+<ol>
+<li><p><strong>Isolate the node immediately</strong>:</p>
+<pre><code class="language-bash"># Stop ICNd
+systemctl stop icnd
+# OR
+pkill icnd
+
+# Block network access (if available)
+sudo iptables -A INPUT -j DROP
+sudo iptables -A OUTPUT -j DROP
+</code></pre>
+</li>
+<li><p><strong>Preserve evidence</strong>:</p>
+<pre><code class="language-bash"># Capture running processes
+ps auxf &gt; /tmp/incident-processes.txt
+
+# Capture network connections
+netstat -tulpn &gt; /tmp/incident-netstat.txt
+
+# Copy ICN logs
+cp -r ~/.icn/logs /tmp/incident-logs-$(date +%Y%m%d-%H%M%S)
+
+# Capture system logs
+journalctl -u icnd --since &quot;1 hour ago&quot; &gt; /tmp/incident-journalctl.txt
+</code></pre>
+</li>
+<li><p><strong>Notify cooperative members</strong>:</p>
+<ul>
+<li>Alert other node operators immediately</li>
+<li>Warn them NOT to trust messages from your DID</li>
+<li>Coordinate on out-of-band communication (Signal, phone, etc.)</li>
+</ul>
+</li>
+</ol>
+<h3>Recovery Actions (Next 2 Hours)</h3>
+<ol start="4">
+<li><p><strong>Revoke compromised device</strong>:</p>
+<p><strong>On a trusted device</strong> (not the compromised one):</p>
+<pre><code class="language-bash"># Restore your identity from backup to a secure device
+icnctl --data-dir /secure/path restore /backup/icn-backup.tar
+
+# List devices to identify the compromised one
+icnctl device list
+
+# Revoke the compromised device
+icnctl device revoke device-compromised-id --reason compromised
+</code></pre>
+</li>
+<li><p><strong>Rotate all keys</strong>:</p>
+<pre><code class="language-bash"># On the secure device, rotate the main key
+icnctl id rotate --reason &quot;Compromise detected - rotating all keys&quot;
+</code></pre>
+</li>
+<li><p><strong>Audit recent activity</strong>:</p>
+<pre><code class="language-bash"># Check ledger for unauthorized transactions
+icnctl ledger history --limit 100
+
+# Review trust edges - did attacker add malicious trust?
+icnctl trust list
+
+# Check deployed contracts
+# (Future: icnctl contract list)
+</code></pre>
+</li>
+</ol>
+<h3>Investigation</h3>
+<ol start="7">
+<li><p><strong>Determine attack vector</strong>:</p>
+<ul>
+<li>Check system logs for unauthorized SSH access</li>
+<li>Review application logs for exploitation attempts</li>
+<li>Examine network logs for command &amp; control traffic</li>
+<li>Check for malware or rootkits</li>
+<li>Review recent software updates or configuration changes</li>
+</ul>
+</li>
+<li><p><strong>Assess damage</strong>:</p>
+<ul>
+<li>What data was accessed?</li>
+<li>Were transactions authorized on your behalf?</li>
+<li>Was trust graph manipulated?</li>
+<li>Were contracts deployed or modified?</li>
+</ul>
+</li>
+</ol>
+<h3>Long-Term Actions</h3>
+<ol start="9">
+<li><p><strong>Harden the replacement node</strong>:</p>
+<ul>
+<li>Reinstall OS from scratch (don&#39;t trust compromised system)</li>
+<li>Apply all security patches</li>
+<li>Enable fail2ban or equivalent</li>
+<li>Configure firewall rules (only allow necessary ports)</li>
+<li>Enable audit logging</li>
+<li>Consider using a hardware security module (HSM) for keys</li>
+</ul>
+</li>
+<li><p><strong>Post-mortem</strong>:</p>
+<ul>
+<li>Document timeline of compromise</li>
+<li>Root cause analysis</li>
+<li>Update security procedures</li>
+<li>Share lessons learned with cooperative</li>
+</ul>
+</li>
+</ol>
+<h3>Prevention</h3>
+<ul>
+<li><strong>Principle of Least Privilege</strong>: Run ICNd as non-root user</li>
+<li><strong>Network Segmentation</strong>: Firewall rules limiting access</li>
+<li><strong>Regular Backups</strong>: Daily encrypted backups to off-site location</li>
+<li><strong>Monitoring</strong>: Set up alerts for unusual activity</li>
+<li><strong>Multi-Device</strong>: Use separate devices for different risk profiles</li>
+<li><strong>HSM</strong>: Consider hardware security modules for high-value identities</li>
+</ul>
+<hr>
+<h2>Incident: Ledger Corruption Detected</h2>
+<p><strong>Severity</strong>: P1 - High (can escalate to P0 if widespread)</p>
+<h3>Symptoms</h3>
+<ul>
+<li>Quarantine size growing rapidly (<code>icn_ledger_quarantine_size</code> metric)</li>
+<li>Merge conflict alerts (<code>icn_ledger_merge_conflicts_total</code>)</li>
+<li>Balance inconsistencies reported by users</li>
+<li>Monitoring dashboard shows ledger errors</li>
+<li>Failed double-entry validation</li>
+</ul>
+<h3>Assessment</h3>
+<ol>
+<li><p><strong>Check quarantine status</strong>:</p>
+<pre><code class="language-bash"># View quarantine size from dashboard
+curl http://localhost:8080/v1/health | jq &#39;.ledger_quarantine_size&#39;
+
+# Or check Prometheus metrics
+curl http://localhost:9100/metrics | grep icn_ledger_quarantine_size
+</code></pre>
+</li>
+<li><p><strong>List quarantined entries</strong> (future command):</p>
+<pre><code class="language-bash">icnctl ledger quarantine list
+</code></pre>
+</li>
+<li><p><strong>Determine scope</strong>:</p>
+<ul>
+<li>Is this affecting one account or many?</li>
+<li>Is this a local issue or network-wide?</li>
+<li>What&#39;s the time window of affected transactions?</li>
+</ul>
+</li>
+</ol>
+<h3>Recovery Procedures</h3>
+<h4>Scenario 1: Small Number of Conflicting Entries</h4>
+<p><strong>If &lt; 10 entries quarantined:</strong></p>
+<ol>
+<li><p><strong>Inspect each entry</strong>:</p>
+<pre><code class="language-bash">icnctl ledger quarantine get &lt;entry-hash&gt;
+</code></pre>
+</li>
+<li><p><strong>Manual resolution</strong>:</p>
+<ul>
+<li>If entry is valid but conflicted: Release from quarantine</li>
+<li>If entry is malicious or erroneous: Drop permanently</li>
+</ul>
+<pre><code class="language-bash"># Release valid entry (retry processing)
+icnctl ledger quarantine release &lt;entry-hash&gt;
+
+# Drop invalid entry
+icnctl ledger quarantine drop &lt;entry-hash&gt;
+</code></pre>
+</li>
+<li><p><strong>Verify resolution</strong>:</p>
+<pre><code class="language-bash">icnctl ledger balance &lt;account-id&gt;
+</code></pre>
+</li>
+</ol>
+<h4>Scenario 2: Large-Scale Corruption</h4>
+<p><strong>If &gt; 100 entries quarantined or balances severely wrong:</strong></p>
+<p><strong>⚠️ This is a critical incident - coordinate with cooperative before proceeding</strong></p>
+<ol>
+<li><p><strong>Stop the daemon</strong>:</p>
+<pre><code class="language-bash">systemctl stop icnd
+</code></pre>
+</li>
+<li><p><strong>Backup current state</strong> (even if corrupted):</p>
+<pre><code class="language-bash">icnctl backup /backup/corrupted-state-$(date +%Y%m%d-%H%M%S).tar
+</code></pre>
+</li>
+<li><p><strong>Restore from last known good backup</strong>:</p>
+<pre><code class="language-bash"># Identify last good backup (check timestamp and quarantine size)
+ls -lh /backup/
+
+# Restore
+icnctl restore /backup/icn-backup-20250114.tar --force
+</code></pre>
+</li>
+<li><p><strong>Purge quarantine</strong>:</p>
+<pre><code class="language-bash">icnctl ledger quarantine purge
+</code></pre>
+</li>
+<li><p><strong>Restart daemon</strong>:</p>
+<pre><code class="language-bash">systemctl start icnd
+</code></pre>
+</li>
+<li><p><strong>Monitor gossip sync</strong>:</p>
+<ul>
+<li>Watch dashboard for entries being re-synced</li>
+<li>Monitor quarantine to see if conflicts reappear</li>
+<li>If they do, there&#39;s a systemic issue (see Investigation below)</li>
+</ul>
+</li>
+</ol>
+<h4>Scenario 3: Unrecoverable Corruption</h4>
+<p><strong>If restore doesn&#39;t work or no good backup exists:</strong></p>
+<p><strong>🚨 Nuclear option - coordinate with entire cooperative</strong></p>
+<ol>
+<li><p><strong>Reconstruct from cooperative consensus</strong>:</p>
+<ul>
+<li>Poll all nodes for their ledger state</li>
+<li>Identify the most common version (Byzantine consensus)</li>
+<li>Majority state becomes canonical</li>
+</ul>
+</li>
+<li><p><strong>Manual ledger reconstruction</strong> (requires all members):</p>
+<ul>
+<li>Export ledger data from trusted nodes</li>
+<li>Manually reconcile discrepancies</li>
+<li>Re-import agreed-upon state</li>
+</ul>
+<p><em>This is a last resort and requires governance decision</em></p>
+</li>
+</ol>
+<h3>Investigation</h3>
+<p><strong>Why did corruption occur?</strong></p>
+<p>Common causes:</p>
+<ol>
+<li><strong>Concurrent updates</strong> - Two nodes created conflicting transactions simultaneously</li>
+<li><strong>Clock skew</strong> - Node clocks out of sync causing timestamp issues</li>
+<li><strong>Malicious entry</strong> - Attacker injected invalid transaction</li>
+<li><strong>Software bug</strong> - Double-entry validation logic failure</li>
+<li><strong>Disk corruption</strong> - Hardware failure corrupting database</li>
+</ol>
+<p><strong>Check for:</strong></p>
+<pre><code class="language-bash"># Clock skew
+timedatectl status
+
+# Disk errors
+dmesg | grep -i error
+smartctl -a /dev/sda
+
+# Recent software updates
+journalctl -u icnd --since &quot;1 week ago&quot; | grep upgrade
+</code></pre>
+<h3>Prevention</h3>
+<ul>
+<li><strong>Regular backups</strong>: Automated daily backups</li>
+<li><strong>Monitoring</strong>: Alert on quarantine size &gt; 10</li>
+<li><strong>Clock sync</strong>: NTP properly configured</li>
+<li><strong>Disk health</strong>: SMART monitoring enabled</li>
+<li><strong>Testing</strong>: Validate ledger integrity weekly</li>
+<li><strong>Redundancy</strong>: Multiple nodes per cooperative</li>
+</ul>
+<hr>
+<h2>Incident: Key Suspected Stolen</h2>
+<p><strong>Severity</strong>: P0 - Critical</p>
+<h3>Symptoms</h3>
+<ul>
+<li>Unauthorized transactions appearing in ledger</li>
+<li>Messages signed by your DID that you didn&#39;t send</li>
+<li>Your device missing or stolen</li>
+<li>Suspicious login attempts</li>
+<li>Passphrase may have been compromised</li>
+</ul>
+<h3>Immediate Actions (First 30 Minutes)</h3>
+<p><strong>If you have access to an authorized device:</strong></p>
+<ol>
+<li><p><strong>Revoke the compromised device IMMEDIATELY</strong>:</p>
+<pre><code class="language-bash"># From a secure device
+icnctl device list
+icnctl device revoke device-stolen-id --reason lost
+</code></pre>
+</li>
+<li><p><strong>Rotate your main key</strong>:</p>
+<pre><code class="language-bash">icnctl id rotate --reason &quot;Key compromise suspected&quot;
+</code></pre>
+</li>
+<li><p><strong>Change your passphrase</strong>:</p>
+<pre><code class="language-bash"># Export with old passphrase
+icnctl id export /tmp/identity-temp.age
+
+# Import with new passphrase (will prompt for new one)
+icnctl id import /tmp/identity-temp.age
+
+# Securely delete temp file
+shred -u /tmp/identity-temp.age
+</code></pre>
+</li>
+<li><p><strong>Notify cooperative</strong>:</p>
+<ul>
+<li>Alert all members immediately</li>
+<li>Provide new DID after rotation</li>
+<li>Request they update trust edges</li>
+</ul>
+</li>
+</ol>
+<p><strong>If you DON&#39;T have access to an authorized device:</strong></p>
+<p><strong>This is the worst-case scenario - you need social recovery</strong></p>
+<ol>
+<li><p><strong>Contact cooperative members urgently</strong>:</p>
+<ul>
+<li>Use out-of-band communication (phone, in-person)</li>
+<li>Verify your identity through established procedures</li>
+<li>Request they revoke trust edges to your compromised DID</li>
+</ul>
+</li>
+<li><p><strong>Create new identity</strong>:</p>
+<pre><code class="language-bash"># On a secure device
+icnctl --data-dir ~/.icn-new id init
+</code></pre>
+</li>
+<li><p><strong>Social recovery</strong> (Phase 11.6 - not yet implemented):</p>
+<pre><code class="language-bash"># Future: Request guardians to approve identity recovery
+icnctl id recover --guardians did:icn:guardian1,did:icn:guardian2
+</code></pre>
+</li>
+<li><p><strong>Rebuild trust</strong>:</p>
+<ul>
+<li>Request cooperative members add trust edges to new DID</li>
+<li>Re-establish economic relationships</li>
+<li>Accept that old ledger history is tied to compromised DID</li>
+</ul>
+<p><strong>⚠️ This is painful - emphasizes importance of multi-device setup</strong></p>
+</li>
+</ol>
+<h3>Key Rotation Ceremony (Planned Migration)</h3>
+<p><strong>For non-emergency key rotation</strong> (e.g., annual security practice):</p>
+<ol>
+<li><p><strong>Schedule rotation window</strong> with cooperative:</p>
+<ul>
+<li>Announce rotation 1 week in advance</li>
+<li>Pick low-activity time window</li>
+<li>Ensure all members are available for coordination</li>
+</ul>
+</li>
+<li><p><strong>Pre-rotation checks</strong>:</p>
+<pre><code class="language-bash"># Verify all devices are accessible
+icnctl device list
+
+# Create backup
+icnctl backup /backup/pre-rotation-$(date +%Y%m%d).tar
+
+# Verify backup
+icnctl restore /tmp/test-restore /backup/pre-rotation-*.tar
+</code></pre>
+</li>
+<li><p><strong>Execute rotation</strong>:</p>
+<pre><code class="language-bash">icnctl id rotate --reason &quot;Annual key rotation&quot;
+</code></pre>
+</li>
+<li><p><strong>Verify rotation</strong>:</p>
+<pre><code class="language-bash"># Check new DID
+icnctl id show
+
+# Verify old key is marked as rotated
+icnctl device list
+</code></pre>
+</li>
+<li><p><strong>Update external systems</strong>:</p>
+<ul>
+<li>Notify cooperative members of new DID</li>
+<li>Update any external databases or directories</li>
+<li>Test signing and encryption with new keys</li>
+</ul>
+</li>
+<li><p><strong>Post-rotation monitoring</strong> (24-48 hours):</p>
+<ul>
+<li>Watch for any messages still signed with old key</li>
+<li>Monitor gossip for identity updates</li>
+<li>Verify all devices received the rotation event</li>
+</ul>
+</li>
+</ol>
+<h3>Prevention</h3>
+<ul>
+<li><strong>Multi-device setup</strong>: Never rely on single device</li>
+<li><strong>Secure passphrase storage</strong>: Password manager, not written down</li>
+<li><strong>Device encryption</strong>: Full-disk encryption on all devices</li>
+<li><strong>Physical security</strong>: Lock devices when unattended</li>
+<li><strong>Social recovery setup</strong>: Configure guardians (when available)</li>
+<li><strong>Regular rotation</strong>: Annual planned key rotations</li>
+<li><strong>Backup verification</strong>: Test restore monthly</li>
+</ul>
+<hr>
+<h2>Incident: Network Partition</h2>
+<p><strong>Severity</strong>: P1 - High</p>
+<h3>Symptoms</h3>
+<ul>
+<li>Peer count drops to zero</li>
+<li>Gossip sync stalls</li>
+<li>Monitoring shows no network activity</li>
+<li>Can&#39;t reach other nodes</li>
+</ul>
+<h3>Diagnosis</h3>
+<ol>
+<li><p><strong>Check network connectivity</strong>:</p>
+<pre><code class="language-bash"># Test internet connection
+ping 8.8.8.8
+
+# Test DNS
+nslookup google.com
+
+# Check if ICNd is running
+systemctl status icnd
+</code></pre>
+</li>
+<li><p><strong>Check ICN peer status</strong>:</p>
+<pre><code class="language-bash"># View peer count from dashboard
+curl http://localhost:8080/v1/health | jq &#39;.active_connections&#39;
+
+# Check network metrics
+curl http://localhost:9100/metrics | grep icn_network_connections_active
+</code></pre>
+</li>
+<li><p><strong>Check mDNS discovery</strong>:</p>
+<pre><code class="language-bash"># Verify mDNS is working
+avahi-browse -a
+</code></pre>
+</li>
+</ol>
+<h3>Recovery</h3>
+<ol>
+<li><p><strong>Restart ICNd</strong>:</p>
+<pre><code class="language-bash">systemctl restart icnd
+</code></pre>
+</li>
+<li><p><strong>Check firewall rules</strong>:</p>
+<pre><code class="language-bash"># Verify QUIC port is open (default: 7777/udp)
+sudo iptables -L -n | grep 7777
+
+# Verify mDNS port is open (5353)
+sudo iptables -L -n | grep 5353
+</code></pre>
+</li>
+<li><p><strong>Manual peer dial</strong> (future feature):</p>
+<pre><code class="language-bash"># If mDNS fails, manually dial known peers
+icnctl network dial &lt;peer-multiaddr&gt; &lt;peer-did&gt;
+</code></pre>
+</li>
+<li><p><strong>Check for split-brain</strong>:</p>
+<ul>
+<li>If network partitions, different nodes may have divergent state</li>
+<li>When partition heals, gossip anti-entropy will sync</li>
+<li>Monitor quarantine for conflicts</li>
+</ul>
+</li>
+</ol>
+<h3>Prevention</h3>
+<ul>
+<li><strong>Multiple network paths</strong>: Don&#39;t rely on single network link</li>
+<li><strong>Monitoring</strong>: Alert on peer count &lt; 2</li>
+<li><strong>Fallback discovery</strong>: Manual peer list in config</li>
+<li><strong>Regular testing</strong>: Chaos engineering - test partition recovery</li>
+</ul>
+<hr>
+<h2>Incident: Pod Failure (K3s)</h2>
+<p><strong>Severity</strong>: P1 - High</p>
+<h3>Symptoms</h3>
+<ul>
+<li>Pod not in <code>Running</code> state</li>
+<li>Health endpoint returns 503 or times out</li>
+<li>Grafana shows gaps in metrics</li>
+<li>Alertmanager fires <code>ICNPodNotReady</code> alert</li>
+</ul>
+<h3>Diagnosis</h3>
+<ol>
+<li><p><strong>Check pod status</strong>:</p>
+<pre><code class="language-bash">ssh ubuntu@10.8.10.40
+sudo kubectl -n icn get pods -o wide
+</code></pre>
+</li>
+<li><p><strong>Check pod events</strong>:</p>
+<pre><code class="language-bash">sudo kubectl -n icn describe pod -l app=icn
+</code></pre>
+<p>Common issues in events:</p>
+<ul>
+<li><code>ImagePullBackOff</code> - Image not available on node</li>
+<li><code>CrashLoopBackOff</code> - Application crashing repeatedly</li>
+<li><code>OOMKilled</code> - Out of memory</li>
+<li><code>Pending</code> - No resources or node selector mismatch</li>
+</ul>
+</li>
+<li><p><strong>Check logs</strong>:</p>
+<pre><code class="language-bash"># Current pod logs
+sudo kubectl -n icn logs deployment/icn-daemon --tail=200
+
+# Previous container (if crashed)
+sudo kubectl -n icn logs deployment/icn-daemon --previous
+</code></pre>
+</li>
+<li><p><strong>Check node resources</strong>:</p>
+<pre><code class="language-bash">sudo kubectl top nodes
+sudo kubectl describe nodes | grep -A 5 &quot;Allocated resources&quot;
+</code></pre>
+</li>
+</ol>
+<h3>Recovery</h3>
+<h4>Scenario 1: CrashLoopBackOff</h4>
+<ol>
+<li><p><strong>Check logs for crash reason</strong>:</p>
+<pre><code class="language-bash">sudo kubectl -n icn logs deployment/icn-daemon --previous
+</code></pre>
+</li>
+<li><p><strong>Common fixes</strong>:</p>
+<ul>
+<li><strong>Config error</strong>: Check ConfigMap for typos</li>
+<li><strong>Permission error</strong>: Verify PVC is mounted correctly</li>
+<li><strong>Port conflict</strong>: Check if ports are available</li>
+</ul>
+</li>
+<li><p><strong>Restart after fix</strong>:</p>
+<pre><code class="language-bash">sudo kubectl -n icn rollout restart deployment/icn-daemon
+</code></pre>
+</li>
+</ol>
+<h4>Scenario 2: OOMKilled</h4>
+<ol>
+<li><p><strong>Check memory usage before OOM</strong>:</p>
+<pre><code class="language-bash">sudo kubectl -n icn describe pod -l app=icn | grep -A 3 &quot;Last State&quot;
+</code></pre>
+</li>
+<li><p><strong>Increase memory limit</strong> (edit deployment):</p>
+<pre><code class="language-bash">sudo kubectl -n icn edit deployment icn-daemon
+# Change: resources.limits.memory: 2Gi -&gt; 4Gi
+</code></pre>
+<p>Or redeploy with updated manifests:</p>
+<pre><code class="language-bash">cd /home/matt/projects/icn/deploy/k8s &amp;&amp; make full-deploy-dev
+</code></pre>
+</li>
+</ol>
+<h4>Scenario 3: ImagePullBackOff</h4>
+<ol>
+<li><p><strong>Check image availability</strong>:</p>
+<pre><code class="language-bash">sudo crictl images | grep icn
+</code></pre>
+</li>
+<li><p><strong>Sync image to nodes</strong>:</p>
+<pre><code class="language-bash">cd /home/matt/projects/icn/deploy/k8s
+make sync-images
+</code></pre>
+</li>
+</ol>
+<h4>Scenario 4: Stuck Pending</h4>
+<ol>
+<li><p><strong>Check for resource constraints</strong>:</p>
+<pre><code class="language-bash">sudo kubectl -n icn describe pod -l app=icn
+</code></pre>
+</li>
+<li><p><strong>Check PVC binding</strong>:</p>
+<pre><code class="language-bash">sudo kubectl -n icn get pvc
+sudo kubectl -n icn describe pvc icn-data
+</code></pre>
+</li>
+<li><p><strong>Check NFS server</strong> (Atlas):</p>
+<pre><code class="language-bash">ssh atlas &quot;systemctl status nfs-kernel-server&quot;
+showmount -e 10.8.10.25
+</code></pre>
+</li>
+</ol>
+<h3>Prevention</h3>
+<ul>
+<li><strong>Resource limits</strong>: Set appropriate CPU/memory limits</li>
+<li><strong>Health probes</strong>: Liveness and readiness probes configured</li>
+<li><strong>PodDisruptionBudget</strong>: Prevent accidental disruption</li>
+<li><strong>Monitoring</strong>: Alert on pod restarts &gt; 3 in 10 minutes</li>
+</ul>
+<hr>
+<h2>Incident: Gossip Storm</h2>
+<p><strong>Severity</strong>: P2 - Medium</p>
+<h3>Symptoms</h3>
+<ul>
+<li>Extremely high network bandwidth usage</li>
+<li>CPU pegged at 100%</li>
+<li>Gossip metrics showing thousands of messages/sec</li>
+<li>Dashboard shows message count exploding</li>
+</ul>
+<h3>Diagnosis</h3>
+<ol>
+<li><p><strong>Check gossip metrics</strong>:</p>
+<pre><code class="language-bash">curl http://localhost:9100/metrics | grep icn_gossip
+</code></pre>
+</li>
+<li><p><strong>Identify problematic topic</strong>:</p>
+<ul>
+<li>Look for topic with disproportionate activity</li>
+<li>Check for single peer sending excessive messages</li>
+</ul>
+</li>
+</ol>
+<h3>Mitigation</h3>
+<ol>
+<li><p><strong>Rate limiting is automatic</strong>:</p>
+<ul>
+<li>ICN has trust-based rate limiting built in</li>
+<li>Untrusted peers limited to 10 msg/sec</li>
+<li>Trusted peers limited to 200 msg/sec</li>
+</ul>
+</li>
+<li><p><strong>If rate limiting insufficient</strong>:</p>
+<pre><code class="language-bash"># Restart daemon (clears in-memory state)
+systemctl restart icnd
+</code></pre>
+</li>
+<li><p><strong>Block malicious peer</strong> (future feature):</p>
+<pre><code class="language-bash"># Remove trust edge to spammer
+icnctl trust remove did:icn:spammer
+
+# Block peer entirely
+icnctl network block did:icn:spammer
+</code></pre>
+</li>
+</ol>
+<h3>Prevention</h3>
+<ul>
+<li><strong>Trust gating</strong>: Only subscribe trusted peers to sensitive topics</li>
+<li><strong>Entry limits</strong>: Configure max entries per topic</li>
+<li><strong>Monitoring</strong>: Alert on unusual message rates</li>
+</ul>
+<hr>
+<h2>Incident: Quarantine Growth</h2>
+<p><strong>Severity</strong>: P2 - Medium (can escalate)</p>
+<h3>Symptoms</h3>
+<ul>
+<li><code>icn_ledger_quarantine_size</code> metric growing</li>
+<li>Dashboard shows degraded health</li>
+<li>Merge conflicts incrementing</li>
+</ul>
+<h3>Investigation</h3>
+<ol>
+<li><p><strong>List quarantined entries</strong>:</p>
+<pre><code class="language-bash">icnctl ledger quarantine list
+</code></pre>
+</li>
+<li><p><strong>Identify patterns</strong>:</p>
+<ul>
+<li>Same account appearing repeatedly?</li>
+<li>Specific time period?</li>
+<li>Common error type?</li>
+</ul>
+</li>
+</ol>
+<h3>Resolution</h3>
+<ol>
+<li><p><strong>Manual review</strong> (if &lt; 50 entries):</p>
+<pre><code class="language-bash"># Inspect each entry
+icnctl ledger quarantine get &lt;hash&gt;
+
+# Release or drop based on validity
+icnctl ledger quarantine release &lt;hash&gt;
+# OR
+icnctl ledger quarantine drop &lt;hash&gt;
+</code></pre>
+</li>
+<li><p><strong>Automated cleanup</strong> (if &gt; 50 entries):</p>
+<pre><code class="language-bash"># Purge expired entries (older than 7 days)
+icnctl ledger quarantine purge
+</code></pre>
+</li>
+<li><p><strong>Root cause fix</strong>:</p>
+<ul>
+<li>If clock skew: Sync NTP</li>
+<li>If malicious: Remove trust edge</li>
+<li>If bug: Report to ICN developers</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h2>Incident: Storage Issues (K3s)</h2>
+<p><strong>Severity</strong>: P1 - High</p>
+<h3>Symptoms</h3>
+<ul>
+<li>Write failures in logs (<code>sled error</code>, <code>I/O error</code>)</li>
+<li>PVC shows as <code>Pending</code> or <code>Lost</code></li>
+<li>NFS mount errors</li>
+<li>Disk space alerts</li>
+<li>Data not persisting across pod restarts</li>
+</ul>
+<h3>Diagnosis</h3>
+<ol>
+<li><p><strong>Check PVC status</strong>:</p>
+<pre><code class="language-bash">ssh ubuntu@10.8.10.40
+sudo kubectl -n icn get pvc
+sudo kubectl -n icn describe pvc icn-data
+</code></pre>
+</li>
+<li><p><strong>Check disk space on NFS server</strong>:</p>
+<pre><code class="language-bash">ssh atlas &quot;df -h /mnt/storage&quot;
+</code></pre>
+</li>
+<li><p><strong>Check NFS service</strong>:</p>
+<pre><code class="language-bash">ssh atlas &quot;systemctl status nfs-kernel-server&quot;
+ssh atlas &quot;exportfs -v&quot;
+</code></pre>
+</li>
+<li><p><strong>Check mount from pod</strong>:</p>
+<pre><code class="language-bash">sudo kubectl -n icn exec deploy/icn-daemon -- df -h /data
+sudo kubectl -n icn exec deploy/icn-daemon -- ls -la /data
+</code></pre>
+</li>
+<li><p><strong>Check for Sled database issues</strong>:</p>
+<pre><code class="language-bash">sudo kubectl -n icn logs deployment/icn-daemon | grep -i &quot;sled\|error\|corrupt&quot;
+</code></pre>
+</li>
+</ol>
+<h3>Recovery</h3>
+<h4>Scenario 1: NFS Server Unreachable</h4>
+<ol>
+<li><p><strong>Check network connectivity</strong>:</p>
+<pre><code class="language-bash">ping 10.8.10.25
+</code></pre>
+</li>
+<li><p><strong>Restart NFS service</strong>:</p>
+<pre><code class="language-bash">ssh atlas &quot;sudo systemctl restart nfs-kernel-server&quot;
+</code></pre>
+</li>
+<li><p><strong>Verify exports</strong>:</p>
+<pre><code class="language-bash">showmount -e 10.8.10.25
+</code></pre>
+</li>
+<li><p><strong>Restart ICN pod</strong> (to remount):</p>
+<pre><code class="language-bash">sudo kubectl -n icn rollout restart deployment/icn-daemon
+</code></pre>
+</li>
+</ol>
+<h4>Scenario 2: Disk Full</h4>
+<ol>
+<li><p><strong>Check space usage</strong>:</p>
+<pre><code class="language-bash">ssh atlas &quot;du -sh /mnt/storage/k8s/icn-data/*&quot;
+</code></pre>
+</li>
+<li><p><strong>Clean old backups</strong>:</p>
+<pre><code class="language-bash">ssh atlas &quot;find /mnt/storage/k8s/icn-data/backups -mtime +30 -delete&quot;
+</code></pre>
+</li>
+<li><p><strong>Compact Sled database</strong>:</p>
+<blockquote>
+<p>Note: An <code>icnctl db compact</code> command does not currently exist.
+Sled performs automatic compaction. If manual compaction is needed,
+consider stopping the daemon and using Sled tools directly.</p>
+</blockquote>
+</li>
+</ol>
+<h4>Scenario 3: Sled Corruption</h4>
+<ol>
+<li><p><strong>Stop the daemon</strong>:</p>
+<pre><code class="language-bash">sudo kubectl -n icn scale deployment icn-daemon --replicas=0
+</code></pre>
+</li>
+<li><p><strong>Backup current state</strong>:</p>
+<pre><code class="language-bash">ssh atlas &quot;cp -r /mnt/storage/k8s/icn-data /mnt/storage/k8s/icn-data-corrupted-$(date +%Y%m%d)&quot;
+</code></pre>
+</li>
+<li><p><strong>Restore from backup</strong>:</p>
+<pre><code class="language-bash">ssh atlas &quot;ls -la /mnt/storage/k8s/icn-data/backups/&quot;
+# Copy latest good backup to data directory
+</code></pre>
+</li>
+<li><p><strong>Restart daemon</strong>:</p>
+<pre><code class="language-bash">sudo kubectl -n icn scale deployment icn-daemon --replicas=1
+</code></pre>
+</li>
+</ol>
+<h3>Prevention</h3>
+<ul>
+<li><strong>Monitoring</strong>: Alert on disk usage &gt; 80%</li>
+<li><strong>Automated backups</strong>: Daily snapshots with rotation</li>
+<li><strong>NFS redundancy</strong>: Consider replicated storage</li>
+<li><strong>Health checks</strong>: Include storage health in liveness probe</li>
+</ul>
+<hr>
+<h2>Incident: Backup Verification Failure</h2>
+<p><strong>Severity</strong>: P2 - Medium (can escalate to P1 if no valid backups exist)</p>
+<h3>Symptoms</h3>
+<ul>
+<li><code>ICNBackupVerificationFailed</code> alert firing</li>
+<li>Backup verification CronJob failing</li>
+<li>No recent backup completion records</li>
+<li><code>ICNBackupMissing</code> critical alert (no backup in 26+ hours)</li>
+</ul>
+<h3>Diagnosis</h3>
+<ol>
+<li><p><strong>Check backup job status</strong>:</p>
+<pre><code class="language-bash">ssh ubuntu@10.8.10.40
+sudo kubectl -n icn get jobs -l component=backup
+sudo kubectl -n icn get jobs -l component=backup-verify
+</code></pre>
+</li>
+<li><p><strong>View backup job logs</strong>:</p>
+<pre><code class="language-bash"># Get latest backup job
+sudo kubectl -n icn logs job/$(sudo kubectl -n icn get jobs -l component=backup-job --sort-by=.metadata.creationTimestamp -o jsonpath=&#39;{.items[-1].metadata.name}&#39;)
+
+# Get latest verification job
+sudo kubectl -n icn logs job/$(sudo kubectl -n icn get jobs -l component=backup-verify-job --sort-by=.metadata.creationTimestamp -o jsonpath=&#39;{.items[-1].metadata.name}&#39;)
+</code></pre>
+</li>
+<li><p><strong>Check backup files directly</strong>:</p>
+<pre><code class="language-bash">ssh atlas &quot;ls -la /mnt/storage/k8s/icn-backups/&quot;
+</code></pre>
+</li>
+<li><p><strong>Check backup PVC</strong>:</p>
+<pre><code class="language-bash">sudo kubectl -n icn get pvc icn-backups
+sudo kubectl -n icn describe pvc icn-backups
+</code></pre>
+</li>
+</ol>
+<h3>Recovery</h3>
+<h4>Scenario 1: Verification Failing but Backups Exist</h4>
+<ol>
+<li><p><strong>Run manual verification</strong>:</p>
+<pre><code class="language-bash"># SSH to a node with backup access
+ssh atlas
+
+# Test newest backup
+cd /mnt/storage/k8s/icn-backups
+NEWEST=$(ls -t icn-backup-*.tar.gz | head -1)
+
+# Verify archive integrity
+tar -tzf &quot;$NEWEST&quot; &gt; /dev/null &amp;&amp; echo &quot;Archive OK&quot;
+
+# Extract and check contents
+mkdir -p /tmp/verify &amp;&amp; tar -xzf &quot;$NEWEST&quot; -C /tmp/verify
+ls -la /tmp/verify
+rm -rf /tmp/verify
+</code></pre>
+</li>
+<li><p><strong>If backup is valid, check verification script</strong>:</p>
+<pre><code class="language-bash">sudo kubectl -n icn get configmap backup-scripts -o yaml
+</code></pre>
+</li>
+</ol>
+<h4>Scenario 2: No Recent Backups</h4>
+<ol>
+<li><p><strong>Check CronJob schedule</strong>:</p>
+<pre><code class="language-bash">sudo kubectl -n icn get cronjob icn-backup -o yaml | grep schedule
+</code></pre>
+</li>
+<li><p><strong>Run backup manually</strong>:</p>
+<pre><code class="language-bash">sudo kubectl -n icn create job --from=cronjob/icn-backup manual-backup-$(date +%Y%m%d-%H%M%S)
+
+# Watch job progress
+sudo kubectl -n icn get jobs -w
+</code></pre>
+</li>
+<li><p><strong>Check for resource issues</strong>:</p>
+<pre><code class="language-bash"># Check if backup PVC has space
+ssh atlas &quot;df -h /mnt/storage/k8s/icn-backups&quot;
+
+# Check if data PVC is accessible
+sudo kubectl -n icn exec deploy/icn-daemon -- ls -la /data
+</code></pre>
+</li>
+</ol>
+<h4>Scenario 3: Backup Storage Full</h4>
+<ol>
+<li><p><strong>Check usage</strong>:</p>
+<pre><code class="language-bash">ssh atlas &quot;du -sh /mnt/storage/k8s/icn-backups/*&quot;
+</code></pre>
+</li>
+<li><p><strong>Clean old backups</strong> (keep at least 3):</p>
+<pre><code class="language-bash">ssh atlas &quot;cd /mnt/storage/k8s/icn-backups &amp;&amp; ls -t icn-backup-*.tar.gz | tail -n +4 | xargs rm -v&quot;
+</code></pre>
+</li>
+<li><p><strong>Adjust retention</strong> (if needed, edit CronJob):</p>
+<pre><code class="language-bash">sudo kubectl -n icn edit cronjob icn-backup
+# Change: -mtime +7 to -mtime +3 for 3-day retention
+</code></pre>
+</li>
+</ol>
+<h3>Backup Restoration Procedure</h3>
+<p><strong>⚠️ Full restoration should be coordinated with cooperative - this affects service availability</strong></p>
+<ol>
+<li><p><strong>Stop ICN daemon</strong>:</p>
+<pre><code class="language-bash">sudo kubectl -n icn scale deployment icn-daemon --replicas=0
+</code></pre>
+</li>
+<li><p><strong>Identify backup to restore</strong>:</p>
+<pre><code class="language-bash">ssh atlas &quot;ls -la /mnt/storage/k8s/icn-backups/&quot;
+# Select backup by date - prefer newest verified backup
+</code></pre>
+</li>
+<li><p><strong>Backup current state</strong> (even if corrupted):</p>
+<pre><code class="language-bash">ssh atlas &quot;cp -r /mnt/storage/k8s/icn-data /mnt/storage/k8s/icn-data-pre-restore-$(date +%Y%m%d-%H%M%S)&quot;
+</code></pre>
+</li>
+<li><p><strong>Clear current data and restore</strong>:</p>
+<pre><code class="language-bash">ssh atlas
+cd /mnt/storage/k8s
+
+# Clear current data
+rm -rf icn-data/*
+
+# Extract backup
+tar -xzf icn-backups/icn-backup-YYYYMMDD-HHMMSS.tar.gz -C icn-data
+
+# Verify extraction
+ls -la icn-data/
+</code></pre>
+</li>
+<li><p><strong>Restart ICN daemon</strong>:</p>
+<pre><code class="language-bash">sudo kubectl -n icn scale deployment icn-daemon --replicas=1
+sudo kubectl -n icn rollout status deployment/icn-daemon
+</code></pre>
+</li>
+<li><p><strong>Verify restoration</strong>:</p>
+<pre><code class="language-bash"># Check health
+curl http://10.8.10.40:30080/v1/health
+
+# Check identity
+sudo kubectl -n icn exec deploy/icn-daemon -- /usr/local/bin/icnctl id show
+
+# Monitor logs for errors
+sudo kubectl -n icn logs -f deployment/icn-daemon
+</code></pre>
+</li>
+<li><p><strong>Monitor gossip resync</strong>:</p>
+<ul>
+<li>Watch for entries being replayed from network</li>
+<li>Check quarantine for conflicts</li>
+<li>Verify ledger balances</li>
+</ul>
+</li>
+</ol>
+<h3>Prevention</h3>
+<ul>
+<li><strong>Automated verification</strong>: Daily verification CronJob at 6am (4 hours after backup)</li>
+<li><strong>Multiple retention periods</strong>: Keep daily (7), weekly (4), monthly (3)</li>
+<li><strong>Off-site backups</strong>: Consider replicating to cloud storage</li>
+<li><strong>Alert on age</strong>: Critical alert if newest backup &gt; 26 hours old</li>
+<li><strong>Test restores</strong>: Monthly restoration drill to verify procedure</li>
+</ul>
+<hr>
+<h2>Monitoring and Detection</h2>
+<h3>Key Metrics to Monitor</h3>
+<p><strong>Critical Alerts</strong> (page on-call):</p>
+<ul>
+<li><code>icn_ledger_quarantine_size &gt; 100</code> - Ledger issues</li>
+<li><code>icn_network_connections_active == 0</code> - Network partition</li>
+<li>Health endpoint returns 503 - Node unhealthy</li>
+</ul>
+<p><strong>Warning Alerts</strong> (notify in Slack):</p>
+<ul>
+<li><code>icn_gossip_subscriptions_rejected_total</code> incrementing - Trust issues</li>
+<li><code>icn_network_messages_rate_limited_total</code> spiking - Possible attack</li>
+<li><code>icn_ledger_merge_conflicts_total</code> incrementing - Sync problems</li>
+</ul>
+<p><strong>Info Alerts</strong> (log for trends):</p>
+<ul>
+<li>Peer count fluctuations</li>
+<li>Gossip topic growth</li>
+<li>Transaction volume changes</li>
+</ul>
+<h3>Dashboard Checks</h3>
+<p>Visit <code>http://localhost:8080/</code> daily and verify:</p>
+<ul>
+<li>✅ Status: Healthy (green banner)</li>
+<li>✅ Active connections &gt; 0</li>
+<li>✅ Quarantine size &lt; 10</li>
+<li>✅ No unusual spikes in metrics</li>
+</ul>
+<h3>Health Check Integration</h3>
+<p>Configure external monitoring:</p>
+<pre><code class="language-bash"># Kubernetes liveness probe
+http://icn-node:8080/health
+
+# Systemd watchdog
+WatchdogSec=60s
+
+# Nagios/Zabbix
+curl -f http://localhost:8080/v1/health || exit 1
+</code></pre>
+<hr>
+<h2>Communication Templates</h2>
+<h3>Status Update Template</h3>
+<p>Use this template for ongoing incident updates:</p>
+<pre><code>ICN Incident Update - [INCIDENT_ID]
+Status: [Investigating | Identified | Monitoring | Resolved]
+Severity: [P0 Critical | P1 High | P2 Medium | P3 Low]
+Time: [YYYY-MM-DD HH:MM UTC]
+
+Summary:
+[Brief description of current status]
+
+Impact:
+- Affected services: [List affected components]
+- User impact: [Description of user-facing effects]
+
+Current Actions:
+- [What is being done right now]
+
+Next Update:
+Expected in [X] minutes/hours
+
+---
+ICN Operations Team
+</code></pre>
+<h3>Initial Incident Notification</h3>
+<p>Use when first declaring an incident:</p>
+<pre><code>Subject: [P0/P1/P2/P3] ICN Incident: [Brief Description]
+
+Team,
+
+We are investigating an incident affecting [component/service].
+
+Detected: [Time UTC]
+Severity: [P0-P3]
+Initial Symptoms: [What was observed]
+
+Status at this update:
+- [What we know so far]
+
+Immediate Actions:
+- [Responder name] is investigating
+- [Any containment steps taken]
+
+Communication Channel:
+[Slack channel / Video call link]
+
+Next Update: [Time]
+
+---
+[Responder Name]
+</code></pre>
+<h3>Resolution Notification</h3>
+<p>Use when incident is resolved:</p>
+<pre><code>Subject: [RESOLVED] ICN Incident: [Brief Description]
+
+Team,
+
+The incident affecting [component/service] has been resolved.
+
+Timeline:
+- Detected: [Time UTC]
+- Identified: [Time UTC]
+- Resolved: [Time UTC]
+- Total Duration: [X hours/minutes]
+
+Root Cause:
+[Brief explanation of what caused the incident]
+
+Resolution:
+[What was done to fix it]
+
+User Impact:
+[Summary of impact during incident]
+
+Follow-up Actions:
+- [ ] Post-mortem scheduled for [Date]
+- [ ] [Any immediate improvements planned]
+
+---
+[Responder Name]
+</code></pre>
+<h3>Stakeholder Briefing (Non-Technical)</h3>
+<p>Use for executive or external stakeholder updates:</p>
+<pre><code>Subject: ICN Service Update - [Date]
+
+Summary:
+On [Date], the ICN network experienced [brief non-technical description].
+The issue was resolved at [Time] after [Duration].
+
+Impact:
+- [What users/cooperatives experienced]
+- [Any data or transaction concerns]
+
+Resolution:
+Our team [brief explanation of fix without technical jargon].
+
+Prevention:
+We are implementing [improvements] to prevent recurrence.
+
+Questions:
+Please contact [contact person] for additional information.
+
+---
+ICN Operations
+</code></pre>
+<hr>
+<h2>Emergency Contacts</h2>
+<p><strong>ICN Development Team</strong>:</p>
+<ul>
+<li>GitHub Issues: <a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">https://github.com/InterCooperative-Network/icn/issues</a></li>
+<li>Email: [TBD]</li>
+</ul>
+<p><strong>Cooperative Contacts</strong>:</p>
+<ul>
+<li>Primary: [Your cooperative&#39;s emergency contact]</li>
+<li>Secondary: [Backup contact]</li>
+<li>Out-of-band: [Signal group, phone tree]</li>
+</ul>
+<hr>
+<h2>Post-Incident Review Template</h2>
+<p>After resolving an incident, document:</p>
+<ol>
+<li><p><strong>Incident Summary</strong>:</p>
+<ul>
+<li>Date/time of detection</li>
+<li>Severity level</li>
+<li>Duration of incident</li>
+</ul>
+</li>
+<li><p><strong>Timeline</strong>:</p>
+<ul>
+<li>When was it first detected?</li>
+<li>What actions were taken and when?</li>
+<li>When was it resolved?</li>
+</ul>
+</li>
+<li><p><strong>Root Cause</strong>:</p>
+<ul>
+<li>What caused the incident?</li>
+<li>Why wasn&#39;t it prevented?</li>
+<li>Why wasn&#39;t it detected sooner?</li>
+</ul>
+</li>
+<li><p><strong>Impact</strong>:</p>
+<ul>
+<li>How many nodes affected?</li>
+<li>Data loss or corruption?</li>
+<li>Economic impact?</li>
+</ul>
+</li>
+<li><p><strong>Action Items</strong>:</p>
+<ul>
+<li>What monitoring should be added?</li>
+<li>What procedures should be updated?</li>
+<li>What code changes are needed?</li>
+</ul>
+</li>
+<li><p><strong>Lessons Learned</strong>:</p>
+<ul>
+<li>What went well?</li>
+<li>What could be improved?</li>
+<li>How can we prevent this in the future?</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h2>Version History</h2>
+<ul>
+<li><strong>2026-01-04</strong>: Added backup verification incident procedures, restoration guide (#320)</li>
+<li><strong>2026-01-04</strong>: Added K3s-specific procedures, communication templates (#324)</li>
+<li><strong>2025-01-14</strong>: Initial version (Track B1)</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

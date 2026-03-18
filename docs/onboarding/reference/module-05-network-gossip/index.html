@@ -1,0 +1,874 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Module 5: Network and Gossip | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>onboarding</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>reference</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>module 05 network gossip</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/onboarding/reference/module-05-network-gossip.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Module 5: Network and Gossip</h1>
+<h2>Overview</h2>
+<p>This module teaches you how ICN nodes communicate: establishing secure connections
+(transport layer) and synchronizing state across the network (gossip layer).
+Understanding these layers is essential for debugging connectivity issues and
+implementing features that involve peer communication.</p>
+<h2>Objectives</h2>
+<ul>
+<li>Understand the QUIC transport protocol and why ICN uses it</li>
+<li>Learn how peer discovery works (mDNS, bootstrap)</li>
+<li>Understand DID-TLS binding for authenticated connections</li>
+<li>Master the gossip protocol: push, pull, and anti-entropy</li>
+<li>Learn how vector clocks track causality</li>
+<li>Understand topic-based message routing</li>
+</ul>
+<h2>Prerequisites</h2>
+<ul>
+<li>Module 4 (Identity &amp; Trust)</li>
+<li>Module 3 (Runtime &amp; Actors)</li>
+</ul>
+<h2>Key Reading</h2>
+<ul>
+<li><code>icn/crates/icn-net/src/actor/mod.rs</code> - NetworkActor implementation</li>
+<li><code>icn/crates/icn-gossip/src/gossip.rs</code> - GossipActor implementation</li>
+<li><code>docs/ARCHITECTURE.md</code> - Sections 3 and 6</li>
+</ul>
+<hr>
+<h2>Core Concepts</h2>
+<h3>1. Transport vs. Gossip</h3>
+<p>ICN separates communication into two layers:</p>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Responsibility</th>
+<th>Crate</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Transport</strong></td>
+<td>Establishing secure connections between nodes</td>
+<td><code>icn-net</code></td>
+</tr>
+<tr>
+<td><strong>Gossip</strong></td>
+<td>Synchronizing state across the network</td>
+<td><code>icn-gossip</code></td>
+</tr>
+</tbody></table>
+<pre><code>┌────────────────────────────────────────────────────────┐
+│                     APPLICATION                         │
+│           (Ledger, Contracts, Governance)              │
+├────────────────────────────────────────────────────────┤
+│                       GOSSIP                            │
+│   Topic routing, vector clocks, anti-entropy sync      │
+├────────────────────────────────────────────────────────┤
+│                      TRANSPORT                          │
+│        QUIC connections, TLS, peer discovery           │
+├────────────────────────────────────────────────────────┤
+│                      NETWORK                            │
+│                 IP, UDP, mDNS                          │
+└────────────────────────────────────────────────────────┘
+</code></pre>
+<p><strong>Why separate them?</strong></p>
+<ul>
+<li>Transport handles &quot;can I connect to this peer?&quot;</li>
+<li>Gossip handles &quot;what data do we need to exchange?&quot;</li>
+<li>Separation allows different sync strategies without changing transport</li>
+</ul>
+<hr>
+<h2>The Transport Layer (icn-net)</h2>
+<h3>2. QUIC Protocol</h3>
+<p><strong>What is QUIC?</strong></p>
+<p>QUIC (Quick UDP Internet Connections) is a modern transport protocol:</p>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>TCP</th>
+<th>QUIC</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Encryption</td>
+<td>Separate TLS handshake</td>
+<td>Built-in TLS 1.3</td>
+</tr>
+<tr>
+<td>Streams</td>
+<td>One per connection</td>
+<td>Multiple per connection</td>
+</tr>
+<tr>
+<td>Connection migration</td>
+<td>IP change = reconnect</td>
+<td>Survives IP changes</td>
+</tr>
+<tr>
+<td>Head-of-line blocking</td>
+<td>Yes (TCP)</td>
+<td>No (per-stream)</td>
+</tr>
+<tr>
+<td>Connection setup</td>
+<td>1-3 RTT</td>
+<td>0-1 RTT</td>
+</tr>
+</tbody></table>
+<p><strong>Why ICN uses QUIC:</strong></p>
+<ol>
+<li><p><strong>Multiplexed streams</strong>: Multiple conversations on one connection</p>
+<ul>
+<li>Gossip, RPC, and control messages share a connection</li>
+<li>No head-of-line blocking between streams</li>
+</ul>
+</li>
+<li><p><strong>Built-in encryption</strong>: TLS 1.3 is mandatory</p>
+<ul>
+<li>No unencrypted fallback</li>
+<li>Perfect forward secrecy</li>
+</ul>
+</li>
+<li><p><strong>Connection migration</strong>: Handles network changes</p>
+<ul>
+<li>Mobile nodes can change WiFi/cellular</li>
+<li>NAT rebinding doesn&#39;t break connections</li>
+</ul>
+</li>
+<li><p><strong>Fast connection setup</strong>: 0-RTT for resumed connections</p>
+<ul>
+<li>Critical for frequent peer reconnections</li>
+</ul>
+</li>
+</ol>
+<pre><code class="language-rust">// From icn-net: QUIC endpoint setup
+use quinn::{Endpoint, ServerConfig, ClientConfig};
+
+pub struct NetworkActor {
+    endpoint: Endpoint,              // QUIC endpoint
+    sessions: HashMap&lt;Did, Session&gt;, // Active peer sessions
+    discovery: Discovery,            // mDNS discovery
+}
+</code></pre>
+<h3>3. Peer Discovery</h3>
+<p><strong>How do nodes find each other?</strong></p>
+<p>ICN uses multiple discovery mechanisms:</p>
+<p><strong>mDNS (Multicast DNS)</strong></p>
+<ul>
+<li>Discovers peers on local network</li>
+<li>Zero configuration</li>
+<li>Announces <code>_icn._udp.local</code></li>
+</ul>
+<pre><code class="language-rust">// mDNS service advertisement
+pub struct MdnsConfig {
+    enabled: bool,
+    service_name: String,  // &quot;_icn._udp.local&quot;
+    announce_interval: Duration,
+}
+</code></pre>
+<p><strong>Bootstrap Peers</strong></p>
+<ul>
+<li>Known peers to connect to on startup</li>
+<li>Configured in <code>icn.toml</code></li>
+</ul>
+<pre><code class="language-toml"># Configuration
+[network]
+bootstrap_peers = [
+    &quot;icn://did:icn:5K...@seed1.example.com:8443&quot;,
+    &quot;icn://did:icn:7H...@seed2.example.com:8443&quot;,
+]
+</code></pre>
+<p><strong>Peer Exchange</strong></p>
+<ul>
+<li>Connected peers share their peer lists</li>
+<li>Gossip about network topology</li>
+</ul>
+<p><strong>Discovery Flow:</strong></p>
+<pre><code>┌─────────────────────────────────────────────────────────────┐
+│                    PEER DISCOVERY                            │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  1. mDNS Announcement                                       │
+│     Node broadcasts: &quot;_icn._udp.local&quot;                      │
+│     Contains: DID, port, capabilities                       │
+│                                                             │
+│  2. Bootstrap Connection                                    │
+│     Connect to configured seed nodes                        │
+│     Exchange peer lists                                     │
+│                                                             │
+│  3. Peer Exchange                                           │
+│     Connected peers share known addresses                   │
+│     Build routing table                                     │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+</code></pre>
+<h3>4. DID-TLS Binding</h3>
+<p><strong>The problem:</strong> How do we know the peer is who they claim to be?</p>
+<p><strong>The solution:</strong> DID-TLS binding ties cryptographic identity to the connection.</p>
+<p><strong>How it works:</strong></p>
+<ol>
+<li><p><strong>TLS certificate contains DID</strong></p>
+<ul>
+<li>Self-signed certificate</li>
+<li>DID embedded in certificate</li>
+</ul>
+</li>
+<li><p><strong>Challenge-response during handshake</strong></p>
+<ul>
+<li>Server sends random challenge</li>
+<li>Client signs with DID private key</li>
+<li>Server verifies signature</li>
+</ul>
+</li>
+<li><p><strong>Mutual authentication</strong></p>
+<ul>
+<li>Both sides prove DID ownership</li>
+<li>Connection is authenticated bidirectionally</li>
+</ul>
+</li>
+</ol>
+<pre><code class="language-rust">// DID-TLS verification
+pub struct TlsVerification {
+    peer_certificate: Certificate,
+    challenge: [u8; 32],
+    signature: Signature,
+}
+
+impl TlsVerification {
+    pub fn verify(&amp;self, expected_did: &amp;Did) -&gt; Result&lt;()&gt; {
+        // 1. Extract DID from certificate
+        let cert_did = self.extract_did_from_cert()?;
+
+        // 2. Verify DID matches expected
+        if cert_did != *expected_did {
+            bail!(&quot;DID mismatch&quot;);
+        }
+
+        // 3. Verify signature on challenge
+        let public_key = expected_did.to_public_key()?;
+        public_key.verify(&amp;self.challenge, &amp;self.signature)?;
+
+        Ok(())
+    }
+}
+</code></pre>
+<h3>5. Message Types</h3>
+<p>The transport layer handles different message types:</p>
+<pre><code class="language-rust">pub enum MessagePayload {
+    /// Gossip protocol messages
+    Gossip(GossipMessage),
+
+    /// Topic subscription requests
+    Subscribe { topics: Vec&lt;String&gt; },
+    Unsubscribe { topics: Vec&lt;String&gt; },
+
+    /// RPC calls (request/response)
+    Rpc(RpcMessage),
+
+    /// Connection handshake
+    Hello { version: u32, capabilities: Vec&lt;String&gt; },
+
+    /// Signed envelope (wrapped message)
+    Signed(SignedEnvelope),
+
+    /// Encrypted envelope (E2E encrypted)
+    Encrypted(EncryptedEnvelope),
+}
+</code></pre>
+<h3>6. Signed Envelopes</h3>
+<p>All important messages are wrapped in signed envelopes:</p>
+<pre><code class="language-rust">pub struct SignedEnvelope {
+    /// Sender&#39;s DID
+    pub from: Did,
+    /// Payload type for routing
+    pub payload_type: PayloadType,
+    /// Serialized payload
+    pub payload: Vec&lt;u8&gt;,
+    /// Ed25519 signature
+    pub signature: Signature,
+    /// Sequence number for replay protection
+    pub sequence: u64,
+}
+</code></pre>
+<p><strong>Replay Protection:</strong></p>
+<p>The sequence number prevents replay attacks:</p>
+<pre><code class="language-rust">pub struct ReplayGuard {
+    // Last seen sequence per sender
+    sequences: HashMap&lt;Did, u64&gt;,
+}
+
+impl ReplayGuard {
+    pub fn check(&amp;mut self, from: &amp;Did, sequence: u64) -&gt; Result&lt;()&gt; {
+        let last = self.sequences.get(from).copied().unwrap_or(0);
+
+        if sequence &lt;= last {
+            bail!(&quot;Replay detected: got {}, last was {}&quot;, sequence, last);
+        }
+
+        self.sequences.insert(from.clone(), sequence);
+        Ok(())
+    }
+}
+</code></pre>
+<hr>
+<h2>The Gossip Layer (icn-gossip)</h2>
+<h3>7. What is Gossip?</h3>
+<p><strong>Gossip</strong> is a protocol for spreading information through a network without
+central coordination, similar to how rumors spread through a social network.</p>
+<p><strong>Properties:</strong></p>
+<ul>
+<li><strong>Epidemic spread</strong>: Information spreads exponentially</li>
+<li><strong>Fault tolerant</strong>: Works despite node failures</li>
+<li><strong>Eventually consistent</strong>: All nodes converge to same state</li>
+<li><strong>Decentralized</strong>: No coordinator needed</li>
+</ul>
+<p><strong>How it works:</strong></p>
+<ol>
+<li>Node A receives new data</li>
+<li>A tells random peers B, C, D</li>
+<li>B, C, D each tell their random peers</li>
+<li>Data spreads exponentially</li>
+<li>Eventually everyone has it</li>
+</ol>
+<h3>8. Gossip Message Types</h3>
+<p>ICN&#39;s gossip protocol uses three message types:</p>
+<pre><code class="language-rust">pub enum GossipMessage {
+    /// &quot;I have this new entry&quot;
+    Announcement {
+        topic: String,
+        entry_hash: Hash,
+        entry: Entry,
+    },
+
+    /// &quot;What entries do you have since this vector clock?&quot;
+    PullRequest {
+        topic: String,
+        since: VectorClock,
+    },
+
+    /// &quot;Here are the entries you&#39;re missing&quot;
+    PullResponse {
+        topic: String,
+        entries: Vec&lt;Entry&gt;,
+    },
+
+    /// &quot;Let&#39;s sync - here&#39;s my bloom filter&quot;
+    AntiEntropy {
+        topic: String,
+        bloom: BloomFilter,
+        clock: VectorClock,
+    },
+}
+</code></pre>
+<h3>9. Push, Pull, and Anti-Entropy</h3>
+<p><strong>Push (Announcements):</strong>
+When a node creates or receives new data, it pushes to subscribers:</p>
+<pre><code>Node A creates entry E
+    │
+    ├──► Push to Node B (subscriber)
+    ├──► Push to Node C (subscriber)
+    └──► Push to Node D (subscriber)
+</code></pre>
+<p><strong>Pull (On-demand sync):</strong>
+When a node reconnects or suspects missing data, it pulls:</p>
+<pre><code>Node B reconnects
+    │
+    └──► Pull request to Node A
+             │
+             └──► Pull response with missing entries
+</code></pre>
+<p><strong>Anti-Entropy (Background sync):</strong>
+Periodic exchanges to ensure consistency:</p>
+<pre><code>Every 30 seconds:
+    │
+    ├──► Node A sends Bloom filter to random peer
+    │
+    └──► Peer responds with entries not in filter
+</code></pre>
+<h3>10. Vector Clocks</h3>
+<p><strong>The problem:</strong> How do we know which events happened before others?</p>
+<p><strong>The solution:</strong> Vector clocks track logical time per node.</p>
+<pre><code class="language-rust">pub struct VectorClock {
+    clock: HashMap&lt;Did, u64&gt;,
+}
+
+impl VectorClock {
+    /// Increment our entry
+    pub fn tick(&amp;mut self, node: &amp;Did) {
+        *self.clock.entry(node.clone()).or_default() += 1;
+    }
+
+    /// Merge with another clock (take max of each entry)
+    pub fn merge(&amp;mut self, other: &amp;VectorClock) {
+        for (node, &amp;time) in &amp;other.clock {
+            let entry = self.clock.entry(node.clone()).or_default();
+            *entry = (*entry).max(time);
+        }
+    }
+
+    /// Check if this clock happened before other
+    pub fn happened_before(&amp;self, other: &amp;VectorClock) -&gt; bool {
+        // All our entries ≤ theirs
+        self.clock.iter().all(|(node, &amp;time)| {
+            other.clock.get(node).copied().unwrap_or(0) &gt;= time
+        })
+        // AND at least one entry &lt;
+        &amp;&amp; self.clock.iter().any(|(node, &amp;time)| {
+            other.clock.get(node).copied().unwrap_or(0) &gt; time
+        })
+    }
+}
+</code></pre>
+<p><strong>Example:</strong></p>
+<pre><code>Node A: {A:1, B:0, C:0}
+Node B: {A:0, B:1, C:0}
+Node C: {A:1, B:1, C:1}  ← C has seen both A and B&#39;s events
+</code></pre>
+<h3>11. Bloom Filters</h3>
+<p><strong>The problem:</strong> How do we efficiently check if peers have the same entries?</p>
+<p><strong>The solution:</strong> Bloom filters provide probabilistic set membership.</p>
+<pre><code class="language-rust">pub struct BloomFilter {
+    bits: BitVec,
+    hash_count: usize,
+}
+
+impl BloomFilter {
+    /// Add an entry hash to the filter
+    pub fn insert(&amp;mut self, hash: &amp;Hash) {
+        for i in 0..self.hash_count {
+            let idx = self.hash_index(hash, i);
+            self.bits.set(idx, true);
+        }
+    }
+
+    /// Check if hash might be in the filter
+    pub fn might_contain(&amp;self, hash: &amp;Hash) -&gt; bool {
+        (0..self.hash_count).all(|i| {
+            let idx = self.hash_index(hash, i);
+            self.bits[idx]
+        })
+    }
+}
+</code></pre>
+<p><strong>Properties:</strong></p>
+<ul>
+<li><strong>False positives possible</strong>: Might say &quot;yes&quot; when entry isn&#39;t there</li>
+<li><strong>False negatives impossible</strong>: Never says &quot;no&quot; when entry is there</li>
+<li><strong>Space efficient</strong>: Much smaller than entry list</li>
+<li><strong>Perfect for sync</strong>: Quickly identify what peer is missing</li>
+</ul>
+<h3>12. Topics</h3>
+<p>Gossip is organized around <strong>topics</strong>—namespaced channels for different data:</p>
+<pre><code>┌─────────────────────────────────────────────────────────┐
+│                      TOPICS                              │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  ledger:entries        Ledger transactions              │
+│  trust:edges           Trust graph updates              │
+│  governance:proposals  Governance proposals             │
+│  governance:votes      Voting events                    │
+│  coop:{coop_id}        Per-cooperative messages         │
+│  federation:agreements Inter-coop agreements            │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+</code></pre>
+<p><strong>Topic naming convention:</strong></p>
+<pre><code>{namespace}:{resource}[:{qualifier}]
+
+Examples:
+- ledger:entries
+- governance:votes:proposal-123
+- coop:did:icn:abc123:announcements
+</code></pre>
+<h3>13. Access Control</h3>
+<p>Topics have access control policies:</p>
+<pre><code class="language-rust">pub enum AccessControl {
+    /// Anyone can subscribe
+    Public,
+
+    /// Must be known (trust &gt; 0.1)
+    Known,
+
+    /// Must be in cooperative
+    CoopMembers { coop_did: Did },
+
+    /// Must have specific trust level
+    TrustGated { min_trust: f64 },
+
+    /// Custom policy
+    Custom(Box&lt;dyn AccessPolicy&gt;),
+}
+
+impl GossipActor {
+    fn check_subscribe_access(&amp;self, peer: &amp;Did, topic: &amp;str) -&gt; Result&lt;()&gt; {
+        let policy = self.get_topic_policy(topic);
+
+        match policy {
+            AccessControl::Public =&gt; Ok(()),
+
+            AccessControl::TrustGated { min_trust } =&gt; {
+                let score = self.trust_graph.compute_trust(peer)?;
+                if score &lt; min_trust {
+                    bail!(&quot;Insufficient trust: {:.2} &lt; {:.2}&quot;, score, min_trust);
+                }
+                Ok(())
+            }
+
+            // ... other policies
+        }
+    }
+}
+</code></pre>
+<hr>
+<h2>Message Flow</h2>
+<h3>14. Incoming Message Flow</h3>
+<pre><code>┌─────────────────────────────────────────────────────────────────┐
+│                  INCOMING MESSAGE FLOW                           │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Peer                                                           │
+│    │                                                            │
+│    │ QUIC packet                                                │
+│    ▼                                                            │
+│  NetworkActor ────────────────────────────────────────────────  │
+│    │  - Decrypt TLS                                             │
+│    │  - Verify peer identity                                    │
+│    │  - Parse NetworkMessage                                    │
+│    ▼                                                            │
+│  IncomingHandler ─────────────────────────────────────────────  │
+│    │  - Route by payload type                                   │
+│    │  - Verify SignedEnvelope                                   │
+│    │  - Check replay guard                                      │
+│    ▼                                                            │
+│  GossipActor ─────────────────────────────────────────────────  │
+│    │  - Check trust score                                       │
+│    │  - Validate topic access                                   │
+│    │  - Process gossip message                                  │
+│    ▼                                                            │
+│  Topic Handler ───────────────────────────────────────────────  │
+│    │  - Update vector clock                                     │
+│    │  - Store entry                                             │
+│    │  - Notify subscribers                                      │
+│    ▼                                                            │
+│  Subscriber Callback (e.g., Ledger)                             │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+</code></pre>
+<h3>15. Outgoing Message Flow</h3>
+<pre><code>┌─────────────────────────────────────────────────────────────────┐
+│                  OUTGOING MESSAGE FLOW                           │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Application (e.g., Ledger creates entry)                       │
+│    │                                                            │
+│    │ new_entry(entry)                                           │
+│    ▼                                                            │
+│  GossipActor ─────────────────────────────────────────────────  │
+│    │  - Store locally                                           │
+│    │  - Update vector clock                                     │
+│    │  - Get subscribers for topic                               │
+│    ▼                                                            │
+│  Send Callback ───────────────────────────────────────────────  │
+│    │  - Create SignedEnvelope                                   │
+│    │  - Increment sequence number                               │
+│    │  - Sign with identity key                                  │
+│    ▼                                                            │
+│  NetworkActor ────────────────────────────────────────────────  │
+│    │  - Look up peer connection                                 │
+│    │  - Send on QUIC stream                                     │
+│    ▼                                                            │
+│  Peer receives message                                          │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+</code></pre>
+<hr>
+<h2>Trust-Gated Networking</h2>
+<h3>16. Trust-Based Rate Limiting</h3>
+<p>Network traffic is rate-limited based on trust:</p>
+<pre><code class="language-rust">pub fn get_rate_limit(trust_score: f64) -&gt; u32 {
+    match TrustClass::from_score(trust_score) {
+        TrustClass::Isolated =&gt; 10,   // &lt; 0.1
+        TrustClass::Known =&gt; 50,      // 0.1 - 0.4
+        TrustClass::Partner =&gt; 100,   // 0.4 - 0.7
+        TrustClass::Federated =&gt; 200, // &gt; 0.7
+    }
+}
+</code></pre>
+<p><strong>Why?</strong></p>
+<ul>
+<li>Unknown peers get limited bandwidth</li>
+<li>Trusted peers get priority</li>
+<li>Prevents spam from unknown sources</li>
+<li>Aligns network resources with social trust</li>
+</ul>
+<h3>17. Message Validation</h3>
+<p>Before processing, messages are validated:</p>
+<pre><code class="language-rust">impl GossipActor {
+    async fn handle_message(&amp;mut self, from: &amp;Did, msg: GossipMessage) -&gt; Result&lt;()&gt; {
+        // 1. Check trust score
+        let trust_score = self.compute_trust(from)?;
+        if trust_score &lt; MIN_TRUST_FOR_MESSAGE {
+            bail!(&quot;Insufficient trust: {:.3}&quot;, trust_score);
+        }
+
+        // 2. Check rate limit
+        if !self.rate_limiter.allow(from, trust_score) {
+            bail!(&quot;Rate limited&quot;);
+        }
+
+        // 3. Validate message structure
+        msg.validate()?;
+
+        // 4. Check topic access
+        if let Some(topic) = msg.topic() {
+            self.check_topic_access(from, topic)?;
+        }
+
+        // 5. Process message
+        match msg {
+            GossipMessage::Announcement { .. } =&gt; self.handle_announcement(from, msg).await,
+            GossipMessage::PullRequest { .. } =&gt; self.handle_pull_request(from, msg).await,
+            // ...
+        }
+    }
+}
+</code></pre>
+<hr>
+<h2>Diagrams</h2>
+<h3>Network Layer Architecture</h3>
+<pre><code class="language-mermaid">flowchart TB
+    subgraph Transport[Transport Layer - icn-net]
+        QUIC[QUIC Endpoint]
+        Sessions[Peer Sessions]
+        TLS[TLS 1.3]
+        Discovery[mDNS Discovery]
+    end
+
+    subgraph Gossip[Gossip Layer - icn-gossip]
+        Topics[Topic Manager]
+        VClock[Vector Clocks]
+        Bloom[Bloom Filters]
+        Subs[Subscriptions]
+    end
+
+    subgraph App[Application]
+        Ledger[Ledger]
+        Trust[Trust Graph]
+        Gov[Governance]
+    end
+
+    QUIC --&gt; Sessions
+    Sessions --&gt; TLS
+    Discovery --&gt; Sessions
+
+    Sessions --&gt;|route| Topics
+    Topics --&gt; VClock
+    Topics --&gt; Bloom
+    Topics --&gt; Subs
+
+    Subs --&gt;|notify| Ledger
+    Subs --&gt;|notify| Trust
+    Subs --&gt;|notify| Gov
+</code></pre>
+<h3>Gossip Sync Sequence</h3>
+<pre><code class="language-mermaid">sequenceDiagram
+    participant A as Node A
+    participant B as Node B
+
+    Note over A,B: Push - New Entry
+    A-&gt;&gt;A: Create entry E
+    A-&gt;&gt;B: Announcement(E)
+    B-&gt;&gt;B: Store E
+
+    Note over A,B: Pull - Reconnection
+    B-&gt;&gt;A: PullRequest(since: VClock)
+    A-&gt;&gt;B: PullResponse(missing entries)
+
+    Note over A,B: Anti-Entropy - Background
+    A-&gt;&gt;B: AntiEntropy(bloom, clock)
+    B-&gt;&gt;B: Find entries not in bloom
+    B-&gt;&gt;A: PullResponse(missing)
+</code></pre>
+<hr>
+<h2>Code Examples</h2>
+<h3>Creating a Gossip Subscription</h3>
+<pre><code class="language-rust">// Subscribe to ledger entries
+let gossip_handle = gossip_actor.handle();
+
+let ledger_callback = {
+    let ledger = ledger_handle.clone();
+    move |entry: LedgerEntry| {
+        let ledger = ledger.clone();
+        tokio::spawn(async move {
+            ledger.write().await.apply_entry(entry).await
+        });
+    }
+};
+
+gossip_handle.write().await.subscribe(
+    &quot;ledger:entries&quot;,
+    Box::new(ledger_callback),
+)?;
+</code></pre>
+<h3>Announcing a New Entry</h3>
+<pre><code class="language-rust">// Announce a new entry to subscribers
+impl GossipActor {
+    pub async fn announce(&amp;mut self, topic: &amp;str, entry: Entry) -&gt; Result&lt;()&gt; {
+        // 1. Store locally
+        self.store_entry(topic, &amp;entry)?;
+
+        // 2. Update vector clock
+        self.vector_clock.tick(&amp;self.our_did);
+
+        // 3. Create announcement
+        let msg = GossipMessage::Announcement {
+            topic: topic.to_string(),
+            entry_hash: entry.hash(),
+            entry,
+        };
+
+        // 4. Send to subscribers
+        if let Some(ref send_cb) = self.send_callback {
+            for subscriber in self.get_subscribers(topic) {
+                send_cb(subscriber.clone(), msg.clone())?;
+            }
+        }
+
+        Ok(())
+    }
+}
+</code></pre>
+<hr>
+<h2>Exercises</h2>
+<ol>
+<li><p><strong>Transport Tracing</strong>: Find where QUIC connections are established in
+<code>icn-net</code>. What happens during the TLS handshake?</p>
+</li>
+<li><p><strong>Gossip Message Types</strong>: List all <code>GossipMessage</code> variants and explain
+when each is used.</p>
+</li>
+<li><p><strong>Vector Clock Merge</strong>: Given two vector clocks <code>{A:3, B:2}</code> and <code>{A:1, B:4}</code>,
+what is the merged result?</p>
+</li>
+<li><p><strong>Topic Access</strong>: Find a topic with trust-gated access control. What
+minimum trust is required?</p>
+</li>
+<li><p><strong>Anti-Entropy</strong>: Explain why anti-entropy is necessary even with push
+announcements. What scenarios does it handle?</p>
+</li>
+</ol>
+<hr>
+<h2>Checkpoints</h2>
+<ul>
+<li><input disabled="" type="checkbox"> You can explain why ICN uses QUIC instead of TCP</li>
+<li><input disabled="" type="checkbox"> You understand DID-TLS binding and its purpose</li>
+<li><input disabled="" type="checkbox"> You can describe the three gossip message types (push, pull, anti-entropy)</li>
+<li><input disabled="" type="checkbox"> You understand what vector clocks track</li>
+<li><input disabled="" type="checkbox"> You know how Bloom filters are used in anti-entropy</li>
+<li><input disabled="" type="checkbox"> You can trace a message from network to gossip to application</li>
+<li><input disabled="" type="checkbox"> You understand trust-based rate limiting</li>
+</ul>
+<hr>
+<h2>Quick Reference</h2>
+<table>
+<thead>
+<tr>
+<th>Concept</th>
+<th>Definition</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>QUIC</td>
+<td>UDP-based transport with built-in encryption</td>
+</tr>
+<tr>
+<td>mDNS</td>
+<td>Multicast DNS for local peer discovery</td>
+</tr>
+<tr>
+<td>DID-TLS</td>
+<td>Binding DID identity to TLS connection</td>
+</tr>
+<tr>
+<td>SignedEnvelope</td>
+<td>Message wrapper with signature and replay protection</td>
+</tr>
+<tr>
+<td>Vector Clock</td>
+<td>Logical time per node for causality tracking</td>
+</tr>
+<tr>
+<td>Bloom Filter</td>
+<td>Probabilistic set for efficient sync</td>
+</tr>
+<tr>
+<td>Topic</td>
+<td>Namespaced channel for gossip messages</td>
+</tr>
+<tr>
+<td>Anti-Entropy</td>
+<td>Background sync to ensure consistency</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Next Steps</h2>
+<p>Proceed to <strong>Module 6: Ledger &amp; Contracts</strong> to understand mutual credit
+accounting, the Merkle-DAG structure, and how CCL contracts execute.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

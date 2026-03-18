@@ -1,0 +1,796 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Vision-to-Implementation Gap Analysis | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>internal</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>status</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>vision implementation gap</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/internal/status/vision-implementation-gap.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Vision-to-Implementation Gap Analysis</h1>
+<p><strong>Document ID</strong>: ICN-GAP-VISION-01
+<strong>Created</strong>: 2025-11-28
+<strong>Purpose</strong>: Map the ICN vision to implementation status and prioritize closing gaps</p>
+<hr>
+<h2>Executive Summary</h2>
+<p>ICN is <strong>substrate-complete</strong> (~80% architecturally sound) but <strong>integration-incomplete</strong> (~50% functionally integrated). The core protocols work; they&#39;re not connected into the coherent experience the vision describes.</p>
+<p><strong>Critical Finding</strong>: The vision describes &quot;a global cooperative operating layer&quot; but several key pieces are either:</p>
+<ul>
+<li>Code exists but never wired into the daemon</li>
+<li>CLI commands are stubs that print &quot;TODO&quot;</li>
+<li>Security holes that would be unacceptable in production</li>
+</ul>
+<hr>
+<h2>Vision Components Mapped to Implementation</h2>
+<h3>1. Identity You Own, Not Rent</h3>
+<p><strong>Vision</strong>: &quot;Device-level DIDs that you actually possess. Identity becomes portable, multi-device, cryptographically verifiable, independent of institutions.&quot;</p>
+<p><strong>Implementation Status</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Code</th>
+<th>Integrated</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>DID generation</td>
+<td>✅</td>
+<td>✅</td>
+<td>Ed25519 keypairs, <code>did:icn:</code> format</td>
+</tr>
+<tr>
+<td>Keystore (Age-encrypted)</td>
+<td>✅</td>
+<td>✅</td>
+<td>v2.1 with TLS + X25519</td>
+</tr>
+<tr>
+<td>Multi-device DID Document</td>
+<td>✅</td>
+<td>⚠️</td>
+<td>Code exists, IdentityActor commented out</td>
+</tr>
+<tr>
+<td>Device add/revoke</td>
+<td>✅</td>
+<td>❌</td>
+<td>CLI stubs: &quot;TODO: Sign this event&quot;</td>
+</tr>
+<tr>
+<td>Social recovery</td>
+<td>✅</td>
+<td>❌</td>
+<td>CLI stubs: &quot;TODO: Publish to gossip&quot;</td>
+</tr>
+<tr>
+<td>Identity sync via gossip</td>
+<td>✅</td>
+<td>❌</td>
+<td><code>identity:updates</code> topic defined, not used</td>
+</tr>
+</tbody></table>
+<p><strong>Gap</strong>: Multi-device identity is CLI-local only. The IdentityActor that would sync across nodes is commented out in <code>supervisor.rs:315</code>.</p>
+<p><strong>Files</strong>:</p>
+<ul>
+<li><code>icn-identity/src/did_document.rs</code> - DID Document v2 ✅</li>
+<li><code>icn-identity/src/bundle.rs</code> - IdentityBundle ✅</li>
+<li><code>icn-core/src/supervisor.rs:315</code> - IdentityActor COMMENTED OUT</li>
+<li><code>bins/icnctl/src/main.rs:3070,3158</code> - device approve/revoke stubs</li>
+</ul>
+<hr>
+<h3>2. Web-of-Participation (Trust Graph)</h3>
+<p><strong>Vision</strong>: &quot;You trust people you&#39;ve worked with. And you trust who they trust to the degree that makes sense. This creates a dynamic graph of actual participation.&quot;</p>
+<p><strong>Implementation Status</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Code</th>
+<th>Integrated</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Trust graph storage</td>
+<td>✅</td>
+<td>✅</td>
+<td>Sled-backed</td>
+</tr>
+<tr>
+<td>Transitive trust computation</td>
+<td>✅</td>
+<td>✅</td>
+<td>PageRank-style algorithm</td>
+</tr>
+<tr>
+<td>Trust-gated rate limiting</td>
+<td>✅</td>
+<td>✅</td>
+<td>4 trust classes</td>
+</tr>
+<tr>
+<td>Trust-gated gossip topics</td>
+<td>✅</td>
+<td>✅</td>
+<td>AccessControl::TrustGated</td>
+</tr>
+<tr>
+<td>Trust-gated compute</td>
+<td>✅</td>
+<td>✅</td>
+<td>MIN_TRUST_SUBMIT/EXECUTE</td>
+</tr>
+<tr>
+<td>Trust in policies</td>
+<td>✅</td>
+<td>⚠️</td>
+<td>Direct trust only, not transitive</td>
+</tr>
+</tbody></table>
+<p><strong>Gap</strong>: Transitive trust computation works but is NOT used in access control policies. Only direct trust scores are checked.</p>
+<p><strong>Files</strong>:</p>
+<ul>
+<li><code>icn-trust/src/graph.rs</code> - Trust graph ✅</li>
+<li><code>icn-trust/src/compute.rs</code> - Transitive computation ✅</li>
+<li><code>icn-net/src/rate_limit.rs</code> - Trust-based rate limiting ✅</li>
+</ul>
+<hr>
+<h3>3. Mutual Credit Economy</h3>
+<p><strong>Vision</strong>: &quot;No tokens to speculate on. No miners. No global blockchain. It models reciprocity: when you contribute value, you earn credit.&quot;</p>
+<p><strong>Implementation Status</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Code</th>
+<th>Integrated</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Double-entry ledger</td>
+<td>✅</td>
+<td>✅</td>
+<td>Merkle-DAG journal</td>
+</tr>
+<tr>
+<td>Multi-currency</td>
+<td>✅</td>
+<td>✅</td>
+<td>hours, USD, kWh, etc.</td>
+</tr>
+<tr>
+<td>Dynamic credit limits</td>
+<td>✅</td>
+<td>✅</td>
+<td>Trust + history based</td>
+</tr>
+<tr>
+<td>New member protection</td>
+<td>✅</td>
+<td>✅</td>
+<td>Progressive ramping</td>
+</tr>
+<tr>
+<td>Dispute resolution</td>
+<td>✅</td>
+<td>✅</td>
+<td>File, mediate, resolve</td>
+</tr>
+<tr>
+<td>Cooperative treasury</td>
+<td>❌</td>
+<td>❌</td>
+<td>No collective fund concept</td>
+</tr>
+</tbody></table>
+<p><strong>Gap</strong>: No treasury DID per cooperative. Payments are attributed to individuals, not coops. Communities can&#39;t hold collective funds.</p>
+<p><strong>Files</strong>:</p>
+<ul>
+<li><code>icn-ledger/src/ledger.rs</code> - Core ledger ✅</li>
+<li><code>icn-ledger/src/credit_policy.rs</code> - Dynamic limits ✅</li>
+<li><code>icn-ledger/src/dispute.rs</code> - Dispute resolution ✅</li>
+</ul>
+<hr>
+<h3>4. Contracts as Computation (CCL)</h3>
+<p><strong>Vision</strong>: &quot;A tiny deterministic VM that executes agreements as code: membership rules, cooperative bylaws, cost-sharing, approvals, contributions.&quot;</p>
+<p><strong>Implementation Status</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Code</th>
+<th>Integrated</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>CCL AST &amp; parser</td>
+<td>✅</td>
+<td>✅</td>
+<td>Contract, Rule, Stmt, Expr</td>
+</tr>
+<tr>
+<td>Interpreter</td>
+<td>✅</td>
+<td>✅</td>
+<td>Fuel-metered execution</td>
+</tr>
+<tr>
+<td>Capability system</td>
+<td>✅</td>
+<td>✅</td>
+<td>ReadLedger, WriteLedger, ReadTrust</td>
+</tr>
+<tr>
+<td>Compute execution</td>
+<td>✅</td>
+<td>✅</td>
+<td>LocalExecutor runs CCL</td>
+</tr>
+<tr>
+<td>Contract registry</td>
+<td>✅</td>
+<td>⚠️</td>
+<td>Code exists, needs supervisor wiring</td>
+</tr>
+<tr>
+<td>CclRef task code</td>
+<td>✅</td>
+<td>⚠️</td>
+<td>TaskCode::CclRef variant ready</td>
+</tr>
+<tr>
+<td>Gossip deployment</td>
+<td>❌</td>
+<td>❌</td>
+<td>Registry sync not yet implemented</td>
+</tr>
+</tbody></table>
+<p><strong>Progress (2025-11-28)</strong>: Contract registry implemented with persistent storage and in-memory caching. Deploy once, invoke by hash pattern ready. Executor handles CclRef variant.</p>
+<p><strong>Files</strong>:</p>
+<ul>
+<li><code>icn-ccl/src/ast.rs</code> - AST types ✅</li>
+<li><code>icn-ccl/src/interpreter.rs</code> - Execution ✅</li>
+<li><code>icn-ccl/src/registry.rs</code> - ContractRegistry ✅ NEW</li>
+<li><code>icn-compute/src/types.rs</code> - TaskCode::CclRef ✅</li>
+</ul>
+<hr>
+<h3>5. Gossip Instead of Gods</h3>
+<p><strong>Vision</strong>: &quot;Information flows the way it does in communities: locally first, outward second. This makes the network resilient, unkillable, scalable.&quot;</p>
+<p><strong>Implementation Status</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Code</th>
+<th>Integrated</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Push announcements</td>
+<td>✅</td>
+<td>✅</td>
+<td>Broadcast content hashes</td>
+</tr>
+<tr>
+<td>Pull requests</td>
+<td>✅</td>
+<td>✅</td>
+<td>Request missing content</td>
+</tr>
+<tr>
+<td>Anti-entropy</td>
+<td>✅</td>
+<td>✅</td>
+<td>Bloom filter exchange</td>
+</tr>
+<tr>
+<td>Vector clocks</td>
+<td>✅</td>
+<td>✅</td>
+<td>Causal ordering</td>
+</tr>
+<tr>
+<td>Topic subscriptions</td>
+<td>✅</td>
+<td>✅</td>
+<td>With notification callbacks</td>
+</tr>
+<tr>
+<td>Partition healing</td>
+<td>✅</td>
+<td>✅</td>
+<td>Clock recovery</td>
+</tr>
+</tbody></table>
+<p><strong>Status</strong>: ✅ <strong>COMPLETE</strong> - Gossip protocol is fully implemented and integrated.</p>
+<p><strong>Files</strong>:</p>
+<ul>
+<li><code>icn-gossip/src/gossip.rs</code> - GossipActor ✅</li>
+<li><code>icn-gossip/src/partition.rs</code> - Partition healing ✅</li>
+<li><code>icn-gossip/src/bloom.rs</code> - Bloom filters ✅</li>
+</ul>
+<hr>
+<h3>6. Distributed Compute as a Commons</h3>
+<p><strong>Vision</strong>: &quot;Nodes can run actors, migrate workloads, share CPU/GPU cycles, schedule tasks to where trust is highest. Every device becomes part of a global cooperative supercomputer.&quot;</p>
+<p><strong>Implementation Status</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Code</th>
+<th>Integrated</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Task submission</td>
+<td>✅</td>
+<td>✅</td>
+<td>Via gossip, RPC, Gateway</td>
+</tr>
+<tr>
+<td>Trust-gated execution</td>
+<td>✅</td>
+<td>✅</td>
+<td>MIN_TRUST thresholds</td>
+</tr>
+<tr>
+<td>CCL executor</td>
+<td>✅</td>
+<td>✅</td>
+<td>Real interpreter</td>
+</tr>
+<tr>
+<td>WASM executor</td>
+<td>✅</td>
+<td>⚠️</td>
+<td>Code exists, no blob storage</td>
+</tr>
+<tr>
+<td>Placement scoring</td>
+<td>✅</td>
+<td>✅</td>
+<td>7-factor algorithm</td>
+</tr>
+<tr>
+<td>Locality awareness</td>
+<td>✅</td>
+<td>✅</td>
+<td>RTT + data locality</td>
+</tr>
+<tr>
+<td>Actor checkpoints</td>
+<td>✅</td>
+<td>✅</td>
+<td>Stateful migration</td>
+</tr>
+<tr>
+<td>Cooperative policies</td>
+<td>✅</td>
+<td>✅</td>
+<td>Quotas, rules, enforcement</td>
+</tr>
+<tr>
+<td>Blob storage</td>
+<td>❌</td>
+<td>❌</td>
+<td>Can&#39;t store/fetch large files</td>
+</tr>
+</tbody></table>
+<p><strong>Gap</strong>: WASM executor exists but can&#39;t fetch WASM binaries - no blob storage. Tasks limited to inline CCL code.</p>
+<p><strong>Files</strong>:</p>
+<ul>
+<li><code>icn-compute/src/actor.rs</code> - ComputeActor ✅</li>
+<li><code>icn-compute/src/executor.rs</code> - LocalExecutor ✅</li>
+<li><code>icn-compute/src/scheduler.rs</code> - Placement scoring ✅</li>
+<li><code>icn-compute/src/wasm_executor.rs:299</code> - Blob storage TODO</li>
+</ul>
+<hr>
+<h3>7. Democratic Federation</h3>
+<p><strong>Vision</strong>: &quot;Communities choose whom to federate with. Trust determines bandwidth, permissions, and cooperation. No central server; no company to appease.&quot;</p>
+<p><strong>Implementation Status</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Code</th>
+<th>Integrated</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>P2P networking</td>
+<td>✅</td>
+<td>✅</td>
+<td>QUIC/TLS with mDNS</td>
+</tr>
+<tr>
+<td>Manual peer connection</td>
+<td>✅</td>
+<td>✅</td>
+<td><code>icnctl network add-peer</code></td>
+</tr>
+<tr>
+<td>NAT traversal</td>
+<td>✅</td>
+<td>✅</td>
+<td>STUN + hole punching</td>
+</tr>
+<tr>
+<td>Federation config</td>
+<td>⚠️</td>
+<td>❌</td>
+<td>FederationConfig exists, unused</td>
+</tr>
+<tr>
+<td>Federation protocol</td>
+<td>❌</td>
+<td>❌</td>
+<td>No cross-network routing</td>
+</tr>
+<tr>
+<td>Federation CLI</td>
+<td>❌</td>
+<td>❌</td>
+<td>All commands print &quot;not yet implemented&quot;</td>
+</tr>
+</tbody></table>
+<p><strong>Gap</strong>: Federation is entirely unimplemented. CLI commands are stubs. No way to connect separate ICN networks.</p>
+<p><strong>Files</strong>:</p>
+<ul>
+<li><code>icn-net/src/actor.rs</code> - NetworkActor ✅</li>
+<li><code>icn-net/src/nat.rs</code> - NAT traversal ✅</li>
+<li><code>bins/icnctl/src/main.rs</code> - federation commands are stubs</li>
+</ul>
+<hr>
+<h3>8. Privacy Layer</h3>
+<p><strong>Vision</strong>: (Implicit) Metadata protection, traffic obfuscation, anonymous routing.</p>
+<p><strong>Implementation Status</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Code</th>
+<th>Integrated</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Topic encryption</td>
+<td>✅</td>
+<td>❌</td>
+<td>Code exists, not wired in</td>
+</tr>
+<tr>
+<td>Onion routing</td>
+<td>✅</td>
+<td>❌</td>
+<td>Code exists, not wired in</td>
+</tr>
+<tr>
+<td>Traffic obfuscation</td>
+<td>✅</td>
+<td>❌</td>
+<td>Code exists, not wired in</td>
+</tr>
+<tr>
+<td>Privacy metrics</td>
+<td>✅</td>
+<td>❌</td>
+<td>Defined, never incremented</td>
+</tr>
+</tbody></table>
+<p><strong>Gap</strong>: The entire <code>icn-privacy</code> crate exists with 23 passing tests but is NOT in the workspace Cargo.toml and never spawned by the supervisor.</p>
+<p><strong>Files</strong>:</p>
+<ul>
+<li><code>icn-privacy/src/topic_encryption.rs</code> - TopicEncryptor ✅</li>
+<li><code>icn-privacy/src/onion_routing.rs</code> - OnionRouter ✅</li>
+<li><code>icn-privacy/src/traffic_obfuscation.rs</code> - TrafficObfuscator ✅</li>
+<li><code>icn/Cargo.toml</code> - icn-privacy NOT LISTED</li>
+</ul>
+<hr>
+<h2>Security Issues</h2>
+<h3><del>CRITICAL: RPC Endpoint Has No Authentication</del> ✅ FIXED (2025-11-28)</h3>
+<p><strong>Location</strong>: <code>icn-rpc/src/auth.rs</code> (NEW), <code>icn-rpc/src/server.rs</code></p>
+<p><strong>Resolution</strong>: Full JWT authentication added to RPC server:</p>
+<ul>
+<li><code>auth.challenge</code> / <code>auth.verify</code> endpoints for DID-based authentication</li>
+<li>Scope-based authorization for all methods (e.g., <code>compute:write</code>, <code>ledger:read</code>)</li>
+<li>Authenticated DID tracked for compute task submission (no more <code>&quot;rpc:unknown&quot;</code>)</li>
+<li>6 new tests validating auth flow</li>
+</ul>
+<p><strong>Usage</strong>:</p>
+<pre><code class="language-bash"># 1. Get challenge
+curl -X POST http://localhost:5601 -d &#39;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;method&quot;:&quot;auth.challenge&quot;,&quot;params&quot;:{&quot;did&quot;:&quot;did:icn:...&quot;},&quot;id&quot;:1}&#39;
+
+# 2. Sign nonce and verify to get JWT
+curl -X POST http://localhost:5601 -d &#39;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;method&quot;:&quot;auth.verify&quot;,&quot;params&quot;:{&quot;did&quot;:&quot;did:icn:...&quot;,&quot;signature&quot;:&quot;...&quot;,&quot;scopes&quot;:[&quot;compute:write&quot;]},&quot;id&quot;:2}&#39;
+
+# 3. Use token for authenticated requests
+curl -H &quot;Authorization: Bearer &lt;token&gt;&quot; -X POST http://localhost:5601 -d &#39;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;method&quot;:&quot;compute.submit&quot;,...}&#39;
+</code></pre>
+<hr>
+<h2>CLI Commands That Are Stubs</h2>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Location</th>
+<th>Current Behavior</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><del><code>icnctl status</code></del></td>
+<td>:889</td>
+<td>✅ FIXED - Now connects to daemon via RPC</td>
+</tr>
+<tr>
+<td><code>icnctl recovery setup</code></td>
+<td>:1285</td>
+<td>&quot;TODO: Publish to gossip&quot;</td>
+</tr>
+<tr>
+<td><code>icnctl recovery initiate</code></td>
+<td>:1341</td>
+<td>&quot;TODO: Publish to gossip&quot;</td>
+</tr>
+<tr>
+<td><code>icnctl recovery attest</code></td>
+<td>:1424</td>
+<td>&quot;TODO: Publish to gossip&quot;</td>
+</tr>
+<tr>
+<td><code>icnctl recovery finalize</code></td>
+<td>:1488</td>
+<td>&quot;TODO: Publish to gossip&quot;</td>
+</tr>
+<tr>
+<td><code>icnctl recovery cancel</code></td>
+<td>:1556</td>
+<td>&quot;TODO: Publish to gossip&quot;</td>
+</tr>
+<tr>
+<td><code>icnctl device approve</code></td>
+<td>:3070</td>
+<td>&quot;TODO: Sign this event&quot;</td>
+</tr>
+<tr>
+<td><code>icnctl device revoke</code></td>
+<td>:3158</td>
+<td>&quot;TODO: Sign this event&quot;</td>
+</tr>
+<tr>
+<td><code>icnctl federation invite</code></td>
+<td>-</td>
+<td>&quot;not yet implemented&quot;</td>
+</tr>
+<tr>
+<td><code>icnctl federation accept</code></td>
+<td>-</td>
+<td>&quot;not yet implemented&quot;</td>
+</tr>
+<tr>
+<td><code>icnctl federation list</code></td>
+<td>-</td>
+<td>&quot;not yet implemented&quot;</td>
+</tr>
+<tr>
+<td><code>icnctl federation remove</code></td>
+<td>-</td>
+<td>&quot;not yet implemented&quot;</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Prioritized Implementation Plan</h2>
+<h3>Tier 1: Security &amp; Core Integration (Week 1)</h3>
+<ol>
+<li><p><del><strong>RPC Authentication</strong> [CRITICAL]</del> ✅ COMPLETED (2025-11-28)</p>
+<ul>
+<li>✅ JWT authentication with challenge-response flow</li>
+<li>✅ Scope-based authorization for all methods</li>
+<li>✅ Authenticated DID tracked for compute tasks</li>
+</ul>
+</li>
+<li><p><strong>Enable IdentityActor</strong></p>
+<ul>
+<li>Uncomment in supervisor.rs</li>
+<li>Wire gossip callbacks for <code>identity:updates</code></li>
+<li>Enable daemon-side multi-device sync</li>
+</ul>
+</li>
+<li><p><strong>Wire icn-privacy</strong></p>
+<ul>
+<li>Add to Cargo.toml workspace members</li>
+<li>Spawn PrivacyActor in supervisor</li>
+<li>Enable encrypted topics for sensitive data</li>
+</ul>
+</li>
+</ol>
+<h3>Tier 2: Making Contracts Persistent (Week 2)</h3>
+<ol start="4">
+<li><p><strong>Contract Registry</strong></p>
+<ul>
+<li>Gossip-based contract deployment</li>
+<li>Content-addressed storage (hash → contract)</li>
+<li>Invoke by hash instead of inline code</li>
+</ul>
+</li>
+<li><p><strong>Blob Storage</strong></p>
+<ul>
+<li>Content-addressed blob store</li>
+<li>Gossip announcements for blob locations</li>
+<li>Enable WASM binary distribution</li>
+</ul>
+</li>
+</ol>
+<h3>Tier 3: Federation &amp; Treasury (Week 3+)</h3>
+<ol start="6">
+<li><p><strong>Federation Protocol</strong></p>
+<ul>
+<li>Cross-network peer discovery</li>
+<li>Trust-gated federation handshake</li>
+<li>Routing across network boundaries</li>
+</ul>
+</li>
+<li><p><strong>Cooperative Treasury</strong></p>
+<ul>
+<li>Treasury DID per cooperative</li>
+<li>Governance-approved spending</li>
+<li>Collective fund accounting</li>
+</ul>
+</li>
+<li><p><strong>Fix CLI Stubs</strong></p>
+<ul>
+<li>✅ <code>icnctl status</code> - Now connects to daemon via RPC (2025-11-28)</li>
+<li>Implement recovery commands (gossip publish)</li>
+<li>Implement device commands (sign + broadcast)</li>
+<li>Implement federation commands</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h2>What Real Users Can&#39;t Do Today</h2>
+<p>Despite 760+ passing tests, users cannot:</p>
+<table>
+<thead>
+<tr>
+<th>Action</th>
+<th>Blocker</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Add a second device and sync across nodes</td>
+<td>IdentityActor disabled</td>
+</tr>
+<tr>
+<td>Set up social recovery with trustees</td>
+<td>CLI stubs</td>
+</tr>
+<tr>
+<td>Deploy a contract once and reuse it</td>
+<td>No registry</td>
+</tr>
+<tr>
+<td>Join another ICN network</td>
+<td>Federation not implemented</td>
+</tr>
+<tr>
+<td>Send private messages</td>
+<td>Privacy not wired in</td>
+</tr>
+<tr>
+<td>Submit large WASM files</td>
+<td>No blob storage</td>
+</tr>
+<tr>
+<td>Run long-running stateful services</td>
+<td>Actor model incomplete</td>
+</tr>
+<tr>
+<td>Lock funds in cooperative treasury</td>
+<td>Treasury not implemented</td>
+</tr>
+<tr>
+<td><del>Trust that RPC requests are authenticated</del></td>
+<td>✅ FIXED - RPC now has JWT auth</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Success Metrics</h2>
+<p>After implementing Tier 1-3:</p>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> RPC requires authentication (0 unauthenticated mutations possible) ✅ 2025-11-28</li>
+<li><input disabled="" type="checkbox"> Multi-device identity syncs across daemon restarts</li>
+<li><input disabled="" type="checkbox"> Private topics are encrypted on the wire</li>
+<li><input disabled="" type="checkbox"> Contracts can be deployed once and invoked by hash</li>
+<li><input disabled="" type="checkbox"> WASM binaries can be stored and fetched</li>
+<li><input disabled="" type="checkbox"> Two ICN networks can federate</li>
+<li><input disabled="" type="checkbox"> Cooperatives can hold treasury funds</li>
+<li><input disabled="" type="checkbox"> All CLI commands are functional (0 stubs)</li>
+</ul>
+<hr>
+<h2>Appendix: File Locations</h2>
+<h3>Commented-Out Code</h3>
+<ul>
+<li><code>icn-core/src/supervisor.rs:315</code> - IdentityActor spawn</li>
+</ul>
+<h3>Stub Implementations</h3>
+<ul>
+<li><code>icn-rpc/src/server.rs:1658-1672</code> - Hardcoded &quot;rpc:unknown&quot; submitter</li>
+<li><code>icn-ccl/src/actor.rs:125</code> - Contract registry TODO</li>
+<li><code>icn-compute/src/wasm_executor.rs:299</code> - Blob storage TODO</li>
+</ul>
+<h3>Missing Integration</h3>
+<ul>
+<li><code>icn-privacy/</code> - Not in Cargo.toml</li>
+<li><code>icn-core/src/supervisor.rs</code> - No PrivacyActor spawn</li>
+</ul>
+<h3>Dead-Letter Queue (Missing)</h3>
+<ul>
+<li><code>icn-core/src/supervisor.rs:1564</code> - Failed messages silently dropped</li>
+</ul>
+<hr>
+<p><strong>Document Status</strong>: Living document, updated as gaps are closed.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

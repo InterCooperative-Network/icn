@@ -1,0 +1,400 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>SDIS API Guide | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>sdis</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>SDIS API GUIDE</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/sdis/SDIS_API_GUIDE.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>SDIS API Guide</h1>
+<p>Complete guide to using the Secure Distributed Identity System (SDIS) API.</p>
+<h2>Base URL</h2>
+<pre><code>http://10.8.10.40:30080/v1/sdis
+</code></pre>
+<h2>Authentication</h2>
+<p>Most SDIS endpoints require authentication via Bearer token:</p>
+<pre><code>Authorization: Bearer &lt;your-token&gt;
+</code></pre>
+<p>To get a token:</p>
+<pre><code class="language-bash">POD=$(kubectl get pods -n icn -l component=daemon -o jsonpath=&#39;{.items[0].metadata.name}&#39;)
+kubectl exec -it -n icn $POD -- icnctl auth token --coop-id &lt;COOP_ID&gt; --gateway http://localhost:8080
+</code></pre>
+<h2>API Endpoints</h2>
+<h3>1. Health Check</h3>
+<p>Check if SDIS is operational.</p>
+<pre><code class="language-bash">curl http://10.8.10.40:30080/v1/sdis/health
+</code></pre>
+<p><strong>Response:</strong></p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;healthy&quot;,
+  &quot;timestamp&quot;: &quot;2025-12-12T22:00:00Z&quot;
+}
+</code></pre>
+<hr>
+<h3>2. Enrollment</h3>
+<h4>Start Enrollment</h4>
+<p>Begin the SDIS enrollment process to create a new identity.</p>
+<p><strong>POST</strong> <code>/v1/sdis/enrollment/start</code></p>
+<pre><code class="language-bash">curl -X POST http://10.8.10.40:30080/v1/sdis/enrollment/start \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+    &quot;identity_name&quot;: &quot;Alice&quot;,
+    &quot;coop_id&quot;: &quot;my-coop&quot;
+  }&#39;
+</code></pre>
+<p><strong>Response:</strong></p>
+<pre><code class="language-json">{
+  &quot;enrollment_id&quot;: &quot;enroll_abc123...&quot;,
+  &quot;expires_at&quot;: &quot;2025-12-12T23:00:00Z&quot;,
+  &quot;qr_code&quot;: &quot;data:image/png;base64,...&quot;,
+  &quot;verification_code&quot;: &quot;VERIFY-1234&quot;
+}
+</code></pre>
+<h4>Complete Enrollment</h4>
+<p>Finalize enrollment after verification.</p>
+<p><strong>POST</strong> <code>/v1/sdis/enrollment/complete</code></p>
+<pre><code class="language-bash">curl -X POST http://10.8.10.40:30080/v1/sdis/enrollment/complete \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+    &quot;enrollment_id&quot;: &quot;enroll_abc123...&quot;,
+    &quot;ephemeral_did&quot;: &quot;did:icn:z...&quot;,
+    &quot;ephemeral_signature&quot;: &quot;base64-signature&quot;,
+    &quot;device_info&quot;: {
+      &quot;device_type&quot;: &quot;smartphone&quot;,
+      &quot;os&quot;: &quot;Android&quot;,
+      &quot;app_version&quot;: &quot;1.0.0&quot;
+    }
+  }&#39;
+</code></pre>
+<p><strong>Response:</strong></p>
+<pre><code class="language-json">{
+  &quot;did&quot;: &quot;did:icn:z9AWguvsTEkAVXkpQrHWthPuK86Tw3c8DunToVWLJeP4s&quot;,
+  &quot;recovery_codes&quot;: [&quot;CODE1&quot;, &quot;CODE2&quot;, &quot;CODE3&quot;],
+  &quot;auth_token&quot;: &quot;Bearer eyJ...&quot;
+}
+</code></pre>
+<hr>
+<h3>3. Verification Levels</h3>
+<h4>Level 1 Verification (Basic)</h4>
+<p>Verify device possession via QR scan.</p>
+<p><strong>POST</strong> <code>/v1/sdis/verify/level1</code></p>
+<pre><code class="language-bash">curl -X POST http://10.8.10.40:30080/v1/sdis/verify/level1 \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+    &quot;enrollment_id&quot;: &quot;enroll_abc123...&quot;,
+    &quot;device_proof&quot;: &quot;base64-proof&quot;
+  }&#39;
+</code></pre>
+<h4>Level 2 Verification (Steward Vouching)</h4>
+<p>Get vouched by a trusted steward.</p>
+<p><strong>POST</strong> <code>/v1/sdis/verify/level2</code></p>
+<pre><code class="language-bash">curl -X POST http://10.8.10.40:30080/v1/sdis/verify/level2 \
+  -H &quot;Authorization: Bearer &lt;steward-token&gt;&quot; \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+    &quot;enrollment_id&quot;: &quot;enroll_abc123...&quot;,
+    &quot;vouch_statement&quot;: &quot;I vouch for this person&quot;
+  }&#39;
+</code></pre>
+<hr>
+<h3>4. Anchor Device Management</h3>
+<h4>List Anchor Devices</h4>
+<p>Get all trusted devices for a specific anchor.</p>
+<p><strong>GET</strong> <code>/v1/sdis/anchor/{anchor_id}/devices</code></p>
+<pre><code class="language-bash">curl http://10.8.10.40:30080/v1/sdis/anchor/anchor_123/devices \
+  -H &quot;Authorization: Bearer &lt;your-token&gt;&quot;
+</code></pre>
+<p><strong>Response:</strong></p>
+<pre><code class="language-json">{
+  &quot;devices&quot;: [
+    {
+      &quot;device_id&quot;: &quot;device_001&quot;,
+      &quot;device_name&quot;: &quot;Primary Phone&quot;,
+      &quot;added_at&quot;: 1765065600,
+      &quot;last_seen&quot;: 1765141200
+    }
+  ]
+}
+</code></pre>
+<h4>Add Anchor</h4>
+<p>Add a new anchor device.</p>
+<p><strong>POST</strong> <code>/v1/sdis/anchor/devices/add</code></p>
+<pre><code class="language-bash">curl -X POST http://10.8.10.40:30080/v1/sdis/anchor/devices/add \
+  -H &quot;Authorization: Bearer &lt;your-token&gt;&quot; \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+    &quot;anchor_id&quot;: &quot;anchor_123&quot;,
+    &quot;device_name&quot;: &quot;Backup Phone&quot;,
+    &quot;device_pubkey&quot;: &quot;base64-pubkey&quot;
+  }&#39;
+</code></pre>
+<h4>Get Anchor Details</h4>
+<p>Get anchor metadata and rotation/device information.</p>
+<p><strong>GET</strong> <code>/v1/sdis/anchor/{anchor_id}</code></p>
+<pre><code class="language-bash">curl http://10.8.10.40:30080/v1/sdis/anchor/anchor_123 \
+  -H &quot;Authorization: Bearer &lt;your-token&gt;&quot;
+</code></pre>
+<h4>Rotate Anchor Keys</h4>
+<p>Rotate keys for an existing anchor.</p>
+<p><strong>POST</strong> <code>/v1/sdis/anchor/rotate-keys</code></p>
+<pre><code class="language-bash">curl -X POST http://10.8.10.40:30080/v1/sdis/anchor/rotate-keys \
+  -H &quot;Authorization: Bearer &lt;your-token&gt;&quot; \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+    &quot;anchor_id&quot;: &quot;anchor_123&quot;,
+    &quot;current_did&quot;: &quot;did:icn:z...&quot;,
+    &quot;new_keybundle&quot;: {
+      &quot;ed25519_pub&quot;: &quot;base64-ed25519&quot;,
+      &quot;ml_dsa_pub&quot;: &quot;base64-mldsa&quot;,
+      &quot;x25519_pub&quot;: &quot;base64-x25519&quot;
+    },
+    &quot;reason&quot;: &quot;scheduled-rotation&quot;
+  }&#39;
+</code></pre>
+<hr>
+<h3>5. Recovery</h3>
+<h4>Initiate Recovery</h4>
+<p>Start identity recovery ceremony using anchor/vui context and verification data.</p>
+<p><strong>POST</strong> <code>/v1/sdis/recovery/start</code></p>
+<pre><code class="language-bash">curl -X POST http://10.8.10.40:30080/v1/sdis/recovery/start \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+    &quot;anchor_id&quot;: &quot;anchor_123&quot;,
+    &quot;verification_data&quot;: {&quot;method&quot;: &quot;selfie&quot;, &quot;proof&quot;: &quot;...&quot;},
+    &quot;new_keybundle&quot;: {
+      &quot;ed25519_pub&quot;: &quot;base64-ed25519&quot;,
+      &quot;ml_dsa_pub&quot;: &quot;base64-mldsa&quot;,
+      &quot;x25519_pub&quot;: &quot;base64-x25519&quot;
+    }
+  }&#39;
+</code></pre>
+<p><strong>Response:</strong></p>
+<pre><code class="language-json">{
+  &quot;recovery_id&quot;: &quot;recovery_xyz...&quot;,
+  &quot;status&quot;: &quot;pending_steward_verification&quot;,
+  &quot;required_stewards&quot;: 3
+}
+</code></pre>
+<h4>Check Recovery Status</h4>
+<p><strong>GET</strong> <code>/v1/sdis/recovery/{recovery_id}</code></p>
+<pre><code class="language-bash">curl http://10.8.10.40:30080/v1/sdis/recovery/recovery_xyz... \
+  -H &quot;Authorization: Bearer &lt;your-token&gt;&quot;
+</code></pre>
+<h4>Complete Recovery</h4>
+<p>Finalize recovery with challenge response.</p>
+<p><strong>POST</strong> <code>/v1/sdis/recovery/{recovery_id}/complete</code></p>
+<pre><code class="language-bash">curl -X POST http://10.8.10.40:30080/v1/sdis/recovery/recovery_xyz.../complete \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+    &quot;recovery_share&quot;: &quot;optional-share-fragment&quot;
+  }&#39;
+</code></pre>
+<hr>
+<h3>6. Ephemeral DIDs</h3>
+<h4>Generate Ephemeral DID</h4>
+<p>Get a temporary DID for device pairing.</p>
+<p><strong>POST</strong> <code>/v1/sdis/ephemeral/generate</code></p>
+<pre><code class="language-bash">curl -X POST http://10.8.10.40:30080/v1/sdis/ephemeral/generate \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+    &quot;purpose&quot;: &quot;enrollment&quot;,
+    &quot;ttl_seconds&quot;: 3600
+  }&#39;
+</code></pre>
+<p><strong>Response:</strong></p>
+<pre><code class="language-json">{
+  &quot;ephemeral_did&quot;: &quot;did:icn:z...&quot;,
+  &quot;private_key&quot;: &quot;base64-key&quot;,
+  &quot;expires_at&quot;: &quot;2025-12-12T23:00:00Z&quot;
+}
+</code></pre>
+<hr>
+<h2>Verification Levels Explained</h2>
+<h3>Level 0: Unverified</h3>
+<ul>
+<li>New enrollments</li>
+<li>No trust in the network</li>
+<li>Limited capabilities</li>
+</ul>
+<h3>Level 1: Device Verified</h3>
+<ul>
+<li>QR code scanned successfully</li>
+<li>Device possession proven</li>
+<li>Basic network access</li>
+</ul>
+<h3>Level 2: Steward Vouched</h3>
+<ul>
+<li>Verified by trusted member</li>
+<li>Enhanced trust score</li>
+<li>Full network capabilities</li>
+</ul>
+<h3>Level 3: Multi-Steward (Future)</h3>
+<ul>
+<li>Multiple independent vouches</li>
+<li>Highest trust level</li>
+<li>Governance participation</li>
+</ul>
+<hr>
+<h2>QR Code Format</h2>
+<p>QR codes contain enrollment data:</p>
+<pre><code class="language-json">{
+  &quot;type&quot;: &quot;icn-enrollment&quot;,
+  &quot;enrollment_id&quot;: &quot;enroll_abc123...&quot;,
+  &quot;challenge&quot;: &quot;base64-challenge&quot;,
+  &quot;gateway_url&quot;: &quot;http://10.8.10.40:30080&quot;
+}
+</code></pre>
+<hr>
+<h2>Error Responses</h2>
+<p>All errors follow this format:</p>
+<pre><code class="language-json">{
+  &quot;error&quot;: &quot;error_code&quot;,
+  &quot;message&quot;: &quot;Human readable description&quot;,
+  &quot;details&quot;: {}
+}
+</code></pre>
+<p>Common errors:</p>
+<ul>
+<li><code>401</code>: Unauthorized (invalid/missing token)</li>
+<li><code>404</code>: Enrollment/device not found</li>
+<li><code>409</code>: Conflict (already exists)</li>
+<li><code>422</code>: Validation error</li>
+<li><code>500</code>: Internal server error</li>
+</ul>
+<hr>
+<h2>Security Notes</h2>
+<ol>
+<li><strong>Ephemeral Keys</strong>: Used only for device pairing, never stored long-term</li>
+<li><strong>Recovery Codes</strong>: Store securely offline, single-use only</li>
+<li><strong>Bearer Tokens</strong>: Short-lived, refresh regularly</li>
+<li><strong>Anchor Devices</strong>: Minimum 2 recommended for redundancy</li>
+<li><strong>Primary Anchor</strong>: Can add/remove other anchors</li>
+</ol>
+<hr>
+<h2>Integration Flow</h2>
+<h3>New User Enrollment</h3>
+<ol>
+<li>User requests enrollment → <code>POST /enrollment/start</code></li>
+<li>Display QR code to user</li>
+<li>User scans QR with mobile app</li>
+<li>App generates ephemeral DID</li>
+<li>App calls <code>POST /verify/level1</code> with device proof</li>
+<li>User gets vouched by steward → <code>POST /verify/level2</code></li>
+<li>Complete enrollment → <code>POST /enrollment/complete</code></li>
+<li>User receives DID, recovery codes, and auth token</li>
+</ol>
+<h3>Device Recovery</h3>
+<ol>
+<li>User lost primary device</li>
+<li>User enters recovery data → <code>POST /recovery/start</code></li>
+<li>System provides challenge</li>
+<li>User&#39;s other anchor signs challenge</li>
+<li>Complete recovery → <code>POST /recovery/complete</code></li>
+<li>New device becomes anchor</li>
+</ol>
+<h3>Adding Backup Device</h3>
+<ol>
+<li>User authenticated on primary</li>
+<li>Generate QR on primary device</li>
+<li>Scan QR with new device</li>
+<li>New device generates ephemeral DID</li>
+<li>Add anchor device → <code>POST /anchor/devices/add</code></li>
+<li>New device becomes trusted anchor</li>
+</ol>
+<hr>
+<h2>Testing</h2>
+<p>Test the full flow:</p>
+<pre><code class="language-bash"># 1. Health check
+curl http://10.8.10.40:30080/v1/sdis/health
+
+# 2. Start enrollment
+ENROLLMENT=$(curl -X POST http://10.8.10.40:30080/v1/sdis/enrollment/start \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{&quot;identity_name&quot;:&quot;TestUser&quot;,&quot;coop_id&quot;:&quot;test-coop&quot;}&#39; | jq -r &#39;.enrollment_id&#39;)
+
+echo &quot;Enrollment ID: $ENROLLMENT&quot;
+
+# 3. Generate ephemeral DID for device
+EPHEMERAL=$(curl -X POST http://10.8.10.40:30080/v1/sdis/ephemeral/generate \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{&quot;purpose&quot;:&quot;enrollment&quot;,&quot;ttl_seconds&quot;:3600}&#39; | jq -r &#39;.ephemeral_did&#39;)
+
+echo &quot;Ephemeral DID: $EPHEMERAL&quot;
+
+# 4. Complete enrollment (requires steward vouching in between)
+# ... continue with verification and completion
+</code></pre>
+<hr>
+<h2>Next Steps</h2>
+<ol>
+<li><strong>Mobile App Integration</strong>: Implement QR scanning in CoopWallet</li>
+<li><strong>Pilot UI</strong>: Add enrollment wizard to web interface</li>
+<li><strong>Steward Dashboard</strong>: Tools for stewards to vouch for new members</li>
+<li><strong>Recovery UX</strong>: User-friendly recovery flow</li>
+<li><strong>Multi-device Sync</strong>: Sync identity state across anchors</li>
+</ol>
+<hr>
+<p>For more information, see:</p>
+<ul>
+<li><code>docs/sdis-architecture.md</code> - Technical architecture</li>
+<li><code>SDIS_STEWARD_ROADMAP.md</code> - Steward system design</li>
+<li><code>icn/crates/icn-gateway/src/api/sdis/</code> - Implementation code</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

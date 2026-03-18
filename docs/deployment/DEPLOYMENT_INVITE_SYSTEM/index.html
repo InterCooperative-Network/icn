@@ -1,0 +1,347 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Invite System - Deployment Guide | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>deployment</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>DEPLOYMENT INVITE SYSTEM</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/deployment/DEPLOYMENT_INVITE_SYSTEM.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Invite System - Deployment Guide</h1>
+<p><strong>Date:</strong> 2025-12-12<br><strong>Status:</strong> Historical deployment snapshot</p>
+<blockquote>
+<p>Historical deployment snapshot from 2025-12-12.
+Validate current invite-system readiness with live checks and <code>docs/ci/CI_CURRENT_STATUS.md</code>.</p>
+</blockquote>
+<h2>Pre-Deployment Checklist</h2>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> All tests passing (152/152 gateway tests)</li>
+<li><input checked="" disabled="" type="checkbox"> Code committed to git (3 commits)</li>
+<li><input checked="" disabled="" type="checkbox"> Docker images built</li>
+<li><input checked="" disabled="" type="checkbox"> Documentation complete</li>
+<li><input checked="" disabled="" type="checkbox"> Release build successful</li>
+</ul>
+<h2>Quick Start</h2>
+<h3>Option 1: Local Docker Compose (Recommended for Testing)</h3>
+<pre><code class="language-bash">cd /home/matt/projects/icn
+
+# Start everything
+docker-compose -f docker-compose.test.yml up -d
+
+# Verify deployment
+./scripts/verify-deployment.sh
+
+# Access Pilot UI
+open http://localhost:3000
+</code></pre>
+<h3>Option 2: Kubernetes Deployment</h3>
+<pre><code class="language-bash">cd /home/matt/projects/icn/deploy/k8s
+
+# Create namespace
+kubectl create namespace icn
+
+# Deploy gateway
+kubectl apply -f deployment.yaml
+kubectl apply -f services.yaml
+
+# Deploy Pilot UI
+./scripts/deploy-pilot-ui.sh
+
+# Check status
+kubectl get pods -n icn
+kubectl get services -n icn
+</code></pre>
+<h3>Option 3: Manual Deployment</h3>
+<pre><code class="language-bash"># Terminal 1: Start Gateway
+cd /home/matt/projects/icn/icn
+./target/release/icnd
+
+# Terminal 2: Serve Pilot UI
+cd /home/matt/projects/icn/web/pilot-ui
+python3 -m http.server 3000
+# Or: nginx, caddy, etc.
+</code></pre>
+<h2>Testing the Invite System</h2>
+<h3>1. Create Test Invite (CLI)</h3>
+<pre><code class="language-bash"># Login as admin
+./target/release/icnctl auth login \
+  --gateway http://localhost:8080 \
+  --coop test-coop
+
+# The CLI will print your token
+# Save it for UI login
+</code></pre>
+<h3>2. Create Invite via UI</h3>
+<ol>
+<li>Open <a href="http://localhost:3000" target="_blank" rel="noopener">http://localhost:3000</a></li>
+<li>Login with admin credentials</li>
+<li>Navigate to &quot;Members&quot; tab</li>
+<li>Click &quot;Create Invite&quot;</li>
+<li>Select role and expiration</li>
+<li>Click &quot;Create Invite&quot;</li>
+<li>Copy the generated code</li>
+</ol>
+<h3>3. Test Join Flow</h3>
+<ol>
+<li>Open new incognito window → <a href="http://localhost:3000" target="_blank" rel="noopener">http://localhost:3000</a></li>
+<li>Click &quot;Join with Invite Code&quot;</li>
+<li>Enter gateway URL: <code>http://localhost:8080</code></li>
+<li>Paste invite code</li>
+<li>Click &quot;Join Cooperative&quot;</li>
+<li>Verify credentials are generated</li>
+<li>Verify auto-login works</li>
+</ol>
+<h3>4. Verify in UI</h3>
+<ul>
+<li>Check Members tab shows new member</li>
+<li>Check Invites section shows invite as &quot;Used&quot;</li>
+<li>Verify new member can send hours</li>
+</ul>
+<h2>API Endpoints</h2>
+<p>All endpoints are under <code>/v1/invites</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Auth</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>POST</td>
+<td><code>/v1/invites</code></td>
+<td>Admin</td>
+<td>Create invite</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/v1/invites?coop_id=X</code></td>
+<td>Admin</td>
+<td>List invites</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/v1/invites/join</code></td>
+<td>Public</td>
+<td>Redeem invite</td>
+</tr>
+</tbody></table>
+<h3>Example: Create Invite</h3>
+<pre><code class="language-bash">curl -X POST http://localhost:8080/v1/invites \
+  -H &quot;Authorization: Bearer YOUR_TOKEN&quot; \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+    &quot;coop_id&quot;: &quot;test-coop&quot;,
+    &quot;role&quot;: &quot;member&quot;,
+    &quot;expires_in_seconds&quot;: 604800
+  }&#39;
+</code></pre>
+<h3>Example: Join via Invite</h3>
+<pre><code class="language-bash">curl -X POST http://localhost:8080/v1/invites/join \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+    &quot;invite_code&quot;: &quot;ABCD1234EFGH&quot;,
+    &quot;did&quot;: &quot;did:icn:YOUR_DID&quot;
+  }&#39;
+</code></pre>
+<h2>Monitoring</h2>
+<h3>Prometheus Metrics</h3>
+<p>Metrics exposed at <code>http://localhost:8080/metrics</code>:</p>
+<pre><code>icn_gateway_invites_created_total{coop_id=&quot;test-coop&quot;} 5
+icn_gateway_invites_used_total{coop_id=&quot;test-coop&quot;} 3
+</code></pre>
+<h3>Logs</h3>
+<p>Gateway logs include:</p>
+<ul>
+<li>Invite creation events</li>
+<li>Join attempts (success/failure)</li>
+<li>Validation errors</li>
+<li>Rate limiting events</li>
+</ul>
+<p>Example:</p>
+<pre><code>INFO icn_gateway::api::invites: Invite created code=ABC123 coop=test-coop role=member
+INFO icn_gateway::api::invites: Invite redeemed code=ABC123 did=did:icn:xyz
+</code></pre>
+<h2>Troubleshooting</h2>
+<h3>Issue: &quot;Invalid invite code&quot;</h3>
+<p><strong>Cause:</strong> Code doesn&#39;t exist, already used, or expired</p>
+<p><strong>Fix:</strong></p>
+<pre><code class="language-bash"># Check invite status in UI (Members tab)
+# Or query via API:
+curl http://localhost:8080/v1/invites?coop_id=test-coop \
+  -H &quot;Authorization: Bearer YOUR_TOKEN&quot;
+</code></pre>
+<h3>Issue: &quot;Failed to generate keypair&quot;</h3>
+<p><strong>Cause:</strong> Browser doesn&#39;t support Web Crypto API</p>
+<p><strong>Fix:</strong> Use modern browser (Chrome, Firefox, Safari) over HTTPS or localhost</p>
+<h3>Issue: Join button disabled</h3>
+<p><strong>Cause:</strong> Gateway URL or invite code missing/invalid</p>
+<p><strong>Fix:</strong> Verify both fields filled, code is 12 characters</p>
+<h3>Issue: Gateway not responding</h3>
+<p><strong>Check:</strong></p>
+<pre><code class="language-bash"># Verify gateway is running
+curl http://localhost:8080/v1/health
+
+# Check logs
+tail -f /var/log/icnd.log
+
+# Restart if needed
+systemctl restart icnd
+</code></pre>
+<h2>Security Checklist</h2>
+<p>Before production deployment:</p>
+<ul>
+<li><input disabled="" type="checkbox"> Use HTTPS for gateway (TLS certificate)</li>
+<li><input disabled="" type="checkbox"> Use HTTPS for Pilot UI (TLS certificate)</li>
+<li><input disabled="" type="checkbox"> Configure CORS properly (gateway)</li>
+<li><input disabled="" type="checkbox"> Set rate limits appropriately</li>
+<li><input disabled="" type="checkbox"> Review invite expiration policy</li>
+<li><input disabled="" type="checkbox"> Enable audit logging</li>
+<li><input disabled="" type="checkbox"> Set up metrics monitoring</li>
+<li><input disabled="" type="checkbox"> Configure backup for invite data</li>
+<li><input disabled="" type="checkbox"> Test with multiple browsers/devices</li>
+<li><input disabled="" type="checkbox"> Verify mobile responsiveness</li>
+</ul>
+<h2>Rollback Procedure</h2>
+<p>If issues occur:</p>
+<pre><code class="language-bash"># Revert git commits
+git revert HEAD~3..HEAD
+
+# Rebuild without invite system
+cd icn/
+cargo build --release
+
+# Redeploy old version
+docker-compose down
+docker-compose up -d
+</code></pre>
+<h2>Performance Tuning</h2>
+<h3>Gateway</h3>
+<pre><code class="language-toml"># icn.toml
+[gateway]
+rate_limit_capacity = 100
+rate_limit_refill_rate = 10
+max_invites_per_coop = 1000
+</code></pre>
+<h3>Pilot UI</h3>
+<pre><code class="language-nginx"># Cache static assets
+location ~* \.(js|css)$ {
+    expires 7d;
+    add_header Cache-Control &quot;public, immutable&quot;;
+}
+</code></pre>
+<h2>Next Steps</h2>
+<p>After successful deployment:</p>
+<ol>
+<li><p><strong>Beta Testing</strong></p>
+<ul>
+<li>Invite 5-10 users to test</li>
+<li>Use beta feedback template</li>
+<li>Monitor metrics for issues</li>
+</ul>
+</li>
+<li><p><strong>Documentation</strong></p>
+<ul>
+<li>Update user guide with invite flow</li>
+<li>Create video tutorial</li>
+<li>Add FAQ entries</li>
+</ul>
+</li>
+<li><p><strong>Enhancements</strong></p>
+<ul>
+<li>QR code generation</li>
+<li>Email integration</li>
+<li>Batch invites</li>
+<li>Custom roles</li>
+</ul>
+</li>
+</ol>
+<h2>Support</h2>
+<p>For issues or questions:</p>
+<ul>
+<li>Check logs: <code>journalctl -u icnd -f</code></li>
+<li>Review metrics: <code>http://localhost:8080/metrics</code></li>
+<li>Check documentation: <code>INVITE_SYSTEM_COMPLETE.md</code></li>
+<li>Run verification: <code>./scripts/verify-deployment.sh</code></li>
+</ul>
+<h2>Verification Script</h2>
+<p>Run pre-deployment checks:</p>
+<pre><code class="language-bash">./scripts/verify-deployment.sh
+</code></pre>
+<p>Expected output:</p>
+<pre><code>✓ Gateway health endpoint
+✓ Gateway status is ok
+✓ Pilot UI accessible
+✓ Join screen present
+✓ Invite creation modal present
+✓ Invite JavaScript loaded
+✓ Invite CSS loaded
+✓ Gateway binary exists
+✓ CLI binary exists
+✓ Pilot UI Docker image exists
+✓ No uncommitted changes
+✓ Invite system committed
+
+🎉 All checks passed! Ready for deployment.
+</code></pre>
+<hr>
+<p><strong>Status:</strong> ✅ ALL SYSTEMS GO</p>
+<p>Deploy with confidence! 🚀</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

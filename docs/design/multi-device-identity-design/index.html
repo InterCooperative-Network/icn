@@ -1,0 +1,701 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Multi-Device Identity Design (Phase 11) | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>multi device identity design</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/multi-device-identity-design.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Multi-Device Identity Design (Phase 11)</h1>
+<p><strong>Status</strong>: Design Phase
+<strong>Started</strong>: 2025-01-13
+<strong>Target</strong>: 3-4 weeks to implementation complete</p>
+<h2>Problem Statement</h2>
+<p><strong>Current State</strong>: ICN identity = single Ed25519 keypair stored in Age-encrypted keystore.</p>
+<p><strong>Failure Modes</strong>:</p>
+<ol>
+<li>Device dies → lose entire economic history</li>
+<li>Device stolen → must rotate key, invalidate all trust edges</li>
+<li>Multiple devices → can&#39;t use ICN on phone + laptop</li>
+<li>Key compromise → no recovery path</li>
+</ol>
+<p><strong>Real-World Blocker</strong>: No community will trust their economic coordination to a system where hardware failure = total loss.</p>
+<hr>
+<h2>Design Goals</h2>
+<ol>
+<li><strong>Multi-Device Support</strong>: Same DID usable from multiple devices</li>
+<li><strong>Key Rotation</strong>: Clean rotation without breaking trust/ledger history</li>
+<li><strong>Recovery</strong>: Survive total device loss via social recovery or backup</li>
+<li><strong>Backward Compatible</strong>: Migrate existing v2.1 keystores without data loss</li>
+<li><strong>Security</strong>: No single point of failure, clear revocation semantics</li>
+</ol>
+<hr>
+<h2>Architecture Overview</h2>
+<h3>Core Components</h3>
+<pre><code>┌─────────────────────────────────────────────────────────────┐
+│                      DID Document v2                         │
+│  (Canonical list of authorized keys + capabilities)         │
+└─────────────────────────────────────────────────────────────┘
+                           │
+                           │ references
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                  Verification Methods                        │
+│  - device-1: Ed25519 key (laptop) [sign, rotate, recover]   │
+│  - device-2: Ed25519 key (phone) [sign]                     │
+│  - device-3: X25519 key (encryption)                         │
+└─────────────────────────────────────────────────────────────┘
+                           │
+                           │ stored in
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                  Keystore v3 Format                          │
+│  - Primary identity bundle (device-specific)                │
+│  - DID Document (shared identity state)                     │
+│  - Rotation chain (audit log)                               │
+└─────────────────────────────────────────────────────────────┘
+                           │
+                           │ synced via
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│               Identity Sync Protocol (NEW)                   │
+│  - Gossip topic: &quot;identity:updates&quot;                         │
+│  - Broadcasts: DID Document changes, rotation events        │
+│  - Trust-gated: Only visible to existing trust edges        │
+└─────────────────────────────────────────────────────────────┘
+</code></pre>
+<hr>
+<h2>Data Structures</h2>
+<h3>DID Document v2</h3>
+<pre><code class="language-rust">/// DID Document version 2: Multi-device identity
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DidDocument {
+    /// The DID this document describes (did:icn:base58-pubkey)
+    /// This is the *original* keypair&#39;s DID, remains stable across rotations
+    pub id: DID,
+
+    /// Version number (incremented on each update)
+    pub version: u64,
+
+    /// Timestamp of last update
+    pub updated_at: u64,
+
+    /// List of authorized verification methods (keys)
+    pub verification_method: Vec&lt;VerificationMethod&gt;,
+
+    /// Which keys can authenticate (sign messages)
+    pub authentication: Vec&lt;String&gt;,  // refs to verification_method IDs
+
+    /// Optional recovery configuration
+    pub recovery: Option&lt;RecoveryConfig&gt;,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VerificationMethod {
+    /// Unique ID within this DID Document (e.g., &quot;device-1&quot;, &quot;device-2&quot;)
+    pub id: String,
+
+    /// Human-readable label
+    pub label: String,  // e.g., &quot;Matt&#39;s Laptop&quot;, &quot;Phone&quot;
+
+    /// Key type
+    pub key_type: KeyType,
+
+    /// The actual public key
+    pub public_key: PublicKey,
+
+    /// What this key is authorized to do
+    pub capabilities: Vec&lt;Capability&gt;,
+
+    /// When this key was added
+    pub added_at: u64,
+
+    /// Optional: When this key was revoked
+    pub revoked_at: Option&lt;u64&gt;,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum KeyType {
+    Ed25519,   // Signing
+    X25519,    // Encryption
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Capability {
+    /// Can sign messages on behalf of this DID
+    Sign,
+
+    /// Can add new devices
+    AddDevice,
+
+    /// Can revoke devices (including self)
+    RevokeDevice,
+
+    /// Can rotate keys
+    RotateKey,
+
+    /// Can participate in recovery
+    Recover,
+
+    /// Can encrypt/decrypt messages
+    Encrypt,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecoveryConfig {
+    pub method: RecoveryMethod,
+    pub threshold: u8,
+    pub trustees: Vec&lt;DID&gt;,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum RecoveryMethod {
+    /// M-of-N social recovery
+    Social { m: u8, n: u8 },
+
+    /// Encrypted backup seed (offline)
+    BackupSeed,
+
+    /// No recovery (accept total loss risk)
+    None,
+}
+</code></pre>
+<h3>Key Rotation Event</h3>
+<pre><code class="language-rust">/// Represents a key rotation or device change event
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RotationEvent {
+    /// The DID being rotated
+    pub did: DID,
+
+    /// Event type
+    pub event_type: RotationEventType,
+
+    /// Signature by the authorized key performing this action
+    pub proof: Signature,
+
+    /// Which key signed this (must have RotateKey or RevokeDevice capability)
+    pub signed_by: String,  // verification method ID
+
+    /// Timestamp
+    pub timestamp: u64,
+
+    /// New DID Document version
+    pub new_version: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum RotationEventType {
+    /// Add a new device
+    AddDevice {
+        device_id: String,
+        public_key: PublicKey,
+        capabilities: Vec&lt;Capability&gt;,
+    },
+
+    /// Revoke a device
+    RevokeDevice {
+        device_id: String,
+        reason: RevocationReason,
+    },
+
+    /// Rotate a key (change the underlying keypair for a device)
+    RotateKey {
+        device_id: String,
+        old_key: PublicKey,
+        new_key: PublicKey,
+    },
+
+    /// Full recovery (new root key after total loss)
+    Recover {
+        new_root_key: PublicKey,
+        recovery_proofs: Vec&lt;RecoveryProof&gt;,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum RevocationReason {
+    /// Normal removal
+    Removed,
+
+    /// Device compromised
+    Compromised,
+
+    /// Device lost/stolen
+    Lost,
+
+    /// Key rotation
+    Rotated,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecoveryProof {
+    /// Trustee DID
+    pub trustee: DID,
+
+    /// Trustee&#39;s signature on recovery request
+    pub signature: Signature,
+
+    /// Timestamp
+    pub timestamp: u64,
+}
+</code></pre>
+<h3>Keystore v3 Format</h3>
+<pre><code class="language-rust">/// Keystore version 3: Multi-device with DID Document
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KeystoreV3 {
+    /// Format version
+    pub version: u8,  // = 3
+
+    /// This device&#39;s identity bundle
+    pub identity: IdentityBundle,
+
+    /// The canonical DID Document (shared across devices)
+    pub did_document: DidDocument,
+
+    /// This device&#39;s ID in the DID Document
+    pub device_id: String,
+
+    /// Rotation event history (audit log)
+    pub rotation_chain: Vec&lt;RotationEvent&gt;,
+}
+</code></pre>
+<hr>
+<h2>Key Workflows</h2>
+<h3>1. Initial Setup (Fresh Identity)</h3>
+<pre><code>User runs: icnctl id init --device-name &quot;Laptop&quot;
+
+1. Generate Ed25519 keypair (primary)
+2. Generate X25519 keypair (encryption)
+3. Create DID from Ed25519 pubkey: did:icn:abc123
+4. Create DID Document v2:
+   - verification_method = [
+       { id: &quot;device-1&quot;, label: &quot;Laptop&quot;, key_type: Ed25519, capabilities: [Sign, AddDevice, RevokeDevice, RotateKey, Recover] },
+       { id: &quot;enc-1&quot;, label: &quot;Encryption Key&quot;, key_type: X25519, capabilities: [Encrypt] }
+     ]
+   - authentication = [&quot;device-1&quot;]
+   - recovery = None (default, can configure later)
+5. Create keystore v3
+6. Encrypt and save to {data_dir}/identity.age
+</code></pre>
+<p><strong>Output</strong>: User has a working identity, ready to add more devices.</p>
+<h3>2. Add a Second Device</h3>
+<pre><code>User runs on NEW device: icnctl device add --name &quot;Phone&quot;
+
+Flow:
+1. Generate new Ed25519 keypair on phone
+2. Create AddDevice request:
+   {
+     device_id: &quot;device-2&quot;,
+     public_key: &lt;phone&#39;s pubkey&gt;,
+     capabilities: [Sign, Encrypt]  // Note: NOT AddDevice/RevokeDevice (limited trust)
+   }
+3. Export request as QR code or file
+4. On EXISTING device (laptop):
+   icnctl device approve &lt;request-file&gt;
+   - Verifies request
+   - Updates DID Document (adds device-2)
+   - Signs RotationEvent with device-1&#39;s key
+   - Broadcasts update to network via gossip
+5. Phone receives updated DID Document
+6. Phone creates its own keystore v3 with:
+   - New identity bundle (phone&#39;s keys)
+   - Shared DID Document
+   - device_id = &quot;device-2&quot;
+</code></pre>
+<p><strong>Result</strong>: Both laptop and phone can sign as the same DID.</p>
+<h3>3. Revoke a Device</h3>
+<pre><code>User runs: icnctl device revoke device-2 --reason &quot;Lost phone&quot;
+
+1. Check: Does current device have RevokeDevice capability? (Yes, device-1 does)
+2. Update DID Document:
+   - Set device-2.revoked_at = now()
+3. Create RotationEvent:
+   {
+     event_type: RevokeDevice { device_id: &quot;device-2&quot;, reason: Lost },
+     signed_by: &quot;device-1&quot;,
+     proof: &lt;signature by device-1&gt;
+   }
+4. Broadcast to network
+5. All nodes see the update, stop accepting signatures from device-2
+</code></pre>
+<p><strong>Result</strong>: Old device can no longer act as this DID.</p>
+<h3>4. Key Rotation (Proactive Security)</h3>
+<pre><code>User runs: icnctl key rotate --device device-1
+
+1. Generate new Ed25519 keypair
+2. Create RotationEvent:
+   {
+     event_type: RotateKey {
+       device_id: &quot;device-1&quot;,
+       old_key: &lt;current pubkey&gt;,
+       new_key: &lt;new pubkey&gt;
+     },
+     signed_by: &quot;device-1&quot;,
+     proof: &lt;signed by OLD key&gt;
+   }
+3. Update DID Document:
+   - Replace device-1&#39;s public_key with new key
+   - Increment version
+4. Broadcast to network
+5. Update local keystore with new keypair
+</code></pre>
+<p><strong>Result</strong>: Underlying key changed, but DID and trust/ledger history intact.</p>
+<h3>5. Social Recovery (Total Device Loss)</h3>
+<pre><code>Setup (one-time):
+icnctl recovery setup --method social --threshold 3 --trustees did:icn:alice,did:icn:bob,did:icn:carol
+
+User loses ALL devices, gets a new one:
+icnctl recovery initiate --did did:icn:abc123
+
+1. Generate new Ed25519 keypair on new device
+2. Create recovery request:
+   {
+     did: did:icn:abc123,
+     new_root_key: &lt;new device&#39;s pubkey&gt;,
+     requested_at: now()
+   }
+3. Send recovery request to trustees (out-of-band: email, Signal, in-person)
+4. Each trustee runs:
+   icnctl recovery approve &lt;request&gt; --trustee-key &lt;their key&gt;
+   - Verifies identity (out-of-band: &quot;Is this really Matt?&quot;)
+   - Signs recovery proof
+5. Once M-of-N signatures collected, user runs:
+   icnctl recovery finalize &lt;recovery-proofs&gt;
+   - Creates RotationEvent with Recover type
+   - Includes all recovery proofs
+   - Broadcasts to network
+6. Network validates:
+   - Check M-of-N threshold met
+   - Verify trustee signatures
+   - Accept new root key
+7. New DID Document:
+   - Old devices revoked
+   - New device becomes device-1 with full capabilities
+</code></pre>
+<p><strong>Result</strong>: User regains control of their DID without losing history.</p>
+<hr>
+<h2>Security Considerations</h2>
+<h3>1. <strong>Capability Hierarchy</strong></h3>
+<p>Not all devices are equal:</p>
+<ul>
+<li><strong>Primary device</strong> (e.g., laptop): Full capabilities (AddDevice, RevokeDevice, RotateKey)</li>
+<li><strong>Secondary device</strong> (e.g., phone): Limited to Sign, Encrypt</li>
+<li><strong>Rationale</strong>: If phone is lost, can&#39;t be used to add malicious devices</li>
+</ul>
+<h3>2. <strong>Revocation Checking</strong></h3>
+<p>Every signature verification must:</p>
+<ol>
+<li>Extract DID from signature</li>
+<li>Fetch current DID Document for that DID</li>
+<li>Check signing key is in <code>verification_method</code> AND not revoked</li>
+<li>Check key has <code>Sign</code> capability</li>
+</ol>
+<p><strong>Implementation</strong>: NetworkActor caches DID Documents, gossip keeps them synced.</p>
+<h3>3. <strong>Replay Protection Across Devices</strong></h3>
+<p>Current <code>ReplayGuard</code> uses per-peer sequence numbers. With multi-device:</p>
+<ul>
+<li><strong>Option A</strong>: Shared sequence counter across devices (requires coordination)</li>
+<li><strong>Option B</strong>: Per-device sequences, check against revocation</li>
+<li><strong>Recommendation</strong>: Option B (simpler, no coordination overhead)</li>
+</ul>
+<h3>4. <strong>Recovery Attack Prevention</strong></h3>
+<p>Malicious actor could try to initiate fake recovery:</p>
+<ul>
+<li><strong>Mitigation</strong>: Recovery requires M-of-N trustees to verify identity out-of-band</li>
+<li><strong>Threshold</strong>: Recommend M ≥ 3, N ≥ 5 (balance security vs. availability)</li>
+<li><strong>Trustee selection</strong>: Should be high-trust, long-term relationships</li>
+</ul>
+<h3>5. <strong>DID Document Sync</strong></h3>
+<p>DID Documents propagate via gossip:</p>
+<ul>
+<li><strong>Topic</strong>: <code>identity:updates</code> (trust-gated, only visible to trust edges)</li>
+<li><strong>Conflict resolution</strong>: Highest version number wins</li>
+<li><strong>Byzantine resistance</strong>: Accept updates only if:<ol>
+<li>Signed by a key with appropriate capability</li>
+<li>Version increments by 1 (no skipping)</li>
+<li>Rotation chain is valid</li>
+</ol>
+</li>
+</ul>
+<hr>
+<h2>Migration Path (v2.1 → v3)</h2>
+<h3>Automatic Migration on First Unlock</h3>
+<pre><code class="language-rust">impl Keystore {
+    pub fn unlock(passphrase: &amp;[u8]) -&gt; Result&lt;KeystoreV3&gt; {
+        let data = decrypt(passphrase)?;
+
+        match detect_version(&amp;data)? {
+            2 | 21 =&gt; {
+                // Old format: just IdentityBundle
+                let bundle: IdentityBundle = deserialize(data)?;
+
+                // Create v3 keystore
+                let did_doc = DidDocument {
+                    id: bundle.did.clone(),
+                    version: 1,
+                    updated_at: now(),
+                    verification_method: vec![
+                        VerificationMethod {
+                            id: &quot;device-1&quot;.into(),
+                            label: &quot;Primary Device&quot;.into(),
+                            key_type: KeyType::Ed25519,
+                            public_key: bundle.keypair.public.clone(),
+                            capabilities: vec![
+                                Capability::Sign,
+                                Capability::AddDevice,
+                                Capability::RevokeDevice,
+                                Capability::RotateKey,
+                                Capability::Recover,
+                            ],
+                            added_at: now(),
+                            revoked_at: None,
+                        },
+                        VerificationMethod {
+                            id: &quot;enc-1&quot;.into(),
+                            label: &quot;Encryption Key&quot;.into(),
+                            key_type: KeyType::X25519,
+                            public_key: bundle.x25519_keypair.public.clone(),
+                            capabilities: vec![Capability::Encrypt],
+                            added_at: now(),
+                            revoked_at: None,
+                        },
+                    ],
+                    authentication: vec![&quot;device-1&quot;.into()],
+                    recovery: None,  // User can configure later
+                };
+
+                let v3 = KeystoreV3 {
+                    version: 3,
+                    identity: bundle,
+                    did_document: did_doc,
+                    device_id: &quot;device-1&quot;.into(),
+                    rotation_chain: vec![],
+                };
+
+                // Save upgraded keystore immediately
+                v3.encrypt_and_save(passphrase)?;
+
+                info!(&quot;✅ Migrated keystore v2.1 → v3 (multi-device support enabled)&quot;);
+
+                Ok(v3)
+            }
+
+            3 =&gt; {
+                // Already v3
+                Ok(deserialize(data)?)
+            }
+
+            v =&gt; bail!(&quot;Unsupported keystore version: {}&quot;, v),
+        }
+    }
+}
+</code></pre>
+<p><strong>Guarantees</strong>:</p>
+<ul>
+<li>Existing identities work unchanged</li>
+<li>DID remains stable (derived from original Ed25519 key)</li>
+<li>Trust edges and ledger history preserved</li>
+<li>Automatic, invisible to user</li>
+</ul>
+<hr>
+<h2>Implementation Plan</h2>
+<h3>Phase 11.1: Data Structures (Week 1)</h3>
+<p><strong>Crate</strong>: <code>icn-identity</code></p>
+<ul>
+<li><input disabled="" type="checkbox"> Define <code>DidDocument</code>, <code>VerificationMethod</code>, <code>Capability</code> types</li>
+<li><input disabled="" type="checkbox"> Define <code>RotationEvent</code> and related types</li>
+<li><input disabled="" type="checkbox"> Define <code>KeystoreV3</code> format</li>
+<li><input disabled="" type="checkbox"> Implement serialization/deserialization</li>
+<li><input disabled="" type="checkbox"> Write unit tests for data structures</li>
+</ul>
+<p><strong>Deliverable</strong>: Core types compile, serialize correctly.</p>
+<h3>Phase 11.2: DID Document Management (Week 1-2)</h3>
+<p><strong>Crate</strong>: <code>icn-identity</code></p>
+<ul>
+<li><input disabled="" type="checkbox"> Implement <code>DidDocument::new()</code> (create initial doc)</li>
+<li><input disabled="" type="checkbox"> Implement <code>DidDocument::add_device()</code></li>
+<li><input disabled="" type="checkbox"> Implement <code>DidDocument::revoke_device()</code></li>
+<li><input disabled="" type="checkbox"> Implement <code>DidDocument::rotate_key()</code></li>
+<li><input disabled="" type="checkbox"> Implement <code>DidDocument::verify_signature()</code> (check key is authorized)</li>
+<li><input disabled="" type="checkbox"> Implement rotation event validation</li>
+<li><input disabled="" type="checkbox"> Write tests for each operation</li>
+</ul>
+<p><strong>Deliverable</strong>: DID Document CRUD operations work.</p>
+<h3>Phase 11.3: Keystore v3 Migration (Week 2)</h3>
+<p><strong>Crate</strong>: <code>icn-identity</code></p>
+<ul>
+<li><input disabled="" type="checkbox"> Implement <code>KeystoreV3</code> type</li>
+<li><input disabled="" type="checkbox"> Implement v2.1 → v3 migration in <code>Keystore::unlock()</code></li>
+<li><input disabled="" type="checkbox"> Implement <code>KeystoreV3::encrypt_and_save()</code></li>
+<li><input disabled="" type="checkbox"> Test migration preserves identity, DID, keys</li>
+<li><input disabled="" type="checkbox"> Test idempotence (migrating twice is safe)</li>
+</ul>
+<p><strong>Deliverable</strong>: Existing keystores auto-upgrade to v3.</p>
+<h3>Phase 11.4: icnctl Device Commands (Week 2-3)</h3>
+<p><strong>Crate</strong>: <code>icnctl</code></p>
+<ul>
+<li><input disabled="" type="checkbox"> <code>icnctl device list</code> - Show all devices for this DID</li>
+<li><input disabled="" type="checkbox"> <code>icnctl device add &lt;name&gt;</code> - Initiate device add flow</li>
+<li><input disabled="" type="checkbox"> <code>icnctl device approve &lt;request&gt;</code> - Approve device add</li>
+<li><input disabled="" type="checkbox"> <code>icnctl device revoke &lt;device-id&gt;</code> - Revoke a device</li>
+<li><input disabled="" type="checkbox"> <code>icnctl key rotate</code> - Rotate current device&#39;s key</li>
+<li><input disabled="" type="checkbox"> Test workflows end-to-end</li>
+</ul>
+<p><strong>Deliverable</strong>: Users can manage devices via CLI.</p>
+<h3>Phase 11.5: Identity Sync Protocol (Week 3)</h3>
+<p><strong>Crates</strong>: <code>icn-gossip</code>, <code>icn-core</code></p>
+<ul>
+<li><input disabled="" type="checkbox"> Define gossip topic <code>identity:updates</code></li>
+<li><input disabled="" type="checkbox"> Implement IdentityActor (manages local DID Documents)</li>
+<li><input disabled="" type="checkbox"> On device add/revoke/rotate: broadcast RotationEvent</li>
+<li><input disabled="" type="checkbox"> On receive RotationEvent: validate, update local DID cache</li>
+<li><input disabled="" type="checkbox"> NetworkActor checks DID Documents before accepting messages</li>
+<li><input disabled="" type="checkbox"> Test: Two nodes, add device on node1, node2 sees update</li>
+</ul>
+<p><strong>Deliverable</strong>: DID Document changes propagate across network.</p>
+<h3>Phase 11.6: Recovery Mechanisms (Week 3-4)</h3>
+<p><strong>Crate</strong>: <code>icn-identity</code>, <code>icnctl</code></p>
+<ul>
+<li><input disabled="" type="checkbox"> Implement <code>icnctl recovery setup</code></li>
+<li><input disabled="" type="checkbox"> Implement <code>icnctl recovery initiate</code></li>
+<li><input disabled="" type="checkbox"> Implement <code>icnctl recovery approve</code> (trustee side)</li>
+<li><input disabled="" type="checkbox"> Implement <code>icnctl recovery finalize</code></li>
+<li><input disabled="" type="checkbox"> Test social recovery flow with 3-of-5 threshold</li>
+<li><input disabled="" type="checkbox"> Document recovery best practices</li>
+</ul>
+<p><strong>Deliverable</strong>: Users can recover from total device loss.</p>
+<h3>Phase 11.7: Integration &amp; Testing (Week 4)</h3>
+<p><strong>All crates</strong></p>
+<ul>
+<li><input disabled="" type="checkbox"> Update Runtime to load DID Documents on startup</li>
+<li><input disabled="" type="checkbox"> Update Supervisor to sync identity changes</li>
+<li><input disabled="" type="checkbox"> End-to-end test: Multi-device gossip + ledger transactions</li>
+<li><input disabled="" type="checkbox"> End-to-end test: Device revocation prevents signing</li>
+<li><input disabled="" type="checkbox"> End-to-end test: Social recovery restores identity</li>
+<li><input disabled="" type="checkbox"> Update documentation</li>
+</ul>
+<p><strong>Deliverable</strong>: Phase 11 complete, all tests pass.</p>
+<hr>
+<h2>Open Questions</h2>
+<h3>1. <strong>Device Add Flow: Interactive or File-Based?</strong></h3>
+<p><strong>Option A: Interactive (QR code)</strong></p>
+<ul>
+<li>New device generates request, shows QR</li>
+<li>Existing device scans QR, approves</li>
+<li>Pros: Good UX, secure</li>
+<li>Cons: Requires camera, GUI</li>
+</ul>
+<p><strong>Option B: File-based (copy request file)</strong></p>
+<ul>
+<li>New device writes <code>device-add-request.json</code></li>
+<li>User copies to existing device (USB, scp, etc.)</li>
+<li>Existing device runs <code>icnctl device approve device-add-request.json</code></li>
+<li>Pros: Works on servers, no GUI needed</li>
+<li>Cons: Manual file transfer</li>
+</ul>
+<p><strong>Recommendation</strong>: Start with Option B (simpler), add Option A later.</p>
+<h3>2. <strong>Recovery: Social vs. Backup Seed?</strong></h3>
+<p><strong>Social Recovery</strong>:</p>
+<ul>
+<li>Pros: No single point of failure, social trust</li>
+<li>Cons: Requires coordinating with trustees, can fail if trustees unavailable</li>
+</ul>
+<p><strong>Backup Seed</strong>:</p>
+<ul>
+<li>Pros: Self-sovereign, always available</li>
+<li>Cons: Single point of failure (if backup stolen/lost)</li>
+</ul>
+<p><strong>Recommendation</strong>: Support both, let users choose. Default: Social recovery.</p>
+<h3>3. <strong>DID Stability: What if root key rotates?</strong></h3>
+<p><strong>Current Design</strong>: DID = hash of original Ed25519 public key, never changes.</p>
+<p><strong>Implication</strong>: Root key can rotate (via RotationEvent), but DID stays stable.</p>
+<p><strong>Alternative</strong>: DID = hash of DID Document, changes on rotation.</p>
+<ul>
+<li>Pros: More &quot;pure&quot;</li>
+<li>Cons: Breaks trust edges, ledger references, every rotation</li>
+</ul>
+<p><strong>Recommendation</strong>: Stick with stable DID (original key). Rotation updates the mapping.</p>
+<h3>4. <strong>Capability Granularity: Per-Device or Per-Key?</strong></h3>
+<p><strong>Current Design</strong>: Capabilities attached to VerificationMethod (per-key).</p>
+<p><strong>Alternative</strong>: Capabilities at device level, keys inherit.</p>
+<p><strong>Recommendation</strong>: Per-key is more flexible (can have signing key + encryption key on same device with different caps).</p>
+<hr>
+<h2>Success Criteria</h2>
+<p>Phase 11 is complete when:</p>
+<ol>
+<li>✅ User can add a second device to their identity</li>
+<li>✅ Both devices can sign messages as the same DID</li>
+<li>✅ User can revoke a compromised device</li>
+<li>✅ Revoked device signatures are rejected by network</li>
+<li>✅ User can recover identity after total device loss (social recovery)</li>
+<li>✅ All existing tests pass (262+)</li>
+<li>✅ New tests cover multi-device workflows</li>
+<li>✅ Documentation updated</li>
+</ol>
+<p><strong>Target</strong>: 3-4 weeks (end of February 2025)</p>
+<hr>
+<h2>Next Steps (Today)</h2>
+<ol>
+<li><strong>Review this design doc</strong> - Any objections? Changes?</li>
+<li><strong>Start Phase 11.1</strong> - Implement data structures in <code>icn-identity</code></li>
+<li><strong>Set up test infrastructure</strong> - Multi-device test helpers in <code>icn-testkit</code></li>
+</ol>
+<p>Let&#39;s build this.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

@@ -1,0 +1,361 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Cooperative Setup Guide | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>guides</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>user</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>cooperative setup guide</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/guides/user/cooperative-setup-guide.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Cooperative Setup Guide</h1>
+<p>This guide provides step-by-step instructions for setting up a new cooperative on ICN.</p>
+<h2>Prerequisites</h2>
+<p>Before setting up a cooperative, ensure you have:</p>
+<ol>
+<li><strong>ICN node running</strong> - See <a href="/docs/GETTING_STARTED">Getting Started</a> for installation</li>
+<li><strong>Admin identity created</strong> - You need a DID to become the founding admin</li>
+<li><strong>Gateway running</strong> - For REST API access (member onboarding, payments)</li>
+</ol>
+<pre><code class="language-bash"># Verify ICN is installed and running
+icnctl status
+
+# Verify you have an identity
+icnctl id show
+</code></pre>
+<hr>
+<h2>Step 1: Create the Cooperative</h2>
+<h3>Option A: Guided Setup Wizard (Recommended)</h3>
+<p>Use the interactive wizard for a streamlined experience:</p>
+<pre><code class="language-bash"># Start the guided setup wizard
+icnctl init-coop --name &quot;Downtown Food Cooperative&quot;
+
+# With pre-specified founding members
+icnctl init-coop --name &quot;Downtown Food Cooperative&quot; \
+  --members &quot;did:icn:alice123,did:icn:bob456&quot;
+
+# Non-interactive mode (skip confirmation prompts)
+icnctl init-coop --name &quot;Downtown Food Cooperative&quot; --yes
+</code></pre>
+<p>The wizard will:</p>
+<ol>
+<li>Generate a cooperative ID from the name</li>
+<li>Create initial governance domain</li>
+<li>Set up the mutual credit ledger</li>
+<li>Configure founding members</li>
+</ol>
+<h3>Option B: Gateway API</h3>
+<p>For programmatic setup, use the Gateway REST API:</p>
+<pre><code class="language-bash"># Get JWT token for API access
+export TOKEN=$(icnctl auth token --gateway http://localhost:8080 --coop-id food-coop)
+
+# Create cooperative via API
+curl -X POST http://localhost:8080/v1/coops \
+  -H &quot;Authorization: Bearer $TOKEN&quot; \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+    &quot;id&quot;: &quot;food-coop&quot;,
+    &quot;name&quot;: &quot;Downtown Food Cooperative&quot;
+  }&#39;
+</code></pre>
+<p><strong>Naming conventions</strong>:</p>
+<ul>
+<li><code>id</code>: lowercase, hyphens allowed, no spaces (used in API paths)</li>
+<li><code>name</code>: Human-readable display name</li>
+</ul>
+<hr>
+<h2>Step 2: Create and Ratify the Charter</h2>
+<p>The charter is your cooperative&#39;s founding document, defining governance rules and membership criteria.</p>
+<h3>Create a Charter</h3>
+<pre><code class="language-bash"># Create a charter for the cooperative
+icnctl charter create \
+  --name &quot;Downtown Food Cooperative Charter&quot; \
+  --domain &quot;coop:food-coop&quot; \
+  --org-type cooperative \
+  --mission &quot;Provide affordable local food to community members&quot; \
+  --founders &quot;did:icn:alice123,did:icn:bob456&quot; \
+  --output food-coop-charter.json
+</code></pre>
+<blockquote>
+<p><strong>Note</strong>: Governance rules (quorum, voting periods) are configured in the charter JSON template, not via CLI flags.</p>
+</blockquote>
+<h3>Sign and Ratify</h3>
+<p>Founding members must sign the charter before it becomes active:</p>
+<pre><code class="language-bash"># Each founder signs the charter
+icnctl charter sign food-coop-charter --coop-id food-coop
+
+# Once enough signatures are collected, ratify the charter
+icnctl charter ratify food-coop-charter --coop-id food-coop
+</code></pre>
+<h3>View Charter Status</h3>
+<pre><code class="language-bash"># Show charter details and signature status
+icnctl charter show food-coop-charter
+
+# List all charters
+icnctl charter list
+</code></pre>
+<hr>
+<h2>Step 3: Set Up Governance Domain</h2>
+<p>Create a governance domain for proposals and voting:</p>
+<pre><code class="language-bash"># Create the governance domain
+icnctl gov domain create \
+  --domain-id &quot;coop:food-coop&quot; \
+  --name &quot;Food Coop Governance&quot;
+</code></pre>
+<hr>
+<h2>Step 4: Onboard Members</h2>
+<h3>Add Members via Gateway API</h3>
+<pre><code class="language-bash"># Get JWT token for admin operations
+export TOKEN=$(icnctl auth token --gateway http://localhost:8080 --coop-id food-coop)
+
+# Add a member via REST API
+curl -X POST http://localhost:8080/v1/coops/food-coop/members \
+  -H &quot;Authorization: Bearer $TOKEN&quot; \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+    &quot;did&quot;: &quot;did:icn:5Xk8Y2r...&quot;,
+    &quot;role&quot;: &quot;member&quot;
+  }&#39;
+</code></pre>
+<h3>Member Roles</h3>
+<table>
+<thead>
+<tr>
+<th>Role</th>
+<th>Permissions</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>member</code></td>
+<td>Vote, transact, create proposals</td>
+</tr>
+<tr>
+<td><code>admin</code></td>
+<td>Manage members, configure settings</td>
+</tr>
+<tr>
+<td><code>owner</code></td>
+<td>Full control, including deletion</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Step 5: Establish Initial Trust</h2>
+<p>New members start with no trust relationships. Existing members must vouch for them.</p>
+<h3>Add Trust Attestations</h3>
+<pre><code class="language-bash"># Alice vouches for Bob with trust score 0.5 (moderate trust)
+icnctl trust add did:icn:bob123 0.5
+
+# Trust levels guide:
+# 0.1 - 0.3: Acquaintance (limited transactions)
+# 0.3 - 0.5: Known member (normal participation)
+# 0.5 - 0.7: Trusted colleague (elevated privileges)
+# 0.7 - 0.9: Close collaborator (governance roles)
+</code></pre>
+<h3>Verify Trust</h3>
+<pre><code class="language-bash"># Check a member&#39;s computed trust score
+icnctl trust show did:icn:bob123
+
+# View your trust attestations
+icnctl trust list
+</code></pre>
+<hr>
+<h2>Step 6: Verify Setup</h2>
+<p>Run through this checklist to ensure everything is configured correctly:</p>
+<h3>Health Checks</h3>
+<pre><code class="language-bash"># Check daemon status
+icnctl status
+
+# Verify charter is ratified
+icnctl charter show food-coop-charter
+
+# View ledger state
+icnctl ledger head
+</code></pre>
+<h3>Test Ledger Operations</h3>
+<pre><code class="language-bash"># Check a specific account balance (use your DID)
+icnctl ledger balance did:icn:alice123
+
+# With currency filter
+icnctl ledger balance did:icn:alice123 --currency hours
+
+# View recent transactions
+icnctl ledger history --limit 10
+</code></pre>
+<h3>Make a Payment (via Gateway API)</h3>
+<pre><code class="language-bash">curl -X POST http://localhost:8080/v1/ledger/food-coop/payment \
+  -H &quot;Authorization: Bearer $TOKEN&quot; \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+    &quot;from&quot;: &quot;did:icn:alice456...&quot;,
+    &quot;to&quot;: &quot;did:icn:bob123...&quot;,
+    &quot;amount&quot;: 10,
+    &quot;currency&quot;: &quot;hours&quot;,
+    &quot;memo&quot;: &quot;Test payment&quot;
+  }&#39;
+</code></pre>
+<h3>Test Governance Vote</h3>
+<p>Create a test proposal and verify voting works:</p>
+<pre><code class="language-bash"># Create a test proposal
+icnctl gov proposal create \
+  --domain &quot;coop:food-coop&quot; \
+  --title &quot;Test Proposal&quot; \
+  --description &quot;Verify governance is working correctly&quot; \
+  --voting-period 1h
+
+# List proposals
+icnctl gov proposal list --domain &quot;coop:food-coop&quot;
+
+# Cast a vote
+icnctl gov vote cast &lt;proposal-id&gt; yes
+</code></pre>
+<hr>
+<h2>Charter Templates</h2>
+<h3>Worker Cooperative Charter</h3>
+<p>Optimized for worker-owned businesses:</p>
+<pre><code class="language-json">{
+  &quot;name&quot;: &quot;Tech Workers Cooperative Charter&quot;,
+  &quot;organization_id&quot;: &quot;tech-workers&quot;,
+  &quot;governance&quot;: {
+    &quot;model&quot;: &quot;consensus&quot;,
+    &quot;quorum_percentage&quot;: 75,
+    &quot;voting_period_days&quot;: 7,
+    &quot;deliberation_period_days&quot;: 3
+  },
+  &quot;membership&quot;: {
+    &quot;join_policy&quot;: &quot;approval&quot;,
+    &quot;vouches_required&quot;: 3,
+    &quot;probation_days&quot;: 90
+  },
+  &quot;economics&quot;: {
+    &quot;currency&quot;: &quot;hours&quot;,
+    &quot;initial_credit_limit&quot;: 40
+  }
+}
+</code></pre>
+<h3>Consumer Cooperative Charter</h3>
+<p>For buying cooperatives:</p>
+<pre><code class="language-json">{
+  &quot;name&quot;: &quot;Food Buying Cooperative Charter&quot;,
+  &quot;organization_id&quot;: &quot;food-coop&quot;,
+  &quot;governance&quot;: {
+    &quot;model&quot;: &quot;majority&quot;,
+    &quot;quorum_percentage&quot;: 50,
+    &quot;voting_period_days&quot;: 5
+  },
+  &quot;membership&quot;: {
+    &quot;join_policy&quot;: &quot;approval&quot;,
+    &quot;vouches_required&quot;: 2,
+    &quot;probation_days&quot;: 30
+  },
+  &quot;economics&quot;: {
+    &quot;currency&quot;: &quot;credits&quot;,
+    &quot;initial_credit_limit&quot;: 100
+  }
+}
+</code></pre>
+<hr>
+<h2>Troubleshooting</h2>
+<h3>&quot;Insufficient trust&quot; Error</h3>
+<p>The member needs trust attestations from existing members:</p>
+<pre><code class="language-bash"># Check current trust score
+icnctl trust show did:icn:xyz789
+
+# Have trusted members add attestations
+icnctl trust add did:icn:xyz789 0.5
+</code></pre>
+<h3>&quot;Charter not ratified&quot; Error</h3>
+<p>Ensure enough founding members have signed:</p>
+<pre><code class="language-bash"># Check signature status
+icnctl charter show food-coop-charter
+
+# Have missing founders sign
+icnctl charter sign food-coop-charter --coop-id food-coop
+</code></pre>
+<h3>&quot;Domain not found&quot; Error</h3>
+<p>Create the governance domain first:</p>
+<pre><code class="language-bash">icnctl gov domain create --domain-id &quot;coop:food-coop&quot;
+</code></pre>
+<h3>&quot;Unauthorized&quot; API Error</h3>
+<p>Ensure you have a valid JWT token:</p>
+<pre><code class="language-bash"># Get a fresh token
+export TOKEN=$(icnctl auth token --gateway http://localhost:8080 --coop-id food-coop)
+
+# Verify token is valid by making an API call
+curl -H &quot;Authorization: Bearer $TOKEN&quot; http://localhost:8080/v1/health
+</code></pre>
+<hr>
+<h2>Next Steps</h2>
+<p>After completing setup:</p>
+<ol>
+<li><strong>Invite members</strong> - Share the cooperative ID and onboarding instructions</li>
+<li><strong>Set up backup procedures</strong> - See <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/operations/backup-and-recovery">Backup and Recovery</a></li>
+<li><strong>Configure monitoring</strong> - See <a href="https://github.com/InterCooperative-Network/icn/blob/main/ARCHITECTURE#observability#observability">Observability Guide</a></li>
+<li><strong>Plan governance cadence</strong> - Regular meetings, proposal review cycles</li>
+</ol>
+<hr>
+<h2>Related Documentation</h2>
+<ul>
+<li><a href="/docs/GETTING_STARTED">Getting Started</a> - Installation and first steps</li>
+<li><a href="/docs/design/governance/governance-primitives">Governance Primitives</a> - Detailed governance documentation</li>
+<li><a href="/docs/design/economics/economic-safety">Economic Safety</a> - Credit limits and financial safeguards</li>
+<li><a href="/docs/reference/config/trust-threshold-configuration">Trust Threshold Configuration</a> - Trust system details</li>
+<li><a href="/docs/reference/api/API_REFERENCE">API Reference</a> - Complete API documentation</li>
+<li><a href="/docs/glossary">Glossary</a> - ICN terminology definitions</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

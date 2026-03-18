@@ -1,0 +1,385 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Follow-Up Issues for HSM/TPM Backend Implementation | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>archive</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>2025</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>hsm tpm follow up issues</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/archive/2025/hsm-tpm-follow-up-issues.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Follow-Up Issues for HSM/TPM Backend Implementation</h1>
+<blockquote>
+<p><strong>Archived Document Notice (2026-02-12):</strong> This file is retained for historical context and may not reflect current code, APIs, runtime defaults, CI status, or deployment posture.
+Use active documentation under <code>docs/</code> as authoritative.</p>
+</blockquote>
+<p>This document tracks the follow-up issues needed after completing the IdentityBundle refactor (Phase A).</p>
+<h2>Issue Template</h2>
+<p>Each issue below should be created in the GitHub repository as a separate issue.</p>
+<hr>
+<h2>Issue 1: Add Optional Signing Backend to IdentityBundle</h2>
+<p><strong>Title:</strong> <code>feat(identity): Add optional DidSigner backend to IdentityBundle</code></p>
+<p><strong>Labels:</strong> <code>enhancement</code>, <code>identity</code>, <code>hsm-tpm</code></p>
+<p><strong>Description:</strong></p>
+<h3>Summary</h3>
+<p>IdentityBundle needs an optional signing backend to support hardware-backed signing (HSM/TPM) where the private key never exists in application memory.</p>
+<h3>Current State</h3>
+<p>After Phase A refactor, IdentityBundle uses <code>DidKey</code> enum but still expects to sign directly. Hardware keys cannot sign without external hardware access.</p>
+<h3>Proposed Solution</h3>
+<p>Add optional signer field:</p>
+<pre><code class="language-rust">pub struct IdentityBundle {
+    // ... existing fields ...
+    
+    /// Optional signing backend for hardware keys
+    /// None for software keys (use did_key directly)
+    /// Some for hardware keys (delegate to HSM/TPM)
+    signer: Option&lt;Arc&lt;dyn DidSigner&gt;&gt;,
+}
+</code></pre>
+<h3>Implementation Tasks</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Add <code>signer</code> field to <code>IdentityBundle</code></li>
+<li><input disabled="" type="checkbox"> Update constructors to accept optional signer</li>
+<li><input disabled="" type="checkbox"> Implement <code>sign()</code> method that delegates correctly</li>
+<li><input disabled="" type="checkbox"> Add tests for software and hardware signing paths</li>
+<li><input disabled="" type="checkbox"> Update documentation</li>
+</ul>
+<h3>Acceptance Criteria</h3>
+<ul>
+<li>Software keys continue working without signer</li>
+<li>Hardware keys require and use signer</li>
+<li>Signing fails gracefully if hardware key has no signer</li>
+<li>All existing tests pass</li>
+</ul>
+<h3>Dependencies</h3>
+<ul>
+<li>Requires Phase A (IdentityBundle refactor) to be complete</li>
+</ul>
+<hr>
+<h2>Issue 2: PKCS#11 Backend Returns Hardware DidKey</h2>
+<p><strong>Title:</strong> <code>feat(hsm): Make PKCS#11 backend return Hardware DidKey</code></p>
+<p><strong>Labels:</strong> <code>enhancement</code>, <code>hsm</code>, <code>pkcs11</code></p>
+<p><strong>Description:</strong></p>
+<h3>Summary</h3>
+<p>The PKCS#11 HSM backend needs to create and return <code>DidKey::Hardware</code> instead of failing with &quot;IdentityBundle refactor required&quot;.</p>
+<h3>Current State</h3>
+<p><code>Pkcs11Backend::init()</code> currently returns an error stating that IdentityBundle refactor is required. This was the correct behavior until Phase A completed.</p>
+<h3>Proposed Solution</h3>
+<ol>
+<li>Generate key pair in HSM</li>
+<li>Extract public key only</li>
+<li>Create <code>DidKey::Hardware</code> with:<ul>
+<li><code>verifying_key</code>: Public key from HSM</li>
+<li><code>backend_type</code>: &quot;pkcs11&quot;</li>
+<li><code>hardware_id</code>: Slot ID + object handle</li>
+</ul>
+</li>
+<li>Return bundle with hardware DidKey</li>
+</ol>
+<h3>Implementation Tasks</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Update <code>Pkcs11Backend::init()</code> to create hardware DidKey</li>
+<li><input disabled="" type="checkbox"> Implement public key extraction from HSM</li>
+<li><input disabled="" type="checkbox"> Add slot/handle tracking</li>
+<li><input disabled="" type="checkbox"> Create <code>Pkcs11DidSigner</code> implementation</li>
+<li><input disabled="" type="checkbox"> Add integration test with SoftHSM2</li>
+<li><input disabled="" type="checkbox"> Document HSM setup procedure</li>
+</ul>
+<h3>Acceptance Criteria</h3>
+<ul>
+<li>Key generation in HSM succeeds</li>
+<li>Public key extraction works</li>
+<li>DidKey::Hardware is created correctly</li>
+<li>Signing delegates to HSM</li>
+<li>Integration test with SoftHSM2 passes</li>
+</ul>
+<h3>Dependencies</h3>
+<ul>
+<li>Requires Issue #1 (Optional signer) to be complete</li>
+<li>Requires SoftHSM2 for testing</li>
+</ul>
+<hr>
+<h2>Issue 3: TPM Backend Phase 1 - Core Sealing/Unsealing</h2>
+<p><strong>Title:</strong> <code>feat(tpm): Implement TPM 2.0 key sealing and unsealing</code></p>
+<p><strong>Labels:</strong> <code>enhancement</code>, <code>tpm</code>, <code>phase-1</code></p>
+<p><strong>Description:</strong></p>
+<h3>Summary</h3>
+<p>Implement actual TPM 2.0 key sealing and unsealing to replace the placeholder implementation.</p>
+<h3>Current State</h3>
+<p><code>TpmBackend</code> is gated behind <code>tpm-experimental</code> flag and all operations return errors. This is scaffolding only.</p>
+<h3>Proposed Solution</h3>
+<p>Follow Phase 1 of TPM implementation plan (<code>docs/tpm-implementation-plan.md</code>):</p>
+<ol>
+<li>Implement key sealing with TPM</li>
+<li>Implement key unsealing with TPM</li>
+<li>Store sealed blob on disk</li>
+<li>Verify PCR policy on unseal</li>
+<li>Return hardware DidKey</li>
+</ol>
+<h3>Implementation Tasks</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Initialize TPM context with <code>tss-esapi</code></li>
+<li><input disabled="" type="checkbox"> Implement Ed25519 key generation</li>
+<li><input disabled="" type="checkbox"> Seal key to TPM with PCR policy</li>
+<li><input disabled="" type="checkbox"> Store sealed blob encrypted with Age</li>
+<li><input disabled="" type="checkbox"> Implement unsealing with PCR verification</li>
+<li><input disabled="" type="checkbox"> Create <code>TpmDidSigner</code> implementation</li>
+<li><input disabled="" type="checkbox"> Add integration tests with swtpm</li>
+<li><input disabled="" type="checkbox"> Document TPM setup procedure</li>
+</ul>
+<h3>Acceptance Criteria</h3>
+<ul>
+<li>Key sealing to TPM succeeds</li>
+<li>Unsealing verifies PCR values</li>
+<li>Sealed key persists across restarts</li>
+<li>PCR policy prevents unauthorized unsealing</li>
+<li>Integration tests with swtpm pass</li>
+</ul>
+<h3>Dependencies</h3>
+<ul>
+<li>Requires Issue #1 (Optional signer) to be complete</li>
+<li>Requires Issue #2 or independent path for hardware DidKey</li>
+<li>Requires TPM 2.0 hardware or swtpm for testing</li>
+</ul>
+<h3>Security Considerations</h3>
+<ul>
+<li>PCR values must be validated</li>
+<li>Sealed blob must be encrypted at rest</li>
+<li>No private key material in memory outside TPM</li>
+</ul>
+<hr>
+<h2>Issue 4: Gateway Authentication with Hardware Keys</h2>
+<p><strong>Title:</strong> <code>feat(gateway): Support hardware-backed signing in authentication</code></p>
+<p><strong>Labels:</strong> <code>enhancement</code>, <code>gateway</code>, <code>auth</code></p>
+<p><strong>Description:</strong></p>
+<h3>Summary</h3>
+<p>Gateway authentication middleware needs to support hardware-backed signing where calling <code>bundle.keypair().sign()</code> is not possible.</p>
+<h3>Current State</h3>
+<p>Gateway code assumes it can call <code>bundle.keypair().sign()</code> directly. This fails for hardware keys.</p>
+<h3>Proposed Solution</h3>
+<p>Update authentication code to use:</p>
+<pre><code class="language-rust">// OLD:
+bundle.keypair().sign(message)
+
+// NEW:
+bundle.sign(message)?  // Delegates to signer if needed
+</code></pre>
+<h3>Implementation Tasks</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Audit all <code>keypair().sign()</code> calls in gateway</li>
+<li><input disabled="" type="checkbox"> Replace with <code>bundle.sign()</code> calls</li>
+<li><input disabled="" type="checkbox"> Add error handling for missing signers</li>
+<li><input disabled="" type="checkbox"> Update tests to cover both software and hardware paths</li>
+<li><input disabled="" type="checkbox"> Document authentication flow</li>
+</ul>
+<h3>Affected Files</h3>
+<ul>
+<li><code>icn-gateway/src/auth.rs</code></li>
+<li><code>icn-gateway/src/api/auth.rs</code></li>
+<li><code>icn-gateway/src/middleware.rs</code></li>
+<li>Gateway integration tests</li>
+</ul>
+<h3>Acceptance Criteria</h3>
+<ul>
+<li>Software keys continue working</li>
+<li>Hardware keys work with signer</li>
+<li>Graceful error if hardware key has no signer</li>
+<li>All gateway tests pass</li>
+</ul>
+<h3>Dependencies</h3>
+<ul>
+<li>Requires Issue #1 (Optional signer) to be complete</li>
+</ul>
+<hr>
+<h2>Issue 5: State Snapshot Compatibility with Hardware Keys</h2>
+<p><strong>Title:</strong> <code>feat(snapshot): Support hardware keys in state snapshots</code></p>
+<p><strong>Labels:</strong> <code>enhancement</code>, <code>snapshot</code></p>
+<p><strong>Description:</strong></p>
+<h3>Summary</h3>
+<p>State snapshot system needs to handle hardware keys which cannot serialize private key material.</p>
+<h3>Current State</h3>
+<p>Snapshots may attempt to serialize <code>KeyPair</code> which includes private keys. This won&#39;t work for hardware keys.</p>
+<h3>Proposed Solution</h3>
+<ol>
+<li>Detect hardware vs software keys</li>
+<li>For software: Serialize secret key material (existing behavior)</li>
+<li>For hardware: Serialize only public key + backend info</li>
+<li>On restore: Reconnect to hardware backend</li>
+</ol>
+<h3>Implementation Tasks</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Update snapshot serialization for DidKey enum</li>
+<li><input disabled="" type="checkbox"> Add hardware key detection</li>
+<li><input disabled="" type="checkbox"> Implement public-only serialization for hardware</li>
+<li><input disabled="" type="checkbox"> Add backend reconnection on restore</li>
+<li><input disabled="" type="checkbox"> Update tests for both key types</li>
+<li><input disabled="" type="checkbox"> Document snapshot behavior</li>
+</ul>
+<h3>Affected Files</h3>
+<ul>
+<li><code>icn-snapshot/src/protocol.rs</code></li>
+<li><code>icn-snapshot/src/coordinator.rs</code></li>
+</ul>
+<h3>Acceptance Criteria</h3>
+<ul>
+<li>Software keys snapshot with private material</li>
+<li>Hardware keys snapshot with public only</li>
+<li>Restore reconnects to hardware backend</li>
+<li>Tests cover both scenarios</li>
+<li>Documentation explains limitations</li>
+</ul>
+<h3>Dependencies</h3>
+<ul>
+<li>Requires Issue #1 (Optional signer) to be complete</li>
+<li>Requires Issue #2 or #3 for hardware backend</li>
+</ul>
+<hr>
+<h2>Issue 6: Backend Factory and Configuration</h2>
+<p><strong>Title:</strong> <code>feat(identity): Add backend factory for HSM/TPM selection</code></p>
+<p><strong>Labels:</strong> <code>enhancement</code>, <code>identity</code>, <code>config</code></p>
+<p><strong>Description:</strong></p>
+<h3>Summary</h3>
+<p>Users need a way to select and configure which keystore backend (Age/PKCS#11/TPM) to use via configuration file.</p>
+<h3>Current State</h3>
+<p>No configuration mechanism exists. Backends are feature-gated but not selectable at runtime.</p>
+<h3>Proposed Solution</h3>
+<p>Add backend configuration:</p>
+<pre><code class="language-toml">[identity]
+backend = &quot;age&quot;  # or &quot;pkcs11&quot; or &quot;tpm&quot;
+
+[identity.pkcs11]
+library_path = &quot;/usr/lib/libsofthsm2.so&quot;
+slot_id = 0
+pin = &quot;${PKCS11_PIN}&quot;  # Environment variable
+
+[identity.tpm]
+pcr_policy = [0, 1, 2, 3, 7]
+owner_auth = &quot;${TPM_OWNER_AUTH}&quot;
+</code></pre>
+<p>Factory pattern:</p>
+<pre><code class="language-rust">pub fn open_keystore(config: &amp;IdentityConfig) -&gt; Result&lt;Box&lt;dyn KeyStore&gt;&gt; {
+    match config.backend.as_str() {
+        &quot;age&quot; =&gt; Ok(Box::new(AgeKeyStore::new()?)),
+        &quot;pkcs11&quot; =&gt; Ok(Box::new(Pkcs11Backend::new(&amp;config.pkcs11)?)),
+        &quot;tpm&quot; =&gt; Ok(Box::new(TpmBackend::new(&amp;config.tpm)?)),
+        _ =&gt; bail!(&quot;Unknown backend: {}&quot;, config.backend),
+    }
+}
+</code></pre>
+<h3>Implementation Tasks</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Add configuration types</li>
+<li><input disabled="" type="checkbox"> Implement backend factory</li>
+<li><input disabled="" type="checkbox"> Add environment variable expansion</li>
+<li><input disabled="" type="checkbox"> Update icnd to use factory</li>
+<li><input disabled="" type="checkbox"> Add icnctl commands for backend selection</li>
+<li><input disabled="" type="checkbox"> Document configuration options</li>
+<li><input disabled="" type="checkbox"> Add validation and error handling</li>
+</ul>
+<h3>Acceptance Criteria</h3>
+<ul>
+<li>Config file selects backend</li>
+<li>Factory creates correct backend instance</li>
+<li>Environment variables work for secrets</li>
+<li>icnd uses configured backend</li>
+<li>Documentation complete</li>
+</ul>
+<h3>Dependencies</h3>
+<ul>
+<li>Requires Issue #2 (PKCS#11) and/or #3 (TPM) for hardware backends</li>
+<li>Can be done in parallel with other issues</li>
+</ul>
+<hr>
+<h2>Implementation Order</h2>
+<p>Recommended sequence:</p>
+<ol>
+<li><strong>Issue #1</strong> - Add optional signer (prerequisite for all hardware backends)</li>
+<li><strong>Issue #6</strong> - Backend factory (enables configuration)</li>
+<li><strong>Issue #2</strong> - PKCS#11 integration (smaller scope, SoftHSM2 available)</li>
+<li><strong>Issue #4</strong> - Gateway auth updates (required for production use)</li>
+<li><strong>Issue #3</strong> - TPM Phase 1 (larger scope, hardware dependent)</li>
+<li><strong>Issue #5</strong> - Snapshot compatibility (nice-to-have)</li>
+</ol>
+<h2>Timeline Estimates</h2>
+<ul>
+<li>Issue #1: ~1 week</li>
+<li>Issue #2: ~1-2 weeks</li>
+<li>Issue #3: ~2-3 weeks</li>
+<li>Issue #4: ~3-5 days</li>
+<li>Issue #5: ~3-5 days</li>
+<li>Issue #6: ~1 week</li>
+</ul>
+<p><strong>Total: ~6-8 weeks</strong> (aligns with TPM implementation plan)</p>
+<h2>Testing Strategy</h2>
+<p>Each issue should include:</p>
+<ul>
+<li>Unit tests for new functionality</li>
+<li>Integration tests with real/simulated hardware</li>
+<li>Backward compatibility tests</li>
+<li>Documentation updates</li>
+</ul>
+<h2>Security Review</h2>
+<p>Before merging to main:</p>
+<ul>
+<li><input disabled="" type="checkbox"> Code review by security-focused reviewer</li>
+<li><input disabled="" type="checkbox"> Threat model validation</li>
+<li><input disabled="" type="checkbox"> HSM/TPM best practices check</li>
+<li><input disabled="" type="checkbox"> Documentation security review</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

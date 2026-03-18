@@ -1,0 +1,669 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Economic Model Validation | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>economics</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>model validation</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/economics/model-validation.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Economic Model Validation</h1>
+<p><strong>Status</strong>: Authoritative Truth Document
+<strong>Last Updated</strong>: 2026-02-17
+<strong>Purpose</strong>: Maps every economic operation a cooperative needs against ICN&#39;s actual implementation state.</p>
+<blockquote>
+<p>This document is the single source of truth for what ICN&#39;s economic system <strong>actually does</strong> vs. what it <strong>claims to do</strong>. Every entry in the gap matrices below has been verified against the codebase. If an operation is listed as &quot;Not Supported&quot;, it means no working end-to-end path exists — regardless of whether types or stubs are present.</p>
+</blockquote>
+<hr>
+<h2>Methodology</h2>
+<p>For each cooperative archetype, we enumerate the required economic operations and audit ICN&#39;s current state across five dimensions:</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Definition</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>ICN API/Type</strong></td>
+<td>The Rust struct, function, or REST endpoint that handles this operation. &quot;None&quot; = no implementation exists.</td>
+</tr>
+<tr>
+<td><strong>State Location</strong></td>
+<td>Where data lives: ledger (sled-backed), gateway (sled-backed via <code>icn-ledger-app</code>), in-memory only, or nowhere.</td>
+</tr>
+<tr>
+<td><strong>Test Evidence</strong></td>
+<td>Specific test functions that exercise this operation end-to-end. &quot;CRUD only&quot; = store read/write tests without business logic. &quot;None&quot; = zero test coverage.</td>
+</tr>
+<tr>
+<td><strong>Failure Mode</strong></td>
+<td>Why the operation doesn&#39;t work end-to-end for a real cooperative.</td>
+</tr>
+<tr>
+<td><strong>Minimum Viable Fix</strong></td>
+<td>Smallest change to make it actually functional.</td>
+</tr>
+</tbody></table>
+<h3>Classification Legend</h3>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Works</strong></td>
+<td>End-to-end path exists and is tested</td>
+</tr>
+<tr>
+<td><strong>Partial</strong></td>
+<td>Types and/or API exist but execution is incomplete</td>
+</tr>
+<tr>
+<td><strong>Schema Only</strong></td>
+<td>Types/structs exist but no functional path</td>
+</tr>
+<tr>
+<td><strong>Not Supported</strong></td>
+<td>No types, no API, no path</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Archetype 1: Worker Co-op (10 members)</h2>
+<p><strong>Profile</strong>: Software development cooperative. 10 member-owners, monthly payroll via surplus distribution, client invoicing, quarterly surplus allocation, member onboarding with capital contribution, departure with share buyout.</p>
+<h3>Gap Matrix</h3>
+<table>
+<thead>
+<tr>
+<th>Required Operation</th>
+<th>ICN API/Type</th>
+<th>State Location</th>
+<th>Test Evidence</th>
+<th>Failure Mode</th>
+<th>Status</th>
+<th>Minimum Viable Fix</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Monthly Payroll</strong></td>
+<td><code>RecurringPayment</code> struct, <code>execute_due_payments()</code> fn, <code>start_scheduler()</code></td>
+<td>Gateway sled store (<code>icn-ledger-app::RecurringPaymentStore</code>)</td>
+<td><code>test_recurring_payment_lifecycle</code> (integration), <code>test_recurring_payment_frequencies</code></td>
+<td><strong>Works in gateway context only.</strong> Scheduler runs via <code>start_scheduler()</code> in gateway <code>server.rs:715</code>. Payments execute via <code>LedgerManager::create_payment()</code>. Not a daemon-level service — dies if gateway restarts without cleanup. No governance approval for payroll setup.</td>
+<td><strong>Partial</strong></td>
+<td>Move scheduler to <code>icn-core</code> supervisor as a background task. Add governance proposal type for payroll approval.</td>
+</tr>
+<tr>
+<td><strong>Client Invoicing</strong></td>
+<td>None</td>
+<td>Nowhere</td>
+<td>None</td>
+<td>No invoice type, no accounts receivable tracking, no payment matching.</td>
+<td><strong>Not Supported</strong></td>
+<td>New <code>Invoice</code> type in <code>icn-ledger-app</code>, gateway CRUD endpoints, payment matching on receipt.</td>
+</tr>
+<tr>
+<td><strong>Surplus Allocation</strong></td>
+<td><code>ProposalPayload::SurplusAllocation { allocation: SurplusAllocation }</code></td>
+<td>Governance proposal store (in-memory <code>InMemoryGovernanceStore</code>)</td>
+<td>None for end-to-end execution</td>
+<td>Types exist in <code>icn-governance/src/proposal.rs:587</code>. <code>SurplusAllocation</code> type exists in <code>icn-ledger</code>. <strong>But</strong>: when the governance proposal is accepted, the surplus is NOT automatically distributed to member accounts. The <code>KernelGovernanceExecutor</code> does not have a handler for <code>SurplusAllocation</code> — it would produce a <code>NoOp</code> or fail silently.</td>
+<td><strong>Schema Only</strong></td>
+<td>Add <code>SurplusAllocation</code> effect to <code>KernelEffect</code> enum. Wire executor to create journal entries distributing surplus to member accounts pro-rata.</td>
+</tr>
+<tr>
+<td><strong>Member Onboarding (Capital Contribution)</strong></td>
+<td><code>ProposalPayload::Membership { action: Add, member }</code></td>
+<td>Governance store</td>
+<td><code>test_membership_proposal</code> (unit test for proposal creation only)</td>
+<td>Proposal can be created and voted on. When accepted, <code>KernelEffect::Membership(MembershipEffect::Add)</code> fires. But there is no capital contribution collection — member is added without payment. No escrow for initial buy-in.</td>
+<td><strong>Partial</strong></td>
+<td>Link membership approval to escrow creation for capital contribution. Only finalize membership when contribution escrow releases.</td>
+</tr>
+<tr>
+<td><strong>Member Departure (Share Buyout)</strong></td>
+<td><code>ProposalPayload::ShareRedemption { member, share_ids, payout_schedule, reason }</code></td>
+<td>Governance proposal store</td>
+<td>None</td>
+<td>Types exist in <code>icn-governance/src/proposal.rs:599</code>. <code>ShareId</code> and <code>ScheduledPayout</code> types exist in <code>icn-ledger</code>. <strong>But</strong>: no executor handles share redemption. No scheduled payout mechanism. When proposal is accepted, nothing happens in the ledger.</td>
+<td><strong>Schema Only</strong></td>
+<td>Add <code>ShareRedemption</code> effect. Wire executor to create scheduled payout entries in ledger. Implement payout scheduler (could extend <code>RecurringPayment</code>).</td>
+</tr>
+<tr>
+<td><strong>Operating Expense Tracking</strong></td>
+<td><code>JournalEntry</code> with <code>description</code> field</td>
+<td>Ledger sled store</td>
+<td><code>test_create_entries</code> (basic entry creation)</td>
+<td>Journal entries can be created via <code>LedgerManager::create_payment()</code>. Basic debit/credit tracking works. <strong>But</strong>: no GL account categories (no distinction between payroll, rent, supplies). No expense categorization. No budget-vs-actual reporting.</td>
+<td><strong>Partial</strong></td>
+<td>Add <code>category</code> field to <code>JournalEntry</code>. Define standard GL categories. Build budget-vs-actual query in gateway.</td>
+</tr>
+<tr>
+<td><strong>Bond Issuance</strong></td>
+<td><code>ProposalPayload::BondIssuance { bond_offering: BondOffering }</code></td>
+<td>Governance proposal store</td>
+<td>None</td>
+<td>Types exist in <code>icn-governance/src/proposal.rs:617</code>. <code>BondOffering</code> type exists in <code>icn-ledger</code>. No executor handles it. When proposal accepted, nothing happens.</td>
+<td><strong>Schema Only</strong></td>
+<td>Add bond effect to executor. Create bond lifecycle management (issuance → maturity → redemption).</td>
+</tr>
+</tbody></table>
+<h3>Summary: Worker Co-op</h3>
+<ul>
+<li><strong>Works</strong>: 1/7 operations (payroll, partially)</li>
+<li><strong>Partial</strong>: 3/7 (payroll scheduling, onboarding membership, expense tracking)</li>
+<li><strong>Schema Only</strong>: 2/7 (surplus allocation, share redemption, bond issuance)</li>
+<li><strong>Not Supported</strong>: 1/7 (client invoicing)</li>
+</ul>
+<hr>
+<h2>Archetype 2: Consumer Co-op (200 members)</h2>
+<p><strong>Profile</strong>: Food co-op with 200 member-consumers. Monthly dues, bulk purchasing coordination, member patronage dividends, strict budget enforcement, quarterly financial reporting.</p>
+<h3>Gap Matrix</h3>
+<table>
+<thead>
+<tr>
+<th>Required Operation</th>
+<th>ICN API/Type</th>
+<th>State Location</th>
+<th>Test Evidence</th>
+<th>Failure Mode</th>
+<th>Status</th>
+<th>Minimum Viable Fix</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Membership Dues Collection</strong></td>
+<td><code>RecurringPayment</code></td>
+<td>Gateway sled store</td>
+<td><code>test_recurring_payment_lifecycle</code></td>
+<td>Same as payroll — the recurring payment scheduler works but only in gateway context. Could model dues as recurring payments from each member. <strong>But</strong>: no batch creation for 200 members. No delinquency tracking. No automatic suspension on non-payment.</td>
+<td><strong>Partial</strong></td>
+<td>Batch recurring payment creation API. Add delinquency threshold → automatic <code>FreezeMember</code> proposal trigger.</td>
+</tr>
+<tr>
+<td><strong>Bulk Purchasing Orders</strong></td>
+<td>None</td>
+<td>Nowhere</td>
+<td>None</td>
+<td>No purchase order type. No order aggregation. No supplier payment workflow.</td>
+<td><strong>Not Supported</strong></td>
+<td>New <code>PurchaseOrder</code> type. Aggregate member orders → single supplier payment. Track fulfillment.</td>
+</tr>
+<tr>
+<td><strong>Member Patronage Dividends</strong></td>
+<td><code>ProposalPayload::SurplusAllocation</code></td>
+<td>Governance store</td>
+<td>None for execution</td>
+<td>Same gap as worker co-op surplus allocation. Types exist, executor doesn&#39;t handle it. Patronage dividends are economically equivalent to surplus allocation but pro-rata to purchases, not labor.</td>
+<td><strong>Schema Only</strong></td>
+<td>Extend <code>SurplusAllocation</code> to support purchase-weighted distribution. Wire executor.</td>
+</tr>
+<tr>
+<td><strong>Budget Enforcement</strong></td>
+<td><code>Budget</code>, <code>BudgetStore</code>, gateway CRUD</td>
+<td>Gateway sled store (<code>icn-ledger-app::BudgetStore</code>)</td>
+<td><code>test_budget_tracking</code>, <code>test_budget_period_calculations</code>, <code>test_budget_multiple_accounts</code></td>
+<td>Budget tracking exists in gateway. Budgets can be created, spending tracked against limits. <strong>But</strong>: enforcement is advisory only — <code>LedgerManager::create_payment()</code> checks budget but returns a warning, not a hard rejection. Budget state is in gateway, not in ledger consensus. A direct ledger API call bypasses budget checks entirely.</td>
+<td><strong>Partial</strong></td>
+<td>Move budget enforcement into <code>Ledger::append_entry()</code> validation. Budget violations must reject at ledger level, not just gateway.</td>
+</tr>
+<tr>
+<td><strong>Financial Reporting</strong></td>
+<td><code>Ledger::balance()</code>, <code>Ledger::get_entries()</code></td>
+<td>Ledger sled store</td>
+<td>Basic balance queries tested</td>
+<td>Can query balances by DID and currency. Can list journal entries. <strong>But</strong>: no aggregation by time period, no GL categories, no income statement / balance sheet generation, no export formats.</td>
+<td><strong>Partial</strong></td>
+<td>Add time-range queries. GL classification. Report generation endpoints in gateway.</td>
+</tr>
+<tr>
+<td><strong>Member Discount Tracking</strong></td>
+<td>None</td>
+<td>Nowhere</td>
+<td>None</td>
+<td>No discount/pricing mechanism. No purchase history per member. No patronage credit accumulation.</td>
+<td><strong>Not Supported</strong></td>
+<td>Member purchase ledger. Discount tiers based on patronage.</td>
+</tr>
+</tbody></table>
+<h3>Summary: Consumer Co-op</h3>
+<ul>
+<li><strong>Works</strong>: 0/6 operations fully</li>
+<li><strong>Partial</strong>: 3/6 (dues collection, budget enforcement, financial reporting)</li>
+<li><strong>Schema Only</strong>: 1/6 (patronage dividends)</li>
+<li><strong>Not Supported</strong>: 2/6 (bulk purchasing, discount tracking)</li>
+</ul>
+<hr>
+<h2>Archetype 3: Housing Co-op (50 units)</h2>
+<p><strong>Profile</strong>: Resident-owned housing cooperative with 50 units. Monthly rent/maintenance fees, maintenance escrow fund, capital improvement budgeting, contractor payment disbursement, reserve fund management.</p>
+<h3>Gap Matrix</h3>
+<table>
+<thead>
+<tr>
+<th>Required Operation</th>
+<th>ICN API/Type</th>
+<th>State Location</th>
+<th>Test Evidence</th>
+<th>Failure Mode</th>
+<th>Status</th>
+<th>Minimum Viable Fix</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Rent/Maintenance Fee Collection</strong></td>
+<td><code>RecurringPayment</code></td>
+<td>Gateway sled store</td>
+<td><code>test_recurring_payment_lifecycle</code></td>
+<td>Same recurring payment system. Works for fixed monthly amounts. <strong>But</strong>: no unit-specific amount tracking (different rents per unit size). No late fee calculation. No delinquency → eviction workflow.</td>
+<td><strong>Partial</strong></td>
+<td>Per-account recurring payment amounts (already supported). Late fee calculation. Delinquency threshold escalation.</td>
+</tr>
+<tr>
+<td><strong>Maintenance Escrow Fund</strong></td>
+<td><code>Escrow</code>, <code>EscrowStore</code>, <code>EscrowCondition</code></td>
+<td>Gateway sled store (<code>icn-ledger-app::EscrowStore</code>)</td>
+<td><code>test_escrow_conditions</code>, <code>test_escrow_time_release</code></td>
+<td>Escrow CRUD works. Release executes ledger payment via <code>LedgerManager::create_payment()</code> (<code>escrow.rs:203</code>). <strong>But</strong>: <code>create_escrow</code> does NOT lock funds — it creates a record only. Funds are not moved to a holding account. The &quot;refund&quot; path (<code>escrow.rs:298-305</code>) explicitly notes this: no ledger transaction because nothing was locked. Escrow is a &quot;promise to pay&quot;, not actual fund locking.</td>
+<td><strong>Partial</strong></td>
+<td>Add fund-locking on escrow creation (debit from → holding account). Release moves holding → to. Refund moves holding → from. This requires a &quot;system holding&quot; account pattern.</td>
+</tr>
+<tr>
+<td><strong>Capital Improvement Budgeting</strong></td>
+<td><code>TreasuryBudget</code> in <code>icn-ledger/src/treasury/budgets.rs</code></td>
+<td>Ledger in-memory + sled snapshots</td>
+<td>None for end-to-end governance→budget flow</td>
+<td><code>TreasuryBudget</code> has rich types: amounts, periods, spending tracking. <code>BudgetManager</code> can create/track budgets. Treasury proposals (<code>TreasuryProposalOperation::CreateBudget</code>) exist. <strong>But</strong>: treasury executor is a placeholder that logs but doesn&#39;t create budgets. When governance approves a budget, nothing is created in the budget manager.</td>
+<td><strong>Schema Only</strong></td>
+<td>Wire <code>TreasuryEffect::Spend</code> to <code>BudgetManager::create_budget()</code>. Or better: add <code>TreasuryEffect::CreateBudget</code> variant.</td>
+</tr>
+<tr>
+<td><strong>Contractor Payment Disbursement</strong></td>
+<td><code>Escrow</code> with <code>EscrowCondition::RequiresApproval</code></td>
+<td>Gateway sled store</td>
+<td><code>test_escrow_conditions</code></td>
+<td>Can model as escrow: create escrow for contractor, require board approval to release. Release path works (creates ledger entry). <strong>But</strong>: no multi-sig approval threshold (only checks if all required DIDs approved). No milestone-based partial release. No contractor identity verification.</td>
+<td><strong>Partial</strong></td>
+<td>Multi-sig threshold (M-of-N approvals). Milestone-based partial release (split escrow).</td>
+</tr>
+<tr>
+<td><strong>Reserve Fund Management</strong></td>
+<td><code>Treasury</code> types in <code>icn-ledger/src/treasury/</code></td>
+<td>Ledger in-memory + sled snapshots</td>
+<td>Zero test coverage for treasury lifecycle</td>
+<td>Treasury types are comprehensive: <code>TreasuryOperation</code>, <code>TreasuryAuditRecord</code>, <code>SpendingRule</code>, <code>VelocityLimit</code>, <code>TreasuryBudget</code>. The <code>TreasuryManager</code> exists with in-memory state and sled persistence. <strong>But</strong>: the manager is not exercised by any tests. Treasury operations via governance (<code>TreasuryProposalOperation</code>) produce effects that the executor handles only as logging stubs. No integration test proves treasury → ledger flow.</td>
+<td><strong>Schema Only</strong></td>
+<td>Write treasury integration tests. Wire executor to real <code>TreasuryManager</code>. Prove spend → journal entry → balance update.</td>
+</tr>
+</tbody></table>
+<h3>Summary: Housing Co-op</h3>
+<ul>
+<li><strong>Works</strong>: 0/5 operations fully</li>
+<li><strong>Partial</strong>: 3/5 (rent collection, escrow fund, contractor payment)</li>
+<li><strong>Schema Only</strong>: 2/5 (capital budgeting, reserve fund management)</li>
+<li><strong>Not Supported</strong>: 0/5</li>
+</ul>
+<hr>
+<h2>Archetype 4: Federation of 5 Co-ops</h2>
+<p><strong>Profile</strong>: Regional federation of 5 cooperatives sharing resources, settling inter-coop trades, and coordinating shared costs. Cross-coop credit, payment clearing, dispute resolution.</p>
+<h3>Gap Matrix</h3>
+<table>
+<thead>
+<tr>
+<th>Required Operation</th>
+<th>ICN API/Type</th>
+<th>State Location</th>
+<th>Test Evidence</th>
+<th>Failure Mode</th>
+<th>Status</th>
+<th>Minimum Viable Fix</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Inter-Coop Credit/Settlement</strong></td>
+<td><code>SettlementEngine</code> in <code>icn-ledger/src/settlement.rs</code>, <code>ClearingPosition</code> concept</td>
+<td>Ledger in-memory (dedup set)</td>
+<td><code>test_settlement_dedup</code> (dedup only)</td>
+<td><code>SettlementEngine</code> exists with idempotent receipt settlement. Can create journal entries from settlement requests. <strong>But</strong>: no end-to-end proof of multi-coop netting. The <code>ClearingPosition</code> type from design docs doesn&#39;t exist as a concrete struct. Settlement requires a <code>SettlementRequest</code> with <code>executor_verified: true</code> — who verifies? No federation-level clearing house implementation.</td>
+<td><strong>Schema Only</strong></td>
+<td>Implement clearing position tracker. Create netting algorithm. Wire federation governance to settlement approval. Add multi-coop integration test.</td>
+</tr>
+<tr>
+<td><strong>Shared Cost Allocation</strong></td>
+<td><code>ProposalPayload::Federation(FederationProposal::EstablishClearing { .. })</code></td>
+<td>Governance store</td>
+<td>None</td>
+<td>Federation proposal types exist for clearing agreements. <strong>But</strong>: when accepted, the executor produces a federation effect that is handled as a logging stub (<code>KernelFederationExecutor</code> logs but doesn&#39;t create actual clearing positions or journal entries). No cost-splitting algorithm.</td>
+<td><strong>Schema Only</strong></td>
+<td>Wire federation executor to ledger. Implement proportional cost splitting. Create clearing agreement → recurring settlement schedule.</td>
+</tr>
+<tr>
+<td><strong>Cross-Coop Payment Clearing</strong></td>
+<td><code>SettlementEngine::settle_receipt()</code></td>
+<td>Ledger in-memory</td>
+<td>Settlement dedup test only</td>
+<td>The settlement engine can create journal entries from receipts. Has idempotency (dedup). <strong>But</strong>: no periodic netting cycle. No bilateral balance tracking between co-ops. No clearing deadline enforcement.</td>
+<td><strong>Schema Only</strong></td>
+<td>Bilateral balance tracker. Periodic netting scheduler. Net position → journal entry batch.</td>
+</tr>
+<tr>
+<td><strong>Dispute Resolution (Financial)</strong></td>
+<td><code>ProposalPayload::DisputeResolution { dispute_entry_hash, filer, proposed_outcome }</code>, <code>Dispute</code> types in <code>icn-ledger/src/dispute.rs</code></td>
+<td>Governance store (proposal), Ledger (dispute types)</td>
+<td>None</td>
+<td>Dispute types exist in both governance and ledger. <code>DisputeResolutionOutcome</code> has variants: <code>Uphold</code>, <code>Reject</code>, <code>Partial</code>, <code>NullifyTransaction</code>. <strong>But</strong>: filing a dispute doesn&#39;t actually pause the disputed entry. Upholding a dispute doesn&#39;t reverse the transaction. The governance→ledger execution bridge is missing.</td>
+<td><strong>Schema Only</strong></td>
+<td>Dispute filing → freeze disputed entry. Governance resolution → ledger reversal/confirmation. Idempotent execution with receipt.</td>
+</tr>
+<tr>
+<td><strong>Consolidated Financial Reporting</strong></td>
+<td>None</td>
+<td>Nowhere</td>
+<td>None</td>
+<td>No federation-level aggregation of co-op financials. No cross-coop balance sheet. No shared metric computation.</td>
+<td><strong>Not Supported</strong></td>
+<td>Federation reporting query that aggregates across co-op ledgers. Access control for federation-level views.</td>
+</tr>
+</tbody></table>
+<h3>Summary: Federation</h3>
+<ul>
+<li><strong>Works</strong>: 0/5 operations fully</li>
+<li><strong>Partial</strong>: 0/5</li>
+<li><strong>Schema Only</strong>: 4/5 (settlement, cost allocation, clearing, dispute resolution)</li>
+<li><strong>Not Supported</strong>: 1/5 (consolidated reporting)</li>
+</ul>
+<hr>
+<h2>Cross-Cutting Gaps</h2>
+<p>These issues affect all archetypes:</p>
+<h3>1. The Execution Bridge Gap</h3>
+<p><strong>The central problem</strong>: Governance decisions don&#39;t flow to economic actions.</p>
+<p>When a proposal is accepted (<code>ProposalState::Accepted</code>), the <code>EffectDispatcher</code> (<code>icn-core/src/supervisor/effect_dispatcher.rs</code>) executes pre-translated <code>KernelEffect</code>s. But the translation layer (app → kernel effects) only handles:</p>
+<table>
+<thead>
+<tr>
+<th>ProposalPayload Variant</th>
+<th>KernelEffect Produced</th>
+<th>Actual Execution</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Treasury { Spend }</code></td>
+<td><code>KernelEffect::Treasury(TreasuryEffect::Spend)</code></td>
+<td><strong>Works</strong> — logs operation, creates ledger entry if <code>LedgerService</code> is wired</td>
+</tr>
+<tr>
+<td><code>Treasury { CreateBudget }</code></td>
+<td><code>KernelEffect::Treasury(TreasuryEffect::Allocate)</code></td>
+<td>Placeholder — logs but doesn&#39;t create budget</td>
+</tr>
+<tr>
+<td><code>ProtocolChange</code></td>
+<td><code>KernelEffect::Protocol(SetParameter)</code></td>
+<td><strong>Works</strong> — updates protocol parameter store</td>
+</tr>
+<tr>
+<td><code>Membership { Add/Remove }</code></td>
+<td><code>KernelEffect::Membership(Add/Remove)</code></td>
+<td><strong>Works</strong> if <code>MembershipService</code> is wired</td>
+</tr>
+<tr>
+<td><code>FreezeMember</code></td>
+<td><code>KernelEffect::Membership(Freeze)</code></td>
+<td><strong>Works</strong> if <code>MembershipService</code> is wired</td>
+</tr>
+<tr>
+<td><code>VetoProposal</code></td>
+<td><code>KernelEffect::Control(Veto)</code></td>
+<td><strong>Works</strong> if <code>ControlService</code> is wired</td>
+</tr>
+<tr>
+<td><code>Text</code></td>
+<td><code>KernelEffect::Control(TextResolution)</code></td>
+<td><strong>Works</strong> — records hash</td>
+</tr>
+<tr>
+<td><code>SurplusAllocation</code></td>
+<td><strong>Not translated</strong></td>
+<td>Nothing happens</td>
+</tr>
+<tr>
+<td><code>ShareRedemption</code></td>
+<td><strong>Not translated</strong></td>
+<td>Nothing happens</td>
+</tr>
+<tr>
+<td><code>BondIssuance</code></td>
+<td><strong>Not translated</strong></td>
+<td>Nothing happens</td>
+</tr>
+<tr>
+<td><code>DisputeResolution</code></td>
+<td><strong>Not translated</strong></td>
+<td>Nothing happens</td>
+</tr>
+<tr>
+<td><code>Federation(*)</code></td>
+<td><code>KernelEffect::Federation(*)</code></td>
+<td>Placeholder — logs only</td>
+</tr>
+</tbody></table>
+<p><strong>Impact</strong>: 6 of 20 ProposalPayload variants have working execution. The remaining 14 are either untranslated or produce logging-only stubs.</p>
+<h3>2. Escrow Doesn&#39;t Lock Funds</h3>
+<p>Escrow creation (<code>POST /escrow</code>) stores a record but does not debit the from_account. This means:</p>
+<ul>
+<li>The escrow &quot;amount&quot; is aspirational — the funds may have been spent elsewhere</li>
+<li>There&#39;s no atomicity guarantee</li>
+<li>The &quot;refund&quot; path correctly does nothing because nothing was locked</li>
+</ul>
+<p><strong>See</strong>: <code>icn-gateway/src/api/escrow.rs:298-305</code> (explicit comment documenting this gap)</p>
+<h3>3. Budget Enforcement Is Advisory</h3>
+<p><code>BudgetStore</code> tracks spending against limits, but enforcement happens in the gateway layer only. A direct ledger API call or governance execution bypasses budget checks entirely.</p>
+<p><strong>Required</strong>: Budget validation in <code>Ledger::append_entry()</code> so no path can create an entry that exceeds a budget.</p>
+<h3>4. Treasury Is Untested</h3>
+<p>The <code>icn-ledger/src/treasury/</code> directory contains comprehensive types (audit records, budgets, spending rules, velocity limits) with zero integration test coverage. The <code>TreasuryManager</code> has in-memory state with sled snapshot persistence, but no test proves the snapshot/restore cycle works.</p>
+<h3>5. No GL Account Categories</h3>
+<p>All ledger accounts are identified by <code>(DID, currency)</code> pairs. There&#39;s no distinction between asset, liability, equity, revenue, or expense accounts. This means:</p>
+<ul>
+<li>No income statement generation</li>
+<li>No balance sheet generation</li>
+<li>No budget-vs-actual comparison by category</li>
+<li>No financial audit trail beyond raw journal entries</li>
+</ul>
+<hr>
+<h2>Validation Against Real Cooperatives</h2>
+<h3>Rochdale Principles Compliance</h3>
+<table>
+<thead>
+<tr>
+<th>Rochdale Principle</th>
+<th>ICN Support</th>
+<th>Gap</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Voluntary &amp; Open Membership</td>
+<td><code>Membership</code> proposals, <code>ProposalPayload::Membership</code></td>
+<td>No member application workflow, no eligibility criteria enforcement</td>
+</tr>
+<tr>
+<td>Democratic Member Control</td>
+<td>1-member-1-vote (<code>VoteChoice</code>, <code>weight: 1</code>)</td>
+<td>No elections, no board terms, no delegation</td>
+</tr>
+<tr>
+<td>Member Economic Participation</td>
+<td><code>SurplusAllocation</code>, <code>ShareRedemption</code> types</td>
+<td>Neither actually executes when approved</td>
+</tr>
+<tr>
+<td>Autonomy &amp; Independence</td>
+<td>Federation governance proposals</td>
+<td>Federation executor is a stub</td>
+</tr>
+<tr>
+<td>Education, Training, Information</td>
+<td>Not in scope for ledger/governance</td>
+<td>N/A</td>
+</tr>
+<tr>
+<td>Cooperation Among Cooperatives</td>
+<td><code>FederationProposal</code>, <code>SettlementEngine</code></td>
+<td>Federation executor is a stub</td>
+</tr>
+<tr>
+<td>Concern for Community</td>
+<td><code>ResourceAccess</code> proposals</td>
+<td>Resource access executor not implemented</td>
+</tr>
+</tbody></table>
+<h3>ICA Cooperative Identity Statement</h3>
+<p>ICN&#39;s <code>Charter</code> type (<code>icn-governance/src/charter.rs</code>) contains comprehensive cooperative governance structures including <code>MembershipPolicy</code>, <code>EconomicPolicy</code>, <code>DisputePolicy</code>, and <code>ContributionRouting</code>. These provide the constitutional framework. <strong>The gap is not in governance design but in execution</strong> — the charter describes rules that the system doesn&#39;t enforce.</p>
+<hr>
+<h2>Prioritized Fix List</h2>
+<p>Ordered by impact (how many archetypes are unblocked):</p>
+<table>
+<thead>
+<tr>
+<th>Priority</th>
+<th>Fix</th>
+<th>Unblocks</th>
+<th>Effort</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>P0</strong></td>
+<td>Wire governance→ledger execution bridge for remaining ProposalPayload variants</td>
+<td>All 4 archetypes</td>
+<td>Large — requires new KernelEffect variants + executor handlers</td>
+</tr>
+<tr>
+<td><strong>P1</strong></td>
+<td>Make escrow actually lock funds (debit from → holding on create)</td>
+<td>Housing, Worker</td>
+<td>Medium — new holding account pattern</td>
+</tr>
+<tr>
+<td><strong>P1</strong></td>
+<td>Move budget enforcement into ledger consensus</td>
+<td>Consumer, Housing</td>
+<td>Medium — validation in <code>append_entry()</code></td>
+</tr>
+<tr>
+<td><strong>P1</strong></td>
+<td>Write treasury integration tests</td>
+<td>Housing, Federation</td>
+<td>Small — test existing code paths</td>
+</tr>
+<tr>
+<td><strong>P2</strong></td>
+<td>Add GL account categories to journal entries</td>
+<td>Consumer, Federation</td>
+<td>Medium — schema change + migration</td>
+</tr>
+<tr>
+<td><strong>P2</strong></td>
+<td>Implement surplus allocation executor</td>
+<td>Worker, Consumer</td>
+<td>Medium — new effect + pro-rata distribution logic</td>
+</tr>
+<tr>
+<td><strong>P2</strong></td>
+<td>Implement share redemption executor + payout scheduler</td>
+<td>Worker</td>
+<td>Medium — new effect + extend recurring payments</td>
+</tr>
+<tr>
+<td><strong>P3</strong></td>
+<td>Implement federation settlement e2e</td>
+<td>Federation</td>
+<td>Large — clearing positions + netting + journal entries</td>
+</tr>
+<tr>
+<td><strong>P3</strong></td>
+<td>Add dispute→ledger reversal execution</td>
+<td>Federation, Housing</td>
+<td>Medium — dispute freeze + reversal journal entries</td>
+</tr>
+<tr>
+<td><strong>P3</strong></td>
+<td>Add financial reporting queries</td>
+<td>Consumer, Worker</td>
+<td>Medium — time-range aggregation + GL categories</td>
+</tr>
+<tr>
+<td><strong>P4</strong></td>
+<td>Invoice tracking</td>
+<td>Worker</td>
+<td>Medium — new type + matching</td>
+</tr>
+<tr>
+<td><strong>P4</strong></td>
+<td>Bulk purchasing</td>
+<td>Consumer</td>
+<td>Large — order aggregation + supplier payment</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Document History</h2>
+<ul>
+<li>2026-02-17: Initial creation from comprehensive codebase audit</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

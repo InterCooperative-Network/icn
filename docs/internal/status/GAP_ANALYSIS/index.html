@@ -1,0 +1,473 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Project Gap Analysis | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>internal</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>status</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>GAP ANALYSIS</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/internal/status/GAP_ANALYSIS.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Project Gap Analysis</h1>
+<p><strong>Date</strong>: 2025-12-04
+<strong>Last Updated</strong>: 2025-12-04
+<strong>Status</strong>: Historical pre-pilot assessment snapshot
+<strong>Recommendation</strong>: CONDITIONAL GO</p>
+<blockquote>
+<p>Historical note (2025-12-04): This document records a point-in-time gap assessment.
+For current status, use the latest status/audit documents and live CI results.</p>
+</blockquote>
+<hr>
+<h2>Executive Summary</h2>
+<p>Comprehensive analysis of the ICN codebase identified <strong>23 gaps</strong> (as of 2025-12-04) across test coverage, documentation, feature completeness, monitoring, and configuration. Of these, <strong>9 were high severity</strong> and recommended for resolution before or during early pilot.</p>
+<p><strong>Historical progress update (2025-12-04)</strong>: all 4 pilot-blocking items were marked resolved in this assessment, including contract gossip (Gap #18/Issue #40). The table below reflects that same snapshot.</p>
+<table>
+<thead>
+<tr>
+<th>Category</th>
+<th>High</th>
+<th>Medium</th>
+<th>Low</th>
+<th>Total</th>
+<th>Fixed</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Test Coverage</td>
+<td>4</td>
+<td>2</td>
+<td>1</td>
+<td>7</td>
+<td>7</td>
+</tr>
+<tr>
+<td>Documentation</td>
+<td>2</td>
+<td>2</td>
+<td>0</td>
+<td>4</td>
+<td>2</td>
+</tr>
+<tr>
+<td>Feature Completeness</td>
+<td>2</td>
+<td>2</td>
+<td>4</td>
+<td>8</td>
+<td>8</td>
+</tr>
+<tr>
+<td>Monitoring</td>
+<td>1</td>
+<td>1</td>
+<td>0</td>
+<td>2</td>
+<td>2</td>
+</tr>
+<tr>
+<td>Config/Deployment</td>
+<td>0</td>
+<td>2</td>
+<td>0</td>
+<td>2</td>
+<td>2</td>
+</tr>
+<tr>
+<td><strong>TOTAL</strong></td>
+<td><strong>9</strong></td>
+<td><strong>9</strong></td>
+<td><strong>5</strong></td>
+<td><strong>23</strong></td>
+<td><strong>23</strong></td>
+</tr>
+</tbody></table>
+<hr>
+<h2>High Severity Gaps</h2>
+<h3>1. <del>RPC Server Lacks Metrics Instrumentation</del> ✅ FIXED</h3>
+<p><strong>Impact</strong>: Cannot monitor API performance in production</p>
+<ul>
+<li><strong>Location</strong>: <code>icn/crates/icn-rpc/src/server.rs</code></li>
+<li><strong>Issue</strong>: 47 RPC handlers with zero metrics (no latency, volume, error tracking)</li>
+<li><strong>Fix</strong>: Add <code>icn_rpc_*</code> metrics module, instrument all handlers</li>
+<li><strong>Resolution</strong>: Added 9 RPC metrics (requests, errors, latency, auth) - commit <code>3d4ae1f</code> (2025-12-04)</li>
+</ul>
+<h3>2. <del>Compute API Missing from OpenAPI Specification</del> ✅ FIXED</h3>
+<p><strong>Impact</strong>: Developers cannot consume compute endpoints</p>
+<ul>
+<li><strong>Location</strong>: <code>docs/api/openapi.yaml</code></li>
+<li><strong>Issue</strong>: Compute endpoints (submit, status, cancel) not documented</li>
+<li><strong>Fix</strong>: Add <code>/v1/compute/*</code> endpoints to OpenAPI spec</li>
+<li><strong>Resolution</strong>: Added cancel endpoint, schemas, status enum - commit <code>49c2e04</code> (2025-12-04)</li>
+</ul>
+<h3>3. <del>RPC Integration Tests Missing</del> ✅ FIXED</h3>
+<p><strong>Impact</strong>: Public API surface untested end-to-end</p>
+<ul>
+<li><strong>Location</strong>: <code>icn/crates/icn-rpc/tests/</code></li>
+<li><strong>Issue</strong>: 47 handlers have unit tests but limited integration tests</li>
+<li><strong>Fix</strong>: Create integration test suite (20-30 tests)</li>
+<li><strong>Resolution (2025-12-04)</strong>:<ul>
+<li>Initial suite: 8 tests (auth flow, server startup, error handling, token validation). Commit <code>1893e51</code>.</li>
+<li>Extended suite: 12 additional tests (scope enforcement, multiple scopes, network/ledger/trust actor errors, missing params, batch handling, JSON-RPC version, compute auth, empty method, policy/recovery actors).</li>
+<li>Compute tests: 12 new tests (submit validation, status edge cases, cancel scenarios, priority, coop_id). Commit <code>7d976fb</code>.</li>
+<li><strong>Total: 32 tests</strong> (target was 20-30). ✅</li>
+</ul>
+</li>
+</ul>
+<h3>4. <del>Privacy Crate Lacks Integration Tests</del> ✅ FIXED</h3>
+<p><strong>Impact</strong>: Privacy features untested in realistic scenarios</p>
+<ul>
+<li><strong>Location</strong>: <code>icn/crates/icn-privacy/tests/privacy_integration.rs</code></li>
+<li><strong>Issue</strong>: Only 22 inline unit tests for onion routing, traffic obfuscation</li>
+<li><strong>Fix</strong>: Add integration tests for circuit reliability, message padding</li>
+<li><strong>Resolution (2025-12-04)</strong>: Created comprehensive integration test suite with <strong>27 tests</strong> covering:<ul>
+<li>Topic encryption (5 tests: multi-party encryption, bloom filter discovery, linkability prevention, find_matches)</li>
+<li>Onion routing (5 tests: circuit creation, missing key error, wrap/peel/extract 2-hop, relay selection with trust)</li>
+<li>Traffic obfuscation (9 tests: padding roundtrip, size uniformity, delay ranges, cover traffic timing)</li>
+<li>Combined privacy stack (3 tests: encryption + obfuscation, config accessors, defaults)</li>
+<li>Error handling (5 tests: corrupted ciphertext, wrong nonce, empty/unicode/large topics)</li>
+</ul>
+</li>
+</ul>
+<h3>5. <del>Federation Integration Tests Missing</del> ✅ FIXED</h3>
+<p><strong>Impact</strong>: Multi-cooperative coordination untested</p>
+<ul>
+<li><strong>Location</strong>: <code>icn/crates/icn-federation/tests/federation_integration.rs</code></li>
+<li><strong>Issue</strong>: 13 modules, 38 unit tests, no integration tests</li>
+<li><strong>Fix</strong>: Test cross-coop registry, trust bridging, DID resolution</li>
+<li><strong>Resolution (2025-12-04)</strong>: Created comprehensive integration test suite with <strong>22 tests</strong> covering:<ul>
+<li>Cross-cooperative registry (4 tests: multi-coop workflow, persistence, capability/currency search, stale detection)</li>
+<li>Trust bridging (4 tests: attestation signing/verification, store operations, expiry, removal)</li>
+<li>Clearing agreements (4 tests: creation/rates, manager lifecycle, settlement intervals, duplicate error)</li>
+<li>Federated DID resolution (4 tests: workflow, caching, parsing, unknown coop error)</li>
+<li>Combined workflows (3 tests: full onboarding, vouch chain, trust contexts)</li>
+<li>Edge cases (3 tests: builder pattern, self-registration, last_seen update, valid attestations filter)</li>
+</ul>
+</li>
+</ul>
+<h3>6. TODO/FIXME Comments in Production Code (Substantial Progress)</h3>
+<p><strong>Impact</strong>: Features marked &quot;complete&quot; have incomplete implementations</p>
+<p>Key TODOs and their status:</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Line</th>
+<th>Issue</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icn-ledger/src/ledger.rs</code></td>
+<td>411</td>
+<td>N-way fork handling incomplete</td>
+<td>Issue #36</td>
+</tr>
+<tr>
+<td><code>icn-core/src/supervisor.rs</code></td>
+<td>1396</td>
+<td>TURN relay unimplemented</td>
+<td>Issue #37</td>
+</tr>
+<tr>
+<td><del><code>icn-core/src/supervisor.rs</code></del></td>
+<td><del>1867</del></td>
+<td><del>Cooperative treasury DID</del></td>
+<td>✅ FIXED</td>
+</tr>
+<tr>
+<td><del><code>icn-federation/src/gossip.rs</code></del></td>
+<td><del>132,226,345,383</del></td>
+<td><del>Signature verification stubs</del></td>
+<td>✅ FIXED</td>
+</tr>
+<tr>
+<td><del><code>icn-compute/src/actor.rs</code></del></td>
+<td><del>2023</del></td>
+<td><del>Placement metrics</del></td>
+<td>✅ FIXED</td>
+</tr>
+<tr>
+<td><del><code>icn-gateway/src/compute_mgr.rs</code></del></td>
+<td><del>124</del></td>
+<td><del>coop_id not set from JWT</del></td>
+<td>✅ FIXED</td>
+</tr>
+<tr>
+<td><del><code>icn-rpc/src/server.rs</code></del></td>
+<td><del>654</del></td>
+<td><del>listen_addr hardcoded</del></td>
+<td>✅ FIXED</td>
+</tr>
+<tr>
+<td><del><code>icn-rpc/src/server.rs</code></del></td>
+<td><del>1032-1033</del></td>
+<td><del>bytes_processed, wall_time_ms</del></td>
+<td>✅ FIXED</td>
+</tr>
+<tr>
+<td><del><code>icn-rpc/src/server.rs</code></del></td>
+<td><del>2005,2018</del></td>
+<td><del>coop_id, resource_profile</del></td>
+<td>✅ FIXED</td>
+</tr>
+<tr>
+<td><del><code>icn-federation/src/resolver.rs</code></del></td>
+<td><del>250</del></td>
+<td><del>Federated DID HTTP/RPC call</del></td>
+<td>✅ FIXED</td>
+</tr>
+<tr>
+<td><del><code>icn-ccl/src/actor.rs</code></del></td>
+<td><del>125</del></td>
+<td><del>Contract deployment gossip</del></td>
+<td>✅ FIXED</td>
+</tr>
+<tr>
+<td><del><code>icn-core/src/supervisor.rs</code></del></td>
+<td><del>2033,2042,2053</del></td>
+<td><del>Governance operations (veto, force-close)</del></td>
+<td>✅ FIXED</td>
+</tr>
+</tbody></table>
+<p><strong>Resolved (2025-12-04)</strong>:</p>
+<ul>
+<li>Federation signature verification implemented - commit <code>b411487</code></li>
+<li>Federation accept signature verification added (security fix)</li>
+<li>coop_id now populated from JWT claims in compute_mgr</li>
+<li>RPC server listen_addr now uses configured address</li>
+<li>Contract execution tracks bytes_processed and wall_time_ms</li>
+<li>Compute submit supports coop_id (from request or JWT claims)</li>
+<li>Compute submit supports resource_profile specification</li>
+<li>Placement wins/losses metrics now tracked</li>
+<li><strong>Cooperative treasury DID</strong> - Added <code>[cooperative]</code> config section with <code>treasury_did</code> option; governance budget payouts now use treasury DID (Issue #38)</li>
+<li><strong>Federated DID Resolution</strong> - Implemented HTTP-based DID resolution via remote gateway endpoints; added <code>/v1/identity/resolve/{did}</code> public endpoint to gateway; resolver uses reqwest for HTTP calls with 10s timeout; 4 identity tests + 3 resolver HTTP tests added (Issue #39)</li>
+<li><strong>Governance Operations</strong> - Implemented veto and force-close proposal operations; added <code>Vetoed</code> and <code>ForceClosed</code> states to ProposalState; added <code>VetoProposal</code> and <code>ForceCloseProposal</code> commands to GovernanceActor; supervisor now executes veto/force-close via governance handle; 3 new proposal tests added; 2 new governance metrics added (Issue #41). Note: Ledger rollback remains unimplemented (requires manual intervention for security)</li>
+<li><strong>Contract Deployment Gossip</strong> - Added <code>GossipCallback</code> to ContractActor for publishing deployments to <code>contracts:deploy</code> topic; added <code>set_gossip_callback()</code> method; <code>handle_deployment_message()</code> for receiving remote deployments; metrics tracked via <code>contract::deployments_inc()</code> and <code>contract::deployments_received_inc()</code>; 2 new tests added (Issue #40)</li>
+</ul>
+<h3>7. CCL Contract Crate Has No Integration Tests ✅ FIXED</h3>
+<p><strong>Impact</strong>: Contract deployment and execution lifecycle untested</p>
+<ul>
+<li><strong>Location</strong>: <code>icn/crates/icn-ccl/tests/contract_integration.rs</code></li>
+<li><strong>Issue</strong>: 38 unit tests but no deployment/execution integration tests</li>
+<li><strong>Fix</strong>: Add contract lifecycle tests (15-20 tests)</li>
+<li><strong>Resolution (2025-12-04)</strong>: Created comprehensive integration test suite with <strong>24 tests</strong> covering:<ul>
+<li>Contract creation (3 tests: simple, with rule, with precondition)</li>
+<li>Contract validation (3 tests: empty name, no participants, duplicate rules)</li>
+<li>Registry operations (5 tests: deploy, metadata, list by owner, duplicate detection, resolve by name)</li>
+<li>Interpreter execution (4 tests: arithmetic, precondition pass/fail, rule not found)</li>
+<li>Fuel metering (2 tests: consumption tracking, exhaustion)</li>
+<li>Ledger operations (2 tests: transfer with capability, missing capability error)</li>
+<li>State management (1 test: variable initialization)</li>
+<li>Serialization (1 test: JSON roundtrip)</li>
+<li>Comparison operations (1 test: all BinOp variants)</li>
+<li>Metadata creation (1 test: from_contract)</li>
+<li>Bug fix: fuel_consumed tracking bug fixed (initial_fuel captured at start of execution) - commit <code>d352f69</code></li>
+</ul>
+</li>
+</ul>
+<hr>
+<h2>Medium Severity Gaps</h2>
+<h3>8. <del>Time Synchronization Lacks Integration Testing</del> ✅ FIXED</h3>
+<ul>
+<li><strong>Location</strong>: <code>icn/crates/icn-time/tests/time_integration.rs</code></li>
+<li><strong>Issue</strong>: 9 unit tests, no Rough Time server integration tests</li>
+<li><strong>Fix</strong>: Add server connectivity and clock drift tests</li>
+<li><strong>Resolution (2025-12-04)</strong>: Created comprehensive integration test suite with <strong>32 tests</strong> covering:<ul>
+<li>ClockSync lifecycle (4 tests: default creation, custom servers, empty servers, default server list)</li>
+<li>RoughTimeServer (3 tests: creation, with public key, clone)</li>
+<li>Timestamp validation (6 tests: not synchronized, within skew, too old, in future, boundary, network time)</li>
+<li>Freshness checking (2 tests: not synced, after sync)</li>
+<li>Network time calculation (4 tests: synchronized, positive offset, negative offset, not synced)</li>
+<li>Offset and uncertainty (3 tests: positive local ahead, negative local behind, uncertainty init)</li>
+<li>Edge cases (5 tests: timestamp zero, very large offset, multiple updates, max skew config, default impl)</li>
+<li>Error types (3 tests: NotSynchronized, InsufficientResponses, TimestampOutOfRange)</li>
+<li>Network tests (2 ignored tests: real sync with servers, insufficient servers)</li>
+<li>PR #35, commit <code>dfdd876</code></li>
+</ul>
+</li>
+</ul>
+<h3>9. <del>Configuration Documentation Gap</del> ✅ FIXED</h3>
+<ul>
+<li><strong>Location</strong>: Missing <code>example.toml</code>, incomplete <code>docs/deployment-guide.md</code></li>
+<li><strong>Issue</strong>: No comprehensive config schema documentation</li>
+<li><strong>Fix</strong>: Create example config, document all options</li>
+<li><strong>Resolution</strong>: Added gateway and privacy sections to <code>config/icn.toml.example</code> (155 lines) - commit <code>dd6486a</code> (2025-12-04)</li>
+</ul>
+<h3>10. <del>Compute Endpoints Need More Test Coverage</del> ✅ FIXED</h3>
+<ul>
+<li><strong>Location</strong>: <code>icn-gateway/tests/</code>, <code>icn-rpc/</code></li>
+<li><strong>Issue</strong>: Limited error scenario testing for compute API</li>
+<li><strong>Fix</strong>: Add priority validation, cancellation edge cases</li>
+<li><strong>Resolution (2025-12-04)</strong>:<ul>
+<li>Gateway: Added 6 new compute_mgr tests (fuel limit max, task ID length, empty code, priority variants, status fallback, cancel without daemon). Gateway tests now at 112.</li>
+<li>RPC: Added 12 new compute integration tests (submit validation, status edge cases, cancel auth, priority, coop_id). RPC integration tests now at 32.</li>
+<li><strong>Total: 18 new compute tests across gateway and RPC layers.</strong> Commit <code>7d976fb</code>.</li>
+</ul>
+</li>
+</ul>
+<h3>11. <del>Governance Architecture Unclear</del> ✅ FIXED</h3>
+<ul>
+<li><strong>Location</strong>: <code>icn-core/src/governance/</code> vs <code>icn-rpc/src/server.rs</code></li>
+<li><strong>Issue</strong>: Two implementations, unclear source of truth</li>
+<li><strong>Fix</strong>: Document architecture, add RPC→gossip integration tests</li>
+<li><strong>Resolution</strong>: Added &quot;Runtime Architecture&quot; section to <code>docs/governance.md</code> with component diagram, deployment modes, data flows, and source of truth documentation (2025-12-04)</li>
+</ul>
+<h3>12. <del>WASM Executor Incomplete</del> ✅ FIXED</h3>
+<ul>
+<li><strong>Location</strong>: <code>icn-compute/src/wasm_executor.rs:321</code></li>
+<li><strong>Issue</strong>: TODO for blob storage fetch</li>
+<li><strong>Fix</strong>: Complete blob integration, add WASM execution tests</li>
+<li><strong>Resolution (2025-12-04)</strong>: Added <code>WasmRegistry</code> for content-addressed WASM module storage:<ul>
+<li><code>deploy()</code> stores WASM with blake3 hash as key</li>
+<li><code>get_blocking()</code> fetches WASM for sync executor context</li>
+<li>Validates WASM magic bytes, supports sled persistence</li>
+<li>Updated <code>WasmExecutor</code> to resolve WasmRef from registry</li>
+<li>17 new tests (13 registry + 3 executor WasmRef + 1 validation)</li>
+<li>PR #43, commit <code>822a2be</code></li>
+</ul>
+</li>
+</ul>
+<h3>13. <del>Trust Metrics Missing from Grafana Dashboard</del> ✅ FIXED</h3>
+<ul>
+<li><strong>Location</strong>: <code>monitoring/grafana-dashboard.json</code></li>
+<li><strong>Issue</strong>: No panels for trust score distribution, cache efficiency</li>
+<li><strong>Fix</strong>: Add 3 trust-related panels</li>
+<li><strong>Resolution</strong>: Added 4 trust panels (Trust Edges, Cache Hit Rate, Peers by Trust Class pie chart, Trust Score Distribution percentiles)</li>
+</ul>
+<h3>14. <del>Passphrase Handling Not Documented for Automation</del> ✅ FIXED</h3>
+<ul>
+<li><strong>Location</strong>: <code>icn/bins/icnd/src/main.rs:115-116</code></li>
+<li><strong>Issue</strong>: Interactive prompt fails in systemd/Docker</li>
+<li><strong>Fix</strong>: Add <code>ICN_KEYSTORE_PASSPHRASE</code> env var support</li>
+<li><strong>Resolution</strong>: Added ICN_KEYSTORE_PASSPHRASE env var (preferred) with ICN_PASSPHRASE fallback - commit <code>4b4f530</code> (2025-12-04)</li>
+</ul>
+<h3>15. <del>Rate Limits Hardcoded</del> ✅ FIXED</h3>
+<ul>
+<li><strong>Location</strong>: <code>icn-net/src/rate_limit.rs</code>, <code>icn-gateway/src/rate_limit.rs</code></li>
+<li><strong>Issue</strong>: No config file options for rate limit tuning</li>
+<li><strong>Fix</strong>: Make configurable via TOML</li>
+<li><strong>Resolution</strong>: Added <code>[gateway.rate_limiting]</code> config section with capacity, refill_rate, cost_per_request options. GatewayServer now accepts RateLimitConfig via <code>.with_rate_limit_config()</code> builder method.</li>
+</ul>
+<hr>
+<h2>Low Severity Gaps (Post-Pilot)</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Gap</th>
+<th>Location</th>
+<th>Phase</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>16</td>
+<td>Federation not in supervisor</td>
+<td><code>supervisor.rs</code></td>
+<td>19+</td>
+</tr>
+<tr>
+<td>17</td>
+<td>Privacy not integrated</td>
+<td><code>supervisor.rs</code></td>
+<td>19+</td>
+</tr>
+<tr>
+<td><del>18</del></td>
+<td><del>Contract gossip incomplete</del></td>
+<td><del><code>icn-ccl/src/actor.rs:125</code></del></td>
+<td>✅ FIXED</td>
+</tr>
+<tr>
+<td>19</td>
+<td>N-way fork resolution</td>
+<td><code>ledger.rs:411</code></td>
+<td>Future</td>
+</tr>
+<tr>
+<td>20</td>
+<td>Task migration incomplete</td>
+<td><code>migration_manager.rs</code></td>
+<td>16D</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Pilot Blocking Items</h2>
+<p>These <strong>must be fixed</strong> before pilot deployment:</p>
+<ol>
+<li><input checked="" disabled="" type="checkbox"> <del>Add <code>ICN_KEYSTORE_PASSPHRASE</code> env var support</del> (automation blocker) - commit <code>4b4f530</code></li>
+<li><input checked="" disabled="" type="checkbox"> <del>Add compute endpoints to OpenAPI</del> (developer blocker) - commit <code>49c2e04</code></li>
+<li><input checked="" disabled="" type="checkbox"> <del>Implement federation signature verification</del> (5 TODOs) - commit <code>b411487</code></li>
+<li><input checked="" disabled="" type="checkbox"> <del>Add RPC metrics instrumentation</del> (monitoring blocker) - commit <code>3d4ae1f</code></li>
+</ol>
+<p><strong>Status</strong>: ✅ <strong>ALL 4/4 PILOT BLOCKERS RESOLVED</strong> (2025-12-04)</p>
+<hr>
+<h2>Tracking</h2>
+<p>Progress on gap remediation will be tracked in:</p>
+<ul>
+<li>GitHub Issues (create from this document)</li>
+<li>Weekly status in dev journal</li>
+</ul>
+<hr>
+<h2>References</h2>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CLAUDE">CLAUDE.md</a> - Project architecture</li>
+<li><a href="/docs/development/sessions/undated/ROADMAP">ROADMAP.md</a> - Strategic roadmap</li>
+<li><a href="/docs/development/testing/INTERNAL_TESTING_PLAN">INTERNAL_TESTING_PLAN.md</a> - Test scenarios</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

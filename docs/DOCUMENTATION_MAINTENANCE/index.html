@@ -1,0 +1,515 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Documentation Maintenance Guide | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>  <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>DOCUMENTATION MAINTENANCE</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/DOCUMENTATION_MAINTENANCE.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Documentation Maintenance Guide</h1>
+<p>This guide provides guidelines for maintaining ICN documentation structure and quality.</p>
+<p><strong>Last Updated</strong>: 2026-02-10<br><strong>Version</strong>: 1.0</p>
+<hr>
+<h2>Quick Decision Tree: Where to Put Documentation</h2>
+<pre><code>┌─ New documentation? ────────────────────────────────────┐
+│                                                          │
+├─ Is it architectural/design? ──────────────────────────►├─ docs/architecture/ or docs/design/
+│                                                          │
+├─ Is it a formal specification? ────────────────────────►├─ docs/spec/
+│                                                          │
+├─ Is it API/config reference? ──────────────────────────►├─ docs/reference/api/ or docs/reference/config/
+│                                                          │
+├─ Is it a user or developer guide? ─────────────────────►├─ docs/guides/user/ or docs/guides/developer/
+│                                                          │
+├─ Is it security-related? ──────────────────────────────►├─ docs/security/
+│                                                          │
+├─ Is it deployment/operations? ─────────────────────────►├─ docs/guides/operations/ or docs/deployment/
+│                                                          │
+├─ Is it SDIS-specific? ─────────────────────────────────►├─ docs/sdis/
+│                                                          │
+├─ Is it historical/completed? ──────────────────────────►├─ docs/archive/YYYY/
+│                                                          │
+├─ Is it internal planning? ─────────────────────────────►├─ docs/internal/
+│                                                          │
+├─ Is it a status report? ───────────────────────────────►├─ docs/status/
+│                                                          │
+└─ When in doubt ────────────────────────────────────────►└─ Ask in PR or create issue
+</code></pre>
+<hr>
+<h2>Directory Categories</h2>
+<h3>Core Documents (<code>docs/</code>)</h3>
+<p><strong>Never add to project root except these files:</strong></p>
+<ul>
+<li><code>README.md</code>, <code>CHANGELOG.md</code>, <code>CLAUDE.md</code>, <code>CODE_OF_CONDUCT.md</code>, <code>CONTRIBUTING.md</code>, <code>AGENTS.md</code></li>
+</ul>
+<p>Core documentation files live directly in <code>docs/</code>:</p>
+<ul>
+<li><code>ARCHITECTURE.md</code> - Master architecture document</li>
+<li><code>GETTING_STARTED.md</code> - Quick start guide</li>
+<li><code>PHASE_HISTORY.md</code> - Completed development phases</li>
+<li><code>STATE.md</code> - Current project state snapshot</li>
+<li><code>TODO.md</code> - Active work items and priorities</li>
+<li><code>INDEX.md</code> - Documentation index (update when adding major sections)</li>
+<li><code>README.md</code> - Documentation overview</li>
+<li><code>glossary.md</code> - Terminology definitions</li>
+</ul>
+<h3>Architecture &amp; Design (<code>docs/architecture/</code>, <code>docs/design/</code>)</h3>
+<p><strong>When to use <code>architecture/</code>:</strong></p>
+<ul>
+<li>Comprehensive architectural reviews</li>
+<li>Design decisions affecting multiple components</li>
+<li>System-wide patterns and conventions</li>
+<li>Architectural Decision Records (ADRs)</li>
+<li>Gap analyses and audit reports</li>
+</ul>
+<p><strong>When to use <code>design/</code>:</strong></p>
+<ul>
+<li>Feature-specific designs</li>
+<li>Evolution plans and roadmaps</li>
+<li>Proposals for new capabilities</li>
+<li>Domain-specific designs (economics, governance, SDIS)</li>
+</ul>
+<p><strong>Subdirectories:</strong></p>
+<ul>
+<li><code>design/economics/</code> - Economic system designs</li>
+<li><code>design/governance/</code> - Governance system designs</li>
+<li><code>design/sdis/</code> - SDIS-specific designs</li>
+</ul>
+<h3>Specifications (<code>docs/spec/</code>)</h3>
+<p><strong>Use for:</strong></p>
+<ul>
+<li>Formal protocol specifications</li>
+<li>Wire format definitions</li>
+<li>Contract specifications</li>
+<li>Anything requiring precise, versioned definitions</li>
+</ul>
+<h3>Reference Documentation (<code>docs/reference/</code>)</h3>
+<p><strong>Use for:</strong></p>
+<ul>
+<li>API documentation (<code>reference/api/</code>)</li>
+<li>Configuration references (<code>reference/config/</code>)</li>
+<li>Command-line tool references</li>
+<li>Technical glossaries and references</li>
+</ul>
+<h3>Guides (<code>docs/guides/</code>)</h3>
+<p><strong>Subdirectories:</strong></p>
+<ul>
+<li><code>guides/user/</code> - End-user documentation (cooperative setup, usage)</li>
+<li><code>guides/developer/</code> - Developer documentation (contribution, debugging)</li>
+<li><code>guides/operations/</code> - Operations documentation (deployment, monitoring)</li>
+</ul>
+<p><strong>Guidelines:</strong></p>
+<ul>
+<li>Keep guides practical and task-oriented</li>
+<li>Include code examples and commands</li>
+<li>Link to reference documentation for details</li>
+</ul>
+<h3>Development Resources (<code>docs/development/</code>)</h3>
+<p><strong>Use for:</strong></p>
+<ul>
+<li>Sprint planning and tracking (<code>development/sprints/</code>)</li>
+<li>Testing documentation (<code>development/testing/</code>)</li>
+<li>Development workflows</li>
+<li>Build and release processes</li>
+</ul>
+<h3>Security Documentation (<code>docs/security/</code>)</h3>
+<p><strong>Use for:</strong></p>
+<ul>
+<li>Security audits</li>
+<li>Threat models</li>
+<li>Vulnerability reports and fixes</li>
+<li>Security guidelines</li>
+<li>Penetration test results</li>
+</ul>
+<h3>SDIS Documentation (<code>docs/sdis/</code>)</h3>
+<p><strong>Use for:</strong></p>
+<ul>
+<li>SDIS implementation guides</li>
+<li>VUI documentation</li>
+<li>Zero-knowledge proof documentation</li>
+<li>SDIS-specific protocols</li>
+</ul>
+<h3>Internal Documentation (<code>docs/internal/</code>)</h3>
+<p><strong>Use for:</strong></p>
+<ul>
+<li>Internal planning documents</li>
+<li>Pilot program documentation (<code>internal/pilots/</code>)</li>
+<li>Status tracking (<code>internal/status/</code>)</li>
+<li>Documents not yet ready for public consumption</li>
+</ul>
+<h3>Status Reports (<code>docs/status/</code>)</h3>
+<p><strong>Use for:</strong></p>
+<ul>
+<li>Current project state snapshots</li>
+<li>Deployment verification reports</li>
+<li>System health reports</li>
+<li>Periodic status updates</li>
+</ul>
+<p><strong>Naming convention:</strong> <code>PROJECT_STATE_YYYY-MM-DD.md</code> or <code>COMPONENT_STATUS_YYYY-MM-DD.md</code></p>
+<h3>Archives (<code>docs/archive/</code>)</h3>
+<p><strong>Organization:</strong></p>
+<pre><code>docs/archive/
+└── YYYY/
+    ├── design/
+    ├── guides/
+    ├── sprints/
+    ├── sessions/
+    └── status/
+</code></pre>
+<p><strong>When to archive:</strong></p>
+<ul>
+<li>Completed work that is superseded</li>
+<li>Historical sprint plans</li>
+<li>Old design documents no longer relevant</li>
+<li>Outdated guides or references</li>
+<li>Session notes older than 6 months (unless frequently referenced)</li>
+</ul>
+<p><strong>When NOT to archive:</strong></p>
+<ul>
+<li>Living documents (ARCHITECTURE.md, STATE.md, TODO.md)</li>
+<li>Current guides and references</li>
+<li>Active design documents</li>
+<li>Frequently referenced historical documents</li>
+</ul>
+<hr>
+<h2>Archival Policy</h2>
+<h3>When to Archive</h3>
+<p><strong>Archive documentation when:</strong></p>
+<ol>
+<li><strong>Superseded by newer versions</strong> - Old design replaced by new implementation</li>
+<li><strong>Completed work</strong> - Sprint plans, session notes for completed phases</li>
+<li><strong>Historical value only</strong> - Documents useful for context but not current guidance</li>
+<li><strong>Age &gt; 6 months</strong> and no longer actively referenced</li>
+</ol>
+<p><strong>Keep in active structure when:</strong></p>
+<ol>
+<li><strong>Frequently referenced</strong> - Even if historical, if referenced often keep active</li>
+<li><strong>Living documents</strong> - Continuously updated (ARCHITECTURE.md, STATE.md, etc.)</li>
+<li><strong>Current guidance</strong> - Active guides, references, specifications</li>
+<li><strong>Recent status</strong> - Status reports from last 3 months</li>
+</ol>
+<h3>Archival Process</h3>
+<ol>
+<li><p><strong>Create year directory</strong> if it doesn&#39;t exist:</p>
+<pre><code class="language-bash">mkdir -p docs/archive/YYYY/
+</code></pre>
+</li>
+<li><p><strong>Move files to appropriate subdirectory</strong>:</p>
+<pre><code class="language-bash"># Example: Archive old sprint plans
+mv docs/development/sprints/sprint-2025-01-* docs/archive/2025/sprints/
+
+# Example: Archive superseded design
+mv docs/design/old-feature-design.md docs/archive/2025/design/
+</code></pre>
+</li>
+<li><p><strong>Update links</strong>:</p>
+<ul>
+<li>Search for references to moved files: <code>grep -r &quot;old-file.md&quot; docs/</code></li>
+<li>Update links to point to archive location or remove if no longer relevant</li>
+<li>Add redirect note in prominent locations</li>
+</ul>
+</li>
+<li><p><strong>Document in archive README</strong>:</p>
+<pre><code class="language-bash"># Update docs/archive/YYYY/README.md
+echo &quot;- old-file.md - Reason for archival, date moved&quot; &gt;&gt; docs/archive/YYYY/README.md
+</code></pre>
+</li>
+<li><p><strong>Update INDEX.md</strong> if major sections moved</p>
+</li>
+</ol>
+<hr>
+<h2>Naming Conventions</h2>
+<h3>File Names</h3>
+<p><strong>Use lowercase with hyphens:</strong></p>
+<ul>
+<li>✅ <code>multi-device-identity-design.md</code></li>
+<li>✅ <code>api-reference.md</code></li>
+<li>❌ <code>MultiDeviceIdentityDesign.md</code></li>
+<li>❌ <code>API_REFERENCE.md</code></li>
+</ul>
+<p><strong>Exceptions (all caps):</strong></p>
+<ul>
+<li>Core docs: <code>ARCHITECTURE.md</code>, <code>GETTING_STARTED.md</code>, <code>README.md</code>, <code>INDEX.md</code></li>
+<li>ADRs: <code>ADR-001-decision-name.md</code></li>
+</ul>
+<p><strong>Prefixes for special types:</strong></p>
+<ul>
+<li>ADRs: <code>ADR-NNN-</code> (Architecture Decision Records)</li>
+<li>Status reports: <code>PROJECT_STATE_</code> or <code>COMPONENT_STATUS_</code></li>
+</ul>
+<h3>Directory Names</h3>
+<p><strong>Use lowercase singular or plural as appropriate:</strong></p>
+<ul>
+<li>✅ <code>architecture/</code>, <code>guides/</code>, <code>reference/</code></li>
+<li>✅ <code>api/</code>, <code>config/</code>, <code>security/</code></li>
+<li>❌ <code>Architecture/</code>, <code>Guides/</code></li>
+</ul>
+<hr>
+<h2>README Update Process</h2>
+<h3>Category READMEs</h3>
+<p><strong>Every category directory must have a README.md:</strong></p>
+<p>Template:</p>
+<pre><code class="language-markdown"># [Category Name]
+
+Brief description of what belongs in this category.
+
+## Contents
+
+- `document.md` - Brief description
+- `subdirectory/` - Brief description
+
+## Related Documentation
+
+- `Link to related category` (`./other-category/`)
+- `Link to INDEX.md` (`./INDEX.md`)
+</code></pre>
+<p><strong>Update when:</strong></p>
+<ul>
+<li>Adding new documents to category</li>
+<li>Reorganizing category structure</li>
+<li>Changing document locations</li>
+</ul>
+<h3>INDEX.md Updates</h3>
+<p><strong>Update <code>docs/INDEX.md</code> when:</strong></p>
+<ul>
+<li>Adding new top-level categories</li>
+<li>Adding significant new documents</li>
+<li>Reorganizing major sections</li>
+<li>Changing navigation structure</li>
+</ul>
+<p><strong>Don&#39;t update for:</strong></p>
+<ul>
+<li>Minor documents within existing categories</li>
+<li>Category README changes</li>
+<li>Small content updates</li>
+</ul>
+<p><strong>Process:</strong></p>
+<ol>
+<li>Add entry in appropriate section</li>
+<li>Update &quot;Last Updated&quot; date at top</li>
+<li>Maintain alphabetical ordering within sections</li>
+<li>Keep descriptions concise (one line)</li>
+</ol>
+<hr>
+<h2>Link Checking Guidelines</h2>
+<h3>Internal Links</h3>
+<p><strong>Use relative paths:</strong></p>
+<ul>
+<li>✅ <code>[Architecture](./architecture/ARCHITECTURE_MAP.md)</code></li>
+<li>✅ <code>[Getting Started](./GETTING_STARTED.md)</code></li>
+<li>❌ Example absolute-path link syntax (avoid): <code>/docs/architecture/ARCHITECTURE_MAP.md</code></li>
+<li>❌ <code>[Architecture](https://github.com/.../ARCHITECTURE_MAP.md)</code> (external)</li>
+</ul>
+<p><strong>Check links when:</strong></p>
+<ul>
+<li>Moving or renaming files</li>
+<li>Reorganizing directories</li>
+<li>Before major documentation releases</li>
+<li>Periodically (monthly recommended)</li>
+</ul>
+<p><strong>Tools:</strong></p>
+<pre><code class="language-bash"># Find markdown links in docs (fallback heuristic)
+rg -n &quot;\\]\\([^)]*\\.md\\)&quot; docs/
+
+# Check for markdown link targets ending in .md
+find docs/ -name &quot;*.md&quot; -exec rg -n &quot;\\]\\([^)]*\\.md\\)&quot; {} \;
+</code></pre>
+<h3>External Links</h3>
+<p><strong>Check external links:</strong></p>
+<ul>
+<li>Before major releases</li>
+<li>Periodically (quarterly recommended)</li>
+<li>When referenced projects release major versions</li>
+</ul>
+<p><strong>Document known issues:</strong></p>
+<ul>
+<li>If external links are temporarily broken, add note in document</li>
+<li>Consider Internet Archive links for important references</li>
+</ul>
+<hr>
+<h2>Cross-References Best Practices</h2>
+<h3>When to Cross-Reference</h3>
+<p><strong>Always link when:</strong></p>
+<ul>
+<li>Mentioning another document&#39;s topic</li>
+<li>Referring to concepts defined elsewhere</li>
+<li>Directing users to more detail</li>
+<li>Building documentation hierarchy</li>
+</ul>
+<p><strong>Example:</strong></p>
+<pre><code class="language-markdown">ICN uses Tokio for its actor runtime. For details on actor communication 
+patterns, see [Architecture Overview](./architecture/README.md).
+
+For API usage examples, see the [Developer Guide](./guides/developer/README.md).
+</code></pre>
+<h3>Cross-Reference Format</h3>
+<p><strong>Use descriptive link text:</strong></p>
+<ul>
+<li>✅ <code>[Architecture Overview](./architecture/README.md)</code></li>
+<li>❌ <code>[here](./architecture/README.md)</code></li>
+<li>❌ <code>[click here](./architecture/README.md)</code></li>
+</ul>
+<p><strong>Include section anchors when relevant:</strong></p>
+<ul>
+<li>✅ <code>[Trust Graph Computation](./ARCHITECTURE.md#trust-graph)</code></li>
+<li>✅ <code>[API Versioning Strategy](./reference/api/api-versioning.md#semver-approach)</code></li>
+</ul>
+<hr>
+<h2>Documentation Quality Checklist</h2>
+<p>Before committing new documentation:</p>
+<ul>
+<li><input disabled="" type="checkbox"> <strong>Location</strong>: File is in correct category directory</li>
+<li><input disabled="" type="checkbox"> <strong>Naming</strong>: Follows naming conventions (lowercase-with-hyphens.md)</li>
+<li><input disabled="" type="checkbox"> <strong>README</strong>: Category README updated if needed</li>
+<li><input disabled="" type="checkbox"> <strong>INDEX</strong>: docs/INDEX.md updated if major document</li>
+<li><input disabled="" type="checkbox"> <strong>Links</strong>: All internal links use relative paths</li>
+<li><input disabled="" type="checkbox"> <strong>Links</strong>: All internal links verified to exist</li>
+<li><input disabled="" type="checkbox"> <strong>Cross-refs</strong>: Key concepts link to detailed docs</li>
+<li><input disabled="" type="checkbox"> <strong>Code examples</strong>: Tested and working</li>
+<li><input disabled="" type="checkbox"> <strong>File paths</strong>: Rust paths verified (icn/crates/...)</li>
+<li><input disabled="" type="checkbox"> <strong>Commands</strong>: Build/test commands verified</li>
+<li><input disabled="" type="checkbox"> <strong>Metadata</strong>: Date and version at top if relevant</li>
+<li><input disabled="" type="checkbox"> <strong>Formatting</strong>: Markdown properly formatted</li>
+<li><input disabled="" type="checkbox"> <strong>Spelling</strong>: Spell-checked</li>
+<li><input disabled="" type="checkbox"> <strong>Grammar</strong>: Proofread</li>
+</ul>
+<hr>
+<h2>Metadata Standards</h2>
+<h3>Document Headers</h3>
+<p><strong>Include at top of significant documents:</strong></p>
+<pre><code class="language-markdown"># Document Title
+
+Brief one-line description.
+
+**Last Updated**: YYYY-MM-DD  
+**Version**: X.Y  
+**Status**: Draft | Active | Superseded | Archived
+
+---
+</code></pre>
+<p><strong>Fields:</strong></p>
+<ul>
+<li><strong>Last Updated</strong>: Date of last significant change (YYYY-MM-DD)</li>
+<li><strong>Version</strong>: Semantic version or simple incrementing number</li>
+<li><strong>Status</strong>: Current status (Draft, Active, Superseded, Archived)</li>
+</ul>
+<h3>Status Values</h3>
+<ul>
+<li><strong>Draft</strong>: Work in progress, not yet authoritative</li>
+<li><strong>Active</strong>: Current, authoritative documentation</li>
+<li><strong>Superseded</strong>: Replaced by newer document (link to replacement)</li>
+<li><strong>Archived</strong>: Historical, no longer applicable</li>
+</ul>
+<hr>
+<h2>Review Cycles</h2>
+<h3>Quarterly Reviews</h3>
+<p><strong>Every 3 months, review:</strong></p>
+<ol>
+<li>Core documentation (ARCHITECTURE.md, GETTING_STARTED.md, etc.)</li>
+<li>Guide accuracy and completeness</li>
+<li>API reference alignment with code</li>
+<li>Broken links and outdated references</li>
+<li>Archive candidates</li>
+</ol>
+<h3>Before Major Releases</h3>
+<p><strong>Documentation tasks:</strong></p>
+<ol>
+<li>Update all version references</li>
+<li>Verify all guides and examples</li>
+<li>Check API documentation completeness</li>
+<li>Update CHANGELOG.md</li>
+<li>Review and update INDEX.md</li>
+<li>Archive completed phase documentation</li>
+</ol>
+<hr>
+<h2>Common Mistakes to Avoid</h2>
+<p>❌ <strong>Don&#39;t:</strong></p>
+<ul>
+<li>Save docs to project root (except core files)</li>
+<li>Use absolute paths in links</li>
+<li>Leave broken internal links</li>
+<li>Create orphaned documents (no links to them)</li>
+<li>Duplicate information without cross-refs</li>
+<li>Use ambiguous file names (e.g., <code>notes.md</code>)</li>
+<li>Forget to update category READMEs</li>
+</ul>
+<p>✅ <strong>Do:</strong></p>
+<ul>
+<li>Use docs/ category structure</li>
+<li>Use relative paths in links</li>
+<li>Verify links before committing</li>
+<li>Link new docs from INDEX.md or category README</li>
+<li>Cross-reference instead of duplicating</li>
+<li>Use descriptive, specific file names</li>
+<li>Keep READMEs up to date</li>
+</ul>
+<hr>
+<h2>Contact &amp; Questions</h2>
+<p>For questions about documentation organization:</p>
+<ul>
+<li><strong>Create an issue</strong>: Label with <code>documentation</code></li>
+<li><strong>Ask in PR</strong>: Tag reviewers for guidance</li>
+<li><strong>Update this guide</strong>: Submit PR with improvements</li>
+</ul>
+<hr>
+<h2>Version History</h2>
+<ul>
+<li><strong>1.0</strong> (2026-02-10): Initial maintenance guide created during Phase 2D reorganization</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

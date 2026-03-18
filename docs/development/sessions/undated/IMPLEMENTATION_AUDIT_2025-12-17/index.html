@@ -1,0 +1,708 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Implementation Audit - December 17, 2025 | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>development</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>sessions</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>undated</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>IMPLEMENTATION AUDIT 2025 12 17</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/development/sessions/undated/IMPLEMENTATION_AUDIT_2025-12-17.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Implementation Audit - December 17, 2025</h1>
+<h2>Executive Summary</h2>
+<p><strong>Audit Date:</strong> 2025-12-17<br><strong>Audit Type:</strong> Comprehensive codebase review<br><strong>Purpose:</strong> Verify actual implementation status vs. documentation claims</p>
+<hr>
+<h2>Core Infrastructure ✅</h2>
+<h3>Identity Layer (icn-identity)</h3>
+<ul>
+<li><strong>Status:</strong> ✅ FULLY IMPLEMENTED</li>
+<li><strong>Components:</strong><ul>
+<li>DID generation and management</li>
+<li>Ed25519/X25519 key pairs</li>
+<li>Keystore with encryption</li>
+<li>Multi-device support</li>
+<li>Certificate management</li>
+<li><strong>NEW:</strong> Post-quantum crypto integration (ML-DSA-65, ML-KEM-768)</li>
+<li>Hybrid signature verification</li>
+</ul>
+</li>
+<li><strong>Tests:</strong> Passing</li>
+<li><strong>API:</strong> Exposed via gateway <code>/v1/identity/*</code></li>
+</ul>
+<h3>Network Layer (icn-net)</h3>
+<ul>
+<li><strong>Status:</strong> ✅ FULLY IMPLEMENTED</li>
+<li><strong>Components:</strong><ul>
+<li>QUIC transport with TLS 1.3</li>
+<li>mDNS peer discovery</li>
+<li>DID-TLS binding</li>
+<li>Session management</li>
+<li>Message encryption (SignedEnvelope, EncryptedEnvelope)</li>
+</ul>
+</li>
+<li><strong>Tests:</strong> Passing</li>
+<li><strong>Integration:</strong> Wired into supervisor</li>
+</ul>
+<h3>Gossip Protocol (icn-gossip)</h3>
+<ul>
+<li><strong>Status:</strong> ✅ FULLY IMPLEMENTED</li>
+<li><strong>Components:</strong><ul>
+<li>Push/pull anti-entropy</li>
+<li>Bloom filter synchronization</li>
+<li>Vector clocks for causality</li>
+<li>Topic-based subscriptions</li>
+<li>Access control (Public, Private, TrustGated)</li>
+<li>Notification callbacks</li>
+</ul>
+</li>
+<li><strong>Tests:</strong> 30+ integration tests passing</li>
+<li><strong>Integration:</strong> Wired into supervisor</li>
+</ul>
+<h3>Trust Graph (icn-trust)</h3>
+<ul>
+<li><strong>Status:</strong> ✅ FULLY IMPLEMENTED</li>
+<li><strong>Components:</strong><ul>
+<li>Edge-weighted trust computation</li>
+<li>Transitive trust calculation</li>
+<li>Multi-graph support (participation, reputation, disputes)</li>
+<li>Trust attestation primitives</li>
+</ul>
+</li>
+<li><strong>Tests:</strong> Passing</li>
+<li><strong>API:</strong> Exposed via gateway <code>/v1/trust/*</code></li>
+</ul>
+<h3>Mutual Credit Ledger (icn-ledger)</h3>
+<ul>
+<li><strong>Status:</strong> ✅ FULLY IMPLEMENTED</li>
+<li><strong>Components:</strong><ul>
+<li>Double-entry bookkeeping</li>
+<li>Merkle-DAG for entries</li>
+<li>Credit limit enforcement</li>
+<li>Entry quarantine for conflicts</li>
+<li>Gossip-based sync (<code>ledger:sync</code> topic)</li>
+<li>Balance calculations</li>
+</ul>
+</li>
+<li><strong>Tests:</strong> 50+ tests passing</li>
+<li><strong>API:</strong> Exposed via gateway <code>/v1/ledger/*</code></li>
+</ul>
+<h3>Contract Language (icn-ccl)</h3>
+<ul>
+<li><strong>Status:</strong> ✅ FULLY IMPLEMENTED</li>
+<li><strong>Components:</strong><ul>
+<li>AST-based interpreter</li>
+<li>Capability system (ReadLedger, WriteLedger, ReadTrust)</li>
+<li>Fuel metering</li>
+<li>Contract registry</li>
+<li>Governance integration</li>
+<li>Dispute primitives</li>
+</ul>
+</li>
+<li><strong>Tests:</strong> Passing</li>
+<li><strong>API:</strong> Contracts invoked via governance and compute</li>
+</ul>
+<h3>Storage Layer (icn-store)</h3>
+<ul>
+<li><strong>Status:</strong> ✅ FULLY IMPLEMENTED</li>
+<li><strong>Components:</strong><ul>
+<li>Sled-based KV store</li>
+<li>Prefix-based namespacing</li>
+<li>Atomic operations</li>
+<li>Batch writes</li>
+</ul>
+</li>
+<li><strong>Tests:</strong> Passing</li>
+<li><strong>Integration:</strong> Used by all actors</li>
+</ul>
+<h3>Observability (icn-obs)</h3>
+<ul>
+<li><strong>Status:</strong> ✅ FULLY IMPLEMENTED</li>
+<li><strong>Components:</strong><ul>
+<li>Prometheus metrics</li>
+<li>Structured logging (tracing)</li>
+<li>Health endpoints</li>
+</ul>
+</li>
+<li><strong>API:</strong> <code>/metrics</code>, <code>/health</code>, <code>/readiness</code>, <code>/liveness</code></li>
+</ul>
+<hr>
+<h2>Advanced Features ✅</h2>
+<h3>Governance System (icn-governance)</h3>
+<ul>
+<li><strong>Status:</strong> ✅ FULLY IMPLEMENTED</li>
+<li><strong>Components:</strong><ul>
+<li>Governance domains with hierarchies</li>
+<li>Proposal creation and lifecycle</li>
+<li>Voting primitives (Simple, Quadratic, Ranked, Delegated)</li>
+<li>Vote tallying and finalization</li>
+<li>Amendment support</li>
+<li>Appeal mechanisms</li>
+<li>Steward management (registration, status, bonds, attestations)</li>
+</ul>
+</li>
+<li><strong>Tests:</strong> Passing</li>
+<li><strong>API:</strong> Exposed via gateway <code>/v1/governance/*</code></li>
+<li><strong>UI:</strong> Dashboard exists (<code>pilot-ui/index.html</code>, governance sections)</li>
+</ul>
+<h3>Distributed Compute (icn-compute)</h3>
+<ul>
+<li><strong>Status:</strong> ✅ FULLY IMPLEMENTED</li>
+<li><strong>Components:</strong><ul>
+<li>Task submission and scheduling</li>
+<li>Trust-weighted executor selection</li>
+<li>Deterministic execution with fuel limits</li>
+<li>Result verification</li>
+<li>Task cancellation</li>
+<li>Metrics collection</li>
+</ul>
+</li>
+<li><strong>Tests:</strong> Passing</li>
+<li><strong>API:</strong> Exposed via gateway <code>/v1/compute/*</code></li>
+<li><strong>Integration:</strong> Wired into supervisor</li>
+</ul>
+<h3>Cooperative Management (icn-cooperative)</h3>
+<ul>
+<li><strong>Status:</strong> ✅ FULLY IMPLEMENTED</li>
+<li><strong>Components:</strong><ul>
+<li>Cooperative creation and lifecycle</li>
+<li>Member management</li>
+<li>Role-based permissions</li>
+<li>Settings management</li>
+<li>Statistics tracking</li>
+</ul>
+</li>
+<li><strong>Tests:</strong> Passing</li>
+<li><strong>API:</strong> Exposed via gateway <code>/v1/coops/*</code></li>
+<li><strong>UI:</strong> Dashboard exists with coop management</li>
+</ul>
+<h3>Community Features (icn-community)</h3>
+<ul>
+<li><strong>Status:</strong> ✅ FULLY IMPLEMENTED</li>
+<li><strong>Components:</strong><ul>
+<li>Community lifecycle (founding, active, suspended, dissolved)</li>
+<li>Membership management</li>
+<li>Resource allocation</li>
+<li>Community store (Sled-based)</li>
+</ul>
+</li>
+<li><strong>Tests:</strong> Passing</li>
+<li><strong>Integration:</strong> Used by gateway</li>
+</ul>
+<h3>Federation System (icn-federation)</h3>
+<ul>
+<li><strong>Status:</strong> ✅ FULLY IMPLEMENTED</li>
+<li><strong>Components:</strong><ul>
+<li>Federation lifecycle (proposed, active, suspended, dissolved)</li>
+<li>Member cooperative management</li>
+<li>Governance coordination</li>
+<li>Federation store</li>
+</ul>
+</li>
+<li><strong>Tests:</strong> Passing</li>
+<li><strong>API:</strong> Exposed via gateway <code>/v1/federation/*</code></li>
+</ul>
+<hr>
+<h2>Security &amp; Privacy ✅</h2>
+<h3>Post-Quantum Cryptography (icn-crypto-pq)</h3>
+<ul>
+<li><strong>Status:</strong> ✅ FULLY IMPLEMENTED</li>
+<li><strong>Components:</strong><ul>
+<li>ML-DSA-65 (FIPS 204 signature)</li>
+<li>ML-KEM-768 (FIPS 203 key encapsulation)</li>
+<li>Hybrid signature support</li>
+<li>SDIS integration for quantum-resistant identity</li>
+</ul>
+</li>
+<li><strong>Tests:</strong> Passing</li>
+<li><strong>Integration:</strong> Used by icn-identity and icn-steward</li>
+</ul>
+<h3>Privacy Layer (icn-privacy)</h3>
+<ul>
+<li><strong>Status:</strong> ✅ FULLY IMPLEMENTED</li>
+<li><strong>Components:</strong><ul>
+<li>Consent management</li>
+<li>Data retention policies</li>
+<li>Audit log generation</li>
+<li>Privacy store (Sled-based)</li>
+</ul>
+</li>
+<li><strong>Tests:</strong> Passing</li>
+<li><strong>Integration:</strong> Used by gateway</li>
+</ul>
+<h3>Security Module (icn-security)</h3>
+<ul>
+<li><strong>Status:</strong> ✅ FULLY IMPLEMENTED</li>
+<li><strong>Components:</strong><ul>
+<li>Rate limiting (token bucket, IP-based)</li>
+<li>Security headers (CSP, HSTS, etc.)</li>
+<li>CORS configuration</li>
+<li>JWT authentication</li>
+<li>Byzantine misbehavior detection</li>
+</ul>
+</li>
+<li><strong>Tests:</strong> Passing</li>
+<li><strong>Integration:</strong> Middleware in gateway</li>
+</ul>
+<h3>Zero-Knowledge Proofs (icn-zkp)</h3>
+<ul>
+<li><strong>Status:</strong> ✅ FULLY IMPLEMENTED</li>
+<li><strong>Components:</strong><ul>
+<li>Bulletproofs for range proofs</li>
+<li>Commitment schemes</li>
+<li>Balance proof generation</li>
+<li>Proof verification</li>
+</ul>
+</li>
+<li><strong>Tests:</strong> Passing</li>
+<li><strong>Integration:</strong> Used for privacy-preserving balance proofs</li>
+</ul>
+<hr>
+<h2>SDIS (Secure Decentralized Identity System) ✅</h2>
+<h3>Core SDIS (icn-steward)</h3>
+<ul>
+<li><strong>Status:</strong> ✅ FULLY IMPLEMENTED</li>
+<li><strong>Components:</strong><ul>
+<li>Steward registration and lifecycle</li>
+<li>Attestation issuance and tracking</li>
+<li>Bond management (deposits, slashing)</li>
+<li>Reputation scoring</li>
+<li>Jurisdiction support</li>
+<li>Recovery mechanisms</li>
+<li>VUI (Voice User Interface) registry</li>
+<li>Profile management with PQ crypto</li>
+</ul>
+</li>
+<li><strong>Tests:</strong> Passing (including steward_integration.rs)</li>
+<li><strong>API:</strong> Exposed via gateway <code>/v1/sdis/*</code> and <code>/v1/steward/*</code></li>
+</ul>
+<h3>Gateway SDIS API (icn-gateway/src/api/sdis/)</h3>
+<ul>
+<li><strong>Status:</strong> ✅ FULLY IMPLEMENTED</li>
+<li><strong>Endpoints:</strong><ul>
+<li>Simple enrollment (<code>POST /v1/sdis/enrollment/simple</code>)</li>
+<li>Level 1/2 verification (<code>POST /v1/sdis/verify/level1</code>, <code>level2</code>)</li>
+<li>Ephemeral key generation (<code>POST /v1/sdis/ephemeral</code>)</li>
+<li>Recovery mechanisms (<code>POST /v1/sdis/recovery/*</code>)</li>
+<li>Anchor management (<code>POST /v1/sdis/anchor/*</code>)</li>
+<li>QR code generation and verification</li>
+</ul>
+</li>
+<li><strong>Tests:</strong> sdis_integration.rs passing</li>
+</ul>
+<h3>Gateway Steward API (icn-gateway/src/api/steward/)</h3>
+<ul>
+<li><strong>Status:</strong> ✅ FULLY IMPLEMENTED</li>
+<li><strong>Endpoints:</strong><ul>
+<li><code>POST /v1/steward</code> - Register as steward</li>
+<li><code>GET /v1/steward/{id}</code> - Get steward details</li>
+<li><code>GET /v1/steward/by-did/{did}</code> - Lookup by DID</li>
+<li><code>GET /v1/steward</code> - List stewards (with filters)</li>
+<li><code>GET /v1/steward/attesters</code> - List active attesters</li>
+<li><code>PUT /v1/steward/{id}/status</code> - Update status (suspend/reinstate/retire/revoke)</li>
+<li><code>POST /v1/steward/{id}/retire</code> - Self-service retirement</li>
+<li><code>POST /v1/steward/{id}/extend-term</code> - Extend term</li>
+<li><code>POST /v1/steward/{id}/bond/add</code> - Add bond</li>
+<li><code>POST /v1/steward/{id}/bond/slash</code> - Slash bond (governance)</li>
+<li><code>POST /v1/steward/{id}/attestation</code> - Record attestation</li>
+<li><code>POST /v1/steward/{id}/dispute</code> - Record dispute</li>
+<li><code>POST /v1/steward/{id}/dispute-won</code> - Record dispute won</li>
+</ul>
+</li>
+<li><strong>Tests:</strong> steward_integration.rs passing</li>
+</ul>
+<h3>SDIS UI (web/pilot-ui)</h3>
+<ul>
+<li><strong>Status:</strong> ✅ FULLY IMPLEMENTED</li>
+<li><strong>Pages:</strong><ul>
+<li><code>sdis-enrollment.html</code> - Enrollment flow</li>
+<li><code>sdis-identity.html</code> - Identity management</li>
+<li><code>sdis-proofs.html</code> - Proof generation and verification</li>
+<li><code>sdis-recovery.html</code> - Recovery mechanisms</li>
+<li><code>steward-dashboard.html</code> - Steward management interface</li>
+</ul>
+</li>
+<li><strong>Integration:</strong> Connected to gateway API</li>
+</ul>
+<hr>
+<h2>Economic Features ✅</h2>
+<h3>Ledger Features</h3>
+<ul>
+<li><p><strong>Recurring Payments:</strong> ✅ IMPLEMENTED</p>
+<ul>
+<li>Store: Sled-based</li>
+<li>Scheduler: Background task running</li>
+<li>API: <code>/v1/recurring-payments/*</code> (CRUD + processing)</li>
+<li>Tests: recurring_payments_integration.rs passing</li>
+</ul>
+</li>
+<li><p><strong>Escrow:</strong> ✅ IMPLEMENTED</p>
+<ul>
+<li>Store: Sled-based</li>
+<li>Lifecycle: Created → Funded → Released/Refunded/Disputed</li>
+<li>API: <code>/v1/escrow/*</code> (create, fund, release, refund, dispute)</li>
+<li>Tests: Integrated into gateway tests</li>
+</ul>
+</li>
+<li><p><strong>Budgets:</strong> ✅ IMPLEMENTED</p>
+<ul>
+<li>Store: Sled-based</li>
+<li>Types: Departmental, project, personal</li>
+<li>API: <code>/v1/budgets/*</code> (CRUD + spend tracking)</li>
+<li>Tests: Integrated into gateway tests</li>
+</ul>
+</li>
+<li><p><strong>Credit Limits:</strong> ✅ IMPLEMENTED</p>
+<ul>
+<li>Per-member limits</li>
+<li>Global safety rails</li>
+<li>Automatic enforcement in ledger</li>
+</ul>
+</li>
+</ul>
+<h3>Dispute Resolution</h3>
+<ul>
+<li><strong>Status:</strong> ✅ IMPLEMENTED IN CCL</li>
+<li><strong>Components:</strong><ul>
+<li>Dispute primitives in icn-ccl/src/disputes.rs</li>
+<li>Dispute tracking in contracts</li>
+<li>Resolution mechanisms</li>
+<li>Evidence submission</li>
+</ul>
+</li>
+<li><strong>Integration:</strong> Used by governance and escrow</li>
+</ul>
+<hr>
+<h2>Client SDKs &amp; UIs</h2>
+<h3>TypeScript SDK (sdk/typescript)</h3>
+<ul>
+<li><strong>Status:</strong> ✅ FULLY IMPLEMENTED</li>
+<li><strong>Components:</strong><ul>
+<li>Client wrapper for all gateway APIs</li>
+<li>WebSocket support</li>
+<li>Type definitions</li>
+</ul>
+</li>
+<li><strong>Build:</strong> Compiles successfully</li>
+<li><strong>Tests:</strong> Not audited (separate test suite)</li>
+</ul>
+<h3>React Native SDK (sdk/react-native)</h3>
+<ul>
+<li><strong>Status:</strong> ✅ FULLY IMPLEMENTED</li>
+<li><strong>Components:</strong><ul>
+<li>Mobile client with all APIs</li>
+<li>Offline queue manager</li>
+<li>Hybrid wallet (PQ crypto support)</li>
+<li>QR code support (join, contact, SDIS enrollment)</li>
+<li>Hooks for all features:<ul>
+<li>SDIS hooks (enrollment, recovery, proofs)</li>
+<li>Steward hooks</li>
+<li>Membership hooks</li>
+<li>Charter hooks</li>
+<li>Constitutional hooks</li>
+<li>Governance dashboard hooks</li>
+<li>Economic hooks</li>
+<li>Device hooks</li>
+<li>Notification hooks</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><strong>Tests:</strong> ✅ 202 tests passing (7 test suites)</li>
+<li><strong>Build:</strong> Compiles successfully</li>
+</ul>
+<h3>Pilot UI (web/pilot-ui)</h3>
+<ul>
+<li><strong>Status:</strong> ✅ FULLY IMPLEMENTED</li>
+<li><strong>Pages:</strong><ul>
+<li><code>index.html</code> - Main dashboard</li>
+<li><code>sdis-enrollment.html</code> - SDIS enrollment</li>
+<li><code>sdis-identity.html</code> - Identity management</li>
+<li><code>sdis-proofs.html</code> - Proof verification</li>
+<li><code>sdis-recovery.html</code> - Account recovery</li>
+<li><code>steward-dashboard.html</code> - Steward interface</li>
+<li><code>offline.html</code> - Offline support</li>
+</ul>
+</li>
+<li><strong>Features:</strong><ul>
+<li>PWA support with service worker</li>
+<li>Offline storage</li>
+<li>Transaction filtering</li>
+<li>Member management</li>
+<li>Governance dashboard</li>
+<li>Ledger operations</li>
+</ul>
+</li>
+<li><strong>Tests:</strong> Playwright E2E tests exist</li>
+</ul>
+<hr>
+<h2>Binaries &amp; Tools</h2>
+<h3>icnd (Daemon)</h3>
+<ul>
+<li><strong>Status:</strong> ✅ FULLY IMPLEMENTED</li>
+<li><strong>Location:</strong> <code>icn/bins/icnd/</code></li>
+<li><strong>Components:</strong><ul>
+<li>Supervisor spawns all actors</li>
+<li>Actors: Network, Gossip, Ledger, Governance, Compute, Gateway</li>
+<li>Graceful shutdown</li>
+<li>Metrics exposure</li>
+</ul>
+</li>
+<li><strong>Integration:</strong> Production-ready</li>
+</ul>
+<h3>icnctl (CLI)</h3>
+<ul>
+<li><strong>Status:</strong> ✅ FULLY IMPLEMENTED</li>
+<li><strong>Commands:</strong><ul>
+<li><code>status</code> - Node status</li>
+<li><code>identity</code> - Identity management</li>
+<li><code>backup</code> / <code>restore</code> - Disaster recovery</li>
+<li><code>upgrade-pq</code> - Post-quantum key upgrade</li>
+</ul>
+</li>
+<li><strong>Build:</strong> Compiles successfully</li>
+</ul>
+<hr>
+<h2>Gap Analysis</h2>
+<h3>❌ <strong>Actually Missing Components</strong></h3>
+<ol>
+<li><p><strong>Mobile App Binary:</strong></p>
+<ul>
+<li>React Native SDK exists ✅</li>
+<li>Mobile app example/binary <strong>DOES NOT EXIST</strong> ❌</li>
+<li><strong>Need:</strong> <code>mobile-app/</code> directory with React Native app using the SDK</li>
+</ul>
+</li>
+<li><p><strong>Web Dashboard Binary:</strong></p>
+<ul>
+<li>Pilot UI HTML exists ✅</li>
+<li>Not packaged as deployable application ⚠️</li>
+<li><strong>Need:</strong> Proper build pipeline (Vite/Webpack) and deployment config</li>
+</ul>
+</li>
+<li><p><strong>End-to-End Integration Tests:</strong></p>
+<ul>
+<li>Unit tests: ✅ Comprehensive</li>
+<li>Integration tests: ✅ Per-crate</li>
+<li><strong>Full system E2E tests: ❌ MISSING</strong></li>
+<li><strong>Need:</strong> Tests that spawn daemon + gateway + UI and verify full flows</li>
+</ul>
+</li>
+<li><p><strong>Production Deployment Configs:</strong></p>
+<ul>
+<li>Kubernetes yamls exist in <code>deploy/</code> ✅</li>
+<li>Docker compose exists ✅</li>
+<li><strong>Actual deployment guide: ⚠️ INCOMPLETE</strong></li>
+<li><strong>Need:</strong> Step-by-step production deployment docs</li>
+</ul>
+</li>
+<li><p><strong>Network Protocol Versioning:</strong></p>
+<ul>
+<li>Protocol exists ✅</li>
+<li><strong>Version negotiation: ❌ MISSING</strong></li>
+<li><strong>Need:</strong> Protocol version handshake for network upgrades</li>
+</ul>
+</li>
+<li><p><strong>Backup/Restore Testing:</strong></p>
+<ul>
+<li>CLI commands exist ✅</li>
+<li><strong>Actual backup/restore tests: ❌ MISSING</strong></li>
+<li><strong>Need:</strong> Integration tests for disaster recovery</li>
+</ul>
+</li>
+<li><p><strong>Upgrade Coordination:</strong></p>
+<ul>
+<li><strong>Status:</strong> ❌ NOT IMPLEMENTED</li>
+<li><strong>Need:</strong> Coordinated protocol upgrades across network</li>
+<li><strong>Components Missing:</strong><ul>
+<li>Version announcement gossip</li>
+<li>Rolling upgrade orchestration</li>
+<li>Backward compatibility layer</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p><strong>Federation UI:</strong></p>
+<ul>
+<li>Backend API exists ✅</li>
+<li><strong>UI for federation management: ❌ MISSING</strong></li>
+<li><strong>Need:</strong> Pages in pilot-ui for federation operations</li>
+</ul>
+</li>
+<li><p><strong>Commons/Jurisdiction UI:</strong></p>
+<ul>
+<li>Backend API exists ✅</li>
+<li><strong>UI for commons management: ⚠️ INCOMPLETE</strong></li>
+<li><strong>Need:</strong> Dedicated pages for jurisdiction and capability management</li>
+</ul>
+</li>
+<li><p><strong>Monitoring Dashboard:</strong></p>
+<ul>
+<li>Metrics exposed ✅</li>
+<li><strong>Grafana dashboards: ❌ MISSING</strong></li>
+<li><strong>Need:</strong> Pre-built dashboards for operators</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h2>Documentation Status</h2>
+<h3>✅ <strong>Complete Documentation</strong></h3>
+<ul>
+<li><code>docs/ARCHITECTURE.md</code> - Comprehensive</li>
+<li><code>docs/GETTING_STARTED.md</code> - Up to date</li>
+<li><code>docs/production-hardening.md</code> - Detailed</li>
+<li><code>docs/governance-primitives.md</code> - Complete</li>
+<li><code>docs/scheduler-evolution-plan.md</code> - Detailed</li>
+<li><code>CLAUDE.md</code> (this file) - Accurate</li>
+<li>Per-crate READMEs - Present</li>
+</ul>
+<h3>⚠️ <strong>Documentation Gaps</strong></h3>
+<ul>
+<li><strong>API Reference:</strong> No OpenAPI/Swagger spec</li>
+<li><strong>SDK Examples:</strong> Limited examples in SDK directories</li>
+<li><strong>Deployment Guide:</strong> Incomplete production deployment steps</li>
+<li><strong>Operator Manual:</strong> Missing runbook for production operations</li>
+<li><strong>Upgrade Guide:</strong> No documented upgrade procedures</li>
+</ul>
+<hr>
+<h2>Test Coverage Summary</h2>
+<pre><code>✅ Core Infrastructure:      1134+ tests passing
+✅ Governance:                50+ tests passing
+✅ Compute:                   30+ tests passing
+✅ SDIS:                      20+ tests passing
+✅ Gateway:                   Integration tests passing
+✅ React Native SDK:          202 tests passing
+⚠️  TypeScript SDK:           Not audited
+⚠️  Pilot UI:                 Playwright tests exist but not run in CI
+❌ End-to-End:                No full system tests
+</code></pre>
+<hr>
+<h2>Critical Path to Production</h2>
+<h3>Phase 1: Fill Core Gaps (1-2 weeks)</h3>
+<ol>
+<li>✅ <del>Post-quantum integration</del> (COMPLETED TODAY)</li>
+<li>⬜ Add protocol version negotiation</li>
+<li>⬜ Implement upgrade coordination mechanism</li>
+<li>⬜ Add backup/restore integration tests</li>
+</ol>
+<h3>Phase 2: UI/UX Completion (1-2 weeks)</h3>
+<ol start="5">
+<li>⬜ Build mobile app binary using React Native SDK</li>
+<li>⬜ Package pilot-ui as deployable webapp</li>
+<li>⬜ Add federation management UI pages</li>
+<li>⬜ Add commons/jurisdiction management UI</li>
+</ol>
+<h3>Phase 3: Deployment &amp; Ops (1 week)</h3>
+<ol start="9">
+<li>⬜ Create Grafana monitoring dashboards</li>
+<li>⬜ Write production deployment guide</li>
+<li>⬜ Write operator runbook</li>
+<li>⬜ Add CI/CD for mobile app and UI</li>
+</ol>
+<h3>Phase 4: Documentation (1 week)</h3>
+<ol start="13">
+<li>⬜ Generate OpenAPI spec from gateway</li>
+<li>⬜ Write SDK usage examples</li>
+<li>⬜ Document upgrade procedures</li>
+<li>⬜ Create video tutorials</li>
+</ol>
+<h3>Phase 5: Testing (1 week)</h3>
+<ol start="17">
+<li>⬜ Write end-to-end system tests</li>
+<li>⬜ Load testing and benchmarking</li>
+<li>⬜ Security audit</li>
+<li>⬜ Penetration testing</li>
+</ol>
+<hr>
+<h2>Recommendations</h2>
+<h3>Immediate Actions (This Week)</h3>
+<ol>
+<li><strong>Protocol Versioning:</strong> Add version field to <code>SignedEnvelope</code> and handshake logic</li>
+<li><strong>Mobile App:</strong> Create <code>mobile-app/</code> directory with React Native app scaffolding</li>
+<li><strong>E2E Tests:</strong> Write one end-to-end test (signup → payment → governance vote)</li>
+</ol>
+<h3>Short-term (This Month)</h3>
+<ol start="4">
+<li><strong>Upgrade Coordination:</strong> Implement version announcement gossip and rolling upgrade</li>
+<li><strong>UI Completion:</strong> Add missing federation and commons management pages</li>
+<li><strong>Monitoring:</strong> Create basic Grafana dashboards for key metrics</li>
+</ol>
+<h3>Medium-term (Next Quarter)</h3>
+<ol start="7">
+<li><strong>Security Hardening:</strong> Professional security audit and penetration testing</li>
+<li><strong>Performance:</strong> Load testing and optimization for 1000+ node networks</li>
+<li><strong>Documentation:</strong> Complete API reference and operator manual</li>
+</ol>
+<hr>
+<h2>Conclusion</h2>
+<p><strong>Overall Status:</strong> 🟢 <strong>PILOT-READY</strong> (with caveats)</p>
+<p>The ICN codebase is <strong>remarkably complete</strong> for a distributed systems project. The core infrastructure, governance, compute, SDIS, and economic features are all fully implemented and tested. The React Native SDK is comprehensive with 202 passing tests.</p>
+<p><strong>However</strong>, the system is <strong>not yet production-ready</strong> due to:</p>
+<ul>
+<li>Missing mobile app binary</li>
+<li>Incomplete UI packaging</li>
+<li>No end-to-end tests</li>
+<li>No upgrade coordination</li>
+<li>Incomplete operational tooling</li>
+</ul>
+<p><strong>The good news:</strong> These are <strong>packaging and operational gaps</strong>, not architectural ones. The underlying technology is sound and well-tested.</p>
+<p><strong>Estimated time to production:</strong> 4-6 weeks of focused work on the critical path items above.</p>
+<hr>
+<p><strong>Audit Completed:</strong> 2025-12-17<br><strong>Next Review:</strong> After Phase 1 completion (2 weeks)</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

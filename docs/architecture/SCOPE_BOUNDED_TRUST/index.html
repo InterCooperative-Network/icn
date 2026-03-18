@@ -1,0 +1,473 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Scope-Bounded Trust: Structural Centralization Prevention | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>SCOPE BOUNDED TRUST</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/SCOPE_BOUNDED_TRUST.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Scope-Bounded Trust: Structural Centralization Prevention</h1>
+<p><strong>Status</strong>: Implemented (Wave 2)<br><strong>Last Updated</strong>: 2026-02-01<br><strong>Related Issues</strong>: <a href="https://github.com/InterCooperative-Network/icn/issues/1008" target="_blank" rel="noopener">#1008</a> (Wave 2)</p>
+<hr>
+<h2>Executive Summary</h2>
+<blockquote>
+<p><strong>Trust centralization is a political-economy problem, not just a technical one.</strong></p>
+</blockquote>
+<p>Scope-bounded trust provides <strong>structural prevention</strong> of trust centralization by limiting trust computation to organizational boundaries. This is NOT a damping mechanism (decay, transitive damping) but a fundamental architectural constraint.</p>
+<p><strong>Key Insight</strong>: By partitioning trust into scopes (cooperatives, federations, domains, topic classes), no single entity can accumulate cross-boundary trust power. This prevents &quot;super-nodes&quot; that dominate multiple organizational contexts.</p>
+<hr>
+<h2>Design Principle</h2>
+<blockquote>
+<p><strong>Scope must NOT enter kernel.</strong></p>
+</blockquote>
+<ul>
+<li><code>scope_id</code> lives ONLY in <code>icn-trust</code> (app crate)</li>
+<li>Kernel receives <code>ConstraintSet</code> with opaque constraint values</li>
+<li>Kernel must NOT pattern-match on scope</li>
+<li>Scope selection is performed by apps/PolicyOracles → output is pure <code>ConstraintSet</code></li>
+</ul>
+<p>This maintains the <strong>Meaning Firewall</strong>: the kernel enforces constraints without understanding their semantic origin.</p>
+<hr>
+<h2>Scope Types</h2>
+<p>Trust edges can be scoped to prevent centralization across organizational boundaries:</p>
+<h3>1. Cooperative Scope (<code>coop:&lt;id&gt;</code>)</h3>
+<p>Trust within a single cooperative.</p>
+<p><strong>Use Case</strong>: Member vouching, governance participation, work distribution within one coop.</p>
+<p><strong>Example</strong>: <code>coop:food-coop-123</code></p>
+<h3>2. Federation Scope (<code>federation:&lt;id&gt;</code>)</h3>
+<p>Trust within a federation of cooperatives.</p>
+<p><strong>Use Case</strong>: Inter-cooperative trade credit, federated dispute resolution, resource sharing.</p>
+<p><strong>Example</strong>: <code>federation:regional-food-network</code></p>
+<h3>3. Domain Scope (<code>domain:&lt;id&gt;</code>)</h3>
+<p>Trust within a governance domain.</p>
+<p><strong>Use Case</strong>: Specialized expertise (dispute mediators, auditors, technical stewards).</p>
+<p><strong>Example</strong>: <code>domain:dispute-resolution</code></p>
+<h3>4. Topic Class Scope (<code>topic:&lt;class&gt;</code>)</h3>
+<p>Trust within a service class (compute, storage, etc.).</p>
+<p><strong>Use Case</strong>: Provider reputation scoped to service type. Storage providers don&#39;t automatically gain compute trust.</p>
+<p><strong>Example</strong>: <code>topic:compute</code>, <code>topic:storage</code></p>
+<h3>5. Global Scope</h3>
+<p>Trust without scope boundaries (default for backward compatibility).</p>
+<p><strong>Use Case</strong>: Legacy edges, cross-scope foundational trust (rare).</p>
+<p><strong>Example</strong>: Foundational cooperative members, system architects.</p>
+<hr>
+<h2>Data Model</h2>
+<h3>ScopeId Type</h3>
+<pre><code class="language-rust">#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ScopeId {
+    /// Trust within a single cooperative
+    Cooperative(String),
+    /// Trust within a federation of cooperatives
+    Federation(String),
+    /// Trust within a governance domain
+    Domain(String),
+    /// Trust within a topic class (e.g., compute, storage)
+    TopicClass(String),
+    /// Trust without scope boundaries (default)
+    Global,
+}
+</code></pre>
+<h3>TrustEdge Extension</h3>
+<pre><code class="language-rust">pub struct TrustEdge {
+    pub source: Did,
+    pub target: Did,
+    pub labels: Vec&lt;String&gt;,
+    pub score: TrustScore,
+    pub evidence: Vec&lt;TrustEvidence&gt;,
+    pub expires_at: Option&lt;u64&gt;,
+    pub created_at: u64,
+    pub graph_type: TrustGraphType,
+    
+    /// Optional scope identifier (Wave 2)
+    /// Defaults to None (global scope) for backward compatibility
+    #[serde(default)]
+    pub scope_id: Option&lt;ScopeId&gt;,
+}
+</code></pre>
+<p><strong>Backward Compatibility</strong>: Existing edges have <code>scope_id: None</code>, treated as global scope.</p>
+<hr>
+<h2>Scope-Aware Trust Computation</h2>
+<h3>Method: <code>compute_trust_score_in_scope</code></h3>
+<pre><code class="language-rust">impl TrustGraph {
+    pub fn compute_trust_score_in_scope(
+        &amp;self,
+        target: &amp;Did,
+        scope: &amp;ScopeId,
+    ) -&gt; Result&lt;f64&gt; {
+        // Filter edges to scope before computing trust
+        let scoped_edges: Vec&lt;_&gt; = self
+            .get_outgoing_edges(&amp;self.own_did)?
+            .into_iter()
+            .filter(|e| match &amp;e.scope_id {
+                Some(edge_scope) =&gt; edge_scope == scope,
+                None =&gt; scope.is_global(),
+            })
+            .collect();
+        
+        // Compute trust using only scoped edges
+        // (direct + transitive within scope)
+        compute_score_from_edges(target, &amp;scoped_edges)
+    }
+}
+</code></pre>
+<h3>Scope Isolation</h3>
+<p>Trust computed in one scope DOES NOT affect trust in another scope:</p>
+<pre><code class="language-rust">// Alice has high trust in coop scope
+let coop_trust = graph.compute_trust_score_in_scope(
+    &amp;alice, 
+    &amp;ScopeId::cooperative(&quot;food-coop-123&quot;)
+)?;
+// coop_trust = 0.85
+
+// Alice has ZERO trust in federation scope
+let fed_trust = graph.compute_trust_score_in_scope(
+    &amp;alice,
+    &amp;ScopeId::federation(&quot;regional-network&quot;)
+)?;
+// fed_trust = 0.0
+
+// Scopes are isolated - no cross-contamination
+</code></pre>
+<hr>
+<h2>Centralization Metrics (Observational Only)</h2>
+<h3>Purpose</h3>
+<p>Metrics detect concentration of trust within a scope. They are <strong>observational only</strong> - they feed dashboards and governance, NOT automatic enforcement.</p>
+<h3>Metrics Flow</h3>
+<pre><code>Metrics ─► Governance ─► PolicyOracle ─► ConstraintSet ─► Kernel
+            │                              │
+       (human vote)                   (pure data)
+</code></pre>
+<p><strong>Never</strong>: <code>Metrics ─► Kernel</code> (direct enforcement)</p>
+<h3>CentralizationMetrics</h3>
+<pre><code class="language-rust">pub struct CentralizationMetrics {
+    /// Gini coefficient (0.0 = equal, 1.0 = one node has all trust)
+    pub gini_coefficient: f64,
+    
+    /// Number of nodes in scope
+    pub node_count: usize,
+    
+    /// Total inbound trust across all nodes
+    pub total_inbound_trust: f64,
+    
+    /// Fraction of trust held by top 10% of nodes
+    pub top_10_percent_share: f64,
+    
+    /// Betweenness centrality statistics
+    pub betweenness: BetweennessStats,
+}
+</code></pre>
+<h3>Gini Coefficient</h3>
+<p>Measures inequality in trust distribution:</p>
+<ul>
+<li><strong>0.0</strong>: Perfect equality (all nodes have equal trust)</li>
+<li><strong>1.0</strong>: Perfect inequality (one node has all trust)</li>
+</ul>
+<p><strong>Formula</strong>:</p>
+<pre><code>G = (2 * Σ(i * x_i)) / (n * Σ(x_i)) - (n + 1) / n
+</code></pre>
+<p>Where edges are sorted by inbound trust.</p>
+<h3>Top-N Concentration</h3>
+<p>Measures power concentration in top percentile:</p>
+<pre><code class="language-rust">let top_10 = metrics.top_10_percent_share;
+// If top_10 &gt; 0.5, top 10% of nodes hold &gt;50% of trust
+</code></pre>
+<h3>Betweenness Centrality</h3>
+<p>Measures &quot;bridge&quot; nodes that connect clusters:</p>
+<ul>
+<li><strong>High betweenness</strong>: Node is a bottleneck/bridge between groups</li>
+<li><strong>Low betweenness</strong>: Node is peripheral or in a dense cluster</li>
+</ul>
+<pre><code class="language-rust">pub struct BetweennessStats {
+    pub max: f64,       // Most central node
+    pub mean: f64,      // Average centrality
+    pub std_dev: f64,   // Variance in centrality
+}
+</code></pre>
+<h3>Computing Metrics</h3>
+<pre><code class="language-rust">use icn_trust::{TrustGraphAnalyzer, ScopeId};
+
+let analyzer = TrustGraphAnalyzer::default();
+let scope = ScopeId::cooperative(&quot;food-coop-123&quot;);
+
+let metrics = analyzer.compute_centralization_metrics(&amp;graph, &amp;scope)?;
+
+println!(&quot;Gini coefficient: {:.3}&quot;, metrics.gini_coefficient);
+println!(&quot;Top 10% hold: {:.1}% of trust&quot;, metrics.top_10_percent_share * 100.0);
+</code></pre>
+<hr>
+<h2>Bridge Nodes (Future Work)</h2>
+<p><strong>Status</strong>: Not yet implemented. Included here for design reference.</p>
+<p><strong>Bridge nodes</strong> span multiple scopes and could accumulate cross-scope influence. When implemented, bridges will require explicit declaration and stricter constraints.</p>
+<h3>Planned Design</h3>
+<ul>
+<li><code>BridgeDeclaration</code> struct with DID, scopes, timestamp, and signature</li>
+<li>Gossip topic <code>bridges:declarations</code> for discovery</li>
+<li>PolicyOracles apply stricter constraints (reduced rate limits, fewer topics)</li>
+<li>Governance policies can formalize &quot;approved bridges&quot; through voting</li>
+<li><strong>Firewall compliance</strong>: Bridge status → PolicyOracle → ConstraintSet (kernel never sees bridge semantics)</li>
+</ul>
+<p>See <a href="#merge-gate">Merge Gate</a> for tracking.</p>
+<hr>
+<h2>Migration Path</h2>
+<h3>Existing Edges</h3>
+<p>All existing edges default to <code>scope_id: None</code> (global scope):</p>
+<pre><code class="language-rust">// Old edge (pre-Wave 2)
+let edge = TrustEdge {
+    source: alice,
+    target: bob,
+    score: 0.8,
+    // scope_id is None (global)
+    ..
+};
+
+// Serde deserializes to scope_id: None
+// Global scope queries match these edges
+</code></pre>
+<h3>Adding Scope to Edges</h3>
+<p>Apps can add scope when creating new edges:</p>
+<pre><code class="language-rust">// Coop-scoped trust
+let edge = TrustEdge::new_scoped(
+    alice,
+    bob,
+    TrustScore::new(0.8)?,
+    TrustGraphType::Social,
+    ScopeId::cooperative(&quot;food-coop-123&quot;)
+);
+
+graph.add_edge(edge)?;
+</code></pre>
+<h3>Gradual Migration</h3>
+<ol>
+<li><strong>Phase 1</strong>: All edges global (current state)</li>
+<li><strong>Phase 2</strong>: New edges optionally scoped</li>
+<li><strong>Phase 3</strong>: Governance policies enforce scope on new edges</li>
+<li><strong>Phase 4</strong>: Legacy edges remain global or migrated by governance vote</li>
+</ol>
+<hr>
+<h2>Firewall Compliance Verification</h2>
+<h3>Rule 1: Kernel Must Not Import icn-trust</h3>
+<p>✅ <strong>Verified</strong>: Kernel crates (<code>icn-core</code>, <code>icn-kernel-api</code>, <code>icn-net</code>, <code>icn-gossip</code>) do NOT depend on <code>icn-trust</code>.</p>
+<p>CI enforcement: <code>.github/scripts/firewall_denylist.py</code></p>
+<h3>Rule 2: Kernel Only Accepts Pure Data</h3>
+<p>✅ <strong>Verified</strong>: Kernel entrypoints accept only:</p>
+<ul>
+<li><code>ConstraintSet</code> (pure data)</li>
+<li><code>CapabilityToken</code> (pure data)</li>
+<li><code>Did</code>, <code>Timestamp</code>, <code>Hash</code> (primitives)</li>
+</ul>
+<p>No <code>ScopeId</code> in kernel interfaces.</p>
+<h3>Rule 3: Semantic Lookup in PolicyOracle Only</h3>
+<p>✅ <strong>Verified</strong>: Trust score computation by scope happens in:</p>
+<ul>
+<li><code>icn-trust::TrustGraph::compute_trust_score_in_scope</code> (app layer)</li>
+<li>PolicyOracle implementations (app layer)</li>
+</ul>
+<p>Kernel NEVER calls scope-aware methods.</p>
+<h3>Rule 4: No Pattern-Matching on ConstraintSet.custom</h3>
+<p>✅ <strong>Verified</strong>: Kernel uses ONLY typed <code>ConstraintSet</code> fields:</p>
+<ul>
+<li><code>rate_limit: Option&lt;RateLimit&gt;</code></li>
+<li><code>max_topics: Option&lt;u32&gt;</code></li>
+<li>etc.</li>
+</ul>
+<p>Kernel does NOT check <code>custom</code> keys for scope-related branching.</p>
+<h3>Rule 5: Mechanism vs Policy</h3>
+<p>✅ <strong>Verified</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Kernel Owns (Mechanism)</th>
+<th>Apps Own (Value)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Rate Limiting</td>
+<td>Token bucket algorithm</td>
+<td>Messages/sec</td>
+</tr>
+<tr>
+<td>Topic Admission</td>
+<td>Max topics check</td>
+<td>Max value (25 vs 100)</td>
+</tr>
+<tr>
+<td>Connection Limits</td>
+<td>Max connections check</td>
+<td>Max value</td>
+</tr>
+<tr>
+<td>Scope Trust</td>
+<td>(none - not in kernel)</td>
+<td>Scope filtering</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Example: PolicyOracle Integration</h2>
+<pre><code class="language-rust">// In apps/trust/src/oracle.rs
+impl PolicyOracle for ScopedTrustOracle {
+    fn evaluate(&amp;self, request: &amp;PolicyRequest) -&gt; PolicyDecision {
+        // Extract scope from request context (app logic)
+        let scope = self.extract_scope_from_request(request)?;
+        
+        // Compute scope-bounded trust (app logic)
+        let trust_score = self.graph
+            .compute_trust_score_in_scope(&amp;request.actor, &amp;scope)?;
+        
+        // ═══════════════════════════════════════════════════════
+        // Semantic logic ENDS here. Below is pure data.
+        // ═══════════════════════════════════════════════════════
+        
+        // Translate trust score to constraints (pure data)
+        let rate_limit = if trust_score &gt;= 0.7 {
+            RateLimit::new(200, 50) // Federated
+        } else if trust_score &gt;= 0.4 {
+            RateLimit::new(100, 25) // Partner
+        } else {
+            RateLimit::new(20, 5)   // Known
+        };
+        
+        PolicyDecision::allow_with(
+            ConstraintSet::new()
+                .with_rate_limit(rate_limit),
+        )
+    }
+}
+</code></pre>
+<p><strong>Kernel Enforcement</strong> (mechanism only):</p>
+<pre><code class="language-rust">// In icn-core (kernel)
+fn apply_constraints(actor: &amp;Did, constraints: &amp;ConstraintSet) {
+    if let Some(limit) = constraints.rate_limit {
+        self.rate_limiter.apply(actor, limit);
+        // Kernel doesn&#39;t know WHY limit is 200/50 vs 20/5
+    }
+}
+</code></pre>
+<hr>
+<h2>Governance Integration</h2>
+<h3>Metrics → Governance</h3>
+<p>Centralization metrics trigger governance discussions:</p>
+<ol>
+<li><strong>Dashboard</strong> displays Gini coefficient per scope</li>
+<li><strong>Alert</strong> if <code>gini &gt; 0.7</code> (high inequality)</li>
+<li><strong>Proposal</strong> created: &quot;Limit top 10% trust share to 40%&quot;</li>
+<li><strong>Vote</strong> by cooperative members</li>
+<li><strong>PolicyOracle</strong> updated to enforce new limits</li>
+</ol>
+<h3>PolicyOracle → Enforcement</h3>
+<pre><code class="language-rust">// After governance vote, PolicyOracle enforces limit
+impl PolicyOracle for GovernanceTrustOracle {
+    fn evaluate(&amp;self, request: &amp;PolicyRequest) -&gt; PolicyDecision {
+        let scope = self.extract_scope(request)?;
+        let metrics = self.analyzer.compute_centralization_metrics(&amp;self.graph, &amp;scope)?;
+        
+        // Governance policy: reject if Gini &gt; 0.7
+        if metrics.gini_coefficient &gt; 0.7 {
+            return PolicyDecision::deny(
+                &quot;Trust centralization exceeds cooperative policy limit&quot;
+            );
+        }
+        
+        // Otherwise, standard constraints
+        PolicyDecision::allow()
+    }
+}
+</code></pre>
+<p><strong>Firewall Holds</strong>: Governance policy → PolicyOracle → ConstraintSet. Kernel sees only opaque allow/deny.</p>
+<hr>
+<h2>Research Directions (Phase 4)</h2>
+<h3>Inbound Trust Saturation Cap</h3>
+<p>Prevent any single node from accumulating unbounded trust:</p>
+<pre><code>effective_trust = Σ edges[0..N] + Σ edges[N..] * decay^(i-N)
+</code></pre>
+<p>Where:</p>
+<ul>
+<li>First N edges count fully</li>
+<li>Subsequent edges decay exponentially</li>
+<li>Prevents &quot;super-nodes&quot; even with many incoming edges</li>
+</ul>
+<p><strong>Status</strong>: Prototype in Phase 4 (optional)</p>
+<hr>
+<h2>Merge Gate</h2>
+<p><strong>Required for Wave 2 completion:</strong></p>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> <code>TrustEdge.scope_id</code> field exists</li>
+<li><input checked="" disabled="" type="checkbox"> Trust tests pass with scope</li>
+<li><input disabled="" type="checkbox"> Gossip tests pass with scope-aware admission</li>
+<li><input checked="" disabled="" type="checkbox"> No scope logic in kernel crates (firewall holds)</li>
+<li><input checked="" disabled="" type="checkbox"> Metrics exposed but not auto-enforcing</li>
+<li><input disabled="" type="checkbox"> Bridge node declaration exists (observational only)</li>
+</ul>
+<p><strong>Current Status</strong>: 4/6 complete (documentation phase)</p>
+<hr>
+<h2>References</h2>
+<ul>
+<li><strong>Wave 1</strong>: <a href="https://github.com/InterCooperative-Network/icn/issues/1007" target="_blank" rel="noopener">#1007</a> - Firewall Contract</li>
+<li><strong>Wave 2</strong>: <a href="https://github.com/InterCooperative-Network/icn/issues/1008" target="_blank" rel="noopener">#1008</a> - Scope-Bounded Trust (this)</li>
+<li><strong>Firewall Architecture</strong>: <code>docs/architecture/KERNEL_APP_SEPARATION.md</code></li>
+<li><strong>Trust Graph Design</strong>: <code>icn/crates/icn-trust/src/lib.rs</code></li>
+</ul>
+<hr>
+<h2>Authors</h2>
+<ul>
+<li>Implementation: GitHub Copilot (2026-02-01)</li>
+<li>Design Review: ICN Core Team</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

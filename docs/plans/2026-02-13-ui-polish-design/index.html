@@ -1,0 +1,675 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>UI Polish: Conference-Ready Demo — Implementation Plan | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>plans</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>2026 02 13 ui polish design</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/plans/2026-02-13-ui-polish-design.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>UI Polish: Conference-Ready Demo — Implementation Plan</h1>
+<blockquote>
+<p><strong>For Claude:</strong> REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.</p>
+</blockquote>
+<p><strong>Goal:</strong> Make the Pilot UI demo conference-ready with human-readable names instead of raw DIDs across login, transactions, and governance flows.</p>
+<p><strong>Architecture:</strong> Client-side name cache in app.js resolves DIDs to display names via the existing <code>GET /v1/members/{coop_id}/{did}</code> endpoint. A new <code>PUT /v1/members/{coop_id}/{did}/profile</code> backend endpoint enables name editing. Demo seed script creates 4 named members with transactions.</p>
+<p><strong>Tech Stack:</strong> Vanilla JS (app.js ~6,300 lines), Rust/actix-web (icn-gateway), bash (demo scripts)</p>
+<hr>
+<h2>Task 1: Backend — Add PUT profile endpoint</h2>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>icn/crates/icn-gateway/src/api/members.rs</code> (add <code>update_member_profile</code> handler)</li>
+<li>Modify: <code>icn/crates/icn-gateway/src/server.rs:995</code> (register route)</li>
+<li>Modify: <code>icn/crates/icn-gateway/src/commons_mgr.rs</code> (add <code>update_display_name</code> method)</li>
+</ul>
+<h3>Step 1: Add <code>update_display_name</code> to CommonsManager</h3>
+<p>In <code>icn/crates/icn-gateway/src/commons_mgr.rs</code>, add after <code>get_holder_by_did</code> (line ~364):</p>
+<pre><code class="language-rust">/// Update the display name for a holder identified by DID
+pub async fn update_display_name(&amp;self, did: &amp;Did, display_name: String) -&gt; Result&lt;()&gt; {
+    let did_str = did.to_string();
+    let mut holder = self.store.get_holder_by_did(&amp;did_str)?
+        .ok_or_else(|| anyhow::anyhow!(&quot;No holder found for DID: {did_str}&quot;))?;
+    holder.set_display_name(display_name);
+    self.store.put_holder(&amp;holder)?;
+    Ok(())
+}
+</code></pre>
+<h3>Step 2: Add PUT handler in members.rs</h3>
+<p>In <code>icn/crates/icn-gateway/src/api/members.rs</code>, add after the existing <code>get_member_profile</code> handler:</p>
+<pre><code class="language-rust">use actix_web::put;
+
+/// Request body for updating member profile
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct UpdateProfileRequest {
+    /// Display name to set
+    pub display_name: String,
+}
+
+/// PUT /v1/members/{coop_id}/{did}/profile - Update member profile
+///
+/// Allows a member to update their own display name.
+/// JWT `sub` must match the DID being updated (self-service only).
+#[put(&quot;/members/{coop_id}/{did}/profile&quot;)]
+pub async fn update_member_profile(
+    http_req: HttpRequest,
+    path: web::Path&lt;(String, String)&gt;,
+    body: web::Json&lt;UpdateProfileRequest&gt;,
+    coop_manager: web::Data&lt;Arc&lt;CoopManager&gt;&gt;,
+    commons_manager: web::Data&lt;Arc&lt;CommonsManager&gt;&gt;,
+) -&gt; Result&lt;HttpResponse&gt; {
+    let (coop_id, did_str) = path.into_inner();
+
+    // Parse DID
+    let did = did_str
+        .parse::&lt;Did&gt;()
+        .map_err(|e| GatewayError::BadRequest(format!(&quot;Invalid DID: {e}&quot;)))?;
+
+    // Auth: JWT sub must match the DID being edited
+    let claims = get_claims(&amp;http_req)
+        .ok_or_else(|| GatewayError::Unauthorized(&quot;Authentication required&quot;.to_string()))?;
+    let caller_did: Did = claims.sub.parse()
+        .map_err(|e| GatewayError::Unauthorized(format!(&quot;Invalid caller DID: {e}&quot;)))?;
+    if caller_did != did {
+        return Err(GatewayError::Forbidden(&quot;Can only update your own profile&quot;.to_string()));
+    }
+
+    // Verify member exists in coop
+    let coop = coop_manager.get_coop(&amp;coop_id).await?;
+    if !coop.members.iter().any(|m| m.did == did) {
+        return Err(GatewayError::NotFound(&quot;Member not found in cooperative&quot;.to_string()));
+    }
+
+    // Validate display name
+    let name = body.display_name.trim().to_string();
+    if name.is_empty() || name.len() &gt; 100 {
+        return Err(GatewayError::BadRequest(
+            &quot;Display name must be 1-100 characters&quot;.to_string(),
+        ));
+    }
+
+    // Update (creates holder record if needed via get_or_create pattern)
+    commons_manager.update_display_name(&amp;did, name.clone()).await
+        .map_err(|e| GatewayError::Internal(format!(&quot;Failed to update display name: {e}&quot;)))?;
+
+    Ok(HttpResponse::Ok().json(serde_json::json!({
+        &quot;did&quot;: did_str,
+        &quot;display_name&quot;: name
+    })))
+}
+</code></pre>
+<h3>Step 3: Register the route in server.rs</h3>
+<p>In <code>icn/crates/icn-gateway/src/server.rs</code>, find line 995:</p>
+<pre><code class="language-rust">.service(api::members::get_member_profile)
+</code></pre>
+<p>Add the PUT route right after:</p>
+<pre><code class="language-rust">.service(api::members::get_member_profile)
+.service(api::members::update_member_profile)
+</code></pre>
+<h3>Step 4: Verify it compiles</h3>
+<p>Run: <code>cd icn &amp;&amp; cargo check -p icn-gateway</code>
+Expected: success (exit 0)</p>
+<h3>Step 5: Write test</h3>
+<p>Add to the <code>#[cfg(test)] mod tests</code> in <code>members.rs</code>:</p>
+<pre><code class="language-rust">#[actix_web::test]
+async fn test_update_member_profile() {
+    let coop_manager = Arc::new(CoopManager::new());
+    let commons_manager = create_test_commons_manager();
+
+    let coop_id = &quot;test-coop&quot;;
+    let keypair = icn_identity::KeyPair::generate().unwrap();
+    let did = keypair.did().clone();
+    let did_str = did.to_string();
+    let timestamp = icn_time::current_timestamp_secs();
+
+    coop_manager
+        .create_coop(coop_id.to_string(), &quot;Test&quot;.to_string(), did.clone(), timestamp)
+        .await
+        .unwrap();
+
+    // Create a holder record so update_display_name can find it
+    commons_manager
+        .create_holder_from_anchor(&amp;hex::encode([0u8; 32]), &amp;did)
+        .await
+        .unwrap();
+
+    // Create JWT claims for auth
+    let jwt_secret = b&quot;test-secret-32-characters-long!!&quot;;
+    let token = crate::middleware::create_test_token(&amp;did_str, jwt_secret);
+
+    let app = test::init_service(
+        App::new()
+            .app_data(web::Data::new(coop_manager))
+            .app_data(web::Data::new(commons_manager))
+            .service(update_member_profile)
+            .wrap(crate::middleware::JwtAuth::new(jwt_secret.to_vec())),
+    )
+    .await;
+
+    let req = test::TestRequest::put()
+        .uri(&amp;format!(&quot;/members/{coop_id}/{did_str}/profile&quot;))
+        .set_json(serde_json::json!({&quot;display_name&quot;: &quot;Test User&quot;}))
+        .insert_header((&quot;Authorization&quot;, format!(&quot;Bearer {token}&quot;)))
+        .to_request();
+    let resp = test::call_service(&amp;app, req).await;
+
+    assert_eq!(resp.status(), 200);
+}
+</code></pre>
+<blockquote>
+<p><strong>Note</strong>: The test helper <code>create_test_token</code> may need to be added or adjusted to match actual JWT creation patterns in the gateway test suite. Check <code>icn-gateway/src/middleware.rs</code> for existing test helpers. If none exist, use the same JWT encoding the demo scripts use. The test can be simplified to just <code>test::TestRequest::put()</code> without auth if the route is registered outside the auth middleware scope for testing.</p>
+</blockquote>
+<h3>Step 6: Run tests</h3>
+<p>Run: <code>cd icn &amp;&amp; cargo test -p icn-gateway -- members</code>
+Expected: all member tests pass</p>
+<h3>Step 7: Commit</h3>
+<pre><code class="language-bash">git add icn/crates/icn-gateway/src/api/members.rs icn/crates/icn-gateway/src/server.rs icn/crates/icn-gateway/src/commons_mgr.rs
+git commit -m &quot;feat(gateway): add PUT /v1/members/{coop_id}/{did}/profile endpoint&quot;
+</code></pre>
+<hr>
+<h2>Task 2: Frontend — Name resolution layer</h2>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>web/pilot-ui/app.js</code> (add name cache + resolveName helper near top)</li>
+</ul>
+<h3>Step 1: Add name cache to state initialization</h3>
+<p>Find the <code>state</code> object initialization in <code>app.js</code> (near the top, around line 10-30). Add:</p>
+<pre><code class="language-javascript">nameCache: new Map(), // Map&lt;did, {name: string, fetchedAt: number}&gt;
+</code></pre>
+<h3>Step 2: Add resolveName and resolveNames helpers</h3>
+<p>Add after the <code>truncateDid</code> function (line ~334):</p>
+<pre><code class="language-javascript">// Name resolution with caching (5-minute TTL)
+const NAME_CACHE_TTL = 5 * 60 * 1000;
+
+async function resolveName(did) {
+    if (!did) return &#39;Unknown&#39;;
+
+    // Check cache first
+    const cached = state.nameCache.get(did);
+    if (cached &amp;&amp; (Date.now() - cached.fetchedAt) &lt; NAME_CACHE_TTL) {
+        return cached.name;
+    }
+
+    // Current user shortcut
+    if (did === state.did &amp;&amp; state.userName) {
+        return state.userName;
+    }
+
+    // Fetch from API
+    try {
+        const profile = await apiRequest(&#39;GET&#39;, `/members/${encodeURIComponent(state.coopId)}/${encodeURIComponent(did)}`);
+        const name = profile.name || truncateDid(did);
+        state.nameCache.set(did, { name, fetchedAt: Date.now() });
+        return name;
+    } catch (e) {
+        // Fallback to truncated DID
+        const fallback = truncateDid(did);
+        state.nameCache.set(did, { name: fallback, fetchedAt: Date.now() });
+        return fallback;
+    }
+}
+
+async function resolveNames(dids) {
+    const unique = [...new Set(dids.filter(Boolean))];
+    await Promise.all(unique.map(did =&gt; resolveName(did)));
+    // After this call, all names are cached; callers can use getNameSync
+}
+
+// Synchronous name access (returns cached or truncated)
+function getNameSync(did) {
+    if (!did) return &#39;Unknown&#39;;
+    const cached = state.nameCache.get(did);
+    if (cached) return cached.name;
+    return truncateDid(did);
+}
+</code></pre>
+<h3>Step 3: Verify no syntax errors</h3>
+<p>Open <code>http://&lt;host&gt;:3000</code> in browser (or check via console). The app should still load and function exactly as before since no call sites have changed yet.</p>
+<h3>Step 4: Commit</h3>
+<pre><code class="language-bash">git add web/pilot-ui/app.js
+git commit -m &quot;feat(ui): add DID-to-name resolution layer with caching&quot;
+</code></pre>
+<hr>
+<h2>Task 3: Frontend — Wire name resolution into login flow</h2>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>web/pilot-ui/app.js</code> (login function + header display)</li>
+</ul>
+<h3>Step 1: Resolve current user&#39;s name on login</h3>
+<p>In the <code>login()</code> function (line ~530), after <code>elements.userDid.textContent = truncateDid(state.did);</code>, add:</p>
+<pre><code class="language-javascript">// Resolve display name for current user
+resolveName(state.did).then(name =&gt; {
+    state.userName = name;
+    elements.userDid.textContent = name;
+});
+</code></pre>
+<h3>Step 2: Add <code>state.userName</code> initialization</h3>
+<p>In the state object, add: <code>userName: null,</code></p>
+<h3>Step 3: Commit</h3>
+<pre><code class="language-bash">git add web/pilot-ui/app.js
+git commit -m &quot;feat(ui): resolve current user name on login&quot;
+</code></pre>
+<hr>
+<h2>Task 4: Frontend — Replace truncateDid in member dropdown</h2>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>web/pilot-ui/app.js</code> (lines 682-691, member dropdown population)</li>
+</ul>
+<h3>Step 1: Update member dropdown to show names</h3>
+<p>Find the <code>loadMembers()</code> function around line 682. Replace:</p>
+<pre><code class="language-javascript">option.textContent = truncateDid(member.did);
+</code></pre>
+<p>With:</p>
+<pre><code class="language-javascript">option.textContent = getNameSync(member.did) !== truncateDid(member.did)
+    ? `${getNameSync(member.did)} (${truncateDid(member.did)})`
+    : truncateDid(member.did);
+</code></pre>
+<h3>Step 2: Pre-resolve all member names before populating dropdown</h3>
+<p>Before the dropdown population loop (before <code>elements.recipient.innerHTML = ...</code>), add:</p>
+<pre><code class="language-javascript">// Pre-resolve all member names
+await resolveNames(members.map(m =&gt; m.did));
+</code></pre>
+<blockquote>
+<p><strong>Note</strong>: If <code>loadMembers()</code> is not already async, make it async.</p>
+</blockquote>
+<h3>Step 3: Commit</h3>
+<pre><code class="language-bash">git add web/pilot-ui/app.js
+git commit -m &quot;feat(ui): show member names in recipient dropdown&quot;
+</code></pre>
+<hr>
+<h2>Task 5: Frontend — Replace truncateDid in transaction displays</h2>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>web/pilot-ui/app.js</code> (lines 1049, 1264, 3384-3386, 3235)</li>
+</ul>
+<h3>Step 1: Update activity feed (line ~1049)</h3>
+<p>Replace:</p>
+<pre><code class="language-javascript">${isReceived ? &#39;From&#39; : &#39;To&#39;} ${truncateDid(other)}
+</code></pre>
+<p>With:</p>
+<pre><code class="language-javascript">${isReceived ? &#39;From&#39; : &#39;To&#39;} ${getNameSync(other)}
+</code></pre>
+<h3>Step 2: Update recent transactions (line ~1264)</h3>
+<p>Replace:</p>
+<pre><code class="language-javascript">${truncateDid(tx.from)} &amp;rarr; ${truncateDid(tx.to)}
+</code></pre>
+<p>With:</p>
+<pre><code class="language-javascript">${getNameSync(tx.from)} &amp;rarr; ${getNameSync(tx.to)}
+</code></pre>
+<h3>Step 3: Update transaction list rows (lines ~3384-3386)</h3>
+<p>Replace:</p>
+<pre><code class="language-javascript">&lt;div class=&quot;transaction-from&quot;&gt;${truncateDid(tx.from)}&lt;/div&gt;
+&lt;div class=&quot;transaction-arrow&quot;&gt;→&lt;/div&gt;
+&lt;div class=&quot;transaction-to&quot;&gt;${truncateDid(tx.to)}&lt;/div&gt;
+</code></pre>
+<p>With:</p>
+<pre><code class="language-javascript">&lt;div class=&quot;transaction-from&quot;&gt;${getNameSync(tx.from)}&lt;/div&gt;
+&lt;div class=&quot;transaction-arrow&quot;&gt;→&lt;/div&gt;
+&lt;div class=&quot;transaction-to&quot;&gt;${getNameSync(tx.to)}&lt;/div&gt;
+</code></pre>
+<h3>Step 4: Update transaction party display (line ~3235)</h3>
+<p>Replace:</p>
+<pre><code class="language-javascript">&lt;span class=&quot;did&quot;&gt;${truncateDid(isIncoming ? tx.from : tx.to)}&lt;/span&gt;
+</code></pre>
+<p>With:</p>
+<pre><code class="language-javascript">&lt;span class=&quot;did&quot;&gt;${getNameSync(isIncoming ? tx.from : tx.to)}&lt;/span&gt;
+</code></pre>
+<h3>Step 5: Pre-resolve names before rendering transactions</h3>
+<p>In the function that loads/renders transactions, before the render loop, add:</p>
+<pre><code class="language-javascript">// Pre-resolve all transaction party names
+const allDids = transactions.flatMap(tx =&gt; [tx.from, tx.to]);
+await resolveNames(allDids);
+</code></pre>
+<h3>Step 6: Commit</h3>
+<pre><code class="language-bash">git add web/pilot-ui/app.js
+git commit -m &quot;feat(ui): show member names in transaction displays&quot;
+</code></pre>
+<hr>
+<h2>Task 6: Frontend — Replace truncateDid in member lists and contributors</h2>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>web/pilot-ui/app.js</code> (lines 1242, 1298, 3280)</li>
+</ul>
+<h3>Step 1: Update top contributors (line ~1242)</h3>
+<p>Replace:</p>
+<pre><code class="language-javascript">&lt;span class=&quot;contributor-did&quot;&gt;${truncateDid(did)}&lt;/span&gt;
+</code></pre>
+<p>With:</p>
+<pre><code class="language-javascript">&lt;span class=&quot;contributor-did&quot;&gt;${getNameSync(did)}&lt;/span&gt;
+</code></pre>
+<h3>Step 2: Update member list item (line ~1298)</h3>
+<p>Replace:</p>
+<pre><code class="language-javascript">&lt;div class=&quot;member-did&quot; title=&quot;${escapeHtml(member.did)}&quot;&gt;${truncateDid(member.did)}&lt;/div&gt;
+</code></pre>
+<p>With:</p>
+<pre><code class="language-javascript">&lt;div class=&quot;member-did&quot; title=&quot;${escapeHtml(member.did)}&quot;&gt;${getNameSync(member.did)}&lt;/div&gt;
+</code></pre>
+<h3>Step 3: Update member card (line ~3280)</h3>
+<p>Replace:</p>
+<pre><code class="language-javascript">&lt;div class=&quot;member-did&quot;&gt;${truncateDid(member.did)}&lt;/div&gt;
+</code></pre>
+<p>With:</p>
+<pre><code class="language-javascript">&lt;div class=&quot;member-did&quot;&gt;${getNameSync(member.did)}&lt;/div&gt;
+</code></pre>
+<h3>Step 4: Commit</h3>
+<pre><code class="language-bash">git add web/pilot-ui/app.js
+git commit -m &quot;feat(ui): show member names in member lists and contributors&quot;
+</code></pre>
+<hr>
+<h2>Task 7: Frontend — Replace truncateDid in governance displays</h2>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>web/pilot-ui/app.js</code> (lines 777-859, proposal rendering)</li>
+</ul>
+<h3>Step 1: Add proposer name to proposal cards</h3>
+<p>In <code>renderProposalList</code> (line ~841), after the <code>proposal-header</code> div, add a proposer line:</p>
+<pre><code class="language-javascript">${proposal.proposer ? `&lt;div class=&quot;proposal-proposer&quot;&gt;Proposed by ${getNameSync(proposal.proposer)}&lt;/div&gt;` : &#39;&#39;}
+</code></pre>
+<h3>Step 2: Pre-resolve proposer names</h3>
+<p>At the start of <code>renderProposalList</code>, before the map:</p>
+<pre><code class="language-javascript">// Pre-resolve proposer names
+await resolveNames(proposals.map(p =&gt; p.proposer).filter(Boolean));
+</code></pre>
+<h3>Step 3: Commit</h3>
+<pre><code class="language-bash">git add web/pilot-ui/app.js
+git commit -m &quot;feat(ui): show proposer names in governance proposals&quot;
+</code></pre>
+<hr>
+<h2>Task 8: Frontend — Replace remaining truncateDid calls</h2>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>web/pilot-ui/app.js</code> (lines 531, 2262, 2424, 2611, 4077-4078, 4289, 4304, 4319, 5143, 5146, 3705)</li>
+</ul>
+<h3>Step 1: Header user DID (line ~531)</h3>
+<p>Already handled by Task 3 (login flow resolves name).</p>
+<h3>Step 2: Profile page DID (line ~2262)</h3>
+<p>Replace:</p>
+<pre><code class="language-javascript">document.getElementById(&#39;profile-did&#39;).textContent = truncateDid(state.did || &#39;did:icn:...&#39;);
+</code></pre>
+<p>With:</p>
+<pre><code class="language-javascript">document.getElementById(&#39;profile-did&#39;).textContent = state.userName || truncateDid(state.did || &#39;did:icn:...&#39;);
+</code></pre>
+<h3>Step 3: Service history peer (line ~2424)</h3>
+<p>Replace <code>truncateDid(peer)</code> with <code>getNameSync(peer)</code>.</p>
+<h3>Step 4: Service listing poster (line ~2611)</h3>
+<p>Replace <code>truncateDid(service.poster)</code> with <code>getNameSync(service.poster)</code>.</p>
+<h3>Step 5: Batch import preview (lines ~4077-4078)</h3>
+<p>Replace both <code>truncateDid(row.from)</code> and <code>truncateDid(row.to)</code> with <code>getNameSync(row.from)</code> and <code>getNameSync(row.to)</code>.</p>
+<h3>Step 6: Toast notifications (lines ~4289, 4304, 4319)</h3>
+<p>Replace <code>truncateDid(did)</code> with <code>getNameSync(did)</code> in all three toasts.</p>
+<h3>Step 7: Filter labels (lines ~5143, 5146)</h3>
+<p>Replace <code>truncateDid(filterState.fromDid)</code> and <code>truncateDid(filterState.toDid)</code> with <code>getNameSync(filterState.fromDid)</code> and <code>getNameSync(filterState.toDid)</code>.</p>
+<h3>Step 8: CSV import preview (line ~3705)</h3>
+<p>Replace <code>truncateDid(row.did)</code> with <code>getNameSync(row.did)</code>.</p>
+<h3>Step 9: Commit</h3>
+<pre><code class="language-bash">git add web/pilot-ui/app.js
+git commit -m &quot;feat(ui): replace all remaining truncateDid calls with name resolution&quot;
+</code></pre>
+<hr>
+<h2>Task 9: Frontend — Profile edit button in header</h2>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>web/pilot-ui/app.js</code> (header area near line 531)</li>
+<li>Modify: <code>web/pilot-ui/index.html</code> (add edit button element to header)</li>
+</ul>
+<h3>Step 1: Add edit button to HTML header</h3>
+<p>In <code>index.html</code>, find the user DID display element (likely <code>&lt;span id=&quot;user-did&quot;&gt;</code> or similar). Add an edit button next to it:</p>
+<pre><code class="language-html">&lt;button id=&quot;edit-name-btn&quot; class=&quot;btn-icon&quot; title=&quot;Edit display name&quot; style=&quot;display:none;&quot;&gt;✏️&lt;/button&gt;
+</code></pre>
+<h3>Step 2: Add edit name handler in app.js</h3>
+<p>After the login name resolution code, add:</p>
+<pre><code class="language-javascript">// Show edit button after login
+const editNameBtn = document.getElementById(&#39;edit-name-btn&#39;);
+if (editNameBtn) {
+    editNameBtn.style.display = &#39;inline-block&#39;;
+    editNameBtn.onclick = () =&gt; {
+        const currentName = state.userName || &#39;&#39;;
+        const newName = prompt(&#39;Enter your display name:&#39;, currentName);
+        if (newName !== null &amp;&amp; newName.trim() !== &#39;&#39;) {
+            apiRequest(&#39;PUT&#39;, `/members/${encodeURIComponent(state.coopId)}/${encodeURIComponent(state.did)}/profile`, {
+                display_name: newName.trim()
+            }).then(() =&gt; {
+                state.userName = newName.trim();
+                state.nameCache.set(state.did, { name: newName.trim(), fetchedAt: Date.now() });
+                elements.userDid.textContent = newName.trim();
+                showToast(&#39;Display name updated&#39;, &#39;success&#39;);
+            }).catch(err =&gt; {
+                showToast(&#39;Failed to update name: &#39; + err.message, &#39;error&#39;);
+            });
+        }
+    };
+}
+</code></pre>
+<h3>Step 3: Commit</h3>
+<pre><code class="language-bash">git add web/pilot-ui/app.js web/pilot-ui/index.html
+git commit -m &quot;feat(ui): add inline profile name editing&quot;
+</code></pre>
+<hr>
+<h2>Task 10: Demo seed — Create named members with transactions</h2>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>demo/scripts/run-tool-library-demo.sh</code> (Step 3b seed section, lines ~307-373)</li>
+</ul>
+<h3>Step 1: Expand seed section to create 4 named members</h3>
+<p>Replace the current single-recipient seed block (lines ~311-372) with a loop that creates 4 members, sets their display names, adds them to the coop, and creates transactions between them.</p>
+<p><strong>Pattern for each member:</strong></p>
+<pre><code class="language-bash"># Create identity
+MEMBER_DIR=$(mktemp -d /tmp/icn-demo-member-N.XXXXXX)
+MEMBER_DID=$(cd &quot;$ICN_DIR&quot; &amp;&amp; ICN_PASSPHRASE=demo123 $TARGET_DIR/release/icnctl \
+    -d &quot;$MEMBER_DIR&quot; id init 2&gt;/dev/null \
+    | grep -oE &#39;did:icn:[A-Za-z0-9]+&#39; | head -1 || true)
+
+# Add to cooperative
+curl -s -X POST &quot;$GATEWAY/v1/coops/$COOP_ID/members&quot; \
+    -H &quot;Authorization: Bearer $TOKEN&quot; \
+    -H &quot;Content-Type: application/json&quot; \
+    -d &quot;{\&quot;did\&quot;:\&quot;$MEMBER_DID\&quot;,\&quot;role\&quot;:\&quot;participant\&quot;}&quot; &gt;/dev/null 2&gt;&amp;1
+
+# Set display name (uses new PUT endpoint from Task 1)
+# Note: The PUT endpoint requires JWT sub == DID. For demo seeding,
+# we need a different approach. Option A: generate a token for each member.
+# Option B: Add an admin override to the PUT endpoint for seeding.
+# Simplest: Use the CommonsManager directly via a seed-specific endpoint
+# or use the GET endpoint which already reads from CommonsHolderRecord.
+#
+# PRAGMATIC APPROACH: Since the demo script has admin tokens, add a
+# query parameter ?admin=true or use a separate POST endpoint for seeding.
+# OR: Seed names via icnctl (if it supports set-display-name).
+#
+# SIMPLEST: Add display_name to the AddMemberRequest so names are set
+# when members are added to the coop. This is the least-effort path.
+</code></pre>
+<blockquote>
+<p><strong>IMPORTANT DECISION</strong>: The PUT profile endpoint requires self-auth (JWT sub == DID). For demo seeding, the simplest approach is to <strong>add an optional <code>display_name</code> field to <code>AddMemberRequest</code></strong> so names are set when the admin adds members. This avoids generating per-member JWTs during seeding.</p>
+</blockquote>
+<h3>Step 2: Add <code>display_name</code> to AddMemberRequest</h3>
+<p>In <code>icn/crates/icn-gateway/src/models.rs:103</code>:</p>
+<pre><code class="language-rust">pub struct AddMemberRequest {
+    pub did: String,
+    pub role: String,
+    #[serde(default)]
+    pub display_name: Option&lt;String&gt;,
+}
+</code></pre>
+<h3>Step 3: Wire display_name into add_member handler</h3>
+<p>In <code>icn/crates/icn-gateway/src/api/coops.rs:175</code>, after <code>add_member_atomic</code> succeeds, set display name if provided:</p>
+<pre><code class="language-rust">// Set display name if provided
+if let Some(name) = &amp;req.display_name {
+    if let Ok(commons) = commons_manager.as_ref() {
+        let _ = commons.update_display_name(&amp;did, name.clone()).await;
+    }
+}
+</code></pre>
+<blockquote>
+<p><strong>Note</strong>: The <code>add_member</code> handler needs <code>commons_manager</code> injected. Add it as a parameter.</p>
+</blockquote>
+<h3>Step 4: Update seed script with 4 named members</h3>
+<pre><code class="language-bash"># Member names for demo
+declare -a MEMBER_NAMES=(&quot;Sarah Chen&quot; &quot;Marcus Rivera&quot; &quot;Priya Patel&quot; &quot;James Okafor&quot;)
+declare -a MEMBER_DIDS=()
+
+for i in &quot;${!MEMBER_NAMES[@]}&quot;; do
+    NAME=&quot;${MEMBER_NAMES[$i]}&quot;
+    MEMBER_DIR=$(mktemp -d /tmp/icn-demo-member-$i.XXXXXX)
+    MEMBER_DID=$(cd &quot;$ICN_DIR&quot; &amp;&amp; ICN_PASSPHRASE=demo123 $TARGET_DIR/release/icnctl \
+        -d &quot;$MEMBER_DIR&quot; id init 2&gt;/dev/null \
+        | grep -oE &#39;did:icn:[A-Za-z0-9]+&#39; | head -1 || true)
+
+    if [ -n &quot;$MEMBER_DID&quot; ]; then
+        curl -s -X POST &quot;$GATEWAY/v1/coops/$COOP_ID/members&quot; \
+            -H &quot;Authorization: Bearer $TOKEN&quot; \
+            -H &quot;Content-Type: application/json&quot; \
+            -d &quot;{\&quot;did\&quot;:\&quot;$MEMBER_DID\&quot;,\&quot;role\&quot;:\&quot;participant\&quot;,\&quot;display_name\&quot;:\&quot;$NAME\&quot;}&quot; \
+            &gt;/dev/null 2&gt;&amp;1 &amp;&amp; echo -e &quot;  ${GREEN}✓${NC} Member: $NAME ($MEMBER_DID)&quot; || true
+        MEMBER_DIDS+=(&quot;$MEMBER_DID&quot;)
+    fi
+    rm -rf &quot;$MEMBER_DIR&quot;
+done
+
+# Set current user display name
+curl -s -X PUT &quot;$GATEWAY/v1/members/$COOP_ID/$CURRENT_DID/profile&quot; \
+    -H &quot;Authorization: Bearer $TOKEN&quot; \
+    -H &quot;Content-Type: application/json&quot; \
+    -d &#39;{&quot;display_name&quot;:&quot;Demo User&quot;}&#39; \
+    &gt;/dev/null 2&gt;&amp;1 &amp;&amp; echo -e &quot;  ${GREEN}✓${NC} Set current user name: Demo User&quot; || true
+
+# Create transactions between members
+if [ ${#MEMBER_DIDS[@]} -ge 2 ]; then
+    curl -s -X POST &quot;$GATEWAY/v1/ledger/$COOP_ID/payment&quot; \
+        -H &quot;Authorization: Bearer $TOKEN&quot; \
+        -H &quot;Content-Type: application/json&quot; \
+        -d &quot;{\&quot;from\&quot;:\&quot;$CURRENT_DID\&quot;,\&quot;to\&quot;:\&quot;${MEMBER_DIDS[0]}\&quot;,\&quot;amount\&quot;:3,\&quot;currency\&quot;:\&quot;hours\&quot;,\&quot;memo\&quot;:\&quot;Garden bed construction — built 4x8 raised bed\&quot;}&quot; \
+        &gt;/dev/null 2&gt;&amp;1 &amp;&amp; echo -e &quot;  ${GREEN}✓${NC} Transaction: Demo User → Sarah Chen (3 hrs)&quot; || true
+
+    curl -s -X POST &quot;$GATEWAY/v1/ledger/$COOP_ID/payment&quot; \
+        -H &quot;Authorization: Bearer $TOKEN&quot; \
+        -H &quot;Content-Type: application/json&quot; \
+        -d &quot;{\&quot;from\&quot;:\&quot;$CURRENT_DID\&quot;,\&quot;to\&quot;:\&quot;${MEMBER_DIDS[1]}\&quot;,\&quot;amount\&quot;:2,\&quot;currency\&quot;:\&quot;hours\&quot;,\&quot;memo\&quot;:\&quot;Tool maintenance — sharpened mower blades and pruning shears\&quot;}&quot; \
+        &gt;/dev/null 2&gt;&amp;1 &amp;&amp; echo -e &quot;  ${GREEN}✓${NC} Transaction: Demo User → Marcus Rivera (2 hrs)&quot; || true
+
+    curl -s -X POST &quot;$GATEWAY/v1/ledger/$COOP_ID/payment&quot; \
+        -H &quot;Authorization: Bearer $TOKEN&quot; \
+        -H &quot;Content-Type: application/json&quot; \
+        -d &quot;{\&quot;from\&quot;:\&quot;$CURRENT_DID\&quot;,\&quot;to\&quot;:\&quot;${MEMBER_DIDS[2]}\&quot;,\&quot;amount\&quot;:1,\&quot;currency\&quot;:\&quot;hours\&quot;,\&quot;memo\&quot;:\&quot;Workshop instruction — intro to power tools safety\&quot;}&quot; \
+        &gt;/dev/null 2&gt;&amp;1 &amp;&amp; echo -e &quot;  ${GREEN}✓${NC} Transaction: Demo User → Priya Patel (1 hr)&quot; || true
+fi
+</code></pre>
+<h3>Step 5: Run the full demo and verify names appear</h3>
+<p>Run: <code>./demo/scripts/run-tool-library-demo.sh</code></p>
+<p>Then open UI, log in, verify:</p>
+<ul>
+<li>Header shows &quot;Demo User&quot; instead of truncated DID</li>
+<li>Member dropdown shows &quot;Sarah Chen (did:icn:abc...)&quot; etc.</li>
+<li>Transaction history shows &quot;Demo User → Sarah Chen&quot; etc.</li>
+</ul>
+<h3>Step 6: Commit</h3>
+<pre><code class="language-bash">git add demo/scripts/run-tool-library-demo.sh icn/crates/icn-gateway/src/models.rs icn/crates/icn-gateway/src/api/coops.rs
+git commit -m &quot;feat(demo): seed 4 named members with transactions&quot;
+</code></pre>
+<hr>
+<h2>Task 11: Verification — Full demo e2e test</h2>
+<h3>Step 1: Reset and run demo</h3>
+<pre><code class="language-bash"># Kill any existing demo processes
+pkill icnd 2&gt;/dev/null || true
+pkill -f &quot;http.server&quot; 2&gt;/dev/null || true
+rm -rf .demo-data/
+
+# Run fresh demo
+./demo/scripts/run-tool-library-demo.sh
+</code></pre>
+<h3>Step 2: Verify three flows</h3>
+<p><strong>Flow 1: Login + Dashboard</strong></p>
+<ul>
+<li>Open UI at <code>http://&lt;host&gt;:3000</code></li>
+<li>Log in with displayed credentials</li>
+<li>Verify: Header shows &quot;Demo User&quot; (not truncated DID)</li>
+<li>Verify: Member list shows named members</li>
+<li>Verify: Contributor list shows names</li>
+</ul>
+<p><strong>Flow 2: Log Hours + Transaction</strong></p>
+<ul>
+<li>Select &quot;Sarah Chen (did:icn:...)&quot; from dropdown</li>
+<li>Log 2 hours with memo</li>
+<li>Verify: Transaction row shows &quot;Demo User → Sarah Chen&quot;</li>
+<li>Verify: Activity feed shows names</li>
+</ul>
+<p><strong>Flow 3: Governance</strong></p>
+<ul>
+<li>View proposals</li>
+<li>Verify: &quot;Proposed by Demo User&quot; appears on proposals</li>
+<li>Cast a vote</li>
+<li>Verify: Vote confirmation works</li>
+</ul>
+<h3>Step 3: Run automated tests</h3>
+<pre><code class="language-bash">cd icn &amp;&amp; cargo test -p icn-gateway
+./demo/scripts/quick-test.sh
+</code></pre>
+<h3>Step 4: Run pre-push gates</h3>
+<p>Use <code>/push</code> skill to verify fmt + clippy + push.</p>
+<hr>
+<h2>Out of Scope</h2>
+<ul>
+<li>SDIS enrollment UI</li>
+<li>Exchange/listings features</li>
+<li>Push notifications</li>
+<li>Offline/edge cases</li>
+<li>Invite flow</li>
+<li>Mobile responsive redesign</li>
+<li>Marketplace assignee dropdown (line 6212 already uses <code>display_name</code>)</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

@@ -1,0 +1,478 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Development Plan 2026 | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>development</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>sessions</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>undated</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>DEVELOPMENT PLAN 2026</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/development/sessions/undated/DEVELOPMENT_PLAN_2026.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Development Plan 2026</h1>
+<p><strong>Created</strong>: 2026-01-08
+<strong>Target</strong>: Pilot deployment with a real cooperative
+<strong>Author</strong>: Development planning based on comprehensive code review</p>
+<hr>
+<h2>Revised Assessment</h2>
+<p>The code review identified &quot;4,618 unwraps&quot; as a critical issue. <strong>This was misleading.</strong></p>
+<p>Actual breakdown:</p>
+<table>
+<thead>
+<tr>
+<th>Location</th>
+<th>Count</th>
+<th>%</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Test code</td>
+<td>4,323</td>
+<td>97.6%</td>
+</tr>
+<tr>
+<td>Production code</td>
+<td>107</td>
+<td>2.4%</td>
+</tr>
+</tbody></table>
+<p><strong>The codebase is in much better shape than initially assessed.</strong></p>
+<h3>Real Issues (Corrected)</h3>
+<table>
+<thead>
+<tr>
+<th>Issue</th>
+<th>Severity</th>
+<th>Blocking Pilot?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>107 production unwraps</td>
+<td>LOW</td>
+<td>No - mostly infallible ops</td>
+</tr>
+<tr>
+<td><code>block_in_place</code> in trust_mgr</td>
+<td>LOW</td>
+<td>No - correct Tokio pattern</td>
+</tr>
+<tr>
+<td>Low test coverage (icn-coop, icn-core)</td>
+<td>MEDIUM</td>
+<td>No - but risky to change</td>
+</tr>
+<tr>
+<td>No NAT traversal</td>
+<td>HIGH</td>
+<td><strong>Yes</strong> - LAN only currently</td>
+</tr>
+<tr>
+<td>No backup validation</td>
+<td>HIGH</td>
+<td><strong>Yes</strong> - data loss risk</td>
+</tr>
+<tr>
+<td>Empty icn-testkit</td>
+<td>LOW</td>
+<td>No - nice to have</td>
+</tr>
+<tr>
+<td>6 ignored integration tests</td>
+<td>MEDIUM</td>
+<td>No - known async issue</td>
+</tr>
+</tbody></table>
+<h3>Actual Pilot Blockers</h3>
+<ol>
+<li><strong>Network</strong>: ICN only works on LAN (mDNS). Need NAT traversal for internet.</li>
+<li><strong>Operations</strong>: No validated backup/restore. Unacceptable for real data.</li>
+<li><strong>Documentation</strong>: No runbooks for cooperative administrators.</li>
+<li><strong>Onboarding</strong>: No setup guide for new cooperatives.</li>
+</ol>
+<hr>
+<h2>Goal</h2>
+<p>Deploy ICN with a <strong>real cooperative</strong> for a 3-month pilot, with:</p>
+<ul>
+<li>Mutual credit ledger tracking real transactions</li>
+<li>Governance proposals for real decisions</li>
+<li>Trust relationships between real members</li>
+<li>Ability to operate over the internet (not just LAN)</li>
+</ul>
+<hr>
+<h2>Critical Path</h2>
+<pre><code>M1: Operations Foundation (3 weeks)
+         ↓
+M2: Network Connectivity (4 weeks)
+         ↓
+M3: Documentation &amp; Onboarding (2 weeks)
+         ↓
+M4: Pilot Deployment (ongoing)
+</code></pre>
+<p><strong>Total to pilot-ready: ~9 weeks</strong></p>
+<hr>
+<h2>Milestones</h2>
+<h3>Milestone 1: Operations Foundation</h3>
+<p><strong>Duration</strong>: 3 weeks
+<strong>Goal</strong>: Production-grade operations without data loss risk</p>
+<p>The current deployment runs but lacks operational safety nets. Before adding users with real data, we need backup validation and basic monitoring.</p>
+<h4>Tasks</h4>
+<ul>
+<li><input disabled="" type="checkbox"> Backup validation tests (#224) - 3 days<ul>
+<li>Automated backup/restore cycle in CI</li>
+<li>Verify ledger integrity after restore</li>
+<li>Test keystore recovery</li>
+</ul>
+</li>
+<li><input disabled="" type="checkbox"> Production runbooks (#230) - 4 days<ul>
+<li>Startup/shutdown procedures</li>
+<li>Backup/restore procedures</li>
+<li>Common troubleshooting</li>
+<li>Emergency procedures</li>
+</ul>
+</li>
+<li><input disabled="" type="checkbox"> Service Level Objectives (#220) - 2 days<ul>
+<li>Define availability targets</li>
+<li>Define data durability targets</li>
+<li>Alert thresholds</li>
+</ul>
+</li>
+<li><input disabled="" type="checkbox"> Secrets rotation runbook (#189) - 1 day<ul>
+<li>Document key rotation process</li>
+<li>Test rotation procedure</li>
+</ul>
+</li>
+</ul>
+<h4>Done When</h4>
+<ul>
+<li><input disabled="" type="checkbox"> CI runs backup/restore validation on every merge</li>
+<li><input disabled="" type="checkbox"> Runbooks exist for all common operations</li>
+<li><input disabled="" type="checkbox"> SLOs documented with corresponding alerts</li>
+<li><input disabled="" type="checkbox"> Successfully restored a backup on a fresh node</li>
+</ul>
+<hr>
+<h3>Milestone 2: Network Connectivity</h3>
+<p><strong>Duration</strong>: 4 weeks
+<strong>Goal</strong>: ICN nodes can connect over the internet, not just LAN</p>
+<p>Currently ICN uses mDNS for discovery, which only works on local networks. For a pilot with members in different locations, we need internet connectivity.</p>
+<h4>Tasks</h4>
+<ul>
+<li><input disabled="" type="checkbox"> NAT traversal with STUN/TURN (#471) - 2 weeks<ul>
+<li>Integrate STUN for hole-punching</li>
+<li>Add TURN relay fallback</li>
+<li>Test behind various NAT types</li>
+</ul>
+</li>
+<li><input disabled="" type="checkbox"> Bootstrap peer support - 3 days<ul>
+<li>Already partially implemented (supervisor parses <code>icn://</code> URLs)</li>
+<li>Add DNS resolution for hostnames</li>
+<li>Document bootstrap configuration</li>
+</ul>
+</li>
+<li><input disabled="" type="checkbox"> Connection resilience - 3 days<ul>
+<li>Reconnection on disconnect</li>
+<li>Handle network changes gracefully</li>
+</ul>
+</li>
+<li><input disabled="" type="checkbox"> Dynamic Bloom filter sizing (#472) - 2 days<ul>
+<li>Scale with network size</li>
+<li>Prevent saturation at scale</li>
+</ul>
+</li>
+</ul>
+<h4>Done When</h4>
+<ul>
+<li><input disabled="" type="checkbox"> Two nodes behind different NATs can connect</li>
+<li><input disabled="" type="checkbox"> Node survives network disconnection and reconnects</li>
+<li><input disabled="" type="checkbox"> Bootstrap peers work with DNS hostnames</li>
+<li><input disabled="" type="checkbox"> Tested with 10+ nodes across different networks</li>
+</ul>
+<hr>
+<h3>Milestone 3: Documentation &amp; Onboarding</h3>
+<p><strong>Duration</strong>: 2 weeks
+<strong>Goal</strong>: A cooperative can set up and use ICN without developer assistance</p>
+<h4>Tasks</h4>
+<ul>
+<li><input disabled="" type="checkbox"> Cooperative setup guide (#229) - 3 days<ul>
+<li>Node installation</li>
+<li>Identity creation</li>
+<li>Connecting to network</li>
+<li>Basic operations</li>
+</ul>
+</li>
+<li><input disabled="" type="checkbox"> API versioning strategy (#497) - 1 day<ul>
+<li>Document current API version</li>
+<li>Stability guarantees</li>
+</ul>
+</li>
+<li><input disabled="" type="checkbox"> User-facing feature documentation - 3 days<ul>
+<li>Ledger operations</li>
+<li>Governance proposals</li>
+<li>Trust management</li>
+</ul>
+</li>
+<li><input disabled="" type="checkbox"> Pilot onboarding materials - 2 days<ul>
+<li>Quickstart for pilot participants</li>
+<li>FAQ</li>
+<li>Support channels</li>
+</ul>
+</li>
+</ul>
+<h4>Done When</h4>
+<ul>
+<li><input disabled="" type="checkbox"> Non-developer can follow guide to join network</li>
+<li><input disabled="" type="checkbox"> All user-facing APIs documented</li>
+<li><input disabled="" type="checkbox"> Pilot participants have onboarding materials</li>
+<li><input disabled="" type="checkbox"> Support process defined</li>
+</ul>
+<hr>
+<h3>Milestone 4: Pilot Deployment</h3>
+<p><strong>Duration</strong>: Ongoing (3+ months)
+<strong>Goal</strong>: Real cooperative using ICN for real transactions</p>
+<h4>Tasks</h4>
+<ul>
+<li><input disabled="" type="checkbox"> Select pilot cooperative (#5) - 1 week<ul>
+<li>Identify candidate (worker coop, food coop, etc.)</li>
+<li>Assess technical capacity</li>
+<li>Define pilot scope</li>
+</ul>
+</li>
+<li><input disabled="" type="checkbox"> Initial deployment - 1 week<ul>
+<li>Set up infrastructure</li>
+<li>Onboard initial members</li>
+<li>Verify connectivity</li>
+</ul>
+</li>
+<li><input disabled="" type="checkbox"> Monitoring period - 2 weeks<ul>
+<li>Daily check-ins initially</li>
+<li>Address issues as they arise</li>
+<li>Gather feedback</li>
+</ul>
+</li>
+<li><input disabled="" type="checkbox"> Stabilization - ongoing<ul>
+<li>Fix bugs discovered in production</li>
+<li>Iterate on UX based on feedback</li>
+</ul>
+</li>
+</ul>
+<h4>Done When</h4>
+<ul>
+<li><input disabled="" type="checkbox"> Cooperative using ICN for real transactions</li>
+<li><input disabled="" type="checkbox"> 3 months of operation without critical failures</li>
+<li><input disabled="" type="checkbox"> Feedback collected and documented</li>
+<li><input disabled="" type="checkbox"> Decision made on broader rollout</li>
+</ul>
+<hr>
+<h2>Parallel Work</h2>
+<p>These can happen alongside the critical path by anyone with spare cycles:</p>
+<h3>Low-Risk Improvements</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Performance benchmark suite (#227) - establishes baseline</li>
+<li><input disabled="" type="checkbox"> Enhanced Grafana dashboards (#331) - better observability</li>
+<li><input disabled="" type="checkbox"> CLI improvements (#176-179) - developer experience</li>
+</ul>
+<h3>Test Infrastructure</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Multi-node test harness (#319) - enables better integration tests</li>
+<li><input disabled="" type="checkbox"> Fuzz testing for CCL parser (#228) - security hardening</li>
+<li><input disabled="" type="checkbox"> Enable ignored integration tests - requires async refactoring</li>
+</ul>
+<h3>Technical Debt</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Audit 107 production unwraps - most are likely fine</li>
+<li><input disabled="" type="checkbox"> Split config.rs into modules (#158) - code organization</li>
+<li><input disabled="" type="checkbox"> Increase icn-coop test coverage - safety for future changes</li>
+</ul>
+<h3>Security (Post-Pilot)</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Sybil resistance (#470) - important but not pilot-blocking</li>
+<li><input disabled="" type="checkbox"> Real ZKP circuits (#196-199) - current simulation is documented</li>
+<li><input disabled="" type="checkbox"> HSM/TPM keystore (#481) - enterprise feature</li>
+</ul>
+<hr>
+<h2>Risks</h2>
+<h3>1. NAT Traversal Complexity</h3>
+<p><strong>Risk</strong>: STUN/TURN integration takes longer than expected
+<strong>Mitigation</strong>:</p>
+<ul>
+<li>Start with well-tested libraries (libp2p has STUN)</li>
+<li>Fallback: pilot with VPN tunnel between locations
+<strong>Impact if realized</strong>: +2 weeks</li>
+</ul>
+<h3>2. Pilot Cooperative Availability</h3>
+<p><strong>Risk</strong>: Can&#39;t find a cooperative willing to pilot
+<strong>Mitigation</strong>:</p>
+<ul>
+<li>Start outreach during M1</li>
+<li>Have backup candidates</li>
+<li>Consider internal/simulated pilot first
+<strong>Impact if realized</strong>: Delay pilot start</li>
+</ul>
+<h3>3. Unknown Production Issues</h3>
+<p><strong>Risk</strong>: Real usage reveals problems not caught in testing
+<strong>Mitigation</strong>:</p>
+<ul>
+<li>Conservative SLOs initially</li>
+<li>Close monitoring first 2 weeks</li>
+<li>Fast response capability
+<strong>Impact if realized</strong>: Extended stabilization</li>
+</ul>
+<h3>4. Single Developer Bottleneck</h3>
+<p><strong>Risk</strong>: Illness, burnout, other commitments
+<strong>Mitigation</strong>:</p>
+<ul>
+<li>Document everything</li>
+<li>Keep milestones achievable</li>
+<li>Build in slack time
+<strong>Impact if realized</strong>: Schedule slip</li>
+</ul>
+<hr>
+<h2>Timeline</h2>
+<table>
+<thead>
+<tr>
+<th>Week</th>
+<th>Milestone</th>
+<th>Key Deliverable</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1-3</td>
+<td>M1: Operations</td>
+<td>Backup validation in CI</td>
+</tr>
+<tr>
+<td>4-7</td>
+<td>M2: Network</td>
+<td>NAT traversal working</td>
+</tr>
+<tr>
+<td>8-9</td>
+<td>M3: Docs</td>
+<td>Setup guide complete</td>
+</tr>
+<tr>
+<td>10+</td>
+<td>M4: Pilot</td>
+<td>Cooperative onboarded</td>
+</tr>
+</tbody></table>
+<p><strong>Target pilot start</strong>: ~Week 10 (late March 2026)</p>
+<hr>
+<h2>What&#39;s NOT in This Plan</h2>
+<p>Explicitly deferred to post-pilot:</p>
+<ol>
+<li><strong>Mobile SDK</strong> (#213-215) - web/CLI sufficient for pilot</li>
+<li><strong>Federation</strong> (#270, #268) - single-network pilot first</li>
+<li><strong>Multi-region deployment</strong> (#225) - overkill for pilot scale</li>
+<li><strong>HSM/TPM</strong> (#481) - enterprise security feature</li>
+<li><strong>Full ZKP implementation</strong> (#196-199) - simulated is documented</li>
+<li><strong>GitOps/ArgoCD</strong> (#191) - manual deployment fine for pilot</li>
+<li><strong>Blue-green deployments</strong> (#193) - downtime acceptable for pilot</li>
+</ol>
+<p>These become relevant for production scale, not pilot.</p>
+<hr>
+<h2>Success Criteria</h2>
+<p><strong>Pilot is successful if:</strong></p>
+<ol>
+<li>✅ Cooperative completes real transactions on ICN ledger</li>
+<li>✅ Governance proposals created and resolved</li>
+<li>✅ No data loss incidents</li>
+<li>✅ Members can operate with minimal support after onboarding</li>
+<li>✅ 3 months operation with &gt;95% uptime</li>
+<li>✅ Clear feedback collected for next iteration</li>
+</ol>
+<p><strong>Pilot teaches us:</strong></p>
+<ul>
+<li>What features cooperatives actually need</li>
+<li>What UX issues matter in practice</li>
+<li>What operational burden looks like</li>
+<li>Whether the architecture scales</li>
+</ul>
+<hr>
+<h2>Questions Answered</h2>
+<h3>1. What&#39;s the minimum viable state for pilot?</h3>
+<ul>
+<li>Working backup/restore (M1)</li>
+<li>Internet connectivity (M2)</li>
+<li>Basic documentation (M3)</li>
+<li>One willing cooperative (M4)</li>
+</ul>
+<h3>2. How do you phase the unwrap cleanup?</h3>
+<p><strong>Don&#39;t.</strong> Only 107 production unwraps exist, mostly in infallible operations. Not worth dedicated effort. Fix any that cause actual panics.</p>
+<h3>3. Is the blocking RwLock issue actually causing problems?</h3>
+<p><strong>No.</strong> The code uses <code>block_in_place</code> which is the correct Tokio pattern. It&#39;s documented as &quot;deprecated for async contexts&quot; but isn&#39;t breaking anything. Low priority.</p>
+<h3>4. What security gaps are pilot-blocking vs. nice-to-have?</h3>
+<ul>
+<li><strong>Pilot-blocking</strong>: None (three-layer security is solid)</li>
+<li><strong>Nice-to-have</strong>: Sybil resistance, HSM, real ZKP</li>
+<li><strong>Current state</strong>: Sufficient for trusted pilot participants</li>
+</ul>
+<h3>5. How many milestones to pilot?</h3>
+<p><strong>4 milestones</strong>, ~9 weeks of work. Could compress to 6-7 weeks if aggressive.</p>
+<hr>
+<h2>Next Actions</h2>
+<ol>
+<li><input disabled="" type="checkbox"> Create GitHub issues for M1 tasks if not exists</li>
+<li><input disabled="" type="checkbox"> Start backup validation work immediately</li>
+<li><input disabled="" type="checkbox"> Begin pilot cooperative outreach in parallel</li>
+<li><input disabled="" type="checkbox"> Update ROADMAP.md to align with this plan</li>
+</ol>
+<hr>
+<p><em>This plan prioritizes shipping a working pilot over perfection. Many &quot;issues&quot; from the code review are actually fine for pilot scale. We can iterate based on real feedback.</em></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

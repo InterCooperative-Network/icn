@@ -1,0 +1,1268 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Comprehensive Code Review - Complete Report | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>archive</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>2025</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>CODE REVIEW COMPLETE</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/archive/2025/CODE_REVIEW_COMPLETE.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><p>⚠️ <strong>ARCHIVED</strong> - This document is from 2025 and has been archived.</p>
+<p>For current information, see:</p>
+<ul>
+<li><a href="/docs/STATE">STATE.md</a> - Current project state</li>
+<li><a href="/docs/PHASE_HISTORY">PHASE_HISTORY.md</a> - Historical phase records</li>
+<li><a href="/docs/ARCHITECTURE">ARCHITECTURE.md</a> - Current architecture</li>
+</ul>
+<hr>
+<h1>ICN Comprehensive Code Review - Complete Report</h1>
+<p><strong>Review Date</strong>: January 2026
+<strong>Reviewer</strong>: Claude Code (Opus 4.5)
+<strong>Branch</strong>: <code>fix/metric-cardinality-review</code>
+<strong>Commit</strong>: 275da41d (fix(core): Remove deprecated per-DID uptime metrics)</p>
+<hr>
+<h2>Executive Summary</h2>
+<p>The ICN (InterCooperative Network) repository is a substantial (~228K LOC) Rust project implementing a P2P cooperative coordination substrate. This review found a well-architected system with robust security primitives, comprehensive test coverage, and thoughtful design patterns.</p>
+<h3>Overall Assessment: <strong>B+ (83/100)</strong></h3>
+<table>
+<thead>
+<tr>
+<th>Category</th>
+<th>Score</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Architecture</td>
+<td>A-</td>
+<td>Clean actor model, proper separation of concerns</td>
+</tr>
+<tr>
+<td>Security</td>
+<td>B+</td>
+<td>Three-layer security, proper key management</td>
+</tr>
+<tr>
+<td>Test Coverage</td>
+<td>B+</td>
+<td>2,968 tests, some gaps in economic modules</td>
+</tr>
+<tr>
+<td>Code Quality</td>
+<td>B</td>
+<td>Some blocking patterns, large files need splitting</td>
+</tr>
+<tr>
+<td>Documentation</td>
+<td>B-</td>
+<td>Good architecture docs, API docs sparse</td>
+</tr>
+<tr>
+<td>Production Readiness</td>
+<td>B</td>
+<td>Phase 18/35 complete, pilot-ready</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Project Statistics</h2>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Lines of Code</strong></td>
+<td>227,843 (source only)</td>
+</tr>
+<tr>
+<td><strong>Total Crates</strong></td>
+<td>26 workspace crates</td>
+</tr>
+<tr>
+<td><strong>Unit Tests</strong></td>
+<td>2,328 <code>#[test]</code> functions</td>
+</tr>
+<tr>
+<td><strong>Async Tests</strong></td>
+<td>640 <code>#[tokio::test]</code> functions</td>
+</tr>
+<tr>
+<td><strong>Integration Tests</strong></td>
+<td>69 test files</td>
+</tr>
+<tr>
+<td><strong>Total Test Functions</strong></td>
+<td>2,968</td>
+</tr>
+<tr>
+<td><strong>Dependencies</strong></td>
+<td>779 crates (Cargo.lock)</td>
+</tr>
+<tr>
+<td><strong>Total Commits</strong></td>
+<td>1,904</td>
+</tr>
+<tr>
+<td><strong>Documentation Files</strong></td>
+<td>352</td>
+</tr>
+<tr>
+<td><strong>Open Branches</strong></td>
+<td>37</td>
+</tr>
+<tr>
+<td><strong>CI Workflows</strong></td>
+<td>9</td>
+</tr>
+<tr>
+<td><strong>Primary Contributor</strong></td>
+<td>Matt Faherty (1,736 commits)</td>
+</tr>
+<tr>
+<td><strong>Deployment</strong></td>
+<td>K3s cluster since 2025-12-03</td>
+</tr>
+<tr>
+<td><strong>Development Phase</strong></td>
+<td>18/35 complete (~75%)</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Verification Results</h2>
+<h3>Cargo Test: PASSED</h3>
+<ul>
+<li>All 2,968 tests pass</li>
+<li>Build time: ~7m 23s (debug profile)</li>
+<li>No test failures or panics</li>
+</ul>
+<h3>Cargo Audit: 8 Warnings (No Critical)</h3>
+<table>
+<thead>
+<tr>
+<th>Advisory</th>
+<th>Crate</th>
+<th>Severity</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>RUSTSEC-2023-0089</td>
+<td>atomic-polyfill 1.0.3</td>
+<td>Warning</td>
+<td>Unmaintained (via postcard)</td>
+</tr>
+<tr>
+<td>RUSTSEC-2025-0141</td>
+<td>bincode 2.0.1</td>
+<td>Warning</td>
+<td>Unmaintained</td>
+</tr>
+<tr>
+<td>RUSTSEC-2025-0057</td>
+<td>fxhash 0.2.1</td>
+<td>Warning</td>
+<td>Unmaintained</td>
+</tr>
+<tr>
+<td>RUSTSEC-2024-0384</td>
+<td>instant 0.1.13</td>
+<td>Warning</td>
+<td>Unmaintained</td>
+</tr>
+<tr>
+<td>RUSTSEC-2024-0380</td>
+<td>pqcrypto-dilithium 0.5.0</td>
+<td>Warning</td>
+<td>Use pqcrypto-mldsa instead</td>
+</tr>
+<tr>
+<td>RUSTSEC-2024-0381</td>
+<td>pqcrypto-kyber 0.8.1</td>
+<td>Warning</td>
+<td>Use pqcrypto-mlkem instead</td>
+</tr>
+<tr>
+<td>RUSTSEC-2024-0370</td>
+<td>proc-macro-error 1.0.4</td>
+<td>Warning</td>
+<td>Unmaintained</td>
+</tr>
+<tr>
+<td>RUSTSEC-2025-0134</td>
+<td>rustls-pemfile 1.0.4</td>
+<td>Warning</td>
+<td>Unmaintained</td>
+</tr>
+</tbody></table>
+<p><strong>Action Required</strong>: Update PQ crypto dependencies to NIST-finalized names (ML-DSA, ML-KEM).</p>
+<h3>Cargo Deny: Warnings Only</h3>
+<ul>
+<li>Duplicate <code>axum</code> versions (0.7.9, 0.8.8) - from tonic/opentelemetry deps</li>
+<li>No license violations detected</li>
+</ul>
+<hr>
+<h2>Crate-by-Crate Analysis</h2>
+<h3>icn-core (~13,000 LOC) - Grade: B</h3>
+<p><strong>Purpose</strong>: Central orchestration, supervisor pattern, actor lifecycle management</p>
+<p><strong>Key Components</strong>:</p>
+<ul>
+<li><code>supervisor/mod.rs</code> (1,817 lines) - Main supervisor orchestrating 15+ actors</li>
+<li><code>config.rs</code> (1,638 lines) - Comprehensive configuration with validation</li>
+<li>21 supervisor init modules for each subsystem</li>
+</ul>
+<p><strong>Architecture</strong>:</p>
+<pre><code>Supervisor
+├── NetworkActor (QUIC sessions)
+├── GossipActor (topic pub/sub)
+├── LedgerActor (mutual credit)
+├── GovernanceActor (proposals, voting)
+├── ComputeActor (task execution)
+├── TrustActor (trust computation)
+├── StewardActor (SDIS enrollment)
+├── CommunityActor (community lifecycle)
+├── CoopActor (cooperative management)
+├── EntityActor (unified entity model)
+├── SnapshotActor (Chandy-Lamport)
+├── RpcServer (JSON-RPC)
+└── GatewayServer (REST/WS)
+</code></pre>
+<p><strong>Issues</strong>:</p>
+<ul>
+<li><code>supervisor/mod.rs</code> too large (Issue #157) - needs splitting</li>
+<li><code>config.rs</code> too large (Issue #158) - needs domain modules</li>
+<li>Some blocking patterns in callbacks</li>
+</ul>
+<p><strong>Tests</strong>: 5 ignored tests due to async issues</p>
+<hr>
+<h3>icn-identity (~11,700 LOC) - Grade: A-</h3>
+<p><strong>Purpose</strong>: DID management, cryptographic keys, keystore with Age encryption</p>
+<p><strong>Key Features</strong>:</p>
+<ul>
+<li>DID format: <code>did:icn:&lt;multibase-pubkey&gt;</code></li>
+<li>Keystore versions: v1 → v2 → v2.1 → v3 → v4</li>
+<li>Ed25519 signing + X25519 encryption + ML-DSA (PQ)</li>
+<li>Multi-device support with DID Document</li>
+<li>Proper Zeroization on secret key drop</li>
+<li>SDIS Anchor and KeyBundle support</li>
+</ul>
+<p><strong>Storage Format Evolution</strong>:</p>
+<pre><code>v1: Basic Ed25519 only
+v2: Added TLS binding
+v2.1: Added X25519 encryption keys
+v3: Added DID Document + multi-device
+v4: Added SDIS Anchor + KeyBundles
+</code></pre>
+<p><strong>Security Positives</strong>:</p>
+<ul>
+<li><code>#[zeroize(drop)]</code> on all secret key structs</li>
+<li>Age encryption for keystore at rest</li>
+<li>Proper key rotation with dual signatures</li>
+</ul>
+<p><strong>Tests</strong>: 173 unit tests, 275 integration test lines</p>
+<hr>
+<h3>icn-trust (~6,300 LOC) - Grade: A-</h3>
+<p><strong>Purpose</strong>: Multi-graph trust computation, anomaly detection, Sybil resistance</p>
+<p><strong>Trust Architecture (Phase 21)</strong>:</p>
+<pre><code>MultiTrustGraph
+├── Social Graph (60% direct, 40% transitive)
+│   └── Used for: connection priority, gossip, topic access
+├── Economic Graph (80% direct, 20% transitive)
+│   └── Used for: credit limits, dispute weighting
+└── Technical Graph (90% direct, 10% transitive)
+    └── Used for: compute scheduling, storage selection
+</code></pre>
+<p><strong>Trust Classes</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Class</th>
+<th>Score Range</th>
+<th>Rate Limit</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Isolated</td>
+<td>&lt; 0.1</td>
+<td>10/sec</td>
+</tr>
+<tr>
+<td>Known</td>
+<td>0.1 - 0.4</td>
+<td>50/sec</td>
+</tr>
+<tr>
+<td>Partner</td>
+<td>0.4 - 0.7</td>
+<td>100/sec</td>
+</tr>
+<tr>
+<td>Federated</td>
+<td>&gt; 0.7</td>
+<td>200/sec</td>
+</tr>
+</tbody></table>
+<p><strong>Anomaly Detection</strong>:</p>
+<ul>
+<li>Circular vouching (trust cycles with &gt;0.8 edges)</li>
+<li>Sybil clusters (high internal, low external trust)</li>
+<li>Rapid trust growth (&gt;50% in 7 days)</li>
+</ul>
+<p><strong>Performance Optimizations</strong>:</p>
+<ul>
+<li>LRU cache with 5-minute TTL</li>
+<li>Bloom filter for negative lookups</li>
+<li>Precomputed scores for hot paths</li>
+</ul>
+<p><strong>Tests</strong>: 103 unit tests, benchmark suite</p>
+<hr>
+<h3>icn-net (~18,600 LOC) - Grade: B+</h3>
+<p><strong>Purpose</strong>: QUIC/TLS networking, peer discovery, signed envelopes</p>
+<p><strong>Protocol Stack</strong>:</p>
+<pre><code>Application: NetworkMessage (from_did, to_did, payload)
+Security: SignedEnvelope (Ed25519 + optional ML-DSA)
+Encryption: EncryptedEnvelope (X25519 ECDH + ChaCha20-Poly1305)
+Transport: QUIC/TLS with DID binding
+Discovery: mDNS + STUN/TURN (NAT traversal)
+</code></pre>
+<p><strong>Replay Protection</strong>:</p>
+<ul>
+<li>Per-peer sequence tracking</li>
+<li>Bloom filter rotation at 8,000 entries</li>
+<li>Persistent storage with TTL</li>
+</ul>
+<p><strong>NAT Traversal (Phase 21)</strong>:</p>
+<ul>
+<li>Parallel dial for local + public addresses</li>
+<li>STUN for public endpoint discovery</li>
+<li>TURN relay for symmetric NAT fallback</li>
+<li>Connection candidates via gossip topic</li>
+</ul>
+<p><strong>Tests</strong>: 226 unit tests, 6 integration test files</p>
+<hr>
+<h3>icn-gossip (~9,300 LOC) - Grade: B+</h3>
+<p><strong>Purpose</strong>: Topic-based pub/sub, vector clocks, partition healing</p>
+<p><strong>Topics</strong>:</p>
+<pre><code>global:identity        - Public, Global scope
+global:rendezvous     - Public, Global scope
+trust:attestations    - Known+, Regional scope
+labor-shares:*        - Various access levels
+federation:*          - Cross-cooperative
+</code></pre>
+<p><strong>Anti-Entropy Protocol</strong>:</p>
+<ol>
+<li>Push announcements (new entries)</li>
+<li>Pull requests (missing entries)</li>
+<li>Bloom filter exchange for diff</li>
+<li>Vector clock merge for ordering</li>
+</ol>
+<p><strong>Scalability (M2)</strong>:</p>
+<ul>
+<li>Adaptive fanout based on network size</li>
+<li>Dynamic Bloom filter sizing</li>
+<li>Trust-weighted peer limits</li>
+</ul>
+<p><strong>Partition Handling (Phase 18)</strong>:</p>
+<ul>
+<li>Detection: No contact for 5 minutes</li>
+<li>Healing: Vector clock merge + conflict resolution</li>
+<li>Strategies: Last-Write-Wins, Trust-Weighted, Manual</li>
+</ul>
+<p><strong>Tests</strong>: 127 unit tests, benchmark suite</p>
+<hr>
+<h3>icn-ledger (~20,300 LOC) - Grade: B</h3>
+<p><strong>Purpose</strong>: Double-entry mutual credit, Merkle-DAG, fork resolution</p>
+<p><strong>Entry Structure</strong>:</p>
+<pre><code class="language-rust">JournalEntry {
+    id: ContentHash,        // SHA-256 of content
+    parents: Vec&lt;Hash&gt;,     // Merkle-DAG links
+    timestamp: u64,
+    author: Did,
+    operation: Operation,   // Transfer, CreditLimit, etc.
+    signature: Vec&lt;u8&gt;,
+}
+</code></pre>
+<p><strong>Credit Policy</strong>:</p>
+<ul>
+<li>Dynamic limits based on trust + history</li>
+<li>Progressive ramping for new members</li>
+<li>Cleared volume tracking for O(1) limit calculation</li>
+</ul>
+<p><strong>Fork Resolution Strategies</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Strategy</th>
+<th>Best For</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>TimestampPreference</td>
+<td>Simple, low-trust</td>
+</tr>
+<tr>
+<td>TrustWeighted</td>
+<td>Established communities</td>
+</tr>
+<tr>
+<td>MajoritySignatures</td>
+<td>Multi-party transactions</td>
+</tr>
+<tr>
+<td>Hybrid (default)</td>
+<td>Production deployments</td>
+</tr>
+</tbody></table>
+<p><strong>Features</strong>:</p>
+<ul>
+<li>Quarantine store for suspect entries</li>
+<li>Freeze manager for emergencies</li>
+<li>Treasury management</li>
+<li>FX support with oracle rates</li>
+</ul>
+<p><strong>Tests</strong>: 9 tokio tests, 2 integration files</p>
+<hr>
+<h3>icn-governance (~23,500 LOC) - Grade: B</h3>
+<p><strong>Purpose</strong>: Proposals, voting, charters, protocol governance</p>
+<p><strong>Domain Model</strong>:</p>
+<pre><code>GovernanceDomain
+├── GovernanceConfig
+│   ├── ProposalThresholds
+│   └── EmergencyThresholds
+├── GovernanceProfile
+│   ├── DecisionRule
+│   └── VotingPeriod
+└── MembershipConfig
+    └── MembershipSource (Trust/Registry/Contract)
+</code></pre>
+<p><strong>Proposal Lifecycle</strong>:</p>
+<pre><code>Draft → Open → Closed → (Executed | Rejected)
+</code></pre>
+<p><strong>Vote Delegation</strong>:</p>
+<ul>
+<li>Recursive delegation (configurable depth)</li>
+<li>Scope-based (topic-level or domain-wide)</li>
+<li>Revocable at any time</li>
+</ul>
+<p><strong>Protocol Governance (Phase 20)</strong>:</p>
+<ul>
+<li>Parameter categories: Network, Economic, Security</li>
+<li>Scope hierarchy: Network → Cooperative → Community</li>
+<li>Validation constraints per parameter</li>
+</ul>
+<p><strong>Modules</strong>: 27 modules including:</p>
+<ul>
+<li><code>charter.rs</code> - Cooperative charters</li>
+<li><code>amendment.rs</code> - Charter amendments</li>
+<li><code>delegation.rs</code> - Vote delegation</li>
+<li><code>protocol.rs</code> - Protocol parameters</li>
+<li><code>steward.rs</code> - SDIS steward governance</li>
+</ul>
+<p><strong>Tests</strong>: 39 unit tests, 1 integration file</p>
+<hr>
+<h3>icn-gateway (~50,500 LOC) - Grade: B</h3>
+<p><strong>Purpose</strong>: REST/WebSocket API for cooperative applications</p>
+<p><strong>API Structure</strong>:</p>
+<pre><code>/api/v1/
+├── auth/       - DID authentication
+├── ledger/     - Balance, transfers
+├── governance/ - Proposals, voting
+├── trust/      - Trust edges
+├── compute/    - Task submission
+├── sdis/       - SDIS enrollment
+├── communities/
+├── coops/
+└── notifications/
+</code></pre>
+<p><strong>Authentication</strong>:</p>
+<ul>
+<li>Challenge-response with Ed25519</li>
+<li>JWT tokens with DID claims</li>
+<li>Per-DID rate limiting</li>
+</ul>
+<p><strong>WebSocket Events</strong>:</p>
+<ul>
+<li>Balance changes</li>
+<li>Proposal updates</li>
+<li>Task status</li>
+<li>Community events</li>
+</ul>
+<p><strong>Managers</strong>: 15+ manager modules for domain logic</p>
+<p><strong>Tests</strong>: 102 async tests, 0 inline tests</p>
+<hr>
+<h3>icn-ccl (~9,800 LOC) - Grade: B+</h3>
+<p><strong>Purpose</strong>: Cooperative Contract Language (DSL for agreements)</p>
+<p><strong>AST Structure</strong>:</p>
+<pre><code>Contract
+├── name: String
+├── participants: Vec&lt;Did&gt;
+├── currency: Option&lt;String&gt;
+├── state_vars: Vec&lt;StateVar&gt;
+├── rules: Vec&lt;Rule&gt;       // Functions
+└── triggers: Vec&lt;Trigger&gt; // Scheduled actions
+</code></pre>
+<p><strong>Statements</strong>:</p>
+<ul>
+<li><code>Assign</code> - Local variable</li>
+<li><code>SetState</code> - Persistent state</li>
+<li><code>LedgerTransfer</code> - Money movement</li>
+<li><code>SetCreditLimit</code> - Credit policy</li>
+<li><code>If/For/Return</code> - Control flow</li>
+</ul>
+<p><strong>Validation</strong>:</p>
+<ul>
+<li>Max expression depth: 50</li>
+<li>Max loop depth: 5</li>
+<li>Max participants: 100</li>
+<li>Reserved keyword protection</li>
+</ul>
+<p><strong>Fuel Metering</strong>:</p>
+<ul>
+<li>Not Turing-complete (bounded execution)</li>
+<li>Configurable fuel costs per operation</li>
+<li>Deterministic execution</li>
+</ul>
+<p><strong>Tests</strong>: 88 unit tests, 34 integration tests</p>
+<hr>
+<h3>icn-compute (~19,000 LOC) - Grade: B</h3>
+<p><strong>Purpose</strong>: Distributed task execution with trust gating</p>
+<p><strong>Trust Requirements</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>Min Trust</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Submit task</td>
+<td>0.1</td>
+</tr>
+<tr>
+<td>Execute task</td>
+<td>0.3</td>
+</tr>
+<tr>
+<td>Priority tasks</td>
+<td>0.5</td>
+</tr>
+</tbody></table>
+<p><strong>Resource Profiles</strong>:</p>
+<pre><code class="language-rust">ResourceProfile {
+    cpu_cores: Option&lt;f64&gt;,
+    memory_mb: Option&lt;u64&gt;,
+    storage_mb: Option&lt;u64&gt;,
+    network_mbps: Option&lt;f64&gt;,
+    gpu_spec: Option&lt;GpuSpec&gt;,
+    duration_estimate: Option&lt;Duration&gt;,
+}
+</code></pre>
+<p><strong>Placement Scoring</strong>:</p>
+<ol>
+<li>Trust score (40%)</li>
+<li>Resource availability (30%)</li>
+<li>Locality (20%)</li>
+<li>Historical success (10%)</li>
+</ol>
+<p><strong>WASM Executor</strong>:</p>
+<ul>
+<li>Wasmtime 40.0</li>
+<li>Sandboxed execution</li>
+<li>Fuel metering</li>
+</ul>
+<p><strong>Tests</strong>: 38 actor tests, 2 integration files</p>
+<hr>
+<h3>icn-federation (~7,100 LOC) - Grade: B</h3>
+<p><strong>Purpose</strong>: Inter-cooperative coordination</p>
+<p><strong>Components</strong>:</p>
+<pre><code>CooperativeRegistry - Discovery
+AttestationStore   - Trust bridging
+ClearingManager    - Credit settlement
+FederatedGossipRouter - Scoped routing
+FederatedDidResolver - Cross-coop DIDs
+</code></pre>
+<p><strong>DID Format</strong>:</p>
+<pre><code>did:icn:food-coop:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK
+        ^--------^ ^-----------------------------------------^
+        Coop ID    Public Key
+</code></pre>
+<p><strong>Clearing Settlement</strong>:</p>
+<ul>
+<li>Bilateral agreements</li>
+<li>Position netting</li>
+<li>Settlement intervals</li>
+</ul>
+<p><strong>Tests</strong>: 49 unit tests, 37 integration tests</p>
+<hr>
+<h3>Supporting Crates Summary</h3>
+<table>
+<thead>
+<tr>
+<th>Crate</th>
+<th>LOC</th>
+<th>Tests</th>
+<th>Grade</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>icn-crypto-pq</td>
+<td>~3,000</td>
+<td>62</td>
+<td>B</td>
+<td>ML-DSA/ML-KEM, needs integration tests</td>
+</tr>
+<tr>
+<td>icn-store</td>
+<td>~2,800</td>
+<td>~50</td>
+<td>C+</td>
+<td>No multi-key transactions</td>
+</tr>
+<tr>
+<td>icn-rpc</td>
+<td>~8,500</td>
+<td>85</td>
+<td>B</td>
+<td>JWT revocation missing</td>
+</tr>
+<tr>
+<td>icn-obs</td>
+<td>~8,400</td>
+<td>40</td>
+<td>B-</td>
+<td>21 unwrap calls in prod</td>
+</tr>
+<tr>
+<td>icn-steward</td>
+<td>~6,100</td>
+<td>63</td>
+<td>B</td>
+<td>SDIS enrollment</td>
+</tr>
+<tr>
+<td>icn-zkp</td>
+<td>~5,900</td>
+<td>74</td>
+<td>B</td>
+<td>STARK circuits</td>
+</tr>
+<tr>
+<td>icn-entity</td>
+<td>~4,600</td>
+<td>69</td>
+<td>B+</td>
+<td>Unified entity model</td>
+</tr>
+<tr>
+<td>icn-coop</td>
+<td>~2,500</td>
+<td>7</td>
+<td>C</td>
+<td><strong>Only 7 tests</strong></td>
+</tr>
+<tr>
+<td>icn-snapshot</td>
+<td>~2,200</td>
+<td>31</td>
+<td>B</td>
+<td>Chandy-Lamport</td>
+</tr>
+<tr>
+<td>icn-privacy</td>
+<td>~1,400</td>
+<td>22</td>
+<td>B</td>
+<td>Onion routing</td>
+</tr>
+<tr>
+<td>icn-community</td>
+<td>~1,400</td>
+<td>16</td>
+<td>C+</td>
+<td>Limited tests</td>
+</tr>
+<tr>
+<td>icn-security</td>
+<td>~1,200</td>
+<td>20</td>
+<td>B+</td>
+<td>Byzantine detection</td>
+</tr>
+<tr>
+<td>icn-time</td>
+<td>~800</td>
+<td>14</td>
+<td>B</td>
+<td>Rough Time Protocol</td>
+</tr>
+<tr>
+<td>icn-encoding</td>
+<td>~350</td>
+<td>10</td>
+<td>B</td>
+<td>postcard migration</td>
+</tr>
+<tr>
+<td>icn-testkit</td>
+<td>~3</td>
+<td>0</td>
+<td>F</td>
+<td><strong>STUB - Not implemented</strong></td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Critical Findings</h2>
+<h3>HIGH Priority</h3>
+<ol>
+<li><p><strong>Blocking Async Patterns</strong> (~60 occurrences)</p>
+<ul>
+<li><code>blocking_write()</code> / <code>blocking_read()</code> in async contexts</li>
+<li><code>block_in_place()</code> used as workaround but still blocks</li>
+<li>Some tests already <code>#[ignore]</code> due to this</li>
+<li><strong>Recommendation</strong>: Migrate to fully async patterns</li>
+</ul>
+</li>
+<li><p><strong>Test Coverage Gaps</strong></p>
+<ul>
+<li><code>icn-coop</code>: 7 tests for 2,500 LOC</li>
+<li><code>icn-community</code>: 16 tests for 1,400 LOC</li>
+<li><code>icn-crypto-pq</code>: 0 integration tests</li>
+<li><code>icn-testkit</code>: Stub only (3 LOC)</li>
+<li><strong>Recommendation</strong>: Add 100+ tests to economic modules</li>
+</ul>
+</li>
+<li><p><strong>Large Monolithic Files</strong></p>
+<ul>
+<li><code>supervisor/mod.rs</code>: 1,817 lines</li>
+<li><code>config.rs</code>: 1,638 lines</li>
+<li><code>governance/store.rs</code>: 37K+ tokens</li>
+<li><code>compute/wasm_executor.rs</code>: ~46K lines</li>
+<li><strong>Recommendation</strong>: Split into domain modules</li>
+</ul>
+</li>
+<li><p><strong>Unmaintained PQ Dependencies</strong></p>
+<ul>
+<li><code>pqcrypto-dilithium</code> → <code>pqcrypto-mldsa</code></li>
+<li><code>pqcrypto-kyber</code> → <code>pqcrypto-mlkem</code></li>
+<li><strong>Recommendation</strong>: Update to NIST-finalized names</li>
+</ul>
+</li>
+</ol>
+<h3>MEDIUM Priority</h3>
+<ol start="5">
+<li><p><strong>Unwrap Usage</strong>: 6,066 occurrences</p>
+<ul>
+<li>Many in test code (acceptable)</li>
+<li>~21 in <code>icn-obs</code> prod code</li>
+<li><strong>Recommendation</strong>: Audit prod code unwraps</li>
+</ul>
+</li>
+<li><p><strong>Missing JWT Revocation</strong> (icn-rpc)</p>
+<ul>
+<li>Compromised tokens can&#39;t be invalidated</li>
+<li>Challenge nonces lost on restart</li>
+</ul>
+</li>
+<li><p><strong>Threshold Crypto Limitation</strong> (icn-crypto-pq)</p>
+<ul>
+<li>n-of-n only (XOR-based)</li>
+<li>Needs Shamir&#39;s Secret Sharing for fault tolerance</li>
+</ul>
+</li>
+<li><p><strong>Duplicate Dependencies</strong></p>
+<ul>
+<li><code>axum</code> 0.7.9 and 0.8.8</li>
+<li>From tonic/opentelemetry dependency chain</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h2>Security Assessment</h2>
+<h3>Overall Score: 8.0/10</h3>
+<p><strong>Positives</strong>:</p>
+<ul>
+<li>Three-layer security (Transport → Message → Application)</li>
+<li>Ed25519 + X25519 + ML-DSA/ML-KEM crypto</li>
+<li>Age-encrypted keystore with proper Zeroization</li>
+<li>Trust-gated rate limiting</li>
+<li>Replay protection with Bloom filter rotation</li>
+<li>Byzantine fault detection (7 violation types)</li>
+</ul>
+<p><strong>Concerns</strong>:</p>
+<ul>
+<li>PQ signature verification deferred (icn-net/envelope.rs:254-314)</li>
+<li>Dev mode auth bypass (icn-rpc/auth.rs:98)</li>
+<li>TOCTOU in rate limiting (icn-net/rate_limit.rs:246)</li>
+</ul>
+<hr>
+<h2>Recommendations</h2>
+<h3>Immediate (Before Pilot)</h3>
+<ol>
+<li><strong>Fix blocking patterns</strong> - Replace <code>blocking_write/read</code> with async</li>
+<li><strong>Add tests</strong> - Minimum 50 tests each for icn-coop, icn-community</li>
+<li><strong>Implement icn-testkit</strong> - Provide test node helpers</li>
+</ol>
+<h3>Short-Term (Phase 19-20)</h3>
+<ol start="4">
+<li><p><strong>Split large files</strong>:</p>
+<ul>
+<li><code>supervisor/mod.rs</code> → domain initializers</li>
+<li><code>config.rs</code> → config modules per domain</li>
+</ul>
+</li>
+<li><p><strong>Update PQ dependencies</strong> to NIST-finalized names</p>
+</li>
+<li><p><strong>Add JWT revocation</strong> mechanism</p>
+</li>
+</ol>
+<h3>Medium-Term (Phase 21-25)</h3>
+<ol start="7">
+<li><strong>Implement Shamir&#39;s</strong> for threshold crypto</li>
+<li><strong>Add fuzz testing</strong> for CCL parser, envelope parsing</li>
+<li><strong>Complete API documentation</strong></li>
+</ol>
+<hr>
+<h2>File Inventory</h2>
+<h3>Critical Files (Read in Full)</h3>
+<ul>
+<li><code>icn-core/src/supervisor/mod.rs</code> - Actor orchestration</li>
+<li><code>icn-core/src/config.rs</code> - Configuration</li>
+<li><code>icn-identity/src/keystore.rs</code> - Key management</li>
+<li><code>icn-trust/src/lib.rs</code> - Trust graph</li>
+<li><code>icn-net/src/actor.rs</code> - Network actor</li>
+<li><code>icn-gossip/src/gossip.rs</code> - Gossip protocol</li>
+<li><code>icn-ledger/src/ledger.rs</code> - Mutual credit</li>
+<li><code>icn-ledger/src/fork_resolution.rs</code> - Fork handling</li>
+<li><code>icn-gossip/src/partition.rs</code> - Partition healing</li>
+<li><code>icn-trust/src/anomaly.rs</code> - Sybil detection</li>
+<li><code>icn-ccl/src/ast.rs</code> - Contract AST</li>
+<li><code>icn-compute/src/scheduler.rs</code> - Task scheduling</li>
+</ul>
+<h3>Modules Reviewed</h3>
+<ul>
+<li>icn-core: 21 supervisor modules</li>
+<li>icn-governance: 27 modules</li>
+<li>icn-gateway: 59 modules</li>
+<li>icn-federation: 11 modules</li>
+</ul>
+<hr>
+<h2>Development History</h2>
+<h3>Completed Phases (1-18)</h3>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Name</th>
+<th>Completed</th>
+<th>Key Deliverables</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1-10</td>
+<td>Foundation</td>
+<td>2025-Q3</td>
+<td>Identity, Trust, Ledger, Network, Gossip</td>
+</tr>
+<tr>
+<td>11</td>
+<td>Multi-Device Identity</td>
+<td>2025-01-14</td>
+<td>DID Document v2, Keystore v3</td>
+</tr>
+<tr>
+<td>12</td>
+<td>Economic Safety Rails</td>
+<td>2025-01-14</td>
+<td>Dynamic limits, dispute resolution</td>
+</tr>
+<tr>
+<td>13</td>
+<td>Governance Primitives</td>
+<td>2025-01-15</td>
+<td>Proposals, voting, domains</td>
+</tr>
+<tr>
+<td>14</td>
+<td>Gateway API</td>
+<td>2025-01-17</td>
+<td>REST/WebSocket, JWT auth</td>
+</tr>
+<tr>
+<td>15</td>
+<td>Distributed Compute</td>
+<td>2025-11-20</td>
+<td>Trust-gated task execution</td>
+</tr>
+<tr>
+<td>16</td>
+<td>Scheduler Evolution</td>
+<td>2025-11-24</td>
+<td>Resource profiles, placement scoring</td>
+</tr>
+<tr>
+<td>17</td>
+<td>Storage Replication</td>
+<td>2025-11-25</td>
+<td>Replica tracking, health management</td>
+</tr>
+<tr>
+<td>18</td>
+<td>Pre-Pilot Hardening</td>
+<td>2025-11-27</td>
+<td>Byzantine detection, quarantine</td>
+</tr>
+</tbody></table>
+<h3>Planned Phases (19-35)</h3>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Name</th>
+<th>Key Work</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>19</td>
+<td>Code Review &amp; Remediation</td>
+<td>Vector clock bounds, Bloom rotation</td>
+</tr>
+<tr>
+<td>20</td>
+<td>Testing Foundation</td>
+<td>Chaos engineering, fuzzing, benchmarks</td>
+</tr>
+<tr>
+<td>21</td>
+<td>Network Connectivity</td>
+<td>NAT traversal, STUN/TURN, connection pooling</td>
+</tr>
+<tr>
+<td>22</td>
+<td>Security Hardening</td>
+<td>Sybil resistance, strict gossip defaults</td>
+</tr>
+<tr>
+<td>23</td>
+<td>Identity &amp; Trust Evolution</td>
+<td>Key rotation, multi-device sync</td>
+</tr>
+<tr>
+<td>24</td>
+<td>SDK Completion</td>
+<td>TypeScript SDK type safety</td>
+</tr>
+<tr>
+<td>25</td>
+<td>Observability</td>
+<td>OpenTelemetry tracing, dashboards</td>
+</tr>
+<tr>
+<td>26</td>
+<td>Documentation</td>
+<td>Production runbooks, SLOs</td>
+</tr>
+<tr>
+<td>27</td>
+<td>Ledger &amp; Economics</td>
+<td>Bilateral clearing, currency rebalancing</td>
+</tr>
+<tr>
+<td>28</td>
+<td>CCL &amp; Governance</td>
+<td>State isolation, fuel costs</td>
+</tr>
+<tr>
+<td>29</td>
+<td>Code Quality</td>
+<td>Split config.rs, supervisor.rs</td>
+</tr>
+<tr>
+<td>30</td>
+<td>Mobile SDK</td>
+<td>React Native, offline-first</td>
+</tr>
+<tr>
+<td>31</td>
+<td>Infrastructure Polish</td>
+<td>Multi-region, GitOps</td>
+</tr>
+<tr>
+<td>32</td>
+<td>Federation</td>
+<td>Recursive hierarchy, inter-coop economics</td>
+</tr>
+<tr>
+<td>33</td>
+<td>CLI &amp; UX Polish</td>
+<td>REPL mode, data export</td>
+</tr>
+<tr>
+<td>34</td>
+<td>Release Candidate</td>
+<td>Integration validation, security audit</td>
+</tr>
+<tr>
+<td>35</td>
+<td>Pilot Deployment</td>
+<td>Real cooperative, 3-month operation</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>CI/CD Configuration</h2>
+<h3>Workflows (9 total)</h3>
+<table>
+<thead>
+<tr>
+<th>Workflow</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ci.yml</code></td>
+<td>Format, clippy, test, coverage</td>
+</tr>
+<tr>
+<td><code>benchmark.yml</code></td>
+<td>Performance regression detection</td>
+</tr>
+<tr>
+<td><code>security-audit.yml</code></td>
+<td>cargo-audit, cargo-deny</td>
+</tr>
+<tr>
+<td><code>docker-build-deploy.yml</code></td>
+<td>K8s deployment</td>
+</tr>
+<tr>
+<td><code>api-types.yml</code></td>
+<td>OpenAPI drift detection</td>
+</tr>
+<tr>
+<td><code>npm-publish.yml</code></td>
+<td>SDK publishing</td>
+</tr>
+</tbody></table>
+<h3>Coverage Configuration</h3>
+<ul>
+<li>Tool: Tarpaulin</li>
+<li>Target: 70%</li>
+<li>Reporting: Codecov</li>
+</ul>
+<hr>
+<h2>Security Issues (Detailed)</h2>
+<h3>HIGH Severity</h3>
+<table>
+<thead>
+<tr>
+<th>Issue</th>
+<th>Location</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>PQ signature deferred verification</td>
+<td><code>icn-net/src/envelope.rs:254-314</code></td>
+<td>ML-DSA signatures not verified immediately</td>
+</tr>
+<tr>
+<td>Blob registry no size limits</td>
+<td><code>icn-net/src/actor.rs</code></td>
+<td>Potential memory exhaustion</td>
+</tr>
+</tbody></table>
+<h3>MEDIUM Severity</h3>
+<table>
+<thead>
+<tr>
+<th>Issue</th>
+<th>Location</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Key material copies in serialization</td>
+<td><code>icn-identity/src/keystore.rs:462-470</code></td>
+<td>Secret bytes may be copied</td>
+</tr>
+<tr>
+<td>Auth bypass in dev mode</td>
+<td><code>icn-rpc/src/auth.rs:98</code></td>
+<td>Easy to forget in production</td>
+</tr>
+<tr>
+<td>Unbounded gossip entries</td>
+<td><code>icn-gossip/src/gossip.rs:151</code></td>
+<td>Memory exhaustion risk</td>
+</tr>
+</tbody></table>
+<h3>LOW Severity</h3>
+<table>
+<thead>
+<tr>
+<th>Issue</th>
+<th>Location</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>TOCTOU in rate limiting</td>
+<td><code>icn-net/src/rate_limit.rs:246</code></td>
+<td>Race condition window</td>
+</tr>
+</tbody></table>
+<h3>Code Quality Concerns</h3>
+<ul>
+<li><strong>Arc<RwLock> overuse</strong>: 304 instances across codebase (potential lock contention)</li>
+<li><strong>missing_docs suppressed</strong>: 41 crates have <code>#![allow(missing_docs)]</code></li>
+<li><strong>Unwrap in prod</strong>: 6,066 <code>.unwrap()</code> calls (many in tests, ~21 in icn-obs prod)</li>
+</ul>
+<h3>Byzantine Fault Detection (icn-security)</h3>
+<p>7 violation types implemented:</p>
+<ol>
+<li><code>InvalidSignature</code></li>
+<li><code>ConflictingLedgerEntries</code></li>
+<li><code>FailedComputeVerification</code></li>
+<li><code>ExcessiveResourceUse</code></li>
+<li><code>TrustGraphSpam</code></li>
+<li><code>ConflictingSignedStatements</code></li>
+<li><code>ReplayAttack</code></li>
+</ol>
+<p>Severity scoring: Critical (10), Major (5), Minor (1-2)
+<code>MAX_VIOLATIONS_PER_PEER = 100</code></p>
+<hr>
+<h2>What Was NOT Explored</h2>
+<h3>Not Verified This Session</h3>
+<ol>
+<li><strong>GitHub Issues &amp; PRs</strong> - <code>gh</code> CLI authentication not configured</li>
+<li><strong>Deployment manifests</strong> - K8s configs in <code>deploy/k8s/</code> not reviewed</li>
+<li><strong>Docker configuration</strong> - Dockerfile not analyzed</li>
+<li><strong>Performance profiling</strong> - Benchmarks exist but weren&#39;t executed</li>
+</ol>
+<h3>Large Files Partially Analyzed</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Size</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icn-governance/src/store.rs</code></td>
+<td>~37K tokens</td>
+<td>Read first 500 lines</td>
+</tr>
+<tr>
+<td><code>icn-compute/src/wasm_executor.rs</code></td>
+<td>~46K lines</td>
+<td>Not fully analyzed</td>
+</tr>
+<tr>
+<td><code>icn-gossip/src/gossip.rs</code></td>
+<td>~4K lines</td>
+<td>Read first 300 lines</td>
+</tr>
+<tr>
+<td><code>icn-core/src/supervisor/mod.rs</code></td>
+<td>1,817 lines</td>
+<td>Fully analyzed</td>
+</tr>
+</tbody></table>
+<h3>Algorithms Needing Documentation</h3>
+<ul>
+<li>Fork resolution algorithm details (icn-ledger)</li>
+<li>Trust computation weights derivation (icn-trust)</li>
+<li>Byzantine fault tolerance formal proof (icn-security)</li>
+<li>Gossip anti-entropy protocol specifics (icn-gossip)</li>
+</ul>
+<hr>
+<h2>Key File Locations Reference</h2>
+<pre><code># Documentation
+docs/PHASE_HISTORY.md          # Development phases
+docs/dev-journal/ROADMAP.md    # Future roadmap
+docs/ARCHITECTURE.md           # Architecture docs
+docs/GAP_ANALYSIS.md           # Known gaps
+CLAUDE.md                      # AI assistant context
+
+# Configuration
+.github/workflows/ci.yml       # Main CI
+.github/ISSUE_POLICY.md        # Issue management
+.codecov.yml                   # Coverage config
+
+# Core Entry Points
+icn/Cargo.toml                                    # Workspace manifest
+icn/crates/icn-core/src/supervisor/mod.rs         # Main supervisor
+icn/crates/icn-core/src/config.rs                 # Configuration
+icn/crates/icn-identity/src/keystore.rs           # Key management
+icn/crates/icn-ledger/src/ledger.rs               # Mutual credit
+icn/crates/icn-gossip/src/gossip.rs               # Gossip protocol
+</code></pre>
+<hr>
+<h2>Conclusion</h2>
+<p>ICN is a well-architected P2P coordination substrate with strong security primitives and thoughtful design. The codebase demonstrates professional Rust practices with proper error handling, async patterns, and cryptographic key management.</p>
+<p><strong>Ready for</strong>: Continued Phase 19-20 development
+<strong>Blocking for pilot</strong>: Critical test coverage gaps in economic modules
+<strong>Estimated pilot readiness</strong>: Phase 25-26 (current: Phase 18)</p>
+<hr>
+<p><em>Report generated by Claude Code (Opus 4.5)</em>
+<em>Includes findings from previous review session</em></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

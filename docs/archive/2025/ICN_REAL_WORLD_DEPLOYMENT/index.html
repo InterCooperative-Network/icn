@@ -1,0 +1,1039 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Real-World Deployment | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>archive</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>2025</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ICN REAL WORLD DEPLOYMENT</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/archive/2025/ICN_REAL_WORLD_DEPLOYMENT.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><p>⚠️ <strong>SUPERSEDED</strong> - This document has been superseded.</p>
+<p>See current deployment guide: <a href="/docs/operations/deployment/HOMELAB_DEPLOYMENT">HOMELAB_DEPLOYMENT.md</a></p>
+<hr>
+<h1>ICN Real-World Deployment</h1>
+<p><strong>Last Updated</strong>: 2026-01-23
+<strong>Status</strong>: Design Document
+<strong>Authors</strong>: Claude Code, fahertym</p>
+<hr>
+<h2>Overview</h2>
+<p>This document describes how ICN operates at scale in the real world: deployment topology, mobile wallets, day-to-day cooperative use, and federation architecture.</p>
+<hr>
+<h2>Deployment Topology</h2>
+<h3>Node Types</h3>
+<p>ICN uses a <strong>multi-tier node architecture</strong> where different organizations run different types of nodes based on their resources and needs.</p>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────┐
+│                        FEDERATION LAYER                                  │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐         │
+│  │  Federation     │  │  Federation     │  │  Meta-Federation │         │
+│  │  Gateway Node   │  │  Gateway Node   │  │  Coordinator     │         │
+│  │  (Regional)     │  │  (Sector)       │  │  (Global)        │         │
+│  └────────┬────────┘  └────────┬────────┘  └────────┬────────┘         │
+│           │                    │                    │                   │
+└───────────┼────────────────────┼────────────────────┼───────────────────┘
+            │                    │                    │
+┌───────────┼────────────────────┼────────────────────┼───────────────────┐
+│           │         COOPERATIVE LAYER               │                   │
+│  ┌────────▼────────┐  ┌────────▼────────┐  ┌───────▼─────────┐         │
+│  │  Full Node      │  │  Full Node      │  │  Full Node      │         │
+│  │  (Coop A)       │  │  (Coop B)       │  │  (Coop C)       │         │
+│  │  - Gateway      │  │  - Gateway      │  │  - Gateway      │         │
+│  │  - Compute      │  │  - Compute      │  │  - Compute      │         │
+│  │  - Ledger       │  │  - Ledger       │  │  - Ledger       │         │
+│  └────────┬────────┘  └────────┬────────┘  └────────┬────────┘         │
+│           │                    │                    │                   │
+└───────────┼────────────────────┼────────────────────┼───────────────────┘
+            │                    │                    │
+┌───────────┼────────────────────┼────────────────────┼───────────────────┐
+│           │           MEMBER LAYER                  │                   │
+│  ┌────────▼────────┐  ┌────────▼────────┐  ┌───────▼─────────┐         │
+│  │  Mobile Wallet  │  │  Web App        │  │  Desktop App    │         │
+│  │  (Light Client) │  │  (Light Client) │  │  (Light Client) │         │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘         │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<h3>Node Specifications</h3>
+<table>
+<thead>
+<tr>
+<th>Node Type</th>
+<th>Who Runs It</th>
+<th>Resources</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Full Node</strong></td>
+<td>Cooperatives, Communities</td>
+<td>4+ CPU, 8GB+ RAM, SSD</td>
+<td>Full ICN daemon, Gateway API, Compute executor</td>
+</tr>
+<tr>
+<td><strong>Gateway Node</strong></td>
+<td>Federations</td>
+<td>2+ CPU, 4GB+ RAM</td>
+<td>API routing, cross-coop coordination</td>
+</tr>
+<tr>
+<td><strong>Light Client</strong></td>
+<td>Individual members</td>
+<td>Mobile/browser</td>
+<td>Wallet, signing, local keystore</td>
+</tr>
+<tr>
+<td><strong>Compute Node</strong></td>
+<td>Resource contributors</td>
+<td>Variable (can include GPU)</td>
+<td>Task execution for credit</td>
+</tr>
+<tr>
+<td><strong>Steward Node</strong></td>
+<td>Verified members</td>
+<td>2+ CPU, 4GB+ RAM</td>
+<td>VUI computation, enrollment ceremonies</td>
+</tr>
+</tbody></table>
+<h3>Recommended Deployment</h3>
+<p><strong>Small Cooperative (10-100 members)</strong>:</p>
+<ul>
+<li>1 Full Node (can be shared VPS or dedicated server)</li>
+<li>Members use mobile wallet or web app</li>
+</ul>
+<p><strong>Medium Cooperative (100-1000 members)</strong>:</p>
+<ul>
+<li>2-3 Full Nodes (redundancy)</li>
+<li>1 dedicated Gateway for member traffic</li>
+<li>Optional: Compute nodes for task execution revenue</li>
+</ul>
+<p><strong>Large Federation (10+ cooperatives)</strong>:</p>
+<ul>
+<li>Federation Gateway Node</li>
+<li>Shared steward nodes for SDIS</li>
+<li>Clearing house for inter-coop settlement</li>
+</ul>
+<hr>
+<h2>Mobile Wallet Architecture</h2>
+<h3>Overview</h3>
+<p>The mobile wallet is a <strong>light client</strong> that manages identity, signs transactions, and communicates with cooperative gateways.</p>
+<pre><code>┌─────────────────────────────────────────────────────────────────┐
+│                     MOBILE WALLET APP                           │
+│                                                                 │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌────────────────┐ │
+│  │   UI Layer      │  │   UI Layer      │  │   UI Layer     │ │
+│  │   (Balance)     │  │   (Payments)    │  │   (Governance) │ │
+│  └────────┬────────┘  └────────┬────────┘  └───────┬────────┘ │
+│           │                    │                   │           │
+│  ┌────────▼────────────────────▼───────────────────▼────────┐ │
+│  │                    SDK Layer (@icn/client)                │ │
+│  │  - ICNClient (REST calls)                                │ │
+│  │  - ICNSubscription (WebSocket)                           │ │
+│  │  - SignatureProvider (signing interface)                 │ │
+│  └────────────────────────────┬─────────────────────────────┘ │
+│                               │                               │
+│  ┌────────────────────────────▼─────────────────────────────┐ │
+│  │                  Keystore Layer                           │ │
+│  │  - Ed25519 keypair (Secure Enclave / Keychain)           │ │
+│  │  - DID management                                         │ │
+│  │  - Device registration                                    │ │
+│  │  - Biometric unlock                                       │ │
+│  └──────────────────────────────────────────────────────────┘ │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+                               │
+                               │ HTTPS / WSS
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    COOPERATIVE GATEWAY                          │
+│  - DID-based authentication (challenge/response)                │
+│  - JWT tokens for session                                       │
+│  - Real-time events via WebSocket                               │
+└─────────────────────────────────────────────────────────────────┘
+</code></pre>
+<h3>Key Features</h3>
+<h4>1. Secure Keystore</h4>
+<p><strong>Platform Integration</strong>:</p>
+<ul>
+<li><strong>iOS</strong>: Keys stored in Secure Enclave, biometric unlock via Face ID / Touch ID</li>
+<li><strong>Android</strong>: Keys in Android Keystore, biometric via BiometricPrompt</li>
+<li><strong>Desktop</strong>: OS-specific keychain with optional hardware key (YubiKey)</li>
+</ul>
+<p><strong>Multi-Device Support</strong>:</p>
+<pre><code class="language-typescript">// Register new device from existing device
+await client.registerDevice(&#39;did:icn:alice&#39;, {
+  device_id: &#39;phone-2&#39;,
+  label: &#39;New iPhone&#39;,
+  public_key: newDevicePublicKey,
+  capabilities: [&#39;sign&#39;, &#39;encrypt&#39;],
+  signing_device_id: &#39;phone-1&#39;,  // Existing device authorizes
+  signature: authorizationSignature,
+});
+</code></pre>
+<p><strong>Device Recovery</strong>:</p>
+<ul>
+<li>Threshold key shares across steward network</li>
+<li>Social recovery via trusted contacts</li>
+<li>Backup to encrypted cloud storage (optional)</li>
+</ul>
+<h4>2. Authentication Flow</h4>
+<pre><code>┌──────────┐                    ┌──────────┐                    ┌──────────┐
+│  Wallet  │                    │  Gateway │                    │   ICN    │
+│  (App)   │                    │          │                    │  Daemon  │
+└────┬─────┘                    └────┬─────┘                    └────┬─────┘
+     │                               │                               │
+     │  POST /auth/challenge         │                               │
+     │  { did: &quot;did:icn:alice&quot; }     │                               │
+     │ ─────────────────────────────►│                               │
+     │                               │                               │
+     │  { nonce: &quot;abc123...&quot; }       │                               │
+     │ ◄─────────────────────────────│                               │
+     │                               │                               │
+     │  [Sign nonce with private key]│                               │
+     │                               │                               │
+     │  POST /auth/verify            │                               │
+     │  { did, signature, coop_id }  │                               │
+     │ ─────────────────────────────►│                               │
+     │                               │  [Verify signature vs DID]    │
+     │                               │ ─────────────────────────────►│
+     │                               │                               │
+     │                               │  [Signature valid]            │
+     │                               │ ◄─────────────────────────────│
+     │                               │                               │
+     │  { token: &quot;jwt...&quot;, expires } │                               │
+     │ ◄─────────────────────────────│                               │
+     │                               │                               │
+</code></pre>
+<h4>3. Real-Time Updates</h4>
+<pre><code class="language-typescript">// Subscribe to cooperative events with auto-reconnect
+const subscription = client.subscribe(&#39;my-coop&#39;, {
+  onEvent: (event) =&gt; {
+    switch (event.type) {
+      case &#39;Payment&#39;:
+        updateBalance(event.payload);
+        showNotification(&#39;Payment received!&#39;);
+        break;
+      case &#39;ProposalOpened&#39;:
+        showVotingNotification(event.payload);
+        break;
+    }
+  },
+  onReconnect: (attempt) =&gt; {
+    showConnectionStatus(&#39;Reconnecting...&#39;);
+  },
+}, {
+  autoReconnect: true,
+  autoBackfill: true,  // Catch up on missed events
+  gapDetection: true,  // Detect missing sequence numbers
+});
+</code></pre>
+<h4>4. Offline Support</h4>
+<p><strong>Queued Transactions</strong>:</p>
+<pre><code class="language-typescript">// Queue payment for later submission
+if (!isOnline) {
+  await queueTransaction({
+    type: &#39;payment&#39;,
+    to: &#39;did:icn:bob&#39;,
+    amount: 2.5,
+    currency: &#39;hours&#39;,
+    memo: &#39;Garden help&#39;,
+  });
+  showMessage(&#39;Payment queued - will submit when online&#39;);
+}
+</code></pre>
+<p><strong>Cached Data</strong>:</p>
+<ul>
+<li>Balance cached locally (synced on connect)</li>
+<li>Recent transaction history</li>
+<li>Member directory</li>
+<li>Proposal summaries</li>
+</ul>
+<p><strong>Sync on Reconnect</strong>:</p>
+<ol>
+<li>Submit queued transactions</li>
+<li>Request backfill of missed events</li>
+<li>Refresh balances</li>
+<li>Update cached data</li>
+</ol>
+<hr>
+<h2>Identity → Membership → Authorization (In Practice)</h2>
+<p><strong>How a person goes from &quot;I downloaded the app&quot; to &quot;I can pay and vote&quot;:</strong></p>
+<h3>Step 1: Create Identity (in wallet)</h3>
+<pre><code class="language-typescript">// Happens automatically on first app launch
+const keypair = await SecureEnclave.generateEd25519();
+const did = `did:icn:${base58Encode(keypair.publicKey)}`;
+// DID stored locally, never leaves device
+</code></pre>
+<p><strong>User sees</strong>: &quot;Your identity has been created. Back up your recovery phrase.&quot;</p>
+<h3>Step 2: Apply for Membership</h3>
+<pre><code class="language-typescript">// User taps &quot;Join Cooperative&quot; and enters invite code
+const application = await client.applyForMembership({
+  coopId: &#39;coop:icn:food-coop-123&#39;,
+  inviteCode: &#39;ABC123&#39;,
+  name: &#39;Alice Smith&#39;,
+  email: &#39;alice@example.com&#39;,
+});
+// Status: &quot;pending&quot; until approved
+</code></pre>
+<p><strong>User sees</strong>: &quot;Application submitted. A member will review your application.&quot;</p>
+<h3>Step 3: Receive Membership Credential</h3>
+<pre><code class="language-typescript">// After approval (governance vote or admin action)
+// Gateway issues Verifiable Credential:
+const membershipVC = {
+  type: &#39;MembershipCredential&#39;,
+  issuer: &#39;entity:icn:coop:food-coop-123&#39;,
+  subject: &#39;did:icn:alice...&#39;,
+  roles: [&#39;member&#39;],  // Can be upgraded later
+  issuedAt: &#39;2026-01-23T...&#39;,
+  expiresAt: &#39;2027-01-23T...&#39;,
+  signature: &#39;...&#39;,
+};
+// VC stored in wallet, presented to gateway on auth
+</code></pre>
+<p><strong>User sees</strong>: &quot;Welcome to Food Co-op! You&#39;re now a member.&quot;</p>
+<h3>Step 4: Authenticate to Gateway</h3>
+<pre><code>Every API call includes this flow:
+
+1. Wallet: POST /auth/challenge { did: &quot;did:icn:alice...&quot; }
+2. Gateway: { nonce: &quot;random-challenge-bytes&quot; }
+3. Wallet: Signs nonce with private key
+4. Wallet: POST /auth/verify { did, signature, membershipVC }
+5. Gateway: Verifies signature + VC + non-revocation
+6. Gateway: { token: &quot;jwt...&quot;, expiresIn: 3600 }
+7. Wallet: Uses JWT for subsequent requests
+</code></pre>
+<h3>Step 5: Authorization Check (every request)</h3>
+<pre><code>Gateway checks (in order):
+
+1. JWT valid and not expired?
+2. DID in JWT matches request context?
+3. Membership VC valid for this coop?
+4. VC not in revocation accumulator?
+5. Role in VC permits this action?
+6. Trust score meets threshold for this endpoint?
+
+If ANY check fails → 401/403 error
+</code></pre>
+<h3>Role Progression</h3>
+<pre><code>New member joins:
+  └── Roles: [member]
+      ├── Can: view balance, make payments, vote
+      └── Cannot: create proposals, approve members
+
+After 6 months + good standing:
+  └── Roles: [member, proposer]
+      └── Can: create governance proposals
+
+Elected to board:
+  └── Roles: [member, proposer, moderator, treasurer]
+      └── Can: manage budgets, approve members
+
+Trained as steward:
+  └── Roles: [member, steward]
+      └── Can: conduct VUI ceremonies, participate in key recovery
+</code></pre>
+<hr>
+<h2>Identity Lifecycle (Practical Scenarios)</h2>
+<h3>Scenario: Lost Phone</h3>
+<pre><code>1. Alice loses her phone (device: &quot;iphone-12&quot;)
+
+2. Alice uses her laptop (device: &quot;macbook-1&quot;) to:
+   DELETE /devices/{alice-did}/iphone-12
+   { reason: &quot;lost&quot;, signature: &lt;signed-by-macbook-1&gt; }
+
+3. Gateway adds &quot;iphone-12&quot; to revoked devices list
+
+4. If someone finds Alice&#39;s phone:
+   - They can&#39;t auth (device credential revoked)
+   - They can see cached data (encrypt sensitive local data!)
+   - They can&#39;t sign new transactions
+
+5. Alice buys new phone, registers it:
+   POST /devices/{alice-did}
+   { device_id: &quot;iphone-14&quot;, public_key: &quot;...&quot;, signature: &lt;signed-by-macbook-1&gt; }
+
+6. Alice&#39;s membership is unaffected—her DID didn&#39;t change
+</code></pre>
+<h3>Scenario: Phone Stolen AND Unlocked (Worst Case)</h3>
+<pre><code>1. Attacker has Alice&#39;s phone, unlocked (biometrics bypassed)
+
+2. Alice calls trusted contact (Bob) who has emergency auth:
+   Bob: POST /identity/emergency-revoke
+   { target_did: &quot;did:icn:alice...&quot;, voucher_did: &quot;did:icn:bob...&quot;, reason: &quot;theft&quot; }
+
+3. Gateway immediately:
+   - Revokes ALL of Alice&#39;s device credentials
+   - Marks Alice&#39;s DID as &quot;recovery mode&quot;
+   - Blocks all transactions from Alice&#39;s DID
+
+4. Alice schedules recovery ceremony with stewards:
+   - In-person verification (video call with 3 stewards)
+   - Stewards use threshold shares to reconstruct recovery key
+   - New keypair generated, new DID created
+
+5. Alice&#39;s old DID is linked to new DID via recovery proof:
+   { old_did: &quot;did:icn:alice-old...&quot;, new_did: &quot;did:icn:alice-new...&quot;,
+     recovery_proof: &lt;signed-by-steward-threshold&gt;, timestamp: &quot;...&quot; }
+
+6. Alice&#39;s memberships are migrated:
+   - Each entity re-issues membership VC to new DID
+   - Trust graph transfers attestations (with verification)
+   - Balance transfers (via governance-approved migration)
+</code></pre>
+<h3>Scenario: Key Rotation (Proactive Security)</h3>
+<pre><code>1. Alice decides to rotate keys (annual security hygiene)
+
+2. Alice generates new keypair on her device:
+   const newKeypair = await SecureEnclave.generateEd25519();
+   const newDid = `did:icn:${base58Encode(newKeypair.publicKey)}`;
+
+3. Alice publishes rotation announcement (signed by OLD key):
+   POST /identity/rotate
+   { old_did: &quot;did:icn:alice-old...&quot;, new_did: &quot;did:icn:alice-new...&quot;,
+     reason: &quot;scheduled_rotation&quot;, signature: &lt;signed-by-old-key&gt; }
+
+4. 7-day grace period:
+   - Both DIDs accepted by gateway
+   - Other members notified of pending rotation
+   - Entities prepare new membership VCs
+
+5. After grace period:
+   - Old DID deprecated (auth rejected)
+   - New DID is canonical
+   - All credentials now reference new DID
+</code></pre>
+<h3>Scenario: Member Removed (Governance Action)</h3>
+<pre><code>1. Governance proposal: &quot;Remove Alice for code of conduct violation&quot;
+
+2. Proposal passes with required majority
+
+3. Gateway executes:
+   - Alice&#39;s membership VC added to revocation accumulator
+   - Alice&#39;s trust attestations from this entity zeroed
+   - Alice&#39;s credit limit set to zero, outstanding balance flagged
+
+4. Alice&#39;s app shows:
+   - &quot;Your membership has been revoked&quot;
+   - &quot;Reason: Governance decision #1234&quot;
+   - &quot;Appeal deadline: 30 days&quot;
+
+5. Alice can appeal:
+   POST /governance/appeals
+   { proposal_id: &quot;1234&quot;, grounds: &quot;procedural error&quot;, evidence: &quot;...&quot; }
+
+6. If appeal succeeds:
+   - Membership VC removed from revocation accumulator
+   - Trust/credit restored
+</code></pre>
+<hr>
+<h2>Day-to-Day Cooperative Use</h2>
+<h3>User Journey: New Member Onboarding</h3>
+<pre><code>1. INVITATION
+   ├── Existing member sends invite link/QR code
+   └── Contains: coop_id, invite_code, gateway_url
+
+2. APP INSTALLATION
+   ├── Download mobile wallet from app store
+   └── Or: Access web app at coop&#39;s subdomain
+
+3. IDENTITY CREATION
+   ├── Generate Ed25519 keypair (in Secure Enclave)
+   ├── Create DID: did:icn:&lt;pubkey&gt;
+   └── Set up biometric unlock
+
+4. STEWARD VERIFICATION (for full membership)
+   ├── Schedule enrollment ceremony
+   ├── Meet with steward (in person or video)
+   ├── Complete VUI generation (proof-of-personhood)
+   └── Receive personhood anchor credential
+
+5. COOPERATIVE MEMBERSHIP
+   ├── Apply with invite code
+   ├── Existing members vouch (builds initial trust)
+   ├── Membership approved (governance or auto)
+   └── Initial credit limit assigned based on sponsorship
+
+6. FIRST TRANSACTION
+   ├── Receive welcome credits from cooperative fund
+   └── Or: Log first contribution, earn credits
+</code></pre>
+<h3>User Journey: Daily Transaction</h3>
+<pre><code>ALICE PAYS BOB FOR 2 HOURS OF GARDENING HELP
+
+1. ALICE opens wallet app
+   └── Authenticates with Face ID
+
+2. ALICE taps &quot;Pay&quot;
+   ├── Scans Bob&#39;s QR code (or selects from directory)
+   ├── Enters: 2 hours, memo &quot;Garden help&quot;
+   └── Reviews: &quot;Pay 2.00 hours to Bob&quot;
+
+3. ALICE confirms
+   └── Signs transaction with private key
+
+4. TRANSACTION SUBMITTED
+   ├── SDK calls POST /ledger/{coop}/payment
+   └── Gateway validates, forwards to ICN daemon
+
+5. LEDGER PROCESSING
+   ├── ICN daemon creates double-entry
+   │   ├── Debit: Alice -2 hours
+   │   └── Credit: Bob +2 hours
+   ├── Entry added to Merkle-DAG
+   └── Gossip broadcasts to other nodes
+
+6. REAL-TIME UPDATE
+   ├── WebSocket pushes event to Bob&#39;s wallet
+   └── Bob sees notification: &quot;Received 2 hours from Alice&quot;
+
+7. BOTH WALLETS UPDATED
+   ├── Alice sees new balance
+   └── Bob sees new balance
+
+TOTAL TIME: ~2 seconds
+</code></pre>
+<h3>User Journey: Governance Vote</h3>
+<pre><code>COOPERATIVE PROPOSAL: &quot;Increase credit limit for new members&quot;
+
+1. PROPOSAL CREATED
+   ├── Board member creates proposal via app
+   ├── Type: Economic, requires 2/3 majority
+   └── Discussion period: 7 days
+
+2. NOTIFICATION
+   ├── All members receive push notification
+   └── &quot;New proposal: Review and vote within 7 days&quot;
+
+3. MEMBER REVIEWS
+   ├── Opens proposal in app
+   ├── Reads description, sees current discussion
+   └── Can add comments
+
+4. MEMBER VOTES
+   ├── Options: For / Against / Abstain
+   ├── Signs vote with private key
+   └── Can delegate vote to trusted member
+
+5. VOTING CLOSES
+   ├── Automatic after deadline
+   ├── Or: Manual close by authorized member
+   └── Results calculated
+
+6. OUTCOME APPLIED
+   ├── If passed: Parameters updated automatically
+   └── If failed: Proposal archived
+
+7. AUDIT TRAIL
+   └── Full vote history preserved in governance log
+</code></pre>
+<hr>
+<h2>Application Integration Patterns</h2>
+<h3>Pattern 1: Web Application</h3>
+<pre><code class="language-typescript">// React app with ICN SDK
+import { createClient, ICNClient } from &#39;@icn/client&#39;;
+
+function CoopDashboard() {
+  const [client, setClient] = useState&lt;ICNClient | null&gt;(null);
+  const [balance, setBalance] = useState&lt;number&gt;(0);
+
+  useEffect(() =&gt; {
+    let sub: any = null;
+
+    async function init() {
+      const icn = createClient({
+        baseUrl: &#39;https://gateway.mycoop.org&#39;,
+        autoRefresh: true,
+      });
+
+      // Authenticate with wallet
+      await icn.authenticate(did, walletSigner, &#39;my-coop&#39;);
+      setClient(icn);
+
+      // Subscribe to real-time updates
+      sub = icn.subscribe(&#39;my-coop&#39;, {
+        onEvent: (event) =&gt; {
+          if (event.type === &#39;Payment&#39;) {
+            refreshBalance();
+          }
+        },
+      });
+    }
+
+    init();
+    return () =&gt; { if (sub) sub.close(); };
+  }, []);
+
+  async function refreshBalance() {
+    const bal = await client.getBalance(&#39;my-coop&#39;, did);
+    setBalance(bal.balance);
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Balance: {balance} hours&lt;/h1&gt;
+      &lt;PaymentForm client={client} /&gt;
+    &lt;/div&gt;
+  );
+}
+</code></pre>
+<h3>Pattern 2: Point-of-Sale Terminal</h3>
+<pre><code class="language-typescript">// POS terminal for in-person payments
+class POSTerminal {
+  private client: ICNClient;
+  private merchantDid: string;
+
+  async processPayment(amount: number, currency: string) {
+    // Display QR code for customer to scan
+    const paymentRequest = {
+      to: this.merchantDid,
+      amount,
+      currency,
+      memo: `POS Sale - ${new Date().toISOString()}`,
+    };
+
+    displayQRCode(encodePaymentRequest(paymentRequest));
+
+    // Wait for payment confirmation via WebSocket
+    return new Promise((resolve, reject) =&gt; {
+      const timeout = setTimeout(() =&gt; reject(&#39;Payment timeout&#39;), 60000);
+
+      this.client.subscribe(&#39;my-coop&#39;, {
+        onEvent: (event) =&gt; {
+          if (event.type === &#39;Payment&#39; &amp;&amp;
+              event.payload.to === this.merchantDid &amp;&amp;
+              event.payload.amount === amount) {
+            clearTimeout(timeout);
+            printReceipt(event.payload);
+            resolve(event.payload);
+          }
+        },
+      });
+    });
+  }
+}
+</code></pre>
+<h3>Pattern 3: Scheduled Contributions</h3>
+<pre><code class="language-typescript">// Automated monthly contributions via CCL contract
+const monthlyContributionContract = {
+  name: &quot;MonthlyMembershipDues&quot;,
+  participants: memberDids,
+  currency: &quot;hours&quot;,
+  rules: [
+    {
+      name: &quot;collect_dues&quot;,
+      requires: [
+        // Only callable on first of month
+        &quot;day_of_month(now()) == 1&quot;
+      ],
+      body: [
+        // Transfer 1 hour from each member to coop treasury
+        {
+          type: &quot;For&quot;,
+          var: &quot;member&quot;,
+          iterable: &quot;participants&quot;,
+          body: [
+            {
+              type: &quot;LedgerTransfer&quot;,
+              from: { type: &quot;Var&quot;, name: &quot;member&quot; },
+              to: { type: &quot;Literal&quot;, value: &quot;did:icn:coop-treasury&quot; },
+              amount: { type: &quot;Literal&quot;, value: 1 },
+              currency: { type: &quot;Literal&quot;, value: &quot;hours&quot; },
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  triggers: [
+    {
+      name: &quot;monthly_dues&quot;,
+      schedule: &quot;0 0 1 * *&quot;,  // First of each month
+      action: [{ type: &quot;Call&quot;, name: &quot;collect_dues&quot;, args: [] }]
+    }
+  ]
+};
+</code></pre>
+<hr>
+<h2>Federation at Scale</h2>
+<h3>Topology: Regional Food Co-op Federation</h3>
+<pre><code>                     ┌─────────────────────────────────┐
+                     │     NATIONAL FOOD COOP          │
+                     │     FEDERATION                  │
+                     │     (Meta-Federation)           │
+                     │     - Policy coordination       │
+                     │     - Bulk purchasing pools     │
+                     │     - Advocacy                  │
+                     └──────────────┬──────────────────┘
+                                    │
+          ┌─────────────────────────┼─────────────────────────┐
+          │                         │                         │
+┌─────────▼─────────┐    ┌─────────▼─────────┐    ┌─────────▼─────────┐
+│  MIDWEST REGION   │    │  NORTHEAST REGION │    │  WEST COAST       │
+│  FEDERATION       │    │  FEDERATION       │    │  FEDERATION       │
+│  - Regional       │    │  - Regional       │    │  - Regional       │
+│    clearing       │    │    clearing       │    │    clearing       │
+│  - Shared stewards│    │  - Shared stewards│    │  - Shared stewards│
+│  - Compute pool   │    │  - Compute pool   │    │  - Compute pool   │
+└─────────┬─────────┘    └─────────┬─────────┘    └─────────┬─────────┘
+          │                         │                         │
+    ┌─────┼─────┐            ┌─────┼─────┐            ┌─────┼─────┐
+    │     │     │            │     │     │            │     │     │
+┌───▼─┐ ┌─▼───┐ ┌▼──┐    ┌───▼─┐ ┌─▼───┐ ┌▼──┐    ┌───▼─┐ ┌─▼───┐ ┌▼──┐
+│Coop │ │Coop │ │...│    │Coop │ │Coop │ │...│    │Coop │ │Coop │ │...│
+│  A  │ │  B  │ │   │    │  C  │ │  D  │ │   │    │  E  │ │  F  │ │   │
+└─────┘ └─────┘ └───┘    └─────┘ └─────┘ └───┘    └─────┘ └─────┘ └───┘
+</code></pre>
+<h3>Cross-Cooperative Transactions</h3>
+<p><strong>Scenario</strong>: Alice (Coop A) pays Bob (Coop B) for consulting</p>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────┐
+│                     CROSS-COOP PAYMENT FLOW                             │
+└─────────────────────────────────────────────────────────────────────────┘
+
+1. ALICE initiates payment
+   ├── Alice&#39;s wallet → Coop A Gateway
+   └── &quot;Pay 5 hours to did:icn:bob (Coop B)&quot;
+
+2. COOP A processes
+   ├── Debit Alice&#39;s account: -5 hours
+   ├── Create clearing entry: +5 hours owed to Coop B
+   └── Sign cross-coop payment message
+
+3. FEDERATION ROUTING
+   ├── Coop A Gateway → Midwest Federation Gateway
+   ├── Federation routes to Coop B (same region)
+   │   OR
+   ├── If different region: → National Federation → Target Region → Coop B
+   └── Message includes: signed payment, Alice&#39;s trust attestation
+
+4. COOP B processes
+   ├── Verify Alice&#39;s signature and trust score
+   ├── Credit Bob&#39;s account: +5 hours
+   ├── Create clearing entry: -5 hours from Coop A
+   └── Notify Bob via WebSocket
+
+5. FEDERATION SETTLEMENT (periodic)
+   ├── Clearing house nets all inter-coop balances
+   ├── Net settlement via:
+   │   ├── Labor hour transfers
+   │   ├── Asset token swaps
+   │   └── Or: Fiat bridge (last resort)
+   └── Clearing entries zeroed out
+</code></pre>
+<h3>Trust Propagation</h3>
+<pre><code>Trust flows transitively through federation:
+
+Alice (Coop A) → Bob (Coop B) direct trust: NONE
+Alice (Coop A) → Coop A trust: 0.8 (Partner)
+Coop A → Midwest Federation trust: 0.7 (Federated)
+Midwest Federation → Coop B trust: 0.6 (Partner)
+
+Transitive trust: Alice → Bob = 0.8 × 0.7 × 0.6 = 0.336 (Known)
+
+Bob can accept Alice&#39;s payment because transitive trust &gt; MIN_TRUST (0.1)
+Bob&#39;s credit limit for Alice is gated by this transitive trust score.
+</code></pre>
+<h3>Federation Services</h3>
+<table>
+<thead>
+<tr>
+<th>Service</th>
+<th>Purpose</th>
+<th>How It Works</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Clearing House</strong></td>
+<td>Net inter-coop balances</td>
+<td>Periodic settlement, multi-modal (labor/assets/fiat)</td>
+</tr>
+<tr>
+<td><strong>Steward Pool</strong></td>
+<td>Shared identity verification</td>
+<td>Distributed steward network, threshold ceremonies</td>
+</tr>
+<tr>
+<td><strong>Compute Pool</strong></td>
+<td>Shared task execution</td>
+<td>Federated executors, cross-coop workloads</td>
+</tr>
+<tr>
+<td><strong>Bulk Purchasing</strong></td>
+<td>Collective buying power</td>
+<td>Aggregate orders, negotiate as federation</td>
+</tr>
+<tr>
+<td><strong>Dispute Resolution</strong></td>
+<td>Cross-coop conflicts</td>
+<td>Arbitration panels from multiple coops</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Scaling Considerations</h2>
+<h3>Horizontal Scaling</h3>
+<p><strong>Gateway Layer</strong>:</p>
+<pre><code>┌─────────────────────────────────────────────────────────────┐
+│                    LOAD BALANCER                            │
+│                    (HAProxy / Nginx)                        │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+     ┌─────────────────────┼─────────────────────┐
+     │                     │                     │
+┌────▼─────┐         ┌─────▼────┐         ┌─────▼────┐
+│ Gateway  │         │ Gateway  │         │ Gateway  │
+│ Instance │         │ Instance │         │ Instance │
+│    1     │         │    2     │         │    3     │
+└────┬─────┘         └─────┬────┘         └─────┬────┘
+     │                     │                     │
+     └─────────────────────┼─────────────────────┘
+                           │
+                    ┌──────▼──────┐
+                    │  ICN Daemon │
+                    │  (Single)   │
+                    └─────────────┘
+</code></pre>
+<p><strong>Gossip Layer</strong>:</p>
+<ul>
+<li>Adaptive fanout based on network size</li>
+<li>Bloom filters reduce bandwidth</li>
+<li>Sharded topics for high-volume coops</li>
+</ul>
+<h3>Database Scaling</h3>
+<p><strong>Sled (embedded)</strong>:</p>
+<ul>
+<li>Single-writer, multi-reader</li>
+<li>Good for: &lt;10,000 transactions/day</li>
+<li>Runs in ICN daemon process</li>
+</ul>
+<p><strong>Distributed Storage</strong> (large deployments):</p>
+<ul>
+<li>PostgreSQL + read replicas for gateway state</li>
+<li>Redis for session/cache</li>
+<li>S3-compatible for large blobs</li>
+</ul>
+<h3>Compute Scaling</h3>
+<p><strong>Auto-scaling Executor Pool</strong>:</p>
+<pre><code class="language-yaml"># Kubernetes HPA for compute nodes
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: icn-compute-pool
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: icn-compute
+  minReplicas: 2
+  maxReplicas: 20
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+</code></pre>
+<h3>Performance Targets</h3>
+<p><strong>Note</strong>: These are design targets, not measured benchmarks. Actual performance depends on hardware, network conditions, and load. See <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/performance/">docs/performance/</a> for benchmark methodology and results.</p>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Target</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Payment latency</td>
+<td>&lt; 2 seconds</td>
+<td>End-to-end, same coop</td>
+</tr>
+<tr>
+<td>Cross-coop payment</td>
+<td>&lt; 5 seconds</td>
+<td>Regional federation</td>
+</tr>
+<tr>
+<td>WebSocket event delivery</td>
+<td>&lt; 100ms</td>
+<td>After ledger commit</td>
+</tr>
+<tr>
+<td>Gateway API p99</td>
+<td>&lt; 200ms</td>
+<td>Most endpoints</td>
+</tr>
+<tr>
+<td>Mobile app startup</td>
+<td>&lt; 3 seconds</td>
+<td>Cold start to usable</td>
+</tr>
+</tbody></table>
+<p><strong>Benchmarking resources</strong>:</p>
+<ul>
+<li><code>docs/performance/BENCHMARKS.md</code> - Benchmark suite and results</li>
+<li><code>docs/performance/PROFILING.md</code> - CPU/memory profiling guides</li>
+<li><code>docs/performance/TARGETS.md</code> - Detailed target specifications</li>
+</ul>
+<hr>
+<h2>Security at Scale</h2>
+<h3>Defense in Depth</h3>
+<pre><code>Layer 1: Transport
+├── TLS 1.3 everywhere
+├── Certificate pinning in mobile apps
+└── mTLS for inter-node communication
+
+Layer 2: Authentication
+├── DID-based challenge/response
+├── JWT tokens (short-lived, 1 hour)
+├── Refresh tokens (longer-lived, secure storage)
+└── Device-bound credentials
+
+Layer 3: Authorization
+├── Cooperative membership verification
+├── Role-based access control
+├── Capability tokens for scoped access
+└── Trust-gated rate limits
+
+Layer 4: Application
+├── Input validation at gateway
+├── CCL fuel metering
+├── Compute result verification (BFT)
+└── Byzantine fault detection
+
+Layer 5: Data
+├── Signed messages (Ed25519)
+├── Merkle-DAG auditability
+├── Encrypted topic metadata
+└── Optional E2E encryption
+</code></pre>
+<h3>Rate Limiting by Trust</h3>
+<pre><code>Isolated (&lt; 0.1):   10 requests/second, 1KB max payload
+Known (0.1-0.4):    50 requests/second, 10KB max payload
+Partner (0.4-0.7):  100 requests/second, 100KB max payload
+Federated (0.7+):   200 requests/second, 1MB max payload
+</code></pre>
+<h3>Monitoring &amp; Alerting</h3>
+<p><strong>Prometheus Metrics</strong>:</p>
+<ul>
+<li><code>icn_gateway_requests_total</code> - Request count by endpoint</li>
+<li><code>icn_ledger_transactions_total</code> - Transaction count</li>
+<li><code>icn_gossip_messages_total</code> - Gossip message count</li>
+<li><code>icn_trust_violations_total</code> - Security violations</li>
+<li><code>icn_compute_tasks_total</code> - Compute task count</li>
+</ul>
+<p><strong>Alerting Thresholds</strong>:</p>
+<ul>
+<li>Gateway error rate &gt; 1%</li>
+<li>Payment latency p99 &gt; 5 seconds</li>
+<li>Byzantine violations &gt; 10/hour</li>
+<li>Node unreachable &gt; 5 minutes</li>
+</ul>
+<hr>
+<h2>Deployment Checklist</h2>
+<h3>New Cooperative Setup</h3>
+<pre><code>□ Provision infrastructure
+  □ Server(s) for Full Node
+  □ Domain name and SSL certificate
+  □ Backup storage
+
+□ Deploy ICN daemon
+  □ Install icnd binary
+  □ Generate node keypair
+  □ Configure node.toml
+  □ Start daemon, verify peer discovery
+
+□ Deploy Gateway
+  □ Configure gateway.toml
+  □ Connect to ICN daemon
+  □ Enable HTTPS
+  □ Set up rate limiting
+
+□ Configure cooperative
+  □ Create cooperative entity
+  □ Set governance parameters
+  □ Configure credit policy
+  □ Set up currency (hours, etc.)
+
+□ Member onboarding
+  □ Deploy mobile app / web app
+  □ Create invite system
+  □ Document onboarding process
+  □ Train initial stewards
+
+□ Federation (optional)
+  □ Apply to regional federation
+  □ Configure trust bridge
+  □ Test cross-coop payments
+  □ Set up clearing participation
+</code></pre>
+<hr>
+<h2>Related Documents</h2>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/ICN_COMPLETE_ARCHITECTURE_SYNTHESIS">ICN_COMPLETE_ARCHITECTURE_SYNTHESIS.md</a> - Technical architecture</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/ICN_MINIMUM_VERTICAL_SLICE">ICN_MINIMUM_VERTICAL_SLICE.md</a> - End-to-end operation traces</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/ECONOMIC_ARCHITECTURE">ECONOMIC_ARCHITECTURE.md</a> - Economic system details</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/HOMELAB_DEPLOYMENT">HOMELAB_DEPLOYMENT.md</a> - Example deployment</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/dev-journal/ROADMAP">dev-journal/ROADMAP.md</a> - Implementation roadmap</li>
+</ul>
+<hr>
+<h2>Document History</h2>
+<ul>
+<li>2026-01-23: Added Identity→Membership→Authorization, Identity Lifecycle scenarios</li>
+<li>2026-01-23: Initial creation from SDK/Gateway analysis</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

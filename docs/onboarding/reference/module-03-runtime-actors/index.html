@@ -1,0 +1,823 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Module 3: Runtime and Actor Model | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>onboarding</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>reference</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>module 03 runtime actors</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/onboarding/reference/module-03-runtime-actors.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Module 3: Runtime and Actor Model</h1>
+<h2>Overview</h2>
+<blockquote>
+<p><strong>ICN is a constraint engine: apps translate meaning into constraints; the kernel enforces constraints without understanding meaning.</strong></p>
+</blockquote>
+<p>This module teaches you how ICN starts up, manages long-running services, and coordinates graceful shutdown. Understanding the runtime and actor model is essential for contributing to any ICN subsystem.</p>
+<p>In the constraint engine model, the runtime and supervisor are part of the <strong>kernel</strong> (enforcement mechanisms), while actors like Trust, Governance, and Ledger are <strong>policy oracles</strong> that translate domain semantics into constraints.</p>
+<h2>Objectives</h2>
+<ul>
+<li>Trace the startup flow from <code>icnd</code> main to running actors</li>
+<li>Understand the actor pattern and why ICN uses it</li>
+<li>Learn how actors are initialized in dependency order</li>
+<li>Understand graceful shutdown coordination</li>
+<li>Know how to add a new actor to the system</li>
+</ul>
+<h2>Prerequisites</h2>
+<ul>
+<li>Module 2 (Architecture)</li>
+<li>Module 1 (Rust async and smart pointers)</li>
+</ul>
+<h2>Key Reading</h2>
+<ul>
+<li><code>icn/bins/icnd/src/main.rs</code> - Entry point</li>
+<li><code>icn/crates/icn-core/src/runtime.rs</code> - Runtime lifecycle</li>
+<li><code>icn/crates/icn-core/src/supervisor/mod.rs</code> - Actor orchestration</li>
+</ul>
+<hr>
+<h2>Core Concepts</h2>
+<h3>1. The ICN Process Lifecycle</h3>
+<p>When you run <code>icnd</code>, here&#39;s what happens:</p>
+<pre><code>┌──────────────────────────────────────────────────────────────────┐
+│                         PROCESS STARTUP                          │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  1. main()                 Parse CLI args, load config           │
+│       │                                                          │
+│       ▼                                                          │
+│  2. Initialize tracing     Set up logging and metrics            │
+│       │                                                          │
+│       ▼                                                          │
+│  3. Open keystore          Unlock identity (passphrase)          │
+│       │                                                          │
+│       ▼                                                          │
+│  4. Runtime::new()         Create runtime with config            │
+│       │                                                          │
+│       ▼                                                          │
+│  5. Runtime::run()         Start supervisor                      │
+│       │                                                          │
+│       ▼                                                          │
+│  6. Supervisor::run()      Initialize and run actors             │
+│       │                                                          │
+│       ▼                                                          │
+│  7. Wait for shutdown      CTRL+C or signal                      │
+│       │                                                          │
+│       ▼                                                          │
+│  8. Graceful shutdown      Stop actors, flush state              │
+│                                                                  │
+└──────────────────────────────────────────────────────────────────┘
+</code></pre>
+<h3>2. The Runtime: Process-Level Concerns</h3>
+<p><strong>What is the Runtime?</strong></p>
+<p>The Runtime is a thin lifecycle shell that:</p>
+<ul>
+<li>Holds configuration</li>
+<li>Manages the identity bundle</li>
+<li>Owns the shutdown broadcast channel</li>
+<li>Starts the Supervisor</li>
+</ul>
+<p><strong>It does NOT implement system logic</strong>—that&#39;s the Supervisor&#39;s job.</p>
+<pre><code class="language-rust">// From icn-core/src/runtime.rs
+pub struct Runtime {
+    config: Config,
+    identity_bundle: Option&lt;IdentityBundle&gt;,
+    shutdown_tx: ShutdownTx,  // broadcast::Sender&lt;()&gt;
+}
+
+impl Runtime {
+    pub fn new(config: Config, identity_bundle: Option&lt;IdentityBundle&gt;) -&gt; Self {
+        let (shutdown_tx, _) = broadcast::channel(1);
+        Runtime { config, identity_bundle, shutdown_tx }
+    }
+
+    pub async fn run(self) -&gt; Result&lt;()&gt; {
+        info!(&quot;ICNd runtime starting&quot;);
+
+        // Create and run supervisor
+        let supervisor = Supervisor::new(
+            self.config.clone(),
+            self.identity_bundle,
+            self.shutdown_tx.clone(),
+        );
+
+        supervisor.run().await?;
+
+        info!(&quot;ICNd runtime stopped&quot;);
+        Ok(())
+    }
+}
+</code></pre>
+<p><strong>Why separate Runtime from Supervisor?</strong></p>
+<ul>
+<li><strong>Separation of concerns</strong>: Process lifecycle vs. actor orchestration</li>
+<li><strong>Testability</strong>: Can test Supervisor without full process setup</li>
+<li><strong>Flexibility</strong>: Different entry points (daemon, tests) share Supervisor</li>
+</ul>
+<h3>3. The Supervisor: Actor Orchestration</h3>
+<p><strong>What is the Supervisor?</strong></p>
+<p>The Supervisor is the orchestration layer that:</p>
+<ul>
+<li>Creates actors in the correct dependency order</li>
+<li>Wires connections between actors (callbacks, channels)</li>
+<li>Holds long-lived handles to keep actors alive</li>
+<li>Coordinates graceful shutdown</li>
+</ul>
+<pre><code class="language-rust">// From icn-core/src/supervisor/mod.rs
+pub struct Supervisor {
+    config: Config,
+    identity_bundle: Option&lt;IdentityBundle&gt;,
+    shutdown_tx: ShutdownTx,
+}
+
+impl Supervisor {
+    pub async fn run(self) -&gt; Result&lt;()&gt; {
+        // Initialize metrics server
+        icn_obs::init_metrics()?;
+
+        // Track background tasks for graceful shutdown
+        let mut background_tasks: JoinSet&lt;()&gt; = JoinSet::new();
+
+        if let Some(identity_bundle) = &amp;self.identity_bundle {
+            // Full node: initialize all actors
+            let did = identity_bundle.did().clone();
+
+            // 1. Trust services first (needed by everyone)
+            let trust_services = init_trust::init_trust_services(&amp;self.config, did.clone()).await?;
+
+            // 2. Gossip services (needs trust)
+            let gossip_services = init_gossip::init_gossip_services(/*...*/).await?;
+
+            // 3. Ledger services (needs gossip)
+            let ledger_services = init_ledger::init_ledger_services(/*...*/).await?;
+
+            // 4. Network actor (needs everything wired)
+            let network_handle = init_network::init_network(/*...*/).await?;
+
+            // 5. Gateway (exposes everything via API)
+            let gateway = init_gateway::init_gateway(/*...*/).await?;
+
+            // ... wait for shutdown
+        } else {
+            // Limited mode: no identity-dependent actors
+            warn!(&quot;No identity bundle - running in limited mode&quot;);
+        }
+
+        Ok(())
+    }
+}
+</code></pre>
+<hr>
+<h2>The Actor Model</h2>
+<h3>4. What is an Actor?</h3>
+<p>An <strong>actor</strong> is a concurrent component that:</p>
+<ul>
+<li><strong>Encapsulates state</strong>: Only the actor can modify its internal state</li>
+<li><strong>Communicates via messages</strong>: No shared mutable state between actors</li>
+<li><strong>Has a handle</strong>: External code interacts through a handle</li>
+<li><strong>Runs as an async task</strong>: Non-blocking, event-driven</li>
+</ul>
+<p><strong>Why actors?</strong></p>
+<table>
+<thead>
+<tr>
+<th>Problem</th>
+<th>Actor Solution</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Shared mutable state</td>
+<td>Each actor owns its state exclusively</td>
+</tr>
+<tr>
+<td>Data races</td>
+<td>Message passing eliminates races</td>
+</tr>
+<tr>
+<td>Circular dependencies</td>
+<td>Callbacks avoid direct references</td>
+</tr>
+<tr>
+<td>Testing</td>
+<td>Actors can be tested in isolation</td>
+</tr>
+<tr>
+<td>Shutdown</td>
+<td>Clear lifecycle management</td>
+</tr>
+</tbody></table>
+<h3>5. Actor Structure</h3>
+<p>Every ICN actor follows this pattern:</p>
+<pre><code class="language-rust">// 1. The actor struct holds internal state
+pub struct MyActor {
+    state: MyState,
+    config: MyConfig,
+    // ... internal fields
+}
+
+// 2. The handle provides concurrent access
+#[derive(Clone)]
+pub struct MyActorHandle {
+    // Option A: Arc&lt;RwLock&lt;Actor&gt;&gt; for direct access
+    inner: Arc&lt;RwLock&lt;MyActor&gt;&gt;,
+
+    // Option B: Channel for message passing
+    // tx: mpsc::Sender&lt;MyCommand&gt;,
+}
+
+impl MyActorHandle {
+    pub async fn do_something(&amp;self) -&gt; Result&lt;Something&gt; {
+        let actor = self.inner.read().await;
+        actor.internal_operation()
+    }
+
+    pub async fn mutate(&amp;self, data: Data) -&gt; Result&lt;()&gt; {
+        let mut actor = self.inner.write().await;
+        actor.apply_mutation(data)
+    }
+}
+
+// 3. Constructor creates both actor and handle
+impl MyActor {
+    pub fn new(config: MyConfig) -&gt; (Self, MyActorHandle) {
+        let actor = MyActor {
+            state: MyState::default(),
+            config,
+        };
+        let handle = MyActorHandle {
+            inner: Arc::new(RwLock::new(actor)),
+        };
+        (actor, handle)
+    }
+}
+</code></pre>
+<h3>6. Handle Patterns</h3>
+<p>ICN uses two main handle patterns:</p>
+<p><strong>Pattern A: Arc&lt;RwLock<Actor>&gt;</strong></p>
+<p>Direct access to actor state through a read-write lock.</p>
+<pre><code class="language-rust">pub struct GossipHandle {
+    inner: Arc&lt;RwLock&lt;GossipActor&gt;&gt;,
+}
+
+impl GossipHandle {
+    pub async fn subscribe(&amp;self, topic: &amp;str) -&gt; Result&lt;()&gt; {
+        let mut actor = self.inner.write().await;
+        actor.add_subscription(topic)
+    }
+
+    pub async fn get_subscriptions(&amp;self) -&gt; Vec&lt;String&gt; {
+        let actor = self.inner.read().await;
+        actor.subscriptions.keys().cloned().collect()
+    }
+}
+</code></pre>
+<p><strong>Pros</strong>: Simple, direct access
+<strong>Cons</strong>: Lock contention if many readers/writers</p>
+<p><strong>Pattern B: Channel-Based (mpsc)</strong></p>
+<p>Commands sent through channels, processed by actor loop.</p>
+<pre><code class="language-rust">pub struct NetworkHandle {
+    tx: mpsc::Sender&lt;NetworkCommand&gt;,
+}
+
+enum NetworkCommand {
+    SendMessage {
+        to: Did,
+        msg: NetworkMessage,
+        reply: oneshot::Sender&lt;Result&lt;()&gt;&gt;,
+    },
+    GetPeer {
+        did: Did,
+        reply: oneshot::Sender&lt;Option&lt;PeerInfo&gt;&gt;,
+    },
+}
+
+impl NetworkHandle {
+    pub async fn send_message(&amp;self, to: Did, msg: NetworkMessage) -&gt; Result&lt;()&gt; {
+        let (reply_tx, reply_rx) = oneshot::channel();
+        self.tx.send(NetworkCommand::SendMessage {
+            to,
+            msg,
+            reply: reply_tx,
+        }).await?;
+        reply_rx.await?
+    }
+}
+
+// Actor loop
+impl NetworkActor {
+    pub async fn run(mut self, mut rx: mpsc::Receiver&lt;NetworkCommand&gt;) {
+        while let Some(cmd) = rx.recv().await {
+            match cmd {
+                NetworkCommand::SendMessage { to, msg, reply } =&gt; {
+                    let result = self.internal_send(&amp;to, msg).await;
+                    let _ = reply.send(result);
+                }
+                // ... handle other commands
+            }
+        }
+    }
+}
+</code></pre>
+<p><strong>Pros</strong>: Backpressure, no lock contention, clear command boundaries
+<strong>Cons</strong>: More boilerplate, indirect access</p>
+<hr>
+<h2>Actor Communication</h2>
+<h3>7. Callbacks: Connecting Actors</h3>
+<p>Actors communicate through callbacks to avoid circular dependencies.</p>
+<p><strong>The problem:</strong></p>
+<pre><code class="language-rust">// This creates circular dependency - won&#39;t compile
+struct GossipActor {
+    network: NetworkHandle,  // Gossip depends on Network
+}
+
+struct NetworkActor {
+    gossip: GossipHandle,    // Network depends on Gossip
+}
+</code></pre>
+<p><strong>The solution: Callbacks</strong></p>
+<pre><code class="language-rust">// Callback type for sending messages
+pub type SendCallback = Arc&lt;dyn Fn(Did, GossipMessage) -&gt; Result&lt;()&gt; + Send + Sync&gt;;
+
+struct GossipActor {
+    send_callback: Option&lt;SendCallback&gt;,  // Set after creation
+}
+
+impl GossipActor {
+    pub fn set_send_callback(&amp;mut self, callback: SendCallback) {
+        self.send_callback = Some(callback);
+    }
+
+    fn broadcast(&amp;self, msg: GossipMessage) -&gt; Result&lt;()&gt; {
+        if let Some(ref cb) = self.send_callback {
+            for peer in self.subscribers.keys() {
+                cb(peer.clone(), msg.clone())?;
+            }
+        }
+        Ok(())
+    }
+}
+</code></pre>
+<p><strong>Wiring in Supervisor:</strong></p>
+<pre><code class="language-rust">// Create actors first
+let gossip_handle = GossipActor::new(config).1;
+let network_handle = NetworkActor::new(config).1;
+
+// Then wire callbacks
+let network_for_gossip = network_handle.clone();
+let send_callback: SendCallback = Arc::new(move |to, msg| {
+    // This closure captures network_handle
+    network_for_gossip.blocking_send(to, msg)
+});
+
+gossip_handle.write().await.set_send_callback(send_callback);
+</code></pre>
+<h3>8. Common Callback Types</h3>
+<pre><code class="language-rust">// Network → Gossip: Handle incoming messages
+pub type IncomingMessageHandler = Arc&lt;
+    dyn Fn(NetworkMessage) -&gt; Result&lt;()&gt; + Send + Sync
+&gt;;
+
+// Gossip → Network: Send outgoing messages
+pub type SendMessageCallback = Arc&lt;
+    dyn Fn(Did, GossipMessage) -&gt; Result&lt;()&gt; + Send + Sync
+&gt;;
+
+// Gossip → Ledger: Notify of new entries
+pub type LedgerNotificationCallback = Arc&lt;
+    dyn Fn(LedgerEntry) -&gt; Result&lt;()&gt; + Send + Sync
+&gt;;
+
+// Trust → Security: Report misbehavior
+pub type MisbehaviorCallback = Arc&lt;
+    dyn Fn(Did, MisbehaviorEvent) -&gt; Result&lt;()&gt; + Send + Sync
+&gt;;
+</code></pre>
+<hr>
+<h2>Initialization Order</h2>
+<h3>9. Why Order Matters</h3>
+<p>Actors have dependencies. The Supervisor must initialize them in the right order:</p>
+<pre><code>┌─────────────────────────────────────────────────────────────────┐
+│                    INITIALIZATION ORDER                          │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  1. Metrics/Observability    ← Needed for all subsequent steps  │
+│       │                                                         │
+│       ▼                                                         │
+│  2. Storage (Sled)           ← Persistence for everyone         │
+│       │                                                         │
+│       ▼                                                         │
+│  3. Trust Services           ← Access control for network       │
+│       ├── TrustGraph                                            │
+│       ├── MisbehaviorDetector                                   │
+│       └── RecoveryStore                                         │
+│       │                                                         │
+│       ▼                                                         │
+│  4. Gossip Services          ← Needs trust for gating           │
+│       ├── GossipActor                                           │
+│       └── Topic subscriptions                                   │
+│       │                                                         │
+│       ▼                                                         │
+│  5. Ledger Services          ← Needs gossip for replication     │
+│       ├── Ledger                                                │
+│       ├── ContractRuntime                                       │
+│       └── TreasuryManager                                       │
+│       │                                                         │
+│       ▼                                                         │
+│  6. Cooperative Services     ← Domain logic on ledger           │
+│       ├── CoopActor                                             │
+│       └── CommunityActor                                        │
+│       │                                                         │
+│       ▼                                                         │
+│  7. Network Actor            ← Needs gossip handler wired       │
+│       │                                                         │
+│       ▼                                                         │
+│  8. Gateway                  ← Exposes everything via API       │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+</code></pre>
+<h3>10. Dependency Wiring</h3>
+<p>After actors are created, the Supervisor wires their connections:</p>
+<pre><code class="language-rust">// From supervisor initialization
+async fn wire_actors(
+    network_handle: &amp;NetworkHandle,
+    gossip_handle: &amp;GossipHandle,
+    ledger_handle: &amp;LedgerHandle,
+    trust_graph: &amp;Arc&lt;RwLock&lt;TrustGraph&gt;&gt;,
+) -&gt; Result&lt;()&gt; {
+    // 1. Network → Gossip (incoming messages)
+    let gossip_for_network = gossip_handle.clone();
+    let incoming_handler: IncomingMessageHandler = Arc::new(move |msg| {
+        if let MessagePayload::Gossip(gossip_msg) = msg.payload {
+            gossip_for_network.blocking_write().handle_message(gossip_msg)?;
+        }
+        Ok(())
+    });
+    network_handle.write().await.set_incoming_handler(incoming_handler);
+
+    // 2. Gossip → Network (outgoing messages)
+    let network_for_gossip = network_handle.clone();
+    let send_callback: SendCallback = Arc::new(move |to, msg| {
+        network_for_gossip.blocking_send(to, wrap_gossip(msg))
+    });
+    gossip_handle.write().await.set_send_callback(send_callback);
+
+    // 3. Gossip → Ledger (new entry notifications)
+    let ledger_for_gossip = ledger_handle.clone();
+    let ledger_callback: LedgerCallback = Arc::new(move |entry| {
+        ledger_for_gossip.blocking_write().apply_entry(entry)
+    });
+    gossip_handle.write().await.subscribe_ledger(ledger_callback);
+
+    Ok(())
+}
+</code></pre>
+<hr>
+<h2>Shutdown Coordination</h2>
+<h3>11. The Shutdown Channel</h3>
+<p>Graceful shutdown uses a broadcast channel:</p>
+<pre><code class="language-rust">// Shutdown signal type
+pub type ShutdownTx = broadcast::Sender&lt;()&gt;;
+pub type ShutdownRx = broadcast::Receiver&lt;()&gt;;
+
+// In Runtime
+let (shutdown_tx, _) = broadcast::channel(1);
+
+// Each actor subscribes
+let mut shutdown_rx = shutdown_tx.subscribe();
+</code></pre>
+<h3>12. Actor Shutdown Pattern</h3>
+<p>Every actor loop includes shutdown handling:</p>
+<pre><code class="language-rust">impl MyActor {
+    pub async fn run(
+        mut self,
+        mut cmd_rx: mpsc::Receiver&lt;Command&gt;,
+        mut shutdown_rx: ShutdownRx,
+    ) {
+        loop {
+            tokio::select! {
+                // Handle commands
+                Some(cmd) = cmd_rx.recv() =&gt; {
+                    self.handle_command(cmd).await;
+                }
+
+                // Handle shutdown
+                _ = shutdown_rx.recv() =&gt; {
+                    info!(&quot;MyActor received shutdown signal&quot;);
+                    break;
+                }
+            }
+        }
+
+        // Cleanup
+        self.persist_state().await;
+        info!(&quot;MyActor shutdown complete&quot;);
+    }
+}
+</code></pre>
+<h3>13. Triggering Shutdown</h3>
+<p>Shutdown is triggered by:</p>
+<ul>
+<li><strong>CTRL+C</strong>: Signal handler sends to channel</li>
+<li><strong>API call</strong>: Runtime::shutdown() method</li>
+<li><strong>Fatal error</strong>: Supervisor drops channel</li>
+</ul>
+<pre><code class="language-rust">// Signal handler
+tokio::spawn(async move {
+    tokio::signal::ctrl_c().await.expect(&quot;Failed to listen for ctrl_c&quot;);
+    info!(&quot;Received CTRL+C, initiating shutdown&quot;);
+    let _ = shutdown_tx.send(());
+});
+
+// Explicit shutdown
+impl Runtime {
+    pub fn shutdown(&amp;self) {
+        info!(&quot;Triggering shutdown&quot;);
+        let _ = self.shutdown_tx.send(());
+    }
+}
+</code></pre>
+<h3>14. Shutdown Order</h3>
+<p>Shutdown happens in reverse initialization order:</p>
+<pre><code>1. Gateway stops accepting requests
+2. Network stops accepting connections
+3. Cooperative services flush state
+4. Ledger persists pending entries
+5. Gossip flushes message queues
+6. Trust saves graph updates
+7. Storage syncs to disk
+8. Metrics final flush
+</code></pre>
+<hr>
+<h2>Limited Mode (No Identity)</h2>
+<h3>15. Running Without Identity</h3>
+<p>If the keystore is missing or locked, ICN runs in limited mode:</p>
+<pre><code class="language-rust">if let Some(identity_bundle) = &amp;self.identity_bundle {
+    // Full node: all actors
+    let network = init_network(/*...*/);
+    let gossip = init_gossip(/*...*/);
+    // ...
+} else {
+    // Limited mode: skip identity-dependent actors
+    warn!(&quot;No identity bundle - running in limited mode&quot;);
+
+    // Can still run:
+    // - Metrics server
+    // - Health check endpoints
+    // - Read-only operations
+
+    // Cannot run:
+    // - Network (can&#39;t prove identity)
+    // - Gossip (can&#39;t sign messages)
+    // - Ledger (can&#39;t create entries)
+}
+</code></pre>
+<p><strong>Why?</strong></p>
+<ul>
+<li>Process stays healthy (can report status)</li>
+<li>Operator can initialize identity while running</li>
+<li>Graceful degradation</li>
+</ul>
+<hr>
+<h2>Adding a New Actor</h2>
+<h3>16. Step-by-Step Guide</h3>
+<p><strong>Step 1: Define the actor struct</strong></p>
+<pre><code class="language-rust">// In icn-myactor/src/lib.rs
+pub struct MyActor {
+    config: MyConfig,
+    state: MyState,
+}
+</code></pre>
+<p><strong>Step 2: Create the handle</strong></p>
+<pre><code class="language-rust">#[derive(Clone)]
+pub struct MyActorHandle {
+    inner: Arc&lt;RwLock&lt;MyActor&gt;&gt;,
+}
+
+impl MyActorHandle {
+    pub async fn do_thing(&amp;self) -&gt; Result&lt;()&gt; {
+        self.inner.write().await.internal_do_thing()
+    }
+}
+</code></pre>
+<p><strong>Step 3: Add constructor</strong></p>
+<pre><code class="language-rust">impl MyActor {
+    pub fn new(config: MyConfig) -&gt; MyActorHandle {
+        let actor = Self {
+            config,
+            state: MyState::default(),
+        };
+        MyActorHandle {
+            inner: Arc::new(RwLock::new(actor)),
+        }
+    }
+}
+</code></pre>
+<p><strong>Step 4: Create initialization module</strong></p>
+<pre><code class="language-rust">// In icn-core/src/supervisor/init_myactor.rs
+pub struct MyActorDeps {
+    pub trust_graph: Arc&lt;RwLock&lt;TrustGraph&gt;&gt;,
+    // ... other dependencies
+}
+
+pub async fn init_myactor(
+    config: &amp;Config,
+    deps: MyActorDeps,
+) -&gt; Result&lt;MyActorHandle&gt; {
+    let handle = MyActor::new(config.myactor.clone());
+
+    // Wire callbacks if needed
+    // ...
+
+    Ok(handle)
+}
+</code></pre>
+<p><strong>Step 5: Add to Supervisor</strong></p>
+<pre><code class="language-rust">// In supervisor/mod.rs
+mod init_myactor;
+
+// In Supervisor::run()
+let myactor_handle = init_myactor::init_myactor(
+    &amp;self.config,
+    init_myactor::MyActorDeps {
+        trust_graph: trust_graph_handle.clone(),
+    },
+).await?;
+icn_obs::metrics::supervisor::actor_spawned_inc(&quot;myactor&quot;);
+</code></pre>
+<p><strong>Step 6: Add metrics</strong></p>
+<pre><code class="language-rust">// In icn-obs/src/metrics/myactor.rs
+pub fn operation_completed_inc() {
+    counter!(&quot;icn_myactor_operations_total&quot;).increment(1);
+}
+</code></pre>
+<hr>
+<h2>Diagrams</h2>
+<h3>Startup Sequence</h3>
+<pre><code class="language-mermaid">sequenceDiagram
+    participant Main as main()
+    participant RT as Runtime
+    participant SV as Supervisor
+    participant Trust as TrustServices
+    participant Gossip as GossipActor
+    participant Ledger as Ledger
+    participant Net as NetworkActor
+
+    Main-&gt;&gt;RT: new(config, identity)
+    Main-&gt;&gt;RT: run()
+    RT-&gt;&gt;SV: new(config, identity, shutdown_tx)
+    RT-&gt;&gt;SV: run()
+
+    SV-&gt;&gt;Trust: init_trust_services()
+    Trust--&gt;&gt;SV: trust_handle
+
+    SV-&gt;&gt;Gossip: init_gossip_services(trust)
+    Gossip--&gt;&gt;SV: gossip_handle
+
+    SV-&gt;&gt;Ledger: init_ledger_services(gossip)
+    Ledger--&gt;&gt;SV: ledger_handle
+
+    SV-&gt;&gt;Net: init_network(gossip, trust)
+    Net--&gt;&gt;SV: network_handle
+
+    Note over SV: Wire callbacks between actors
+    Note over SV: Wait for shutdown signal
+</code></pre>
+<h3>Actor Lifecycle</h3>
+<pre><code class="language-mermaid">stateDiagram-v2
+    [*] --&gt; Created: new()
+    Created --&gt; Initialized: init_*()
+    Initialized --&gt; Wired: set_callbacks()
+    Wired --&gt; Running: spawn task
+    Running --&gt; Running: handle messages
+    Running --&gt; ShuttingDown: shutdown signal
+    ShuttingDown --&gt; Stopped: cleanup complete
+    Stopped --&gt; [*]
+</code></pre>
+<hr>
+<h2>Exercises</h2>
+<ol>
+<li><p><strong>Trace Startup</strong>: Starting from <code>icnd/src/main.rs</code>, trace the code path
+until the first actor is spawned. List each function called.</p>
+</li>
+<li><p><strong>Dependency Analysis</strong>: Why must TrustGraph be initialized before GossipActor?
+Find the code that passes trust to gossip.</p>
+</li>
+<li><p><strong>Handle Lifetime</strong>: Find where subscription handles are stored in the
+Supervisor. What happens if they&#39;re dropped early?</p>
+</li>
+<li><p><strong>Shutdown Path</strong>: Add logging to trace shutdown order. Which actor
+receives the shutdown signal first?</p>
+</li>
+<li><p><strong>Add an Actor</strong>: Create a skeleton for a new &quot;AuditActor&quot; that logs all
+ledger entries. Where would it be initialized in the Supervisor?</p>
+</li>
+</ol>
+<hr>
+<h2>Checkpoints</h2>
+<ul>
+<li><input disabled="" type="checkbox"> You can trace the path from <code>main()</code> to <code>Supervisor::run()</code></li>
+<li><input disabled="" type="checkbox"> You understand why Runtime and Supervisor are separate</li>
+<li><input disabled="" type="checkbox"> You can explain the actor pattern and its benefits</li>
+<li><input disabled="" type="checkbox"> You know why initialization order matters</li>
+<li><input disabled="" type="checkbox"> You understand how callbacks connect actors</li>
+<li><input disabled="" type="checkbox"> You can describe the shutdown flow</li>
+<li><input disabled="" type="checkbox"> You know what limited mode means and when it&#39;s used</li>
+</ul>
+<hr>
+<h2>Quick Reference</h2>
+<table>
+<thead>
+<tr>
+<th>Concept</th>
+<th>Definition</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Runtime</td>
+<td>Process-level lifecycle shell</td>
+</tr>
+<tr>
+<td>Supervisor</td>
+<td>Actor orchestration layer</td>
+</tr>
+<tr>
+<td>Actor</td>
+<td>Concurrent component with encapsulated state</td>
+</tr>
+<tr>
+<td>Handle</td>
+<td>External interface to an actor</td>
+</tr>
+<tr>
+<td>Callback</td>
+<td>Function connecting actors without direct dependency</td>
+</tr>
+<tr>
+<td>ShutdownTx</td>
+<td>Broadcast channel for coordinated shutdown</td>
+</tr>
+<tr>
+<td>Limited Mode</td>
+<td>Running without identity-dependent actors</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Next Steps</h2>
+<p>Proceed to <strong>Module 4: Identity &amp; Trust</strong> to understand DIDs, keystores,
+trust computation, and how identity underlies all ICN operations.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

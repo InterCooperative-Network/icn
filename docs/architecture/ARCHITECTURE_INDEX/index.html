@@ -1,0 +1,829 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Architecture Documentation Index | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ARCHITECTURE INDEX</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/ARCHITECTURE_INDEX.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Architecture Documentation Index</h1>
+<p><strong>Complete Architecture Review - December 2025</strong></p>
+<blockquote>
+<p>This index references architecture review materials produced in December 2025.
+For current architecture truth, start with <code>docs/ARCHITECTURE.md</code>.</p>
+</blockquote>
+<hr>
+<h2>📚 Documentation Overview</h2>
+<p>This architecture review produced three comprehensive documents:</p>
+<h3>1. <strong>ARCHITECTURE_MAP.md</strong> (51KB)</h3>
+<p><strong>The Complete System Map</strong></p>
+<ul>
+<li>All 25 crates with detailed descriptions</li>
+<li>Actor system architecture and patterns</li>
+<li>Data flow examples (complete transaction lifecycle)</li>
+<li>Testing architecture and strategies</li>
+<li>Deployment topologies</li>
+<li>Performance benchmarks</li>
+<li>Security model (three-layer defense)</li>
+<li>Configuration guide</li>
+<li>Dependency graph</li>
+<li>ADR (Architecture Decision Records)</li>
+</ul>
+<p><strong>Read this for:</strong> Comprehensive understanding of the entire system</p>
+<h3>2. <strong>ARCHITECTURE_VISUAL.md</strong> (38KB)</h3>
+<p><strong>Quick Visual Reference</strong></p>
+<ul>
+<li>Layer-by-layer system diagrams (ASCII art)</li>
+<li>Actor communication patterns</li>
+<li>Message flow examples</li>
+<li>Data flow lifecycle diagrams</li>
+<li>Security layer visualization</li>
+<li>Gossip topic architecture</li>
+<li>Compute scheduler decision tree</li>
+<li>Ledger fork resolution flowchart</li>
+<li>Directory structure</li>
+<li>Metrics dashboard layout</li>
+<li>Trust class hierarchy</li>
+</ul>
+<p><strong>Read this for:</strong> Quick visual reference and flow diagrams</p>
+<h3>3. <strong>../ARCHITECTURE.md</strong> (Existing, 69KB)</h3>
+<p><strong>Design Rationale &amp; Deep Dive</strong></p>
+<ul>
+<li>Design principles and philosophy</li>
+<li>Detailed component specifications</li>
+<li>Technical decision rationale</li>
+<li>Trade-off analysis</li>
+<li>Future work and limitations</li>
+<li>SDIS identity extensions</li>
+<li>Federation layer design</li>
+</ul>
+<p><strong>Read this for:</strong> Design philosophy and technical deep-dives</p>
+<h3>4. <strong>KERNEL_APP_SEPARATION.md</strong> (NEW - 2026-01)</h3>
+<p><strong>The Meaning Firewall Architecture</strong></p>
+<ul>
+<li>Kernel/app separation principles</li>
+<li>PolicyOracle and TrustService abstractions</li>
+<li>ServiceRegistry dependency injection</li>
+<li>Migration patterns and status</li>
+<li>Implementation guide</li>
+<li>Request flow diagrams</li>
+</ul>
+<p><strong>Read this for:</strong> Understanding how kernel enforces constraints without domain knowledge</p>
+<hr>
+<h2>🏗️ System Summary</h2>
+<h3>Core Architecture</h3>
+<pre><code>ICN = Substrate for Cooperative Coordination
+
+NOT a blockchain. NOT a federation server.
+P2P coordination layer with:
+- Identity (DIDs + Ed25519)
+- Trust (Web-of-participation graph)
+- Network (QUIC/TLS with DID-TLS binding)
+- Gossip (Eventually-consistent pub/sub)
+- Ledger (Double-entry mutual credit)
+- Contracts (Deterministic CCL execution)
+- Compute (Trust-gated distributed tasks)
+- Governance (Democratic proposals/voting)
+</code></pre>
+<h3>Key Statistics</h3>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Workspace Crates</strong></td>
+<td>25 (22 libraries + 3 binaries)</td>
+</tr>
+<tr>
+<td><strong>Lines of Rust</strong></td>
+<td>~40,000 (16,449 in crates/*/src)</td>
+</tr>
+<tr>
+<td><strong>Test Files</strong></td>
+<td>150+ test files</td>
+</tr>
+<tr>
+<td><strong>Total Tests</strong></td>
+<td>1,134+ (all passing)</td>
+</tr>
+<tr>
+<td><strong>Integration Tests</strong></td>
+<td>85+ multi-node scenarios</td>
+</tr>
+<tr>
+<td><strong>Benchmark Suites</strong></td>
+<td>3 (gossip, ledger, trust)</td>
+</tr>
+<tr>
+<td><strong>Documentation Files</strong></td>
+<td>198 markdown files</td>
+</tr>
+<tr>
+<td><strong>Node Scale (Tested)</strong></td>
+<td>100+ nodes</td>
+</tr>
+<tr>
+<td><strong>Gossip Latency (p50)</strong></td>
+<td>5ms</td>
+</tr>
+<tr>
+<td><strong>Ledger Throughput</strong></td>
+<td>5,000 tx/s</td>
+</tr>
+<tr>
+<td><strong>Trust Lookups</strong></td>
+<td>50,000 ops/s</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>📦 Crate Inventory</h2>
+<h3>Foundation Layer</h3>
+<ul>
+<li><strong>icn-identity</strong> - DIDs, Ed25519, X25519, Age keystore</li>
+<li><strong>icn-trust</strong> - Web-of-participation graph, transitive trust</li>
+<li><strong>icn-store</strong> - Sled database, storage quotas</li>
+</ul>
+<h3>Network Layer</h3>
+<ul>
+<li><strong>icn-net</strong> - QUIC/TLS, DID-TLS, mDNS, NAT traversal</li>
+<li><strong>icn-gossip</strong> - Topic-based pub/sub, anti-entropy</li>
+</ul>
+<h3>State Layer</h3>
+<ul>
+<li><strong>icn-ledger</strong> - Double-entry mutual credit, Merkle-DAG</li>
+<li><strong>icn-ccl</strong> - Contract language interpreter</li>
+<li><strong>icn-governance</strong> - Proposals, voting, execution</li>
+</ul>
+<h3>Coordination Layer</h3>
+<ul>
+<li><strong>icn-compute</strong> - Distributed task execution, WASM sandbox</li>
+<li><strong>icn-core</strong> - Supervisor, runtime, actor registry</li>
+</ul>
+<h3>API Layer</h3>
+<ul>
+<li><strong>icn-gateway</strong> - REST + WebSocket (port 8080)</li>
+<li><strong>icn-rpc</strong> - JSON-RPC (CLI ↔ daemon)</li>
+</ul>
+<h3>Cross-Cutting</h3>
+<ul>
+<li><strong>icn-obs</strong> - Prometheus metrics, tracing logs</li>
+<li><strong>icn-security</strong> - Byzantine detection, reputation</li>
+<li><strong>icn-time</strong> - Clock sync (Rough Time Protocol)</li>
+<li><strong>icn-privacy</strong> - Encrypted topics, onion routing (partial)</li>
+<li><strong>icn-snapshot</strong> - Backup/restore</li>
+</ul>
+<h3>Experimental/Future</h3>
+<ul>
+<li><strong>icn-federation</strong> - Inter-cooperative coordination</li>
+<li><strong>icn-steward</strong> - SDIS identity enrollment</li>
+<li><strong>icn-crypto-pq</strong> - Post-quantum signatures (ML-DSA)</li>
+<li><strong>icn-zkp</strong> - Zero-knowledge credential presentation</li>
+</ul>
+<h3>Binaries</h3>
+<ul>
+<li><strong>icnd</strong> - The daemon (supervisor + all actors)</li>
+<li><strong>icnctl</strong> - CLI management tool</li>
+<li><strong>icn-console</strong> - TUI application</li>
+</ul>
+<h3>Testing</h3>
+<ul>
+<li><strong>icn-testkit</strong> - Test utilities, multi-node helpers</li>
+</ul>
+<hr>
+<h2>🔄 Core Data Flows</h2>
+<h3>1. Identity Creation → Node Startup</h3>
+<pre><code>KeyPair::generate() 
+  → DID (did:icn:&lt;base58-pubkey&gt;)
+  → Age-encrypt with passphrase
+  → Save to {data_dir}/identity.age
+  → Startup: Unlock keystore → Spawn actors
+</code></pre>
+<h3>2. Peer Discovery → Trust Establishment</h3>
+<pre><code>mDNS announce (local network)
+  → QUIC connection (UDP)
+  → TLS 1.3 handshake + DID-TLS verify
+  → Create trust edge (manual or auto)
+  → Gossip propagate attestations
+</code></pre>
+<h3>3. Ledger Transaction → Gossip Sync</h3>
+<pre><code>REST API: POST /api/v1/ledger/transfer
+  → Ledger: Create JournalEntry (hash, sign)
+  → Validate: balances, credit limits
+  → Update cached_balances
+  → Persist to Sled store
+  → Gossip: announce(&quot;ledger:sync&quot;, entry_bytes)
+  → Network: SignedEnvelope → broadcast to peers
+  → Peers: validate → apply → convergence
+</code></pre>
+<h3>4. Compute Task Execution</h3>
+<pre><code>Submit task (wasm_hash + inputs)
+  → Scheduler: filter by trust + resources
+  → Policy: TrustWeighted / FIFO / LoadBalanced
+  → Assign executor
+  → Gossip: publish(&quot;compute:claim&quot;)
+  → Execute: WASM sandbox + fuel limit
+  → Result: publish(&quot;compute:result&quot;)
+  → Payment: credit executor via ledger
+</code></pre>
+<hr>
+<h2>🛡️ Security Model</h2>
+<h3>Three-Layer Defense</h3>
+<pre><code>Layer 1: Transport (QUIC/TLS + DID-TLS)
+  ✓ Certificate verification
+  ✓ DID matches cert pubkey
+  ✓ Stream multiplexing
+
+Layer 2: Message (SignedEnvelope + EncryptedEnvelope)
+  ✓ Ed25519 signatures
+  ✓ Replay protection (timestamp + nonce)
+  ✓ X25519-ChaCha20-Poly1305 encryption
+
+Layer 3: Application (Capability System)
+  ✓ ReadLedger, WriteLedger, ReadTrust
+  ✓ Fuel metering (runaway prevention)
+  ✓ Trust-gated access control
+</code></pre>
+<h3>Trust Classes &amp; Rate Limits</h3>
+<table>
+<thead>
+<tr>
+<th>Class</th>
+<th>Score Range</th>
+<th>Capabilities</th>
+<th>Rate Limit</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Unknown</td>
+<td>0.0 - 0.1</td>
+<td>None (blocked)</td>
+<td>0/min</td>
+</tr>
+<tr>
+<td>Known</td>
+<td>0.1 - 0.3</td>
+<td>Read ledger/trust</td>
+<td>10/min</td>
+</tr>
+<tr>
+<td>Colleague</td>
+<td>0.3 - 0.6</td>
+<td>Write ledger, submit tasks</td>
+<td>100/min</td>
+</tr>
+<tr>
+<td>Close</td>
+<td>0.6 - 0.8</td>
+<td>Execute tasks, create proposals</td>
+<td>1,000/min</td>
+</tr>
+<tr>
+<td>Intimate</td>
+<td>0.8 - 1.0</td>
+<td>Recovery guardian, admin</td>
+<td>Unlimited</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>🧪 Testing Strategy</h2>
+<h3>Test Organization</h3>
+<pre><code>icn/crates/
+  ├── icn-core/tests/        # 30+ integration tests
+  │   ├── network_gossip_integration.rs
+  │   ├── governance_ledger_integration.rs
+  │   ├── multi_node_gossip_convergence.rs
+  │   ├── byzantine_integration.rs
+  │   └── ...
+  │
+  ├── icn-gossip/
+  │   ├── src/               # Inline unit tests
+  │   ├── tests/             # Integration tests
+  │   └── benches/           # Criterion benchmarks
+  │
+  └── ... (repeat for all crates)
+</code></pre>
+<h3>Test Categories</h3>
+<ol>
+<li><strong>Unit Tests</strong> - Inline (<code>#[cfg(test)]</code>)</li>
+<li><strong>Integration Tests</strong> - <code>tests/</code> directories</li>
+<li><strong>Benchmarks</strong> - <code>benches/</code> using criterion.rs</li>
+<li><strong>End-to-End</strong> - Multi-node scenarios in icn-core/tests</li>
+</ol>
+<h3>Key Integration Tests</h3>
+<ul>
+<li>Multi-node gossip convergence (2-5 nodes)</li>
+<li>Governance → ledger rollback flow</li>
+<li>Byzantine misbehavior detection</li>
+<li>Storage replication</li>
+<li>Topology-aware routing</li>
+<li>Graceful restart with state recovery</li>
+</ul>
+<hr>
+<h2>📊 Performance Characteristics</h2>
+<h3>Benchmarks (Ryzen 5900X, 64GB RAM)</h3>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>Throughput</th>
+<th>p50 Latency</th>
+<th>p99 Latency</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Gossip propagation</td>
+<td>10,000 msg/s</td>
+<td>5ms</td>
+<td>25ms</td>
+</tr>
+<tr>
+<td>Ledger transaction</td>
+<td>5,000 tx/s</td>
+<td>2ms</td>
+<td>10ms</td>
+</tr>
+<tr>
+<td>Trust score lookup</td>
+<td>50,000 ops/s</td>
+<td>0.5ms</td>
+<td>2ms</td>
+</tr>
+<tr>
+<td>Signature verify</td>
+<td>20,000 ops/s</td>
+<td>0.05ms</td>
+<td>0.2ms</td>
+</tr>
+<tr>
+<td>QUIC connection</td>
+<td>1,000 conn/s</td>
+<td>10ms</td>
+<td>50ms</td>
+</tr>
+</tbody></table>
+<h3>Scalability Limits (v0.1.0)</h3>
+<ul>
+<li><strong>Network Size:</strong> 100-1,000 nodes</li>
+<li><strong>Gossip Topics:</strong> 100+ concurrent</li>
+<li><strong>Ledger Size:</strong> 1M+ entries (disk-limited)</li>
+<li><strong>Trust Graph:</strong> 10K nodes, 100K edges</li>
+<li><strong>Compute Tasks:</strong> 1,000+ concurrent</li>
+</ul>
+<h3>Resource Usage (Idle Node)</h3>
+<ul>
+<li><strong>Memory:</strong> ~50MB RSS</li>
+<li><strong>CPU:</strong> &lt;1% (1 core)</li>
+<li><strong>Disk:</strong> ~100MB (fresh node)</li>
+<li><strong>Network:</strong> ~1KB/s (mDNS + keepalive)</li>
+</ul>
+<hr>
+<h2>🚀 Development Workflow</h2>
+<h3>Building</h3>
+<pre><code class="language-bash">cd icn/
+cargo build --release              # All binaries
+cargo test --workspace             # All tests (1,134+)
+cargo clippy --workspace           # Linting
+cargo fmt --workspace              # Formatting
+cargo bench -p icn-gossip          # Run benchmarks
+</code></pre>
+<h3>Running</h3>
+<pre><code class="language-bash"># Start daemon
+./target/release/icnd
+
+# With gateway enabled
+./target/release/icnd --gateway-enable --gateway-bind 0.0.0.0:8080
+
+# CLI management
+./target/release/icnctl status
+./target/release/icnctl trust add &lt;did&gt; 0.8
+
+# TUI console
+./target/release/icn-console
+</code></pre>
+<h3>Testing</h3>
+<pre><code class="language-bash"># All tests
+cargo test --workspace
+
+# Specific crate
+cargo test -p icn-gossip
+
+# Specific test with logs
+RUST_LOG=debug cargo test test_governance_proposal -- --nocapture
+
+# Integration tests only
+cargo test --test &#39;*&#39;
+</code></pre>
+<hr>
+<h2>📁 Key Directories</h2>
+<pre><code>icn/
+├── bins/                    # 3 binaries (icnd, icnctl, icn-console)
+├── crates/                  # 22 library crates
+├── docs/                    # 198 documentation files
+│   ├── ARCHITECTURE.md      # Design deep-dive (69KB)
+│   ├── api/                 # REST API specs
+│   ├── dev-journal/         # Development session notes
+│   └── manual/              # User manual
+├── config/                  # Config templates
+├── deploy/                  # Kubernetes manifests
+├── monitoring/              # Grafana dashboards
+├── scripts/                 # Build/test automation
+├── web/                     # Web UIs (pilot-ui, etc.)
+├── sdk/                     # Client SDKs (TypeScript, etc.)
+└── examples/                # Usage examples
+</code></pre>
+<hr>
+<h2>🎯 Phase Completion Status</h2>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Status</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1-10</td>
+<td>✅ Complete</td>
+<td>Core substrate (identity, trust, network, ledger, gossip)</td>
+</tr>
+<tr>
+<td>11-13</td>
+<td>✅ Complete</td>
+<td>Contracts, governance, monitoring</td>
+</tr>
+<tr>
+<td>14</td>
+<td>✅ Complete</td>
+<td>Backup/restore, disaster recovery</td>
+</tr>
+<tr>
+<td>15</td>
+<td>✅ Complete</td>
+<td>Economic safety rails (credit limits)</td>
+</tr>
+<tr>
+<td>16</td>
+<td>✅ Complete</td>
+<td>Distributed compute layer + scheduler</td>
+</tr>
+<tr>
+<td>17</td>
+<td>✅ Complete</td>
+<td>Node morphogenesis (ServiceRole, Capacity)</td>
+</tr>
+<tr>
+<td>18</td>
+<td>✅ Complete</td>
+<td>Byzantine fault tolerance, storage replication</td>
+</tr>
+<tr>
+<td>19</td>
+<td>✅ Complete</td>
+<td>Clock sync, graceful restart</td>
+</tr>
+<tr>
+<td>20</td>
+<td>🔄 Partial</td>
+<td>Privacy layer (encrypted topics done, onion routing planned)</td>
+</tr>
+<tr>
+<td>F1-F6</td>
+<td>✅ Complete</td>
+<td>Federation layer (inter-cooperative)</td>
+</tr>
+<tr>
+<td>S1-S5</td>
+<td>✅ Complete</td>
+<td>SDIS identity (anchors, post-quantum, ZKP)</td>
+</tr>
+<tr>
+<td>21+</td>
+<td>📋 Planned</td>
+<td>Mobile SDKs, production hardening, pilot deployments</td>
+</tr>
+</tbody></table>
+<p><strong>Status at Review Time:</strong> Pilot-ready assessment (Q4 2025)<br><strong>Target:</strong> Production-ready Q1 2026</p>
+<hr>
+<h2>🔗 Quick Links</h2>
+<h3>Primary Documentation</h3>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/ARCHITECTURE_MAP">ARCHITECTURE_MAP.md</a> - Complete system map (51KB)</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/ARCHITECTURE_VISUAL">ARCHITECTURE_VISUAL.md</a> - Visual diagrams (38KB)</li>
+<li><a href="/docs/ARCHITECTURE">ARCHITECTURE.md</a> - Design rationale (69KB)</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/KERNEL_APP_SEPARATION">KERNEL_APP_SEPARATION.md</a> - Meaning Firewall architecture (NEW)</li>
+</ul>
+<h3>Getting Started</h3>
+<ul>
+<li><a href="/docs/GETTING_STARTED">GETTING_STARTED.md</a> - New contributor guide</li>
+<li><a href="/docs/guides/QUICK_REFERENCE">guides/QUICK_REFERENCE.md</a> - Command cheatsheet</li>
+<li><a href="/docs/guides/FAQ">guides/FAQ.md</a> - Common questions</li>
+</ul>
+<h3>Specialized Topics</h3>
+<ul>
+<li><a href="/docs/security/production-hardening">security/production-hardening.md</a> - Security best practices</li>
+<li><a href="/docs/design/governance/governance-primitives">design/governance/governance-primitives.md</a> - Governance design</li>
+<li><a href="/docs/design/scheduler-evolution-plan">design/scheduler-evolution-plan.md</a> - Compute scheduler</li>
+<li><a href="/docs/guides/operations/backup-and-recovery">guides/operations/backup-and-recovery.md</a> - Disaster recovery</li>
+<li><a href="/docs/security/threat-model">security/threat-model.md</a> - Security analysis</li>
+</ul>
+<h3>API Documentation</h3>
+<ul>
+<li><a href="/docs/reference/api/README">reference/api/</a> - REST API specification</li>
+<li>Cargo docs: <code>cargo doc --open --workspace</code></li>
+</ul>
+<h3>Development</h3>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING">CONTRIBUTING.md</a> - Contribution guidelines</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CHANGELOG">CHANGELOG.md</a> - Release notes</li>
+<li><a href="/docs/development/sessions/undated/ROADMAP">ROADMAP.md</a> - Feature timeline (historical session roadmap)</li>
+</ul>
+<hr>
+<h2>📝 Glossary of Key Terms</h2>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Definition</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Actor</strong></td>
+<td>Async task with message-passing (Tokio-based)</td>
+</tr>
+<tr>
+<td><strong>Bloom Filter</strong></td>
+<td>Probabilistic set membership (gossip anti-entropy)</td>
+</tr>
+<tr>
+<td><strong>CCL</strong></td>
+<td>Cooperative Contract Language (deterministic, not Turing-complete)</td>
+</tr>
+<tr>
+<td><strong>DID</strong></td>
+<td>Decentralized Identifier (did:icn:<base58-pubkey>)</td>
+</tr>
+<tr>
+<td><strong>DID-TLS</strong></td>
+<td>Certificate verification where cert pubkey = DID</td>
+</tr>
+<tr>
+<td><strong>Gossip</strong></td>
+<td>Eventually-consistent pub/sub protocol</td>
+</tr>
+<tr>
+<td><strong>Handle</strong></td>
+<td>Public API for actor communication (mpsc::Sender wrapper)</td>
+</tr>
+<tr>
+<td><strong>Merkle-DAG</strong></td>
+<td>Hash-linked directed acyclic graph (ledger structure)</td>
+</tr>
+<tr>
+<td><strong>QUIC</strong></td>
+<td>UDP-based multiplexed transport (RFC 9000)</td>
+</tr>
+<tr>
+<td><strong>SignedEnvelope</strong></td>
+<td>Message integrity (Ed25519 signature + replay guard)</td>
+</tr>
+<tr>
+<td><strong>EncryptedEnvelope</strong></td>
+<td>End-to-end encryption (X25519-ChaCha20-Poly1305)</td>
+</tr>
+<tr>
+<td><strong>Sled</strong></td>
+<td>Embedded key-value database (Rust-native)</td>
+</tr>
+<tr>
+<td><strong>TrustGated</strong></td>
+<td>Access control based on trust score threshold</td>
+</tr>
+<tr>
+<td><strong>Vector Clock</strong></td>
+<td>Causal ordering (detect duplicate gossip messages)</td>
+</tr>
+<tr>
+<td><strong>VUI</strong></td>
+<td>Verifiable Unique Identifier (biometric hash for SDIS)</td>
+</tr>
+<tr>
+<td><strong>WASM</strong></td>
+<td>WebAssembly (compute task sandbox)</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>🏆 Key Achievements</h2>
+<p>✅ <strong>1,134+ tests passing</strong> (comprehensive test coverage)<br>✅ <strong>85+ integration tests</strong> (multi-node scenarios)<br>✅ <strong>100+ node scale</strong> (successfully tested)<br>✅ <strong>5ms gossip latency</strong> (median propagation time)<br>✅ <strong>Zero security incidents</strong> (in development phase)<br>✅ <strong>198 documentation files</strong> (thorough documentation)<br>✅ <strong>40K+ lines of Rust</strong> (production-quality code)<br>✅ <strong>3 benchmark suites</strong> (performance validated)  </p>
+<hr>
+<h2>📞 Contact &amp; Community</h2>
+<ul>
+<li><strong>Repository:</strong> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">https://github.com/InterCooperative-Network/icn</a></li>
+<li><strong>Issues:</strong> GitHub Issues</li>
+<li><strong>Discussions:</strong> GitHub Discussions</li>
+<li><strong>Matrix:</strong> #icn:matrix.org (planned)</li>
+</ul>
+<hr>
+<h2>📄 License</h2>
+<p>MIT OR Apache-2.0 (dual-licensed)</p>
+<hr>
+<h2>🗂️ Architecture Document Comparison</h2>
+<table>
+<thead>
+<tr>
+<th>Document</th>
+<th>Size</th>
+<th>Focus</th>
+<th>Best For</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>ARCHITECTURE_MAP.md</strong></td>
+<td>51KB</td>
+<td>Complete system inventory</td>
+<td>Understanding all components</td>
+</tr>
+<tr>
+<td><strong>ARCHITECTURE_VISUAL.md</strong></td>
+<td>38KB</td>
+<td>Diagrams &amp; flow charts</td>
+<td>Visual learners, quick reference</td>
+</tr>
+<tr>
+<td><strong>docs/ARCHITECTURE.md</strong></td>
+<td>69KB</td>
+<td>Design rationale &amp; decisions</td>
+<td>Deep technical understanding</td>
+</tr>
+<tr>
+<td><strong>KERNEL_APP_SEPARATION.md</strong></td>
+<td>25KB</td>
+<td>Meaning Firewall, PolicyOracle</td>
+<td>Kernel/app boundary work</td>
+</tr>
+<tr>
+<td><strong>ARCHITECTURE_INDEX.md</strong></td>
+<td>This file</td>
+<td>Navigation &amp; summary</td>
+<td>Starting point, quick overview</td>
+</tr>
+</tbody></table>
+<hr>
+<p><strong>Recommendation:</strong> Start with this index, then read ARCHITECTURE_VISUAL.md for visual understanding, followed by ARCHITECTURE_MAP.md for comprehensive details. Refer to docs/ARCHITECTURE.md for design philosophy and rationale.</p>
+<hr>
+<p><strong>Last Updated:</strong> December 17, 2025<br><strong>Review Completed By:</strong> GitHub Copilot<br><strong>System Status (Historical):</strong> Pilot-ready assessment ✅</p>
+<hr>
+<h2>🔄 Addendum: Client-Side Ecosystem</h2>
+<p><strong>Update:</strong> December 17, 2025 - Complete coverage verification</p>
+<p>The initial review focused on the Rust backend (icn/ directory). A comprehensive verification revealed significant client-side components that are now fully documented in <strong>ARCHITECTURE_MAP.md</strong> addendum:</p>
+<h3>Newly Documented Components</h3>
+<p>✅ <strong>Client SDKs</strong> (<code>sdk/</code>)</p>
+<ul>
+<li>TypeScript SDK (~19,000 lines) - Browser &amp; Node.js</li>
+<li>React Native SDK (~19,000 lines) - iOS &amp; Android</li>
+</ul>
+<p>✅ <strong>Web UI</strong> (<code>web/pilot-ui/</code>)</p>
+<ul>
+<li>Production-ready web interface (~4,500 files)</li>
+<li>PWA, offline support, real-time updates</li>
+<li>SDIS identity enrollment UI</li>
+</ul>
+<p>✅ <strong>Examples</strong> (<code>examples/</code>)</p>
+<ul>
+<li>Quickstart, contracts, governance, mobile, WASM compute</li>
+</ul>
+<p>✅ <strong>Contract Templates</strong> (<code>contracts/</code>)</p>
+<ul>
+<li>4 governance templates (consensus, majority, supermajority, unanimous)</li>
+<li>Protocol contracts (credit limits, fee structures)</li>
+</ul>
+<p>✅ <strong>Simulations</strong> (<code>sims/mutual-credit/</code>)</p>
+<ul>
+<li>Agent-based economic modeling (~2,500 lines Python)</li>
+<li>5+ scenarios tested with visualizations</li>
+</ul>
+<p>✅ <strong>Infrastructure</strong> (<code>docker/</code>, <code>deploy/</code>, <code>monitoring/</code>)</p>
+<ul>
+<li>Docker deployment (compose files)</li>
+<li>Kubernetes resources (20+ YAML files)</li>
+<li>Prometheus + Grafana monitoring</li>
+</ul>
+<p>✅ <strong>Configuration</strong> (<code>config/</code>)</p>
+<ul>
+<li>Environment templates</li>
+<li>JSON schema validation</li>
+</ul>
+<p>✅ <strong>Scripts</strong> (<code>scripts/</code>)</p>
+<ul>
+<li>16 automation scripts (dev, test, deploy)</li>
+</ul>
+<h3>Updated Statistics</h3>
+<table>
+<thead>
+<tr>
+<th>Category</th>
+<th>Original</th>
+<th>Updated</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Total Codebase</strong></td>
+<td>~40K Rust</td>
+<td>~100K lines (all languages)</td>
+</tr>
+<tr>
+<td><strong>Test Coverage</strong></td>
+<td>Rust only</td>
+<td>Rust + JS + Python</td>
+</tr>
+<tr>
+<td><strong>Documentation</strong></td>
+<td>198 files</td>
+<td>200+ files (including UI docs)</td>
+</tr>
+<tr>
+<td><strong>Deployment Options</strong></td>
+<td>Backend only</td>
+<td>Full stack (backend + frontend)</td>
+</tr>
+</tbody></table>
+<h3>Repository Coverage</h3>
+<p><strong>100% Complete</strong> ✅</p>
+<p>All directories mapped:</p>
+<ul>
+<li>✅ <code>icn/</code> - Rust workspace (25 crates)</li>
+<li>✅ <code>sdk/</code> - Client SDKs (TypeScript, React Native)</li>
+<li>✅ <code>web/</code> - Web UI (Pilot UI)</li>
+<li>✅ <code>examples/</code> - Usage examples (5 projects)</li>
+<li>✅ <code>contracts/</code> - CCL templates</li>
+<li>✅ <code>sims/</code> - Economic simulations</li>
+<li>✅ <code>docker/</code> - Container deployment</li>
+<li>✅ <code>deploy/</code> - Kubernetes configs</li>
+<li>✅ <code>monitoring/</code> - Observability stack</li>
+<li>✅ <code>config/</code> - Configuration management</li>
+<li>✅ <code>scripts/</code> - Automation tools</li>
+<li>✅ <code>docs/</code> - Documentation (198+ files)</li>
+</ul>
+<p><strong>See ARCHITECTURE_MAP.md § &quot;Client-Side Ecosystem&quot; for full details.</strong></p>
+<hr>
+<p><strong>Complete Architecture Review Status:</strong> VERIFIED ✅<br><strong>Last Updated:</strong> December 17, 2025, 01:15 UTC<br><strong>Coverage:</strong> 100% of repository</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

@@ -1,0 +1,353 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Phase 4: NAT Traversal, Supervisor Modularization &amp; Locality Integration | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>development</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>sessions</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>2025 12</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>2025 12 13 phase4 nat traversal supervisor modularization</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/development/sessions/2025-12/2025-12-13-phase4-nat-traversal-supervisor-modularization.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Phase 4: NAT Traversal, Supervisor Modularization &amp; Locality Integration</h1>
+<p><strong>Date:</strong> 2025-12-13
+<strong>Status:</strong> Complete</p>
+<h2>Overview</h2>
+<p>This session completed several key infrastructure improvements:</p>
+<ul>
+<li>TURN relay client for NAT traversal fallback (M1)</li>
+<li>Supervisor modularization with extracted modules (A1)</li>
+<li>TypeScript SDK public statistics endpoint</li>
+<li>Balance recomputation race fix (M7)</li>
+<li>Locality/RTT integration for compute placement (M5)</li>
+<li>Deliberation period clock skew fix (M9)</li>
+<li>Configuration sprawl fix with SupervisorConfig (A5)</li>
+</ul>
+<h2>Changes Made</h2>
+<h3>1. TURN Relay Client (M1)</h3>
+<p>Created <code>/home/matt/projects/icn/icn/crates/icn-net/src/turn.rs</code>:</p>
+<ul>
+<li><p><strong>TurnConfig</strong>: Configuration with builder pattern</p>
+<ul>
+<li><code>new(server)</code>, <code>with_username()</code>, <code>with_password()</code></li>
+<li><code>with_timeout()</code>, <code>with_allocation_lifetime()</code></li>
+</ul>
+</li>
+<li><p><strong>TurnClient</strong>: Full TURN protocol implementation (RFC 5766)</p>
+<ul>
+<li><code>allocate(socket)</code> - Request relay allocation</li>
+<li><code>refresh(socket)</code> - Refresh existing allocation</li>
+<li><code>create_permission(socket, peer_addr)</code> - Allow peer to send via relay</li>
+</ul>
+</li>
+<li><p><strong>TurnAllocation</strong>: Tracks relay and mapped addresses with expiry</p>
+</li>
+<li><p><strong>TurnPermission</strong>: Tracks peer permissions with expiry</p>
+</li>
+</ul>
+<h4>Integration Points</h4>
+<ol>
+<li><p><strong>Config</strong> (<code>icn-core/src/config.rs</code>):</p>
+<ul>
+<li>Added <code>turn_server</code>, <code>turn_username</code>, <code>turn_password</code> to NetworkConfig</li>
+<li>Added <code>turn_config()</code> helper method</li>
+</ul>
+</li>
+<li><p><strong>SessionManager</strong> (<code>icn-net/src/session.rs</code>):</p>
+<ul>
+<li>Added <code>turn_client</code> and <code>relay_addr</code> fields</li>
+<li>Extended <code>start()</code> to accept <code>turn_config</code> parameter</li>
+<li>Creates TURN allocation on startup if configured</li>
+<li>Added <code>relay_addr()</code> getter method</li>
+<li>Updated <code>connection_candidate()</code> to include relay address</li>
+</ul>
+</li>
+<li><p><strong>NetworkActor</strong> (<code>icn-net/src/actor.rs</code>):</p>
+<ul>
+<li>Extended <code>spawn()</code> signature with <code>turn_config</code> parameter</li>
+<li>Passes config to session manager</li>
+</ul>
+</li>
+<li><p><strong>Supervisor</strong> (<code>icn-core/src/supervisor/mod.rs</code>):</p>
+<ul>
+<li>Reads TURN config from network config</li>
+<li>Passes to NetworkActor::spawn</li>
+</ul>
+</li>
+</ol>
+<h3>2. Supervisor Modularization (A1)</h3>
+<h4>background_tasks.rs (Previously Completed)</h4>
+<p>Created <code>/home/matt/projects/icn/icn/crates/icn-core/src/supervisor/background_tasks.rs</code>:</p>
+<ul>
+<li><code>spawn_clock_sync_task()</code> - Background clock synchronization</li>
+<li><code>spawn_metrics_update_task()</code> - Periodic metrics updates</li>
+<li><code>steward</code> module with helper functions</li>
+</ul>
+<h4>init_rpc.rs (New)</h4>
+<p>Created <code>/home/matt/projects/icn/icn/crates/icn-core/src/supervisor/init_rpc.rs</code>:</p>
+<ul>
+<li><strong>RpcConfig</strong>: Configuration from daemon config</li>
+<li><strong>RpcDeps</strong>: All handles needed for RPC server</li>
+<li><strong>GatewayConfig</strong>: Configuration for gateway server</li>
+<li><strong>GatewayDeps</strong>: Event broadcaster and compute handle</li>
+<li><code>spawn_rpc_server()</code> - Creates and spawns RPC server with all handles</li>
+<li><code>spawn_gateway_server()</code> - Spawns gateway in dedicated thread</li>
+</ul>
+<h3>3. TypeScript SDK Enhancement</h3>
+<p>Updated <code>/home/matt/projects/icn/sdk/typescript/src/</code>:</p>
+<ul>
+<li><strong>types.ts</strong>: Added <code>CoopStatsResponse</code> interface</li>
+<li><strong>index.ts</strong>: Added <code>getCoopStats(coopId)</code> method (no auth required)</li>
+</ul>
+<h3>4. Balance Recomputation Race Fix (M7) - Previously Completed</h3>
+<ul>
+<li>Added <code>journal_version</code> tracking to Ledger</li>
+<li>Snapshot validation in <code>recompute_balances()</code></li>
+<li>Added <code>recompute_balances_with_retry()</code> convenience method</li>
+</ul>
+<h2>Metrics Added</h2>
+<p>TURN-related metrics in <code>icn-obs/src/metrics.rs</code>:</p>
+<ul>
+<li><code>turn_allocation_inc()</code> - Successful allocations</li>
+<li><code>turn_allocation_failure_inc(reason)</code> - Failed allocations</li>
+<li><code>turn_permission_refresh_inc()</code> - Permission refreshes</li>
+</ul>
+<h2>Configuration</h2>
+<p>New TURN config options in <code>icn.toml</code>:</p>
+<pre><code class="language-toml">[network]
+# TURN relay server for NAT traversal fallback
+turn_server = &quot;turn.example.com:3478&quot;
+turn_username = &quot;user&quot;      # Optional
+turn_password = &quot;password&quot;  # Optional
+</code></pre>
+<h2>Testing</h2>
+<p>All existing tests updated to pass new <code>turn_config</code> parameter (set to <code>None</code> for tests).</p>
+<p>Files updated:</p>
+<ul>
+<li><code>icn-net/src/session.rs</code> (test module)</li>
+<li><code>icn-net/src/actor.rs</code> (test module)</li>
+<li><code>icn-net/tests/did_tls_binding_integration.rs</code></li>
+<li><code>icn-net/tests/encrypted_message_integration.rs</code></li>
+<li><code>icn-net/tests/trust_gated_tls_integration.rs</code></li>
+<li><code>icn-core/tests/*.rs</code> (11 test files)</li>
+</ul>
+<h2>Architecture Notes</h2>
+<h3>TURN Integration Design</h3>
+<p>The TURN relay provides fallback connectivity when direct P2P connections fail:</p>
+<ol>
+<li><strong>Startup</strong>: If TURN is configured, session manager creates allocation</li>
+<li><strong>Relay Address</strong>: Stored and included in connection candidates via gossip</li>
+<li><strong>Peer Discovery</strong>: Other nodes see relay address as connection option</li>
+<li><strong>Future Work</strong>: Connection fallback logic (try direct -&gt; STUN -&gt; TURN)</li>
+</ol>
+<h3>Supervisor Module Structure</h3>
+<pre><code>supervisor/
+├── mod.rs              # Main supervisor logic
+├── background_tasks.rs # Background task factories
+├── init_gossip.rs      # Gossip initialization
+├── init_ledger.rs      # Ledger/contract initialization
+├── init_rpc.rs         # RPC/Gateway initialization (NEW)
+├── init_trust.rs       # Trust graph initialization
+├── registry.rs         # Actor registry
+└── shutdown.rs         # Graceful shutdown helpers
+</code></pre>
+<h3>5. Locality/RTT Integration (M5)</h3>
+<p>Integrated network topology RTT data into compute placement scoring.</p>
+<p><strong>New Types</strong> (<code>icn-compute/src/actor.rs</code>):</p>
+<ul>
+<li><code>LocalityCallback</code>: Callback type for querying locality data</li>
+<li>Takes peer DID, returns <code>LocalityContext</code> with RTT, blob info, region data</li>
+</ul>
+<p><strong>ComputeActor Changes</strong>:</p>
+<ul>
+<li>Added <code>locality_callback: Option&lt;LocalityCallback&gt;</code> field</li>
+<li>Added <code>set_locality_callback()</code> setter method</li>
+<li><code>on_placement_request()</code> now uses callback instead of <code>LocalityContext::empty()</code></li>
+</ul>
+<p><strong>Supervisor Integration</strong> (<code>icn-core/src/supervisor/mod.rs</code>):</p>
+<ul>
+<li>Creates locality callback that queries <code>NeighborSets.get_rtt(peer)</code></li>
+<li>Wires callback to compute actor before spawning</li>
+<li>Uses <code>blocking_read()</code> for sync callback execution</li>
+</ul>
+<p><strong>Impact</strong>:</p>
+<ul>
+<li>Placement offers now include real RTT data when available</li>
+<li>Better placement decisions based on network latency</li>
+<li>Foundation for full data locality scoring</li>
+</ul>
+<h3>6. Deliberation Period Clock Skew Fix (M9)</h3>
+<p>Fixed timing issue in placement offer deliberation period.</p>
+<p><strong>Problem</strong>:</p>
+<ul>
+<li>Executors waited a fixed 500ms before broadcasting placement offers</li>
+<li>This used local wall-clock time, ignoring network latency</li>
+<li>Nodes receiving requests late would broadcast late, disadvantaging them</li>
+</ul>
+<p><strong>Solution</strong> (<code>icn-compute/src/actor.rs</code>):</p>
+<ul>
+<li>Added <code>DELIBERATION_PERIOD_MS</code> constant (500ms)</li>
+<li>Use <code>requested_at</code> timestamp from <code>PlacementRequest</code> as reference</li>
+<li>Calculate <code>deadline = requested_at + DELIBERATION_PERIOD_MS</code></li>
+<li>Calculate <code>remaining_ms = deadline - now()</code> (saturating)</li>
+<li>Sleep only the remaining time, not full 500ms</li>
+</ul>
+<p><strong>Result</strong>:</p>
+<ul>
+<li>All executors broadcast at approximately the same wall-clock time</li>
+<li>Network latency no longer disadvantages distant executors</li>
+<li>More fair placement competition</li>
+</ul>
+<h3>7. Configuration Sprawl Fix (A5)</h3>
+<p>Centralized hardcoded configuration values from supervisor.rs.</p>
+<p><strong>New Struct</strong> (<code>icn-core/src/config.rs</code>):</p>
+<pre><code class="language-rust">pub struct SupervisorConfig {
+    pub candidate_cleanup_interval_secs: u64,   // default: 300
+    pub peer_exchange_delay_ms: u64,            // default: 500
+    pub peer_exchange_max_peers: usize,         // default: 50
+    pub metrics_update_interval_secs: u64,      // default: 10
+    pub shutdown_timeout_secs: u64,             // default: 5
+    pub clock_sync_interval_secs: u64,          // default: 600
+}
+</code></pre>
+<p><strong>Supervisor Updates</strong>:</p>
+<ul>
+<li>Replaced hardcoded <code>Duration::from_secs(300)</code> with config value</li>
+<li>Replaced hardcoded <code>Duration::from_millis(500)</code> with config value</li>
+<li>Replaced hardcoded <code>Some(50)</code> peer exchange limit with config value</li>
+<li>Replaced hardcoded <code>Duration::from_secs(10)</code> metrics interval with config value</li>
+<li>Replaced hardcoded <code>Duration::from_secs(5)</code> shutdown timeout with config value</li>
+</ul>
+<p><strong>Benefits</strong>:</p>
+<ul>
+<li>All timing values now configurable via TOML</li>
+<li>Easier to tune for different environments</li>
+<li>Values documented with defaults</li>
+</ul>
+<h3>8. Error Swallowing Observability Fix (A6)</h3>
+<p>Added supervisor error metrics to make logged errors observable via Prometheus.</p>
+<p><strong>New Metrics Module</strong> (<code>icn-obs/src/metrics.rs</code>):</p>
+<pre><code class="language-rust">pub mod supervisor {
+    pub fn error_inc(operation: &amp;str)
+    pub fn startup_phase_inc(phase: &amp;str)
+    pub fn state_set(state: u8)  // 0=stopped, 1=starting, 2=running, 3=stopping
+    pub fn actor_spawned_inc(actor: &amp;str)
+    pub fn actor_spawn_failed_inc(actor: &amp;str)
+}
+</code></pre>
+<p><strong>Instrumented Error Locations</strong>:</p>
+<ul>
+<li><code>metrics_server_start</code> - Metrics server failed to start</li>
+<li><code>rpc_server</code> - RPC server error during operation</li>
+<li><code>gateway_server</code> - Gateway server error</li>
+<li><code>identity_bundle_missing</code> - No identity bundle available</li>
+<li><code>gateway_jwt_secret_missing</code> - JWT secret not configured</li>
+<li><code>shutdown_timeout</code> - Background tasks didn&#39;t complete in time</li>
+</ul>
+<p><strong>Actor Spawn Tracking</strong>:</p>
+<ul>
+<li>gossip, ledger, network, compute, rpc_server, gateway</li>
+<li>Failures tracked with <code>actor_spawn_failed_inc()</code></li>
+</ul>
+<p><strong>Lifecycle State</strong>:</p>
+<ul>
+<li>Supervisor state gauge tracks: stopped(0) → starting(1) → running(2) → stopping(3)</li>
+</ul>
+<p><strong>Rationale</strong>:
+Most supervisor errors occur in async contexts where there&#39;s no caller to propagate to. Rather than changing the architecture, errors are now countable and alertable via Prometheus metrics.</p>
+<h3>9. Architectural Issues Verification (A2, A3, A4, A8)</h3>
+<p>Analyzed remaining architectural issues - all verified as non-issues or appropriate patterns:</p>
+<p><strong>A2. Circular Crate Dependencies - VERIFIED NON-ISSUE</strong>
+Used <code>cargo tree</code> to analyze. Dependencies form a DAG, not a cycle:</p>
+<ul>
+<li>icn-net → icn-ledger → icn-gossip</li>
+<li>No reverse dependencies exist</li>
+<li>Crates can be versioned independently</li>
+</ul>
+<p><strong>A3. Trust Graph Multiple Sources - VERIFIED APPROPRIATE PATTERN</strong>
+Arc&lt;RwLock&lt;&gt;&gt; IS the coordination mechanism. This is the standard Rust pattern:</p>
+<ul>
+<li>Multiple concurrent readers via read lock</li>
+<li>Exclusive writer access via write lock</li>
+<li>Automatic coordination</li>
+</ul>
+<p><strong>A4. Inconsistent Callback Patterns - VERIFIED APPROPRIATE PATTERN</strong>
+Actors have different callback needs (input/output types, sync/async). A unified trait would require excessive generics or runtime type erasure. Current approach is idiomatic Rust.</p>
+<p><strong>A8. Byzantine Detector Ownership - VERIFIED APPROPRIATE PATTERN</strong>
+Ownership is explicit and well-documented:</p>
+<ul>
+<li>Created in <code>init_trust.rs</code> as part of TrustServices</li>
+<li>Shared via Arc&lt;RwLock&lt;&gt;&gt; to Network, Gossip, Ledger, Compute actors</li>
+<li>Correct pattern for aggregating reports from multiple sources</li>
+</ul>
+<h2>Summary</h2>
+<p>All SYSTEM_GAPS architectural items (A1-A8) are now complete:</p>
+<ul>
+<li>A1: Supervisor modularization (multiple phases)</li>
+<li>A2-A4, A7-A8: Verified as non-issues or appropriate patterns</li>
+<li>A5: Configuration sprawl fixed with SupervisorConfig</li>
+<li>A6: Error observability via supervisor metrics</li>
+</ul>
+<h2>Next Steps</h2>
+<p>From ROADMAP.md:</p>
+<ul>
+<li>Track C1: Pilot community selection (business track)</li>
+<li>Any remaining A1 work if needed</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

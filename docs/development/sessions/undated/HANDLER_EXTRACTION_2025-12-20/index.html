@@ -1,0 +1,251 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Handler Extraction Refactoring - 2025-12-20 | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>development</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>sessions</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>undated</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>HANDLER EXTRACTION 2025 12 20</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/development/sessions/undated/HANDLER_EXTRACTION_2025-12-20.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Handler Extraction Refactoring - 2025-12-20</h1>
+<h2>Summary</h2>
+<p>Completed issue #125: Breaking down large files (&gt;2500 lines) into smaller modules. Extracted message handlers from two major actor files into dedicated <code>handlers/</code> modules.</p>
+<h2>Changes Made</h2>
+<h3>icn-gossip Handler Extraction</h3>
+<p><strong>Commit:</strong> <code>5de15240</code></p>
+<p>Extracted 15 message handlers from <code>gossip.rs</code> into <code>handlers/</code> submodule:</p>
+<table>
+<thead>
+<tr>
+<th>Handler File</th>
+<th>Handlers</th>
+<th>Lines</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>push.rs</code></td>
+<td>Announce, Request, Response</td>
+<td>129</td>
+</tr>
+<tr>
+<td><code>bloom.rs</code></td>
+<td>RequestBloomFilter, SendBloomFilter</td>
+<td>90</td>
+</tr>
+<tr>
+<td><code>pull.rs</code></td>
+<td>Digest, PullRequest, PullResponse, RequestMissing</td>
+<td>349</td>
+</tr>
+<tr>
+<td><code>replica.rs</code></td>
+<td>ReplicaRequest, ReplicaOffer, ReplicaStatus</td>
+<td>238</td>
+</tr>
+<tr>
+<td><code>partition.rs</code></td>
+<td>PartitionHealRequest, PartitionHealResponse</td>
+<td>152</td>
+</tr>
+</tbody></table>
+<p><strong>Result:</strong> gossip.rs reduced from 3,668 to 1,542 lines of production code (-58%)</p>
+<h3>icn-net Handler Extraction</h3>
+<p><strong>Commits:</strong> <code>2cf67618</code>, <code>1e6cc55e</code></p>
+<p>Extracted 6 message handlers from <code>actor.rs</code> into <code>handlers/</code> submodule:</p>
+<table>
+<thead>
+<tr>
+<th>Handler File</th>
+<th>Handlers</th>
+<th>Lines</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>hello.rs</code></td>
+<td>Hello (DID-TLS binding, version negotiation)</td>
+<td>231</td>
+</tr>
+<tr>
+<td><code>handshake.rs</code></td>
+<td>Handshake, HandshakeAck, Ping, Pong</td>
+<td>196</td>
+</tr>
+<tr>
+<td><code>signed.rs</code></td>
+<td>SignedEnvelope verification</td>
+<td>99</td>
+</tr>
+<tr>
+<td><code>peer_exchange.rs</code></td>
+<td>PeerExchange (peer discovery)</td>
+<td>157</td>
+</tr>
+<tr>
+<td><code>onion.rs</code></td>
+<td>Onion routing (privacy relay)</td>
+<td>124</td>
+</tr>
+<tr>
+<td><code>mod.rs</code></td>
+<td>ConnectionContext struct</td>
+<td>89</td>
+</tr>
+</tbody></table>
+<p><strong>Result:</strong> actor.rs reduced from 2,790 to 2,097 lines (-25%)</p>
+<h2>Architecture Pattern</h2>
+<h3>ConnectionContext</h3>
+<p>Created a <code>ConnectionContext</code> struct to hold shared state for handlers:</p>
+<pre><code class="language-rust">pub struct ConnectionContext {
+    pub handler: IncomingMessageHandler,
+    pub rate_limiter: Arc&lt;RateLimiter&gt;,
+    pub replay_guard: Arc&lt;RwLock&lt;ReplayGuard&gt;&gt;,
+    pub neighbor_sets: Option&lt;Arc&lt;RwLock&lt;NeighborSets&gt;&gt;&gt;,
+    pub topology_config: Option&lt;TopologyConfig&gt;,
+    pub trust_graph: Option&lt;Arc&lt;RwLock&lt;TrustGraph&gt;&gt;&gt;,
+    pub session_manager: Arc&lt;RwLock&lt;SessionManager&gt;&gt;,
+    pub peer_connections: Arc&lt;RwLock&lt;HashMap&lt;Did, PeerConnectionInfo&gt;&gt;&gt;,
+    pub blob_registry: Option&lt;Arc&lt;RwLock&lt;BlobLocationRegistry&gt;&gt;&gt;,
+    pub misbehavior_detector: Option&lt;Arc&lt;RwLock&lt;MisbehaviorDetector&gt;&gt;&gt;,
+    pub identity_bundle: IdentityBundle,
+    pub own_did: Did,
+}
+</code></pre>
+<p>This pattern:</p>
+<ul>
+<li>Avoids passing many parameters through call chains</li>
+<li>Makes handlers testable in isolation</li>
+<li>Provides clean separation between dispatch and handling logic</li>
+</ul>
+<h3>Dispatch Pattern</h3>
+<p>The main actor dispatch becomes thin:</p>
+<pre><code class="language-rust">match &amp;message.payload {
+    MessagePayload::Hello { ... } =&gt; {
+        ctx.handle_hello(&amp;connection, &amp;from, ...).await?;
+    }
+    MessagePayload::Handshake { ... } =&gt; {
+        ctx.handle_handshake(&amp;connection, &amp;from, ...).await;
+    }
+    // ... etc
+}
+</code></pre>
+<h2>Files Modified</h2>
+<h3>icn-gossip</h3>
+<ul>
+<li><code>src/lib.rs</code> - Added <code>mod handlers</code></li>
+<li><code>src/gossip.rs</code> - Replaced inline handlers with method calls</li>
+<li><code>src/handlers/mod.rs</code> - New module coordinator</li>
+<li><code>src/handlers/push.rs</code> - New</li>
+<li><code>src/handlers/bloom.rs</code> - New</li>
+<li><code>src/handlers/pull.rs</code> - New</li>
+<li><code>src/handlers/replica.rs</code> - New</li>
+<li><code>src/handlers/partition.rs</code> - New</li>
+</ul>
+<h3>icn-net</h3>
+<ul>
+<li><code>src/lib.rs</code> - Added <code>mod handlers</code></li>
+<li><code>src/actor.rs</code> - Replaced inline handlers with method calls, removed 738 lines</li>
+<li><code>src/handlers/mod.rs</code> - New, contains ConnectionContext</li>
+<li><code>src/handlers/hello.rs</code> - New</li>
+<li><code>src/handlers/handshake.rs</code> - New</li>
+<li><code>src/handlers/signed.rs</code> - New</li>
+<li><code>src/handlers/peer_exchange.rs</code> - New</li>
+<li><code>src/handlers/onion.rs</code> - New</li>
+</ul>
+<h2>Test Results</h2>
+<p>All tests pass:</p>
+<ul>
+<li>icn-gossip: 114 tests passed</li>
+<li>icn-net: 147 tests passed (124 unit + 23 integration)</li>
+</ul>
+<h2>Remaining Large Files</h2>
+<p>Files still above 2,000 lines but acceptable:</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Lines</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>metrics_legacy.rs</code></td>
+<td>3,840</td>
+<td>Declarative metric descriptions only</td>
+</tr>
+<tr>
+<td><code>gossip.rs</code></td>
+<td>2,920</td>
+<td>1,542 prod + 1,378 tests (prod under target)</td>
+</tr>
+<tr>
+<td><code>disputes.rs</code></td>
+<td>2,615</td>
+<td>1,531 prod + 1,083 tests (prod under target)</td>
+</tr>
+<tr>
+<td><code>actor.rs</code></td>
+<td>2,097</td>
+<td>Core actor logic, hard to fragment further</td>
+</tr>
+</tbody></table>
+<h2>Issue Closed</h2>
+<p>Issue #125 closed as complete with summary comment.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

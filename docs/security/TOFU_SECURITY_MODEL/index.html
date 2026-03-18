@@ -1,0 +1,302 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>TOFU (Trust-On-First-Use) Security Model | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>security</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>TOFU SECURITY MODEL</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/security/TOFU_SECURITY_MODEL.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>TOFU (Trust-On-First-Use) Security Model</h1>
+<p><strong>Date</strong>: December 18, 2025<br><strong>Status</strong>: Implemented<br><strong>Component</strong>: <code>icn-net</code> TLS layer</p>
+<h2>Overview</h2>
+<p>ICN implements a Trust-On-First-Use (TOFU) security model that balances network openness with security verification. This document describes the architecture, rationale, and security properties of the TOFU implementation.</p>
+<h2>Architecture</h2>
+<h3>Three-Layer Security Model</h3>
+<ol>
+<li><strong>TLS Layer (Transport)</strong>: Mutual TLS with permissive client cert acceptance</li>
+<li><strong>Application Layer (Protocol)</strong>: DID-TLS binding verification in Hello messages</li>
+<li><strong>Authorization Layer (Access Control)</strong>: Trust graph-based authorization</li>
+</ol>
+<h3>TLS Handshake Flow</h3>
+<pre><code>Client                          Server
+  |                               |
+  |-- ClientHello ---------------&gt;|
+  |&lt;----------- ServerHello ------|
+  |&lt;----------- Certificate ------|
+  |&lt;----- CertificateRequest -----|  (requests client cert)
+  |                               |
+  |-- Certificate ---------------&gt;|  (client sends self-signed cert)
+  |-- CertificateVerify ---------&gt;|
+  |-- Finished ------------------&gt;|
+  |&lt;----------- Finished ---------|
+  |                               |
+  [TLS session established]       |
+  |                               |
+  |-- Hello (DID + X25519) ------&gt;|
+  |                               | [Verify DID-TLS binding]
+  |                               | [Check trust score]
+  |&lt;----------- HelloAck ---------|
+</code></pre>
+<h2>Security Properties</h2>
+<h3>What TOFU Provides</h3>
+<ol>
+<li><strong>Cryptographic Authentication</strong>: Ed25519 signatures verify TLS handshake integrity</li>
+<li><strong>Confidentiality</strong>: TLS 1.3 encryption protects all traffic</li>
+<li><strong>Certificate Binding</strong>: DID is bound to TLS certificate in SAN field</li>
+<li><strong>Trust-Based Authorization</strong>: Trust graph enforces access control</li>
+<li><strong>Replay Protection</strong>: Sequence numbers prevent replay attacks</li>
+</ol>
+<h3>What TOFU Doesn&#39;t Provide</h3>
+<ol>
+<li><strong>Pre-Connection Trust Verification</strong>: First connection happens before trust verification</li>
+<li><strong>PKI Infrastructure</strong>: No certificate authorities or trust chains</li>
+<li><strong>Revocation</strong>: Requires application-layer mechanisms</li>
+</ol>
+<h2>Implementation Details</h2>
+<h3>TofuCertificateVerifier</h3>
+<p>Located in <code>icn-net/src/tls.rs</code>, this implements <code>rustls::server::danger::ClientCertVerifier</code>:</p>
+<pre><code class="language-rust">#[derive(Debug)]
+struct TofuCertificateVerifier {}
+
+impl ClientCertVerifier for TofuCertificateVerifier {
+    fn offer_client_auth(&amp;self) -&gt; bool {
+        true  // Request client certificates
+    }
+
+    fn client_auth_mandatory(&amp;self) -&gt; bool {
+        false  // Don&#39;t fail TLS if client doesn&#39;t send cert
+    }
+
+    fn verify_client_cert(&amp;self, ...) -&gt; Result&lt;ClientCertVerified, Error&gt; {
+        // Accept any certificate - verification deferred to Hello handler
+        Ok(ClientCertVerified::assertion())
+    }
+
+    fn verify_tls13_signature(&amp;self, ...) -&gt; Result&lt;HandshakeSignatureValid, Error&gt; {
+        // Verify Ed25519 signature on TLS handshake
+        verifying_key.verify(message, &amp;signature)?;
+        Ok(HandshakeSignatureValid::assertion())
+    }
+}
+</code></pre>
+<h3>Hello Message Verification</h3>
+<p>The application layer verifies DID-TLS binding:</p>
+<ol>
+<li>Extract DID from Hello message</li>
+<li>Extract DID from peer TLS certificate SAN field</li>
+<li>Verify they match</li>
+<li>Verify X25519 encryption key signature</li>
+<li>Query trust graph for authorization decision</li>
+</ol>
+<h2>Threat Model</h2>
+<h3>Threats Mitigated</h3>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Man-in-the-Middle</td>
+<td>TLS 1.3 mutual authentication</td>
+</tr>
+<tr>
+<td>Replay Attacks</td>
+<td>Sequence numbers + Bloom filter</td>
+</tr>
+<tr>
+<td>Identity Spoofing</td>
+<td>DID-TLS binding verification</td>
+</tr>
+<tr>
+<td>Unauthorized Access</td>
+<td>Trust graph authorization</td>
+</tr>
+<tr>
+<td>Traffic Analysis</td>
+<td>TLS encryption</td>
+</tr>
+</tbody></table>
+<h3>Threats Requiring Additional Defenses</h3>
+<table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Defense Mechanism</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Sybil Attacks</td>
+<td>Trust graph + rate limiting</td>
+</tr>
+<tr>
+<td>Byzantine Behavior</td>
+<td>MisbehaviorDetector quarantine</td>
+</tr>
+<tr>
+<td>Resource Exhaustion</td>
+<td>Connection limits + timeouts</td>
+</tr>
+<tr>
+<td>First-Use Attacks</td>
+<td>Bootstrap trust establishment</td>
+</tr>
+</tbody></table>
+<h2>Security Rationale</h2>
+<h3>Why TOFU Instead of Strict Pre-Verification?</h3>
+<ol>
+<li><strong>Network Bootstrap</strong>: Nodes need to connect before establishing trust</li>
+<li><strong>Decentralization</strong>: No central authority to verify certificates</li>
+<li><strong>Flexibility</strong>: Trust relationships evolve over time</li>
+<li><strong>User Experience</strong>: Reduces friction for legitimate connections</li>
+</ol>
+<h3>Why Not PKI or Certificate Authorities?</h3>
+<ol>
+<li><strong>Single Point of Failure</strong>: CA compromise affects all nodes</li>
+<li><strong>Centralization</strong>: Contradicts ICN&#39;s decentralized architecture</li>
+<li><strong>Cost &amp; Complexity</strong>: Requires certificate management infrastructure</li>
+<li><strong>Trust Mismatch</strong>: Social trust != hierarchical CA trust</li>
+</ol>
+<h2>Comparison with Other Models</h2>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Bootstrap</th>
+<th>Flexibility</th>
+<th>Security</th>
+<th>Implementation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>PKI</td>
+<td>Medium</td>
+<td>Low</td>
+<td>High</td>
+<td>Complex</td>
+</tr>
+<tr>
+<td>Web-of-Trust</td>
+<td>Easy</td>
+<td>High</td>
+<td>Medium</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>TOFU (ICN)</td>
+<td>Easy</td>
+<td>High</td>
+<td>Medium-High</td>
+<td>Simple</td>
+</tr>
+<tr>
+<td>Pre-Shared Keys</td>
+<td>Hard</td>
+<td>Low</td>
+<td>High</td>
+<td>Simple</td>
+</tr>
+</tbody></table>
+<h2>Testing</h2>
+<p>All previously flaky tests now pass reliably:</p>
+<ul>
+<li><code>test_contract_deployment_integration</code> (7 tests)</li>
+<li><code>test_topology_integration</code> (6 tests)</li>
+</ul>
+<p>These tests verify:</p>
+<ul>
+<li>Multi-node gossip synchronization</li>
+<li>Contract deployment across trust boundaries</li>
+<li>Regional topology formation</li>
+<li>Peer sampling with trust awareness</li>
+</ul>
+<h2>Future Enhancements</h2>
+<h3>Potential Improvements</h3>
+<ol>
+<li><strong>Cert Pinning</strong>: Remember first-seen certificates</li>
+<li><strong>Trust Attestations</strong>: Third-party trust vouchers</li>
+<li><strong>Revocation Lists</strong>: Distributed revocation mechanism</li>
+<li><strong>Threshold Signatures</strong>: Multi-party cert issuance</li>
+<li><strong>Post-Quantum Crypto</strong>: Hybrid key exchange</li>
+</ol>
+<h3>Migration Path</h3>
+<p>If stricter security is needed:</p>
+<ol>
+<li>Add <code>min_trust_threshold</code> to TLS verifier (&gt;0.0)</li>
+<li>Implement cert pinning for known peers</li>
+<li>Add trust attestation gossip protocol</li>
+<li>Deploy distributed revocation system</li>
+</ol>
+<h2>References</h2>
+<ul>
+<li><a href="https://en.wikipedia.org/wiki/Trust_on_first_use" target="_blank" rel="noopener">TOFU Security Model</a></li>
+<li><a href="https://datatracker.ietf.org/doc/html/rfc8446" target="_blank" rel="noopener">TLS 1.3 Specification</a></li>
+<li><a href="https://www.w3.org/TR/did-core/" target="_blank" rel="noopener">Decentralized Trust Systems</a></li>
+<li><a href="/docs/development/trust-multi-graph-migration">ICN Trust Graph Documentation</a></li>
+</ul>
+<h2>See Also</h2>
+<ul>
+<li><a href="/docs/ARCHITECTURE">docs/ARCHITECTURE.md</a> - Overall system architecture</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/production-hardening">docs/security/production-hardening.md</a> - Security hardening measures</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-net/src/tls.rs">icn/crates/icn-net/src/tls.rs</a> - TLS implementation</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-net/src/actor/mod.rs">icn/crates/icn-net/src/actor/mod.rs</a> - Hello message handling</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

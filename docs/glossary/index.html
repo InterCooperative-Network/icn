@@ -1,0 +1,604 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Glossary | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>  <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>glossary</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/glossary.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Glossary</h1>
+<p><strong>Status</strong>: Reference Document
+<strong>Version</strong>: 1.2.0
+<strong>Last Updated</strong>: 2025-12-14</p>
+<p><em>Expanded with contribution credits terminology (Phase 21) and proposed Commons Evolution terms (RFC)</em></p>
+<p>This glossary defines the authoritative terminology for ICN. All documentation, code, and user-facing text should use these terms consistently.</p>
+<hr>
+<h2>Table of Contents</h2>
+<ol>
+<li><a href="#identity--trust">Identity & Trust</a></li>
+<li><a href="#organizations">Organizations</a></li>
+<li><a href="#economic-system">Economic System</a></li>
+<li><a href="#fuel-system">Fuel System</a></li>
+<li><a href="#infrastructure">Infrastructure</a></li>
+<li><a href="#governance">Governance</a></li>
+<li><a href="#technical-terms">Technical Terms</a></li>
+<li><a href="#disambiguation">Disambiguation</a></li>
+<li><a href="#related-documents">Related Documents</a></li>
+<li><a href="#proposed-terms-commons-evolution-rfc">Proposed Terms (Commons Evolution RFC)</a></li>
+</ol>
+<hr>
+<h2>Identity &amp; Trust</h2>
+<h3>DID (Decentralized Identifier)</h3>
+<p>A self-sovereign identifier in the format <code>did:icn:&lt;base58-pubkey&gt;</code>. Every participant, organization, and the network itself has a DID.</p>
+<h3>Trust Score</h3>
+<p>A computed value (0.0 to 1.0) representing the network&#39;s confidence in an entity, derived from the trust graph using PageRank-like algorithms.</p>
+<h3>Trust Graph</h3>
+<p>The network of trust relationships between DIDs. Edges are directed and labeled (e.g., &quot;vouches for&quot;, &quot;has transacted with&quot;).</p>
+<h3>Trust Class</h3>
+<p>Categories of trust levels that determine rate limits and access:</p>
+<ul>
+<li><strong>Isolated</strong> (&lt; 0.1): Very limited access</li>
+<li><strong>Known</strong> (0.1 - 0.4): Basic access</li>
+<li><strong>Partner</strong> (0.4 - 0.7): Standard access</li>
+<li><strong>Federated</strong> (0.7+): Full access</li>
+</ul>
+<h3>Attestation</h3>
+<p>A signed statement by one DID about another. Used for contribution verification, trust building, and identity claims.</p>
+<p><strong>Eligibility requirements</strong> for contribution attesters:</p>
+<ul>
+<li>Membership age ≥ 90 days</li>
+<li>Trust score ≥ 0.3</li>
+<li>Max 10 attestations per period</li>
+<li>Non-reciprocity (cannot attest someone who attested you)</li>
+</ul>
+<h3>Organizational Attestation</h3>
+<p>For large contributions (&gt; 500 credits), at least one attester must be an <strong>organizational DID</strong> (coop, community, or household), not just individuals.</p>
+<h3>Sybil Resistance</h3>
+<p>Protections against fake identity attacks in the attestation system:</p>
+<ul>
+<li>Membership age requirements</li>
+<li>Trust score thresholds</li>
+<li>Attestation budgets</li>
+<li>Non-reciprocity rules</li>
+<li>Organizational anchoring for large claims</li>
+</ul>
+<h3>Trust Graph Depth</h3>
+<p>Attestation weight based on path length from organizational anchors. Members with no path to an org have zero attestation weight.</p>
+<hr>
+<h2>Organizations</h2>
+<h3>Cooperative (Coop)</h3>
+<p>A formal economic organization with:</p>
+<ul>
+<li>Registered membership</li>
+<li>Bylaws and governance</li>
+<li>Treasury and ledger</li>
+<li>Economic activity (trade, production)</li>
+</ul>
+<p>Cooperatives are the <strong>economic engine</strong> of ICN.</p>
+<h3>Community</h3>
+<p>A civic organization for:</p>
+<ul>
+<li>Mutual aid</li>
+<li>Stewardship</li>
+<li>Advocacy</li>
+<li>Public service</li>
+</ul>
+<p>Communities are <strong>first-class entities</strong> in ICN, not just informal groups. They have DIDs, fuel pools, and governance.</p>
+<h3>Federation</h3>
+<p>A group of cooperatives and/or communities that:</p>
+<ul>
+<li>Share exchange agreements</li>
+<li>Have common governance</li>
+<li>Can trade using federation credits</li>
+</ul>
+<h3>Household</h3>
+<p>A grouping of related DIDs (family, friends) that:</p>
+<ul>
+<li>Pool device contributions</li>
+<li>Share benefits</li>
+<li>Have shared resource accounting</li>
+</ul>
+<h3>Global Commons</h3>
+<p>The network-wide pool for:</p>
+<ul>
+<li>Unaffiliated individual contributions</li>
+<li>Network infrastructure</li>
+<li>Public goods</li>
+</ul>
+<p>Anyone can contribute to the Global Commons without joining a coop.</p>
+<h3>Contribution Routing</h3>
+<p>How infrastructure credits are split when earned. Contributors specify allocations:</p>
+<ul>
+<li><strong>Personal</strong>: To individual account</li>
+<li><strong>Cooperative</strong>: To coop treasury</li>
+<li><strong>Community</strong>: To community</li>
+<li><strong>Household</strong>: To shared household pool</li>
+<li><strong>GlobalCommons</strong>: To network-wide pool</li>
+<li><strong>Federation</strong>: To federation treasury</li>
+</ul>
+<p><strong>Exploitation safeguards</strong>:</p>
+<ul>
+<li>Real membership requirements (2+ independent DIDs for households)</li>
+<li>Pass-through ceilings (max % from single source: 25%)</li>
+<li>Velocity limits (rapid changes trigger review)</li>
+</ul>
+<h3>Network</h3>
+<p>The ICN network as a whole. Has:</p>
+<ul>
+<li>Constitutional governance</li>
+<li>Network-wide parameters</li>
+<li>The Network Treasury DID</li>
+</ul>
+<hr>
+<h2>Economic System</h2>
+<h3>Credit</h3>
+<p>A unit of value in ICN&#39;s mutual credit system. Credits are <strong>internal accounting entries</strong>, not tradeable tokens.</p>
+<p><strong>Always qualify which type:</strong></p>
+<ul>
+<li><strong>Coop-Credits</strong>: Spendable within a single cooperative</li>
+<li><strong>Federation-Credits</strong>: Spendable across federated organizations</li>
+<li><strong>Infra-Credits</strong>: Earned from infrastructure contribution (converts to coop-credits)</li>
+</ul>
+<h3>Mutual Credit</h3>
+<p>An economic system where:</p>
+<ul>
+<li>Value comes from reciprocity, not scarcity</li>
+<li>Balances can be negative (you owe) or positive (you&#39;re owed)</li>
+<li>The system is zero-sum (total credits = total debits)</li>
+<li>No external tokens or currency backing required</li>
+</ul>
+<h3>Hours</h3>
+<p>The default currency unit in most cooperatives. Represents an hour of labor or equivalent value.</p>
+<p><strong>Always qualify which type:</strong></p>
+<ul>
+<li><strong>Labor-Hours</strong>: Human work (tutoring, cooking, etc.)</li>
+<li><strong>CPU-Hours</strong>: Compute contribution</li>
+<li><strong>Uptime-Hours</strong>: Node availability</li>
+</ul>
+<h3>Demurrage</h3>
+<p>Negative interest on idle credit balances. Encourages circulation, discourages hoarding.</p>
+<h3>Provenance</h3>
+<p>The tracked history of a credit unit, including:</p>
+<ul>
+<li>Original contributor</li>
+<li>How it was earned</li>
+<li>Transfer history</li>
+</ul>
+<p>Used to determine bridge eligibility.</p>
+<h3>Bridge</h3>
+<p>The interface between ICN internal credits and external value (fiat, other networks). Governed and restricted.</p>
+<h3>Three-Tier System</h3>
+<p>The graduated exchangeability of credits:</p>
+<ol>
+<li><strong>Internal</strong> (Tier 1): Within one coop only</li>
+<li><strong>Federated</strong> (Tier 2): Across federated orgs</li>
+<li><strong>Bridge</strong> (Tier 3): External exchange (governed)</li>
+</ol>
+<h3>Network Treasury</h3>
+<p>The DID <code>did:icn:network:infrastructure</code> that issues credits for infrastructure contributions.</p>
+<h3>Exchange Pool</h3>
+<p>An automated market maker (AMM) for swapping between currencies within ICN. Governance-controlled, not speculative.</p>
+<h3>Marketplace</h3>
+<p>The internal economy where credits are spent on goods, services, and infrastructure.</p>
+<p><strong>Listing types</strong>:</p>
+<ul>
+<li><strong>Service</strong>: Labor with duration (tutoring, repair, care)</li>
+<li><strong>Good</strong>: Physical items (food, tools, crafts)</li>
+<li><strong>Digital</strong>: Content with license (software, designs)</li>
+<li><strong>Infrastructure</strong>: Compute/storage capacity</li>
+<li><strong>Subscription</strong>: Recurring service access</li>
+</ul>
+<h3>Human Labor Credit</h3>
+<p>Credits earned through human work (as opposed to infrastructure contributions).</p>
+<p><strong>Labor types</strong>:</p>
+<ul>
+<li><strong>Organizational labor</strong>: Logged via coop/community work tracking</li>
+<li><strong>Service delivery</strong>: Peer-to-peer marketplace services</li>
+<li><strong>Community service</strong>: Care work, mutual aid</li>
+</ul>
+<p><strong>Labor categories</strong>: Governance, Operations, Development, Outreach, Education, Care, Skilled, Creative, Physical</p>
+<hr>
+<h2>Fuel System</h2>
+<h3>Fuel</h3>
+<p>Permission to perform network operations. Fuel is:</p>
+<ul>
+<li><strong>Regenerative</strong>: Refills over time</li>
+<li><strong>Non-transferable</strong>: Can&#39;t be traded</li>
+<li><strong>Contribution-based</strong>: More contribution = higher max</li>
+</ul>
+<p>Fuel is <strong>not</strong> a token or currency. It&#39;s a rate-limiting mechanism.</p>
+<h3>Fuel Allowance</h3>
+<p>Your personal fuel capacity, calculated from:</p>
+<ul>
+<li>Base allowance (everyone gets this)</li>
+<li>Trust bonus (higher trust = more fuel)</li>
+<li>Contribution bonus (more contribution = more fuel)</li>
+</ul>
+<h3>Fuel Pool</h3>
+<p>Fuel exists at every organizational level:</p>
+<ul>
+<li><strong>Network Pool</strong>: Cross-federation operations</li>
+<li><strong>Federation Pool</strong>: Cross-coop operations</li>
+<li><strong>Coop Pool</strong>: Internal operations</li>
+<li><strong>Member Allowance</strong>: Individual activity</li>
+</ul>
+<h3>Regeneration Rate</h3>
+<p>How fast fuel refills. Default: full regeneration in 24 hours.</p>
+<h3>Fuel Cost</h3>
+<p>Each operation consumes fuel:</p>
+<ul>
+<li>Publish message: 1 fuel</li>
+<li>Ledger transaction: 10 fuel</li>
+<li>Create proposal: 50 fuel</li>
+<li>Submit compute job: Variable</li>
+</ul>
+<h3>Fuel Guarantees</h3>
+<p><strong>Minimum civic fuel</strong> (50 units) ensures every member can participate in governance regardless of contribution level.</p>
+<p><strong>Guaranteed operations</strong> (never blocked by fuel exhaustion):</p>
+<ul>
+<li>Cast vote on eligible proposals (1 per proposal)</li>
+<li>Create one proposal per governance period</li>
+<li>Send 5 direct messages per day</li>
+<li>View own balances (unlimited)</li>
+<li>Respond to disputes involving self</li>
+</ul>
+<h3>Fuel Reservation</h3>
+<p>For compute jobs, fuel is <strong>reserved upfront</strong> from the submitter&#39;s account. Unused fuel is returned when the job completes.</p>
+<h3>Compute Limit</h3>
+<p>The execution limit for CCL contract execution. This is <strong>distinct from fuel</strong> but draws from the same fuel pool when submitting jobs.</p>
+<p><strong>Important</strong>: In CCL code, the internal execution limit is still called &quot;fuel&quot; for historical reasons. In user-facing documentation, use &quot;compute limit&quot; when referring to contract execution bounds.</p>
+<hr>
+<h2>Infrastructure</h2>
+<h3>Node</h3>
+<p>An instance of <code>icnd</code> (the ICN daemon) providing network infrastructure.</p>
+<h3>Contribution</h3>
+<p>Resources provided to the network:</p>
+<ul>
+<li><strong>Compute</strong>: CPU cycles for job execution</li>
+<li><strong>Storage</strong>: Disk space for data replication</li>
+<li><strong>Bandwidth</strong>: Network relay capacity</li>
+<li><strong>Uptime</strong>: Continuous availability</li>
+</ul>
+<h3>Device Network</h3>
+<p>A collection of devices (phones, laptops, servers) owned by one DID, contributing resources together.</p>
+<h3>Attestation (Contribution)</h3>
+<p>When peers verify that a node actually provided claimed resources. Requires trust-weighted signatures.</p>
+<h3>Metering</h3>
+<p>Automatic measurement of resource contribution via Prometheus metrics.</p>
+<hr>
+<h2>Governance</h2>
+<h3>Proposal</h3>
+<p>A formal suggestion for change, requiring votes to pass.</p>
+<h3>Domain</h3>
+<p>A governance scope (e.g., &quot;coop:food-collective&quot;, &quot;federation:pnw&quot;).</p>
+<h3>Quorum</h3>
+<p>The minimum participation required for a vote to be valid.</p>
+<h3>Threshold</h3>
+<p>The percentage of approval required for a proposal to pass.</p>
+<h3>Protocol Contract</h3>
+<p>Economic rules encoded in CCL. Can be:</p>
+<ul>
+<li><strong>Adopted</strong>: Used as-is</li>
+<li><strong>Extended</strong>: Customized with additions</li>
+<li><strong>Replaced</strong>: Completely custom</li>
+</ul>
+<p><strong>Key protocol contracts</strong>:</p>
+<ul>
+<li><code>infrastructure-credit/v1</code>: Rates for infrastructure → credit conversion</li>
+<li><code>fuel-allocation/v1</code>: Fuel allowance calculation rules</li>
+<li><code>demurrage/v1</code>: Circulation charge policies</li>
+</ul>
+<h3>Role</h3>
+<p>A governance position with specific powers:</p>
+<ul>
+<li><strong>Steward</strong>: Day-to-day administration</li>
+<li><strong>Facilitator</strong>: Meeting and process management</li>
+<li><strong>Delegate</strong>: Represents org in federation</li>
+</ul>
+<hr>
+<h2>Technical Terms</h2>
+<h3>CCL (Cooperative Contract Language)</h3>
+<p>ICN&#39;s domain-specific language for expressing agreements and economic rules. Intentionally limited (not Turing-complete).</p>
+<h3>Ledger</h3>
+<p>The double-entry accounting system tracking all credit movements. Uses Merkle-DAG for integrity.</p>
+<h3>Gossip</h3>
+<p>The P2P messaging protocol for distributing information across the network.</p>
+<h3>QUIC</h3>
+<p>The transport protocol used for node-to-node communication (over UDP, with TLS).</p>
+<h3>Gateway</h3>
+<p>The REST/WebSocket API for applications to interact with ICN.</p>
+<hr>
+<h2>Disambiguation</h2>
+<h3>Fuel vs. Gas</h3>
+<table>
+<thead>
+<tr>
+<th>Concept</th>
+<th>ICN Fuel</th>
+<th>Blockchain Gas</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Acquired by</td>
+<td>Contribution + trust</td>
+<td>Buying tokens</td>
+</tr>
+<tr>
+<td>Transferable</td>
+<td>No</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Speculation</td>
+<td>Impossible</td>
+<td>Common</td>
+</tr>
+<tr>
+<td>Regeneration</td>
+<td>Yes (time-based)</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Purpose</td>
+<td>Rate limiting</td>
+<td>Payment</td>
+</tr>
+</tbody></table>
+<h3>Fuel vs. Compute Limit</h3>
+<table>
+<thead>
+<tr>
+<th>Context</th>
+<th>Term to Use</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>User-facing docs</td>
+<td>&quot;Fuel&quot; for network ops, &quot;compute limit&quot; for CCL jobs</td>
+</tr>
+<tr>
+<td>CCL internal code</td>
+<td>&quot;fuel&quot; (historical, internal only)</td>
+</tr>
+<tr>
+<td>API parameters</td>
+<td><code>fuel_limit</code> for compute jobs</td>
+</tr>
+<tr>
+<td>Metrics</td>
+<td><code>icn_fuel_*</code> for all fuel metrics</td>
+</tr>
+</tbody></table>
+<h3>Credit vs. Token</h3>
+<table>
+<thead>
+<tr>
+<th>ICN Credits</th>
+<th>Crypto Tokens</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Internal accounting</td>
+<td>External asset</td>
+</tr>
+<tr>
+<td>Mutual credit (can be negative)</td>
+<td>Always positive</td>
+</tr>
+<tr>
+<td>No exchange trading</td>
+<td>Exchange tradeable</td>
+</tr>
+<tr>
+<td>Value from reciprocity</td>
+<td>Value from scarcity</td>
+</tr>
+<tr>
+<td>Designed to circulate</td>
+<td>Designed to appreciate</td>
+</tr>
+</tbody></table>
+<h3>Community vs. Cooperative</h3>
+<table>
+<thead>
+<tr>
+<th>Community</th>
+<th>Cooperative</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Civic focus</td>
+<td>Economic focus</td>
+</tr>
+<tr>
+<td>Mutual aid, stewardship</td>
+<td>Trade, production</td>
+</tr>
+<tr>
+<td>Belonging</td>
+<td>Livelihood</td>
+</tr>
+<tr>
+<td>May not have currency</td>
+<td>Has currency/ledger</td>
+</tr>
+<tr>
+<td>Less formal governance</td>
+<td>Formal bylaws</td>
+</tr>
+</tbody></table>
+<p>Both are first-class ICN entities. Individuals typically belong to both.</p>
+<h3>Internal vs. Federated vs. Bridge</h3>
+<table>
+<thead>
+<tr>
+<th>Tier</th>
+<th>Scope</th>
+<th>Can Cash Out?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Internal</td>
+<td>One coop</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Federated</td>
+<td>Partner orgs</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Bridge</td>
+<td>External</td>
+<td>Yes (governed)</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Usage Guidelines</h2>
+<h3>In Documentation</h3>
+<ul>
+<li>Always qualify credit types: &quot;coop-credits&quot;, not just &quot;credits&quot;</li>
+<li>Always qualify hour types: &quot;labor-hours&quot;, &quot;CPU-hours&quot;</li>
+<li>Use &quot;fuel&quot; for network operations</li>
+<li>Use &quot;compute limit&quot; for CCL execution bounds</li>
+</ul>
+<h3>In Code</h3>
+<ul>
+<li>Variable names should match glossary terms</li>
+<li>Comments should use glossary terms</li>
+<li>Error messages should use glossary terms</li>
+</ul>
+<h3>In User Interfaces</h3>
+<ul>
+<li>Prefer plain language with glossary terms</li>
+<li>Provide tooltips linking to glossary</li>
+<li>Avoid jargon without explanation</li>
+</ul>
+<hr>
+<h2>Related Documents</h2>
+<ul>
+<li><a href="/docs/design/economics/contribution-credits-design">Contribution Credits Design</a> - Full economic design specification</li>
+<li><a href="/docs/ARCHITECTURE">ARCHITECTURE.md</a> - System architecture</li>
+<li><a href="/docs/design/governance/governance-primitives">governance-primitives.md</a> - Governance layer design</li>
+</ul>
+<hr>
+<h2>Proposed Terms (Commons Evolution RFC)</h2>
+<p><em>These terms are proposed in <a href="/docs/design/COMMONS_EVOLUTION">COMMONS_EVOLUTION.md</a> and are under review for v0.3.x+. They are not yet implemented.</em></p>
+<h3>The Commons</h3>
+<p><strong>Status</strong>: Proposed (v0.3.0+)</p>
+<p>The shared global coordination layer of ICN: identity, rights, governance, and economic participation held in common by all participants. The Commons provides baseline infrastructure that individual jurisdictions (cooperatives, communities, federations) build upon.</p>
+<h3>Commons Holder</h3>
+<p><strong>Status</strong>: Proposed (v0.3.0+)</p>
+<p>A human participant recognized by the network as holding baseline rights and responsibilities in the commons. Commons Holder status is independent of membership in any specific cooperative or community. A Commons Holder may have multiple affiliations (memberships) with different jurisdictions.</p>
+<p><strong>Key property</strong>: Jurisdictions can revoke membership; they cannot revoke Commons Holder status.</p>
+<h3>Personhood Anchor</h3>
+<p><strong>Status</strong>: Proposed (v0.3.0+)</p>
+<p>The cryptographic root of a Commons Holder&#39;s identity, independent of key rotation. A Personhood Anchor proves that a unique human controls the associated keys, enabling Sybil resistance at the network level.</p>
+<p><strong>Requires</strong>: Proof-of-personhood attestations from stewards or existing verified holders.</p>
+<h3>Charter</h3>
+<p><strong>Status</strong>: Proposed (v0.3.0+)</p>
+<p>The founding document that creates a cooperative, community, or federation as a jurisdiction within the commons. A Charter specifies:</p>
+<ul>
+<li>Organization type (coop, community, federation)</li>
+<li>Governance profile</li>
+<li>Membership policy</li>
+<li>Economic policy (if applicable)</li>
+<li>Dispute resolution rules</li>
+</ul>
+<h3>Jurisdiction</h3>
+<p><strong>Status</strong>: Proposed (v0.3.0+)</p>
+<p>A coop, community, or federation with its own charter, governance, and membership rules. Jurisdictions operate within the commons framework and cannot override baseline Commons Rights.</p>
+<p><strong>Relationship to current terms</strong>: This term generalizes &quot;cooperative&quot; and &quot;community&quot; into a unified concept.</p>
+<h3>Steward (Commons Context)</h3>
+<p><strong>Status</strong>: Proposed (v0.3.0+)</p>
+<p>A trusted operator who performs identity verification (proof-of-personhood attestation), infrastructure maintenance, or governance functions on behalf of the network. Stewards are:</p>
+<ul>
+<li>Commons Holders themselves</li>
+<li>Term-limited (not permanent positions)</li>
+<li>Bonded (stake against misbehavior)</li>
+<li>Subject to governance oversight</li>
+</ul>
+<p><strong>Note</strong>: This extends the existing &quot;Steward&quot; role definition in the Governance section.</p>
+<h3>Commons Rights</h3>
+<p><strong>Status</strong>: Proposed (v0.3.0+)</p>
+<p>The baseline rights held by all Commons Holders, which cannot be revoked by individual jurisdictions:</p>
+<ul>
+<li><strong>Voice</strong>: Vote in commons-level governance</li>
+<li><strong>Petition</strong>: Propose constitutional changes</li>
+<li><strong>Fuel Floor</strong>: Guaranteed minimum fuel for civic participation</li>
+<li><strong>Due Process</strong>: Right to appeal before suspension/revocation</li>
+<li><strong>Exit</strong>: Leave any jurisdiction freely</li>
+<li><strong>Audit</strong>: Access public records</li>
+</ul>
+<h3>Affiliation</h3>
+<p><strong>Status</strong>: Proposed (v0.3.0+)</p>
+<p>A Commons Holder&#39;s membership relationship with a specific jurisdiction, granting additional capabilities (voting, transacting, holding office) within that scope. A Commons Holder may have multiple affiliations simultaneously.</p>
+<p><strong>Relationship to current terms</strong>: This replaces the simpler &quot;membership&quot; concept with a more precise model.</p>
+<h3>Proof-of-Personhood (POP)</h3>
+<p><strong>Status</strong>: Proposed (v0.3.0+)</p>
+<p>Verification that a Commons Holder represents a unique human, not a bot or duplicate identity. POP methods include:</p>
+<ul>
+<li><strong>In-person</strong>: Verification by a steward</li>
+<li><strong>Sponsored</strong>: Vouched for by existing verified holders</li>
+<li><strong>Biometric</strong>: Privacy-preserving biometric verification</li>
+<li><strong>Ceremony</strong>: Community key-signing events</li>
+</ul>
+<hr>
+<p><strong>Feedback</strong>: If you encounter a term that needs clarification, open an issue at <a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">https://github.com/InterCooperative-Network/icn/issues</a></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

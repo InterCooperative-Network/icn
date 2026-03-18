@@ -1,0 +1,871 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Module 9: Operations and Deployment | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>onboarding</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>reference</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>module 09 ops deploy</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/onboarding/reference/module-09-ops-deploy.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Module 9: Operations and Deployment</h1>
+<h2>Learning Objectives</h2>
+<p>By the end of this module, you will:</p>
+<ul>
+<li>Understand configuration layering and validation</li>
+<li>Deploy ICN using native, Docker, or Kubernetes methods</li>
+<li>Configure production-grade secrets and security settings</li>
+<li>Set up monitoring with Prometheus and Grafana</li>
+<li>Perform backup and recovery operations</li>
+<li>Troubleshoot common deployment issues</li>
+</ul>
+<h2>Prerequisites</h2>
+<ul>
+<li>Module 8 (Web UI Integration)</li>
+<li>Basic Linux system administration</li>
+<li>Familiarity with Docker and/or Kubernetes</li>
+</ul>
+<h2>Key Reading</h2>
+<ul>
+<li><code>deploy/README.md</code></li>
+<li><code>config/README.md</code></li>
+<li><code>docs/security/production-hardening.md</code></li>
+<li><code>docs/HOMELAB_DEPLOYMENT.md</code></li>
+</ul>
+<hr>
+<h2>Concepts (Textbook Style)</h2>
+<h3>Configuration Layering</h3>
+<p>ICN uses a layered configuration system where later sources override earlier ones:</p>
+<pre><code>┌─────────────────────────────────────────────────────────────────┐
+│                 Configuration Precedence                        │
+│                                                                 │
+│  ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐ │
+│  │ Built-in │───▶│  Config  │───▶│   Env    │───▶│   CLI    │ │
+│  │ Defaults │    │   File   │    │   Vars   │    │  Flags   │ │
+│  └──────────┘    └──────────┘    └──────────┘    └──────────┘ │
+│                                                                 │
+│  Lowest Priority ─────────────────────────▶ Highest Priority   │
+└─────────────────────────────────────────────────────────────────┘
+</code></pre>
+<p><strong>Why layered configuration?</strong></p>
+<ol>
+<li><strong>Safe Defaults</strong>: Built-in defaults provide a working baseline</li>
+<li><strong>File-based Config</strong>: TOML files for complex, environment-specific settings</li>
+<li><strong>Environment Variables</strong>: 12-factor app compatibility, container orchestration</li>
+<li><strong>CLI Flags</strong>: Quick overrides for testing and debugging</li>
+</ol>
+<h3>Configuration Sources</h3>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Example</th>
+<th>Use Case</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Built-in</td>
+<td><code>network.listen_addr = &quot;0.0.0.0:7777&quot;</code></td>
+<td>Safe starting point</td>
+</tr>
+<tr>
+<td>Config File</td>
+<td><code>config.toml</code></td>
+<td>Production settings</td>
+</tr>
+<tr>
+<td>Environment</td>
+<td><code>ICN_GATEWAY_JWT_SECRET=...</code></td>
+<td>Secret injection</td>
+</tr>
+<tr>
+<td>CLI Flag</td>
+<td><code>--data-dir /var/lib/icn</code></td>
+<td>Testing/runtime overrides</td>
+</tr>
+</tbody></table>
+<h3>Configuration File Structure</h3>
+<pre><code class="language-toml"># config.toml - Main configuration file
+
+data_dir = &quot;/var/lib/icn&quot;
+# Keystore passphrase set via ICN_KEYSTORE_PASSPHRASE (preferred) or ICN_PASSPHRASE
+
+[network]
+listen_addr = &quot;0.0.0.0:7777&quot;
+mdns_enabled = true
+bootstrap_peers = [
+    &quot;icn://did:icn:abc@192.168.1.10:7777&quot;,
+]
+
+[gateway]
+enabled = true
+bind_addr = &quot;0.0.0.0:8080&quot;
+# JWT secret set via ICN_GATEWAY_JWT_SECRET env var
+
+[observability]
+metrics_port = 9100
+health_port = 8080
+log_level = &quot;info&quot;
+
+[rate_limits]
+# Trust-based velocity limiting
+requests_per_second = 100
+burst_capacity = 200
+</code></pre>
+<h3>Configuration Validation</h3>
+<p>Always validate configuration before starting:</p>
+<pre><code class="language-bash"># Validate configuration file
+icnd --config /etc/icn/config.toml --validate-config
+
+# Output shows warnings and errors
+Validating configuration...
+
+✓ network.listen_addr: 0.0.0.0:7777
+✓ gateway.enabled: true
+⚠ Warning: gateway.jwt_secret not set, will use ICN_GATEWAY_JWT_SECRET env var
+✓ observability.metrics_port: 9100
+
+Configuration is valid with 1 warning(s).
+</code></pre>
+<hr>
+<h2>Deployment Models</h2>
+<h3>Native Installation (Systemd)</h3>
+<p>Best for dedicated servers and bare-metal deployments.</p>
+<pre><code>┌────────────────────────────────────────────────────────┐
+│                 Native Deployment                      │
+│                                                        │
+│   systemd ──▶ icnd (daemon)                           │
+│                  │                                     │
+│                  ├── /var/lib/icn/ (data)             │
+│                  ├── /etc/icn/config.toml (config)    │
+│                  └── /etc/icn/icnd.env (secrets)      │
+│                                                        │
+│   nginx ──▶ pilot-ui (static files)                   │
+└────────────────────────────────────────────────────────┘
+</code></pre>
+<p><strong>Installation steps</strong>:</p>
+<pre><code class="language-bash"># 1. Build from source
+cd icn
+cargo build --release
+
+# 2. Install binaries
+sudo cp target/release/icnd /usr/local/bin/
+sudo cp target/release/icnctl /usr/local/bin/
+
+# 3. Create system user and directories
+sudo useradd --system --home-dir /var/lib/icn icn
+sudo mkdir -p /var/lib/icn /etc/icn
+sudo chown icn:icn /var/lib/icn
+
+# 4. Configure environment (secrets)
+sudo cp deploy/icnd.env.example /etc/icn/icnd.env
+sudo chmod 600 /etc/icn/icnd.env
+# Edit to set JWT_SECRET
+
+# 5. Install systemd service
+sudo cp deploy/icnd.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable icnd
+
+# 6. Initialize identity
+sudo -u icn icnctl --data-dir /var/lib/icn id init
+
+# 7. Start service
+sudo systemctl start icnd
+sudo systemctl status icnd
+</code></pre>
+<p><strong>Systemd service file</strong>:</p>
+<pre><code class="language-ini">[Unit]
+Description=ICN Daemon
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=icn
+Group=icn
+EnvironmentFile=/etc/icn/icnd.env
+ExecStart=/usr/local/bin/icnd --config /etc/icn/config.toml --data-dir /var/lib/icn
+Restart=on-failure
+RestartSec=5
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/icn
+
+[Install]
+WantedBy=multi-user.target
+</code></pre>
+<h3>Docker Compose</h3>
+<p>Best for local development and small-scale pilots.</p>
+<pre><code>┌────────────────────────────────────────────────────────┐
+│                Docker Compose Stack                    │
+│                                                        │
+│   ┌──────────┐  ┌──────────┐  ┌──────────┐           │
+│   │   icnd   │  │prometheus│  │ grafana  │           │
+│   │  :8080   │  │  :9091   │  │  :3001   │           │
+│   └──────────┘  └──────────┘  └──────────┘           │
+│        │                                              │
+│        └───────────────────────────────────────┐      │
+│                                                │      │
+│   ┌──────────────────────────────────────────────┐   │
+│   │              Docker Network                  │   │
+│   └──────────────────────────────────────────────┘   │
+│                                                       │
+│   ┌──────────┐                                       │
+│   │ pilot-ui │                                       │
+│   │  :3000   │                                       │
+│   └──────────┘                                       │
+└────────────────────────────────────────────────────────┘
+</code></pre>
+<p><strong>Quick start</strong>:</p>
+<pre><code class="language-bash">cd deploy
+
+# Automated setup
+./quickstart.sh &quot;My Timebank&quot;
+
+# Or manual setup:
+cp .env.example .env
+# Edit .env to set JWT_SECRET
+
+docker-compose build
+docker-compose up -d
+
+# Initialize identity
+docker-compose exec icnd icnctl id init
+docker-compose exec icnd icnctl id show
+
+# Get auth token
+docker-compose exec icnd icnctl auth token --coop my-coop
+</code></pre>
+<p><strong>Environment variables</strong> (<code>.env</code>):</p>
+<pre><code class="language-bash"># Required secrets
+JWT_SECRET=your-secure-secret-at-least-32-chars
+GRAFANA_PASSWORD=admin
+
+# Optional configuration
+ICN_GATEWAY_JWT_SECRET=your-secure-secret-at-least-32-chars
+ICN_KEYSTORE_PASSPHRASE=your-keystore-passphrase
+RUST_LOG=icn=info
+</code></pre>
+<h3>Kubernetes</h3>
+<p>Best for production, multi-node deployments.</p>
+<pre><code>┌─────────────────────────────────────────────────────────────────┐
+│                    Kubernetes Cluster                           │
+│                                                                 │
+│  Namespace: icn                                                 │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │                                                         │   │
+│  │  ┌──────────────┐     ┌──────────────┐                 │   │
+│  │  │ Deployment   │     │  ConfigMap   │                 │   │
+│  │  │  icn-daemon  │◀────│  icn-config  │                 │   │
+│  │  └──────────────┘     └──────────────┘                 │   │
+│  │         │                    │                         │   │
+│  │         │             ┌──────────────┐                 │   │
+│  │         └────────────▶│   Secret     │                 │   │
+│  │                       │ icn-secrets  │                 │   │
+│  │                       └──────────────┘                 │   │
+│  │                                                         │   │
+│  │  ┌──────────────┐     ┌──────────────┐                 │   │
+│  │  │   Service    │     │     PVC      │                 │   │
+│  │  │   NodePort   │     │   icn-data   │                 │   │
+│  │  │  30080/30777 │     │    10Gi      │                 │   │
+│  │  └──────────────┘     └──────────────┘                 │   │
+│  │                                                         │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                 │
+│  Monitoring Namespace                                           │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │  Prometheus │ Grafana │ AlertManager                    │   │
+│  └─────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+</code></pre>
+<p><strong>Key manifests</strong>:</p>
+<pre><code class="language-yaml"># deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: icn-daemon
+  namespace: icn
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+      - name: icnd
+        image: icn:latest
+        args: [&quot;--config&quot;, &quot;/etc/icn/config.toml&quot;, &quot;--data-dir&quot;, &quot;/var/lib/icn&quot;]
+        env:
+        - name: ICN_PASSPHRASE
+          valueFrom:
+            secretKeyRef:
+              name: icn-secrets
+              key: passphrase
+        - name: ICN_GATEWAY_JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: icn-secrets
+              key: jwt-secret
+        ports:
+        - containerPort: 7777
+          protocol: UDP
+        - containerPort: 8080
+          protocol: TCP
+        - containerPort: 9100
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /v1/health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        resources:
+          requests:
+            cpu: 100m
+            memory: 512Mi
+          limits:
+            cpu: &quot;1&quot;
+            memory: 2Gi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+</code></pre>
+<p><strong>Deployment commands</strong>:</p>
+<pre><code class="language-bash">cd deploy/k8s
+
+# Create namespace and secrets
+kubectl apply -f namespace.yaml
+kubectl create secret generic icn-secrets \
+  --from-literal=passphrase=&quot;your-passphrase&quot; \
+  --from-literal=jwt-secret=&quot;$(openssl rand -base64 32)&quot; \
+  -n icn
+
+# Deploy
+kubectl apply -k .
+
+# Or use the Makefile
+make full-deploy-dev
+
+# Check status
+kubectl -n icn get pods
+kubectl -n icn logs -f deployment/icn-daemon
+</code></pre>
+<hr>
+<h2>Secret Management</h2>
+<h3>Required Secrets</h3>
+<table>
+<thead>
+<tr>
+<th>Secret</th>
+<th>Purpose</th>
+<th>Generation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>JWT_SECRET</code></td>
+<td>Signs API tokens</td>
+<td><code>openssl rand -base64 32</code></td>
+</tr>
+<tr>
+<td><code>passphrase</code></td>
+<td>Encrypts keystore</td>
+<td>Strong memorable password</td>
+</tr>
+<tr>
+<td><code>GRAFANA_PASSWORD</code></td>
+<td>Grafana admin</td>
+<td><code>openssl rand -base64 16</code></td>
+</tr>
+</tbody></table>
+<h3>Security Best Practices</h3>
+<pre><code class="language-bash"># Generate secure secrets
+JWT_SECRET=$(openssl rand -base64 32)
+GRAFANA_PASSWORD=$(openssl rand -base64 16)
+
+# Never commit secrets to git
+echo &quot;secret.yaml&quot; &gt;&gt; .gitignore
+echo &quot;.env&quot; &gt;&gt; .gitignore
+
+# Use Kubernetes secrets
+kubectl create secret generic icn-secrets \
+  --from-literal=jwt-secret=&quot;$JWT_SECRET&quot; \
+  --from-literal=passphrase=&quot;your-passphrase&quot; \
+  -n icn
+
+# Verify secrets are not in git
+git status --ignored
+</code></pre>
+<hr>
+<h2>Observability</h2>
+<h3>Metrics</h3>
+<p>ICN exposes Prometheus metrics on port 9100:</p>
+<pre><code class="language-bash"># Check metrics endpoint
+curl http://localhost:9100/metrics
+
+# Key metrics
+icn_gossip_messages_received_total    # Gossip traffic
+icn_network_peers_connected           # Peer count
+icn_ledger_transactions_total         # Transaction volume
+icn_gateway_requests_total            # API requests
+icn_gateway_request_duration_seconds  # API latency
+</code></pre>
+<h3>Prometheus Configuration</h3>
+<pre><code class="language-yaml"># prometheus.yml
+scrape_configs:
+  - job_name: &#39;icnd&#39;
+    static_configs:
+      - targets: [&#39;icnd:9100&#39;]
+    scrape_interval: 15s
+    metrics_path: /metrics
+</code></pre>
+<h3>Grafana Dashboards</h3>
+<p>Pre-configured dashboards include:</p>
+<table>
+<thead>
+<tr>
+<th>Dashboard</th>
+<th>Metrics</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>ICN Overview</strong></td>
+<td>Peer count, message rate, error rate</td>
+</tr>
+<tr>
+<td><strong>Gateway API</strong></td>
+<td>Request rate, latency, error codes</td>
+</tr>
+<tr>
+<td><strong>Gossip Protocol</strong></td>
+<td>Messages sent/received, sync status</td>
+</tr>
+<tr>
+<td><strong>Ledger</strong></td>
+<td>Transaction rate, balance distribution</td>
+</tr>
+</tbody></table>
+<h3>Health Endpoints</h3>
+<pre><code class="language-bash"># Gateway health (HTTP)
+curl http://localhost:8080/v1/health
+# Response: {&quot;status&quot;:&quot;healthy&quot;,&quot;network_peers&quot;:5,&quot;gossip_entries&quot;:1234}
+
+# Prometheus health
+curl http://localhost:9100/metrics | grep icn_up
+</code></pre>
+<h3>Alerting</h3>
+<p>Example Prometheus alerting rules:</p>
+<pre><code class="language-yaml"># prometheusrule.yaml
+groups:
+- name: icn-alerts
+  rules:
+  - alert: ICNDaemonDown
+    expr: up{job=&quot;icnd&quot;} == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: &quot;ICN daemon is down&quot;
+
+  - alert: NoPeersConnected
+    expr: icn_network_peers_connected == 0
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: &quot;No peers connected&quot;
+
+  - alert: HighAPILatency
+    expr: histogram_quantile(0.99, icn_gateway_request_duration_seconds_bucket) &gt; 1
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: &quot;API p99 latency &gt; 1s&quot;
+</code></pre>
+<hr>
+<h2>Backup and Recovery</h2>
+<h3>Backup Strategy</h3>
+<pre><code>┌─────────────────────────────────────────────────────┐
+│                 Backup Components                   │
+│                                                     │
+│  ┌─────────────┐  ┌─────────────┐  ┌───────────┐  │
+│  │  Keystore   │  │   Ledger    │  │  Config   │  │
+│  │ (encrypted) │  │   (sled)    │  │  (toml)   │  │
+│  └─────────────┘  └─────────────┘  └───────────┘  │
+│        │                │                │        │
+│        └────────────────┼────────────────┘        │
+│                         │                         │
+│                         ▼                         │
+│              ┌─────────────────────┐              │
+│              │  icnctl backup      │              │
+│              │  (encrypted tarball)│              │
+│              └─────────────────────┘              │
+└─────────────────────────────────────────────────────┘
+</code></pre>
+<h3>Creating Backups</h3>
+<pre><code class="language-bash"># Native installation
+icnctl backup create -o /var/backups/icn-$(date +%Y%m%d).tar.enc
+
+# Docker
+docker-compose exec icnd icnctl backup create -o /data/backup.tar.enc
+docker cp icn-daemon:/data/backup.tar.enc ./backup-$(date +%Y%m%d).tar.enc
+
+# Kubernetes
+kubectl -n icn exec deploy/icn-daemon -- icnctl backup create -o /data/backup.tar.enc
+kubectl -n icn cp icn-daemon:/data/backup.tar.enc ./backup.tar.enc
+</code></pre>
+<h3>Restoring Backups</h3>
+<pre><code class="language-bash"># Stop the daemon first
+sudo systemctl stop icnd
+
+# Restore
+icnctl backup restore -i /var/backups/icn-20250115.tar.enc
+
+# Restart
+sudo systemctl start icnd
+</code></pre>
+<h3>Automated Backups (Kubernetes)</h3>
+<pre><code class="language-yaml"># backup-cronjob.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: icn-backup
+  namespace: icn
+spec:
+  schedule: &quot;0 2 * * *&quot;  # Daily at 2 AM
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: backup
+            image: icn:latest
+            command:
+            - /bin/sh
+            - -c
+            - |
+              icnctl backup create -o /backup/icn-$(date +%Y%m%d).tar.enc
+            volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: backup
+              mountPath: /backup
+          volumes:
+          - name: data
+            persistentVolumeClaim:
+              claimName: icn-data
+          - name: backup
+            persistentVolumeClaim:
+              claimName: icn-backup
+          restartPolicy: OnFailure
+</code></pre>
+<hr>
+<h2>Production Hardening</h2>
+<h3>Security Checklist</h3>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Status</th>
+<th>Command</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Strong JWT secret (32+ bytes)</td>
+<td>☐</td>
+<td><code>openssl rand -base64 32</code></td>
+</tr>
+<tr>
+<td>TLS enabled for gateway</td>
+<td>☐</td>
+<td>Configure reverse proxy</td>
+</tr>
+<tr>
+<td>Rate limiting enabled</td>
+<td>☐</td>
+<td>Check <code>icn.toml</code></td>
+</tr>
+<tr>
+<td>Keystore passphrase set</td>
+<td>☐</td>
+<td>Set <code>ICN_PASSPHRASE</code></td>
+</tr>
+<tr>
+<td>Resource limits configured</td>
+<td>☐</td>
+<td>Check deployment manifest</td>
+</tr>
+<tr>
+<td>Network policies applied</td>
+<td>☐</td>
+<td><code>kubectl apply -f network-policies.yaml</code></td>
+</tr>
+</tbody></table>
+<h3>Network Policies (Kubernetes)</h3>
+<pre><code class="language-yaml"># network-policies.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: icn-network-policy
+  namespace: icn
+spec:
+  podSelector:
+    matchLabels:
+      app: icn
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow gateway traffic
+  - ports:
+    - port: 8080
+      protocol: TCP
+  # Allow P2P traffic
+  - ports:
+    - port: 7777
+      protocol: UDP
+  # Allow metrics scraping from monitoring
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - port: 9100
+      protocol: TCP
+</code></pre>
+<h3>TLS Termination</h3>
+<p>Example Caddy configuration for TLS:</p>
+<pre><code># Caddyfile
+api.timebank.example.com {
+    reverse_proxy icnd:8080
+
+    # Automatic HTTPS
+    tls {
+        protocols tls1.2 tls1.3
+    }
+
+    # Security headers
+    header {
+        Strict-Transport-Security &quot;max-age=31536000; includeSubDomains&quot;
+        X-Content-Type-Options &quot;nosniff&quot;
+        X-Frame-Options &quot;DENY&quot;
+    }
+}
+
+app.timebank.example.com {
+    reverse_proxy pilot-ui:80
+    encode gzip
+}
+</code></pre>
+<hr>
+<h2>Troubleshooting</h2>
+<h3>Common Issues</h3>
+<table>
+<thead>
+<tr>
+<th>Issue</th>
+<th>Diagnosis</th>
+<th>Solution</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>&quot;JWT secret not set&quot;</td>
+<td>Missing env var</td>
+<td>Set <code>ICN_GATEWAY_JWT_SECRET</code></td>
+</tr>
+<tr>
+<td>&quot;Address already in use&quot;</td>
+<td>Port conflict</td>
+<td>Change port in config</td>
+</tr>
+<tr>
+<td>&quot;Connection refused&quot;</td>
+<td>Service not running</td>
+<td>Check <code>systemctl status icnd</code></td>
+</tr>
+<tr>
+<td>&quot;Certificate expired&quot;</td>
+<td>TLS cert needs renewal</td>
+<td>Update certificates</td>
+</tr>
+<tr>
+<td>&quot;No peers connected&quot;</td>
+<td>Network isolation</td>
+<td>Check bootstrap peers</td>
+</tr>
+</tbody></table>
+<h3>Diagnostic Commands</h3>
+<pre><code class="language-bash"># Check service status
+systemctl status icnd
+journalctl -u icnd -f
+
+# Docker logs
+docker-compose logs -f icnd
+
+# Kubernetes logs
+kubectl -n icn logs -f deployment/icn-daemon
+
+# Check health
+curl http://localhost:8080/v1/health
+
+# Check metrics
+curl http://localhost:9100/metrics | head -50
+
+# Check identity
+icnctl id show
+
+# Check peers
+icnctl network peers
+</code></pre>
+<h3>Log Levels</h3>
+<pre><code class="language-bash"># Set log level via environment
+export RUST_LOG=icn=debug,icn_gateway=trace
+
+# Or via CLI
+icnd --config /etc/icn/config.toml --log-level debug
+</code></pre>
+<hr>
+<h2>Code Map</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>deploy/README.md</code></td>
+<td>Deployment overview</td>
+</tr>
+<tr>
+<td><code>deploy/install.sh</code></td>
+<td>Native installation script</td>
+</tr>
+<tr>
+<td><code>deploy/quickstart.sh</code></td>
+<td>Docker quickstart script</td>
+</tr>
+<tr>
+<td><code>deploy/docker-compose.yml</code></td>
+<td>Docker Compose stack</td>
+</tr>
+<tr>
+<td><code>deploy/k8s/</code></td>
+<td>Kubernetes manifests</td>
+</tr>
+<tr>
+<td><code>deploy/helm/</code></td>
+<td>Helm chart</td>
+</tr>
+<tr>
+<td><code>config/icn.toml.example</code></td>
+<td>Configuration reference</td>
+</tr>
+<tr>
+<td><code>docs/security/production-hardening.md</code></td>
+<td>Security guidance</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Exercises</h2>
+<h3>Exercise 1: Deploy with Docker</h3>
+<p>Set up a local ICN instance using Docker Compose:</p>
+<pre><code class="language-bash">cd deploy
+./quickstart.sh &quot;Test Coop&quot;
+# Verify health endpoint responds
+# Get an auth token and test the API
+</code></pre>
+<h3>Exercise 2: Configure Monitoring</h3>
+<p>Add a custom alert rule for high transaction volume:</p>
+<pre><code class="language-yaml"># Add to prometheusrule.yaml
+- alert: HighTransactionVolume
+  expr: rate(icn_ledger_transactions_total[5m]) &gt; 100
+  for: 10m
+  annotations:
+    summary: &quot;Transaction rate exceeds 100/s&quot;
+</code></pre>
+<h3>Exercise 3: Validate Configuration</h3>
+<p>Create a configuration file and validate it:</p>
+<pre><code class="language-bash"># Create custom config
+cp config/icn.toml.example /tmp/test-config.toml
+# Edit to change ports
+
+# Validate
+icnd --config /tmp/test-config.toml --validate-config
+</code></pre>
+<hr>
+<h2>Checkpoints</h2>
+<p>Before proceeding to Module 10, verify you can:</p>
+<ul>
+<li><input disabled="" type="checkbox"> Explain configuration layering and precedence</li>
+<li><input disabled="" type="checkbox"> Deploy ICN using Docker Compose</li>
+<li><input disabled="" type="checkbox"> Generate and securely store secrets</li>
+<li><input disabled="" type="checkbox"> Access metrics via Prometheus</li>
+<li><input disabled="" type="checkbox"> View dashboards in Grafana</li>
+<li><input disabled="" type="checkbox"> Create and restore backups</li>
+<li><input disabled="" type="checkbox"> Troubleshoot common deployment issues</li>
+<li><input disabled="" type="checkbox"> Apply security hardening measures</li>
+</ul>
+<hr>
+<h2>Next Steps</h2>
+<p>In <strong>Module 10: Contributor Workflow</strong>, you&#39;ll learn how to contribute to ICN development,
+including the git workflow, PR process, and code review guidelines.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

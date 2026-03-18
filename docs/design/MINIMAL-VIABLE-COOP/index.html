@@ -1,0 +1,534 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Minimal Viable Coop (MVC) Track | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>MINIMAL VIABLE COOP</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/MINIMAL-VIABLE-COOP.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Minimal Viable Coop (MVC) Track</h1>
+<p><strong>Goal</strong>: Ship one end-to-end cooperative use case that works in production for 6 months</p>
+<p><strong>Target</strong>: 10-person worker cooperative using ICN for governance + mutual credit</p>
+<p><strong>Timeline</strong>:</p>
+<ul>
+<li>13 weeks (3 months): Development + deployment</li>
+<li>+30 days: Initial operational validation</li>
+<li>+6 months: Full pilot trial</li>
+</ul>
+<p><strong>Success Metric</strong>: Real cooperative (not ICN developers) operates for 6 months without catastrophic failure</p>
+<hr>
+<h2>Why MVC?</h2>
+<p>ICN is a <strong>promising prototype</strong> with solid technical foundations, but significant gaps remain between &quot;daemon runs&quot; and &quot;cooperatives can use this.&quot; The MVC track closes those gaps by focusing ruthlessly on <strong>one real use case</strong> rather than polishing individual components in isolation.</p>
+<p><strong>Current status</strong> (per gap-analysis.md):</p>
+<ul>
+<li>✅ Core substrate works (identity, trust, gossip, ledger, contracts, gateway)</li>
+<li>🚧 Production gaps exist (recovery, NAT, conflicts, UX, ops)</li>
+<li>❌ No complete end-to-end flow from &quot;install&quot; to &quot;operate for months&quot;</li>
+</ul>
+<p><strong>MVC approach</strong>:</p>
+<ol>
+<li>Pick ONE specific cooperative use case</li>
+<li>Close ONLY the gaps blocking that use case</li>
+<li>Deploy with a real pilot cooperative  </li>
+<li>Learn from real-world operation</li>
+<li>Use learnings to prioritize next work</li>
+</ol>
+<hr>
+<h2>MVC Scope: Worker Cooperative Use Case</h2>
+<p><strong>Pilot Profile</strong>: 10-person worker-owned tech cooperative</p>
+<p><strong>Core Workflows</strong>:</p>
+<ol>
+<li><strong>Onboarding</strong>: New member joins, creates identity, gets vouched in</li>
+<li><strong>Governance</strong>: Propose and vote on decisions (e.g., &quot;hire contractor X&quot;)</li>
+<li><strong>Economic</strong>: Track time contributions, exchange mutual credit hours</li>
+<li><strong>Operations</strong>: Backup, recover from failures, upgrade without downtime</li>
+</ol>
+<p><strong>Out of Scope</strong> (defer until after pilot):</p>
+<ul>
+<li>Advanced governance (delegation, liquid democracy, appeals)</li>
+<li>Complex economic patterns (multi-currency, demurrage, cross-ledger)</li>
+<li>Federation across multiple cooperatives</li>
+<li>Mobile apps, fancy UIs</li>
+<li>Scale beyond 50 members</li>
+</ul>
+<hr>
+<h2>Required Work (13 weeks)</h2>
+<h3>Week 1-2: Identity Recovery (Tier 1 Gap #1)</h3>
+<p><strong>Problem</strong>: Users WILL lose devices/keys. No recovery = catastrophic data loss.</p>
+<p><strong>Solution</strong>: Social recovery pattern (M-of-N trusted friends)</p>
+<p><strong>Work</strong>:</p>
+<ol>
+<li>Extend DID Document with recovery trustees</li>
+<li>Implement <code>icnctl identity recover</code> flow:<ul>
+<li>User requests recovery (proves identity via trustees)</li>
+<li>M trustees sign recovery attestation</li>
+<li>New key authorized, old key revoked</li>
+</ul>
+</li>
+<li>UI for configuring recovery (who are your trustees? how many needed?)</li>
+<li>Test: Lose device, recover via social recovery, regain full access</li>
+</ol>
+<p><strong>Deliverables</strong>:</p>
+<ul>
+<li>Recovery trustee system in <code>icn-identity</code></li>
+<li>CLI recovery flow in <code>icnctl</code></li>
+<li>Documentation: &quot;How to set up recovery for your coop&quot;</li>
+<li>Tests: Full recovery flow (lose device → trustees help → back online)</li>
+</ul>
+<p><strong>Success</strong>: Member can lose laptop, recover identity same day with help from 3 colleagues</p>
+<hr>
+<h3>Week 3-4: NAT Traversal (Tier 1 Gap #2)</h3>
+<p><strong>Problem</strong>: Real cooperatives ARE behind NAT/firewalls. Can&#39;t require public IPs.</p>
+<p><strong>Solution</strong>: STUN/TURN support for NAT hole-punching + relay</p>
+<p><strong>Work</strong>:</p>
+<ol>
+<li>Integrate STUN client into <code>icn-net</code>:<ul>
+<li>Discover public IP/port</li>
+<li>Attempt direct connection</li>
+<li>Fall back to TURN relay if needed</li>
+</ul>
+</li>
+<li>Add relay node capability:<ul>
+<li>Node can volunteer as relay</li>
+<li>Relay permissions via trust graph</li>
+</ul>
+</li>
+<li>Configure bootstrap nodes as relays</li>
+<li>Test: Two nodes behind NAT connect via relay</li>
+</ol>
+<p><strong>Deliverables</strong>:</p>
+<ul>
+<li>STUN/TURN integration in <code>icn-net</code></li>
+<li>Relay node configuration</li>
+<li>Public bootstrap relay nodes (icn.coop infrastructure)</li>
+<li>Documentation: &quot;Connecting behind firewalls&quot;</li>
+</ul>
+<p><strong>Success</strong>: Members with home routers can connect without port forwarding</p>
+<hr>
+<h3>Week 5-6: Ledger Conflict Resolution (Tier 1 Gap #3)</h3>
+<p><strong>Problem</strong>: Network partitions WILL happen. Need deterministic conflict resolution.</p>
+<p><strong>Solution</strong>: Last-write-wins with trust-weighted voting for conflicts</p>
+<p><strong>Work</strong>:</p>
+<ol>
+<li>Define conflict detection:<ul>
+<li>Same account, different balances across nodes</li>
+<li>Merkle root mismatch for same entry ID</li>
+</ul>
+</li>
+<li>Implement resolution policy:<ul>
+<li>Trust-weighted majority wins</li>
+<li>Quarantine minority view</li>
+<li>Notify affected parties</li>
+</ul>
+</li>
+<li>Add conflict monitoring:<ul>
+<li>Prometheus metric: <code>ledger_conflicts_detected_total</code></li>
+<li>Alert when conflicts occur</li>
+</ul>
+</li>
+<li>Test: Partition network, create conflicting transactions, verify resolution</li>
+</ol>
+<p><strong>Deliverables</strong>:</p>
+<ul>
+<li>Conflict detection in <code>icn-ledger</code></li>
+<li>Trust-weighted resolution policy</li>
+<li>Conflict monitoring and alerting</li>
+<li>Documentation: &quot;Understanding ledger conflicts&quot;</li>
+</ul>
+<p><strong>Success</strong>: Network partition resolves automatically without human intervention</p>
+<hr>
+<h3>Week 7: Trust Lifecycle (Tier 2 Gap, needed for MVC)</h3>
+<p><strong>Problem</strong>: Trust graph is static. Real trust evolves with interactions.</p>
+<p><strong>Solution</strong>: Simple trust decay + transaction-based trust growth</p>
+<p><strong>Work</strong>:</p>
+<ol>
+<li>Implement time-based decay:<ul>
+<li>Trust decays 5% per month of inactivity</li>
+<li>Configurable per cooperative</li>
+</ul>
+</li>
+<li>Implement transaction-based growth:<ul>
+<li>Successful mutual credit transaction → +0.05 trust</li>
+<li>Capped at 0.8 (never full auto-trust)</li>
+</ul>
+</li>
+<li>Add trust audit log:<ul>
+<li>&quot;Why is my trust 0.6?&quot; → shows events</li>
+</ul>
+</li>
+<li>Test: Inactive member&#39;s trust decays, active trading increases trust</li>
+</ol>
+<p><strong>Deliverables</strong>:</p>
+<ul>
+<li>Trust decay policy in <code>icn-trust</code></li>
+<li>Transaction hooks for trust updates</li>
+<li>Trust audit log</li>
+<li>Documentation: &quot;How trust works in your coop&quot;</li>
+</ul>
+<p><strong>Success</strong>: Trust reflects actual cooperative relationships, not just initial setup</p>
+<hr>
+<h3>Week 8: Governance Templates (Tier 2 Gap, needed for MVC)</h3>
+<p><strong>Problem</strong>: Every coop needs votes/quorum. No one should write contracts from scratch.</p>
+<p><strong>Solution</strong>: 3 battle-tested governance contract templates</p>
+<p><strong>Work</strong>:</p>
+<ol>
+<li><strong>Simple majority vote</strong> contract:<ul>
+<li>Propose, vote yes/no, &gt;50% wins</li>
+<li>Time-bounded (7 days default)</li>
+</ul>
+</li>
+<li><strong>Quorum vote</strong> contract:<ul>
+<li>Requires N% participation</li>
+<li>Then simple majority of participants</li>
+</ul>
+</li>
+<li><strong>Budget approval</strong> contract:<ul>
+<li>Propose spending, requires 2/3 majority</li>
+<li>Auto-executes ledger transfer if passes</li>
+</ul>
+</li>
+<li>Add contract deployment UI to gateway</li>
+<li>Test: Deploy template, run vote, verify execution</li>
+</ol>
+<p><strong>Deliverables</strong>:</p>
+<ul>
+<li>3 contract templates in <code>icn-ccl/templates/</code></li>
+<li>Template deployment API in gateway</li>
+<li>Template instantiation CLI: <code>icnctl governance deploy simple-vote --duration 7d</code></li>
+<li>Documentation: &quot;Governance patterns&quot; with examples</li>
+</ul>
+<p><strong>Success</strong>: Coop can hold binding vote in &lt;5 minutes without writing code</p>
+<hr>
+<h3>Week 9-10: Onboarding UX (Tier 1 Gap #4)</h3>
+<p><strong>Problem</strong>: &quot;Install ICN&quot; is 20 CLI commands and scary errors. Humans need simplicity.</p>
+<p><strong>Solution</strong>: Guided onboarding wizard for new cooperatives</p>
+<p><strong>Work</strong>:</p>
+<ol>
+<li><strong>Coop creation wizard</strong>:<ul>
+<li><code>icnctl coop init &quot;My Worker Coop&quot;</code></li>
+<li>Walks through: name, governance model, currency, founding members</li>
+<li>Generates initial DID, trust graph, governance contracts</li>
+</ul>
+</li>
+<li><strong>Member invitation flow</strong>:<ul>
+<li><code>icnctl coop invite alice@example.com</code></li>
+<li>Sends invitation link</li>
+<li>Recipient clicks link, downloads ICN, auto-configures</li>
+</ul>
+</li>
+<li><strong>Visual trust builder</strong>:<ul>
+<li>Simple web UI: &quot;Who do you trust?&quot;</li>
+<li>Drag trust slider, suggests reasonable defaults</li>
+</ul>
+</li>
+<li><strong>Credit explainer</strong>:<ul>
+<li>Interactive tutorial: &quot;What is mutual credit?&quot;</li>
+<li>Simulation: Make fake transactions, see balances change</li>
+</ul>
+</li>
+<li>Test: Non-technical user completes onboarding in &lt;30 minutes</li>
+</ol>
+<p><strong>Deliverables</strong>:</p>
+<ul>
+<li><code>icnctl coop init</code> wizard</li>
+<li>Member invitation system (email + link)</li>
+<li>Basic web UI for trust + credit explanation</li>
+<li>Onboarding documentation with screenshots</li>
+</ul>
+<p><strong>Success</strong>: Non-developer can join coop and understand system in 30 minutes</p>
+<hr>
+<h3>Week 11: Operations Playbooks (Tier 1 Gap #5)</h3>
+<p><strong>Problem</strong>: Things WILL go wrong. Need runbooks for common incidents.</p>
+<p><strong>Solution</strong>: Comprehensive operational documentation + tooling</p>
+<p><strong>Work</strong>:</p>
+<ol>
+<li><strong>Deployment guide</strong>:<ul>
+<li>&quot;How to run ICN for a 10-person coop&quot;</li>
+<li>Recommended: 3 always-on nodes + per-member mobile apps</li>
+<li>Docker Compose setup for quick start</li>
+</ul>
+</li>
+<li><strong>Backup strategy</strong>:<ul>
+<li>Automated daily backups via <code>icnctl backup</code></li>
+<li>Encrypted backup to S3/local storage</li>
+<li>Tested restore procedure</li>
+</ul>
+</li>
+<li><strong>Upgrade procedure</strong>:<ul>
+<li>Rolling upgrade (keep 2/3 nodes running)</li>
+<li>Data migration for breaking changes</li>
+<li>Rollback procedure if upgrade fails</li>
+</ul>
+</li>
+<li><strong>Incident runbooks</strong>:<ul>
+<li>&quot;Node crashed&quot; → How to restart, check for data loss</li>
+<li>&quot;Network partition&quot; → How to verify ledger consistency</li>
+<li>&quot;Lost member key&quot; → Social recovery procedure</li>
+<li>&quot;Suspicious transaction&quot; → Dispute resolution flow</li>
+</ul>
+</li>
+</ol>
+<p><strong>Deliverables</strong>:</p>
+<ul>
+<li><code>docs/operations/deployment-guide.md</code></li>
+<li><code>docs/operations/backup-restore.md</code></li>
+<li><code>docs/operations/upgrade-procedure.md</code></li>
+<li><code>docs/operations/incident-runbooks.md</code></li>
+<li>Docker Compose file for quick deployment</li>
+</ul>
+<p><strong>Success</strong>: Coop admin can handle common incidents without contacting ICN devs</p>
+<hr>
+<h3>Week 12: Integration Testing &amp; Polish</h3>
+<p><strong>Problem</strong>: Individual components work, but end-to-end flow might be broken.</p>
+<p><strong>Solution</strong>: Full integration test suite + UX polish</p>
+<p><strong>Work</strong>:</p>
+<ol>
+<li><strong>End-to-end test scenarios</strong>:<ul>
+<li>New coop: 10 members onboard, vote, transact</li>
+<li>Device loss: Member loses laptop, recovers via social recovery</li>
+<li>Network partition: Nodes split, later reconcile</li>
+<li>Node failure: 1 node crashes, others continue operating</li>
+<li>Upgrade: Deploy new version without downtime</li>
+</ul>
+</li>
+<li><strong>UX polish</strong>:<ul>
+<li>Fix confusing error messages</li>
+<li>Add progress indicators to long operations</li>
+<li>Improve CLI help text</li>
+<li>Visual polish on web UI</li>
+</ul>
+</li>
+<li><strong>Performance testing</strong>:<ul>
+<li>100 transactions in 1 hour</li>
+<li>50 concurrent votes</li>
+<li>1000+ gossip messages/minute</li>
+</ul>
+</li>
+</ol>
+<p><strong>Deliverables</strong>:</p>
+<ul>
+<li>Integration test suite (10+ scenarios)</li>
+<li>Performance benchmarks</li>
+<li>UX improvements across CLI + web</li>
+<li>Test report: &quot;All scenarios pass&quot;</li>
+</ul>
+<p><strong>Success</strong>: End-to-end flow works smoothly without manual intervention</p>
+<hr>
+<h3>Week 13: Pilot Deployment</h3>
+<p><strong>Problem</strong>: Real cooperative needs to validate this actually works.</p>
+<p><strong>Solution</strong>: Deploy with pilot cooperative, support their first 30 days</p>
+<p><strong>Work</strong>:</p>
+<ol>
+<li><strong>Pilot selection</strong>:<ul>
+<li>10-person worker cooperative (ideally tech-adjacent for early feedback)</li>
+<li>Committed to 6-month trial</li>
+<li>Willing to provide weekly feedback</li>
+</ul>
+</li>
+<li><strong>Deployment</strong>:<ul>
+<li>Install ICN on pilot&#39;s infrastructure</li>
+<li>Walk through onboarding for all members</li>
+<li>Configure governance contracts</li>
+<li>Initialize mutual credit ledger</li>
+</ul>
+</li>
+<li><strong>Support</strong>:<ul>
+<li>Weekly check-in calls</li>
+<li>Monitor metrics and logs</li>
+<li>Rapid bugfix turnaround</li>
+<li>Document all issues and resolutions</li>
+</ul>
+</li>
+<li><strong>Measurement</strong>:<ul>
+<li>Track: Uptime, transactions, votes, conflicts, recoveries</li>
+<li>Collect: User feedback, pain points, feature requests</li>
+</ul>
+</li>
+</ol>
+<p><strong>Deliverables</strong>:</p>
+<ul>
+<li>Pilot cooperative operational on ICN</li>
+<li>Weekly status reports</li>
+<li>Issue tracker: bugs, requests, learnings</li>
+<li>Success metrics dashboard</li>
+</ul>
+<p><strong>Success</strong>: Pilot operates for 1 month without catastrophic failure</p>
+<hr>
+<h2>Success Criteria</h2>
+<h3>At End of Week 13 (Deployment Complete)</h3>
+<p><strong>Technical</strong>:</p>
+<ul>
+<li>✅ Social recovery works (tested with real device loss)</li>
+<li>✅ NAT traversal works (members connect from home)</li>
+<li>✅ Ledger conflicts resolve automatically</li>
+<li>✅ Governance templates deploy and execute</li>
+<li>✅ End-to-end tests pass (10+ scenarios)</li>
+</ul>
+<p><strong>Deployment</strong>:</p>
+<ul>
+<li>✅ Pilot coop deployed and operational</li>
+<li>✅ All 10 members onboarded successfully</li>
+<li>✅ Initial governance contracts configured</li>
+<li>✅ Mutual credit ledger initialized</li>
+</ul>
+<p><strong>User Experience</strong>:</p>
+<ul>
+<li>✅ New member onboards in &lt;30 minutes</li>
+<li>✅ Non-technical members can use basic features</li>
+<li>✅ Trust and credit concepts are understood</li>
+</ul>
+<p><strong>Community</strong>:</p>
+<ul>
+<li>✅ Pilot coop commits to 6-month trial</li>
+<li>✅ Support process established (weekly check-ins)</li>
+</ul>
+<h3>After 30-Day Operation (Week 13 + 1 Month)</h3>
+<p><strong>Operational Stability</strong>:</p>
+<ul>
+<li>✅ 100+ transactions recorded</li>
+<li>✅ 10+ governance decisions made</li>
+<li>✅ Zero data loss events</li>
+<li>✅ All incidents resolved within 24 hours</li>
+<li>✅ No member locked out due to lost key</li>
+</ul>
+<p><strong>Community Feedback</strong>:</p>
+<ul>
+<li>✅ Weekly feedback collected (4 sessions)</li>
+<li>✅ At least 3 feature requests from real use</li>
+<li>✅ Documented learnings inform next priorities</li>
+<li>✅ Pilot confirms commitment to 6-month trial</li>
+</ul>
+<hr>
+<h2>What Happens After MVC?</h2>
+<p><strong>If pilot succeeds</strong> (operates for 6 months):</p>
+<ol>
+<li><strong>Phase 13</strong>: Implement top 3 feature requests from pilot</li>
+<li><strong>Phase 14</strong>: Add 2-3 more pilot cooperatives (diversity of use cases)</li>
+<li><strong>Phase 15</strong>: Generalize learnings into stable platform</li>
+</ol>
+<p><strong>If pilot struggles</strong>:</p>
+<ol>
+<li>Root cause analysis: What failed? Why?</li>
+<li>Fix critical failures (data loss, unusability, etc.)</li>
+<li>Re-attempt with adjusted scope</li>
+</ol>
+<p><strong>If pilot fails</strong>:</p>
+<ol>
+<li>Honest retrospective: What did we learn?</li>
+<li>Re-evaluate: Is ICN solving a real problem?</li>
+<li>Pivot or persist based on evidence</li>
+</ol>
+<hr>
+<h2>Resource Requirements</h2>
+<p><strong>Engineering</strong>:</p>
+<ul>
+<li>1 full-time developer for 13 weeks</li>
+<li>OR 2 developers for 6-7 weeks</li>
+<li>Mix of: Rust backend, basic web frontend, ops/devops</li>
+</ul>
+<p><strong>Pilot Cooperative</strong>:</p>
+<ul>
+<li>10 members willing to be early adopters</li>
+<li>1 technical admin for daily operations</li>
+<li>Commitment to weekly feedback</li>
+</ul>
+<p><strong>Infrastructure</strong>:</p>
+<ul>
+<li>3 always-on nodes (cloud VMs: $30/month)</li>
+<li>1 bootstrap relay node (cloud VM: $10/month)</li>
+<li>S3 bucket for backups ($5/month)</li>
+<li><strong>Total: ~$45/month for 6-month pilot = $270</strong></li>
+</ul>
+<p><strong>Time Commitment</strong>:</p>
+<ul>
+<li>Week 1-12: Development + testing</li>
+<li>Week 13: Pilot deployment + onboarding</li>
+<li>Months 2-6: Ongoing support (10 hours/week)</li>
+</ul>
+<hr>
+<h2>Risks &amp; Mitigations</h2>
+<p><strong>Risk</strong>: Pilot coop drops out before 6 months</p>
+<ul>
+<li><strong>Mitigation</strong>: Select committed coop, provide excellent support, have backup pilot lined up</li>
+</ul>
+<p><strong>Risk</strong>: Critical bug discovered in production</p>
+<ul>
+<li><strong>Mitigation</strong>: Rapid bugfix process, backup/restore ready, clear rollback procedure</li>
+</ul>
+<p><strong>Risk</strong>: NAT traversal doesn&#39;t work in pilot&#39;s network</p>
+<ul>
+<li><strong>Mitigation</strong>: Public bootstrap relay available, VPN fallback, manual port forwarding as last resort</li>
+</ul>
+<p><strong>Risk</strong>: Users find UX too confusing</p>
+<ul>
+<li><strong>Mitigation</strong>: Onboarding wizard, documentation, weekly support calls, iterate based on feedback</li>
+</ul>
+<p><strong>Risk</strong>: 13 weeks isn&#39;t enough time</p>
+<ul>
+<li><strong>Mitigation</strong>: Ruthlessly cut scope, defer nice-to-haves, focus on core workflows</li>
+</ul>
+<hr>
+<h2>Conclusion</h2>
+<p>The MVC track is <strong>the critical path</strong> to proving ICN works for real cooperatives. It closes the gap between &quot;interesting prototype&quot; and &quot;deployable infrastructure&quot; by focusing on <strong>one complete use case</strong> rather than incomplete features across many.</p>
+<p><strong>Bottom line</strong>: 13 weeks, $270, one committed cooperative. If we can&#39;t make that work, we learn why. If we can, we have a foundation to build on.</p>
+<p><strong>Next step</strong>: Find the pilot cooperative.</p>
+<hr>
+<p><strong>Document created</strong>: 2025-01-15<br><strong>Target start</strong>: When pilot cooperative identified<br><strong>Target completion</strong>: 13 weeks after start</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

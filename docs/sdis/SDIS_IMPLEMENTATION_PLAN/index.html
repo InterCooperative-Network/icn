@@ -1,0 +1,1592 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>SDIS Implementation Plan for ICN | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>sdis</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>SDIS IMPLEMENTATION PLAN</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/sdis/SDIS_IMPLEMENTATION_PLAN.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>SDIS Implementation Plan for ICN</h1>
+<p><strong>Status</strong>: Phase S1-S6 Complete (Security Audit Ready)
+<strong>Created</strong>: 2025-12-10
+<strong>Target</strong>: Full SDIS integration into ICN substrate</p>
+<h2>Executive Summary</h2>
+<p>This plan integrates the Sovereign Digital Identity System (SDIS) specification into ICN&#39;s existing infrastructure. The integration leverages ICN&#39;s actor-based architecture, gossip protocol, trust graph, and governance primitives while adding:</p>
+<ul>
+<li><strong>Hybrid cryptography</strong> (Ed25519 + ML-DSA post-quantum)</li>
+<li><strong>Anchor/KeyBundle separation</strong> for recoverable identity</li>
+<li><strong>Steward network</strong> for physical verification</li>
+<li><strong>Zero-knowledge proofs</strong> for selective disclosure</li>
+<li><strong>Tiered credential presentation</strong> (QR → NFC → Network)</li>
+</ul>
+<p><strong>Total Duration</strong>: 32-40 weeks (8-10 months)
+<strong>New Crates</strong>: 6
+<strong>Modified Crates</strong>: 8</p>
+<hr>
+<h2>Phase Overview</h2>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────┐
+│  Phase S1: Cryptographic Foundations                    [Weeks 1-8]     │
+│  └─ icn-crypto-pq crate (hybrid signatures, ML-DSA, threshold)          │
+├─────────────────────────────────────────────────────────────────────────┤
+│  Phase S2: Identity Extensions                          [Weeks 5-12]    │
+│  └─ Anchor, KeyBundle, VUI in icn-identity                              │
+├─────────────────────────────────────────────────────────────────────────┤
+│  Phase S3: Steward Network                              [Weeks 9-20]    │
+│  └─ icn-steward crate (actor, token issuance, ceremonies)               │
+├─────────────────────────────────────────────────────────────────────────┤
+│  Phase S4: Zero-Knowledge Proofs                        [Weeks 13-26]   │
+│  └─ icn-zkp crate (STARK circuits, attribute proofs)                    │
+├─────────────────────────────────────────────────────────────────────────┤
+│  Phase S5: Credential Presentation                      [Weeks 21-30]   │
+│  └─ Gateway API, ephemeral proofs, verification tiers                   │
+├─────────────────────────────────────────────────────────────────────────┤
+│  Phase S6: Governance &amp; Polish                          [Weeks 27-36]   │
+│  └─ Steward oversight, ZK voting, integration tests                     │
+└─────────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<hr>
+<h2>Phase S1: Cryptographic Foundations</h2>
+<p><strong>Duration</strong>: Weeks 1-8
+<strong>Dependencies</strong>: None (foundation layer)
+<strong>Deliverable</strong>: <code>icn-crypto-pq</code> crate</p>
+<h3>S1.1 Crate Setup (Week 1)</h3>
+<p><strong>Task S1.1.1</strong>: Create crate structure</p>
+<pre><code>icn/crates/icn-crypto-pq/
+├── Cargo.toml
+├── src/
+│   ├── lib.rs
+│   ├── hybrid.rs          # Hybrid signatures
+│   ├── ml_dsa.rs          # ML-DSA wrapper
+│   ├── ml_kem.rs          # ML-KEM wrapper (key encapsulation)
+│   ├── threshold.rs       # Threshold signatures
+│   ├── blind.rs           # Blind signatures
+│   └── kdf.rs             # Hybrid key derivation
+└── tests/
+    ├── hybrid_tests.rs
+    └── threshold_tests.rs
+</code></pre>
+<p><strong>Task S1.1.2</strong>: Define Cargo.toml dependencies</p>
+<pre><code class="language-toml">[package]
+name = &quot;icn-crypto-pq&quot;
+version = &quot;0.1.0&quot;
+edition = &quot;2021&quot;
+
+[dependencies]
+# Classical crypto
+ed25519-dalek = { version = &quot;2.1&quot;, features = [&quot;rand_core&quot;] }
+x25519-dalek = &quot;2.0&quot;
+
+# Post-quantum (NIST FIPS 204/203/205)
+pqcrypto-dilithium = &quot;0.5&quot;      # ML-DSA (FIPS 204)
+pqcrypto-kyber = &quot;0.8&quot;          # ML-KEM (FIPS 203)
+pqcrypto-sphincsplus = &quot;0.7&quot;    # SLH-DSA (FIPS 205) - backup
+
+# Threshold crypto
+vsss-rs = &quot;4.0&quot;                 # Verifiable secret sharing
+frost-ed25519 = &quot;2.0&quot;           # FROST threshold signatures
+
+# Utilities
+sha3 = &quot;0.10&quot;
+hkdf = &quot;0.12&quot;
+rand = &quot;0.8&quot;
+rand_core = &quot;0.6&quot;
+zeroize = { version = &quot;1.7&quot;, features = [&quot;derive&quot;] }
+serde = { version = &quot;1.0&quot;, features = [&quot;derive&quot;] }
+thiserror = &quot;1.0&quot;
+
+[dev-dependencies]
+criterion = &quot;0.5&quot;
+</code></pre>
+<h3>S1.2 Hybrid Signatures (Weeks 2-3)</h3>
+<p><strong>Task S1.2.1</strong>: Implement <code>HybridKeypair</code></p>
+<pre><code class="language-rust">// src/hybrid.rs
+pub struct HybridKeypair {
+    classical: Ed25519Keypair,
+    pq: MlDsaKeypair,
+}
+
+impl HybridKeypair {
+    pub fn generate() -&gt; Result&lt;Self&gt;;
+    pub fn from_seed(seed: &amp;[u8; 64]) -&gt; Result&lt;Self&gt;;
+    pub fn sign(&amp;self, message: &amp;[u8]) -&gt; HybridSignature;
+    pub fn public_key(&amp;self) -&gt; HybridPublicKey;
+}
+</code></pre>
+<p><strong>Task S1.2.2</strong>: Implement <code>HybridSignature</code></p>
+<pre><code class="language-rust">pub struct HybridSignature {
+    classical: [u8; 64],      // Ed25519
+    pq: Vec&lt;u8&gt;,              // ML-DSA (~2420 bytes)
+}
+
+impl HybridSignature {
+    pub fn verify(&amp;self, message: &amp;[u8], pk: &amp;HybridPublicKey) -&gt; bool;
+    pub fn to_bytes(&amp;self) -&gt; Vec&lt;u8&gt;;
+    pub fn from_bytes(bytes: &amp;[u8]) -&gt; Result&lt;Self&gt;;
+}
+</code></pre>
+<p><strong>Task S1.2.3</strong>: Implement serialization (Serde + compact binary)</p>
+<p><strong>Task S1.2.4</strong>: Add benchmarks</p>
+<ul>
+<li>Target: &lt;1ms sign, &lt;2ms verify on typical hardware</li>
+</ul>
+<p><strong>Tests</strong>:</p>
+<ul>
+<li><input disabled="" type="checkbox"> Sign/verify roundtrip</li>
+<li><input disabled="" type="checkbox"> Tampered message detection</li>
+<li><input disabled="" type="checkbox"> Tampered signature detection (classical)</li>
+<li><input disabled="" type="checkbox"> Tampered signature detection (pq)</li>
+<li><input disabled="" type="checkbox"> Cross-implementation compatibility</li>
+<li><input disabled="" type="checkbox"> Size verification (~2.5KB)</li>
+</ul>
+<h3>S1.3 Threshold Cryptography (Weeks 4-6)</h3>
+<p><strong>Task S1.3.1</strong>: Implement <code>ThresholdConfig</code></p>
+<pre><code class="language-rust">// src/threshold.rs
+pub struct ThresholdConfig {
+    pub n: usize,           // Total parties
+    pub t: usize,           // Threshold
+    pub party_id: usize,    // This party&#39;s ID
+}
+</code></pre>
+<p><strong>Task S1.3.2</strong>: Implement Distributed Key Generation (DKG)</p>
+<pre><code class="language-rust">pub struct DkgSession {
+    config: ThresholdConfig,
+    state: DkgState,
+}
+
+impl DkgSession {
+    pub fn new(config: ThresholdConfig) -&gt; Self;
+    pub fn round1(&amp;mut self) -&gt; DkgRound1Message;
+    pub fn process_round1(&amp;mut self, msgs: Vec&lt;DkgRound1Message&gt;) -&gt; Result&lt;()&gt;;
+    pub fn round2(&amp;mut self) -&gt; DkgRound2Message;
+    pub fn process_round2(&amp;mut self, msgs: Vec&lt;DkgRound2Message&gt;) -&gt; Result&lt;()&gt;;
+    pub fn finalize(&amp;self) -&gt; Result&lt;(SecretShare, PublicKey)&gt;;
+}
+</code></pre>
+<p><strong>Task S1.3.3</strong>: Implement Threshold PRF (for VUI computation)</p>
+<pre><code class="language-rust">pub struct ThresholdPrf {
+    share: SecretShare,
+    config: ThresholdConfig,
+}
+
+impl ThresholdPrf {
+    /// Compute partial PRF evaluation
+    pub fn evaluate_partial(&amp;self, input: &amp;[u8]) -&gt; PrfPartial;
+
+    /// Combine partials (done by user&#39;s device)
+    pub fn combine(partials: &amp;[PrfPartial]) -&gt; Result&lt;[u8; 32]&gt;;
+}
+</code></pre>
+<p><strong>Task S1.3.4</strong>: Implement Threshold Signing (FROST)</p>
+<pre><code class="language-rust">pub struct ThresholdSigner {
+    share: SecretShare,
+    config: ThresholdConfig,
+}
+
+impl ThresholdSigner {
+    pub fn sign_round1(&amp;mut self, message: &amp;[u8]) -&gt; SignRound1;
+    pub fn sign_round2(&amp;mut self, round1_msgs: &amp;[SignRound1]) -&gt; SignRound2;
+    pub fn aggregate(round2_msgs: &amp;[SignRound2]) -&gt; Result&lt;Signature&gt;;
+}
+</code></pre>
+<p><strong>Tests</strong>:</p>
+<ul>
+<li><input disabled="" type="checkbox"> DKG with 3-of-5 parties</li>
+<li><input disabled="" type="checkbox"> DKG with 5-of-9 parties</li>
+<li><input disabled="" type="checkbox"> Threshold PRF correctness</li>
+<li><input disabled="" type="checkbox"> Threshold signing correctness</li>
+<li><input disabled="" type="checkbox"> Reconstruct fails with t-1 shares</li>
+<li><input disabled="" type="checkbox"> Network partition tolerance</li>
+</ul>
+<h3>S1.4 Blind Signatures (Week 7)</h3>
+<p><strong>Task S1.4.1</strong>: Implement blind signature scheme</p>
+<pre><code class="language-rust">// src/blind.rs
+
+/// User-side: blind a message
+pub fn blind(message: &amp;[u8], blinding_factor: &amp;Scalar) -&gt; BlindedMessage;
+
+/// Signer-side: sign blinded message
+pub fn sign_blinded(sk: &amp;SigningKey, blinded: &amp;BlindedMessage) -&gt; BlindedSignature;
+
+/// User-side: unblind signature
+pub fn unblind(
+    sig: &amp;BlindedSignature,
+    blinding_factor: &amp;Scalar,
+) -&gt; Signature;
+
+/// Verify unblinded signature (standard verification)
+pub fn verify(pk: &amp;VerifyingKey, message: &amp;[u8], sig: &amp;Signature) -&gt; bool;
+</code></pre>
+<p><strong>Tests</strong>:</p>
+<ul>
+<li><input disabled="" type="checkbox"> Blind/sign/unblind roundtrip</li>
+<li><input disabled="" type="checkbox"> Signer cannot correlate blinded to unblinded</li>
+<li><input disabled="" type="checkbox"> Multiple blindings of same message are unlinkable</li>
+</ul>
+<h3>S1.5 Hybrid Key Derivation (Week 8)</h3>
+<p><strong>Task S1.5.1</strong>: Implement hybrid KDF</p>
+<pre><code class="language-rust">// src/kdf.rs
+
+/// Derive key from hybrid shared secrets
+pub fn derive_hybrid(
+    classical_shared: &amp;[u8; 32],
+    pq_shared: &amp;[u8; 32],
+    context: &amp;[u8],
+    output_len: usize,
+) -&gt; Vec&lt;u8&gt; {
+    // Combine secrets: secure if EITHER is secure
+    let combined = [classical_shared, pq_shared].concat();
+    hkdf_sha3_256(&amp;combined, context, output_len)
+}
+</code></pre>
+<p><strong>Task S1.5.2</strong>: Implement seed-based key generation</p>
+<pre><code class="language-rust">/// Generate full KeyBundle from seed
+pub fn keybundle_from_seed(seed: &amp;[u8; 64]) -&gt; Result&lt;KeyBundleKeys&gt; {
+    let classical = derive_ed25519(&amp;seed[..32])?;
+    let pq = derive_ml_dsa(&amp;seed[32..])?;
+    let x25519 = derive_x25519(&amp;hkdf(seed, b&quot;x25519&quot;, 32))?;
+    Ok(KeyBundleKeys { classical, pq, x25519 })
+}
+</code></pre>
+<h3>S1 Deliverables Checklist</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> <code>icn-crypto-pq</code> crate compiles</li>
+<li><input checked="" disabled="" type="checkbox"> All unit tests pass (51 tests passing)</li>
+<li><input disabled="" type="checkbox"> Benchmarks documented</li>
+<li><input disabled="" type="checkbox"> Integration with existing <code>icn-identity</code> verified</li>
+<li><input disabled="" type="checkbox"> Security review of crypto choices</li>
+</ul>
+<p><strong>Completed Modules (2025-12-10)</strong>:</p>
+<ul>
+<li><code>ml_dsa.rs</code> - ML-DSA (Dilithium3) wrapper</li>
+<li><code>hybrid.rs</code> - Hybrid Ed25519 + ML-DSA signatures</li>
+<li><code>ml_kem.rs</code> - ML-KEM (Kyber768) key encapsulation</li>
+<li><code>hybrid_kem.rs</code> - Hybrid X25519 + ML-KEM key exchange</li>
+<li><code>kdf.rs</code> - HKDF-SHA3-256 key derivation</li>
+<li><code>threshold.rs</code> - Secret sharing and threshold PRF</li>
+<li><code>blind.rs</code> - Blind signatures for enrollment tokens</li>
+</ul>
+<hr>
+<h2>Phase S2: Identity Extensions</h2>
+<p><strong>Duration</strong>: Weeks 5-12 (overlaps S1)
+<strong>Dependencies</strong>: S1.2 (hybrid signatures)
+<strong>Deliverable</strong>: Extended <code>icn-identity</code> crate</p>
+<h3>S2.1 Anchor Implementation (Weeks 5-6)</h3>
+<p><strong>Task S2.1.1</strong>: Create <code>anchor.rs</code> module</p>
+<p><strong>File</strong>: <code>icn/crates/icn-identity/src/anchor.rs</code></p>
+<pre><code class="language-rust">/// Permanent identity anchor
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Anchor {
+    pub id: [u8; 32],
+    pub created_at: u64,
+    pub pathway: EnrollmentPathway,
+    pub vui_commitment: [u8; 32],
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EnrollmentPathway {
+    GovernmentId { country: [u8; 2], doc_type_hash: [u8; 8] },
+    OrganizationalSponsorship { org_did: Did, org_internal_id_hash: [u8; 16] },
+    BiometricCommitment { template_hash: [u8; 32] },
+    WebOfTrust { vouchers: Vec&lt;Did&gt;, vouched_at: u64 },
+}
+
+impl Anchor {
+    pub fn from_vui(vui: &amp;[u8; 32], pathway: EnrollmentPathway, genesis: &amp;[u8; 32]) -&gt; Self;
+    pub fn to_did(&amp;self) -&gt; Did;
+    pub fn verify_vui(&amp;self, vui: &amp;[u8; 32]) -&gt; bool;
+}
+</code></pre>
+<p><strong>Task S2.1.2</strong>: Implement DID format extension</p>
+<p>Current: <code>did:icn:&lt;base58-pubkey&gt;</code>
+New: <code>did:icn:&lt;base58-anchor-id&gt;</code></p>
+<p>Add backward compatibility:</p>
+<pre><code class="language-rust">impl Did {
+    /// Parse DID, detecting format version
+    pub fn from_str(s: &amp;str) -&gt; Result&lt;Self&gt; {
+        // Detect: legacy (32-byte pubkey) vs SDIS (32-byte anchor)
+        // Both formats are valid, context determines interpretation
+    }
+
+    /// Check if this is an SDIS anchor-based DID
+    pub fn is_anchor_did(&amp;self) -&gt; bool;
+}
+</code></pre>
+<h3>S2.2 KeyBundle Implementation (Weeks 7-8)</h3>
+<p><strong>Task S2.2.1</strong>: Create <code>keybundle.rs</code> module</p>
+<p><strong>File</strong>: <code>icn/crates/icn-identity/src/keybundle.rs</code></p>
+<pre><code class="language-rust">/// Rotatable key bundle bound to an Anchor
+pub struct KeyBundle {
+    pub anchor: Anchor,
+    pub version: u32,
+    hybrid_keypair: HybridKeypair,
+    x25519_secret: Zeroizing&lt;[u8; 32]&gt;,
+    x25519_public: [u8; 32],
+    pub issued_at: u64,
+    pub expires_at: Option&lt;u64&gt;,
+}
+
+impl KeyBundle {
+    pub fn generate(anchor: Anchor, version: u32) -&gt; Result&lt;Self&gt;;
+    pub fn from_seed(anchor: Anchor, version: u32, seed: &amp;[u8; 64]) -&gt; Result&lt;Self&gt;;
+    pub fn sign(&amp;self, message: &amp;[u8]) -&gt; HybridSignature;
+    pub fn sign_classical(&amp;self, message: &amp;[u8]) -&gt; Ed25519Signature;
+    pub fn did(&amp;self) -&gt; Did;
+    pub fn create_rotation_request(&amp;self, new_bundle: &amp;KeyBundle) -&gt; RotationRequest;
+}
+</code></pre>
+<p><strong>Task S2.2.2</strong>: Implement KeyBundle storage in keystore</p>
+<p><strong>File</strong>: <code>icn/crates/icn-identity/src/keystore.rs</code> (extend)</p>
+<pre><code class="language-rust">/// Keystore format v4: Adds SDIS KeyBundle support
+pub struct KeyStoreV4 {
+    // Legacy fields (v3)
+    pub keypair: KeyPair,
+    pub tls_cert: Vec&lt;u8&gt;,
+    pub tls_key: Vec&lt;u8&gt;,
+    pub x25519_secret: Vec&lt;u8&gt;,
+    pub x25519_public: [u8; 32],
+    pub did_document: Option&lt;DidDocument&gt;,
+
+    // SDIS fields (v4)
+    pub anchor: Option&lt;Anchor&gt;,
+    pub keybundles: Vec&lt;StoredKeyBundle&gt;,
+    pub current_keybundle_version: u32,
+}
+
+pub struct StoredKeyBundle {
+    pub version: u32,
+    pub classical_secret: Vec&lt;u8&gt;,
+    pub pq_secret: Vec&lt;u8&gt;,
+    pub x25519_secret: Vec&lt;u8&gt;,
+    pub issued_at: u64,
+    pub revoked_at: Option&lt;u64&gt;,
+}
+</code></pre>
+<p><strong>Task S2.2.3</strong>: Implement keystore migration v3 → v4</p>
+<h3>S2.3 VUI Types (Weeks 9-10)</h3>
+<p><strong>Task S2.3.1</strong>: Create <code>vui.rs</code> module</p>
+<p><strong>File</strong>: <code>icn/crates/icn-identity/src/vui.rs</code></p>
+<pre><code class="language-rust">/// Verifiable Unique Identifier
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Vui([u8; 32]);
+
+impl Vui {
+    /// Compute VUI from ID data (requires threshold PRF)
+    /// This is called by Steward during enrollment
+    pub async fn compute(
+        id_data: &amp;IdData,
+        pathway: &amp;EnrollmentPathway,
+        threshold_prf: &amp;dyn ThresholdPrfClient,
+    ) -&gt; Result&lt;Self&gt;;
+
+    /// Create commitment (stored in Anchor)
+    pub fn commitment(&amp;self) -&gt; [u8; 32];
+}
+
+/// ID document data (extracted by Steward, never stored)
+pub struct IdData {
+    pub id_number_hash: [u8; 32],  // Hash of actual ID number
+    pub doc_type: DocumentType,
+    pub issuing_authority: String,
+}
+
+pub enum DocumentType {
+    Passport,
+    NationalId,
+    DriversLicense,
+    Other(String),
+}
+</code></pre>
+<h3>S2.4 IdentityBundle Extension (Weeks 11-12)</h3>
+<p><strong>Task S2.4.1</strong>: Extend <code>IdentityBundle</code> for SDIS</p>
+<p><strong>File</strong>: <code>icn/crates/icn-identity/src/bundle.rs</code> (extend)</p>
+<pre><code class="language-rust">impl IdentityBundle {
+    // Existing methods...
+
+    /// Create SDIS-enabled identity bundle
+    pub fn generate_sdis(anchor: Anchor) -&gt; Result&lt;Self&gt;;
+
+    /// Get current KeyBundle
+    pub fn keybundle(&amp;self) -&gt; Option&lt;&amp;KeyBundle&gt;;
+
+    /// Rotate to new KeyBundle
+    pub fn rotate_keybundle(&amp;mut self) -&gt; Result&lt;RotationRequest&gt;;
+
+    /// Check if this is an SDIS identity
+    pub fn is_sdis(&amp;self) -&gt; bool;
+}
+</code></pre>
+<p><strong>Task S2.4.2</strong>: Update DidDocument for SDIS</p>
+<pre><code class="language-rust">impl DidDocument {
+    /// Create from SDIS KeyBundle
+    pub fn from_keybundle(keybundle: &amp;KeyBundle) -&gt; Self;
+
+    /// Verify signature against current KeyBundle
+    pub fn verify_hybrid(&amp;self, message: &amp;[u8], sig: &amp;HybridSignature) -&gt; bool;
+}
+</code></pre>
+<h3>S2 Deliverables Checklist</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> Anchor type implemented and tested (12 tests)</li>
+<li><input checked="" disabled="" type="checkbox"> KeyBundle type implemented and tested (11 tests)</li>
+<li><input checked="" disabled="" type="checkbox"> Keystore v4 migration working (6 tests)</li>
+<li><input checked="" disabled="" type="checkbox"> VUI types defined (7 tests)</li>
+<li><input checked="" disabled="" type="checkbox"> IdentityBundle extended</li>
+<li><input checked="" disabled="" type="checkbox"> Backward compatibility with legacy DIDs</li>
+<li><input checked="" disabled="" type="checkbox"> All existing icn-identity tests still pass (85 total)</li>
+</ul>
+<hr>
+<h2>Phase S3: Steward Network</h2>
+<p><strong>Duration</strong>: Weeks 9-20
+<strong>Dependencies</strong>: S1 (crypto), S2 (identity)
+<strong>Deliverable</strong>: <code>icn-steward</code> crate</p>
+<h3>S3.1 Crate Setup (Week 9)</h3>
+<p><strong>Task S3.1.1</strong>: Create crate structure</p>
+<pre><code>icn/crates/icn-steward/
+├── Cargo.toml
+├── src/
+│   ├── lib.rs
+│   ├── actor.rs           # StewardActor
+│   ├── handle.rs          # StewardHandle
+│   ├── profile.rs         # StewardProfile
+│   ├── token.rs           # EnrollmentToken
+│   ├── ceremony/
+│   │   ├── mod.rs
+│   │   ├── enrollment.rs  # POP enrollment ceremony
+│   │   └── recovery.rs    # Key recovery ceremony
+│   ├── vui_registry.rs    # VUI uniqueness checking
+│   ├── gossip.rs          # Steward gossip messages
+│   └── config.rs          # StewardConfig
+└── tests/
+    ├── enrollment_test.rs
+    ├── recovery_test.rs
+    └── ceremony_test.rs
+</code></pre>
+<h3>S3.2 Steward Types (Weeks 10-11)</h3>
+<p><strong>Task S3.2.1</strong>: Implement <code>StewardProfile</code></p>
+<pre><code class="language-rust">// src/profile.rs
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StewardProfile {
+    pub steward_did: Did,
+    pub citizen_did: Did,
+    pub status: StewardStatus,
+    pub jurisdiction_tier: JurisdictionTier,
+    pub bond_amount: i64,
+    pub region: String,
+    pub term_start: u64,
+    pub term_end: Option&lt;u64&gt;,
+    pub stats: StewardStats,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StewardStats {
+    pub pops_issued: u64,
+    pub fraud_investigations: u64,
+    pub proven_fraud: u64,
+    pub recoveries_participated: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum StewardStatus {
+    Active,
+    Suspended { reason: String, until: Option&lt;u64&gt; },
+    Revoked { reason: String, at: u64 },
+    TermExpired { expired_at: u64 },
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum JurisdictionTier {
+    Tier1,  // Standard
+    Tier2,  // Enhanced monitoring
+    Tier3,  // Requires co-signing
+}
+</code></pre>
+<p><strong>Task S3.2.2</strong>: Implement <code>EnrollmentToken</code></p>
+<pre><code class="language-rust">// src/token.rs
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EnrollmentToken {
+    pub token_id: [u8; 32],
+    pub blinded_signature: Vec&lt;u8&gt;,
+    pub issuing_steward: Did,
+    pub issued_at: u64,
+    pub expires_at: u64,
+    pub vui_commitment: [u8; 32],
+}
+
+impl EnrollmentToken {
+    pub fn is_expired(&amp;self) -&gt; bool;
+    pub fn verify_signature(&amp;self, steward_pk: &amp;VerifyingKey) -&gt; bool;
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TokenIssuanceRecord {
+    pub blinded_token_hash: [u8; 32],  // Cannot correlate to actual token
+    pub vui_checked: [u8; 32],
+    pub issued_at: u64,
+    pub steward_did: Did,
+}
+</code></pre>
+<h3>S3.3 VUI Registry (Weeks 12-13)</h3>
+<p><strong>Task S3.3.1</strong>: Implement Bloom filter registry</p>
+<pre><code class="language-rust">// src/vui_registry.rs
+
+pub struct VuiRegistry {
+    bloom_filter: BloomFilter,
+    overflow_set: HashSet&lt;[u8; 32]&gt;,
+    pending_checks: HashMap&lt;u64, PendingCheck&gt;,
+    store: Arc&lt;dyn Store&gt;,
+}
+
+impl VuiRegistry {
+    pub fn new(store: Arc&lt;dyn Store&gt;, config: VuiRegistryConfig) -&gt; Result&lt;Self&gt;;
+
+    /// Local check (fast, may have false positives)
+    pub fn check_local(&amp;self, vui: &amp;Vui) -&gt; LocalCheckResult;
+
+    /// Distributed check (requires network consensus)
+    pub async fn check_distributed(&amp;self, vui: &amp;Vui) -&gt; Result&lt;DistributedCheckResult&gt;;
+
+    /// Mark VUI as consumed (after successful enrollment)
+    pub async fn consume(&amp;mut self, vui: &amp;Vui) -&gt; Result&lt;()&gt;;
+
+    /// Sync with network (anti-entropy)
+    pub async fn sync(&amp;mut self) -&gt; Result&lt;SyncStats&gt;;
+}
+
+pub enum LocalCheckResult {
+    Unique,
+    PossibleDuplicate,
+    DefiniteDuplicate,
+}
+
+pub enum DistributedCheckResult {
+    Unique { confirmations: usize },
+    Duplicate { first_seen: u64 },
+    Inconclusive { reason: String },
+}
+</code></pre>
+<h3>S3.4 Enrollment Ceremony (Weeks 14-16)</h3>
+<p><strong>Task S3.4.1</strong>: Implement enrollment state machine</p>
+<pre><code class="language-rust">// src/ceremony/enrollment.rs
+
+pub struct EnrollmentCeremony {
+    session_id: [u8; 32],
+    state: EnrollmentState,
+    config: EnrollmentConfig,
+}
+
+pub enum EnrollmentState {
+    /// Waiting for applicant
+    AwaitingApplicant,
+    /// ID verification in progress
+    VerifyingId { id_data: IdData },
+    /// VUI check in progress
+    CheckingVui { vui: Vui },
+    /// Token issuance
+    IssuingToken { blinded_message: BlindedMessage },
+    /// POP generation (threshold ceremony)
+    GeneratingPop { token: EnrollmentToken, partials: Vec&lt;PrfPartial&gt; },
+    /// Complete
+    Complete { anchor: Anchor, keybundle_version: u32 },
+    /// Failed
+    Failed { reason: String },
+}
+
+impl EnrollmentCeremony {
+    pub fn new(config: EnrollmentConfig) -&gt; Self;
+
+    /// Steward: Start ID verification
+    pub fn start_verification(&amp;mut self, id_data: IdData) -&gt; Result&lt;()&gt;;
+
+    /// Steward: Complete ID verification, start VUI check
+    pub async fn verify_id(&amp;mut self, vui_registry: &amp;VuiRegistry) -&gt; Result&lt;()&gt;;
+
+    /// Steward: Issue blind token
+    pub fn issue_token(
+        &amp;mut self,
+        blinded_message: &amp;BlindedMessage,
+        steward_key: &amp;SigningKey,
+    ) -&gt; Result&lt;EnrollmentToken&gt;;
+
+    /// User: Submit token for POP generation
+    pub fn submit_token(
+        &amp;mut self,
+        token: &amp;EnrollmentToken,
+        user_entropy: &amp;[u8; 32],
+    ) -&gt; Result&lt;()&gt;;
+
+    /// Steward: Contribute PRF partial
+    pub fn contribute_partial(
+        &amp;mut self,
+        steward_did: &amp;Did,
+        partial: PrfPartial,
+    ) -&gt; Result&lt;()&gt;;
+
+    /// Finalize: Generate Anchor and KeyBundle
+    pub fn finalize(&amp;mut self) -&gt; Result&lt;(Anchor, KeyBundle)&gt;;
+}
+</code></pre>
+<p><strong>Task S3.4.2</strong>: Implement enrollment protocol messages</p>
+<pre><code class="language-rust">// src/gossip.rs
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum StewardMessage {
+    // VUI checking
+    VuiCheckRequest { steward: Did, vui_hash: [u8; 32], nonce: u64 },
+    VuiCheckResponse { nonce: u64, exists: bool, responder: Did },
+
+    // Token tracking
+    TokenConsumed { token_hash: [u8; 32], steward: Did, at: u64 },
+
+    // POP ceremony
+    PopCeremonyInit { session: [u8; 32], token_hash: [u8; 32], entropy_commit: [u8; 32] },
+    PopCeremonyPartial { session: [u8; 32], steward: Did, partial: Vec&lt;u8&gt; },
+    PopCeremonyComplete { session: [u8; 32], anchor: [u8; 32] },
+
+    // KeyBundle
+    KeyBundleRotation { anchor: [u8; 32], old_v: u32, new_v: u32, sig: Vec&lt;u8&gt; },
+
+    // Recovery
+    RecoveryRequest { session: [u8; 32], anchor: [u8; 32], initiator: Did },
+    RecoveryApproval { session: [u8; 32], steward: Did, sig: Vec&lt;u8&gt; },
+    RecoveryComplete { session: [u8; 32], anchor: [u8; 32], new_v: u32 },
+}
+</code></pre>
+<h3>S3.5 Recovery Ceremony (Weeks 17-18)</h3>
+<p><strong>Task S3.5.1</strong>: Implement recovery state machine</p>
+<pre><code class="language-rust">// src/ceremony/recovery.rs
+
+pub struct RecoveryCeremony {
+    session_id: [u8; 32],
+    anchor: Anchor,
+    state: RecoveryState,
+    config: RecoveryConfig,
+}
+
+pub enum RecoveryState {
+    /// Initiated, awaiting steward approvals
+    AwaitingApprovals {
+        approvals: Vec&lt;(Did, Vec&lt;u8&gt;)&gt;,
+        required: usize,
+    },
+    /// Sufficient approvals, generating new KeyBundle
+    GeneratingKeyBundle,
+    /// Cool-down period (old owner can dispute)
+    CoolDown {
+        new_keybundle: KeyBundle,
+        dispute_deadline: u64,
+    },
+    /// Complete
+    Complete {
+        old_version: u32,
+        new_version: u32,
+    },
+    /// Disputed (old owner contested)
+    Disputed { reason: String },
+}
+
+impl RecoveryCeremony {
+    /// Initiate recovery (requires physical verification)
+    pub fn initiate(
+        anchor: &amp;Anchor,
+        vui: &amp;Vui,
+        initiating_steward: &amp;Did,
+    ) -&gt; Result&lt;Self&gt;;
+
+    /// Steward approves recovery
+    pub fn approve(
+        &amp;mut self,
+        steward: &amp;Did,
+        steward_key: &amp;SigningKey,
+    ) -&gt; Result&lt;()&gt;;
+
+    /// Check if threshold reached
+    pub fn has_threshold(&amp;self) -&gt; bool;
+
+    /// Generate new KeyBundle (after threshold)
+    pub fn generate_keybundle(&amp;mut self) -&gt; Result&lt;&amp;KeyBundle&gt;;
+
+    /// Start cool-down period
+    pub fn start_cooldown(&amp;mut self, duration: Duration) -&gt; Result&lt;()&gt;;
+
+    /// Dispute recovery (by old key holder)
+    pub fn dispute(&amp;mut self, old_keybundle: &amp;KeyBundle, reason: &amp;str) -&gt; Result&lt;()&gt;;
+
+    /// Finalize (after cool-down)
+    pub fn finalize(&amp;mut self) -&gt; Result&lt;RecoveryResult&gt;;
+}
+</code></pre>
+<h3>S3.6 StewardActor (Weeks 19-20)</h3>
+<p><strong>Task S3.6.1</strong>: Implement actor</p>
+<pre><code class="language-rust">// src/actor.rs
+
+pub struct StewardActor {
+    config: StewardConfig,
+    profile: StewardProfile,
+    vui_registry: Arc&lt;RwLock&lt;VuiRegistry&gt;&gt;,
+    threshold_prf: Arc&lt;dyn ThresholdPrfClient&gt;,
+    active_ceremonies: HashMap&lt;[u8; 32], ActiveCeremony&gt;,
+    gossip_handle: GossipHandle,
+    store: Arc&lt;dyn Store&gt;,
+}
+
+enum ActiveCeremony {
+    Enrollment(EnrollmentCeremony),
+    Recovery(RecoveryCeremony),
+}
+
+pub enum StewardCommand {
+    // Enrollment
+    StartEnrollment { id_data: IdData },
+    IssueToken { session: [u8; 32], blinded: BlindedMessage },
+    ContributePopPartial { session: [u8; 32] },
+
+    // Recovery
+    InitiateRecovery { anchor: Anchor, vui: Vui },
+    ApproveRecovery { session: [u8; 32] },
+    DisputeRecovery { session: [u8; 32], reason: String },
+
+    // Admin
+    GetStatus,
+    UpdateProfile { profile: StewardProfile },
+}
+
+impl StewardActor {
+    pub fn spawn(
+        config: StewardConfig,
+        profile: StewardProfile,
+        vui_registry: Arc&lt;RwLock&lt;VuiRegistry&gt;&gt;,
+        threshold_prf: Arc&lt;dyn ThresholdPrfClient&gt;,
+        gossip_handle: GossipHandle,
+        store: Arc&lt;dyn Store&gt;,
+    ) -&gt; StewardHandle;
+}
+</code></pre>
+<p><strong>Task S3.6.2</strong>: Implement handle</p>
+<pre><code class="language-rust">// src/handle.rs
+
+pub struct StewardHandle {
+    tx: mpsc::Sender&lt;StewardCommand&gt;,
+}
+
+impl StewardHandle {
+    pub async fn start_enrollment(&amp;self, id_data: IdData) -&gt; Result&lt;[u8; 32]&gt;;
+    pub async fn issue_token(&amp;self, session: [u8; 32], blinded: BlindedMessage) -&gt; Result&lt;EnrollmentToken&gt;;
+    pub async fn initiate_recovery(&amp;self, anchor: &amp;Anchor, vui: &amp;Vui) -&gt; Result&lt;[u8; 32]&gt;;
+    pub async fn get_status(&amp;self) -&gt; Result&lt;StewardStatus&gt;;
+}
+</code></pre>
+<h3>S3 Deliverables Checklist</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> <code>icn-steward</code> crate compiles (96 tests: 66 unit + 30 integration)</li>
+<li><input checked="" disabled="" type="checkbox"> VUI registry with distributed checking (Bloom filter + exact set)</li>
+<li><input checked="" disabled="" type="checkbox"> Enrollment ceremony state machine</li>
+<li><input checked="" disabled="" type="checkbox"> Recovery ceremony state machine</li>
+<li><input checked="" disabled="" type="checkbox"> StewardActor with gossip integration</li>
+<li><input checked="" disabled="" type="checkbox"> Integration tests with multiple stewards (16 enrollment + 14 recovery)</li>
+<li><input checked="" disabled="" type="checkbox"> Threshold operations tested (3-of-5 PRF combination)</li>
+<li><input checked="" disabled="" type="checkbox"> Supervisor integration in icn-core (steward actor spawning)</li>
+<li><input checked="" disabled="" type="checkbox"> Steward CLI commands in icnctl (9 subcommands)</li>
+</ul>
+<hr>
+<h2>Phase S4: Zero-Knowledge Proofs</h2>
+<p><strong>Duration</strong>: Weeks 13-26
+<strong>Dependencies</strong>: S1 (crypto), S2 (identity)
+<strong>Deliverable</strong>: <code>icn-zkp</code> crate</p>
+<h3>S4.1 Crate Setup (Week 13)</h3>
+<p><strong>Task S4.1.1</strong>: Create crate structure</p>
+<pre><code>icn/crates/icn-zkp/
+├── Cargo.toml
+├── src/
+│   ├── lib.rs
+│   ├── circuit/
+│   │   ├── mod.rs
+│   │   ├── age.rs           # Age proof circuit
+│   │   ├── citizenship.rs   # Citizenship proof circuit
+│   │   ├── membership.rs    # Membership proof circuit
+│   │   └── non_revocation.rs
+│   ├── prover.rs            # STARK prover
+│   ├── verifier.rs          # STARK verifier
+│   ├── accumulator.rs       # Cryptographic accumulator
+│   └── types.rs
+└── tests/
+    ├── age_proof_test.rs
+    └── accumulator_test.rs
+</code></pre>
+<p><strong>Task S4.1.2</strong>: Cargo.toml</p>
+<pre><code class="language-toml">[dependencies]
+# STARK prover (choose one)
+winterfell = &quot;0.9&quot;           # Pure Rust STARK
+# OR
+risc0-zkvm = &quot;1.0&quot;           # RISC Zero (more flexible)
+
+# Accumulator
+rug = &quot;1.22&quot;                 # Arbitrary precision (for RSA accumulator)
+
+# Utilities
+sha3 = &quot;0.10&quot;
+serde = { version = &quot;1.0&quot;, features = [&quot;derive&quot;] }
+</code></pre>
+<h3>S4.2 STARK Infrastructure (Weeks 14-17)</h3>
+<p><strong>Task S4.2.1</strong>: Implement proof types</p>
+<pre><code class="language-rust">// src/types.rs
+
+/// STARK proof (~50-100 KB)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StarkProof {
+    pub proof_bytes: Vec&lt;u8&gt;,
+    pub public_inputs_hash: [u8; 32],
+}
+
+/// Attribute proof request
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AttributeProofRequest {
+    pub proof_type: ProofType,
+    pub context: ProofContext,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ProofType {
+    AgeAtLeast { threshold: u8 },
+    Citizenship { country_code: [u8; 2] },
+    Membership { org_did: Did },
+    NonRevocation,
+    Custom { circuit_id: [u8; 32] },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProofContext {
+    pub verifier_did: Option&lt;Did&gt;,
+    pub timestamp: u64,
+    pub nonce: [u8; 16],
+}
+</code></pre>
+<p><strong>Task S4.2.2</strong>: Implement prover abstraction</p>
+<pre><code class="language-rust">// src/prover.rs
+
+pub trait ZkProver {
+    type PublicInput;
+    type PrivateInput;
+    type Proof;
+
+    fn prove(
+        &amp;self,
+        public: &amp;Self::PublicInput,
+        private: &amp;Self::PrivateInput,
+    ) -&gt; Result&lt;Self::Proof&gt;;
+}
+
+pub struct StarkProver {
+    // Winterfell prover configuration
+}
+
+impl StarkProver {
+    pub fn new() -&gt; Self;
+
+    pub fn prove_age(&amp;self, req: &amp;AgeProofRequest, attestation: &amp;AgeAttestation) -&gt; Result&lt;StarkProof&gt;;
+    pub fn prove_citizenship(&amp;self, req: &amp;CitizenshipProofRequest, attestation: &amp;CitizenshipAttestation) -&gt; Result&lt;StarkProof&gt;;
+    pub fn prove_non_revocation(&amp;self, anchor: &amp;Anchor, accumulator: &amp;AccumulatorWitness) -&gt; Result&lt;StarkProof&gt;;
+}
+</code></pre>
+<h3>S4.3 Age Proof Circuit (Weeks 18-20)</h3>
+<p><strong>Task S4.3.1</strong>: Implement age proof</p>
+<pre><code class="language-rust">// src/circuit/age.rs
+
+pub struct AgeProofPublic {
+    pub threshold: u8,
+    pub current_date: u32,  // Days since epoch
+    pub issuer_pk: [u8; 32],
+}
+
+pub struct AgeProofPrivate {
+    pub birthdate: u32,     // Days since epoch
+    pub issuer_signature: Vec&lt;u8&gt;,
+}
+
+pub struct AgeProofCircuit;
+
+impl AgeProofCircuit {
+    /// Generate STARK proof that:
+    /// 1. issuer_signature is valid for birthdate
+    /// 2. current_date - birthdate &gt;= threshold * 365
+    pub fn prove(
+        public: &amp;AgeProofPublic,
+        private: &amp;AgeProofPrivate,
+    ) -&gt; Result&lt;StarkProof&gt;;
+
+    pub fn verify(
+        public: &amp;AgeProofPublic,
+        proof: &amp;StarkProof,
+    ) -&gt; bool;
+}
+</code></pre>
+<h3>S4.4 Accumulator for Revocation (Weeks 21-23)</h3>
+<p><strong>Task S4.4.1</strong>: Implement RSA accumulator</p>
+<pre><code class="language-rust">// src/accumulator.rs
+
+pub struct RsaAccumulator {
+    modulus: BigInt,
+    value: BigInt,
+}
+
+impl RsaAccumulator {
+    pub fn new() -&gt; Self;
+
+    /// Add element to accumulator
+    pub fn add(&amp;mut self, element: &amp;[u8; 32]);
+
+    /// Generate membership witness
+    pub fn membership_witness(&amp;self, element: &amp;[u8; 32]) -&gt; MembershipWitness;
+
+    /// Generate non-membership witness (Bezout coefficients)
+    pub fn non_membership_witness(&amp;self, element: &amp;[u8; 32]) -&gt; NonMembershipWitness;
+
+    /// Verify membership
+    pub fn verify_membership(&amp;self, element: &amp;[u8; 32], witness: &amp;MembershipWitness) -&gt; bool;
+
+    /// Verify non-membership
+    pub fn verify_non_membership(&amp;self, element: &amp;[u8; 32], witness: &amp;NonMembershipWitness) -&gt; bool;
+}
+</code></pre>
+<h3>S4.5 Combined Proofs (Weeks 24-26)</h3>
+<p><strong>Task S4.5.1</strong>: Implement compound proof generation</p>
+<pre><code class="language-rust">// src/lib.rs
+
+/// Generate compound proof (attribute + non-revocation)
+pub fn generate_compound_proof(
+    attribute_request: &amp;AttributeProofRequest,
+    attestation: &amp;Attestation,
+    anchor: &amp;Anchor,
+    accumulator_witness: &amp;NonMembershipWitness,
+) -&gt; Result&lt;CompoundProof&gt; {
+    let attribute_proof = match &amp;attribute_request.proof_type {
+        ProofType::AgeAtLeast { threshold } =&gt; {
+            AgeProofCircuit::prove(/* ... */)
+        }
+        // ... other types
+    };
+
+    let non_revocation_proof = NonRevocationCircuit::prove(
+        anchor,
+        accumulator_witness,
+    )?;
+
+    Ok(CompoundProof {
+        attribute_proof,
+        non_revocation_proof,
+        context: attribute_request.context.clone(),
+    })
+}
+</code></pre>
+<h3>S4 Deliverables Checklist</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> <code>icn-zkp</code> crate compiles</li>
+<li><input checked="" disabled="" type="checkbox"> Age proof circuit working (simulated, winterfell STARK via <code>stark</code> feature)</li>
+<li><input checked="" disabled="" type="checkbox"> Citizenship proof circuit working</li>
+<li><input checked="" disabled="" type="checkbox"> RSA accumulator implemented (with membership/non-membership witnesses)</li>
+<li><input checked="" disabled="" type="checkbox"> Non-revocation proofs working</li>
+<li><input checked="" disabled="" type="checkbox"> Compound proofs working</li>
+<li><input disabled="" type="checkbox"> Proof size within budget (~50-100KB) - requires <code>stark</code> feature</li>
+<li><input disabled="" type="checkbox"> Benchmarks: proof generation &lt;10s, verification &lt;1s - TODO when <code>stark</code> enabled</li>
+</ul>
+<hr>
+<h2>Phase S5: Credential Presentation</h2>
+<p><strong>Duration</strong>: Weeks 21-30
+<strong>Dependencies</strong>: S1-S4
+<strong>Deliverable</strong>: Extended <code>icn-gateway</code> crate</p>
+<h3>S5.1 Ephemeral Proof System (Weeks 21-24)</h3>
+<p><strong>Task S5.1.1</strong>: Implement ephemeral proof generation</p>
+<p><strong>File</strong>: <code>icn/crates/icn-gateway/src/api/sdis/ephemeral.rs</code></p>
+<pre><code class="language-rust">/// Ephemeral proof for QR codes
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EphemeralProof {
+    pub v: u8,              // Version
+    pub t: ProofType,       // What&#39;s being proved
+    pub a: [u8; 16],        // Truncated anchor hash
+    pub k: [u8; 32],        // Ephemeral Ed25519 public key
+    pub x: u64,             // Expiry timestamp
+    pub n: [u8; 16],        // Nonce
+    pub s: [u8; 64],        // Ed25519 signature
+    pub c: Vec&lt;Channel&gt;,    // Available upgrade channels
+}
+
+impl EphemeralProof {
+    /// Generate from KeyBundle (daily refresh)
+    pub fn generate(
+        keybundle: &amp;KeyBundle,
+        proof_type: ProofType,
+        validity: Duration,
+    ) -&gt; Result&lt;(Self, EphemeralBinding)&gt;;
+
+    /// Encode for QR code
+    pub fn to_qr_bytes(&amp;self) -&gt; Vec&lt;u8&gt;;
+
+    /// Decode from QR scan
+    pub fn from_qr_bytes(bytes: &amp;[u8]) -&gt; Result&lt;Self&gt;;
+
+    /// Size in bytes
+    pub fn size(&amp;self) -&gt; usize;
+}
+
+/// Binding attestation (for Level 2+ verification)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EphemeralBinding {
+    pub anchor: [u8; 32],
+    pub ephemeral_pk: [u8; 32],
+    pub expires: u64,
+    pub hybrid_signature: HybridSignature,  // ~2.5KB
+}
+</code></pre>
+<p><strong>Task S5.1.2</strong>: Implement verification levels</p>
+<pre><code class="language-rust">// src/api/sdis/verify.rs
+
+pub struct Verifier {
+    nonce_cache: LruCache&lt;[u8; 16], u64&gt;,
+    binding_cache: LruCache&lt;[u8; 32], EphemeralBinding&gt;,
+}
+
+impl Verifier {
+    /// Level 1: QR scan only (classical, no network)
+    pub fn verify_level1(&amp;mut self, proof: &amp;EphemeralProof) -&gt; VerifyResult {
+        // 1. Check expiry
+        if proof.x &lt; now() { return VerifyResult::Expired; }
+
+        // 2. Check nonce not reused
+        if self.nonce_cache.contains(&amp;proof.n) {
+            return VerifyResult::ReplayDetected;
+        }
+        self.nonce_cache.put(proof.n, now());
+
+        // 3. Verify Ed25519 signature
+        let message = proof.signing_payload();
+        if !ed25519_verify(&amp;proof.k, &amp;message, &amp;proof.s) {
+            return VerifyResult::InvalidSignature;
+        }
+
+        VerifyResult::Valid { level: 1 }
+    }
+
+    /// Level 2: NFC/BLE with binding verification (hybrid)
+    pub fn verify_level2(
+        &amp;mut self,
+        proof: &amp;EphemeralProof,
+        binding: &amp;EphemeralBinding,
+    ) -&gt; VerifyResult {
+        // 1. Level 1 checks
+        let l1 = self.verify_level1(proof)?;
+
+        // 2. Verify binding matches proof
+        if binding.ephemeral_pk != proof.k {
+            return VerifyResult::BindingMismatch;
+        }
+
+        // 3. Verify hybrid signature on binding
+        if !binding.hybrid_signature.verify(&amp;binding.signing_payload(), &amp;anchor_pk) {
+            return VerifyResult::InvalidHybridSignature;
+        }
+
+        VerifyResult::Valid { level: 2 }
+    }
+
+    /// Level 3: Full network verification with STARK proofs
+    pub async fn verify_level3(
+        &amp;mut self,
+        proof: &amp;EphemeralProof,
+        binding: &amp;EphemeralBinding,
+        stark_proof: &amp;StarkProof,
+    ) -&gt; VerifyResult;
+}
+</code></pre>
+<h3>S5.2 Gateway API Routes (Weeks 25-27)</h3>
+<p><strong>Task S5.2.1</strong>: Add SDIS routes</p>
+<p><strong>File</strong>: <code>icn/crates/icn-gateway/src/api/sdis/mod.rs</code></p>
+<pre><code class="language-rust">pub fn configure(cfg: &amp;mut web::ServiceConfig) {
+    cfg.service(
+        web::scope(&quot;/v1/sdis&quot;)
+            // Ephemeral proofs
+            .route(&quot;/ephemeral/generate&quot;, web::post().to(generate_ephemeral))
+            .route(&quot;/ephemeral/refresh&quot;, web::post().to(refresh_ephemeral))
+
+            // Verification
+            .route(&quot;/verify/level1&quot;, web::post().to(verify_level1))
+            .route(&quot;/verify/level2&quot;, web::post().to(verify_level2))
+            .route(&quot;/verify/level3&quot;, web::post().to(verify_level3))
+
+            // Binding
+            .route(&quot;/binding/{session}&quot;, web::get().to(get_binding))
+
+            // Enrollment (requires Steward auth)
+            .route(&quot;/enroll/init&quot;, web::post().to(init_enrollment))
+            .route(&quot;/enroll/verify-id&quot;, web::post().to(verify_id))
+            .route(&quot;/enroll/issue-token&quot;, web::post().to(issue_token))
+            .route(&quot;/enroll/complete&quot;, web::post().to(complete_enrollment))
+
+            // KeyBundle
+            .route(&quot;/keybundle/current&quot;, web::get().to(get_current_keybundle))
+            .route(&quot;/keybundle/rotate&quot;, web::post().to(rotate_keybundle))
+
+            // Recovery
+            .route(&quot;/recovery/initiate&quot;, web::post().to(initiate_recovery))
+            .route(&quot;/recovery/status/{session}&quot;, web::get().to(recovery_status))
+
+            // Attestations
+            .route(&quot;/attestation/request&quot;, web::post().to(request_attestation))
+            .route(&quot;/attestation/list&quot;, web::get().to(list_attestations))
+
+            // Steward admin
+            .route(&quot;/steward/list&quot;, web::get().to(list_stewards))
+            .route(&quot;/steward/{did}&quot;, web::get().to(get_steward))
+    );
+}
+</code></pre>
+<h3>S5.3 QR Code Integration (Weeks 28-30)</h3>
+<p><strong>Task S5.3.1</strong>: Implement compact encoding</p>
+<pre><code class="language-rust">// src/api/sdis/qr.rs
+
+/// Encode ephemeral proof for QR code
+/// Target: &lt;1KB for QR Version 15-20
+pub fn encode_for_qr(proof: &amp;EphemeralProof) -&gt; Result&lt;Vec&lt;u8&gt;&gt; {
+    // Use CBOR for compact encoding
+    let mut encoded = Vec::new();
+
+    // Version (1 byte)
+    encoded.push(proof.v);
+
+    // Proof type (1 byte)
+    encoded.push(proof.t.to_byte());
+
+    // Truncated anchor (16 bytes)
+    encoded.extend_from_slice(&amp;proof.a);
+
+    // Ephemeral public key (32 bytes)
+    encoded.extend_from_slice(&amp;proof.k);
+
+    // Expiry (4 bytes - seconds since 2024-01-01)
+    let relative_expiry = (proof.x - EPOCH_2024) as u32;
+    encoded.extend_from_slice(&amp;relative_expiry.to_le_bytes());
+
+    // Nonce (16 bytes)
+    encoded.extend_from_slice(&amp;proof.n);
+
+    // Signature (64 bytes)
+    encoded.extend_from_slice(&amp;proof.s);
+
+    // Channels (1 byte bitmap)
+    encoded.push(channels_to_bitmap(&amp;proof.c));
+
+    // Total: 135 bytes base (fits easily in QR)
+    Ok(encoded)
+}
+</code></pre>
+<h3>S5 Deliverables Checklist</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> Ephemeral proof generation working</li>
+<li><input checked="" disabled="" type="checkbox"> Level 1 verification (&lt;2s, no network)</li>
+<li><input checked="" disabled="" type="checkbox"> Level 2 verification (hybrid)</li>
+<li><input checked="" disabled="" type="checkbox"> Level 3 verification (STARK) - implementation complete, requires <code>stark</code> feature for production</li>
+<li><input checked="" disabled="" type="checkbox"> QR encoding &lt;1KB (137 bytes)</li>
+<li><input checked="" disabled="" type="checkbox"> Gateway routes implemented</li>
+<li><input disabled="" type="checkbox"> OpenAPI spec updated</li>
+<li><input disabled="" type="checkbox"> TypeScript SDK extended</li>
+</ul>
+<p><strong>Completed (2025-12-10)</strong>:</p>
+<ul>
+<li><code>ephemeral.rs</code> - EphemeralProof and EphemeralBinding types with generation and signature verification</li>
+<li><code>verify.rs</code> - EphemeralVerifier with Level 1/2/3 verification, nonce cache, binding cache</li>
+<li><code>qr.rs</code> - Compact 137-byte QR encoding with relative timestamps</li>
+<li><code>mod.rs</code> - Gateway routes: <code>/v1/sdis/health</code>, <code>/v1/sdis/verify/level1</code>, <code>/v1/sdis/verify/level2</code></li>
+<li>Full test coverage: 22 tests passing</li>
+</ul>
+<hr>
+<h2>Phase S6: Governance &amp; Polish</h2>
+<p><strong>Duration</strong>: Weeks 27-36
+<strong>Dependencies</strong>: S1-S5
+<strong>Deliverable</strong>: Complete integrated system</p>
+<h3>S6.1 Governance Extensions (Weeks 27-30)</h3>
+<p><strong>Task S6.1.1</strong>: Add SDIS proposal types</p>
+<p><strong>File</strong>: <code>icn/crates/icn-governance/src/sdis.rs</code></p>
+<pre><code class="language-rust">#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum SdisProposal {
+    AppointSteward { candidate: Did, sponsors: Vec&lt;Did&gt;, region: String },
+    RemoveSteward { steward: Did, reason: String },
+    SanctionSteward { steward: Did, penalty: StewardPenalty },
+    ReconfirmSteward { steward: Did, new_term: u64 },
+    ModifyThreshold { op: ThresholdOp, value: usize },
+    ApproveAuthority { authority: InstitutionalAuthority },
+    RevokeAuthority { authority: Did, reason: String },
+    RevocationAppeal { target: RevocationTarget, reason: String },
+}
+</code></pre>
+<p><strong>Task S6.1.2</strong>: Implement ZK voting (optional for v1)</p>
+<h3>S6.2 Integration Tests (Weeks 31-33)</h3>
+<p><strong>Task S6.2.1</strong>: Multi-node enrollment test</p>
+<pre><code class="language-rust">#[tokio::test]
+async fn test_full_enrollment_flow() {
+    // 1. Set up 5 steward nodes
+    let stewards = setup_steward_network(5, 3).await;  // 3-of-5 threshold
+
+    // 2. Applicant generates blinded token
+    let (blinded, blinding_factor) = blind_message(&amp;token);
+
+    // 3. Steward verifies ID, checks VUI, signs
+    let signed_blinded = stewards[0].issue_token(&amp;blinded).await?;
+
+    // 4. Applicant unblinds
+    let token = unblind(&amp;signed_blinded, &amp;blinding_factor);
+
+    // 5. POP generation ceremony
+    let session = stewards[0].init_pop_ceremony(&amp;token).await?;
+
+    // 6. Collect threshold partials
+    for steward in &amp;stewards[..3] {
+        steward.contribute_partial(&amp;session).await?;
+    }
+
+    // 7. User combines partials, generates KeyBundle
+    let (anchor, keybundle) = finalize_enrollment(&amp;session).await?;
+
+    // 8. Verify anchor is valid
+    assert!(verify_anchor(&amp;anchor, &amp;stewards).await?);
+}
+</code></pre>
+<p><strong>Task S6.2.2</strong>: Recovery ceremony test</p>
+<p><strong>Task S6.2.3</strong>: Credential presentation test</p>
+<p><strong>Task S6.2.4</strong>: Revocation test</p>
+<h3>S6.3 Documentation (Weeks 34-35)</h3>
+<p><strong>Task S6.3.1</strong>: Update ARCHITECTURE.md</p>
+<p><strong>Task S6.3.2</strong>: Create SDIS_USER_GUIDE.md</p>
+<p><strong>Task S6.3.3</strong>: Create STEWARD_OPERATIONS.md</p>
+<p><strong>Task S6.3.4</strong>: Update API documentation</p>
+<h3>S6.4 Security Audit Prep (Week 36)</h3>
+<p><strong>Task S6.4.1</strong>: Threat model document</p>
+<p><strong>Task S6.4.2</strong>: Code audit checklist</p>
+<p><strong>Task S6.4.3</strong>: Cryptographic review document</p>
+<h3>S6 Deliverables Checklist</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> SDIS governance proposals working</li>
+<li><input disabled="" type="checkbox"> Full enrollment integration test passing (requires steward network)</li>
+<li><input disabled="" type="checkbox"> Full recovery integration test passing (requires steward network)</li>
+<li><input checked="" disabled="" type="checkbox"> Credential presentation integration test passing (19 tests)</li>
+<li><input checked="" disabled="" type="checkbox"> Documentation complete</li>
+<li><input checked="" disabled="" type="checkbox"> Security audit materials prepared</li>
+</ul>
+<p><strong>Completed (2025-12-10)</strong>:</p>
+<ul>
+<li><code>sdis.rs</code> - SDIS governance proposals (SdisProposal enum with 12 proposal types)</li>
+<li><code>sdis_integration.rs</code> - 19 integration tests for credential presentation</li>
+<li>Governance types: StewardPenalty, JurisdictionTier, ThresholdType, etc.</li>
+<li>Integrated SdisProposal into ProposalPayload enum</li>
+<li><code>SDIS_USER_GUIDE.md</code> - Comprehensive user documentation for credential presentation</li>
+<li><code>ARCHITECTURE.md</code> - Updated with sections 1.5.9-1.5.11 for ZKP, presentation, governance</li>
+<li><code>docs/security/SDIS_THREAT_MODEL.md</code> - Comprehensive threat model</li>
+<li><code>docs/security/SDIS_AUDIT_CHECKLIST.md</code> - Code audit checklist for reviewers</li>
+<li><code>docs/security/SDIS_CRYPTO_REVIEW.md</code> - Cryptographic algorithm review</li>
+</ul>
+<p><strong>Completed (2025-12-11)</strong>:</p>
+<ul>
+<li><code>enrollment.rs</code> - EnrollmentService for end-to-end enrollment orchestration</li>
+<li>EnrollmentClient for client-side enrollment handling</li>
+<li>Threshold PRF integration for VUI computation</li>
+<li>VUI uniqueness checking via registry</li>
+<li>Expanded gossip messages (ParticipationRequest, PrfPartialDelivery, UniquenessCheck/Response)</li>
+<li><code>recovery.rs</code> - RecoveryService for end-to-end identity recovery</li>
+<li>RecoveryClient for client-side recovery handling</li>
+<li>RecoveryEvidence with VUI-based proof of ownership</li>
+<li>Revocation record tracking and double-recovery prevention</li>
+<li>96 steward tests passing (66 unit + 30 integration tests)</li>
+<li><code>enrollment_integration.rs</code> - 16 enrollment integration tests:<ul>
+<li>Single steward enrollment end-to-end</li>
+<li>Multi-steward enrollment simulation with coordinator pattern</li>
+<li>3-of-5 threshold PRF combination</li>
+<li>Duplicate enrollment rejection</li>
+<li>Different users can enroll successfully</li>
+<li>VUI commitment verification</li>
+<li>Gossip message serialization</li>
+<li>Client-side blinded request creation</li>
+<li>Error handling (missing pepper share, no partials)</li>
+<li>Share commitment and VUI registry operations</li>
+</ul>
+</li>
+<li><code>recovery_integration.rs</code> - 14 recovery integration tests:<ul>
+<li>Single steward recovery end-to-end</li>
+<li>3-of-5 threshold recovery</li>
+<li>Mixed attestations (supporting + rejecting)</li>
+<li>Double-recovery prevention</li>
+<li>Revocation chain tracking</li>
+<li>Duplicate attestation rejection</li>
+<li>Gossip message serialization</li>
+<li>Concurrent recovery limits</li>
+</ul>
+</li>
+</ul>
+<hr>
+<h2>Milestone Summary</h2>
+<table>
+<thead>
+<tr>
+<th>Milestone</th>
+<th>Week</th>
+<th>Key Deliverable</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>M1</td>
+<td>8</td>
+<td><code>icn-crypto-pq</code> crate complete</td>
+</tr>
+<tr>
+<td>M2</td>
+<td>12</td>
+<td>Identity extensions complete</td>
+</tr>
+<tr>
+<td>M3</td>
+<td>20</td>
+<td><code>icn-steward</code> crate complete</td>
+</tr>
+<tr>
+<td>M4</td>
+<td>26</td>
+<td><code>icn-zkp</code> crate complete</td>
+</tr>
+<tr>
+<td>M5</td>
+<td>30</td>
+<td>Credential presentation complete</td>
+</tr>
+<tr>
+<td>M6</td>
+<td>36</td>
+<td>Full integration complete</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Risk Mitigation</h2>
+<table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>STARK proof size too large</td>
+<td>Hybrid STARK+SNARK fallback; iterative optimization</td>
+</tr>
+<tr>
+<td>Threshold crypto complexity</td>
+<td>Use well-tested FROST library; extensive testing</td>
+</tr>
+<tr>
+<td>Post-quantum library instability</td>
+<td>Pin versions; fallback to classical-only mode</td>
+</tr>
+<tr>
+<td>Steward UX complexity</td>
+<td>Start with CLI tooling; web UI in follow-on</td>
+</tr>
+<tr>
+<td>Regulatory uncertainty</td>
+<td>Modular design; pathway toggles per jurisdiction</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Resource Requirements</h2>
+<table>
+<thead>
+<tr>
+<th>Role</th>
+<th>Allocation</th>
+<th>Phases</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Crypto Engineer</td>
+<td>1.0 FTE</td>
+<td>S1, S4</td>
+</tr>
+<tr>
+<td>Systems Engineer</td>
+<td>1.0 FTE</td>
+<td>S2, S3, S5</td>
+</tr>
+<tr>
+<td>Protocol Engineer</td>
+<td>0.5 FTE</td>
+<td>S3, S6</td>
+</tr>
+<tr>
+<td>Security Reviewer</td>
+<td>0.25 FTE</td>
+<td>All</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Next Steps</h2>
+<ol>
+<li><strong>Review this plan</strong> with stakeholders</li>
+<li><strong>Finalize Phase S1</strong> task breakdown</li>
+<li><strong>Set up icn-crypto-pq crate</strong> scaffold</li>
+<li><strong>Begin ML-DSA integration</strong> research</li>
+</ol>
+<hr>
+<h2>Appendix: File Change Summary</h2>
+<h3>New Files</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Phase</th>
+<th>Lines (est)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>crates/icn-crypto-pq/src/*</code></td>
+<td>S1</td>
+<td>3,000</td>
+</tr>
+<tr>
+<td><code>crates/icn-identity/src/anchor.rs</code></td>
+<td>S2</td>
+<td>300</td>
+</tr>
+<tr>
+<td><code>crates/icn-identity/src/keybundle.rs</code></td>
+<td>S2</td>
+<td>500</td>
+</tr>
+<tr>
+<td><code>crates/icn-identity/src/vui.rs</code></td>
+<td>S2</td>
+<td>200</td>
+</tr>
+<tr>
+<td><code>crates/icn-steward/src/*</code></td>
+<td>S3</td>
+<td>4,000</td>
+</tr>
+<tr>
+<td><code>crates/icn-zkp/src/*</code></td>
+<td>S4</td>
+<td>5,000</td>
+</tr>
+<tr>
+<td><code>crates/icn-gateway/src/api/sdis/*</code></td>
+<td>S5</td>
+<td>2,000</td>
+</tr>
+<tr>
+<td><code>crates/icn-governance/src/sdis.rs</code></td>
+<td>S6</td>
+<td>500</td>
+</tr>
+</tbody></table>
+<h3>Modified Files</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Phase</th>
+<th>Changes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>crates/icn-identity/src/lib.rs</code></td>
+<td>S2</td>
+<td>Add module exports</td>
+</tr>
+<tr>
+<td><code>crates/icn-identity/src/keystore.rs</code></td>
+<td>S2</td>
+<td>v4 format, migration</td>
+</tr>
+<tr>
+<td><code>crates/icn-identity/src/bundle.rs</code></td>
+<td>S2</td>
+<td>SDIS extensions</td>
+</tr>
+<tr>
+<td><code>crates/icn-trust/src/types.rs</code></td>
+<td>S3</td>
+<td>Steward trust type</td>
+</tr>
+<tr>
+<td><code>crates/icn-gossip/src/types.rs</code></td>
+<td>S3</td>
+<td>SDIS message types</td>
+</tr>
+<tr>
+<td><code>crates/icn-core/src/supervisor.rs</code></td>
+<td>S3</td>
+<td>Steward actor spawn</td>
+</tr>
+<tr>
+<td><code>crates/icn-gateway/src/lib.rs</code></td>
+<td>S5</td>
+<td>SDIS routes</td>
+</tr>
+<tr>
+<td><code>crates/icn-governance/src/proposal.rs</code></td>
+<td>S6</td>
+<td>SDIS proposals</td>
+</tr>
+</tbody></table>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

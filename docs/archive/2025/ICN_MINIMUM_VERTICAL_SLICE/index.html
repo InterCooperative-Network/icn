@@ -1,0 +1,897 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN: Minimum Vertical Slice | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>archive</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>2025</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ICN MINIMUM VERTICAL SLICE</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/archive/2025/ICN_MINIMUM_VERTICAL_SLICE.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><p>⚠️ <strong>ARCHIVED</strong> - This document is from 2025 and has been archived.</p>
+<p>For current information, see:</p>
+<ul>
+<li><a href="/docs/ARCHITECTURE">ARCHITECTURE.md</a> - Current architecture</li>
+<li><a href="/docs/STATE">STATE.md</a> - Current project state</li>
+</ul>
+<hr>
+<h1>ICN: Minimum Vertical Slice</h1>
+<p><strong>Last Updated</strong>: 2026-01-23
+<strong>Status</strong>: Developer Reference
+<strong>Authors</strong>: Claude Code, fahertym</p>
+<hr>
+<h2>Purpose</h2>
+<p>This document traces 8 fundamental operations end-to-end through the ICN stack. For each operation:</p>
+<pre><code>Client Call → Gateway Endpoint → Manager/Service → Daemon Action → Gossip Topic → Storage Write
+</code></pre>
+<p>This is the bridge between &quot;architecture docs&quot; and &quot;the actual repo.&quot;</p>
+<p><strong>Note on Endpoint Paths</strong>: Paths shown are conceptual (e.g., <code>/devices/{did}</code>). Actual gateway may version endpoints (e.g., <code>/v1/devices/{did}</code>) depending on deployment configuration. See <code>icn-gateway/src/server.rs</code> for current routing.</p>
+<hr>
+<h2>1. Create DID in Wallet</h2>
+<p><strong>User action</strong>: Install app, first launch</p>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────────┐
+│ CLIENT (Mobile/Web)                                                          │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ 1. Generate Ed25519 keypair in Secure Enclave                               │
+│    - iOS: SecureEnclave.generateKey()                                       │
+│    - Android: KeyStore.generateKeyPair()                                    │
+│                                                                              │
+│ 2. Derive DID from public key                                               │
+│    did = &quot;did:icn:&quot; + base58_encode(public_key)                             │
+│                                                                              │
+│ 3. Store keypair reference locally                                          │
+│    - Never exported, hardware-bound                                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+                    │
+                    │ (No network call - identity is local)
+                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ LOCAL STORAGE                                                                │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ File: ~/.icn/identity.json (or platform-specific secure storage)            │
+│ {                                                                            │
+│   &quot;did&quot;: &quot;did:icn:5K7gS...&quot;,                                                │
+│   &quot;created_at&quot;: &quot;2026-01-23T...&quot;,                                           │
+│   &quot;key_handle&quot;: &quot;secure_enclave_ref_123&quot;                                    │
+│ }                                                                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<p><strong>Crate path</strong>: <code>icn-identity/src/did.rs</code> (DID formatting), client-side SDK handles key generation</p>
+<p><strong>Key insight</strong>: DID creation is purely local. No server involved until you want to <em>do</em> something with the identity.</p>
+<hr>
+<h2>2. Register Device</h2>
+<p><strong>User action</strong>: Add a second device to existing identity</p>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────────┐
+│ CLIENT CALL                                                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ POST /devices/{did}                                                          │
+│ Authorization: Bearer &lt;jwt-from-existing-device&gt;                            │
+│ {                                                                            │
+│   &quot;device_id&quot;: &quot;iphone-14&quot;,                                                 │
+│   &quot;label&quot;: &quot;Alice&#39;s iPhone 14&quot;,                                             │
+│   &quot;public_key&quot;: &quot;ed25519:ABC123...&quot;,                                        │
+│   &quot;capabilities&quot;: [&quot;sign&quot;, &quot;encrypt&quot;],                                      │
+│   &quot;authorizing_device_id&quot;: &quot;macbook-1&quot;                                      │
+│ }                                                                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ GATEWAY ENDPOINT                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ File: icn-gateway/src/api/devices.rs                                        │
+│                                                                              │
+│ #[post(&quot;/{did}&quot;)]                                                           │
+│ pub async fn register_device(...)                                           │
+│   1. require_scope(&quot;identity:write&quot;)                                        │
+│   2. Verify authorizing device is valid for this DID                        │
+│   3. Validate device_id, public_key format                                  │
+│   4. Call identity_mgr.register_device(...)                                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ IDENTITY MANAGER                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ File: icn-gateway/src/identity_mgr.rs                                       │
+│                                                                              │
+│ pub async fn register_device(&amp;self, req: RegisterDeviceRequest)             │
+│   1. Check device limit (max 10 per identity)                               │
+│   2. Verify authorizing device signature                                    │
+│   3. Create DeviceCredential { device_id, public_key, capabilities, ... }   │
+│   4. Store in device registry                                               │
+│   5. Broadcast to gossip (optional, for cross-node sync)                    │
+└─────────────────────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STORAGE WRITE                                                                │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Sled tree: &quot;identity:devices:{did}&quot;                                         │
+│ Key: device_id                                                              │
+│ Value: DeviceCredential (CBOR encoded)                                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<p><strong>Gossip topic</strong>: <code>identity:devices</code> (optional, for multi-node cooperative setups)</p>
+<hr>
+<h2>3. Obtain Membership Credential</h2>
+<p><strong>User action</strong>: Apply to join a cooperative, get approved</p>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────────┐
+│ CLIENT CALL (Application)                                                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ POST /membership/apply                                                       │
+│ Authorization: Bearer &lt;jwt&gt;                                                 │
+│ {                                                                            │
+│   &quot;entity_id&quot;: &quot;entity:icn:coop:food-coop-123&quot;,                             │
+│   &quot;capabilities_requested&quot;: [&quot;member&quot;],                                     │
+│   &quot;invite_code&quot;: &quot;ABC123&quot;                                                   │
+│ }                                                                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ GATEWAY ENDPOINT                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ File: icn-gateway/src/api/membership/mod.rs                                 │
+│                                                                              │
+│ #[post(&quot;/{coop_id}/members/apply&quot;)]                                         │
+│ pub async fn apply_for_membership(...)                                      │
+│   1. Validate invite code                                                   │
+│   2. Check applicant not already member                                     │
+│   3. Create MembershipApplication { did, status: Pending, ... }             │
+│   4. Notify admins via event                                                │
+└─────────────────────────────────────────────────────────────────────────────┘
+                    │
+                    │ (Later: Admin approves via governance or direct action)
+                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ CLIENT CALL (Admin Approval)                                                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ POST /membership/approve                                                     │
+│ Authorization: Bearer &lt;admin-jwt&gt;                                           │
+│ {                                                                            │
+│   &quot;member_did&quot;: &quot;did:icn:alice...&quot;,                                         │
+│   &quot;entity_id&quot;: &quot;entity:icn:coop:food-coop-123&quot;,                             │
+│   &quot;capabilities&quot;: [&quot;member&quot;],                                               │
+│   &quot;initial_credit_limit&quot;: 100                                               │
+│ }                                                                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ GATEWAY ENDPOINT                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ File: icn-gateway/src/api/members.rs                                        │
+│                                                                              │
+│ #[post(&quot;/{coop_id}/members/{did}/approve&quot;)]                                 │
+│ pub async fn approve_member(...)                                            │
+│   1. require_scope(&quot;members:admin&quot;)                                         │
+│   2. Verify approver has admin role in this coop                            │
+│   3. Issue MembershipCredential (VC)                                        │
+│   4. Set initial credit limit in ledger                                     │
+│   5. Add to trust graph with initial attestation                            │
+│   6. Broadcast MemberJoined event                                           │
+└─────────────────────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ DAEMON ACTIONS                                                               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ 1. Trust Graph (icn-trust)                                                  │
+│    - Add edge: coop → member with initial score                             │
+│    - File: icn-trust/src/graph.rs                                           │
+│                                                                              │
+│ 2. Ledger (icn-ledger)                                                      │
+│    - Create account with credit limit                                       │
+│    - File: icn-ledger/src/ledger.rs                                         │
+│                                                                              │
+│ 3. Entity Registry (icn-entity)                                             │
+│    - Add member to entity membership list                                   │
+│    - File: icn-entity/src/registry.rs                                       │
+└─────────────────────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ GOSSIP TOPICS                                                                │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ 1. &quot;members:{coop_id}&quot; - MemberJoined event                                 │
+│ 2. &quot;trust:attestations&quot; - Initial trust edge                                │
+│ 3. &quot;ledger:{coop_id}:accounts&quot; - New account creation                       │
+└─────────────────────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STORAGE WRITES                                                               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ 1. Sled: &quot;members:{coop_id}:{did}&quot; → MembershipCredential                   │
+│ 2. Sled: &quot;trust:edges:{from}:{to}&quot; → TrustEdge                              │
+│ 3. Sled: &quot;ledger:{coop_id}:accounts:{did}&quot; → Account                        │
+│ 4. Sled: &quot;entity:{entity_id}:members&quot; → Vec&lt;Did&gt;                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<hr>
+<h2>4. Make a Payment</h2>
+<p><strong>User action</strong>: Send 2 hours to another member</p>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────────┐
+│ CLIENT CALL                                                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ POST /ledger/{coop_id}/payment                                              │
+│ Authorization: Bearer &lt;jwt&gt;                                                 │
+│ {                                                                            │
+│   &quot;from&quot;: &quot;did:icn:alice...&quot;,                                               │
+│   &quot;to&quot;: &quot;did:icn:bob...&quot;,                                                   │
+│   &quot;amount&quot;: 2.0,                                                            │
+│   &quot;currency&quot;: &quot;hours&quot;,                                                      │
+│   &quot;memo&quot;: &quot;Garden help&quot;                                                     │
+│ }                                                                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ GATEWAY ENDPOINT                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ File: icn-gateway/src/api/ledger.rs                                         │
+│                                                                              │
+│ #[post(&quot;/{coop_id}/payment&quot;)]                                               │
+│ pub async fn create_payment(...)                                            │
+│   1. require_scope(&quot;ledger:write&quot;)                                          │
+│   2. require_coop_access(&amp;coop_id)                                          │
+│   3. CRITICAL: Verify claims.sub == req.from (can&#39;t send from others)       │
+│   4. Validate amount, currency, memo                                        │
+│   5. Check velocity limits (anti-drain)                                     │
+│   6. Call ledger_mgr.create_payment(...)                                    │
+└─────────────────────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ LEDGER MANAGER                                                               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ File: icn-gateway/src/ledger_mgr.rs                                         │
+│                                                                              │
+│ pub async fn create_payment(...)                                            │
+│   1. Check sender has sufficient balance (balance + credit_limit &gt;= amount) │
+│   2. Check budget constraints (if applicable)                               │
+│   3. Forward to daemon via ledger handle                                    │
+└─────────────────────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ ICN DAEMON (Ledger Actor)                                                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ File: icn-ledger/src/ledger.rs                                              │
+│                                                                              │
+│ pub fn transfer(...)                                                        │
+│   1. Create double-entry:                                                   │
+│      - Debit entry: Alice -2 hours                                          │
+│      - Credit entry: Bob +2 hours                                           │
+│   2. Sign entry with node key                                               │
+│   3. Append to Merkle-DAG                                                   │
+│   4. Update account balances                                                │
+│   5. Return entry hash                                                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ GOSSIP BROADCAST                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Topic: &quot;ledger:{coop_id}:entries&quot;                                           │
+│ Message: SignedLedgerEntry { entry, signature, dag_links }                  │
+│ Scope: CooperativeOnly (stays within this coop)                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STORAGE WRITES                                                               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ 1. Sled: &quot;ledger:{coop_id}:entries:{hash}&quot; → LedgerEntry                    │
+│ 2. Sled: &quot;ledger:{coop_id}:dag:{hash}&quot; → MerkleNode                         │
+│ 3. Sled: &quot;ledger:{coop_id}:balances:{alice}&quot; → Balance (updated)            │
+│ 4. Sled: &quot;ledger:{coop_id}:balances:{bob}&quot; → Balance (updated)              │
+└─────────────────────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ WEBSOCKET EVENT (to both parties)                                            │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ File: icn-gateway/src/events.rs                                             │
+│                                                                              │
+│ GatewayEvent::Payment {                                                     │
+│   from: &quot;did:icn:alice...&quot;,                                                 │
+│   to: &quot;did:icn:bob...&quot;,                                                     │
+│   amount: 2.0,                                                              │
+│   currency: &quot;hours&quot;,                                                        │
+│   entry_hash: &quot;abc123...&quot;,                                                  │
+│   timestamp: &quot;2026-01-23T...&quot;                                               │
+│ }                                                                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<p><strong>Total latency</strong>: ~50-200ms (local), ~500ms-2s (cross-node sync)</p>
+<hr>
+<h2>5. Subscribe to Events</h2>
+<p><strong>User action</strong>: Open app, connect to real-time updates</p>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────────┐
+│ CLIENT CALL                                                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ WebSocket: wss://gateway.mycoop.org/ws/{coop_id}                            │
+│ Headers: Authorization: Bearer &lt;jwt&gt;                                        │
+│                                                                              │
+│ On connect, server sends:                                                   │
+│ { &quot;type&quot;: &quot;connected&quot;, &quot;last_sequence&quot;: 12345 }                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ GATEWAY ENDPOINT                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ File: icn-gateway/src/api/websocket.rs                                      │
+│                                                                              │
+│ pub async fn ws_handler(...)                                                │
+│   1. Verify JWT token                                                       │
+│   2. require_coop_access(&amp;coop_id)                                          │
+│   3. Register connection with EventBroadcaster                              │
+│   4. Handle backfill request if client sends last_seen_sequence             │
+│   5. Enter event loop: forward events to this connection                    │
+└─────────────────────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ EVENT BROADCASTER                                                            │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ File: icn-gateway/src/events.rs                                             │
+│                                                                              │
+│ pub struct EventBroadcaster {                                               │
+│   connections: HashMap&lt;CoopId, Vec&lt;WebSocketSender&gt;&gt;,                       │
+│   sequence_counter: AtomicU64,                                              │
+│ }                                                                            │
+│                                                                              │
+│ When event occurs (payment, proposal, vote, etc.):                          │
+│   1. Wrap in SequencedEvent { sequence, event }                             │
+│   2. Store in event log (for backfill)                                      │
+│   3. For each connection subscribed to this coop:                           │
+│      - Serialize to JSON                                                    │
+│      - Send via WebSocket                                                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ CLIENT RECEIVES                                                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ {                                                                            │
+│   &quot;sequence&quot;: 12346,                                                        │
+│   &quot;event&quot;: {                                                                │
+│     &quot;type&quot;: &quot;Payment&quot;,                                                      │
+│     &quot;payload&quot;: { &quot;from&quot;: &quot;...&quot;, &quot;to&quot;: &quot;...&quot;, &quot;amount&quot;: 2.0, ... }          │
+│   }                                                                          │
+│ }                                                                            │
+│                                                                              │
+│ Client SDK:                                                                 │
+│   - Detects gap if sequence != last_sequence + 1                            │
+│   - Requests backfill: { &quot;type&quot;: &quot;backfill&quot;, &quot;from_sequence&quot;: ... }         │
+│   - Calls onEvent callback for each event                                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<p><strong>Event types</strong>: <code>Payment</code>, <code>ProposalOpened</code>, <code>ProposalClosed</code>, <code>VoteCast</code>, <code>MemberJoined</code>, <code>MemberLeft</code>, <code>TrustChanged</code>, <code>ComputeTaskCompleted</code></p>
+<hr>
+<h2>6. Create a Proposal</h2>
+<p><strong>User action</strong>: Propose a governance change</p>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────────┐
+│ CLIENT CALL                                                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ POST /gov/proposals                                                          │
+│ Authorization: Bearer &lt;jwt&gt;                                                 │
+│ {                                                                            │
+│   &quot;domain_id&quot;: &quot;domain-123&quot;,                                                │
+│   &quot;title&quot;: &quot;Increase new member credit limit&quot;,                              │
+│   &quot;description&quot;: &quot;Raise from 50 to 100 hours...&quot;,                           │
+│   &quot;payload&quot;: {                                                              │
+│     &quot;type&quot;: &quot;ParameterChange&quot;,                                              │
+│     &quot;parameter&quot;: &quot;default_credit_limit&quot;,                                    │
+│     &quot;new_value&quot;: 100                                                        │
+│   }                                                                          │
+│ }                                                                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ GATEWAY ENDPOINT                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ File: icn-gateway/src/api/governance.rs                                     │
+│                                                                              │
+│ #[post(&quot;/domains/{domain_id}/proposals&quot;)]                                   │
+│ pub async fn create_proposal(...)                                           │
+│   1. require_scope(&quot;gov:write&quot;)                                             │
+│   2. Verify proposer is member of domain                                    │
+│   3. Verify proposer has &quot;proposer&quot; role (or domain allows all members)     │
+│   4. Validate proposal payload                                              │
+│   5. Call gov_mgr.create_proposal(...)                                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ GOVERNANCE MANAGER                                                           │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ File: icn-gateway/src/governance_mgr.rs                                     │
+│                                                                              │
+│ pub async fn create_proposal(...)                                           │
+│   1. Generate ProposalId                                                    │
+│   2. Create Proposal struct with status: Draft                              │
+│   3. Store in governance engine                                             │
+│   4. Return proposal_id                                                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ ICN DAEMON (Governance)                                                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ File: icn-governance/src/engine.rs                                          │
+│                                                                              │
+│ pub fn create_proposal(...)                                                 │
+│   1. Validate payload against domain schema                                 │
+│   2. Check proposer eligibility                                             │
+│   3. Create Proposal {                                                      │
+│        id, domain_id, proposer, title, description,                         │
+│        payload, status: Draft, created_at, ...                              │
+│      }                                                                       │
+│   4. Store proposal                                                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ OPEN PROPOSAL (separate action or automatic)                                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ POST /gov/domains/{domain_id}/proposals/{proposal_id}/open                  │
+│                                                                              │
+│ This:                                                                       │
+│   1. Changes status: Draft → Open                                           │
+│   2. Sets voting_starts_at, voting_ends_at                                  │
+│   3. Broadcasts ProposalOpened event                                        │
+│   4. Notifies all domain members                                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ GOSSIP BROADCAST                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Topic: &quot;governance:{domain_id}:proposals&quot;                                   │
+│ Message: ProposalCreated { proposal, signature }                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STORAGE WRITES                                                               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ 1. Sled: &quot;gov:domains:{domain_id}:proposals:{proposal_id}&quot; → Proposal       │
+│ 2. Sled: &quot;gov:domains:{domain_id}:proposals:index&quot; → Vec&lt;ProposalId&gt;        │
+└─────────────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<hr>
+<h2>7. Cast a Vote</h2>
+<p><strong>User action</strong>: Vote on an open proposal</p>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────────┐
+│ CLIENT CALL                                                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ POST /gov/proposals/{proposal_id}/vote                                       │
+│ Authorization: Bearer &lt;jwt&gt;                                                 │
+│ {                                                                            │
+│   &quot;choice&quot;: &quot;For&quot;,                                                          │
+│   &quot;weight&quot;: 1,                                                              │
+│   &quot;rationale&quot;: &quot;This will help new members participate faster&quot;              │
+│ }                                                                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ GATEWAY ENDPOINT                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ File: icn-gateway/src/api/governance.rs                                     │
+│                                                                              │
+│ #[post(&quot;/domains/{domain_id}/proposals/{proposal_id}/vote&quot;)]                │
+│ pub async fn cast_vote(...)                                                 │
+│   1. require_scope(&quot;gov:vote&quot;)                                              │
+│   2. Verify voter is member of domain                                       │
+│   3. Verify proposal is in Open status                                      │
+│   4. Verify voting period is active                                         │
+│   5. Check voter hasn&#39;t already voted (unless change allowed)               │
+│   6. Call gov_mgr.cast_vote(...)                                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ ICN DAEMON (Governance)                                                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ File: icn-governance/src/engine.rs                                          │
+│                                                                              │
+│ pub fn cast_vote(...)                                                       │
+│   1. Calculate voting power based on:                                       │
+│      - Base: 1 vote (one-person-one-vote)                                   │
+│      - OR: Trust-weighted (if domain configured)                            │
+│      - OR: Quadratic (if domain configured)                                 │
+│   2. Create Vote { voter, choice, weight, timestamp, signature }            │
+│   3. Add to proposal&#39;s vote tally                                           │
+│   4. Check if quorum reached (trigger early close if threshold met)         │
+└─────────────────────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ GOSSIP BROADCAST                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Topic: &quot;governance:{domain_id}:votes&quot;                                       │
+│ Message: VoteCast { proposal_id, voter, choice, signature }                 │
+│                                                                              │
+│ Note: Actual vote choice may be encrypted until voting closes               │
+│       (for anonymous voting domains)                                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STORAGE WRITES                                                               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ 1. Sled: &quot;gov:proposals:{id}:votes:{voter}&quot; → Vote                          │
+│ 2. Sled: &quot;gov:proposals:{id}:tally&quot; → VoteTally (updated)                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ WEBSOCKET EVENT                                                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ GatewayEvent::VoteCast {                                                    │
+│   proposal_id: &quot;...&quot;,                                                       │
+│   voter: &quot;did:icn:alice...&quot;,                                                │
+│   // choice may be hidden until close                                       │
+│   current_tally: { for: 15, against: 3, abstain: 2 }                        │
+│ }                                                                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<hr>
+<h2>8. Observe Audit Trail</h2>
+<p><strong>User action</strong>: View transaction history or governance log</p>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────────┐
+│ CLIENT CALL (Transaction History)                                            │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ GET /ledger/{coop_id}/history/{did}?limit=50&amp;cursor=abc123                  │
+│ Authorization: Bearer &lt;jwt&gt;                                                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ GATEWAY ENDPOINT                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ File: icn-gateway/src/api/ledger.rs                                         │
+│                                                                              │
+│ #[get(&quot;/{coop_id}/history/{did}&quot;)]                                          │
+│ pub async fn get_history(...)                                               │
+│   1. require_scope(&quot;ledger:read&quot;)                                           │
+│   2. require_coop_access(&amp;coop_id)                                          │
+│   3. Call ledger_mgr.get_transaction_history(...)                           │
+│   4. Return paginated list with Merkle proofs                               │
+└─────────────────────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ LEDGER MANAGER                                                               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Queries:                                                                    │
+│   1. Sled: &quot;ledger:{coop_id}:history:{did}&quot; → Vec&lt;EntryHash&gt;                │
+│   2. For each hash: &quot;ledger:{coop_id}:entries:{hash}&quot; → LedgerEntry         │
+│   3. Optional: Generate Merkle inclusion proof                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ RESPONSE                                                                     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ {                                                                            │
+│   &quot;entries&quot;: [                                                              │
+│     {                                                                        │
+│       &quot;hash&quot;: &quot;abc123...&quot;,                                                  │
+│       &quot;type&quot;: &quot;transfer&quot;,                                                   │
+│       &quot;from&quot;: &quot;did:icn:alice...&quot;,                                           │
+│       &quot;to&quot;: &quot;did:icn:bob...&quot;,                                               │
+│       &quot;amount&quot;: 2.0,                                                        │
+│       &quot;currency&quot;: &quot;hours&quot;,                                                  │
+│       &quot;memo&quot;: &quot;Garden help&quot;,                                                │
+│       &quot;timestamp&quot;: &quot;2026-01-23T...&quot;,                                        │
+│       &quot;dag_parent&quot;: &quot;xyz789...&quot;,                                            │
+│       &quot;merkle_proof&quot;: { ... }  // Optional: cryptographic proof             │
+│     },                                                                       │
+│     ...                                                                      │
+│   ],                                                                         │
+│   &quot;next_cursor&quot;: &quot;def456...&quot;,                                               │
+│   &quot;has_more&quot;: true                                                          │
+│ }                                                                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<p><strong>Audit Properties</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>How It&#39;s Achieved</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Immutability</strong></td>
+<td>Merkle-DAG: each entry references parent by hash</td>
+</tr>
+<tr>
+<td><strong>Verifiability</strong></td>
+<td>Merkle proofs: any entry can be verified against root</td>
+</tr>
+<tr>
+<td><strong>Non-repudiation</strong></td>
+<td>Entries signed by originator&#39;s key</td>
+</tr>
+<tr>
+<td><strong>Completeness</strong></td>
+<td>DAG structure ensures no entries can be hidden</td>
+</tr>
+<tr>
+<td><strong>Transparency</strong></td>
+<td>Any member can request and verify any entry they have access to</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Quick Reference: Endpoint → Crate Mapping</h2>
+<table>
+<thead>
+<tr>
+<th>Endpoint Pattern</th>
+<th>Gateway File</th>
+<th>Daemon Crate</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>/auth/*</code></td>
+<td><code>api/auth.rs</code></td>
+<td><code>icn-identity</code></td>
+</tr>
+<tr>
+<td><code>/identity/*</code></td>
+<td><code>api/identity.rs</code></td>
+<td><code>icn-identity</code></td>
+</tr>
+<tr>
+<td><code>/devices/{did}/*</code></td>
+<td><code>api/devices.rs</code></td>
+<td><code>icn-identity</code></td>
+</tr>
+<tr>
+<td><code>/membership/*</code></td>
+<td><code>api/membership/mod.rs</code></td>
+<td><code>icn-entity</code></td>
+</tr>
+<tr>
+<td><code>/ledger/{coop_id}/*</code></td>
+<td><code>api/ledger.rs</code></td>
+<td><code>icn-ledger</code></td>
+</tr>
+<tr>
+<td><code>/gov/*</code></td>
+<td><code>api/governance.rs</code></td>
+<td><code>icn-governance</code></td>
+</tr>
+<tr>
+<td><code>/trust/*</code></td>
+<td><code>api/trust.rs</code></td>
+<td><code>icn-trust</code></td>
+</tr>
+<tr>
+<td><code>/compute/*</code></td>
+<td><code>api/compute.rs</code></td>
+<td><code>icn-compute</code></td>
+</tr>
+<tr>
+<td><code>/coops/*</code></td>
+<td><code>api/coops.rs</code></td>
+<td><code>icn-coop</code></td>
+</tr>
+<tr>
+<td><code>/communities/*</code></td>
+<td><code>api/communities.rs</code></td>
+<td><code>icn-community</code></td>
+</tr>
+<tr>
+<td><code>/federation/*</code></td>
+<td><code>api/federation.rs</code></td>
+<td><code>icn-federation</code></td>
+</tr>
+<tr>
+<td><code>/ws/{coop_id}</code></td>
+<td><code>api/websocket.rs</code></td>
+<td>(gateway-only)</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Quick Reference: Gossip Topics</h2>
+<p><strong>Note</strong>: Most gossip topics are dynamically constructed at runtime with parameters (coop_id, domain_id, etc.) rather than predefined constants. Only a few topics like <code>key:rotation</code>, <code>steward:announce</code>, and <code>steward:vui-sync</code> are hardcoded.</p>
+<table>
+<thead>
+<tr>
+<th>Topic Pattern</th>
+<th>Purpose</th>
+<th>Scope</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ledger:{coop_id}:entries</code></td>
+<td>Ledger transactions</td>
+<td>CooperativeOnly</td>
+</tr>
+<tr>
+<td><code>ledger:{coop_id}:accounts</code></td>
+<td>Account changes</td>
+<td>CooperativeOnly</td>
+</tr>
+<tr>
+<td><code>governance:{domain_id}:proposals</code></td>
+<td>Proposal lifecycle</td>
+<td>Domain members</td>
+</tr>
+<tr>
+<td><code>governance:{domain_id}:votes</code></td>
+<td>Vote broadcasts</td>
+<td>Domain members</td>
+</tr>
+<tr>
+<td><code>trust:attestations</code></td>
+<td>Trust graph edges</td>
+<td>Global</td>
+</tr>
+<tr>
+<td><code>members:{coop_id}</code></td>
+<td>Membership changes</td>
+<td>CooperativeOnly</td>
+</tr>
+<tr>
+<td><code>identity:devices</code></td>
+<td>Device registrations</td>
+<td>Global</td>
+</tr>
+<tr>
+<td><code>compute:submit</code></td>
+<td>Task submissions</td>
+<td>TrustGated(0.1)</td>
+</tr>
+<tr>
+<td><code>compute:result</code></td>
+<td>Task results</td>
+<td>TrustGated(0.1)</td>
+</tr>
+<tr>
+<td><code>federation:clearing</code></td>
+<td>Cross-coop settlement</td>
+<td>Federation</td>
+</tr>
+<tr>
+<td><code>key:rotation</code></td>
+<td>Key rotation announcements</td>
+<td>Global</td>
+</tr>
+<tr>
+<td><code>steward:announce</code></td>
+<td>Steward availability</td>
+<td>Global</td>
+</tr>
+<tr>
+<td><code>steward:vui-sync</code></td>
+<td>VUI state synchronization</td>
+<td>Stewards only</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Integration Tests Reference</h2>
+<p>To see these operations tested in code, refer to these integration test files:</p>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>Test File</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Identity &amp; Devices</td>
+<td><code>icn-identity/tests/multi_device_integration.rs</code></td>
+</tr>
+<tr>
+<td>Membership</td>
+<td><code>icn-community/tests/membership_tests.rs</code></td>
+</tr>
+<tr>
+<td>Payments/Ledger</td>
+<td><code>icn-ledger/tests/</code> (unit tests in <code>ledger.rs</code>)</td>
+</tr>
+<tr>
+<td>Governance</td>
+<td><code>icn-governance/tests/</code> (347 tests)</td>
+</tr>
+<tr>
+<td>Compute</td>
+<td><code>icn-compute/tests/compute_integration.rs</code></td>
+</tr>
+<tr>
+<td>Federation</td>
+<td><code>icn-federation/tests/federation_integration.rs</code></td>
+</tr>
+<tr>
+<td>Gossip</td>
+<td><code>icn-gossip/tests/gossip_integration.rs</code></td>
+</tr>
+<tr>
+<td>Privacy</td>
+<td><code>icn-privacy/tests/privacy_integration.rs</code></td>
+</tr>
+<tr>
+<td>Full Stack</td>
+<td><code>icn-testkit/tests/example_integration.rs</code></td>
+</tr>
+</tbody></table>
+<p>Run tests with: <code>cargo test -p &lt;crate-name&gt;</code></p>
+<hr>
+<h2>Related Documents</h2>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/ICN_COMPLETE_ARCHITECTURE_SYNTHESIS">ICN_COMPLETE_ARCHITECTURE_SYNTHESIS.md</a> - Layer-by-layer architecture</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/ICN_REAL_WORLD_DEPLOYMENT">ICN_REAL_WORLD_DEPLOYMENT.md</a> - Deployment and operations</li>
+<li><a href="/docs/ARCHITECTURE">ARCHITECTURE.md</a> - Technical system design</li>
+</ul>
+<hr>
+<h2>Document History</h2>
+<ul>
+<li>2026-01-23: Initial creation as developer onboarding reference</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

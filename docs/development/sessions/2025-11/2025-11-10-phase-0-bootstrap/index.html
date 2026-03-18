@@ -1,0 +1,310 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Development Journal: Phase 0 Bootstrap | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>development</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>sessions</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>2025 11</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>2025 11 10 phase 0 bootstrap</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/development/sessions/2025-11/2025-11-10-phase-0-bootstrap.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Development Journal: Phase 0 Bootstrap</h1>
+<p><strong>Date:</strong> 2025-11-10
+<strong>Phase:</strong> 0 - Scaffold
+<strong>Status:</strong> Complete ✓</p>
+<hr>
+<h2>Summary</h2>
+<p>Successfully bootstrapped ICNd with complete Tokio-based actor runtime. All core infrastructure is in place and functional.</p>
+<hr>
+<h2>What We Built</h2>
+<h3>Workspace Structure</h3>
+<ul>
+<li><strong>11 crates:</strong> core, identity, trust, net, gossip, ledger, ccl, store, rpc, obs, testkit</li>
+<li><strong>2 binaries:</strong> icnd (daemon), icnctl (CLI)</li>
+<li>Clean dependency graph with workspace-level version management</li>
+</ul>
+<h3>Core Runtime (<a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-core/">icn-core</a>)</h3>
+<ul>
+<li>Tokio multi-threaded runtime</li>
+<li>Supervisor pattern for actor lifecycle</li>
+<li>Config management (TOML + env overrides)</li>
+<li>Graceful shutdown with broadcast channel</li>
+<li>Ctrl+C handling</li>
+</ul>
+<h3>Identity Layer (<a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-identity/">icn-identity</a>)</h3>
+<ul>
+<li>Ed25519 key generation</li>
+<li>DID format: <code>did:icn:&lt;base58btc-pubkey&gt;</code></li>
+<li>Zeroized memory for secret keys (secure drop)</li>
+<li>Sign/verify primitives</li>
+<li><strong>Working:</strong> <code>icnctl id generate</code> produces valid DIDs</li>
+</ul>
+<h3>Storage (<a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-store/">icn-store</a>)</h3>
+<ul>
+<li>Pluggable trait for backend independence</li>
+<li>Sled implementation (embedded, pure Rust)</li>
+<li>Temporary database for testing</li>
+</ul>
+<h3>Observability (<a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-obs/">icn-obs</a>)</h3>
+<ul>
+<li><code>tracing</code> subscriber initialized</li>
+<li>Structured logging (env filter)</li>
+<li>Metrics exporter stub (Prometheus)</li>
+</ul>
+<h3>Binaries</h3>
+<ul>
+<li><strong>icnd:</strong> Boots, runs supervisor, waits for shutdown</li>
+<li><strong>icnctl:</strong> Subcommands for <code>status</code>, <code>id</code>, <code>peers</code></li>
+</ul>
+<hr>
+<h2>Technical Decisions Made</h2>
+<h3>1. Runtime: Tokio</h3>
+<p><strong>Why:</strong> Ecosystem maturity, best-in-class async primitives, wide library support (tonic, quinn, etc.)</p>
+<p><strong>Alternatives considered:</strong> async-std (cleaner but smaller ecosystem)</p>
+<h3>2. Identity: Ed25519</h3>
+<p><strong>Why:</strong> Standard, audited, fast, 32-byte keys</p>
+<p><strong>Future:</strong> X25519 for ECDH, multi-key support</p>
+<h3>3. DID Format: <code>did:icn:&lt;base58btc-pubkey&gt;</code></h3>
+<p><strong>Why:</strong> Self-certifying, no registry, verifiable by anyone</p>
+<p><strong>Tradeoff:</strong> Key compromise = identity loss (mitigated by rotation protocol in Phase 1)</p>
+<h3>4. Storage: Sled</h3>
+<p><strong>Why:</strong> Pure Rust, embedded, transactional, good for prototyping</p>
+<p><strong>Future:</strong> RocksDB for production (more mature, faster)</p>
+<h3>5. Zeroized Keys</h3>
+<p><strong>Implementation:</strong> Store key bytes in <code>Zeroizing&lt;[u8; 32]&gt;</code> instead of <code>SigningKey</code> directly
+<strong>Why:</strong> <code>SigningKey</code> doesn&#39;t implement <code>Zeroize</code> trait; manual byte management ensures secure drop</p>
+<hr>
+<h2>Code Structure</h2>
+<pre><code>icn/
+├── Cargo.toml (workspace)
+├── bins/
+│   ├── icnd/
+│   │   └── src/main.rs (daemon entry point)
+│   └── icnctl/
+│       └── src/main.rs (CLI tool)
+└── crates/
+    ├── icn-core/
+    │   ├── config.rs (TOML config)
+    │   ├── runtime.rs (Tokio runtime + shutdown)
+    │   └── supervisor.rs (actor supervisor)
+    ├── icn-identity/
+    │   └── lib.rs (DID, KeyPair, sign/verify)
+    ├── icn-store/
+    │   └── lib.rs (trait + Sled impl)
+    ├── icn-obs/
+    │   └── lib.rs (tracing init)
+    └── [trust, net, gossip, ledger, ccl, rpc, testkit]
+        └── lib.rs (stubs)
+</code></pre>
+<hr>
+<h2>Tests Performed</h2>
+<h3>Build</h3>
+<pre><code class="language-bash">cargo build --release
+# Success: 32.47s
+</code></pre>
+<h3>Run icnd</h3>
+<pre><code class="language-bash">timeout 3 ./target/release/icnd
+# Output:
+# INFO icnd: ICNd starting
+# INFO icnd: Data directory: &quot;/home/matt/.local/share/icn&quot;
+# INFO icnd: Log level: info
+# INFO icn_core::runtime: ICNd runtime starting
+# INFO icn_core::supervisor: Supervisor starting
+</code></pre>
+<h3>Generate DID</h3>
+<pre><code class="language-bash">./target/release/icnctl id generate
+# Output:
+# Generating new identity...
+# DID: did:icn:z2emnkKDB1nvAANKNipKCMygBgzA2qdmJQhNexKKLXzQE
+# Note: Key storage not yet implemented
+</code></pre>
+<h3>CLI Help</h3>
+<pre><code class="language-bash">./target/release/icnctl --help
+# Shows all subcommands (status, id, peers)
+</code></pre>
+<hr>
+<h2>Git Commits</h2>
+<pre><code>4c3afa5 Fix .gitignore to properly ignore target directories
+4a72665 Remove target directory from git
+aa85201 Initial commit: ICNd Phase 0 scaffold
+</code></pre>
+<p><strong>Repository:</strong> <code>github.com:InterCooperative-Network/icn.git</code></p>
+<hr>
+<h2>Issues Encountered</h2>
+<h3>1. Zeroizing SigningKey</h3>
+<p><strong>Problem:</strong> <code>Zeroizing&lt;SigningKey&gt;</code> failed to compile - <code>SigningKey</code> doesn&#39;t implement <code>Zeroize</code> trait</p>
+<p><strong>Solution:</strong> Store raw bytes in <code>Zeroizing&lt;[u8; 32]&gt;</code> and reconstruct <code>SigningKey</code> on each use</p>
+<p><strong>Code:</strong></p>
+<pre><code class="language-rust">pub struct KeyPair {
+    secret_bytes: Zeroizing&lt;[u8; 32]&gt;,  // Secure
+    verifying_key: VerifyingKey,
+    did: Did,
+}
+
+pub fn sign(&amp;self, message: &amp;[u8]) -&gt; Signature {
+    let signing_key = SigningKey::from_bytes(&amp;self.secret_bytes);
+    signing_key.sign(message)
+}
+</code></pre>
+<h3>2. Target Directory in Git</h3>
+<p><strong>Problem:</strong> Accidentally committed 3941 build artifact files</p>
+<p><strong>Solution:</strong> Fixed <code>.gitignore</code> from <code>/target/</code> to <code>target/</code> (match at any level), removed from git</p>
+<hr>
+<h2>Next Phase: Phase 1 - Identity &amp; Trust</h2>
+<h3>Goals</h3>
+<ol>
+<li><strong>Persistent key storage</strong> with Age encryption</li>
+<li><strong>Key rotation</strong> protocol with signed transitions</li>
+<li><strong>Trust graph</strong> storage backend</li>
+<li><strong>DID import/export</strong> for backup/restore</li>
+</ol>
+<h3>Open Questions (to be resolved in architecture doc)</h3>
+<ul>
+<li>Multi-device identity: delegate keys vs shared keys?</li>
+<li>Trust computation: local PageRank-like vs simpler heuristic?</li>
+<li>Bootstrap trust: invite codes, proof-of-work, manual vouching?</li>
+</ul>
+<hr>
+<h2>Metrics</h2>
+<ul>
+<li><strong>Lines of code:</strong> ~800 (excluding tests, stubs)</li>
+<li><strong>Dependencies:</strong> 323 crates</li>
+<li><strong>Build time:</strong> 32.47s (release)</li>
+<li><strong>Binary size:</strong> icnd ~12MB, icnctl ~11MB (release)</li>
+</ul>
+<hr>
+<h2>Architecture Insights</h2>
+<h3>Actor Model Works Well</h3>
+<p>The supervisor + broadcast shutdown pattern is clean:</p>
+<pre><code class="language-rust">let (shutdown_tx, _) = broadcast::channel(1);
+// Each actor subscribes
+let mut shutdown_rx = runtime.shutdown_rx();
+// Select on work vs shutdown
+select! {
+    _ = do_work() =&gt; {},
+    _ = shutdown_rx.recv() =&gt; {},
+}
+</code></pre>
+<h3>Config Hot-Reloading Ready</h3>
+<p>Config is loaded once but structure supports SIGHUP reload:</p>
+<pre><code class="language-rust">// Future:
+signal::unix::signal(SignalKind::hangup())?;
+// Reload config, notify actors
+</code></pre>
+<h3>Storage Trait Flexibility</h3>
+<p>Easy to swap Sled for RocksDB or SQLite:</p>
+<pre><code class="language-rust">let store: Box&lt;dyn Store&gt; = if use_rocksdb {
+    Box::new(RocksDbStore::open(path)?)
+} else {
+    Box::new(SledStore::open(path)?)
+};
+</code></pre>
+<hr>
+<h2>Documentation Created</h2>
+<ul>
+<li><a href="/docs/README">README.md</a> - Project overview</li>
+<li><a href="/docs/ARCHITECTURE">ARCHITECTURE.md</a> - Comprehensive design doc</li>
+<li>This journal entry</li>
+</ul>
+<hr>
+<h2>Team Notes</h2>
+<p><strong>For future contributors:</strong></p>
+<ul>
+<li>The scaffold is intentionally minimal - stubs over speculation</li>
+<li>All architectural decisions documented in ARCHITECTURE.md</li>
+<li>Build should be ~30s on modern hardware</li>
+<li><code>cargo clippy</code> clean, a few warnings expected in stubs</li>
+</ul>
+<p><strong>For security review:</strong></p>
+<ul>
+<li>Key material is zeroized on drop</li>
+<li>No network code active yet (safe to run)</li>
+<li>No persistent state yet (daemon is stateless)</li>
+</ul>
+<hr>
+<h2>Reflections</h2>
+<p><strong>What went well:</strong></p>
+<ul>
+<li>Clean separation of concerns (crates)</li>
+<li>Tokio actor model feels natural</li>
+<li>DID generation works first try</li>
+</ul>
+<p><strong>What to improve:</strong></p>
+<ul>
+<li>More unit tests (only identity has tests)</li>
+<li>CI/CD not set up yet</li>
+<li>No benchmarks yet</li>
+</ul>
+<p><strong>Surprises:</strong></p>
+<ul>
+<li>Zeroizing SigningKey required manual byte management</li>
+<li>Git included target/ despite .gitignore (needed <code>target/</code> not <code>/target/</code>)</li>
+</ul>
+<hr>
+<h2>References</h2>
+<ul>
+<li>Original architecture chat: ChatGPT transcript (2025-11-10)</li>
+<li>Tokio docs: <a href="https://tokio.rs/" target="_blank" rel="noopener">https://tokio.rs/</a></li>
+<li>Ed25519 Dalek: <a href="https://docs.rs/ed25519-dalek/" target="_blank" rel="noopener">https://docs.rs/ed25519-dalek/</a></li>
+<li>Sled: <a href="https://docs.rs/sled/" target="_blank" rel="noopener">https://docs.rs/sled/</a></li>
+</ul>
+<hr>
+<p><strong>Next journal entry:</strong> Phase 1 kickoff (TBD)</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

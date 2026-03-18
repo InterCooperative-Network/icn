@@ -1,0 +1,787 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Constitution / Rights — Repo State &amp; Gap Analysis | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>plans</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>.scratch</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>constitution rights</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/plans/.scratch/constitution-rights.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Constitution / Rights — Repo State &amp; Gap Analysis</h1>
+<h2>1. Current State</h2>
+<h3>1.1 Identity Primitives</h3>
+<h4>Layer 0: Cryptographic Root</h4>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Location</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Did</code> (newtype)</td>
+<td><code>icn-identity/src/lib.rs:177</code></td>
+<td><code>did:icn:&lt;base58-pubkey&gt;</code> — validated on construction/deserialization. Ed25519 public key in multibase.</td>
+</tr>
+<tr>
+<td><code>KeyPair</code></td>
+<td><code>icn-identity/src/lib.rs:308</code></td>
+<td>Ed25519 + optional ML-DSA post-quantum hybrid. Zeroizing secret bytes.</td>
+</tr>
+<tr>
+<td><code>Anchor</code></td>
+<td><code>icn-identity/src/anchor.rs</code></td>
+<td>SDIS anchor — permanent identity root, survives key rotation.</td>
+</tr>
+<tr>
+<td><code>PersonhoodAnchor</code></td>
+<td><code>icn-identity/src/personhood.rs:71</code></td>
+<td>Wraps <code>Anchor</code> + status lifecycle + POP attestations + key rotation history + uniqueness proofs.</td>
+</tr>
+<tr>
+<td><code>AnchorStatus</code></td>
+<td><code>icn-identity/src/personhood.rs:98</code></td>
+<td>`Active</td>
+</tr>
+<tr>
+<td><code>POPAttestation</code></td>
+<td><code>icn-identity/src/personhood.rs:129</code></td>
+<td>Proof-of-personhood attestation: issuer DID, method, level, expiry, signature.</td>
+</tr>
+<tr>
+<td><code>POPMethod</code></td>
+<td><code>icn-identity/src/personhood.rs:157</code></td>
+<td>8 variants: <code>InPerson</code>, <code>Sponsored</code>, <code>Biometric</code>, <code>Ceremony</code>, <code>VideoCall</code>, <code>GovernmentId</code>, <code>WebOfTrust</code>, <code>Genesis</code></td>
+</tr>
+<tr>
+<td><code>POPLevel</code></td>
+<td><code>icn-identity/src/personhood.rs:232</code></td>
+<td>`Weak(1)</td>
+</tr>
+<tr>
+<td><code>UniquenessProof</code></td>
+<td><code>icn-identity/src/personhood.rs:248</code></td>
+<td>Sybil resistance: VUI-based, biometric, or social graph proofs with steward attestations.</td>
+</tr>
+<tr>
+<td><code>UniquenessProofType</code></td>
+<td><code>icn-identity/src/personhood.rs:264</code></td>
+<td>`Vui { vui_commitment }</td>
+</tr>
+<tr>
+<td><code>KeyRotationRecord</code></td>
+<td><code>icn-identity/src/personhood.rs:301</code></td>
+<td>Old key, new key, reason, authorization signature, optional recovery signatures.</td>
+</tr>
+<tr>
+<td><code>KeyRotationReason</code></td>
+<td><code>icn-identity/src/personhood.rs:326</code></td>
+<td>`Scheduled</td>
+</tr>
+<tr>
+<td><code>RecoverySignature</code></td>
+<td><code>icn-identity/src/personhood.rs:341</code></td>
+<td>Signer DID + signature over rotation for social recovery.</td>
+</tr>
+<tr>
+<td><code>Vui</code></td>
+<td><code>icn-identity/src/vui.rs</code></td>
+<td>Verifiable Unique Identifier — threshold PRF-based uniqueness commitment.</td>
+</tr>
+<tr>
+<td><code>IdentityBundle</code></td>
+<td><code>icn-identity/src/bundle.rs</code></td>
+<td>DID + binding info + verification methods.</td>
+</tr>
+<tr>
+<td><code>KeyBundle</code></td>
+<td><code>icn-identity/src/keybundle.rs</code></td>
+<td>Extended key management with X25519 for DH.</td>
+</tr>
+</tbody></table>
+<h4>Layer 1: Commons Holder</h4>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Location</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>CommonsHolderRecord</code></td>
+<td><code>icn-identity/src/commons.rs:116</code></td>
+<td>Links anchor → holder. Fields: <code>holder_id</code>, <code>holder_did</code>, <code>anchor_id</code>, <code>display_name</code>, <code>status</code>, <code>personhood_level</code>, <code>affiliations[]</code>, <code>baseline_rights</code>, timestamps.</td>
+</tr>
+<tr>
+<td><code>HolderStatus</code></td>
+<td><code>icn-identity/src/commons.rs:337</code></td>
+<td>`Active</td>
+</tr>
+<tr>
+<td><code>Affiliation</code></td>
+<td><code>icn-identity/src/commons.rs:383</code></td>
+<td>Links holder → jurisdiction: <code>jurisdiction_id</code>, <code>membership_status</code>, <code>capabilities[]</code>, <code>roles[]</code>, <code>joined_at</code>, <code>expires_at</code>.</td>
+</tr>
+<tr>
+<td><code>MembershipStatus</code> (commons)</td>
+<td><code>icn-identity/src/commons.rs:499</code></td>
+<td>`Candidate</td>
+</tr>
+<tr>
+<td><code>MembershipCapability</code> (commons)</td>
+<td><code>icn-identity/src/commons.rs:529</code></td>
+<td>6 variants: `Vote</td>
+</tr>
+<tr>
+<td><code>CommonsRights</code></td>
+<td><code>icn-identity/src/commons.rs:592</code></td>
+<td>Struct with 6 boolean fields — baseline rights that jurisdictions CANNOT revoke.</td>
+</tr>
+<tr>
+<td><code>CommonsRight</code></td>
+<td><code>icn-identity/src/commons.rs:559</code></td>
+<td>6 variants: `VoteInCommons</td>
+</tr>
+<tr>
+<td><code>JurisdictionId</code></td>
+<td><code>icn-identity/src/commons.rs:24</code></td>
+<td><code>&lt;type&gt;:&lt;id&gt;</code> — <code>coop:</code>, <code>community:</code>, <code>federation:</code>, <code>network:</code> prefixes.</td>
+</tr>
+<tr>
+<td><code>JurisdictionType</code></td>
+<td><code>icn-identity/src/commons.rs:87</code></td>
+<td>`Cooperative</td>
+</tr>
+<tr>
+<td><code>CommonsHolderStore</code></td>
+<td><code>icn-identity/src/commons_store.rs</code></td>
+<td>Trait for persisting <code>CommonsHolderRecord</code>.</td>
+</tr>
+</tbody></table>
+<h4>Recovery &amp; Revocation</h4>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Location</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>RecoveryAttestation</code></td>
+<td><code>icn-identity/src/recovery.rs</code></td>
+<td>Social recovery event with attestation chain.</td>
+</tr>
+<tr>
+<td><code>RevocationRecord</code></td>
+<td><code>icn-identity/src/revocation.rs</code></td>
+<td>Records revocation: <code>RevocationType</code>, <code>RevocationScope</code>, <code>CommonsRevocationReason</code>.</td>
+</tr>
+<tr>
+<td><code>RevocationScope</code></td>
+<td><code>icn-identity/src/revocation.rs</code></td>
+<td>Scope of revocation action.</td>
+</tr>
+<tr>
+<td><code>AppealStatus</code></td>
+<td><code>icn-identity/src/revocation.rs</code></td>
+<td>Due process tracking for appeals.</td>
+</tr>
+</tbody></table>
+<h3>1.2 Scope / Jurisdiction Model</h3>
+<h4>Kernel Scope Primitives</h4>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Location</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ScopeLevel</code></td>
+<td><code>icn-kernel-api/src/scope.rs:45</code></td>
+<td><code>Local(0) &lt; Cell(1) &lt; Org(2) &lt; Federation(3) &lt; Commons(4)</code> — ordinal hierarchy. Methods: <code>widen()</code>, <code>narrow()</code>, <code>includes()</code>. Defaults to <code>Local</code> (narrowest = safest).</td>
+</tr>
+<tr>
+<td><code>CellId</code></td>
+<td><code>icn-kernel-api/src/scope.rs:162</code></td>
+<td><code>[u8; 32]</code> — blake3 hash of <code>scope_id + cell_name + genesis_salt</code>. Deterministic, collision-resistant.</td>
+</tr>
+<tr>
+<td><code>MockCellService</code></td>
+<td><code>icn-kernel-api/src/scope.rs:223</code></td>
+<td>Test implementation of <code>CellService</code> trait. Provides <code>local_cell()</code>, <code>peer_scope()</code>, <code>is_cell_peer()</code>, <code>is_org_peer()</code>.</td>
+</tr>
+</tbody></table>
+<p><strong>Scope flow through the system</strong>: <code>ScopeLevel</code> is a kernel primitive — it flows into <code>PolicyRequest</code> context, gossip topic routing, and compute task placement. The kernel never interprets what &quot;Org&quot; <em>means</em>; it just knows Org is wider than Cell but narrower than Federation.</p>
+<h4>App-Layer Jurisdiction</h4>
+<p><code>JurisdictionId</code> (<code>icn-identity/src/commons.rs:24</code>) is the app-layer counterpart to <code>ScopeLevel</code>. It uses typed prefixes (<code>coop:</code>, <code>community:</code>, <code>federation:</code>, <code>network:</code>) to identify the specific organizational unit, while <code>ScopeLevel</code> provides the generic &quot;how wide&quot; dimension.</p>
+<p><strong>Key separation</strong>: The kernel uses <code>ScopeLevel</code> for routing/replication/capacity decisions. Apps use <code>JurisdictionId</code> to track membership affiliations. The meaning firewall prevents the kernel from knowing what <code>coop:food-portland</code> means.</p>
+<h3>1.3 Rights / Capabilities</h3>
+<h4>Two Capability Systems</h4>
+<p>The codebase has <strong>two distinct capability systems</strong> serving different architectural layers:</p>
+<p><strong>1. Commons-layer MembershipCapability</strong> (<code>icn-identity/src/commons.rs:529</code>)</p>
+<ul>
+<li>6 variants: <code>Vote | Propose | Transact | HoldOffice | AccessPrivate | Sponsor</code></li>
+<li>Carried on <code>Affiliation</code> records within <code>CommonsHolderRecord</code></li>
+<li>Checked by <code>affiliation.has_capability()</code></li>
+<li>No kernel enforcement — purely app-layer bookkeeping</li>
+</ul>
+<p><strong>2. Entity-layer MembershipCapability</strong> (<code>icn-entity/src/membership.rs:648</code>)</p>
+<ul>
+<li>9 variants: <code>Vote | Propose | TreasuryAccess | Invite | ManageSubEntities | Sign | Configure | ViewSensitive | Custom(String)</code></li>
+<li>Carried on <code>Membership</code> records in the entity model</li>
+<li>Role-based defaults (Founder gets all; Observer gets none)</li>
+<li>Checked by <code>membership.has_capability()</code></li>
+<li>No kernel enforcement — purely app-layer bookkeeping</li>
+</ul>
+<p><strong>3. Kernel Capability</strong> (<code>icn-kernel-api/src/authz.rs:736</code>)</p>
+<ul>
+<li><code>Capability</code> struct: bearer token with <code>resource</code>, <code>action</code>, <code>constraints</code>, <code>holder</code>, <code>issuer</code>, <code>expiration</code>, <code>signature</code></li>
+<li><code>CapabilityEngine</code> trait: <code>issue()</code>, <code>check()</code>, <code>delegate()</code>, <code>revoke()</code></li>
+<li>This is the <em>kernel enforcement layer</em> — cryptographically signed, delegation-aware</li>
+<li><strong>NOT yet wired into the app-layer membership capabilities</strong></li>
+</ul>
+<h4>How Rights Are Actually Checked Today</h4>
+<ul>
+<li><strong>Gateway membership endpoints</strong>: Use <code>CommonsHolderStore</code> to check <code>MembershipCapability::HoldOffice</code> before allowing admin operations (<code>icn-gateway/src/api/membership/mod.rs:260</code>)</li>
+<li><strong>Governance voting</strong>: Checks <code>MembershipCapability::Vote</code> on <code>Membership</code> records</li>
+<li><strong>PolicyOracle</strong>: Converts trust scores into <code>ConstraintSet</code> (rate limits, max topics) — kernel enforces blindly</li>
+<li><strong>No scope-aware capability checking</strong>: The gateway does not ask &quot;what capabilities does this DID have <em>in this scope</em>?&quot;</li>
+</ul>
+<h3>1.4 Personhood Model</h3>
+<p><strong>Layered design is implemented:</strong></p>
+<ol>
+<li><p><strong>Layer 0 — PersonhoodAnchor</strong> (<code>icn-identity/src/personhood.rs:71</code>):</p>
+<ul>
+<li>Permanent anchor ID (survives key rotation)</li>
+<li>Multiple POP attestations with levels (Weak/Strong/Verified)</li>
+<li>Uniqueness proofs (VUI, biometric, social graph)</li>
+<li>Key rotation history with recovery signatures</li>
+<li>Status lifecycle: Active → Suspended → Revoked (with due process)</li>
+</ul>
+</li>
+<li><p><strong>Layer 1 — CommonsHolderRecord</strong> (<code>icn-identity/src/commons.rs:116</code>):</p>
+<ul>
+<li>Links to Layer 0 via <code>anchor_id</code></li>
+<li>Baseline rights (non-revocable by jurisdictions)</li>
+<li>Multi-affiliation tracking</li>
+<li>Display name</li>
+</ul>
+</li>
+<li><p><strong>Steward Network</strong> (<code>icn-steward/src/</code>):</p>
+<ul>
+<li><code>StewardProfile</code> (<code>profile.rs:14</code>): status, jurisdiction tier, stats</li>
+<li><code>StewardStatus</code> (<code>profile.rs:86</code>): <code>Active | Suspended | Revoked | Probationary</code></li>
+<li><code>JurisdictionTier</code> (<code>profile.rs:123</code>): Steward&#39;s operating scope</li>
+<li><code>VuiRegistry</code> (<code>vui_registry.rs:16</code>): Manages VUI registrations and uniqueness checks</li>
+<li><code>EnrollmentService</code> (<code>enrollment.rs:170</code>): Full ceremony-based enrollment with config for challenge expiry, quorum requirements</li>
+<li><code>RecoveryService</code> (<code>recovery.rs:154</code>): Key recovery with evidence requirements</li>
+</ul>
+</li>
+</ol>
+<p><strong>Personhood vs Membership IS enforced as a distinction</strong>: The <code>CommonsHolderRecord</code> explicitly separates baseline rights (attached to personhood, non-revocable) from <code>Affiliation</code> capabilities (attached to jurisdiction membership, revocable). The code comment at <code>commons.rs:9-10</code> states: <em>&quot;A cooperative can revoke your membership. A cooperative cannot revoke your personhood.&quot;</em></p>
+<h3>1.5 Entity Model</h3>
+<h4>EntityId (<code>icn-entity/src/entity.rs</code>)</h4>
+<p>Format: <code>entity:icn:&lt;type&gt;:&lt;identifier&gt;</code> with three type prefixes:</p>
+<ul>
+<li><code>entity:icn:individual:&lt;pubkey&gt;</code> — wraps a DID</li>
+<li><code>entity:icn:cooperative:&lt;name&gt;</code> — organizational entity</li>
+<li><code>entity:icn:federation:&lt;name&gt;</code> — federation of entities</li>
+</ul>
+<p><code>EntityId::from_did()</code> creates individual entities; <code>EntityId::to_did()</code> returns <code>Some(Did)</code> for individuals, <code>None</code> for organizations.</p>
+<h4>Cooperative Types (<code>icn-coop/src/types.rs:332</code>)</h4>
+<pre><code>CoopType: Worker | Consumer | Producer | MultiStakeholder | Platform | Housing | Credit
+</code></pre>
+<p>(7 variants)</p>
+<h4>Cooperative Lifecycle (<code>icn-coop/src/types.rs:344</code>)</h4>
+<pre><code>CoopStatus: Forming → Active → Suspended → Dissolving → Dissolved
+                               ↑__________|
+</code></pre>
+<p>(5 states, with state machine at <code>can_transition_to()</code> on line 677)</p>
+<p>Note: The issue mentions <code>Merged | Split</code> but these are NOT in the current code. Only 5 states.</p>
+<h4>Entity Relationships &amp; Membership</h4>
+<ul>
+<li><code>Membership</code> (<code>icn-entity/src/membership.rs:23</code>): Recursive membership (individuals in coops, coops in federations)</li>
+<li><code>MembershipRole</code> (<code>membership.rs:294</code>): 12 variants including individual roles (Founder, Worker, Consumer) and entity roles (FederatedMember, AssociateMember, ObserverMember)</li>
+<li><code>MembershipStatus</code> (<code>membership.rs:453</code>): <code>Pending | Active | Suspended | Inactive | Resigned | Removed | Expelled</code></li>
+<li><code>UnifiedMembershipStatus</code> (<code>membership.rs:535</code>): Simplified state machine: <code>Applicant → Pending → Active → Suspended → Terminated</code></li>
+<li><code>CooperativeEntity</code> (<code>icn-entity/src/entity.rs</code>): Entity with profile, relationships, kind</li>
+<li><code>EntityRelationship</code> / <code>RelationType</code> (<code>entity.rs</code>): How entities relate to each other</li>
+<li><code>AccountId</code> (<code>entity.rs</code>): <code>Did(Did) | Entity(EntityId)</code> for backward compatibility</li>
+</ul>
+<h4>Community Types (<code>icn-entity/src/entity.rs</code>)</h4>
+<p><code>CommunityProfile</code> exists as a profile variant on <code>CooperativeEntity</code>. Community types are defined in the <code>EntityKind</code> enum rather than a separate crate.</p>
+<h3>1.6 Gateway Endpoints</h3>
+<h4>Identity Endpoints (<code>icn-gateway/src/api/identity.rs</code>)</h4>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Returns</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GET</td>
+<td><code>/identity/resolve/{did}</code></td>
+<td>DID resolution with optional attestations</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/identity/health</code></td>
+<td>Identity service health check</td>
+</tr>
+</tbody></table>
+<h4>Commons Endpoints (<code>icn-gateway/src/api/commons/mod.rs</code>)</h4>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Returns</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GET</td>
+<td><code>/commons/status</code></td>
+<td><code>CommonsStatusResponse</code> — holder count, network stats</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/commons/holder/{did}</code></td>
+<td><code>HolderDetailResponse</code> — full holder record with affiliations</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/commons/holder/{did}/affiliate</code></td>
+<td>Join a jurisdiction</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/commons/holder/{did}/affiliate</code></td>
+<td>Update affiliation status</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/commons/holder/{did}/affiliate/{jurisdiction}</code></td>
+<td>Leave a jurisdiction</td>
+</tr>
+</tbody></table>
+<h4>Commons Anchor Endpoints (<code>icn-gateway/src/api/commons/anchor.rs</code>)</h4>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Returns</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GET</td>
+<td><code>/commons/anchor/{id}</code></td>
+<td><code>AnchorDetailResponse</code> — anchor with attestations</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/commons/anchor/{id}/status</code></td>
+<td>Update anchor status</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/commons/anchor/{id}/attestation</code></td>
+<td>Add POP attestation</td>
+</tr>
+</tbody></table>
+<h4>Membership Endpoints (<code>icn-gateway/src/api/membership/mod.rs</code>)</h4>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Returns</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>POST</td>
+<td><code>/v1/membership/enroll</code></td>
+<td>Enroll holder with capabilities</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/v1/membership/{holder_id}/{jurisdiction_id}</code></td>
+<td>Get affiliation details</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/v1/membership/{holder_id}/{jurisdiction_id}/status</code></td>
+<td>Update membership status</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/v1/membership/capability/grant</code></td>
+<td>Grant a capability to holder</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/v1/membership/capability/revoke</code></td>
+<td>Revoke a capability</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/v1/membership/revoke</code></td>
+<td>Revoke commons holder status</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/v1/membership/appeal</code></td>
+<td>File an appeal</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/v1/membership/appeal/{holder_id}</code></td>
+<td>Get appeal status</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/v1/membership/{holder_id}/all</code></td>
+<td>List all affiliations</td>
+</tr>
+</tbody></table>
+<h4>Constitutional Endpoints (<code>icn-gateway/src/api/constitutional/</code>)</h4>
+<ul>
+<li><code>voting.rs</code> — Constitutional voting endpoints</li>
+<li><code>appeals_ui.rs</code> — Appeals UI endpoints</li>
+</ul>
+<h4>Steward Endpoints (<code>icn-gateway/src/api/steward/mod.rs</code>)</h4>
+<ul>
+<li>Steward profile management</li>
+<li>Enrollment ceremony coordination</li>
+</ul>
+<h4>SDIS Endpoints (<code>icn-gateway/src/api/sdis/</code>)</h4>
+<ul>
+<li><code>enrollment.rs</code> — SDIS enrollment flow</li>
+<li><code>simple_enrollment.rs</code> — Simplified enrollment</li>
+<li><code>verify.rs</code> — Verification endpoints</li>
+<li><code>recovery.rs</code> — Key recovery</li>
+<li><code>qr.rs</code> — QR code generation</li>
+<li><code>ephemeral.rs</code> — Ephemeral sessions</li>
+</ul>
+<h4>Trust Endpoints (<code>icn-gateway/src/api/trust.rs</code>)</h4>
+<ul>
+<li>Trust score queries</li>
+</ul>
+<h4>Entity Endpoints (<code>icn-gateway/src/api/entity.rs</code>)</h4>
+<ul>
+<li>Entity CRUD operations</li>
+</ul>
+<h2>2. Critical Questions</h2>
+<h3>Can a user see their rights in the current system?</h3>
+<p><strong>Partially YES.</strong> Evidence:</p>
+<ul>
+<li><code>GET /v1/membership/{holder_id}/all</code> returns all affiliations with capabilities</li>
+<li><code>CommonsHolderRecord.baseline_rights</code> exposes the 6 commons rights</li>
+<li><code>Affiliation.capabilities</code> lists per-jurisdiction capabilities</li>
+<li><code>GET /commons/holder/{did}</code> returns full holder record with affiliations and rights</li>
+</ul>
+<p><strong>But NO for</strong>: There is no single &quot;what can I do right now?&quot; endpoint. A user would need to call multiple endpoints and correlate: commons holder record + each affiliation + trust score + kernel constraint set. No &quot;rights dashboard&quot; endpoint exists.</p>
+<h3>Can a user know &quot;where am I&quot; (scope/jurisdiction)?</h3>
+<p><strong>Partially YES.</strong> Evidence:</p>
+<ul>
+<li><code>CommonsHolderRecord.affiliations[]</code> tracks all jurisdiction memberships</li>
+<li><code>JurisdictionId</code> types (<code>coop:</code>, <code>community:</code>, <code>federation:</code>, <code>network:</code>) identify location</li>
+<li><code>ScopeLevel</code> hierarchy exists in the kernel</li>
+<li>Gateway commons endpoints expose affiliation data</li>
+</ul>
+<p><strong>But NO for</strong>: There is no &quot;current scope context&quot; concept. The API doesn&#39;t return &quot;you are currently operating in scope X with these constraints.&quot; <code>ScopeLevel</code> is not exposed in gateway responses. A user cannot see &quot;I&#39;m in <code>coop:food-portland</code> at scope level <code>Org</code>.&quot;</p>
+<h3>Is &quot;personhood vs membership&quot; enforced as a distinction?</h3>
+<p><strong>YES.</strong> Strong evidence:</p>
+<ul>
+<li><code>CommonsRights</code> are structurally separate from <code>MembershipCapability</code></li>
+<li><code>CommonsRights::restricted()</code> still guarantees <code>MinimalFuelFloor</code>, <code>DueProcess</code>, <code>ExitFreely</code> even when other rights are restricted</li>
+<li><code>CommonsHolderRecord.has_right()</code> checks <code>is_active()</code> first but the rights struct itself is not cleared on membership revocation</li>
+<li>Code comment: <em>&quot;A cooperative can revoke your membership. A cooperative cannot revoke your personhood.&quot;</em></li>
+<li><code>Affiliation.ban()</code> clears capabilities and roles but doesn&#39;t touch <code>CommonsHolderRecord.baseline_rights</code></li>
+</ul>
+<h3>What rights survive org departure?</h3>
+<p>Evidenced in the code:</p>
+<ol>
+<li><strong>Always survive</strong> (baseline rights on <code>CommonsHolderRecord</code>):<ul>
+<li><code>VoteInCommons</code> — commons-level governance participation</li>
+<li><code>Petition</code> — right to petition for constitutional changes</li>
+<li><code>MinimalFuelFloor</code> — guaranteed compute fuel for civic participation</li>
+<li><code>DueProcess</code> — right to due process before suspension</li>
+<li><code>ExitFreely</code> — right to leave any jurisdiction</li>
+<li><code>AuditAccess</code> — right to audit public records</li>
+</ul>
+</li>
+<li><strong>Lost on departure</strong>: All <code>MembershipCapability</code> variants attached to the specific <code>Affiliation</code> (Vote, Propose, Transact, HoldOffice, AccessPrivate, Sponsor)</li>
+<li><strong>Retained</strong>: <code>PersonhoodAnchor</code> and all POP attestations survive membership departure</li>
+<li><strong>Not addressed</strong>: Data portability (ledger history, trust edges) on departure — no export mechanism exists</li>
+</ol>
+<h3>Is scope exposed in the gateway API?</h3>
+<p><strong>NO.</strong> <code>ScopeLevel</code> is not returned by any gateway endpoint. The kernel scope primitive is completely invisible to API consumers. <code>JurisdictionId</code> is exposed (via affiliations), but the scope <em>level</em> (Local/Cell/Org/Federation/Commons) is not surfaced.</p>
+<h2>3. Gap Analysis</h2>
+<h3>Gap 1: No &quot;rights dashboard&quot; endpoint</h3>
+<ul>
+<li><strong>User story blocked</strong>: &quot;As a member, I want to see all my rights and capabilities in one place so I can understand what I can do.&quot;</li>
+<li><strong>Missing primitive OR surface</strong>: A composite endpoint that aggregates: commons rights + all affiliation capabilities + trust-derived constraints + active capability tokens</li>
+<li><strong>Where it belongs</strong>: Gateway (aggregation layer)</li>
+<li><strong>Receipt expectation</strong>: No receipts needed — this is a read-only query</li>
+<li><strong>Phase</strong>: 0</li>
+</ul>
+<h3>Gap 2: Scope not exposed in gateway API</h3>
+<ul>
+<li><strong>User story blocked</strong>: &quot;As a user, I want to know what scope level I&#39;m operating in and what law applies here.&quot;</li>
+<li><strong>Missing primitive OR surface</strong>: <code>ScopeLevel</code> is a kernel primitive but has no gateway representation. No endpoint returns scope context.</li>
+<li><strong>Where it belongs</strong>: Gateway (expose existing kernel data) + UI (scope context banner)</li>
+<li><strong>Receipt expectation</strong>: N/A — metadata, not an action</li>
+<li><strong>Phase</strong>: 0</li>
+</ul>
+<h3>Gap 3: Two capability systems not unified</h3>
+<ul>
+<li><strong>User story blocked</strong>: &quot;As a developer, I need one consistent way to check &#39;can this DID do X in scope Y?&#39;&quot;</li>
+<li><strong>Missing primitive OR surface</strong>: The commons-layer <code>MembershipCapability</code> (6 variants) and entity-layer <code>MembershipCapability</code> (9 variants) are separate enums with overlapping names but different semantics. Neither is wired to the kernel <code>CapabilityEngine</code>.</li>
+<li><strong>Where it belongs</strong>: App layer (unify) + kernel (wire to <code>CapabilityEngine</code>)</li>
+<li><strong>Receipt expectation</strong>: Capability grants/revocations should produce audit receipts</li>
+<li><strong>Phase</strong>: 1</li>
+</ul>
+<h3>Gap 4: No scope-aware capability resolution</h3>
+<ul>
+<li><strong>User story blocked</strong>: &quot;As a system, I need to answer: given DID X in scope Y, what specific capabilities apply?&quot;</li>
+<li><strong>Missing primitive OR surface</strong>: <code>PolicyOracle</code> evaluates per-DID but does not incorporate scope. <code>PolicyContext.namespace</code> exists but is unused for scope-aware resolution.</li>
+<li><strong>Where it belongs</strong>: App layer (oracle implementation) — <code>PolicyContext.namespace</code> could carry scope</li>
+<li><strong>Receipt expectation</strong>: Capability resolution should be logged for audit</li>
+<li><strong>Phase</strong>: 1</li>
+</ul>
+<h3>Gap 5: No data portability on departure</h3>
+<ul>
+<li><strong>User story blocked</strong>: &quot;As a departing member, I want to export my transaction history, trust edges, and receipts before I leave.&quot;</li>
+<li><strong>Missing primitive OR surface</strong>: No export endpoint. Ledger entries are immutable but not extractable per-member. Trust edges have no export format.</li>
+<li><strong>Where it belongs</strong>: Gateway (export endpoints) + kernel (data extraction queries)</li>
+<li><strong>Receipt expectation</strong>: Departure should produce an exit receipt chain: membership termination → data export acknowledgment → exit confirmation</li>
+<li><strong>Phase</strong>: 1</li>
+</ul>
+<h3>Gap 6: No &quot;what law applies here?&quot; surface</h3>
+<ul>
+<li><strong>User story blocked</strong>: &quot;As a member, I want to know what governance rules (charter, bylaws, voting thresholds) apply in my current scope.&quot;</li>
+<li><strong>Missing primitive OR surface</strong>: <code>Cooperative.charter_id</code> and <code>Cooperative.bylaws</code> exist but are not exposed in a user-friendly way. No endpoint returns &quot;active governance policies for scope X.&quot;</li>
+<li><strong>Where it belongs</strong>: Gateway (policy reference endpoint) + UI (scope context)</li>
+<li><strong>Receipt expectation</strong>: Policy changes should produce governance receipts (already partially handled by governance proposals)</li>
+<li><strong>Phase</strong>: 0</li>
+</ul>
+<h3>Gap 7: Multi-org affiliation home screen data missing</h3>
+<ul>
+<li><strong>User story blocked</strong>: &quot;As a member of multiple coops and communities, I want a home screen showing all my affiliations, roles, and standings.&quot;</li>
+<li><strong>Missing primitive OR surface</strong>: <code>GET /v1/membership/{holder_id}/all</code> exists but returns raw affiliations. No aggregated &quot;home view&quot; with enriched org metadata, standings, and active proposals.</li>
+<li><strong>Where it belongs</strong>: Gateway (aggregation endpoint) + UI (home screen)</li>
+<li><strong>Receipt expectation</strong>: N/A — read-only</li>
+<li><strong>Phase</strong>: 1</li>
+</ul>
+<h2>4. Phase 0 Tasks (3-5 tasks)</h2>
+<h3>Task P0-1: Add &quot;rights summary&quot; gateway endpoint</h3>
+<p><strong>Description</strong>: Create <code>GET /v1/rights/{did}</code> that returns a composite view of all rights for a DID:</p>
+<ul>
+<li>Commons baseline rights (from <code>CommonsHolderRecord.baseline_rights</code>)</li>
+<li>Per-jurisdiction capabilities (from each <code>Affiliation.capabilities</code>)</li>
+<li>Trust-derived constraint set (from <code>TrustPolicyOracle</code> evaluation)</li>
+<li>Active kernel capabilities (from <code>CapabilityEngine</code> if any)</li>
+</ul>
+<p><strong>Files to touch</strong>:</p>
+<ul>
+<li><code>icn-gateway/src/api/</code> — new <code>rights.rs</code> module</li>
+<li><code>icn-gateway/src/server.rs</code> — register new route</li>
+<li><code>icn-gateway/src/commons_mgr.rs</code> — add rights aggregation method</li>
+</ul>
+<p><strong>Validation step</strong>: <code>curl /v1/rights/{test-did}</code> returns JSON with <code>baseline_rights</code>, <code>affiliation_capabilities</code>, <code>trust_constraints</code> sections.</p>
+<h3>Task P0-2: Expose scope level in gateway API responses</h3>
+<p><strong>Description</strong>: Add <code>scope_level</code> field to relevant gateway responses. When a request carries a jurisdiction context, include the corresponding <code>ScopeLevel</code> in the response.</p>
+<p><strong>Files to touch</strong>:</p>
+<ul>
+<li><code>icn-gateway/src/api/commons/mod.rs</code> — add <code>scope_level</code> to <code>HolderDetailResponse</code> and <code>AffiliationResponse</code></li>
+<li><code>icn-gateway/src/api/membership/mod.rs</code> — add scope context to membership responses</li>
+<li><code>icn-gateway/src/models.rs</code> — add scope-level response types</li>
+</ul>
+<p><strong>Validation step</strong>: <code>GET /commons/holder/{did}</code> response includes <code>scope_level</code> for each affiliation.</p>
+<h3>Task P0-3: Add &quot;what law applies here?&quot; policy reference endpoint</h3>
+<p><strong>Description</strong>: Create <code>GET /v1/governance/policies/{jurisdiction_id}</code> that returns:</p>
+<ul>
+<li>Charter ID and status (from <code>Cooperative.charter_id</code>)</li>
+<li>Active bylaws (from <code>Cooperative.bylaws</code>)</li>
+<li>Governance domain (from <code>Cooperative.governance_domain</code>)</li>
+<li>Voting thresholds and methods (from governance config)</li>
+<li>Rate limits and constraint values that apply</li>
+</ul>
+<p><strong>Files to touch</strong>:</p>
+<ul>
+<li><code>icn-gateway/src/api/governance.rs</code> — add policy reference endpoint</li>
+<li><code>icn-gateway/src/governance_mgr.rs</code> — add policy aggregation query</li>
+</ul>
+<p><strong>Validation step</strong>: <code>curl /v1/governance/policies/coop:food-portland</code> returns charter, bylaws, and active constraint parameters.</p>
+<h3>Task P0-4: Capability set exposure endpoint</h3>
+<p><strong>Description</strong>: Create <code>GET /v1/capabilities/{did}/{jurisdiction_id}</code> that answers &quot;what can this DID do in this jurisdiction?&quot; by resolving:</p>
+<ul>
+<li>Membership status and role</li>
+<li>MembershipCapability list (both commons-layer and entity-layer)</li>
+<li>Trust score and derived constraints</li>
+<li>Any active delegation chains</li>
+</ul>
+<p><strong>Files to touch</strong>:</p>
+<ul>
+<li><code>icn-gateway/src/api/membership/mod.rs</code> — add capability resolution endpoint</li>
+<li><code>icn-gateway/src/commons_mgr.rs</code> — add scope-aware capability query</li>
+</ul>
+<p><strong>Validation step</strong>: <code>curl /v1/capabilities/{did}/coop:test</code> returns <code>{ &quot;can_vote&quot;: true, &quot;can_propose&quot;: true, &quot;trust_class&quot;: &quot;Partner&quot;, &quot;rate_limit&quot;: 100 }</code>.</p>
+<h3>Task P0-5: Document constitutional invariants (complete Issue #1011)</h3>
+<p><strong>Description</strong>: Complete the &quot;Constitutional Genesis&quot; documentation (Wave 5, Issue #1011) that categorizes hard invariants (immutable) vs meta-invariants (governable). This provides the &quot;what law applies&quot; reference for the system.</p>
+<p><strong>Files to touch</strong>:</p>
+<ul>
+<li><code>docs/genesis.md</code> (new) or <code>docs/ARCHITECTURE.md</code> (new section)</li>
+<li>Reference <code>icn-kernel-api/src/authz.rs</code> for enforcement mechanisms</li>
+<li>Reference <code>apps/trust/src/oracle.rs</code> for meta-invariant sources</li>
+</ul>
+<p><strong>Validation step</strong>: Document exists, reviewed, and linked from <code>ARCHITECTURE.md</code>. Contains hard/meta invariant table with enforcement locations.</p>
+<h2>5. Phase 1 Tasks (3-5 tasks)</h2>
+<h3>Task P1-1: Unify capability systems</h3>
+<p><strong>Description</strong>: Merge the two <code>MembershipCapability</code> enums into one authoritative definition. The entity-layer enum (<code>icn-entity/src/membership.rs:648</code>) has more variants and should be the canonical source. The commons-layer enum (<code>icn-identity/src/commons.rs:529</code>) should re-export or alias it.</p>
+<p><strong>Files to touch</strong>:</p>
+<ul>
+<li><code>icn-identity/src/commons.rs</code> — replace 6-variant enum with re-export from icn-entity</li>
+<li><code>icn-entity/src/membership.rs</code> — ensure all 9+ variants cover both systems</li>
+<li><code>icn-gateway/src/api/membership/mod.rs</code> — update <code>parse_capability()</code> for unified set</li>
+<li>All tests referencing either enum</li>
+</ul>
+<p><strong>Validation step</strong>: Single <code>MembershipCapability</code> definition; no two enums with the same name. All existing tests pass.</p>
+<h3>Task P1-2: Wire MembershipCapability to kernel CapabilityEngine</h3>
+<p><strong>Description</strong>: Bridge the app-layer capability grants to kernel-layer <code>CapabilityEngine</code>. When a membership grants <code>MembershipCapability::Vote</code>, it should produce a signed <code>Capability</code> token the kernel can verify.</p>
+<p><strong>Files to touch</strong>:</p>
+<ul>
+<li><code>icn-kernel-api/src/authz.rs</code> — implement <code>CapabilityEngine</code> trait</li>
+<li>App layer (future <code>apps/membership</code>) — produce <code>Capability</code> tokens on grant</li>
+<li><code>icn-gateway/src/api/membership/mod.rs</code> — issue capability tokens on enroll</li>
+</ul>
+<p><strong>Validation step</strong>: <code>grant_capability()</code> produces a cryptographically signed <code>Capability</code> token that <code>CapabilityEngine::check()</code> validates.</p>
+<h3>Task P1-3: Multi-org affiliations home screen data model</h3>
+<p><strong>Description</strong>: Create a rich &quot;home&quot; endpoint that aggregates across all affiliations for a DID: org name + type + role + standing + active proposals + trust score + pending notifications.</p>
+<p><strong>Files to touch</strong>:</p>
+<ul>
+<li><code>icn-gateway/src/api/</code> — new <code>home.rs</code> or extend <code>commons/mod.rs</code></li>
+<li><code>icn-gateway/src/commons_mgr.rs</code> — aggregation query</li>
+<li><code>icn-gateway/src/governance_mgr.rs</code> — pending proposals for user</li>
+</ul>
+<p><strong>Validation step</strong>: <code>GET /v1/home/{did}</code> returns enriched list of all org memberships with metadata.</p>
+<h3>Task P1-4: Data portability / exit rights</h3>
+<p><strong>Description</strong>: Implement member departure data export: transaction history, trust edge export, receipt chain export. This fulfills the <code>ExitFreely</code> right with practical data portability.</p>
+<p><strong>Files to touch</strong>:</p>
+<ul>
+<li><code>icn-gateway/src/api/</code> — new <code>export.rs</code> endpoint</li>
+<li><code>icn-ledger/src/</code> — per-member transaction extraction</li>
+<li><code>icn-trust/src/</code> — trust edge export format</li>
+<li><code>icn-gateway/src/receipt_store.rs</code> — receipt export</li>
+</ul>
+<p><strong>Validation step</strong>: <code>POST /v1/export/{did}</code> produces a downloadable archive with transaction history, trust edges, and receipts. Exit receipt is generated.</p>
+<h3>Task P1-5: Scope-aware PolicyOracle evaluation</h3>
+<p><strong>Description</strong>: Extend <code>PolicyOracle::evaluate()</code> to incorporate scope. Use <code>PolicyContext.namespace</code> to carry <code>JurisdictionId</code>, and have oracles return scope-specific constraint sets.</p>
+<p><strong>Files to touch</strong>:</p>
+<ul>
+<li><code>apps/trust/src/oracle.rs</code> — check namespace/scope in evaluation</li>
+<li><code>icn-kernel-api/src/authz.rs</code> — document <code>PolicyContext.namespace</code> for scope usage</li>
+<li>Gateway middleware — populate <code>PolicyContext.namespace</code> from request context</li>
+</ul>
+<p><strong>Validation step</strong>: Same DID gets different constraint sets when evaluated in <code>coop:A</code> vs <code>coop:B</code>.</p>
+<h2>6. Relevant Open Issues</h2>
+<table>
+<thead>
+<tr>
+<th>Issue</th>
+<th>Title</th>
+<th>Recommendation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>#1147</strong></td>
+<td>[EPIC] Vertical Slice: Identity → Governance → Compute → Receipts → Audit</td>
+<td><strong>Keep</strong> — directly tracks the end-to-end rights flow this analysis supports. Phase 0 tasks feed into this epic&#39;s Track A (kernel/app separation).</td>
+</tr>
+<tr>
+<td><strong>#1137</strong></td>
+<td>[A3] Phase 5: Membership Consolidation</td>
+<td><strong>Keep</strong> — merging <code>icn-entity</code> + <code>icn-coop</code> + <code>icn-community</code> into <code>apps/membership</code> would be the natural location for the unified capability system (Task P1-1).</td>
+</tr>
+<tr>
+<td><strong>#1139</strong></td>
+<td>[B1] Treasury-Coop Integration</td>
+<td><strong>Keep</strong> — treasury access is a capability (<code>TreasuryAccess</code>) that needs to be wired into the rights system.</td>
+</tr>
+<tr>
+<td><strong>#1011</strong></td>
+<td>[Wave 5] Constitutional Genesis Documentation</td>
+<td><strong>Keep and prioritize</strong> — directly maps to Task P0-5. The hard/meta invariant categorization is foundational for the &quot;what law applies here?&quot; surface.</td>
+</tr>
+<tr>
+<td><strong>#1090</strong></td>
+<td>[PR8c] Fallback atomicity via CoopActor single-writer</td>
+<td><strong>Keep</strong> — treasury nonce enforcement is a capability-gated operation.</td>
+</tr>
+</tbody></table>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

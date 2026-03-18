@@ -1,0 +1,1210 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Cells &amp; Scopes Architecture | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>CELLS AND SCOPES</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/CELLS_AND_SCOPES.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Cells &amp; Scopes Architecture</h1>
+<p><strong>Status</strong>: Living Document
+<strong>Last Updated</strong>: 2026-01-29
+<strong>Related Issues</strong>: See <a href="#12-github-issue-hierarchy">Issue Hierarchy</a> below</p>
+<hr>
+<h2>Executive Summary</h2>
+<p>ICN&#39;s <strong>Cells &amp; Scopes</strong> architecture introduces two primitives that enable multi-scale cooperative computing:</p>
+<ul>
+<li><strong>Cell</strong>: A high-availability clustering envelope — a named group of nodes that share identity, state, and capacity within a scope boundary.</li>
+<li><strong>ScopeLevel</strong>: A five-tier hierarchy (<code>Local → Cell → Org → Federation → Commons</code>) that governs resource allocation, job placement, data replication, service discovery, and economic settlement.</li>
+</ul>
+<p>These primitives extend the existing kernel/app separation by adding <strong>spatial awareness</strong> to the kernel without introducing domain semantics. The kernel routes, replicates, and meters by scope level; apps decide <em>what</em> each scope level <em>means</em> for their domain.</p>
+<p><strong>Key Design Constraint</strong>: Cells and scopes are kernel primitives. The kernel knows that scope <code>Federation</code> is &quot;wider&quot; than <code>Org</code>, but it does not know what an organization <em>is</em>. That interpretation stays in apps, consistent with the <a href="https://github.com/InterCooperative-Network/icn/blob/main/KERNEL_APP_SEPARATION#1-the-meaning-firewall#1-the-meaning-firewall">Meaning Firewall</a>.</p>
+<hr>
+<h2>Table of Contents</h2>
+<ol>
+<li><a href="#1-core-definitions">Core Definitions</a><ul>
+<li><a href="#11-cell">Cell</a></li>
+<li><a href="#12-scopelevel">ScopeLevel</a></li>
+<li><a href="#13-cell-identity">Cell Identity</a></li>
+<li><a href="#14-cell-types">Cell Types</a></li>
+</ul>
+</li>
+<li><a href="#2-scopelevel-type-specification">ScopeLevel Type Specification</a></li>
+<li><a href="#3-capacity-policy">Capacity Policy</a></li>
+<li><a href="#4-job-placement-scoped-routing">Job Placement (Scoped Routing)</a></li>
+<li><a href="#5-storage--replication">Storage & Replication</a></li>
+<li><a href="#6-service-discovery">Service Discovery</a></li>
+<li><a href="#7-economics--settlement">Economics & Settlement</a></li>
+<li><a href="#8-identity-across-devices">Identity Across Devices</a></li>
+<li><a href="#9-gossip-topics">Gossip Topics</a></li>
+<li><a href="#10-integration-with-kernelapp-separation">Integration with Kernel/App Separation</a></li>
+<li><a href="#11-migration-plan">Migration Plan</a></li>
+<li><a href="#12-github-issue-hierarchy">GitHub Issue Hierarchy</a></li>
+</ol>
+<hr>
+<h2>1. Core Definitions</h2>
+<h3>1.1 Cell</h3>
+<p>A <strong>Cell</strong> is a named, HA-clustered group of nodes that:</p>
+<ul>
+<li>Shares a derived identity (<code>CellId</code>)</li>
+<li>Pools compute, storage, and network capacity</li>
+<li>Replicates state within its membership</li>
+<li>Presents a single logical endpoint to peers outside the cell</li>
+</ul>
+<p>Cells are the basic unit of <strong>co-location</strong>. Nodes within a cell are assumed to have low-latency, high-bandwidth interconnects (same rack, same datacenter, same home network). Cross-cell communication uses the existing QUIC/TLS networking layer.</p>
+<pre><code>┌─────────────────────────── Cell &quot;workshop&quot; ──────────────────────────────┐
+│                                                                          │
+│   ┌──────────┐    ┌──────────┐    ┌──────────┐                          │
+│   │  Node A  │◄──►│  Node B  │◄──►│  Node C  │   Intra-cell: fast,     │
+│   │  (icnd)  │    │  (icnd)  │    │  (icnd)  │   replicated, pooled    │
+│   └──────────┘    └──────────┘    └──────────┘                          │
+│                                                                          │
+│   Shared: CellId, capacity pool, replicated state                       │
+└──────────────────────────────────────────────────────────────────────────┘
+         │                                           │
+         │  QUIC/TLS (inter-cell)                    │  QUIC/TLS
+         ▼                                           ▼
+┌─────────────────┐                       ┌─────────────────┐
+│  Cell &quot;garden&quot;  │                       │  Cell &quot;market&quot;  │
+└─────────────────┘                       └─────────────────┘
+</code></pre>
+<h3>1.2 ScopeLevel</h3>
+<p>A <strong>ScopeLevel</strong> defines the radius of an operation — how far a request, a piece of data, or a service announcement should travel.</p>
+<table>
+<thead>
+<tr>
+<th>Level</th>
+<th>Value</th>
+<th>Meaning (kernel)</th>
+<th>Example (app interprets)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Local</code></td>
+<td>0</td>
+<td>This node only</td>
+<td>Dev testing, local cache</td>
+</tr>
+<tr>
+<td><code>Cell</code></td>
+<td>1</td>
+<td>Nodes in this cell</td>
+<td>HA replicas, pooled capacity</td>
+</tr>
+<tr>
+<td><code>Org</code></td>
+<td>2</td>
+<td>Cells in this organization</td>
+<td>Coop-wide services</td>
+</tr>
+<tr>
+<td><code>Federation</code></td>
+<td>3</td>
+<td>Organizations in this federation</td>
+<td>Cross-coop clearing</td>
+</tr>
+<tr>
+<td><code>Commons</code></td>
+<td>4</td>
+<td>All reachable nodes</td>
+<td>Public compute pool</td>
+</tr>
+</tbody></table>
+<p>The kernel treats <code>ScopeLevel</code> as an <strong>ordered enum</strong> — it knows <code>Cell &lt; Org &lt; Federation &lt; Commons</code> but never interprets <em>why</em> something is scoped to a particular level. That decision belongs to apps and their <code>PolicyOracle</code> implementations.</p>
+<h3>1.3 Cell Identity</h3>
+<p>Every cell has a deterministic, collision-resistant identity:</p>
+<pre><code>CellId = blake3(scope_id || cell_name || genesis_salt)
+</code></pre>
+<p>Where:</p>
+<ul>
+<li><code>scope_id</code>: The parent scope identifier (org DID, federation ID, or a well-known commons root)</li>
+<li><code>cell_name</code>: Human-readable name within the scope (e.g., <code>&quot;workshop&quot;</code>, <code>&quot;garden&quot;</code>)</li>
+<li><code>genesis_salt</code>: 32-byte random value set at cell creation time (prevents pre-image attacks)</li>
+</ul>
+<h3>1.4 Cell Types</h3>
+<p>Cells are classified by their parent scope (app-level semantics, not kernel):</p>
+<table>
+<thead>
+<tr>
+<th>Cell Type</th>
+<th>Parent Scope</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Personal</strong></td>
+<td>Individual DID</td>
+<td>Multi-device cell for one person</td>
+</tr>
+<tr>
+<td><strong>Org</strong></td>
+<td>Cooperative DID</td>
+<td>Servers owned by one cooperative</td>
+</tr>
+<tr>
+<td><strong>Federation</strong></td>
+<td>Federation ID</td>
+<td>Cross-coop shared infrastructure</td>
+</tr>
+<tr>
+<td><strong>Commons</strong></td>
+<td>Well-known root</td>
+<td>Open participation, no org affiliation</td>
+</tr>
+</tbody></table>
+<p>The kernel does not distinguish these types — it only sees <code>CellId</code> and <code>ScopeLevel</code>. Apps assign meaning via <code>PolicyOracle</code>.</p>
+<hr>
+<h2>2. ScopeLevel Type Specification</h2>
+<h3>2.1 Rust Definition</h3>
+<pre><code class="language-rust">/// File: icn/crates/icn-kernel-api/src/scope.rs (new file)
+
+use serde::{Deserialize, Serialize};
+
+/// Scope level for operations, data, and services.
+///
+/// Defines how far an operation should reach in the network hierarchy.
+/// The kernel uses this for routing, replication, and capacity allocation
+/// without interpreting the domain semantics of each level.
+///
+/// # Ordering
+///
+/// ScopeLevel implements Ord: Local &lt; Cell &lt; Org &lt; Federation &lt; Commons.
+/// This ordering is used for hierarchical fallback in placement and discovery.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash,
+    Serialize, Deserialize,
+)]
+#[repr(u8)]
+pub enum ScopeLevel {
+    /// This node only — no network involvement
+    Local = 0,
+    /// Nodes within the same cell (HA cluster)
+    Cell = 1,
+    /// Cells within the same organization
+    Org = 2,
+    /// Organizations within the same federation
+    Federation = 3,
+    /// All reachable nodes (public commons)
+    Commons = 4,
+}
+
+impl ScopeLevel {
+    /// All scope levels in ascending order.
+    pub const ALL: [ScopeLevel; 5] = [
+        ScopeLevel::Local,
+        ScopeLevel::Cell,
+        ScopeLevel::Org,
+        ScopeLevel::Federation,
+        ScopeLevel::Commons,
+    ];
+
+    /// Return the next wider scope, or None if already at Commons.
+    pub fn widen(&amp;self) -&gt; Option&lt;ScopeLevel&gt; {
+        match self {
+            ScopeLevel::Local =&gt; Some(ScopeLevel::Cell),
+            ScopeLevel::Cell =&gt; Some(ScopeLevel::Org),
+            ScopeLevel::Org =&gt; Some(ScopeLevel::Federation),
+            ScopeLevel::Federation =&gt; Some(ScopeLevel::Commons),
+            ScopeLevel::Commons =&gt; None,
+        }
+    }
+
+    /// Return the next narrower scope, or None if already at Local.
+    pub fn narrow(&amp;self) -&gt; Option&lt;ScopeLevel&gt; {
+        match self {
+            ScopeLevel::Local =&gt; None,
+            ScopeLevel::Cell =&gt; Some(ScopeLevel::Local),
+            ScopeLevel::Org =&gt; Some(ScopeLevel::Cell),
+            ScopeLevel::Federation =&gt; Some(ScopeLevel::Org),
+            ScopeLevel::Commons =&gt; Some(ScopeLevel::Federation),
+        }
+    }
+
+    /// Check if this scope includes another scope.
+    ///
+    /// A wider scope includes all narrower scopes.
+    /// e.g., `Org.includes(Cell)` is true.
+    pub fn includes(&amp;self, other: ScopeLevel) -&gt; bool {
+        *self &gt;= other
+    }
+
+    /// Numeric value (for serialization and constraint sets).
+    pub fn as_u8(&amp;self) -&gt; u8 {
+        *self as u8
+    }
+
+    /// Parse from numeric value.
+    pub fn from_u8(v: u8) -&gt; Option&lt;ScopeLevel&gt; {
+        match v {
+            0 =&gt; Some(ScopeLevel::Local),
+            1 =&gt; Some(ScopeLevel::Cell),
+            2 =&gt; Some(ScopeLevel::Org),
+            3 =&gt; Some(ScopeLevel::Federation),
+            4 =&gt; Some(ScopeLevel::Commons),
+            _ =&gt; None,
+        }
+    }
+}
+
+impl std::fmt::Display for ScopeLevel {
+    fn fmt(&amp;self, f: &amp;mut std::fmt::Formatter&lt;&#39;_&gt;) -&gt; std::fmt::Result {
+        match self {
+            ScopeLevel::Local =&gt; write!(f, &quot;local&quot;),
+            ScopeLevel::Cell =&gt; write!(f, &quot;cell&quot;),
+            ScopeLevel::Org =&gt; write!(f, &quot;org&quot;),
+            ScopeLevel::Federation =&gt; write!(f, &quot;federation&quot;),
+            ScopeLevel::Commons =&gt; write!(f, &quot;commons&quot;),
+        }
+    }
+}
+</code></pre>
+<h3>2.2 Cell Identity Type</h3>
+<pre><code class="language-rust">/// File: icn/crates/icn-kernel-api/src/scope.rs
+
+/// Unique cell identifier — deterministic hash of scope + name + salt.
+///
+/// Two cells with the same parent scope and name but different genesis
+/// salts produce different CellIds (intentional for re-creation scenarios).
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash,
+    Serialize, Deserialize,
+)]
+pub struct CellId(pub [u8; 32]);
+
+impl CellId {
+    /// Derive a CellId from its components.
+    ///
+    /// # Arguments
+    /// - `scope_id`: Parent scope identifier (org DID, federation ID, etc.)
+    /// - `cell_name`: Human-readable name within the scope
+    /// - `genesis_salt`: 32-byte random value from cell creation
+    pub fn derive(scope_id: &amp;[u8], cell_name: &amp;str, genesis_salt: &amp;[u8; 32]) -&gt; Self {
+        let mut hasher = blake3::Hasher::new();
+        // Domain separation: prefix with lengths to prevent ambiguous concatenation
+        hasher.update(&amp;(scope_id.len() as u32).to_le_bytes());
+        hasher.update(scope_id);
+        hasher.update(&amp;(cell_name.len() as u32).to_le_bytes());
+        hasher.update(cell_name.as_bytes());
+        hasher.update(genesis_salt);
+        CellId(*hasher.finalize().as_bytes())
+    }
+}
+
+impl std::fmt::Display for CellId {
+    fn fmt(&amp;self, f: &amp;mut std::fmt::Formatter&lt;&#39;_&gt;) -&gt; std::fmt::Result {
+        // Full 32 bytes as hex — fixed-width, no truncation ambiguity
+        write!(f, &quot;cell:&quot;)?;
+        for byte in &amp;self.0 {
+            write!(f, &quot;{:02x}&quot;, byte)?;
+        }
+        Ok(())
+    }
+}
+</code></pre>
+<h3>2.3 Integration Points</h3>
+<p><code>ScopeLevel</code> is consumed by existing kernel types:</p>
+<table>
+<thead>
+<tr>
+<th>Existing Type</th>
+<th>New Field</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>PlacementRequest</code></td>
+<td><code>allowed_scopes: Vec&lt;ScopeLevel&gt;</code></td>
+<td>Scoped job routing</td>
+</tr>
+<tr>
+<td><code>ReplicationPolicy</code></td>
+<td>extended with <code>ScopeLevel</code> variant</td>
+<td>Per-scope replication</td>
+</tr>
+<tr>
+<td><code>ConstraintSet</code></td>
+<td><code>custom: { &quot;scope_level&quot;: Int(n) }</code></td>
+<td>Scope as policy output</td>
+</tr>
+<tr>
+<td><code>NodeCapacity</code></td>
+<td><code>scope_budgets: CapacityBudget</code></td>
+<td>Per-scope resource limits</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>3. Capacity Policy</h2>
+<h3>3.1 CapacityBudget</h3>
+<p>Each node allocates its resources across scope levels using a <code>CapacityBudget</code>. This is a kernel-enforced resource partitioning — apps influence the fractions via <code>PolicyOracle</code>, but the kernel enforces the limits.</p>
+<pre><code class="language-rust">/// File: icn/crates/icn-compute/src/scheduler.rs (addition)
+
+/// Per-scope capacity allocation.
+///
+/// Fractions must sum to ≤ 1.0. Remaining capacity is unallocated (buffer).
+/// The kernel enforces these limits when accepting tasks at each scope level.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CapacityBudget {
+    /// Fraction reserved for local-only tasks (0.0–1.0)
+    pub local_reserve: f64,
+    /// Fraction available for cell peers (0.0–1.0)
+    pub cell_share: f64,
+    /// Fraction available for organization-wide tasks (0.0–1.0)
+    pub org_share: f64,
+    /// Fraction available for federation tasks (0.0–1.0)
+    pub federation_share: f64,
+    /// Fraction available for commons tasks (0.0–1.0)
+    pub commons_share: f64,
+}
+
+impl Default for CapacityBudget {
+    fn default() -&gt; Self {
+        Self {
+            local_reserve: 0.30,    // 30% for local work
+            cell_share: 0.25,       // 25% for cell peers
+            org_share: 0.20,        // 20% for org-wide
+            federation_share: 0.15, // 15% for federation
+            commons_share: 0.10,    // 10% for commons
+        }
+    }
+}
+
+impl CapacityBudget {
+    /// Validate that allocations sum to ≤ 1.0 and all are non-negative.
+    pub fn validate(&amp;self) -&gt; Result&lt;(), &amp;&#39;static str&gt; {
+        let total = self.local_reserve
+            + self.cell_share
+            + self.org_share
+            + self.federation_share
+            + self.commons_share;
+
+        if total &gt; 1.0 + f64::EPSILON {
+            return Err(&quot;Capacity budget fractions exceed 1.0&quot;);
+        }
+
+        if self.local_reserve &lt; 0.0
+            || self.cell_share &lt; 0.0
+            || self.org_share &lt; 0.0
+            || self.federation_share &lt; 0.0
+            || self.commons_share &lt; 0.0
+        {
+            return Err(&quot;Capacity budget fractions must be non-negative&quot;);
+        }
+
+        Ok(())
+    }
+
+    /// Get the fraction available for a given scope level.
+    ///
+    /// A wider scope can use its own allocation plus all narrower allocations
+    /// that are currently unused (spillover).
+    pub fn fraction_for(&amp;self, scope: ScopeLevel) -&gt; f64 {
+        match scope {
+            ScopeLevel::Local =&gt; self.local_reserve,
+            ScopeLevel::Cell =&gt; self.cell_share,
+            ScopeLevel::Org =&gt; self.org_share,
+            ScopeLevel::Federation =&gt; self.federation_share,
+            ScopeLevel::Commons =&gt; self.commons_share,
+        }
+    }
+}
+</code></pre>
+<h3>3.2 Dynamic Adjustment</h3>
+<p>Capacity budgets are not static. A demand-feedback loop adjusts allocations:</p>
+<pre><code>┌─────────────────┐     ┌──────────────────┐     ┌─────────────────────┐
+│  Demand Signal  │────►│  ScopePolicy     │────►│  CapacityBudget     │
+│  (queue depths  │     │  Oracle (app)    │     │  (kernel enforces)  │
+│   per scope)    │     │                  │     │                     │
+└─────────────────┘     └──────────────────┘     └─────────────────────┘
+         ▲                                                 │
+         │                                                 │
+         └─────────────────── feedback ────────────────────┘
+</code></pre>
+<ol>
+<li><strong>Kernel</strong> measures queue depth and utilization per scope level</li>
+<li><strong>App</strong> (ScopePolicy oracle) observes demand and outputs adjusted <code>CapacityBudget</code></li>
+<li><strong>Kernel</strong> applies the new budget at the next capacity announcement interval</li>
+</ol>
+<p><strong>Implementation</strong> (Epic 2, PR #962):</p>
+<p>The demand-feedback loop runs as a background tokio task inside <code>ComputeActor::spawn()</code>, controlled by <code>DemandAdjustmentConfig</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>interval_secs</code></td>
+<td>60</td>
+<td>Seconds between adjustment rounds</td>
+</tr>
+<tr>
+<td><code>learning_rate</code></td>
+<td>0.05</td>
+<td>Max fraction shifted per round (clamped to 0.0–0.1)</td>
+</tr>
+<tr>
+<td><code>min_samples</code></td>
+<td>5</td>
+<td>Minimum total queued tasks before adjusting</td>
+</tr>
+</tbody></table>
+<p>The adjustment algorithm (<code>CapacityBudget::adjust_from_demand</code>):</p>
+<ol>
+<li>Computes per-scope utilization as fraction of total queue depth</li>
+<li>Calculates mean utilization across reporting scopes</li>
+<li>Shifts capacity toward over-utilized scopes (delta = <code>(util - mean) * learning_rate</code>)</li>
+<li>Clamps each fraction to <code>[MIN_SCOPE_FRACTION (0.01), MAX_SCOPE_FRACTION (0.80)]</code></li>
+<li>Re-normalizes to preserve the original sum</li>
+</ol>
+<p>The clamping bounds prevent:</p>
+<ul>
+<li><strong>Starvation</strong>: No scope can drop below 1% even under sustained zero demand</li>
+<li><strong>Monopolization</strong>: No scope can exceed 80% even under sustained saturation</li>
+</ul>
+<p>Queue tracking: <code>scope_queue_depths</code> increments on task claim and decrements on completion, failure, cancellation, or timeout via <code>decrement_scope_queue()</code>. The <code>task_scope_map</code> (task_hash → ScopeLevel) enables O(1) scope lookup on exit.</p>
+<h3>3.3 Gossip: Capacity Announcements</h3>
+<p>Existing <code>NodeCapacityAnnounce</code> messages are extended with scope budgets:</p>
+<pre><code class="language-rust">// Extension to ComputeMessage::NodeCapacityAnnounce
+NodeCapacityAnnounce {
+    executor: String,
+    capacity: NodeCapacity,
+    cell_id: Option&lt;CellId&gt;,          // NEW: which cell this node belongs to
+    scope_budgets: CapacityBudget,    // NEW: per-scope allocations
+}
+</code></pre>
+<hr>
+<h2>4. Job Placement (Scoped Routing)</h2>
+<h3>4.1 Extended PlacementRequest</h3>
+<pre><code class="language-rust">/// Extension to PlacementRequest (icn-compute/src/scheduler.rs)
+
+pub struct PlacementRequest {
+    pub task_hash: [u8; 32],
+    pub resource_profile: ResourceProfile,
+    pub locality_hints: Vec&lt;LocalityHint&gt;,
+    pub max_cost: Option&lt;u64&gt;,
+    pub requested_at: u64,
+
+    // === NEW: Scope-aware fields ===
+
+    /// Allowed scope levels for placement, in preference order.
+    ///
+    /// The scheduler tries the narrowest scope first, then widens.
+    /// Empty means &quot;any scope&quot; (backward compatible).
+    pub allowed_scopes: Vec&lt;ScopeLevel&gt;,
+
+    /// Cell affinity — prefer executors in this cell.
+    pub cell_affinity: Option&lt;CellId&gt;,
+
+    /// Maximum scope the submitter is willing to pay for.
+    ///
+    /// Wider scopes may incur higher costs (federation clearing fees, etc.)
+    pub max_scope: Option&lt;ScopeLevel&gt;,
+}
+</code></pre>
+<h3>4.2 Hierarchical Placement Flow</h3>
+<p>When a task is submitted, the scheduler attempts placement at progressively wider scopes:</p>
+<pre><code>Submit task with allowed_scopes = [Cell, Org, Federation]
+
+Step 1: Try Cell scope
+  → Query executors in submitter&#39;s cell
+  → If offer received with acceptable score → PLACE
+  → If no offer or score too low → widen
+
+Step 2: Try Org scope
+  → Query executors across cells in this org
+  → Apply org-level capacity budgets
+  → If offer received → PLACE (+ higher cost tier)
+  → If no offer → widen
+
+Step 3: Try Federation scope
+  → Query executors in federated cooperatives
+  → Apply federation capacity budgets + min trust threshold
+  → If offer received → PLACE (+ clearing fees)
+  → If no offer → REJECT (max scope reached)
+</code></pre>
+<pre><code>┌──────────┐
+│  Submit  │
+│  Task    │
+└────┬─────┘
+     │
+     ▼
+┌──────────────────┐     ┌─────────┐
+│ Try Cell scope   │────►│ Placed? │──Yes──► Done
+└──────────────────┘     └────┬────┘
+                              │ No
+                              ▼
+                    ┌──────────────────┐     ┌─────────┐
+                    │ Try Org scope    │────►│ Placed? │──Yes──► Done
+                    └──────────────────┘     └────┬────┘
+                                                  │ No
+                                                  ▼
+                                       ┌──────────────────────┐     ┌─────────┐
+                                       │ Try Federation scope │────►│ Placed? │──Yes──► Done
+                                       └──────────────────────┘     └────┬────┘
+                                                                        │ No
+                                                                        ▼
+                                                                   ┌──────────┐
+                                                                   │ Try      │
+                                                                   │ Commons  │
+                                                                   └────┬─────┘
+                                                                        │
+                                                                   (or reject)
+</code></pre>
+<h3>4.3 Score Adjustments by Scope</h3>
+<p>The placement score formula (from <code>DefaultPlacementPolicy</code>) gains a scope factor:</p>
+<table>
+<thead>
+<tr>
+<th>Scope Match</th>
+<th>Score Adjustment</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Same cell as submitter</td>
+<td>+0.10 (co-location bonus)</td>
+</tr>
+<tr>
+<td>Same org, different cell</td>
+<td>+0.05</td>
+</tr>
+<tr>
+<td>Same federation, different org</td>
+<td>+0.00 (neutral)</td>
+</tr>
+<tr>
+<td>Commons</td>
+<td>-0.05 (prefer closer scopes)</td>
+</tr>
+</tbody></table>
+<p>These adjustments layer on top of the existing trust, capacity, queue depth, and locality factors.</p>
+<hr>
+<h2>5. Storage &amp; Replication</h2>
+<h3>5.1 Scope-Aware Replication Policy</h3>
+<p>The existing <code>ReplicationPolicy</code> enum is extended with scope awareness:</p>
+<pre><code class="language-rust">/// Extended ReplicationPolicy (icn-kernel-api/src/state.rs)
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ReplicationPolicy {
+    /// Single node, no replication
+    LocalOnly,
+    /// Consensus group, linearizable reads/writes
+    ClusterStrong,
+    /// Gossip/CRDT, eventually consistent
+    FederationEventual,
+    /// Durable archive, retained indefinitely
+    Archive,
+
+    // === NEW: Scope-aware variants ===
+
+    /// Replicate within a specific scope level.
+    ///
+    /// The kernel replicates to `factor` nodes within the given scope.
+    /// e.g., `Scoped { scope: Cell, factor: 3 }` = 3 replicas within the cell.
+    Scoped {
+        scope: ScopeLevel,
+        factor: u8,
+    },
+}
+</code></pre>
+<h3>5.2 Per-Object Replication Configuration</h3>
+<p>Individual objects (blobs, log entries, KV values) can specify their replication scope:</p>
+<pre><code class="language-rust">/// Per-object replication configuration
+pub struct ObjectReplication {
+    /// Primary replication policy
+    pub policy: ReplicationPolicy,
+    /// Minimum scope for durability (narrower scopes may lose data on cell failure)
+    pub min_durability_scope: ScopeLevel,
+    /// Maximum scope (don&#39;t replicate beyond this level for privacy)
+    pub max_scope: ScopeLevel,
+}
+</code></pre>
+<h3>5.3 Data Locality Integration</h3>
+<p>Data replication scope directly influences job placement:</p>
+<ul>
+<li>If input blobs are <code>Scoped { scope: Cell, .. }</code>, the scheduler strongly prefers executors in that cell</li>
+<li>If results must be stored at <code>Org</code> scope, the scheduler accounts for post-execution replication cost</li>
+<li>The existing <code>LocalityHint::DataLocality</code> hint is extended to include scope information</li>
+</ul>
+<hr>
+<h2>6. Service Discovery</h2>
+<h3>6.1 ServiceEndpoint</h3>
+<p>A signed, scoped service advertisement:</p>
+<pre><code class="language-rust">/// File: icn/crates/icn-kernel-api/src/naming.rs (addition)
+
+/// A discoverable service endpoint.
+///
+/// Service providers publish these via gossip. Consumers query by
+/// service_id and scope. The kernel routes queries to the narrowest
+/// matching scope.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServiceEndpoint {
+    /// Unique service identifier (e.g., &quot;compute:ccl&quot;, &quot;storage:blob&quot;)
+    pub service_id: String,
+    /// DID of the service provider
+    pub provider: Did,
+    /// Type of endpoint
+    pub endpoint_type: EndpointType,
+    /// Network addresses (QUIC, HTTP, gRPC, etc.)
+    pub addresses: Vec&lt;String&gt;,
+    /// Capabilities this endpoint offers
+    pub capabilities: Vec&lt;String&gt;,
+    /// Minimum trust score required to use this service
+    pub trust_threshold: f64,
+    /// Scope at which this service is visible
+    pub scope_visibility: ScopeLevel,
+    /// Cell this endpoint belongs to (if any)
+    pub cell_id: Option&lt;CellId&gt;,
+    /// When this endpoint was last refreshed
+    pub updated_at: u64,
+    /// TTL in seconds (endpoint is stale after this)
+    pub ttl_secs: u64,
+    /// Ed25519 signature over all fields above
+    pub signature: Vec&lt;u8&gt;,
+}
+
+/// Endpoint transport type
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum EndpointType {
+    /// QUIC-based direct connection
+    Quic,
+    /// HTTP/REST API
+    Http,
+    /// gRPC service
+    Grpc,
+    /// WebSocket stream
+    WebSocket,
+}
+</code></pre>
+<h3>6.2 Gossip Topics</h3>
+<p>Service announcements use scoped gossip topics:</p>
+<table>
+<thead>
+<tr>
+<th>Topic</th>
+<th>Scope</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>services:cell:announce</code></td>
+<td>Cell</td>
+<td>Intra-cell service ads</td>
+</tr>
+<tr>
+<td><code>services:org:announce</code></td>
+<td>Org</td>
+<td>Org-wide service ads</td>
+</tr>
+<tr>
+<td><code>services:federation:announce</code></td>
+<td>Federation</td>
+<td>Cross-coop service ads</td>
+</tr>
+<tr>
+<td><code>services:commons:announce</code></td>
+<td>Commons</td>
+<td>Public service ads</td>
+</tr>
+<tr>
+<td><code>services:query</code></td>
+<td>Any</td>
+<td>Service lookup requests</td>
+</tr>
+</tbody></table>
+<h3>6.3 Query/Resolution Flow</h3>
+<pre><code>Consumer wants service &quot;compute:ccl&quot; at Org scope:
+
+1. Check local service cache
+2. Query services:cell:announce → find cell-local providers
+3. If no match or score too low → query services:org:announce
+4. Return best-scoring endpoint within allowed scope
+</code></pre>
+<hr>
+<h2>7. Economics &amp; Settlement</h2>
+<h3>7.1 ExecutionReceipt</h3>
+<p>Every task execution produces a metered, signed receipt:</p>
+<pre><code class="language-rust">/// File: icn/crates/icn-compute/src/types.rs (addition)
+
+/// Metered execution receipt with multi-party attestation.
+///
+/// Generated by the executor after task completion, acknowledged by the
+/// submitter, and optionally attested by a third-party verifier.
+/// Used as input to the settlement pipeline.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExecutionReceipt {
+    /// Hash of the executed task
+    pub task_hash: [u8; 32],
+    /// DID of the executor
+    pub executor: Did,
+    /// DID of the task submitter
+    pub submitter: Did,
+    /// Scope at which execution occurred
+    pub scope: ScopeLevel,
+    /// CPU time consumed (seconds, fractional)
+    pub cpu_seconds: f64,
+    /// Memory usage (MB-seconds)
+    pub memory_mb_seconds: f64,
+    /// Storage consumed (bytes)
+    pub storage_bytes: u64,
+    /// Network egress (bytes)
+    pub egress_bytes: u64,
+    /// Fuel units consumed
+    pub fuel_used: u64,
+    /// Computed cost in credits
+    pub cost: u64,
+    /// Executor&#39;s Ed25519 signature over metering fields
+    pub executor_signature: Vec&lt;u8&gt;,
+    /// Submitter&#39;s acknowledgment signature (optional, for dispute prevention)
+    pub submitter_ack: Option&lt;Vec&lt;u8&gt;&gt;,
+    /// Third-party attester DID (for high-value tasks)
+    pub attester: Option&lt;Did&gt;,
+    /// Attester&#39;s signature over the receipt
+    pub attester_signature: Option&lt;Vec&lt;u8&gt;&gt;,
+    /// Timestamp of receipt creation
+    pub created_at: u64,
+}
+
+impl ExecutionReceipt {
+    /// Compute the signing payload (deterministic serialization of metering fields).
+    pub fn signing_payload(&amp;self) -&gt; Vec&lt;u8&gt; {
+        let mut payload = Vec::new();
+        payload.extend_from_slice(&amp;self.task_hash);
+        payload.extend_from_slice(self.executor.as_str().as_bytes());
+        payload.extend_from_slice(self.submitter.as_str().as_bytes());
+        payload.push(self.scope.as_u8());
+        payload.extend_from_slice(&amp;self.cpu_seconds.to_le_bytes());
+        payload.extend_from_slice(&amp;self.memory_mb_seconds.to_le_bytes());
+        payload.extend_from_slice(&amp;self.storage_bytes.to_le_bytes());
+        payload.extend_from_slice(&amp;self.egress_bytes.to_le_bytes());
+        payload.extend_from_slice(&amp;self.fuel_used.to_le_bytes());
+        payload.extend_from_slice(&amp;self.cost.to_le_bytes());
+        payload
+    }
+}
+</code></pre>
+<h3>7.2 Settlement by Scope</h3>
+<p>Settlement mechanisms vary by scope:</p>
+<table>
+<thead>
+<tr>
+<th>Scope</th>
+<th>Settlement Mechanism</th>
+<th>Latency</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Local</strong></td>
+<td>No settlement (self-consumption)</td>
+<td>—</td>
+</tr>
+<tr>
+<td><strong>Cell</strong></td>
+<td>Internal ledger transfer</td>
+<td>Immediate</td>
+</tr>
+<tr>
+<td><strong>Org</strong></td>
+<td>Internal ledger transfer</td>
+<td>Immediate</td>
+</tr>
+<tr>
+<td><strong>Federation</strong></td>
+<td>Mutual credit clearing between orgs</td>
+<td>Batched (hourly/daily)</td>
+</tr>
+<tr>
+<td><strong>Commons</strong></td>
+<td>Commons credit pool (earn by contributing, spend by consuming)</td>
+<td>Batched</td>
+</tr>
+</tbody></table>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────┐
+│                       Settlement Pipeline                               │
+│                                                                         │
+│  ExecutionReceipt                                                       │
+│       │                                                                 │
+│       ▼                                                                 │
+│  ┌─────────────────────┐                                                │
+│  │ Scope Classification│                                                │
+│  └─────────┬───────────┘                                                │
+│            │                                                            │
+│    ┌───────┼──────────┬──────────────┐                                  │
+│    ▼       ▼          ▼              ▼                                  │
+│  Local   Cell/Org   Federation    Commons                               │
+│  (noop)  (direct    (clearing     (commons                              │
+│           ledger     house)        credit                               │
+│           entry)                   pool)                                │
+└─────────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<h3>7.3 Resource Contribution Accounting</h3>
+<p>Nodes that contribute resources to wider scopes earn credits:</p>
+<ul>
+<li>Contributing compute to <strong>Org</strong> scope earns internal cooperative credits</li>
+<li>Contributing to <strong>Federation</strong> scope earns clearing credit with the federation</li>
+<li>Contributing to <strong>Commons</strong> scope earns commons credits, redeemable for commons resources</li>
+</ul>
+<p>The kernel tracks resource contributions via <code>ExecutionReceipt</code> metering. Apps interpret the economic meaning.</p>
+<hr>
+<h2>8. Identity Across Devices</h2>
+<h3>8.1 Personal Cells</h3>
+<p>An individual&#39;s devices form a <strong>personal cell</strong>:</p>
+<pre><code>┌──────────────── Personal Cell (Alice) ──────────────────┐
+│                                                          │
+│   Principal DID: did:icn:alice                           │
+│   CellId: cell:7kQ3...(derived from alice&#39;s DID)        │
+│                                                          │
+│   ┌───────────┐   ┌───────────┐   ┌───────────┐        │
+│   │  Laptop   │   │  Phone    │   │  Server   │        │
+│   │ (device1) │   │ (device2) │   │ (device3) │        │
+│   └───────────┘   └───────────┘   └───────────┘        │
+│                                                          │
+│   All devices share the principal DID&#39;s authority         │
+│   State is replicated within the personal cell           │
+└──────────────────────────────────────────────────────────┘
+</code></pre>
+<ul>
+<li>Each device has its own Ed25519 keypair (for DID-TLS binding)</li>
+<li>The principal DID delegates authority to device keys</li>
+<li>Cell-level replication keeps devices in sync</li>
+<li>Loss of a single device doesn&#39;t lose identity (other devices hold replicas)</li>
+</ul>
+<h3>8.2 Independent Developer Nodes</h3>
+<p>Nodes without organizational affiliation participate directly in the <strong>Commons</strong> scope:</p>
+<ul>
+<li>No <code>Org</code> or <code>Cell</code> membership required</li>
+<li>Contribute compute/storage to the commons pool</li>
+<li>Earn commons credits for contributions</li>
+<li>Can consume commons resources using earned credits</li>
+<li>Trust scores are built individually (no organizational endorsement)</li>
+</ul>
+<hr>
+<h2>9. Gossip Topics</h2>
+<h3>9.1 New Topics</h3>
+<table>
+<thead>
+<tr>
+<th>Topic</th>
+<th>Direction</th>
+<th>Payload</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>cell:announce</code></td>
+<td>Broadcast</td>
+<td><code>CellAnnounce</code></td>
+<td>Cell membership advertisement</td>
+</tr>
+<tr>
+<td><code>cell:join</code></td>
+<td>Directed</td>
+<td><code>CellJoinRequest</code></td>
+<td>Request to join a cell</td>
+</tr>
+<tr>
+<td><code>cell:leave</code></td>
+<td>Broadcast</td>
+<td><code>CellLeaveNotice</code></td>
+<td>Node departing a cell</td>
+</tr>
+<tr>
+<td><code>services:&lt;scope&gt;:announce</code></td>
+<td>Scoped</td>
+<td><code>ServiceEndpoint</code></td>
+<td>Service advertisement at scope</td>
+</tr>
+<tr>
+<td><code>services:query</code></td>
+<td>Request/Response</td>
+<td><code>ServiceQuery</code></td>
+<td>Service lookup</td>
+</tr>
+<tr>
+<td><code>settlement:receipt</code></td>
+<td>Directed</td>
+<td><code>ExecutionReceipt</code></td>
+<td>Settlement input</td>
+</tr>
+<tr>
+<td><code>settlement:dispute</code></td>
+<td>Directed</td>
+<td><code>SettlementDispute</code></td>
+<td>Receipt dispute</td>
+</tr>
+</tbody></table>
+<h3>9.2 Cell Lifecycle Messages</h3>
+<pre><code class="language-rust">/// Cell membership announcement
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CellAnnounce {
+    /// The cell being announced
+    pub cell_id: CellId,
+    /// Human-readable cell name
+    pub cell_name: String,
+    /// Parent scope identifier
+    pub scope_id: String,
+    /// Scope level of this cell&#39;s parent
+    pub scope_level: ScopeLevel,
+    /// Current cell members (DIDs)
+    pub members: Vec&lt;Did&gt;,
+    /// Aggregate capacity of the cell
+    pub aggregate_capacity: NodeCapacity,
+    /// When this announcement was generated
+    pub announced_at: u64,
+    /// Signature by the cell&#39;s genesis key
+    pub signature: Vec&lt;u8&gt;,
+}
+</code></pre>
+<hr>
+<h2>10. Integration with Kernel/App Separation</h2>
+<h3>10.1 CellService Trait</h3>
+<p>Apps that manage cell lifecycle implement this trait:</p>
+<pre><code class="language-rust">/// File: icn/crates/icn-kernel-api/src/services.rs (addition)
+
+/// Abstract cell management service.
+///
+/// The kernel uses this to query cell membership and scope topology
+/// without knowing the organizational semantics behind cells.
+pub trait CellService: Send + Sync {
+    /// Get the cell this node belongs to (if any)
+    fn local_cell(&amp;self) -&gt; Option&lt;CellId&gt;;
+
+    /// Get the scope level of a given cell
+    fn cell_scope(&amp;self, cell_id: &amp;CellId) -&gt; Option&lt;ScopeLevel&gt;;
+
+    /// List members of a cell
+    fn cell_members(&amp;self, cell_id: &amp;CellId) -&gt; Vec&lt;Did&gt;;
+
+    /// Check if a DID is in the same cell as the local node
+    fn is_cell_peer(&amp;self, did: &amp;Did) -&gt; bool;
+
+    /// Check if a DID is in the same org (any cell in the org)
+    fn is_org_peer(&amp;self, did: &amp;Did) -&gt; bool;
+
+    /// Get the scope relationship between local node and a peer
+    fn peer_scope(&amp;self, did: &amp;Did) -&gt; ScopeLevel;
+}
+</code></pre>
+<h3>10.2 ScopePolicy Oracle</h3>
+<p>A <code>PolicyOracle</code> implementation that converts scope decisions into <code>ConstraintSet</code>:</p>
+<pre><code class="language-rust">/// Example: ScopePolicyOracle (app layer)
+impl PolicyOracle for ScopePolicyOracle {
+    fn evaluate(&amp;self, request: &amp;PolicyRequest) -&gt; PolicyDecision {
+        let scope = self.cell_service.peer_scope(&amp;request.actor);
+
+        // ═══ MEANING FIREWALL ═══
+        // Scope semantics (org membership, federation status) end here.
+        // Below this line, only generic constraints.
+
+        let constraints = ConstraintSet::new()
+            .with_rate_limit(scope_to_rate_limit(scope))
+            .with_custom(&quot;scope_level&quot;, ConstraintValue::Int(scope.as_u8() as i64))
+            .with_custom(&quot;max_job_cost&quot;, ConstraintValue::Int(
+                scope_to_max_cost(scope)
+            ));
+
+        PolicyDecision::Allow { constraints }
+    }
+
+    fn domain(&amp;self) -&gt; Domain {
+        Domain::Scope  // new domain variant
+    }
+}
+</code></pre>
+<h3>10.3 Meaning Firewall Compliance</h3>
+<p>The kernel sees:</p>
+<ul>
+<li><code>ScopeLevel</code> as an ordered integer (0–4)</li>
+<li><code>CellId</code> as an opaque 32-byte identifier</li>
+<li><code>CapacityBudget</code> as five floats summing to ≤ 1.0</li>
+<li><code>ServiceEndpoint</code> as a signed blob with a visibility level</li>
+</ul>
+<p>The kernel does NOT see:</p>
+<ul>
+<li>What &quot;organization&quot; means (cooperative? company? household?)</li>
+<li>Why a cell exists (HA? privacy? geographic proximity?)</li>
+<li>Why a budget is split a particular way (policy decision)</li>
+<li>Why a service is scoped to a particular level (business logic)</li>
+</ul>
+<hr>
+<h2>11. Migration Plan</h2>
+<h3>Phase 1: Foundation (ScopeLevel + CellId)</h3>
+<ol>
+<li>Add <code>ScopeLevel</code> enum and <code>CellId</code> type to <code>icn-kernel-api</code></li>
+<li>Add <code>CellService</code> trait to <code>icn-kernel-api/src/services.rs</code></li>
+<li>Register <code>CellService</code> in <code>ServiceRegistry</code></li>
+<li>Unit tests for all new types</li>
+</ol>
+<h3>Phase 2: Capacity &amp; Placement ✅</h3>
+<blockquote>
+<p>Implemented in PR #962 (<code>feat/scope-placement</code>).</p>
+</blockquote>
+<ol>
+<li>✅ Add <code>CapacityBudget</code> to <code>icn-compute</code></li>
+<li>✅ Extend <code>PlacementRequest</code> with <code>allowed_scopes</code> and <code>cell_affinity</code></li>
+<li>✅ Implement hierarchical placement routing in <code>DefaultPlacementPolicy</code></li>
+<li>✅ Add demand-feedback loop for capacity adjustment</li>
+<li>✅ Wire <code>CellService</code> into <code>ComputeActor</code> for real <code>ScopeContext</code></li>
+</ol>
+<h3>Phase 3: Discovery &amp; Networking</h3>
+<ol>
+<li>Add <code>ServiceEndpoint</code> type to <code>icn-kernel-api</code></li>
+<li>Add scoped gossip topics for service discovery</li>
+<li>Add service query API to gateway</li>
+<li>Integration tests for discovery flow</li>
+</ol>
+<h3>Phase 4: Settlement &amp; Economics</h3>
+<ol>
+<li>Add <code>ExecutionReceipt</code> type to <code>icn-compute</code></li>
+<li>Implement receipt signing and verification</li>
+<li>Add settlement entry creation in <code>icn-ledger</code></li>
+<li>Add cross-scope clearing in <code>icn-federation</code></li>
+</ol>
+<h3>Phase 5: Replication &amp; Storage</h3>
+<ol>
+<li>Extend <code>ReplicationPolicy</code> with <code>Scoped</code> variant</li>
+<li>Add per-object replication configuration</li>
+<li>Implement dynamic replication factor adjustment</li>
+<li>Integration tests for scope-aware replication</li>
+</ol>
+<h3>Phase 6: Commons Pool</h3>
+<ol>
+<li>Add <code>CommonsPool</code> type for aggregate capacity tracking</li>
+<li>Implement unaffiliated node participation protocol</li>
+<li>Add commons credit earning and spending</li>
+<li>Integration tests for commons contributions</li>
+</ol>
+<hr>
+<h2>12. GitHub Issue Hierarchy</h2>
+<p>All implementation work is tracked in GitHub issues following the <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/.github/ISSUE_POLICY">Issue Policy</a>.</p>
+<p><strong>Level 0 (Meta)</strong>:</p>
+<ul>
+<li><code>meta: Cells &amp; Scopes Architecture</code> — tracks all epics</li>
+</ul>
+<p><strong>Level 1 (Epics)</strong>:</p>
+<ol>
+<li><code>feat(kernel-api): ScopeLevel primitive and Cell identity</code></li>
+<li><code>feat(compute): Scope-aware capacity budgets and placement</code></li>
+<li><code>feat(kernel-api): Service endpoint discovery and registry</code></li>
+<li><code>feat(compute): ExecutionReceipt and settlement pipeline</code></li>
+<li><code>feat(store): Scope-aware replication policy</code></li>
+<li><code>feat(compute): Commons resource pool and contribution accounting</code></li>
+</ol>
+<p>See individual issues for acceptance criteria and sub-tasks.</p>
+<hr>
+<h2>Appendix: Key Files</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icn/crates/icn-kernel-api/src/lib.rs</code></td>
+<td>Kernel API trait exports</td>
+</tr>
+<tr>
+<td><code>icn/crates/icn-kernel-api/src/scope.rs</code></td>
+<td>ScopeLevel, CellId (NEW)</td>
+</tr>
+<tr>
+<td><code>icn/crates/icn-kernel-api/src/services.rs</code></td>
+<td>CellService trait (addition)</td>
+</tr>
+<tr>
+<td><code>icn/crates/icn-kernel-api/src/naming.rs</code></td>
+<td>ServiceEndpoint type (addition)</td>
+</tr>
+<tr>
+<td><code>icn/crates/icn-kernel-api/src/state.rs</code></td>
+<td>ReplicationPolicy extension</td>
+</tr>
+<tr>
+<td><code>icn/crates/icn-compute/src/scheduler.rs</code></td>
+<td>CapacityBudget, PlacementRequest, DemandAdjustmentConfig, PlacementPolicy</td>
+</tr>
+<tr>
+<td><code>icn/crates/icn-compute/src/actor/mod.rs</code></td>
+<td>ComputeActor with cell_service, scope_queue_depths, demand loop</td>
+</tr>
+<tr>
+<td><code>icn/crates/icn-compute/src/actor/placement.rs</code></td>
+<td>Scope-aware placement handler, ScopeContext construction</td>
+</tr>
+<tr>
+<td><code>icn/crates/icn-compute/src/actor/lifecycle.rs</code></td>
+<td>Queue depth tracking (increment on claim, decrement on exit)</td>
+</tr>
+<tr>
+<td><code>icn/crates/icn-compute/src/types.rs</code></td>
+<td>ExecutionReceipt, ComputeMessage scope fields</td>
+</tr>
+<tr>
+<td><code>icn/crates/icn-federation/src/types.rs</code></td>
+<td>Cross-scope clearing types</td>
+</tr>
+<tr>
+<td><code>docs/architecture/KERNEL_APP_SEPARATION.md</code></td>
+<td>Meaning Firewall reference</td>
+</tr>
+</tbody></table>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

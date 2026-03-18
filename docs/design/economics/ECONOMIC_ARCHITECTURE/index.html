@@ -1,0 +1,623 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Economic Architecture | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>economics</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ECONOMIC ARCHITECTURE</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/economics/ECONOMIC_ARCHITECTURE.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Economic Architecture</h1>
+<p><strong>Last Updated</strong>: 2026-01-17
+<strong>Status</strong>: Design Document</p>
+<hr>
+<h2>Overview</h2>
+<p>This document describes the technical architecture of ICN&#39;s economic system. It complements <a href="https://github.com/InterCooperative-Network/icn/blob/main/ECONOMIC_VISION">ECONOMIC_VISION.md</a> which covers the strategic framing.</p>
+<p>The economic system is designed around three principles:</p>
+<ol>
+<li><strong>Grounded in reality</strong> — tokens represent real things, not financial abstractions</li>
+<li><strong>Speculation-resistant</strong> — mechanisms prevent value extraction without contribution</li>
+<li><strong>Incrementally deployable</strong> — each layer is independently useful</li>
+</ol>
+<hr>
+<h2>The Layered Economy</h2>
+<p>ICN&#39;s economic system has three layers, each serving different needs:</p>
+<pre><code>┌─────────────────────────────────────────────────────────────────┐
+│  LAYER 3: FIAT BRIDGES (Controlled Interfaces)                  │
+│  • Treasury cooperatives hold fiat reserves                     │
+│  • Exchange only through governed gateways                      │
+│  • Rate bands, not free markets                                 │
+│  • For: taxes, external imports, medical systems                │
+└─────────────────────────────────────────────────────────────────┘
+                              ↑↓
+                    Governed conversion (not free market)
+                              ↑↓
+┌─────────────────────────────────────────────────────────────────┐
+│  LAYER 2: ASSET TOKENS (Transformation-Tracked)                 │
+│  • Represent real goods: tools, materials, products             │
+│  • Created only via attested transformations                    │
+│  • Carry full provenance chains                                 │
+│  • Exchange via negotiation within guardrails                   │
+│  • Optional demurrage on idle hoarding                          │
+└─────────────────────────────────────────────────────────────────┘
+                              ↑↓
+                    Labor inputs to transformations
+                              ↑↓
+┌─────────────────────────────────────────────────────────────────┐
+│  LAYER 1: MUTUAL CREDIT (Pure Coordination)                     │
+│  • Hours or community-defined units                             │
+│  • For services, labor, daily exchange                          │
+│  • Reputation-gated limits                                      │
+│  • No backing required (it&#39;s coordination, not money)           │
+└─────────────────────────────────────────────────────────────────┘
+                              ↑↓
+                    Built on
+                              ↑↓
+┌─────────────────────────────────────────────────────────────────┐
+│  SUBSTRATE: ICN Core                                            │
+│  Identity • Trust Graph • Ledger • CCL • Governance • Gossip    │
+└─────────────────────────────────────────────────────────────────┘
+</code></pre>
+<h3>Layer 1: Mutual Credit</h3>
+<p><strong>Purpose</strong>: Coordinate service exchange between members</p>
+<p><strong>Characteristics</strong>:</p>
+<ul>
+<li>Unit of account is hours or community-defined</li>
+<li>Zero-sum: every credit creates a matching debit</li>
+<li>No external backing required</li>
+<li>Works entirely within network</li>
+</ul>
+<p><strong>Use Cases</strong>:</p>
+<ul>
+<li>Timebanking (1 hour = 1 hour)</li>
+<li>Service exchange between members</li>
+<li>Labor contribution tracking</li>
+</ul>
+<p><strong>Safety Mechanisms</strong>:</p>
+<ul>
+<li>Reputation-gated credit limits</li>
+<li>Balance transparency</li>
+<li>Dispute/freeze mechanisms</li>
+</ul>
+<h3>Layer 2: Asset Tokens</h3>
+<p><strong>Purpose</strong>: Track ownership and provenance of real goods</p>
+<p><strong>Characteristics</strong>:</p>
+<ul>
+<li>Each token represents a real physical item</li>
+<li>Creation requires attestation (proof it exists)</li>
+<li>Full provenance chain from origin</li>
+<li>Exchange via negotiation, not markets</li>
+</ul>
+<p><strong>Use Cases</strong>:</p>
+<ul>
+<li>Equipment sharing between coops</li>
+<li>Tool libraries</li>
+<li>Material tracking through supply chains</li>
+<li>Inventory management</li>
+</ul>
+<p><strong>Safety Mechanisms</strong>:</p>
+<ul>
+<li>Attestation requirements for creation</li>
+<li>Bonded witnesses for high-value items</li>
+<li>Challenge windows for disputes</li>
+</ul>
+<h3>Layer 3: Fiat Bridges</h3>
+<p><strong>Purpose</strong>: Interface with external economy when necessary</p>
+<p><strong>Characteristics</strong>:</p>
+<ul>
+<li>Controlled gateways, not free exchange</li>
+<li>Rate bands prevent speculation</li>
+<li>Governed by treasury cooperatives</li>
+<li>Minimized by design (internal first)</li>
+</ul>
+<p><strong>Use Cases</strong>:</p>
+<ul>
+<li>Tax payments</li>
+<li>External supplier payments</li>
+<li>Medical expenses</li>
+<li>Imports not available internally</li>
+</ul>
+<p><strong>Safety Mechanisms</strong>:</p>
+<ul>
+<li>Governance approval for large conversions</li>
+<li>Rate bands (not free market prices)</li>
+<li>Reserve requirements</li>
+</ul>
+<hr>
+<h2>Failure Mode Defenses</h2>
+<p>The economic system must defend against known failure modes of mutual credit and alternative currency systems.</p>
+<h3>Failure Mode 1: Soft Budget Constraint</h3>
+<p><strong>Problem</strong>: Accounts accumulate large negatives with no real consequence, leading to over-issuance and confidence collapse.</p>
+<p><strong>Defense: Reputation-Gated Credit Limits</strong></p>
+<pre><code>credit_limit = f(
+    participation_history,    // How long active, how consistent
+    attestations_received,    // Vouches from other members
+    contracts_fulfilled,      // Track record of commitments
+    dispute_record           // History of problems
+)
+</code></pre>
+<p>Credit limits are not fixed numbers but living variables computed from the trust graph. The deeper someone&#39;s positive participation, the higher their limit.</p>
+<p><strong>Defense: Parameter Guardrails</strong></p>
+<p>Constitutional ranges enforced at protocol level:</p>
+<ul>
+<li>Minimum/maximum credit limits per trust class</li>
+<li>Maximum rate of limit increase</li>
+<li>Mandatory review thresholds</li>
+</ul>
+<h3>Failure Mode 2: Hit-and-Run</h3>
+<p><strong>Problem</strong>: Someone joins, consumes value, disappears.</p>
+<p><strong>Defense: Identity Continuity</strong></p>
+<p>DIDs are portable but reputation follows. You cannot &quot;delete your account&quot; — your identity and history persist. Leaving one community with bad standing affects your reputation across the federation.</p>
+<p><strong>Defense: Federated Reputation Propagation</strong></p>
+<p>Misbehavior attestations propagate via gossip. Bad actors in one coop face reduced trust network-wide.</p>
+<p><strong>Defense: Graduated Onboarding</strong></p>
+<p>New members may have:</p>
+<ul>
+<li>Lower initial credit limits</li>
+<li>Sponsorship requirements</li>
+<li>Probationary periods before full privileges</li>
+</ul>
+<h3>Failure Mode 3: Balance Asymmetry</h3>
+<p><strong>Problem</strong>: One coop becomes perpetual importer, another perpetual exporter, creating unsustainable imbalances.</p>
+<p><strong>Defense: Clearing Bands</strong> (Federation Level)</p>
+<p>Each coop maintains target balance ranges with the federation. Exceeding triggers:</p>
+<ul>
+<li>Automatic demurrage on surplus</li>
+<li>Contribution requirements for deficit</li>
+<li>Mediated rebalancing conversations</li>
+</ul>
+<p><strong>Defense: Multi-Modal Settlement</strong></p>
+<p>Imbalances can be settled via:</p>
+<ul>
+<li>Labor hours</li>
+<li>Asset tokens</li>
+<li>Fiat (last resort)</li>
+<li>Service commitments</li>
+</ul>
+<h3>Failure Mode 4: Valuation Chaos</h3>
+<p><strong>Problem</strong>: If everything is priced arbitrarily, trust evaporates.</p>
+<p><strong>Defense: Reference Units</strong></p>
+<p>Communities maintain reference exchange rates as social agreements:</p>
+<ul>
+<li>&quot;1 hour general labor ≈ X credits&quot;</li>
+<li>&quot;1 table ≈ Y hours carpentry&quot;</li>
+<li>Updated periodically by governance</li>
+</ul>
+<p>These are not market prices but community baselines for negotiation.</p>
+<p><strong>Defense: Negotiation Within Guardrails</strong></p>
+<p>Parties negotiate directly, but:</p>
+<ul>
+<li>Exchanges must be within ±N% of reference (configurable)</li>
+<li>Outlier transactions flagged for review</li>
+<li>Disputes go to community arbitration</li>
+</ul>
+<h3>Failure Mode 5: Governance Capture</h3>
+<p><strong>Problem</strong>: Large actors dominate issuance rules.</p>
+<p><strong>Defense: Quadratic Voice</strong></p>
+<p>Changes to monetary parameters require weighted consensus where voice scales sub-linearly with stake (quadratic voting or similar).</p>
+<p><strong>Defense: Protocol-Level Guardrails</strong></p>
+<p>Some parameters have hard limits that governance cannot override:</p>
+<ul>
+<li>Maximum individual credit limit</li>
+<li>Minimum attestation requirements</li>
+<li>Challenge window durations</li>
+</ul>
+<hr>
+<h2>The Transformation Model</h2>
+<p>When materials are transformed into products (lumber → table), the system tracks this cryptographically.</p>
+<h3>Transformation Structure</h3>
+<pre><code>Transformation {
+    inputs: [
+        (token_id: lumber_batch_42, quantity: 10, unit: &quot;board_feet&quot;),
+        (token_id: labor_hours, quantity: 4, unit: &quot;hours&quot;)
+    ],
+    outputs: [
+        (token_type: &quot;furniture/table&quot;, quantity: 1, grade: &quot;standard&quot;)
+    ],
+    transformer: did:icn:carpenter_alice,
+    recipe: &quot;furniture/table/basic&quot;,
+    attestations: [
+        (witness: did:icn:bob, claim: &quot;observed transformation&quot;),
+        (inspector: did:icn:quality_guild, claim: &quot;grade verified&quot;)
+    ],
+    provenance_root: &lt;merkle_root_of_input_histories&gt;,
+    timestamp: 2026-01-17T14:30:00Z
+}
+</code></pre>
+<h3>Key Properties</h3>
+<ol>
+<li><strong>Inputs are consumed</strong> (UTXO-style) — lumber tokens are &quot;spent&quot; when transformed</li>
+<li><strong>Outputs carry provenance</strong> — the table token contains a merkle root linking to all inputs</li>
+<li><strong>Recipes are governed</strong> — valid transformations must match approved patterns</li>
+<li><strong>Attestations prevent fraud</strong> — witnesses verify transformation actually happened</li>
+</ol>
+<h3>Provenance Chains</h3>
+<p>Every asset token carries its history:</p>
+<pre><code>forest_plot_7 → lumber_batch_42 → table_0891
+     ↑              ↑                ↑
+  harvest       milling          carpentry
+  attestation   attestation      attestation
+</code></pre>
+<p>Anyone can verify: &quot;This table came from sustainably harvested lumber from plot 7, milled by Coop A, built by Alice.&quot;</p>
+<h3>Recipe Governance</h3>
+<p>Recipes define valid transformation patterns:</p>
+<pre><code>Recipe {
+    id: &quot;furniture/table/dining&quot;,
+    version: 3,
+    inputs: [
+        (material: &quot;lumber/hardwood&quot;, min: 8, max: 12, unit: &quot;board_feet&quot;),
+        (labor: &quot;carpentry/journeyman+&quot;, min: 3, max: 6, unit: &quot;hours&quot;)
+    ],
+    outputs: [
+        (asset: &quot;furniture/table/dining&quot;, quantity: 1)
+    ],
+    quality_grades: [&quot;standard&quot;, &quot;fine&quot;, &quot;heirloom&quot;],
+    required_attestations: [&quot;transformer_capability&quot;, &quot;material_inspection&quot;],
+    approved_by: governance_proposal_847
+}
+</code></pre>
+<p><strong>Tiered Approval</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Recipe Type</th>
+<th>Approval Path</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Variant of existing</td>
+<td>Guild review or auto-approve</td>
+</tr>
+<tr>
+<td>New category</td>
+<td>Community vote + expert review</td>
+</tr>
+<tr>
+<td>Cross-domain</td>
+<td>Multi-guild coordination</td>
+</tr>
+<tr>
+<td>Safety-critical</td>
+<td>Stringent review + testing period</td>
+</tr>
+</tbody></table>
+<p><strong>Experimental Recipes</strong>: Allow transformation but mark outputs as &quot;experimental&quot; with limited transferability until recipe graduates to approved status.</p>
+<hr>
+<h2>Physical Verification</h2>
+<p>How do you know the lumber actually exists before tokenizing it?</p>
+<h3>Layered Verification by Value</h3>
+<table>
+<thead>
+<tr>
+<th>Value Level</th>
+<th>Verification Required</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Low (vegetables, small repairs)</td>
+<td>Self-attestation + reputation stake</td>
+</tr>
+<tr>
+<td>Medium (lumber, tools, bulk materials)</td>
+<td>Peer witness (2-of-3 attestations)</td>
+</tr>
+<tr>
+<td>High (vehicles, housing, equipment)</td>
+<td>Inspector guild + bonded collateral</td>
+</tr>
+</tbody></table>
+<h3>Attestation Structure</h3>
+<pre><code>Attestation {
+    attester: did:icn:witness_bob,
+    claim: &quot;lumber_batch_42 exists, 200 board_feet, grade A&quot;,
+    stake: 50 reputation_points,
+    challenge_window: 30 days,
+    evidence: [photo_hashes...],
+
+    // If challenged and found false:
+    penalty: stake * 3 + attestation_privileges_suspended
+}
+</code></pre>
+<h3>Collusion Mitigation</h3>
+<ul>
+<li>Attestation graph analysis flags suspicious patterns</li>
+<li>Same small group always attesting each other → audit trigger</li>
+<li>High-value goods require diverse attestation sources</li>
+<li>Economic bonds (not just reputation) for highest-value items</li>
+</ul>
+<hr>
+<h2>Partial Consumption and Fungibility</h2>
+<h3>Discrete vs. Fungible Goods</h3>
+<p>Different goods need different models:</p>
+<p><strong>Discrete goods</strong> (tools, vehicles, furniture):</p>
+<ul>
+<li>Individual tokens, UTXO-style</li>
+<li>Clear ownership, no splitting</li>
+<li>Full provenance per item</li>
+</ul>
+<p><strong>Bulk fungibles</strong> (fuel, grain, lumber by board-foot):</p>
+<ul>
+<li>Pool tokens with quantity tracking</li>
+<li>Provenance tracked by batch proportions</li>
+<li>First-in-first-out for consumption</li>
+</ul>
+<p><strong>Consumables</strong> (food, supplies):</p>
+<ul>
+<li>Simple quantity tokens</li>
+<li>Batch-level provenance optional</li>
+</ul>
+<h3>Resource Type Definition</h3>
+<pre><code>ResourceType {
+    id: &quot;lumber/pine/construction&quot;,
+    fungibility: Fungible { unit: &quot;board_feet&quot; },
+    provenance_tracking: BatchLevel,
+    depreciation: None,
+    quality_grades: [&quot;construction&quot;, &quot;select&quot;, &quot;premium&quot;]
+}
+
+ResourceType {
+    id: &quot;furniture/table/dining&quot;,
+    fungibility: Discrete,
+    provenance_tracking: Full,
+    depreciation: ConditionBased,
+    quality_grades: [&quot;standard&quot;, &quot;fine&quot;, &quot;heirloom&quot;]
+}
+</code></pre>
+<hr>
+<h2>Quality Grades and Depreciation</h2>
+<h3>Grade-at-Transformation</h3>
+<p>Quality is attested when the item is created:</p>
+<pre><code>GradeAttestation {
+    token: table_token_0891,
+    grade: &quot;fine&quot;,
+    grader: did:icn:furniture_guild,
+    evidence: [photo_hashes...],
+    challenge_window: 14 days
+}
+</code></pre>
+<p><strong>Dispute Resolution</strong>:</p>
+<ol>
+<li>Receiver challenges within window</li>
+<li>Evidence submitted by both parties</li>
+<li>Arbitration by guild panel or community vote</li>
+<li>Outcome: grade adjustment, reputation impact, possible compensation</li>
+</ol>
+<h3>Depreciation Tracking</h3>
+<p>For high-value assets:</p>
+<pre><code>AssetToken {
+    id: truck_token_42,
+    resource_type: &quot;vehicle/truck/box&quot;,
+    created: 2020-01-01,
+    condition_history: [
+        (2024-01-01, &quot;good&quot;, attester: mechanic_guild, notes: &quot;new tires&quot;),
+        (2025-06-01, &quot;fair&quot;, attester: mechanic_guild, notes: &quot;transmission wear&quot;)
+    ],
+    maintenance_log: [
+        (2024-03, &quot;oil change&quot;, attester: garage_coop),
+        (2024-06, &quot;brake pads&quot;, attester: garage_coop)
+    ]
+}
+</code></pre>
+<p><strong>Retirement Events</strong>:</p>
+<pre><code>RetirementEvent {
+    token: truck_token_42,
+    reason: &quot;totaled in accident&quot;,
+    attestation: [insurance_coop, owner],
+    // Token marked retired, cannot be transferred
+    // History preserved for provenance queries
+}
+</code></pre>
+<hr>
+<h2>Cross-Community Exchange</h2>
+<h3>Hierarchical Type Ontology</h3>
+<pre><code>Global Layer: Basic resource ontology (wood, metal, food, shelter...)
+    ↓
+Regional Layer: Refined types (lumber/hardwood, lumber/softwood...)
+    ↓
+Community Layer: Local specifics (lumber/hardwood/bob&#39;s_mill)
+</code></pre>
+<p>Each layer maps to the one above. Cross-community exchange happens at shared layer.</p>
+<h3>Equivalence Mapping</h3>
+<p>Communities use local naming. When they trade, they register equivalences:</p>
+<pre><code>TypeEquivalence {
+    community_a: &quot;palm_city/furniture/dining_table&quot;,
+    community_b: &quot;river_coop/woodwork/table_4seat&quot;,
+    equivalence: Equivalent,
+    attested_by: [federation_council, both_communities]
+}
+</code></pre>
+<h3>Cross-Community Transfer</h3>
+<pre><code>CrossCommunityTransfer {
+    token: table_token_0891,
+    from_community: palm_city_coop,
+    to_community: river_valley_federation,
+
+    source_type: &quot;palm_city/furniture/table/dining&quot;,
+    target_type: &quot;river_valley/woodwork/table&quot;,
+    mapping: registered_equivalence_47,
+
+    exchange_terms: {
+        offered: table_token_0891,
+        received: 35 river_valley_hours,
+        negotiated_by: [alice, bob],
+        within_guardrails: true  // ±20% of reference
+    },
+
+    export_attestation: palm_city_trade_committee,
+    import_attestation: river_valley_trade_committee
+}
+</code></pre>
+<hr>
+<h2>Implementation Staging</h2>
+<p>The economic system is built incrementally. Each stage is independently useful.</p>
+<h3>Stage A: Mutual Credit (Current)</h3>
+<ul>
+<li>Hours-based exchange</li>
+<li>Reputation-gated credit limits</li>
+<li>Basic governance</li>
+<li>Dispute mechanisms</li>
+</ul>
+<p><strong>What this enables</strong>: Timebanks, service exchange, labor tracking</p>
+<h3>Stage B: Simple Asset Tokens</h3>
+<ul>
+<li>Tokens represent &quot;this thing exists&quot;</li>
+<li>Attestation-backed creation</li>
+<li>Ownership transfer</li>
+<li>No transformation yet</li>
+</ul>
+<p><strong>Minimum Viable Listing</strong>:</p>
+<pre><code>Listing {
+    id: unique,
+    type: &quot;offer&quot; | &quot;want&quot;,
+    item: &quot;Commercial convection oven, Vulcan brand&quot;,
+    description: &quot;Doesn&#39;t fit our doorways. Original cost $1200.&quot;,
+    photos: [hash1, hash2],
+    offered_by: did:icn:abundance_coop,
+    seeking: &quot;Credits, labor exchange, or make an offer&quot;,
+    visible_to: [&quot;ny_food_coop_federation&quot;],
+    expires: 2026-03-01,
+    status: &quot;active&quot; | &quot;matched&quot; | &quot;completed&quot;
+}
+</code></pre>
+<p><strong>What this enables</strong>: Tool libraries, equipment sharing, cooperative marketplace</p>
+<h3>Stage C: Transformation System</h3>
+<ul>
+<li>Recipes as CCL contracts</li>
+<li>Input consumption, output creation</li>
+<li>Provenance tracking</li>
+<li>Quality grading</li>
+</ul>
+<p><strong>What this enables</strong>: Maker spaces, manufacturing coops, supply chain transparency</p>
+<h3>Stage D: Cross-Community Exchange</h3>
+<ul>
+<li>Bilateral equivalence mappings</li>
+<li>Federation-level clearing</li>
+<li>Shared type vocabulary (emergent)</li>
+</ul>
+<p><strong>What this enables</strong>: Regional cooperative economies, inter-federation trade</p>
+<h3>Stage E: Fiat Bridges</h3>
+<ul>
+<li>Treasury cooperatives with reserves</li>
+<li>Governed conversion gateways</li>
+<li>Rate bands (not free market)</li>
+</ul>
+<p><strong>What this enables</strong>: External interface when internal options exhausted</p>
+<hr>
+<h2>Relation to ICN Crates</h2>
+<table>
+<thead>
+<tr>
+<th>Economic Concept</th>
+<th>ICN Component</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Mutual credit</td>
+<td><code>icn-ledger</code></td>
+</tr>
+<tr>
+<td>Credit limits</td>
+<td><code>icn-ledger</code> + <code>icn-trust</code></td>
+</tr>
+<tr>
+<td>Asset tokens</td>
+<td><code>icn-ledger</code> (extension)</td>
+</tr>
+<tr>
+<td>Attestations</td>
+<td><code>icn-trust</code> + <code>icn-gossip</code></td>
+</tr>
+<tr>
+<td>Recipes</td>
+<td><code>icn-ccl</code> (contract templates)</td>
+</tr>
+<tr>
+<td>Governance</td>
+<td><code>icn-governance</code></td>
+</tr>
+<tr>
+<td>Cross-community</td>
+<td><code>icn-federation</code></td>
+</tr>
+<tr>
+<td>Listings/exchange</td>
+<td>Gateway extension (new)</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Open Questions</h2>
+<ol>
+<li><p><strong>Collusion resistance</strong>: Is reputation penalty + economic bonds sufficient? What else is needed?</p>
+</li>
+<li><p><strong>Recipe complexity</strong>: Should recipes be CCL contracts or a separate registry?</p>
+</li>
+<li><p><strong>Type ontology governance</strong>: Who defines and maintains the global layer?</p>
+</li>
+<li><p><strong>Depreciation curves</strong>: How arbitrary is &quot;standard vehicle depreciation&quot;? Should we avoid it?</p>
+</li>
+<li><p><strong>Fiat bridge legal structure</strong>: What legal entity holds reserves?</p>
+</li>
+</ol>
+<hr>
+<h2>Document History</h2>
+<ul>
+<li>2026-01-17: Initial creation from design brainstorming session</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

@@ -1,0 +1,701 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Economic Safety Mechanisms | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>economics</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>economic safety</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/economics/economic-safety.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Economic Safety Mechanisms</h1>
+<p><strong>Status:</strong> Phase 12 Implementation (In Progress)
+<strong>Version:</strong> 0.1.x
+<strong>Last Updated:</strong> 2025-01-14</p>
+<h2>Overview</h2>
+<p>Mutual credit systems fail predictably when communities lack economic safeguards. Without protection mechanisms, the first bad actor can destroy trust in the entire system. ICN implements multiple layers of economic safety to protect cooperative communities from common failure modes.</p>
+<h2>Table of Contents</h2>
+<ol>
+<li><a href="#threat-model">Threat Model</a></li>
+<li><a href="#dynamic-credit-limits">Dynamic Credit Limits</a></li>
+<li><a href="#new-member-protection">New Member Protection</a></li>
+<li><a href="#dispute-resolution">Dispute Resolution</a></li>
+<li><a href="#configuration-guide">Configuration Guide</a></li>
+<li><a href="#monitoring--alerts">Monitoring & Alerts</a></li>
+<li><a href="#emergency-procedures">Emergency Procedures</a></li>
+</ol>
+<hr>
+<h2>Threat Model</h2>
+<h3>Common Mutual Credit Failures</h3>
+<p><strong>1. Free Riders</strong></p>
+<ul>
+<li><strong>Attack:</strong> Extract value without contributing back</li>
+<li><strong>Impact:</strong> System collapses as everyone goes negative</li>
+<li><strong>Likelihood:</strong> High without credit limits</li>
+</ul>
+<p><strong>2. &quot;Grab and Run&quot; (New Member Exploitation)</strong></p>
+<ul>
+<li><strong>Attack:</strong> Join, max out credit immediately, disappear</li>
+<li><strong>Impact:</strong> Community loses trust, restricts new members</li>
+<li><strong>Likelihood:</strong> Very high without new member throttling</li>
+</ul>
+<p><strong>3. Credit Limit Gaming</strong></p>
+<ul>
+<li><strong>Attack:</strong> Build trust slowly, then max out and default</li>
+<li><strong>Impact:</strong> Significant loss to cooperative</li>
+<li><strong>Likelihood:</strong> Medium with static limits</li>
+</ul>
+<p><strong>4. Frivolous Disputes</strong></p>
+<ul>
+<li><strong>Attack:</strong> File disputes to block legitimate transactions</li>
+<li><strong>Impact:</strong> System becomes unusable</li>
+<li><strong>Likelihood:</strong> Low with mediator oversight</li>
+</ul>
+<h3>ICN&#39;s Defense-in-Depth Approach</h3>
+<pre><code>Layer 1: Dynamic Credit Limits (trust + history-based)
+  ↓
+Layer 2: New Member Throttling (time + contribution-based)
+  ↓
+Layer 3: Dispute Resolution (mediated oversight)
+  ↓
+Layer 4: Community Governance (Phase 13, future)
+</code></pre>
+<hr>
+<h2>Dynamic Credit Limits</h2>
+<h3>Overview</h3>
+<p>Credit limits determine how much debt a member can owe before being unable to transact. ICN calculates limits dynamically based on:</p>
+<ul>
+<li><strong>Trust score</strong> (from trust graph)</li>
+<li><strong>Historical contributions</strong> (cleared transaction volume)</li>
+<li><strong>Tenure</strong> (time as a member)</li>
+</ul>
+<h3>Formula</h3>
+<pre><code class="language-rust">limit = baseline + trust_bonus + history_bonus
+
+where:
+  trust_bonus = baseline × trust_score × trust_multiplier
+  history_bonus = cleared_volume × history_bonus_rate
+</code></pre>
+<h3>Example Calculation</h3>
+<p><strong>Scenario:</strong> Conservative policy for &quot;hours&quot; currency</p>
+<p><strong>Member Alice:</strong></p>
+<ul>
+<li>Trust score: 0.8 (highly trusted)</li>
+<li>Cleared volume: 1,000 hours (active contributor)</li>
+<li>Tenure: 6 months (established member)</li>
+</ul>
+<p><strong>Calculation:</strong></p>
+<pre><code>baseline = 100 hours
+trust_bonus = 100h × 0.8 × 0.3 = 24 hours
+history_bonus = 1,000h × 0.05 = 50 hours
+total limit = 100h + 24h + 50h = 174 hours
+</code></pre>
+<p><strong>Member Bob:</strong></p>
+<ul>
+<li>Trust score: 0.2 (new relationships)</li>
+<li>Cleared volume: 50 hours (limited activity)</li>
+<li>Tenure: 1 month (new member)</li>
+</ul>
+<p><strong>Calculation:</strong></p>
+<pre><code>baseline = 100 hours
+trust_bonus = 100h × 0.2 × 0.3 = 6 hours
+history_bonus = 50h × 0.05 = 2.5 hours
+total limit = 100h + 6h + 2.5h = 108.5 hours
+</code></pre>
+<p><strong>Result:</strong> Alice can owe up to 174 hours, Bob only 108.5 hours. Trust and contribution are rewarded.</p>
+<h3>Policy Presets</h3>
+<p><strong>Conservative</strong> (recommended for new communities):</p>
+<pre><code class="language-rust">CreditPolicy::conservative(&quot;hours&quot;)
+</code></pre>
+<ul>
+<li>Baseline: 100 hours</li>
+<li>Trust multiplier: 0.3 (30% bonus)</li>
+<li>History bonus rate: 0.05 (5% of cleared volume)</li>
+</ul>
+<p><strong>Permissive</strong> (for established communities):</p>
+<pre><code class="language-rust">CreditPolicy::permissive(&quot;hours&quot;)
+</code></pre>
+<ul>
+<li>Baseline: 500 hours</li>
+<li>Trust multiplier: 0.5 (50% bonus)</li>
+<li>History bonus rate: 0.15 (15% of cleared volume)</li>
+</ul>
+<h3>When Limits Are Checked</h3>
+<ol>
+<li><strong>Before transaction creation:</strong> Validates sender won&#39;t exceed their limit</li>
+<li><strong>During ledger sync:</strong> Entries exceeding limits go to quarantine</li>
+<li><strong>Periodic review:</strong> Communities can audit limit violations</li>
+</ol>
+<h3>Bypassing Limits</h3>
+<p><strong>Not supported in v0.1.</strong> Future versions may support:</p>
+<ul>
+<li>Emergency overrides (requires multi-sig)</li>
+<li>Temporary limit increases (community vote)</li>
+<li>Special account types (infrastructure, shared resources)</li>
+</ul>
+<hr>
+<h2>New Member Protection</h2>
+<h3>The Problem</h3>
+<p>Without throttling, new members can:</p>
+<ol>
+<li>Join the cooperative</li>
+<li>Immediately max out their credit limit</li>
+<li>Disappear before contributing</li>
+<li>Leave the community holding the debt</li>
+</ol>
+<p><strong>Real-world example:</strong> A timebank allows 100 hours of debt. New member Alice requests 100 hours of help in week 1, then ghosts. The community lost 100 hours of labor.</p>
+<h3>ICN&#39;s Solution: Progressive Ramping</h3>
+<p>New members start with a <strong>very low</strong> credit limit that increases over time <strong>only if</strong> they contribute.</p>
+<h3>Ramping Logic</h3>
+<pre><code class="language-rust">if cleared_volume &lt; contribution_threshold {
+    return initial_limit;  // Stay at minimum
+} else {
+    // Linear ramp over ramp_period
+    progress = (current_time - member_since) / ramp_period;
+    return initial_limit + (full_limit - initial_limit) × progress;
+}
+</code></pre>
+<h3>Example: Conservative Policy</h3>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li>Initial limit: 10 hours</li>
+<li>Contribution threshold: 50 hours</li>
+<li>Ramp period: 90 days</li>
+<li>Full limit: 174 hours (from dynamic calculation)</li>
+</ul>
+<p><strong>Timeline:</strong></p>
+<p><strong>Week 1:</strong></p>
+<ul>
+<li>Alice joins, cleared = 0 hours</li>
+<li>Limit = 10 hours (initial)</li>
+<li>Can only request small favors</li>
+</ul>
+<p><strong>Week 5:</strong></p>
+<ul>
+<li>Alice cleared = 60 hours (helps 6 members, 10h each)</li>
+<li>Tenure = 35 days</li>
+<li>Progress = 35 / 90 = 0.39</li>
+<li>Limit = 10h + (174h - 10h) × 0.39 = <strong>74 hours</strong></li>
+</ul>
+<p><strong>Day 90:</strong></p>
+<ul>
+<li>Alice cleared = 200 hours (active contributor)</li>
+<li>Progress = 90 / 90 = 1.0</li>
+<li>Limit = <strong>174 hours</strong> (full limit)</li>
+</ul>
+<p><strong>Result:</strong> Alice earned her limit by demonstrating value. A &quot;grab and run&quot; attacker would be stuck at 10 hours.</p>
+<h3>Contribution Threshold</h3>
+<p>The threshold <strong>prevents gaming</strong> the time-based ramp:</p>
+<ul>
+<li>Can&#39;t just wait 90 days doing nothing</li>
+<li>Must clear <code>contribution_threshold</code> before ramping starts</li>
+<li>Demonstrates genuine participation</li>
+</ul>
+<p><strong>Why 50 hours?</strong> (Conservative default)</p>
+<ul>
+<li>Significant enough to prove commitment</li>
+<li>Achievable within first month for active members</li>
+<li>Small enough not to create unfair barriers</li>
+</ul>
+<h3>Override Mechanisms (Future)</h3>
+<p>For legitimate edge cases:</p>
+<ul>
+<li><strong>Sponsor vouching:</strong> Trusted member co-signs new member&#39;s limit</li>
+<li><strong>Emergency fund:</strong> Community pool for unexpected needs</li>
+<li><strong>Hardship review:</strong> Case-by-case evaluation</li>
+</ul>
+<hr>
+<h2>Dispute Resolution</h2>
+<h3>Overview</h3>
+<p>Disputes provide a mechanism for members to contest ledger entries they believe are incorrect, fraudulent, or should be written off.</p>
+<h3>Dispute Lifecycle</h3>
+<pre><code>Normal Entry
+  ↓
+[Member files dispute] → Contested
+  ↓
+[Evidence added]
+  ↓
+[Mediator assigned]
+  ↓
+[Mediator investigates]
+  ↓
+[Resolution recorded] → Resolved
+</code></pre>
+<h3>Filing a Dispute</h3>
+<p><strong>Who can file:</strong></p>
+<ul>
+<li>Any participant in the transaction</li>
+<li>Affected account holders</li>
+<li>Community mediators (fraud detection)</li>
+</ul>
+<p><strong>Required information:</strong></p>
+<ul>
+<li>Entry hash (which transaction)</li>
+<li>Reason (clear explanation)</li>
+<li>Optional evidence (emails, receipts, photos)</li>
+</ul>
+<p><strong>Example:</strong></p>
+<pre><code class="language-rust">let reason = &quot;Charged 100 hours for work that was agreed at 50 hours&quot;;
+let evidence = &quot;Email from 2025-01-10 confirms 50 hour agreement&quot;;
+
+manager.file_dispute(entry_hash, my_did, reason, timestamp)?;
+manager.add_evidence(&amp;entry_hash, evidence)?;
+</code></pre>
+<h3>Mediation</h3>
+<p><strong>Mediator assignment:</strong></p>
+<ul>
+<li>Community designates trusted mediators</li>
+<li>Mediator cannot be involved in the transaction</li>
+<li>Mediator investigates and reviews evidence</li>
+</ul>
+<p><strong>Mediator duties:</strong></p>
+<ol>
+<li>Review the disputed entry</li>
+<li>Contact both parties</li>
+<li>Examine all evidence</li>
+<li>Make a fair determination</li>
+<li>Record resolution with reasoning</li>
+</ol>
+<h3>Resolution Outcomes</h3>
+<p><strong>1. Upheld</strong></p>
+<ul>
+<li>Entry is valid</li>
+<li>Dispute was frivolous or mistaken</li>
+<li>Original entry stands</li>
+</ul>
+<pre><code class="language-rust">DisputeOutcome::Upheld
+</code></pre>
+<p><strong>2. Reversed</strong></p>
+<ul>
+<li>Entry is invalid</li>
+<li>Should be reversed/rolled back</li>
+<li>Original entry marked invalid</li>
+</ul>
+<pre><code class="language-rust">DisputeOutcome::Reversed
+</code></pre>
+<p><strong>3. Settlement</strong></p>
+<ul>
+<li>Partial agreement reached</li>
+<li>New entry replaces original</li>
+<li>Both parties accept terms</li>
+</ul>
+<pre><code class="language-rust">DisputeOutcome::Settlement {
+    terms: &quot;Split difference: 75 hours instead of 100&quot;.to_string(),
+    replacement_entry: Some(new_entry_hash),
+}
+</code></pre>
+<p><strong>4. Write-Off</strong></p>
+<ul>
+<li>Debt forgiven or written off</li>
+<li>Used for defaults, hardship, or community decisions</li>
+<li>Original entry stays, but obligation removed</li>
+</ul>
+<pre><code class="language-rust">DisputeOutcome::WriteOff {
+    reason: &quot;Member experienced emergency, community voted to forgive&quot;.to_string(),
+}
+</code></pre>
+<h3>Dispute Query</h3>
+<p><strong>Active disputes:</strong></p>
+<pre><code class="language-rust">let active = manager.get_active_disputes();
+for dispute in active {
+    println!(&quot;Entry {} disputed by {}&quot;, dispute.entry_hash, dispute.filed_by);
+}
+</code></pre>
+<p><strong>Disputes by filer:</strong></p>
+<pre><code class="language-rust">let my_disputes = manager.get_disputes_by_filer(&amp;my_did);
+println!(&quot;I&#39;ve filed {} disputes&quot;, my_disputes.len());
+</code></pre>
+<p><strong>Check if entry is disputed:</strong></p>
+<pre><code class="language-rust">if manager.has_active_dispute(&amp;entry_hash) {
+    println!(&quot;⚠️ This entry is currently under dispute&quot;);
+}
+</code></pre>
+<h3>Preventing Abuse</h3>
+<p><strong>Frivolous dispute protection:</strong></p>
+<ul>
+<li>Mediator oversight (bad faith disputes can be dismissed)</li>
+<li>Reputation impact (filers of frivolous disputes lose trust)</li>
+<li>Rate limiting (future: max N disputes per time period)</li>
+</ul>
+<p><strong>Mediator accountability:</strong></p>
+<ul>
+<li>Mediator decisions are recorded and auditable</li>
+<li>Poor mediators can be removed by community governance</li>
+<li>Mediators have their own reputation scores</li>
+</ul>
+<hr>
+<h2>Configuration Guide</h2>
+<h3>Choosing a Policy</h3>
+<p><strong>New communities (&lt;10 members, &lt;6 months old):</strong></p>
+<pre><code class="language-rust">let policy = CreditPolicyManager::conservative(&quot;hours&quot;.to_string());
+</code></pre>
+<ul>
+<li>Protects against early bad actors</li>
+<li>Builds trust slowly</li>
+<li>Lower risk tolerance</li>
+</ul>
+<p><strong>Established communities (&gt;20 members, &gt;1 year, proven track record):</strong></p>
+<pre><code class="language-rust">let policy = CreditPolicyManager::permissive(&quot;hours&quot;.to_string());
+</code></pre>
+<ul>
+<li>Rewards active participation more</li>
+<li>Higher baseline for convenience</li>
+<li>Assumes mature trust relationships</li>
+</ul>
+<p><strong>Custom policies:</strong></p>
+<pre><code class="language-rust">let credit_policy = CreditPolicy::new(
+    200_00,  // 200 hours baseline (using 2 decimals)
+    0.4,     // 40% trust bonus
+    0.10,    // 10% history bonus
+    &quot;hours&quot;.to_string(),
+);
+
+let new_member_policy = NewMemberPolicy::new(
+    20_00,                           // 20 hours initial
+    Duration::from_secs(60 * 86400), // 60 days ramp
+    75_00,                           // 75 hours threshold
+    &quot;hours&quot;.to_string(),
+);
+
+let manager = CreditPolicyManager::new(credit_policy, new_member_policy);
+</code></pre>
+<h3>Tuning Parameters</h3>
+<p><strong>Baseline:</strong></p>
+<ul>
+<li><strong>Higher:</strong> More convenience, higher risk</li>
+<li><strong>Lower:</strong> More restrictive, lower risk</li>
+<li><strong>Recommendation:</strong> Start low, increase as trust builds</li>
+</ul>
+<p><strong>Trust Multiplier:</strong></p>
+<ul>
+<li><strong>Higher:</strong> Rewards trust more heavily</li>
+<li><strong>Lower:</strong> Trust matters less</li>
+<li><strong>Recommendation:</strong> 0.3 (conservative) to 0.5 (permissive)</li>
+</ul>
+<p><strong>History Bonus Rate:</strong></p>
+<ul>
+<li><strong>Higher:</strong> Rewards activity more</li>
+<li><strong>Lower:</strong> Limits based more on trust</li>
+<li><strong>Recommendation:</strong> 0.05 (conservative) to 0.15 (permissive)</li>
+</ul>
+<p><strong>New Member Initial Limit:</strong></p>
+<ul>
+<li><strong>Higher:</strong> Faster onboarding, higher risk</li>
+<li><strong>Lower:</strong> Slower onboarding, lower risk</li>
+<li><strong>Recommendation:</strong> 10-20 hours for timebanking</li>
+</ul>
+<p><strong>Contribution Threshold:</strong></p>
+<ul>
+<li><strong>Higher:</strong> Harder to reach full limit</li>
+<li><strong>Lower:</strong> Easier to game the ramp</li>
+<li><strong>Recommendation:</strong> 0.5× baseline (conservative)</li>
+</ul>
+<p><strong>Ramp Period:</strong></p>
+<ul>
+<li><strong>Longer:</strong> More vetting time</li>
+<li><strong>Shorter:</strong> Faster integration</li>
+<li><strong>Recommendation:</strong> 90 days (conservative), 60 days (moderate)</li>
+</ul>
+<h3>Multi-Currency Configuration</h3>
+<p>Each currency should have its own policy:</p>
+<pre><code class="language-rust">// Hours (labor)
+let hours_policy = CreditPolicyManager::conservative(&quot;hours&quot;.to_string());
+
+// USD (monetary)
+let usd_policy = CreditPolicyManager::new(
+    CreditPolicy::new(100_00, 0.2, 0.05, &quot;USD&quot;.to_string()),  // $100 baseline
+    NewMemberPolicy::new(10_00, Duration::from_secs(90*86400), 50_00, &quot;USD&quot;.to_string()),
+);
+
+// kWh (energy)
+let kwh_policy = CreditPolicyManager::permissive(&quot;kWh&quot;.to_string());
+</code></pre>
+<hr>
+<h2>Monitoring &amp; Alerts</h2>
+<h3>Key Metrics</h3>
+<p><strong>Credit limit violations:</strong></p>
+<pre><code class="language-prometheus"># Entries quarantined due to credit limit exceeded
+icn_ledger_entries_quarantined_total{reason=&quot;credit_limit&quot;}
+
+# Alert if &gt; 10 per day
+</code></pre>
+<p><strong>Dispute activity:</strong></p>
+<pre><code class="language-bash"># Check active dispute count
+icnctl disputes list --active
+</code></pre>
+<p><strong>New member ramp progress:</strong></p>
+<pre><code class="language-bash"># Check a member&#39;s current limit
+icnctl credit-limit show did:icn:alice
+</code></pre>
+<h3>Recommended Alerts</h3>
+<p><strong>High quarantine rate:</strong></p>
+<pre><code class="language-yaml">- alert: HighCreditLimitQuarantine
+  expr: rate(icn_ledger_entries_quarantined_total{reason=&quot;credit_limit&quot;}[1h]) &gt; 5
+  severity: warning
+  message: &quot;Many entries being quarantined for credit limit violations&quot;
+</code></pre>
+<p><strong>Dispute spike:</strong></p>
+<pre><code class="language-yaml">- alert: DisputeSpike
+  expr: icn_dispute_active_count &gt; 10
+  severity: warning
+  message: &quot;Unusual number of active disputes&quot;
+</code></pre>
+<h3>Community Health Indicators</h3>
+<p><strong>Healthy community:</strong></p>
+<ul>
+<li>Low quarantine rate (&lt;1% of transactions)</li>
+<li>Few disputes (&lt;5% of transactions)</li>
+<li>Members staying within 80% of their limits</li>
+<li>New members successfully ramping up</li>
+</ul>
+<p><strong>Warning signs:</strong></p>
+<ul>
+<li>Spike in quarantined entries</li>
+<li>Multiple disputes from same member</li>
+<li>New members hitting limits immediately</li>
+<li>High default rate</li>
+</ul>
+<hr>
+<h2>Emergency Procedures</h2>
+<h3>Scenario 1: Member Defaults on Large Debt</h3>
+<p><strong>Situation:</strong> Member owes 500 hours, disappears</p>
+<p><strong>Immediate actions:</strong></p>
+<ol>
+<li>File dispute against all outstanding entries</li>
+<li>Freeze member&#39;s account (prevent new transactions)</li>
+<li>Assign mediator to investigate</li>
+<li>Contact member (email, phone, in-person)</li>
+</ol>
+<p><strong>Resolution options:</strong></p>
+<ol>
+<li><strong>Payment plan:</strong> Member agrees to repay over time</li>
+<li><strong>Partial write-off:</strong> Community votes to forgive portion</li>
+<li><strong>Full write-off:</strong> Community absorbs the loss</li>
+<li><strong>Expulsion:</strong> Remove member, write off debt</li>
+</ol>
+<p><strong>Prevention for next time:</strong></p>
+<ul>
+<li>Review credit policy settings</li>
+<li>Consider lowering limits</li>
+<li>Implement more frequent check-ins</li>
+</ul>
+<h3>Scenario 2: Credit Policy Too Restrictive</h3>
+<p><strong>Situation:</strong> Legitimate members can&#39;t transact enough</p>
+<p><strong>Diagnosis:</strong></p>
+<pre><code class="language-bash"># Check how many members are near their limits
+icnctl ledger balances --format json | jq &#39;.[] | select(.balance &lt; -.limit * 0.9)&#39;
+</code></pre>
+<p><strong>Solutions:</strong></p>
+<ol>
+<li><strong>Increase baseline:</strong> Raise the floor for everyone</li>
+<li><strong>Increase trust multiplier:</strong> Reward trusted members more</li>
+<li><strong>Decrease new member threshold:</strong> Easier to ramp up</li>
+<li><strong>Switch to permissive preset:</strong> For established communities</li>
+</ol>
+<p><strong>Implementation:</strong></p>
+<pre><code class="language-rust">// Increase baseline from 100 to 150 hours
+let new_policy = CreditPolicy::new(
+    150_00,  // Increased baseline
+    0.3,
+    0.05,
+    &quot;hours&quot;.to_string(),
+);
+</code></pre>
+<h3>Scenario 3: Dispute System Abuse</h3>
+<p><strong>Situation:</strong> Member filing frivolous disputes</p>
+<p><strong>Diagnosis:</strong></p>
+<pre><code class="language-bash"># Check disputes filed by member
+icnctl disputes list --filed-by did:icn:alice
+</code></pre>
+<p><strong>Actions:</strong></p>
+<ol>
+<li><strong>Mediator review:</strong> All disputes by this member</li>
+<li><strong>Pattern detection:</strong> Are disputes legitimate?</li>
+<li><strong>Warning:</strong> Notify member of abuse concerns</li>
+<li><strong>Sanction:</strong> Reduce trust score if abuse confirmed</li>
+<li><strong>Rate limiting:</strong> Implement max disputes per month</li>
+</ol>
+<p><strong>Future prevention:</strong></p>
+<ul>
+<li>Reputation impact for bad-faith disputes</li>
+<li>Community review of repeated filers</li>
+<li>Mediator training on identifying abuse</li>
+</ul>
+<h3>Scenario 4: Mass Defaults (System-Wide Crisis)</h3>
+<p><strong>Situation:</strong> Many members defaulting simultaneously</p>
+<p><strong>Possible causes:</strong></p>
+<ul>
+<li>Economic shock (real-world crisis)</li>
+<li>Policy misconfiguration</li>
+<li>Coordinated attack</li>
+</ul>
+<p><strong>Emergency measures:</strong></p>
+<ol>
+<li><strong>Freeze new transactions:</strong> Prevent further damage</li>
+<li><strong>Community meeting:</strong> Discuss crisis response</li>
+<li><strong>Debt forgiveness vote:</strong> Collective write-off</li>
+<li><strong>Policy reset:</strong> Rebuild with lessons learned</li>
+</ol>
+<p><strong>Recovery:</strong></p>
+<pre><code class="language-rust">// Lower all limits to prevent future crisis
+let crisis_policy = CreditPolicy::new(
+    50_00,   // Much lower baseline
+    0.2,     // Less trust bonus
+    0.03,    // Less history bonus
+    &quot;hours&quot;.to_string(),
+);
+
+// Restart with conservative settings
+</code></pre>
+<hr>
+<h2>Best Practices</h2>
+<h3>For Communities</h3>
+<p><strong>1. Start conservative, loosen gradually</strong></p>
+<ul>
+<li>Use conservative preset initially</li>
+<li>Monitor for 3-6 months</li>
+<li>Adjust based on actual behavior</li>
+</ul>
+<p><strong>2. Regular policy reviews</strong></p>
+<ul>
+<li>Quarterly check-in on policy effectiveness</li>
+<li>Adjust parameters based on community growth</li>
+<li>Survey members about limit adequacy</li>
+</ul>
+<p><strong>3. Transparent communication</strong></p>
+<ul>
+<li>Explain credit limits clearly to new members</li>
+<li>Document policy rationale in community handbook</li>
+<li>Publicize policy changes</li>
+</ul>
+<p><strong>4. Fair mediation</strong></p>
+<ul>
+<li>Select unbiased mediators</li>
+<li>Rotate mediator duties</li>
+<li>Document mediation decisions</li>
+</ul>
+<h3>For Members</h3>
+<p><strong>1. Stay within your limits</strong></p>
+<ul>
+<li>Monitor your balance regularly</li>
+<li>Plan ahead for large transactions</li>
+<li>Build trust and contribution history</li>
+</ul>
+<p><strong>2. File disputes promptly</strong></p>
+<ul>
+<li>Don&#39;t wait months to contest an entry</li>
+<li>Provide clear evidence</li>
+<li>Be honest and specific</li>
+</ul>
+<p><strong>3. Honor commitments</strong></p>
+<ul>
+<li>Fulfill obligations on time</li>
+<li>Communicate if you can&#39;t deliver</li>
+<li>Build reputation through reliability</li>
+</ul>
+<hr>
+<h2>Future Enhancements</h2>
+<h3>Phase 13: Governance Integration</h3>
+<p><strong>Planned features:</strong></p>
+<ul>
+<li>Community voting on policy changes</li>
+<li>Proposal system for limit adjustments</li>
+<li>Elected mediator boards</li>
+<li>Automated dispute escalation</li>
+</ul>
+<h3>Track B3: Economic Modeling</h3>
+<p><strong>Research areas:</strong></p>
+<ul>
+<li>Agent-based simulation of attacks</li>
+<li>Optimal parameter tuning via simulation</li>
+<li>Risk assessment for different policies</li>
+<li>Default prediction modeling</li>
+</ul>
+<h3>Advanced Credit Features</h3>
+<p><strong>Potential additions:</strong></p>
+<ul>
+<li>Credit unions (shared limits across groups)</li>
+<li>Seasonal adjustments (summer/winter variations)</li>
+<li>Emergency credit pools</li>
+<li>Cross-currency credit swaps</li>
+</ul>
+<hr>
+<h2>References</h2>
+<ul>
+<li><a href="/docs/development/sessions/undated/ROADMAP">ROADMAP.md</a> - Phase 12 specification</li>
+<li><a href="/docs/operations/deployment/incident-response">docs/incident-response.md</a> - Default handling procedures</li>
+<li><a href="/docs/guides/operations/operations-guide">docs/operations-guide.md</a> - Daily operational workflows</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-ledger/src/credit_policy.rs">icn-ledger/src/credit_policy.rs</a> - Implementation</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-ledger/src/dispute.rs">icn-ledger/src/dispute.rs</a> - Dispute resolution</li>
+</ul>
+<hr>
+<h2>Conclusion</h2>
+<p>ICN&#39;s economic safety mechanisms provide defense-in-depth protection against common mutual credit failures:</p>
+<ol>
+<li><strong>Dynamic credit limits</strong> prevent free riders and limit gaming</li>
+<li><strong>New member throttling</strong> stops &quot;grab and run&quot; attacks</li>
+<li><strong>Dispute resolution</strong> handles conflicts and enables debt forgiveness</li>
+<li><strong>Community governance</strong> (Phase 13) adds democratic oversight</li>
+</ol>
+<p>These safeguards make ICN suitable for real-world cooperative economies, where trust must be earned and bad actors must be contained.</p>
+<p><strong>Ready for pilot deployment:</strong> All Phase 12 core features implemented and tested.</p>
+<p><strong>Version:</strong> 0.1.x
+<strong>Last Updated:</strong> 2025-01-14
+<strong>Status:</strong> Phase 12 - Economic Safety Rails (In Progress)</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

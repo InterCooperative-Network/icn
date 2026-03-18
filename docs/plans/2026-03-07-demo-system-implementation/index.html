@@ -1,0 +1,961 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Federation Demo System — Implementation Plan | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>plans</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>2026 03 07 demo system implementation</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/plans/2026-03-07-demo-system-implementation.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Federation Demo System — Implementation Plan</h1>
+<blockquote>
+<p><strong>For Claude:</strong> REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.</p>
+</blockquote>
+<p><strong>Goal:</strong> Build a canonical &quot;A Federation in Motion&quot; demo system with four cooperative personas, three modular flows, presenter runbook, and self-serve handoff path.</p>
+<p><strong>Architecture:</strong> Four live K3s coop nodes (alpha/beta/gamma/delta) are reseeded with canonical personas and story data. Bash flow scripts use <code>kubectl port-forward</code> to access each coop&#39;s gateway (ClusterIP-only, no NodePort on port 8080). A shared port library handles setup/teardown so each flow script stays focused on narration.</p>
+<p><strong>Tech Stack:</strong> Bash, kubectl, curl, icnctl CLI, K3s cluster at 10.8.30.40, coop gateways behind ClusterIP services</p>
+<p><strong>Design doc:</strong> <code>docs/plans/2026-03-07-demo-system-design.md</code></p>
+<hr>
+<h2>Cluster Topology Reference</h2>
+<table>
+<thead>
+<tr>
+<th>Persona</th>
+<th>Node</th>
+<th>K8s Namespace</th>
+<th>ClusterIP</th>
+<th>Local port (port-forward)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>BrightWorks Cooperative (worker)</td>
+<td>icn-alpha</td>
+<td>icn-coop-alpha</td>
+<td>10.43.97.80:8080</td>
+<td>18081</td>
+</tr>
+<tr>
+<td>River City Tool Library (resource)</td>
+<td>icn-beta</td>
+<td>icn-coop-beta</td>
+<td>10.43.194.7:8080</td>
+<td>18082</td>
+</tr>
+<tr>
+<td>Harbor Homes Cooperative (housing)</td>
+<td>icn-gamma</td>
+<td>icn-coop-gamma</td>
+<td>10.43.12.70:8080</td>
+<td>18083</td>
+</tr>
+<tr>
+<td>Finger Lakes CDN (intermediate org)</td>
+<td>icn-delta</td>
+<td>icn-coop-delta</td>
+<td>10.43.110.197:8080</td>
+<td>18084</td>
+</tr>
+</tbody></table>
+<p>Use ports 18081–18084 to avoid collision with the main icn-daemon NodePort (30080).</p>
+<hr>
+<h2>Before You Start</h2>
+<pre><code class="language-bash"># Confirm cluster is healthy
+kubectl get pods -A | grep -E &quot;icn-(alpha|beta|gamma|delta)&quot; | grep -v Succeeded
+
+# Confirm you can reach the main gateway
+curl -s http://10.8.30.40:30080/v1/health | python3 -m json.tool
+
+# Confirm kubectl works
+kubectl get nodes
+</code></pre>
+<hr>
+<h2>Task 1: Discover Gateway API Shape</h2>
+<p>Before writing flow scripts, map what endpoints actually exist.</p>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Create: <code>demo/docs/api-map.md</code></li>
+</ul>
+<p><strong>Step 1: Port-forward to alpha and probe the API</strong></p>
+<pre><code class="language-bash">kubectl port-forward -n icn-coop-alpha svc/icn-alpha 18081:8080 &amp;
+PF=$!
+sleep 2
+curl -s http://localhost:18081/v1/health | python3 -m json.tool
+</code></pre>
+<p>Expected: JSON with <code>status: &quot;ok&quot;</code> or similar.</p>
+<p><strong>Step 2: Discover available routes</strong></p>
+<pre><code class="language-bash"># Try OpenAPI spec
+curl -s http://localhost:18081/v1/openapi.json 2&gt;/dev/null | python3 -m json.tool | grep &#39;&quot;/&quot;&#39; | head -40
+
+# Or enumerate known endpoints
+for ep in /v1/health /v1/coops /v1/governance/proposals /v1/ledger/balance /v1/members; do
+  code=$(curl -s -o /dev/null -w &quot;%{http_code}&quot; http://localhost:18081$ep)
+  echo &quot;$code $ep&quot;
+done
+
+kill $PF
+</code></pre>
+<p><strong>Step 3: Write api-map.md</strong></p>
+<p>Document each endpoint that returns 200 or 401 (exists but needs auth). Format:</p>
+<pre><code class="language-markdown"># Gateway API Map (as of YYYY-MM-DD)
+
+| Endpoint | Method | Auth | Notes |
+|---|---|---|---|
+| /v1/health | GET | No | Always returns 200 |
+| /v1/coops | GET | Yes | List all coops |
+| ... | | | |
+</code></pre>
+<p><strong>Step 4: Kill port-forward and commit</strong></p>
+<pre><code class="language-bash">kill $PF 2&gt;/dev/null || true
+git add demo/docs/api-map.md
+git commit -m &quot;docs(demo): add gateway API map for flow scripting&quot;
+</code></pre>
+<hr>
+<h2>Task 2: Create Shared Port-Forward Library</h2>
+<p>All flow scripts need the same port-forward setup/teardown. Build it once.</p>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Create: <code>demo/scripts/lib-demo-ports.sh</code></li>
+</ul>
+<p><strong>Step 1: Write the library</strong></p>
+<pre><code class="language-bash">cat &gt; /home/ubuntu/projects/icn/demo/scripts/lib-demo-ports.sh &lt;&lt; &#39;EOF&#39;
+#!/usr/bin/env bash
+# Shared port-forward management for federation demo scripts.
+# Source this file; do not execute directly.
+#
+# Usage:
+#   source demo/scripts/lib-demo-ports.sh
+#   demo_ports_up           # start all 4 port-forwards
+#   demo_ports_down         # kill all port-forwards
+#   demo_wait_ready         # block until all 4 gateways respond
+
+BRIGHTWORKS_PORT=18081   # icn-coop-alpha
+RIVERCITY_PORT=18082     # icn-coop-beta
+         HARBOR_PORT=18083     # icn-coop-gamma
+FINGERLAKES_PORT=18084   # icn-coop-delta
+
+BRIGHTWORKS_URL=&quot;http://localhost:${BRIGHTWORKS_PORT}&quot;
+RIVERCITY_URL=&quot;http://localhost:${RIVERCITY_PORT}&quot;
+HARBOR_URL=&quot;http://localhost:${HARBOR_PORT}&quot;
+FINGERLAKES_URL=&quot;http://localhost:${FINGERLAKES_PORT}&quot;
+
+_PF_PIDS=()
+
+_pf_start() {
+  local ns=&quot;$1&quot; svc=&quot;$2&quot; local_port=&quot;$3&quot; remote_port=&quot;$4&quot;
+  kubectl port-forward -n &quot;$ns&quot; &quot;svc/$svc&quot; &quot;${local_port}:${remote_port}&quot; \
+    &gt;/tmp/pf-${local_port}.log 2&gt;&amp;1 &amp;
+  _PF_PIDS+=($!)
+}
+
+demo_ports_up() {
+  echo &quot;Starting port-forwards...&quot;
+  _pf_start icn-coop-alpha icn-alpha &quot;${BRIGHTWORKS_PORT}&quot; 8080
+  _pf_start icn-coop-beta  icn-beta  &quot;${RIVERCITY_PORT}&quot;  8080
+  _pf_start icn-coop-gamma icn-gamma &quot;${HARBOR_PORT}&quot;     8080
+  _pf_start icn-coop-delta icn-delta &quot;${FINGERLAKES_PORT}&quot; 8080
+  trap demo_ports_down EXIT INT TERM
+}
+
+demo_ports_down() {
+  for pid in &quot;${_PF_PIDS[@]:-}&quot;; do
+    kill &quot;$pid&quot; 2&gt;/dev/null || true
+  done
+  _PF_PIDS=()
+}
+
+demo_wait_ready() {
+  local urls=(&quot;$BRIGHTWORKS_URL&quot; &quot;$RIVERCITY_URL&quot; &quot;$HARBOR_URL&quot; &quot;$FINGERLAKES_URL&quot;)
+  local names=(&quot;BrightWorks&quot; &quot;River City Tool Library&quot; &quot;Harbor Homes&quot; &quot;Finger Lakes CDN&quot;)
+  local max_wait=30
+  local waited=0
+
+  for i in &quot;${!urls[@]}&quot;; do
+    local url=&quot;${urls[$i]}&quot; name=&quot;${names[$i]}&quot;
+    echo -n &quot;  Waiting for ${name}...&quot;
+    while ! curl -fsS &quot;${url}/v1/health&quot; &gt;/dev/null 2&gt;&amp;1; do
+      sleep 1
+      waited=$((waited+1))
+      if [ &quot;$waited&quot; -ge &quot;$max_wait&quot; ]; then
+        echo &quot; TIMEOUT&quot;
+        return 1
+      fi
+    done
+    echo &quot; ready&quot;
+  done
+}
+
+# Authenticated curl helper
+# Usage: demo_curl &lt;url&gt; &lt;method&gt; [body] [token]
+demo_curl() {
+  local url=&quot;$1&quot; method=&quot;$2&quot; body=&quot;${3:-}&quot; token=&quot;${4:-${DEMO_TOKEN:-}}&quot;
+  local args=(-sS -X &quot;$method&quot; -H &quot;Accept: application/json&quot;)
+  [ -n &quot;$token&quot; ] &amp;&amp; args+=(-H &quot;Authorization: Bearer $token&quot;)
+  [ -n &quot;$body&quot; ] &amp;&amp; args+=(-H &quot;Content-Type: application/json&quot; -d &quot;$body&quot;)
+  curl &quot;${args[@]}&quot; &quot;$url&quot;
+}
+EOF
+</code></pre>
+<p><strong>Step 2: Verify syntax</strong></p>
+<pre><code class="language-bash">bash -n /home/ubuntu/projects/icn/demo/scripts/lib-demo-ports.sh
+echo $?  # expect 0
+</code></pre>
+<p><strong>Step 3: Commit</strong></p>
+<pre><code class="language-bash">git add demo/scripts/lib-demo-ports.sh
+git commit -m &quot;feat(demo): add shared port-forward library for federation flows&quot;
+</code></pre>
+<hr>
+<h2>Task 3: Create Canonical Seed Data</h2>
+<p>Four sets of fixture files — one per coop. These define the stable world the demo always starts from.</p>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Create: <code>demo/data/brightworks-members.json</code></li>
+<li>Create: <code>demo/data/rivercity-members.json</code></li>
+<li>Create: <code>demo/data/harborhomes-members.json</code></li>
+<li>Create: <code>demo/data/fingerlakes-members.json</code></li>
+<li>Create: <code>demo/data/federation-proposals.json</code></li>
+<li>Create: <code>demo/data/federation-history.json</code></li>
+</ul>
+<p><strong>Step 1: Write BrightWorks member data</strong></p>
+<pre><code class="language-json">{
+  &quot;organization&quot;: &quot;BrightWorks Cooperative&quot;,
+  &quot;type&quot;: &quot;worker&quot;,
+  &quot;coop_id&quot;: &quot;brightworks-cooperative&quot;,
+  &quot;members&quot;: [
+    { &quot;name&quot;: &quot;Yusuf Okafor&quot;,    &quot;role&quot;: &quot;Board Secretary&quot;,  &quot;labor_hours&quot;: 120 },
+    { &quot;name&quot;: &quot;Camille Tran&quot;,    &quot;role&quot;: &quot;Member-Worker&quot;,    &quot;labor_hours&quot;: 98  },
+    { &quot;name&quot;: &quot;Devraj Singh&quot;,    &quot;role&quot;: &quot;Member-Worker&quot;,    &quot;labor_hours&quot;: 115 },
+    { &quot;name&quot;: &quot;Rosa Mendez&quot;,     &quot;role&quot;: &quot;Treasurer&quot;,        &quot;labor_hours&quot;: 87  },
+    { &quot;name&quot;: &quot;Anton Kowalski&quot;,  &quot;role&quot;: &quot;Member-Worker&quot;,    &quot;labor_hours&quot;: 104 }
+  ]
+}
+</code></pre>
+<p>Save to <code>demo/data/brightworks-members.json</code>.</p>
+<p><strong>Step 2: Write River City Tool Library member data</strong></p>
+<pre><code class="language-json">{
+  &quot;organization&quot;: &quot;River City Tool Library&quot;,
+  &quot;type&quot;: &quot;community&quot;,
+  &quot;coop_id&quot;: &quot;river-city-tool-library&quot;,
+  &quot;members&quot;: [
+    { &quot;name&quot;: &quot;Priya Sharma&quot;,    &quot;role&quot;: &quot;Coordinator&quot;,      &quot;contribution_hours&quot;: 45 },
+    { &quot;name&quot;: &quot;Marcus Webb&quot;,     &quot;role&quot;: &quot;Member&quot;,           &quot;contribution_hours&quot;: 32 },
+    { &quot;name&quot;: &quot;Fatima Al-Amin&quot;,  &quot;role&quot;: &quot;Member&quot;,           &quot;contribution_hours&quot;: 28 },
+    { &quot;name&quot;: &quot;Lucas Ferreira&quot;,  &quot;role&quot;: &quot;Member&quot;,           &quot;contribution_hours&quot;: 19 },
+    { &quot;name&quot;: &quot;Aiko Nakamura&quot;,   &quot;role&quot;: &quot;Maintenance Lead&quot;, &quot;contribution_hours&quot;: 51 }
+  ]
+}
+</code></pre>
+<p>Save to <code>demo/data/rivercity-members.json</code>.</p>
+<p><strong>Step 3: Write Harbor Homes member data</strong></p>
+<pre><code class="language-json">{
+  &quot;organization&quot;: &quot;Harbor Homes Cooperative&quot;,
+  &quot;type&quot;: &quot;housing&quot;,
+  &quot;coop_id&quot;: &quot;harbor-homes-cooperative&quot;,
+  &quot;members&quot;: [
+    { &quot;name&quot;: &quot;Delphine Moreau&quot;,   &quot;role&quot;: &quot;Board Chair&quot;,   &quot;units&quot;: 1 },
+    { &quot;name&quot;: &quot;James Okafor&quot;,      &quot;role&quot;: &quot;Board Member&quot;,  &quot;units&quot;: 1 },
+    { &quot;name&quot;: &quot;Sunita Kapoor&quot;,     &quot;role&quot;: &quot;Treasurer&quot;,     &quot;units&quot;: 1 },
+    { &quot;name&quot;: &quot;Patrick Brennan&quot;,   &quot;role&quot;: &quot;Member&quot;,        &quot;units&quot;: 2 },
+    { &quot;name&quot;: &quot;Mei-Ling Chen&quot;,     &quot;role&quot;: &quot;Secretary&quot;,     &quot;units&quot;: 1 }
+  ]
+}
+</code></pre>
+<p>Save to <code>demo/data/harborhomes-members.json</code>.</p>
+<p><strong>Step 4: Write Finger Lakes CDN member data</strong></p>
+<pre><code class="language-json">{
+  &quot;organization&quot;: &quot;Finger Lakes Cooperative Development Network&quot;,
+  &quot;type&quot;: &quot;intermediate&quot;,
+  &quot;coop_id&quot;: &quot;fingerlakes-cdn&quot;,
+  &quot;members&quot;: [
+    { &quot;name&quot;: &quot;Amara Diallo&quot;,      &quot;role&quot;: &quot;Executive Director&quot; },
+    { &quot;name&quot;: &quot;Thomas Kowalczyk&quot;,  &quot;role&quot;: &quot;Program Officer&quot;    },
+    { &quot;name&quot;: &quot;Rebecca Nwosu&quot;,     &quot;role&quot;: &quot;Federation Liaison&quot; }
+  ]
+}
+</code></pre>
+<p>Save to <code>demo/data/fingerlakes-members.json</code>.</p>
+<p><strong>Step 5: Write canonical proposals fixture</strong></p>
+<pre><code class="language-json">{
+  &quot;proposals&quot;: [
+    {
+      &quot;coop&quot;: &quot;harbor-homes-cooperative&quot;,
+      &quot;title&quot;: &quot;Authorize roof repair — Building A&quot;,
+      &quot;description&quot;: &quot;The inspection report dated 2026-02-15 identified water intrusion at the Building A flat roof. This proposal authorizes up to $12,000 from the capital reserve fund for repairs. Work will be performed by Harbor Roofing LLC per quote #HH-2026-14.&quot;,
+      &quot;type&quot;: &quot;treasury_spend&quot;,
+      &quot;amount&quot;: 12000,
+      &quot;unit&quot;: &quot;usd&quot;,
+      &quot;status&quot;: &quot;pending&quot;,
+      &quot;demo_role&quot;: &quot;flow1_subject&quot;
+    },
+    {
+      &quot;coop&quot;: &quot;brightworks-cooperative&quot;,
+      &quot;title&quot;: &quot;Q1 patronage distribution&quot;,
+      &quot;description&quot;: &quot;Distribute Q1 surplus proportionally to member labor hours. Total distributable: 3,840 credits across 524 labor hours.&quot;,
+      &quot;type&quot;: &quot;patronage_distribution&quot;,
+      &quot;status&quot;: &quot;approved&quot;,
+      &quot;demo_role&quot;: &quot;flow2_subject&quot;
+    },
+    {
+      &quot;coop&quot;: &quot;fingerlakes-cdn&quot;,
+      &quot;title&quot;: &quot;River City Tool Library — BrightWorks equipment access agreement&quot;,
+      &quot;description&quot;: &quot;Authorize a 90-day equipment-sharing agreement. River City provides access to metalworking tools; BrightWorks contributes 20 maintenance hours per quarter.&quot;,
+      &quot;type&quot;: &quot;federation_agreement&quot;,
+      &quot;status&quot;: &quot;pending&quot;,
+      &quot;demo_role&quot;: &quot;flow3_subject&quot;
+    }
+  ]
+}
+</code></pre>
+<p>Save to <code>demo/data/federation-proposals.json</code>.</p>
+<p><strong>Step 6: Write transaction history fixture</strong></p>
+<p>Create <code>demo/data/federation-history.json</code> with 5–8 realistic cross-coop transactions showing prior coordination between the coops (equipment sharing, maintenance hours, support contributions).</p>
+<pre><code class="language-json">{
+  &quot;transactions&quot;: [
+    {
+      &quot;from&quot;: &quot;BrightWorks Cooperative&quot;,
+      &quot;to&quot;: &quot;River City Tool Library&quot;,
+      &quot;type&quot;: &quot;maintenance_contribution&quot;,
+      &quot;amount&quot;: 8,
+      &quot;unit&quot;: &quot;hours&quot;,
+      &quot;description&quot;: &quot;Quarterly tool maintenance — lathe and drill press&quot;,
+      &quot;date&quot;: &quot;2026-01-15T10:00:00Z&quot;
+    },
+    {
+      &quot;from&quot;: &quot;River City Tool Library&quot;,
+      &quot;to&quot;: &quot;BrightWorks Cooperative&quot;,
+      &quot;type&quot;: &quot;equipment_access&quot;,
+      &quot;amount&quot;: 40,
+      &quot;unit&quot;: &quot;commons_credits&quot;,
+      &quot;description&quot;: &quot;Equipment access credits — Q4 2025&quot;,
+      &quot;date&quot;: &quot;2026-01-20T09:00:00Z&quot;
+    },
+    {
+      &quot;from&quot;: &quot;Finger Lakes CDN&quot;,
+      &quot;to&quot;: &quot;Harbor Homes Cooperative&quot;,
+      &quot;type&quot;: &quot;technical_assistance&quot;,
+      &quot;amount&quot;: 4,
+      &quot;unit&quot;: &quot;hours&quot;,
+      &quot;description&quot;: &quot;Governance setup support — new treasurer onboarding&quot;,
+      &quot;date&quot;: &quot;2026-02-03T14:00:00Z&quot;
+    }
+  ]
+}
+</code></pre>
+<p><strong>Step 7: Commit</strong></p>
+<pre><code class="language-bash">git add demo/data/brightworks-members.json demo/data/rivercity-members.json \
+        demo/data/harborhomes-members.json demo/data/fingerlakes-members.json \
+        demo/data/federation-proposals.json demo/data/federation-history.json
+git commit -m &quot;feat(demo): add canonical seed data for four federation personas&quot;
+</code></pre>
+<hr>
+<h2>Task 4: Create <code>reseed-federation-demo.sh</code></h2>
+<p>Reset all four nodes to canonical demo state. This is the &quot;clear the deck&quot; command.</p>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Create: <code>demo/scripts/reseed-federation-demo.sh</code></li>
+</ul>
+<p><strong>Step 1: Understand what seeding requires</strong></p>
+<p>Before writing the script, verify what API calls actually create proposals and load members. Run:</p>
+<pre><code class="language-bash"># From Task 1 API map — adapt these to real endpoints
+source demo/scripts/lib-demo-ports.sh
+demo_ports_up
+demo_wait_ready
+
+# Try creating a proposal on Harbor Homes (Flow 1 subject)
+# Replace /v1/governance/proposals with actual endpoint from api-map.md
+TOKEN=&quot;&lt;get from kubectl exec or icnctl&gt;&quot;
+curl -X POST http://localhost:18083/v1/governance/proposals \
+  -H &quot;Authorization: Bearer $TOKEN&quot; \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{&quot;title&quot;:&quot;test&quot;,&quot;description&quot;:&quot;test&quot;,&quot;type&quot;:&quot;text&quot;}&#39; | python3 -m json.tool
+</code></pre>
+<p>Document the actual endpoint in <code>demo/docs/api-map.md</code> before proceeding.</p>
+<p><strong>Step 2: Write <code>reseed-federation-demo.sh</code></strong></p>
+<p>Template — fill in actual endpoints discovered in Step 1:</p>
+<pre><code class="language-bash">#!/usr/bin/env bash
+# Reset all four federation demo nodes to canonical state.
+# Usage: ./demo/scripts/reseed-federation-demo.sh
+
+set -euo pipefail
+SCRIPT_DIR=&quot;$(cd &quot;$(dirname &quot;${BASH_SOURCE[0]}&quot;)&quot; &amp;&amp; pwd)&quot;
+source &quot;${SCRIPT_DIR}/lib-demo-ports.sh&quot;
+
+GREEN=&#39;\033[0;32m&#39;; YELLOW=&#39;\033[1;33m&#39;; NC=&#39;\033[0m&#39;
+
+echo &quot;=== ICN Federation Demo — Reseed ===&quot;
+echo
+
+demo_ports_up
+demo_wait_ready
+
+# Helper: get a demo token for a coop
+# Adjust to actual token endpoint from api-map.md
+get_token() {
+  local url=&quot;$1&quot; coop_id=&quot;$2&quot;
+  # TODO: replace with actual token generation call
+  # e.g.: curl -sS -X POST &quot;$url/v1/auth/token&quot; -d &quot;{\&quot;coop_id\&quot;:\&quot;$coop_id\&quot;,...}&quot;
+  echo &quot;PLACEHOLDER_TOKEN&quot;
+}
+
+seed_coop() {
+  local name=&quot;$1&quot; url=&quot;$2&quot; coop_id=&quot;$3&quot; data_file=&quot;$4&quot;
+  echo -n &quot;  Seeding ${name}...&quot;
+  local token; token=$(get_token &quot;$url&quot; &quot;$coop_id&quot;)
+  # Load member display names (API endpoint TBD from api-map.md)
+  # curl -sS -X PUT &quot;$url/v1/coops/$coop_id/members&quot; \
+  #   -H &quot;Authorization: Bearer $token&quot; \
+  #   -H &quot;Content-Type: application/json&quot; \
+  #   --data-binary &quot;@${SCRIPT_DIR}/../data/${data_file}&quot;
+  echo -e &quot; ${GREEN}done${NC}&quot;
+}
+
+seed_coop &quot;BrightWorks Cooperative&quot;                   &quot;$BRIGHTWORKS_URL&quot; &quot;brightworks-cooperative&quot;      &quot;brightworks-members.json&quot;
+seed_coop &quot;River City Tool Library&quot;                   &quot;$RIVERCITY_URL&quot;   &quot;river-city-tool-library&quot;      &quot;rivercity-members.json&quot;
+seed_coop &quot;Harbor Homes Cooperative&quot;                  &quot;$HARBOR_URL&quot;      &quot;harbor-homes-cooperative&quot;     &quot;harborhomes-members.json&quot;
+seed_coop &quot;Finger Lakes Cooperative Development Network&quot; &quot;$FINGERLAKES_URL&quot; &quot;fingerlakes-cdn&quot;           &quot;fingerlakes-members.json&quot;
+
+echo
+echo -e &quot;${GREEN}Federation demo world reseeded.${NC}&quot;
+echo &quot;Run flows:&quot;
+echo &quot;  ./demo/scripts/flow-1-governance.sh&quot;
+echo &quot;  ./demo/scripts/flow-2-patronage.sh&quot;
+echo &quot;  ./demo/scripts/flow-3-federation.sh&quot;
+</code></pre>
+<p><strong>Step 3: Make executable and test</strong></p>
+<pre><code class="language-bash">chmod +x /home/ubuntu/projects/icn/demo/scripts/reseed-federation-demo.sh
+./demo/scripts/reseed-federation-demo.sh
+# Expected: all four coops report &quot;done&quot;, no errors
+</code></pre>
+<p><strong>Step 4: Commit</strong></p>
+<pre><code class="language-bash">git add demo/scripts/reseed-federation-demo.sh
+git commit -m &quot;feat(demo): add reseed-federation-demo.sh for canonical world reset&quot;
+</code></pre>
+<hr>
+<h2>Task 5: Flow 1 — Governance Legitimacy (Flow 1A)</h2>
+<p>Harbor Homes votes on a roof repair, the treasury action follows, provenance is shown.</p>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Create: <code>demo/scripts/flow-1-governance.sh</code></li>
+</ul>
+<p><strong>Step 1: Write Flow 1A script</strong></p>
+<pre><code class="language-bash">#!/usr/bin/env bash
+# Flow 1: Governance Legitimacy and Action Traceability
+# Narrative: Harbor Homes Cooperative — roof repair authorization
+#
+# What this demonstrates (Flow 1A — current scope):
+#   - Proposal creation
+#   - Member voting
+#   - Approval result
+#   - Treasury action initiation
+#   - Provenance context
+#
+# What this does NOT yet claim (Flow 1B — pending PR #1327):
+#   - ExecutionReceiptGate enforcement
+#   - Machine-verifiable governance-to-execution binding
+
+set -euo pipefail
+SCRIPT_DIR=&quot;$(cd &quot;$(dirname &quot;${BASH_SOURCE[0]}&quot;)&quot; &amp;&amp; pwd)&quot;
+source &quot;${SCRIPT_DIR}/lib-demo-ports.sh&quot;
+
+BLUE=&#39;\033[0;34m&#39;; GREEN=&#39;\033[0;32m&#39;; YELLOW=&#39;\033[1;33m&#39;; NC=&#39;\033[0m&#39;
+
+narrate() { echo -e &quot;\n${BLUE}▶${NC} $*\n&quot;; }
+result()  { echo -e &quot;  ${GREEN}✓${NC} $*&quot;; }
+aside()   { echo -e &quot;  ${YELLOW}→${NC} $*&quot;; }
+
+demo_ports_up
+demo_wait_ready
+
+# --- Act ---
+
+narrate &quot;Harbor Homes Cooperative — Roof Repair Authorization&quot;
+echo &quot;  The board has received an inspection report:&quot;
+echo &quot;  water intrusion detected at Building A flat roof.&quot;
+echo &quot;  A proposal to authorize \$12,000 from the capital reserve is pending.&quot;
+echo
+
+narrate &quot;Step 1: Show the pending proposal&quot;
+PROPOSAL=$(demo_curl &quot;$HARBOR_URL/v1/governance/proposals?status=pending&quot; GET &quot;&quot; &quot;$HARBOR_TOKEN&quot;)
+echo &quot;$PROPOSAL&quot; | python3 -m json.tool
+result &quot;Proposal visible to all members&quot;
+aside &quot;Anyone in the coop can see this — not just the board&quot;
+
+narrate &quot;Step 2: Members vote&quot;
+# Vote yes as Delphine Moreau (Board Chair)
+demo_curl &quot;$HARBOR_URL/v1/governance/proposals/${PROPOSAL_ID}/votes&quot; POST \
+  &#39;{&quot;vote&quot;:&quot;yes&quot;,&quot;member&quot;:&quot;did:icn:delphine&quot;}&#39; &quot;$HARBOR_TOKEN&quot; | python3 -m json.tool
+# Vote yes as James Okafor
+demo_curl &quot;$HARBOR_URL/v1/governance/proposals/${PROPOSAL_ID}/votes&quot; POST \
+  &#39;{&quot;vote&quot;:&quot;yes&quot;,&quot;member&quot;:&quot;did:icn:james&quot;}&#39; &quot;$HARBOR_TOKEN&quot; | python3 -m json.tool
+result &quot;Votes recorded — 2 yes, quorum reached&quot;
+aside &quot;Delphine Moreau, James Okafor — names visible, not raw DIDs&quot;
+
+narrate &quot;Step 3: Proposal passes — treasury action authorized&quot;
+APPROVAL=$(demo_curl &quot;$HARBOR_URL/v1/governance/proposals/${PROPOSAL_ID}&quot; GET &quot;&quot; &quot;$HARBOR_TOKEN&quot;)
+echo &quot;$APPROVAL&quot; | python3 -m json.tool
+result &quot;Status: approved&quot;
+
+narrate &quot;Step 4: Show provenance&quot;
+PROVENANCE=$(demo_curl &quot;$HARBOR_URL/v1/ledger/provenance?ref=proposal:${PROPOSAL_ID}&quot; GET &quot;&quot; &quot;$HARBOR_TOKEN&quot;)
+echo &quot;$PROVENANCE&quot; | python3 -m json.tool
+result &quot;Provenance chain links proposal to authorized allocation&quot;
+
+echo
+echo &quot;================================================================&quot;
+echo &quot; FLOW 1A COMPLETE: Governance leading to authorized action&quot;
+echo &quot; with provenance context.&quot;
+echo
+echo &quot; NOTE: The final receipt-gated execution proof is being&quot;
+echo &quot; finalized (PR #1327 — ExecutionReceiptGate). Once merged,&quot;
+echo &quot; the system will provide machine-verifiable binding between&quot;
+echo &quot; the approved vote and the resulting execution.&quot;
+echo &quot;================================================================&quot;
+echo
+</code></pre>
+<p>Save to <code>demo/scripts/flow-1-governance.sh</code>.</p>
+<p><strong>Step 2: Replace placeholder API calls with real endpoints from api-map.md</strong></p>
+<p>This is the critical step. Do not proceed until the curl calls return real data.</p>
+<p>For each call:</p>
+<ol>
+<li>Run it manually against <code>$HARBOR_URL</code></li>
+<li>Verify the response shape</li>
+<li>Update the script to extract the right fields (proposal ID, status, etc.)</li>
+</ol>
+<p><strong>Step 3: Test the full flow end-to-end</strong></p>
+<pre><code class="language-bash">chmod +x demo/scripts/flow-1-governance.sh
+./demo/scripts/flow-1-governance.sh 2&gt;&amp;1 | tee /tmp/flow1-output.txt
+grep -E &quot;(COMPLETE|ERROR|✓)&quot; /tmp/flow1-output.txt
+</code></pre>
+<p>Expected: all <code>✓</code> lines, no errors, ends with <code>FLOW 1A COMPLETE</code>.</p>
+<p><strong>Step 4: Commit</strong></p>
+<pre><code class="language-bash">git add demo/scripts/flow-1-governance.sh
+git commit -m &quot;feat(demo): add flow-1-governance.sh (Flow 1A — Harbor Homes roof repair)&quot;
+</code></pre>
+<hr>
+<h2>Task 6: Flow 2 — Patronage and Contribution Legibility</h2>
+<p>BrightWorks distributes Q1 patronage. Any member can see why allocations look the way they do.</p>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Create: <code>demo/scripts/flow-2-patronage.sh</code></li>
+</ul>
+<p><strong>Step 1: Write the script</strong></p>
+<pre><code class="language-bash">#!/usr/bin/env bash
+# Flow 2: Patronage, Contribution, and Value Legibility
+# Narrative: BrightWorks Cooperative — Q1 patronage distribution
+#
+# What this demonstrates:
+#   - Commons credit / contribution accounting
+#   - Provenance-backed balances
+#   - PatronageTracker logic
+#   - Member-visible explanation of allocations
+
+set -euo pipefail
+SCRIPT_DIR=&quot;$(cd &quot;$(dirname &quot;${BASH_SOURCE[0]}&quot;)&quot; &amp;&amp; pwd)&quot;
+source &quot;${SCRIPT_DIR}/lib-demo-ports.sh&quot;
+
+BLUE=&#39;\033[0;34m&#39;; GREEN=&#39;\033[0;32m&#39;; NC=&#39;\033[0m&#39;
+
+narrate() { echo -e &quot;\n${BLUE}▶${NC} $*\n&quot;; }
+result()  { echo -e &quot;  ${GREEN}✓${NC} $*&quot;; }
+aside()   { echo -e &quot;  → $*&quot;; }
+
+demo_ports_up
+demo_wait_ready
+
+narrate &quot;BrightWorks Cooperative — Q1 Patronage Distribution&quot;
+echo &quot;  Q1 is closing. 3,840 credits are distributable.&quot;
+echo &quot;  The question every member asks: &#39;Why did I get this amount?&#39;&quot;
+echo
+
+narrate &quot;Step 1: Show contribution ledger&quot;
+# Endpoint TBD from api-map.md
+CONTRIBUTIONS=$(demo_curl &quot;$BRIGHTWORKS_URL/v1/ledger/contributions&quot; GET &quot;&quot; &quot;$BRIGHTWORKS_TOKEN&quot;)
+echo &quot;$CONTRIBUTIONS&quot; | python3 -m json.tool
+result &quot;Labor hours per member visible to the whole coop&quot;
+aside &quot;Yusuf: 120h, Devraj: 115h, Camille: 98h, Anton: 104h, Rosa: 87h&quot;
+
+narrate &quot;Step 2: Show patronage calculation (PatronageTracker)&quot;
+PATRONAGE=$(demo_curl &quot;$BRIGHTWORKS_URL/v1/ledger/patronage?period=2026-Q1&quot; GET &quot;&quot; &quot;$BRIGHTWORKS_TOKEN&quot;)
+echo &quot;$PATRONAGE&quot; | python3 -m json.tool
+result &quot;Allocation = (member hours / total hours) * distributable surplus&quot;
+aside &quot;Each member can verify the math. No black box.&quot;
+
+narrate &quot;Step 3: Show provenance-backed balance for one member&quot;
+BALANCE=$(demo_curl &quot;$BRIGHTWORKS_URL/v1/ledger/balance?member=did:icn:yusuf&quot; GET &quot;&quot; &quot;$BRIGHTWORKS_TOKEN&quot;)
+echo &quot;$BALANCE&quot; | python3 -m json.tool
+result &quot;Balance includes provenance reference to the patronage receipt&quot;
+
+echo
+echo &quot;================================================================&quot;
+echo &quot; FLOW 2 COMPLETE: Patronage and contribution legibility&quot;
+echo &quot; Any member can inspect why they received what they received.&quot;
+echo &quot;================================================================&quot;
+echo
+</code></pre>
+<p><strong>Step 2: Fill in real API calls</strong></p>
+<p>Same process as Task 5 Step 2. Verify against <code>$BRIGHTWORKS_URL</code>.</p>
+<p><strong>Step 3: Test</strong></p>
+<pre><code class="language-bash">chmod +x demo/scripts/flow-2-patronage.sh
+./demo/scripts/flow-2-patronage.sh 2&gt;&amp;1 | grep -E &quot;(COMPLETE|ERROR|✓)&quot;
+</code></pre>
+<p><strong>Step 4: Commit</strong></p>
+<pre><code class="language-bash">git add demo/scripts/flow-2-patronage.sh
+git commit -m &quot;feat(demo): add flow-2-patronage.sh (BrightWorks Q1 patronage distribution)&quot;
+</code></pre>
+<hr>
+<h2>Task 7: Flow 3 — Federation Coordination</h2>
+<p>River City shares equipment with BrightWorks. Finger Lakes CDN facilitates. Cross-coop commons credits settle.</p>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Create: <code>demo/scripts/flow-3-federation.sh</code></li>
+</ul>
+<p><strong>Step 1: Write the script</strong></p>
+<pre><code class="language-bash">#!/usr/bin/env bash
+# Flow 3: Federation Coordination Across Autonomous Coops
+# Narrative: River City Tool Library + BrightWorks equipment access agreement,
+#            facilitated by Finger Lakes CDN
+#
+# What this demonstrates:
+#   - Multiple live nodes, separate identities
+#   - Cross-coop proposal and agreement
+#   - Commons credit settlement across orgs
+#   - Federation without centralization
+
+set -euo pipefail
+SCRIPT_DIR=&quot;$(cd &quot;$(dirname &quot;${BASH_SOURCE[0]}&quot;)&quot; &amp;&amp; pwd)&quot;
+source &quot;${SCRIPT_DIR}/lib-demo-ports.sh&quot;
+
+BLUE=&#39;\033[0;34m&#39;; GREEN=&#39;\033[0;32m&#39;; YELLOW=&#39;\033[1;33m&#39;; NC=&#39;\033[0m&#39;
+
+narrate() { echo -e &quot;\n${BLUE}▶${NC} $*\n&quot;; }
+result()  { echo -e &quot;  ${GREEN}✓${NC} $*&quot;; }
+aside()   { echo -e &quot;  ${YELLOW}→${NC} $*&quot;; }
+
+demo_ports_up
+demo_wait_ready
+
+narrate &quot;A Federation in Motion&quot;
+echo &quot;  Three separate cooperatives. Three separate nodes.&quot;
+echo &quot;  No central authority. Each controls its own data.&quot;
+echo &quot;  Today: River City and BrightWorks are forming an equipment-sharing agreement.&quot;
+echo
+
+narrate &quot;Step 1: Show each coop&#39;s identity — they are independent&quot;
+for url_var in BRIGHTWORKS_URL RIVERCITY_URL FINGERLAKES_URL; do
+  url=&quot;${!url_var}&quot;
+  info=$(demo_curl &quot;$url/v1/health&quot; GET)
+  echo &quot;  $url_var: $(echo &quot;$info&quot; | python3 -c &#39;import sys,json; d=json.load(sys.stdin); print(d.get(&quot;coop_id&quot;,&quot;unknown&quot;))&#39;)&quot;
+done
+result &quot;Three separate nodes — separate governance, separate ledgers&quot;
+
+narrate &quot;Step 2: Finger Lakes CDN proposes a federation agreement&quot;
+# CDN initiates on behalf of the two coops (federation proposal pattern)
+AGREEMENT=$(demo_curl &quot;$FINGERLAKES_URL/v1/federation/agreements&quot; POST \
+  &#39;{&quot;parties&quot;:[&quot;river-city-tool-library&quot;,&quot;brightworks-cooperative&quot;],
+    &quot;terms&quot;:&quot;River City provides metalworking equipment access; BrightWorks contributes 20 maintenance hours/quarter&quot;,
+    &quot;duration_days&quot;:90}&#39; &quot;$FINGERLAKES_TOKEN&quot;)
+echo &quot;$AGREEMENT&quot; | python3 -m json.tool
+result &quot;Agreement proposed — each party must accept independently&quot;
+aside &quot;Finger Lakes CDN facilitates. It does not control.&quot;
+
+narrate &quot;Step 3: Both coops accept&quot;
+demo_curl &quot;$RIVERCITY_URL/v1/federation/agreements/${AGREEMENT_ID}/accept&quot; POST \
+  &#39;{}&#39; &quot;$RIVERCITY_TOKEN&quot; | python3 -m json.tool
+demo_curl &quot;$BRIGHTWORKS_URL/v1/federation/agreements/${AGREEMENT_ID}/accept&quot; POST \
+  &#39;{}&#39; &quot;$BRIGHTWORKS_TOKEN&quot; | python3 -m json.tool
+result &quot;Agreement active — both parties accepted independently&quot;
+
+narrate &quot;Step 4: BrightWorks contributes maintenance hours — commons credits settle&quot;
+SETTLEMENT=$(demo_curl &quot;$BRIGHTWORKS_URL/v1/ledger/commons-credit&quot; POST \
+  &#39;{&quot;recipient&quot;:&quot;river-city-tool-library&quot;,
+    &quot;amount&quot;:8,
+    &quot;unit&quot;:&quot;hours&quot;,
+    &quot;description&quot;:&quot;Q1 maintenance contribution — lathe and drill press&quot;,
+    &quot;agreement_ref&quot;:&quot;&#39;&quot;${AGREEMENT_ID}&quot;&#39;&quot;}&#39; &quot;$BRIGHTWORKS_TOKEN&quot;)
+echo &quot;$SETTLEMENT&quot; | python3 -m json.tool
+result &quot;Settlement recorded — cross-coop, provenance-backed&quot;
+
+narrate &quot;Step 5: Show the cross-coop settlement at Finger Lakes CDN&quot;
+FEDERATION_VIEW=$(demo_curl &quot;$FINGERLAKES_URL/v1/federation/settlements?agreement=${AGREEMENT_ID}&quot; GET &quot;&quot; &quot;$FINGERLAKES_TOKEN&quot;)
+echo &quot;$FEDERATION_VIEW&quot; | python3 -m json.tool
+result &quot;CDN can see settlement status across the federation&quot;
+aside &quot;Read-only visibility. No ability to override either coop&#39;s ledger.&quot;
+
+echo
+echo &quot;================================================================&quot;
+echo &quot; FLOW 3 COMPLETE: Federation coordination across autonomous coops&quot;
+echo &quot; Independent coops coordinated without a central authority.&quot;
+echo &quot;================================================================&quot;
+echo
+</code></pre>
+<p><strong>Step 2: Fill in real API calls</strong></p>
+<p>Pay special attention to federation/agreement endpoints — these may be different. Verify from api-map.md and update.</p>
+<p><strong>Step 3: Test</strong></p>
+<pre><code class="language-bash">chmod +x demo/scripts/flow-3-federation.sh
+./demo/scripts/flow-3-federation.sh 2&gt;&amp;1 | grep -E &quot;(COMPLETE|ERROR|✓)&quot;
+</code></pre>
+<p><strong>Step 4: Commit</strong></p>
+<pre><code class="language-bash">git add demo/scripts/flow-3-federation.sh
+git commit -m &quot;feat(demo): add flow-3-federation.sh (River City + BrightWorks equipment agreement)&quot;
+</code></pre>
+<hr>
+<h2>Task 8: Flow 4 — Federation Reporting (Optional Capstone)</h2>
+<p>Finger Lakes CDN shows cross-federation visibility to a funder, without controlling any coop.</p>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Create: <code>demo/scripts/flow-4-reporting.sh</code></li>
+</ul>
+<p>This is a lighter script — mostly read-only queries against the CDN node showing governance evidence and settlement summaries.</p>
+<pre><code class="language-bash">#!/usr/bin/env bash
+# Flow 4: Federation Oversight and Institutional Reporting (optional capstone)
+# Audience: funders, grant reviewers, ecosystem orgs
+
+set -euo pipefail
+SCRIPT_DIR=&quot;$(cd &quot;$(dirname &quot;${BASH_SOURCE[0]}&quot;)&quot; &amp;&amp; pwd)&quot;
+source &quot;${SCRIPT_DIR}/lib-demo-ports.sh&quot;
+
+BLUE=&#39;\033[0;34m&#39;; GREEN=&#39;\033[0;32m&#39;; NC=&#39;\033[0m&#39;
+
+narrate() { echo -e &quot;\n${BLUE}▶${NC} $*\n&quot;; }
+result()  { echo -e &quot;  ${GREEN}✓${NC} $*&quot;; }
+
+demo_ports_up
+demo_wait_ready
+
+narrate &quot;Finger Lakes CDN — Federation Grant Report&quot;
+echo &quot;  A funder asks: &#39;Show us that governance and spending are linked.&#39;&quot;
+echo &quot;  The CDN can produce this without having control over any member coop.&quot;
+echo
+
+# Show governance activity across federation
+narrate &quot;Step 1: Governance activity summary&quot;
+demo_curl &quot;$FINGERLAKES_URL/v1/federation/governance-summary&quot; GET &quot;&quot; &quot;$FINGERLAKES_TOKEN&quot; | python3 -m json.tool
+result &quot;Proposals, votes, approvals — across all member coops&quot;
+
+# Show settlements
+narrate &quot;Step 2: Cross-coop settlement summary&quot;
+demo_curl &quot;$FINGERLAKES_URL/v1/federation/settlements&quot; GET &quot;&quot; &quot;$FINGERLAKES_TOKEN&quot; | python3 -m json.tool
+result &quot;Settlement records with provenance — exportable for grant reporting&quot;
+
+echo
+echo &quot;================================================================&quot;
+echo &quot; FLOW 4 COMPLETE: Institutional trust without centralization&quot;
+echo &quot; The CDN can report. It cannot command.&quot;
+echo &quot;================================================================&quot;
+</code></pre>
+<p>Follow same steps: fill in real endpoints, test, commit.</p>
+<pre><code class="language-bash">git add demo/scripts/flow-4-reporting.sh
+git commit -m &quot;feat(demo): add flow-4-reporting.sh (Finger Lakes CDN federation audit view)&quot;
+</code></pre>
+<hr>
+<h2>Task 9: Presenter Runbook</h2>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>docs/demo/DEMO_SCRIPT.md</code> (replace existing with federation version)</li>
+</ul>
+<p><strong>Step 1: Read the existing file first</strong></p>
+<pre><code class="language-bash">wc -l /home/ubuntu/projects/icn/docs/demo/DEMO_SCRIPT.md
+</code></pre>
+<p><strong>Step 2: Replace with federation runbook</strong></p>
+<p>The new runbook should cover:</p>
+<pre><code class="language-markdown"># ICN Federation Demo — Presenter Runbook
+
+**Versions:** 5 min (lightning) / 12 min (standard) / 20 min (full)
+
+## Pre-Demo Setup (2 min)
+./demo/scripts/reseed-federation-demo.sh
+# Verify: all four coops show &quot;ready&quot;
+
+## Opening (all versions)
+&quot;Cooperatives are supposed to be more democratic than firms.
+ But in practice, they often inherit the same old problems...&quot;
+
+## 5-Minute Version
+- Opening (1 min)
+- Flow 1A: roof repair governance + provenance (3 min)
+- Closing: &quot;This is running on four separate nodes, each
+  coop controls its own data&quot; (1 min)
+
+## 12-Minute Version
+- Opening (1 min)
+- Flow 1A (4 min)
+- Flow 2: patronage legibility (4 min)
+- Flow 3: federation clip (2 min)
+- Closing (1 min)
+
+## 20-Minute Version
+- Opening (2 min)
+- Flow 1A (5 min)
+- Flow 2 (5 min)
+- Flow 3 (5 min)
+- Flow 4 optional (2 min)
+- Closing / Q&amp;A setup (1 min)
+
+## Audience Pivots
+[section per audience type with 1 sentence reframe]
+
+## Fallback Plan
+[prerecorded video link / static screenshots]
+
+## Reset
+./demo/scripts/reseed-federation-demo.sh
+</code></pre>
+<p>Write the full version of each section (not just this skeleton).</p>
+<p><strong>Step 3: Commit</strong></p>
+<pre><code class="language-bash">git add docs/demo/DEMO_SCRIPT.md
+git commit -m &quot;docs(demo): replace demo script with federation runbook (5/12/20 min variants)&quot;
+</code></pre>
+<hr>
+<h2>Task 10: Self-Serve Quickstart</h2>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Create: <code>demo/SELF_SERVE.md</code></li>
+</ul>
+<p>This is the handoff document. A stranger should be able to run the demo from this file alone.</p>
+<p>Sections:</p>
+<ol>
+<li><strong>What this demonstrates</strong> (3 sentences)</li>
+<li><strong>Prerequisites</strong> (kubectl, cluster access)</li>
+<li><strong>Start</strong> (<code>./demo/scripts/reseed-federation-demo.sh</code>)</li>
+<li><strong>Run the flows</strong> (one command each, expected output description)</li>
+<li><strong>What you&#39;re seeing</strong> (one paragraph per flow)</li>
+<li><strong>Troubleshooting</strong> (port-forward stalls, token errors, reseed)</li>
+</ol>
+<pre><code class="language-bash">git add demo/SELF_SERVE.md
+git commit -m &quot;docs(demo): add self-serve quickstart (handoff-survivable)&quot;
+</code></pre>
+<hr>
+<h2>Task 11: Flow 1B Upgrade (Gated on PR #1327)</h2>
+<p><strong>Do not start this task until PR #1327 is merged to main.</strong></p>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>demo/scripts/flow-1-governance.sh</code></li>
+<li>Modify: <code>docs/demo/DEMO_SCRIPT.md</code> (upgrade proof language)</li>
+</ul>
+<p><strong>Step 1: Confirm #1327 is merged</strong></p>
+<pre><code class="language-bash">gh pr view 1327 --json state,mergedAt | python3 -m json.tool
+# Expected: state: &quot;MERGED&quot;
+</code></pre>
+<p><strong>Step 2: Add ExecutionReceiptGate call to flow-1 script</strong></p>
+<p>After the treasury action step, add:</p>
+<pre><code class="language-bash">narrate &quot;Step 5: Execution receipt — governance-to-execution proof&quot;
+RECEIPT=$(demo_curl &quot;$HARBOR_URL/v1/execution/receipts?proposal=${PROPOSAL_ID}&quot; GET &quot;&quot; &quot;$HARBOR_TOKEN&quot;)
+echo &quot;$RECEIPT&quot; | python3 -m json.tool
+result &quot;Execution receipt bound to approved governance event&quot;
+aside &quot;This action could not have run without the approved proposal&quot;
+</code></pre>
+<p><strong>Step 3: Update narrative footer in the script</strong></p>
+<p>Remove the <code>NOTE: The final receipt-gated execution proof is being finalized...</code> block.
+Replace with:</p>
+<pre><code>================================================================
+ FLOW 1B COMPLETE: Governance to execution proof
+ The treasury action is cryptographically bound to the approved
+ governance event via ExecutionReceiptGate.
+================================================================
+</code></pre>
+<p><strong>Step 4: Update presenter narration in DEMO_SCRIPT.md</strong></p>
+<p>Find the Flow 1 section and update to the stronger claim:</p>
+<blockquote>
+<p>This proposal was approved through cooperative governance.
+The resulting action is not merely recorded after the fact —
+it is bound through the execution receipt path, so the system
+can prove the action corresponds to approved governance.</p>
+</blockquote>
+<p><strong>Step 5: Test</strong></p>
+<pre><code class="language-bash">./demo/scripts/flow-1-governance.sh 2&gt;&amp;1 | grep -E &quot;(COMPLETE|ERROR|✓|receipt)&quot;
+</code></pre>
+<p>Expected: <code>FLOW 1B COMPLETE</code> in output, receipt data in results.</p>
+<p><strong>Step 6: Commit</strong></p>
+<pre><code class="language-bash">git add demo/scripts/flow-1-governance.sh docs/demo/DEMO_SCRIPT.md
+git commit -m &quot;feat(demo): upgrade Flow 1 to 1B — ExecutionReceiptGate proof (PR #1327)&quot;
+</code></pre>
+<hr>
+<h2>Verification Checklist</h2>
+<p>Run these before calling the demo presentation-ready:</p>
+<pre><code class="language-bash"># 1. Reseed works cleanly
+./demo/scripts/reseed-federation-demo.sh
+echo &quot;Exit: $?&quot;
+
+# 2. Flow 1 runs without errors
+./demo/scripts/flow-1-governance.sh 2&gt;&amp;1 | tail -5
+
+# 3. Flow 2 runs without errors
+./demo/scripts/flow-2-patronage.sh 2&gt;&amp;1 | tail -5
+
+# 4. Flow 3 runs without errors
+./demo/scripts/flow-3-federation.sh 2&gt;&amp;1 | tail -5
+
+# 5. Run all three in sequence (simulates full 20-min demo)
+./demo/scripts/reseed-federation-demo.sh &amp;&amp; \
+./demo/scripts/flow-1-governance.sh &amp;&amp; \
+./demo/scripts/flow-2-patronage.sh &amp;&amp; \
+./demo/scripts/flow-3-federation.sh
+echo &quot;Full run exit: $?&quot;
+
+# 6. Reseed and run again (determinism check)
+./demo/scripts/reseed-federation-demo.sh &amp;&amp; \
+./demo/scripts/flow-1-governance.sh 2&gt;&amp;1 | grep COMPLETE
+</code></pre>
+<p>All checks must pass before the demo is considered presentation-ready.</p>
+<hr>
+<h2>What to Watch Out For</h2>
+<p><strong>Port-forward instability:</strong> kubectl port-forward can drop under load. If a flow dies mid-way, <code>demo_ports_down &amp;&amp; demo_ports_up &amp;&amp; demo_wait_ready</code> resets cleanly. Add this as a fallback step in the runbook.</p>
+<p><strong>Token expiry:</strong> JWTs expire. The reseed script should regenerate tokens as part of setup. Don&#39;t hardcode tokens in scripts.</p>
+<p><strong>Non-deterministic IDs:</strong> If proposal IDs are UUIDs generated fresh each run, the flow scripts must dynamically extract them from API responses. Do not hardcode IDs.</p>
+<p><strong>API endpoint drift:</strong> If the gateway API changes, update <code>demo/docs/api-map.md</code> first, then update the flow scripts. Keep the map as the source of truth.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

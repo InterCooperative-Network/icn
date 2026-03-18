@@ -1,0 +1,393 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Service Level Objectives (SLOs) | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>ops</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>SLO</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/ops/SLO.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Service Level Objectives (SLOs)</h1>
+<p><strong>Last Updated</strong>: 2026-01-08
+<strong>Review Cadence</strong>: Quarterly</p>
+<h2>Overview</h2>
+<p>This document defines Service Level Objectives for ICN daemon deployments. SLOs provide measurable reliability targets that guide operations and incident response.</p>
+<h2>SLO Summary</h2>
+<table>
+<thead>
+<tr>
+<th>Service</th>
+<th>Metric</th>
+<th>Target</th>
+<th>Error Budget (30d)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Gateway API</td>
+<td>Availability</td>
+<td>99.9%</td>
+<td>43.2 min</td>
+</tr>
+<tr>
+<td>Gossip Network</td>
+<td>Message Delivery</td>
+<td>99.5%</td>
+<td>3.6 hours</td>
+</tr>
+<tr>
+<td>Ledger Sync</td>
+<td>Consistency</td>
+<td>99.9%</td>
+<td>43.2 min</td>
+</tr>
+<tr>
+<td>API Latency</td>
+<td>p99 Response Time</td>
+<td>&lt; 500ms</td>
+<td>N/A</td>
+</tr>
+<tr>
+<td>Recovery</td>
+<td>RTO</td>
+<td>&lt; 15 min</td>
+<td>N/A</td>
+</tr>
+<tr>
+<td>Recovery</td>
+<td>RPO</td>
+<td>&lt; 1 min</td>
+<td>N/A</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Availability SLOs</h2>
+<h3>Gateway API Availability</h3>
+<p><strong>Target</strong>: 99.9% uptime (monthly)</p>
+<p><strong>Definition</strong>: Percentage of time the Gateway API responds to health checks successfully.</p>
+<p><strong>Measurement</strong>:</p>
+<pre><code class="language-promql"># Availability over 30 days
+1 - (
+  sum(rate(icn_gateway_requests_total{status=~&quot;5..&quot;}[30d])) /
+  sum(rate(icn_gateway_requests_total[30d]))
+)
+</code></pre>
+<p><strong>Error Budget</strong>: 43.2 minutes per month</p>
+<p><strong>Alert Thresholds</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Severity</th>
+<th>Condition</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Warning</td>
+<td>&lt; 99.95% (7-day rolling)</td>
+</tr>
+<tr>
+<td>Critical</td>
+<td>&lt; 99.9% (7-day rolling)</td>
+</tr>
+<tr>
+<td>Page</td>
+<td>&lt; 99.5% (1-hour rolling)</td>
+</tr>
+</tbody></table>
+<hr>
+<h3>Gossip Message Delivery</h3>
+<p><strong>Target</strong>: 99.5% message delivery</p>
+<p><strong>Definition</strong>: Percentage of gossip messages successfully delivered to at least one peer.</p>
+<p><strong>Measurement</strong>:</p>
+<pre><code class="language-promql">sum(rate(icn_gossip_messages_delivered_total[30d])) /
+sum(rate(icn_gossip_messages_sent_total[30d]))
+</code></pre>
+<p><strong>Error Budget</strong>: 3.6 hours of message loss per month</p>
+<p><strong>Alert Thresholds</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Severity</th>
+<th>Condition</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Warning</td>
+<td>Delivery &lt; 99% (1-hour)</td>
+</tr>
+<tr>
+<td>Critical</td>
+<td>Delivery &lt; 95% (15-min)</td>
+</tr>
+</tbody></table>
+<hr>
+<h3>Ledger Consistency</h3>
+<p><strong>Target</strong>: 99.9% consistency</p>
+<p><strong>Definition</strong>: Percentage of time ledger state matches across connected peers.</p>
+<p><strong>Measurement</strong>:</p>
+<pre><code class="language-promql"># Peers with matching entry counts
+sum(icn_ledger_peer_sync_match) / count(icn_ledger_peer_sync_match)
+</code></pre>
+<p><strong>Error Budget</strong>: 43.2 minutes of inconsistency per month</p>
+<hr>
+<h2>Latency SLOs</h2>
+<h3>API Response Time</h3>
+<p><strong>Target</strong>: p99 &lt; 500ms</p>
+<p><strong>Definition</strong>: 99th percentile response time for Gateway API requests.</p>
+<p><strong>Measurement</strong>:</p>
+<pre><code class="language-promql">histogram_quantile(0.99,
+  sum(rate(icn_gateway_request_duration_seconds_bucket[5m])) by (le)
+)
+</code></pre>
+<p><strong>Alert Thresholds</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Severity</th>
+<th>Condition</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Warning</td>
+<td>p99 &gt; 400ms (5-min)</td>
+</tr>
+<tr>
+<td>Critical</td>
+<td>p99 &gt; 500ms (5-min)</td>
+</tr>
+<tr>
+<td>Page</td>
+<td>p99 &gt; 1s (5-min)</td>
+</tr>
+</tbody></table>
+<hr>
+<h3>Gossip Propagation</h3>
+<p><strong>Target</strong>: p95 &lt; 2 seconds</p>
+<p><strong>Definition</strong>: Time for a message to reach 95% of subscribed peers.</p>
+<p><strong>Measurement</strong>:</p>
+<pre><code class="language-promql">histogram_quantile(0.95,
+  sum(rate(icn_gossip_propagation_seconds_bucket[5m])) by (le)
+)
+</code></pre>
+<hr>
+<h3>Trust Computation</h3>
+<p><strong>Target</strong>: p99 &lt; 100ms</p>
+<p><strong>Definition</strong>: Time to compute transitive trust score for a DID.</p>
+<p><strong>Measurement</strong>:</p>
+<pre><code class="language-promql">histogram_quantile(0.99,
+  sum(rate(icn_trust_compute_duration_seconds_bucket[5m])) by (le)
+)
+</code></pre>
+<hr>
+<h3>Ledger Entry Creation</h3>
+<p><strong>Target</strong>: p95 &lt; 1 second</p>
+<p><strong>Definition</strong>: Time from entry submission to local persistence.</p>
+<p><strong>Measurement</strong>:</p>
+<pre><code class="language-promql">histogram_quantile(0.95,
+  sum(rate(icn_ledger_entry_duration_seconds_bucket[5m])) by (le)
+)
+</code></pre>
+<hr>
+<h2>Data SLOs</h2>
+<h3>Ledger Eventual Consistency</h3>
+<p><strong>Target</strong>: Convergence within 30 seconds</p>
+<p><strong>Definition</strong>: Maximum time for all peers to reflect a committed entry.</p>
+<p><strong>Measurement</strong>:</p>
+<pre><code class="language-promql">max(icn_ledger_sync_lag_seconds)
+</code></pre>
+<p><strong>Alert Threshold</strong>: Lag &gt; 60 seconds</p>
+<hr>
+<h3>Trust Score Freshness</h3>
+<p><strong>Target</strong>: &lt; 5 minute staleness</p>
+<p><strong>Definition</strong>: Maximum age of cached trust scores.</p>
+<p><strong>Measurement</strong>:</p>
+<pre><code class="language-promql">max(icn_trust_cache_age_seconds)
+</code></pre>
+<hr>
+<h3>No Data Loss</h3>
+<p><strong>Target</strong>: 0 committed entries lost</p>
+<p><strong>Definition</strong>: Once an entry is acknowledged, it must never be lost.</p>
+<p><strong>Measurement</strong>: Compare entry hashes across backups and peers.</p>
+<p><strong>Alert</strong>: Any discrepancy is Critical.</p>
+<hr>
+<h2>Recovery SLOs</h2>
+<h3>Recovery Time Objective (RTO)</h3>
+<p><strong>Target</strong>: &lt; 15 minutes</p>
+<p><strong>Definition</strong>: Maximum time from failure detection to service restoration.</p>
+<p><strong>Includes</strong>:</p>
+<ul>
+<li>Detection time (&lt; 2 min with alerting)</li>
+<li>Response time (&lt; 5 min for on-call)</li>
+<li>Recovery time (&lt; 8 min for restart/restore)</li>
+</ul>
+<hr>
+<h3>Recovery Point Objective (RPO)</h3>
+<p><strong>Target</strong>: &lt; 1 minute</p>
+<p><strong>Definition</strong>: Maximum data loss in a failure scenario.</p>
+<p><strong>Achieved via</strong>:</p>
+<ul>
+<li>Gossip replication (real-time)</li>
+<li>State snapshots (configurable interval)</li>
+<li>Backups (recommended: hourly)</li>
+</ul>
+<hr>
+<h2>Incident Severity Mapping</h2>
+<table>
+<thead>
+<tr>
+<th>Severity</th>
+<th>SLO Impact</th>
+<th>Response</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>P1 Critical</strong></td>
+<td>Multiple SLOs breached</td>
+<td>Immediate page, all hands</td>
+</tr>
+<tr>
+<td><strong>P2 High</strong></td>
+<td>Single SLO breached</td>
+<td>Page on-call</td>
+</tr>
+<tr>
+<td><strong>P3 Medium</strong></td>
+<td>Error budget depleted &gt;50%</td>
+<td>Respond within 4 hours</td>
+</tr>
+<tr>
+<td><strong>P4 Low</strong></td>
+<td>Error budget depleted &gt;25%</td>
+<td>Respond within 24 hours</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Error Budget Policy</h2>
+<h3>When Error Budget is Healthy (&gt; 50%)</h3>
+<ul>
+<li>Normal development velocity</li>
+<li>Deploy at will during business hours</li>
+<li>Experiment with new features</li>
+</ul>
+<h3>When Error Budget is Low (25-50%)</h3>
+<ul>
+<li>Prioritize reliability work</li>
+<li>Require rollback plans for deploys</li>
+<li>No non-critical experiments</li>
+</ul>
+<h3>When Error Budget is Exhausted (&lt; 25%)</h3>
+<ul>
+<li>Freeze non-critical changes</li>
+<li>Focus exclusively on reliability</li>
+<li>Incident review required before resuming</li>
+</ul>
+<hr>
+<h2>SLO Dashboard</h2>
+<p>Grafana dashboard should display:</p>
+<ol>
+<li><strong>Current SLO Status</strong> - Green/Yellow/Red for each SLO</li>
+<li><strong>Error Budget Remaining</strong> - Percentage and time remaining</li>
+<li><strong>Burn Rate</strong> - How fast error budget is depleting</li>
+<li><strong>SLO Trends</strong> - 7-day and 30-day compliance</li>
+</ol>
+<hr>
+<h2>Review Process</h2>
+<h3>Monthly Review</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Calculate actual vs target for each SLO</li>
+<li><input disabled="" type="checkbox"> Review incidents that impacted SLOs</li>
+<li><input disabled="" type="checkbox"> Adjust thresholds if needed</li>
+<li><input disabled="" type="checkbox"> Update error budgets</li>
+</ul>
+<h3>Quarterly Review</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Assess if SLO targets are appropriate</li>
+<li><input disabled="" type="checkbox"> Review new capabilities that need SLOs</li>
+<li><input disabled="" type="checkbox"> Update documentation</li>
+<li><input disabled="" type="checkbox"> Communicate changes to stakeholders</li>
+</ul>
+<hr>
+<h2>Appendix: Prometheus Alerts</h2>
+<pre><code class="language-yaml"># Example alert rules for SLOs
+groups:
+  - name: slo-alerts
+    rules:
+      - alert: GatewayAvailabilityLow
+        expr: |
+          (1 - sum(rate(icn_gateway_requests_total{status=~&quot;5..&quot;}[1h])) /
+               sum(rate(icn_gateway_requests_total[1h]))) &lt; 0.999
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: Gateway availability below 99.9%
+
+      - alert: APILatencyHigh
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(icn_gateway_request_duration_seconds_bucket[5m])) by (le)
+          ) &gt; 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: API p99 latency above 500ms
+</code></pre>
+<hr>
+<p><em>These SLOs are targets for pilot deployment. Production deployments may have stricter requirements.</em></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

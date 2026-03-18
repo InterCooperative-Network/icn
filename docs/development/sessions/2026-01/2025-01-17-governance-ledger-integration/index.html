@@ -1,0 +1,627 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Development Journal: Governance → Contract → Ledger Integration | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>development</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>sessions</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>2026 01</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>2025 01 17 governance ledger integration</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/development/sessions/2026-01/2025-01-17-governance-ledger-integration.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Development Journal: Governance → Contract → Ledger Integration</h1>
+<p><strong>Date</strong>: 2025-01-17
+<strong>Phase</strong>: Post-Phase 14, Critical Gap Resolution
+<strong>Goal</strong>: Enable accepted governance proposals to trigger ledger transactions and contract execution</p>
+<h2>Background</h2>
+<p>The GovernanceActor is fully implemented and working (as of today&#39;s discovery). However, there&#39;s a critical missing piece: <strong>accepted proposals don&#39;t trigger any actions</strong>.</p>
+<p>Currently, when a proposal is accepted:</p>
+<ol>
+<li>GovernanceActor evaluates votes → <code>DecisionOutcome::Accepted</code></li>
+<li>Proposal state updated to <code>ProposalState::Accepted { closed_at }</code></li>
+<li><code>ProposalClosed</code> message broadcast to network</li>
+<li><strong>Nothing else happens</strong> ❌</li>
+</ol>
+<h2>The Missing Flow</h2>
+<p>What <strong>should</strong> happen for a <code>Budget</code> proposal:</p>
+<pre><code>1. Proposal: &quot;Pay supplier 5000 credits&quot;
+   - ProposalPayload::Budget { amount: 5000, recipient: supplier_did, currency: &quot;credits&quot; }
+
+2. Community votes → 66% approval → ACCEPTED
+
+3. GovernanceActor emits → ProposalAccepted event
+
+4. EventBus routes event → LedgerActor (or Contract Executor)
+
+5. Ledger transaction executed:
+   - Debit: cooperative treasury (-5000)
+   - Credit: supplier (+5000)
+
+6. Transaction broadcast via gossip
+
+7. Audit trail created: governance_decision_id → ledger_entry_hash
+
+8. Event broadcast: &quot;Payment executed per governance decision #123&quot;
+</code></pre>
+<h2>Architecture Design</h2>
+<h3>Option 1: Direct Governance → Ledger (Simple)</h3>
+<pre><code class="language-rust">// In GovernanceActor::handle(CloseProposal)
+if outcome == Accepted {
+    match proposal.payload {
+        ProposalPayload::Budget { amount, recipient, currency, .. } =&gt; {
+            // Direct ledger call
+            ledger.record_transaction(Transaction { ... })?;
+        }
+        _ =&gt; {}
+    }
+}
+</code></pre>
+<p><strong>Pros</strong>: Simple, fast to implement
+<strong>Cons</strong>: Tight coupling, hard to extend, no contract support</p>
+<h3>Option 2: Event Bus (Extensible) ✅ <strong>CHOSEN</strong></h3>
+<pre><code class="language-rust">// Event system
+pub enum SystemEvent {
+    ProposalAccepted { proposal_id, payload },
+    ProposalRejected { proposal_id },
+    TransactionExecuted { entry_hash },
+}
+
+// In GovernanceActor
+fn close_proposal() {
+    if outcome == Accepted {
+        event_bus.emit(SystemEvent::ProposalAccepted {
+            proposal_id,
+            payload: proposal.payload.clone()
+        });
+    }
+}
+
+// Event handlers
+event_bus.subscribe(|event| match event {
+    SystemEvent::ProposalAccepted { payload: ProposalPayload::Budget { ... }, .. } =&gt; {
+        // Execute ledger transaction
+    }
+    SystemEvent::ProposalAccepted { payload: ProposalPayload::ConfigChange { ... }, .. } =&gt; {
+        // Update configuration
+    }
+    _ =&gt; {}
+});
+</code></pre>
+<p><strong>Pros</strong>: Decoupled, extensible, audit trail, testable
+<strong>Cons</strong>: Slightly more complex</p>
+<h2>Implementation Plan</h2>
+<h3>Phase 1: Event Infrastructure (2 hours)</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Create <code>icn-core/src/events.rs</code> with <code>SystemEvent</code> enum</li>
+<li><input disabled="" type="checkbox"> Implement simple event bus with <code>tokio::sync::broadcast</code></li>
+<li><input disabled="" type="checkbox"> Add event bus to supervisor</li>
+<li><input disabled="" type="checkbox"> Test event emission and subscription</li>
+</ul>
+<h3>Phase 2: Governance Event Emission (1 hour)</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Modify <code>GovernanceActor::handle(CloseProposal)</code> to emit events</li>
+<li><input disabled="" type="checkbox"> Emit <code>ProposalAccepted</code> with full payload</li>
+<li><input disabled="" type="checkbox"> Emit <code>ProposalRejected</code> for audit trail</li>
+<li><input disabled="" type="checkbox"> Test event emission in integration test</li>
+</ul>
+<h3>Phase 3: Ledger Event Handler (2 hours)</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Create ledger event handler in supervisor</li>
+<li><input disabled="" type="checkbox"> Handle <code>Budget</code> proposal payloads</li>
+<li><input disabled="" type="checkbox"> Execute ledger transactions</li>
+<li><input disabled="" type="checkbox"> Add governance metadata to ledger entries</li>
+<li><input disabled="" type="checkbox"> Test budget proposal → transaction flow</li>
+</ul>
+<h3>Phase 4: Audit Trail (1 hour)</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Store <code>governance_decision:{proposal_id}</code> → ledger entry hash</li>
+<li><input disabled="" type="checkbox"> Add <code>triggered_by_governance</code> field to ledger entries (optional)</li>
+<li><input disabled="" type="checkbox"> Query audit trail via RPC</li>
+<li><input disabled="" type="checkbox"> Test audit trail persistence</li>
+</ul>
+<h3>Phase 5: Contract Execution Support (3 hours)</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Handle <code>ProposalPayload::ConfigChange</code></li>
+<li><input disabled="" type="checkbox"> Create contract execution handler</li>
+<li><input disabled="" type="checkbox"> Wire up contract → ledger flow</li>
+<li><input disabled="" type="checkbox"> Test end-to-end: proposal → contract → ledger</li>
+</ul>
+<h3>Phase 6: Integration Testing (2 hours)</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Multi-node test: budget proposal → ledger mutation</li>
+<li><input disabled="" type="checkbox"> Verify gossip propagation of ledger changes</li>
+<li><input disabled="" type="checkbox"> Verify audit trail across nodes</li>
+<li><input disabled="" type="checkbox"> Test failure scenarios (insufficient funds, etc.)</li>
+</ul>
+<p><strong>Total Estimated Time</strong>: ~11 hours (1.5 days)</p>
+<h2>Implementation Details</h2>
+<h3>SystemEvent Enum</h3>
+<pre><code class="language-rust">// icn-core/src/events.rs
+use icn_governance::{ProposalId, ProposalPayload};
+use icn_identity::Did;
+
+#[derive(Clone, Debug)]
+pub enum SystemEvent {
+    // Governance events
+    ProposalAccepted {
+        proposal_id: ProposalId,
+        domain_id: String,
+        payload: ProposalPayload,
+        decided_at: u64,
+    },
+    ProposalRejected {
+        proposal_id: ProposalId,
+        domain_id: String,
+        decided_at: u64,
+    },
+
+    // Ledger events (for contracts listening to ledger changes)
+    TransactionExecuted {
+        entry_hash: [u8; 32],
+        from: Did,
+        to: Did,
+        amount: i64,
+        currency: String,
+    },
+
+    // Contract events
+    ContractExecuted {
+        contract_id: String,
+        outcome: serde_json::Value,
+    },
+}
+
+pub type EventCallback = Arc&lt;dyn Fn(SystemEvent) + Send + Sync&gt;;
+
+pub struct EventBus {
+    subscribers: Arc&lt;RwLock&lt;Vec&lt;EventCallback&gt;&gt;&gt;,
+}
+
+impl EventBus {
+    pub fn new() -&gt; Self {
+        Self {
+            subscribers: Arc::new(RwLock::new(Vec::new())),
+        }
+    }
+
+    pub fn subscribe(&amp;self, callback: EventCallback) {
+        let mut subs = self.subscribers.blocking_write();
+        subs.push(callback);
+    }
+
+    pub fn emit(&amp;self, event: SystemEvent) {
+        let subs = self.subscribers.blocking_read();
+        for callback in subs.iter() {
+            callback(event.clone());
+        }
+    }
+}
+</code></pre>
+<h3>GovernanceActor Integration</h3>
+<pre><code class="language-rust">// In icn-core/src/governance/actor.rs
+pub struct GovernanceActor {
+    // ... existing fields ...
+    event_bus: Option&lt;Arc&lt;EventBus&gt;&gt;,  // NEW
+}
+
+impl GovernanceActor {
+    pub async fn spawn(
+        did: Did,
+        store: Arc&lt;dyn Store&gt;,
+        gossip: Arc&lt;RwLock&lt;GossipActor&gt;&gt;,
+        resolver: Arc&lt;dyn MembershipResolver + Send + Sync&gt;,
+        event_bus: Option&lt;Arc&lt;EventBus&gt;&gt;,  // NEW
+    ) -&gt; Result&lt;GovernanceHandle&gt; {
+        // ... existing code ...
+
+        let actor = GovernanceActor {
+            did,
+            store,
+            gossip,
+            resolver,
+            profile: GovernanceProfile::cooperative_default(),
+            close_scheduler,
+            close_tx,
+            event_bus,  // NEW
+        };
+
+        // ... rest of spawn ...
+    }
+
+    async fn handle(&amp;mut self, cmd: GovernanceCommand) -&gt; Result&lt;()&gt; {
+        match cmd {
+            // ... existing match arms ...
+
+            GovernanceCommand::CloseProposal { proposal_id } =&gt; {
+                // ... existing close logic ...
+
+                // NEW: Emit event based on outcome
+                if let Some(ref event_bus) = self.event_bus {
+                    let event = match outcome_result {
+                        DecisionOutcome::Accepted =&gt; {
+                            SystemEvent::ProposalAccepted {
+                                proposal_id: proposal_id.clone(),
+                                domain_id: proposal.domain_id.0.clone(),
+                                payload: proposal.payload.clone(),
+                                decided_at: now,
+                            }
+                        }
+                        _ =&gt; {
+                            SystemEvent::ProposalRejected {
+                                proposal_id: proposal_id.clone(),
+                                domain_id: proposal.domain_id.0.clone(),
+                                decided_at: now,
+                            }
+                        }
+                    };
+                    event_bus.emit(event);
+                }
+
+                // ... rest of existing code ...
+            }
+        }
+    }
+}
+</code></pre>
+<h3>Supervisor Event Handler Setup</h3>
+<pre><code class="language-rust">// In supervisor.rs::run()
+
+// Create event bus
+let event_bus = Arc::new(EventBus::new());
+
+// Spawn governance actor with event bus
+let governance_handle = crate::governance::GovernanceActor::spawn(
+    did.clone(),
+    gov_store,
+    gossip_handle.clone(),
+    gov_resolver,
+    Some(event_bus.clone()),  // NEW
+).await?;
+
+// Subscribe to governance events for ledger execution
+{
+    let ledger_handle_clone = ledger_handle.clone();
+    let event_bus_clone = event_bus.clone();
+
+    event_bus.subscribe(Arc::new(move |event| {
+        match event {
+            SystemEvent::ProposalAccepted { proposal_id, payload, .. } =&gt; {
+                match payload {
+                    ProposalPayload::Budget { amount, recipient, currency, purpose } =&gt; {
+                        info!(&quot;Executing budget proposal: {} {} to {}&quot;, amount, currency, recipient);
+
+                        // Spawn async task to execute ledger transaction
+                        let ledger = ledger_handle_clone.clone();
+                        let prop_id = proposal_id.clone();
+
+                        tokio::spawn(async move {
+                            let mut ledger = ledger.write().await;
+
+                            // TODO: Determine source DID (cooperative treasury)
+                            // For now, use a placeholder
+                            let coop_did = Did::placeholder_cooperative();
+
+                            match ledger.record_transfer(
+                                coop_did,
+                                recipient,
+                                amount,
+                                currency,
+                                Some(purpose),
+                            ).await {
+                                Ok(entry_hash) =&gt; {
+                                    info!(&quot;✓ Budget proposal {} executed: ledger entry {:?}&quot;,
+                                          prop_id.0, entry_hash);
+
+                                    // Store audit trail
+                                    // TODO: Add to store
+                                }
+                                Err(e) =&gt; {
+                                    warn!(&quot;Failed to execute budget proposal {}: {}&quot;, prop_id.0, e);
+                                }
+                            }
+                        });
+                    }
+
+                    ProposalPayload::ConfigChange { new_config } =&gt; {
+                        info!(&quot;Config change proposal accepted: {:?}&quot;, new_config);
+                        // TODO: Apply configuration change
+                    }
+
+                    ProposalPayload::Membership { action, member } =&gt; {
+                        info!(&quot;Membership change proposal accepted: {:?} for {}&quot;, action, member);
+                        // TODO: Update membership
+                    }
+
+                    ProposalPayload::Text { .. } =&gt; {
+                        // Text proposals don&#39;t trigger actions
+                    }
+                }
+            }
+
+            SystemEvent::ProposalRejected { proposal_id, .. } =&gt; {
+                info!(&quot;Proposal {} rejected - no action taken&quot;, proposal_id.0);
+            }
+
+            _ =&gt; {}
+        }
+    }));
+}
+</code></pre>
+<h2>Testing Strategy</h2>
+<h3>Unit Tests</h3>
+<ul>
+<li>EventBus emit and subscribe</li>
+<li>SystemEvent serialization</li>
+<li>GovernanceActor event emission</li>
+</ul>
+<h3>Integration Test: Budget Proposal → Ledger</h3>
+<pre><code class="language-rust">#[tokio::test]
+async fn test_budget_proposal_executes_transaction() {
+    // Setup 3-node network
+    let nodes = setup_test_network(3).await;
+
+    // Create governance domain
+    nodes[0].create_domain(&quot;test-coop&quot;).await;
+
+    // Create budget proposal
+    let proposal_id = nodes[0].create_proposal(
+        &quot;Pay supplier&quot;,
+        ProposalPayload::Budget {
+            amount: 5000,
+            recipient: supplier_did,
+            currency: &quot;credits&quot;,
+            purpose: &quot;Office supplies&quot;,
+        }
+    ).await;
+
+    // Open proposal
+    nodes[0].open_proposal(proposal_id, 60).await;
+
+    // Vote (2/3 = 66% = accepted)
+    nodes[0].cast_vote(proposal_id, VoteChoice::For).await;
+    nodes[1].cast_vote(proposal_id, VoteChoice::For).await;
+    nodes[2].cast_vote(proposal_id, VoteChoice::Against).await;
+
+    // Close proposal
+    nodes[0].close_proposal(proposal_id).await;
+
+    // Wait for event processing
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    // Verify ledger transaction was created
+    let balance = nodes[0].get_balance(supplier_did).await;
+    assert_eq!(balance, 5000);
+
+    // Verify audit trail exists
+    let audit = nodes[0].get_audit_trail(proposal_id).await;
+    assert!(audit.is_some());
+    assert!(audit.unwrap().ledger_entry_hash.is_some());
+}
+</code></pre>
+<h2>Security Considerations</h2>
+<ol>
+<li><strong>Authorization</strong>: Only execute if proposal outcome is <code>Accepted</code></li>
+<li><strong>Validation</strong>: Validate payload before execution (e.g., sufficient funds)</li>
+<li><strong>Audit Trail</strong>: Store complete chain: proposal → decision → action → result</li>
+<li><strong>Idempotency</strong>: Handle duplicate events (proposal closed twice)</li>
+<li><strong>Rate Limiting</strong>: Prevent proposal spam</li>
+<li><strong>Access Control</strong>: Verify proposal creator has permission for payload type</li>
+</ol>
+<h2>Metrics to Add</h2>
+<pre><code class="language-rust">// In icn-obs/src/metrics/governance.rs
+pub fn proposals_executed_total_inc(payload_type: &amp;str) {
+    PROPOSALS_EXECUTED_TOTAL.with_label_values(&amp;[payload_type]).inc();
+}
+
+pub fn proposals_execution_failures_inc(reason: &amp;str) {
+    PROPOSALS_EXECUTION_FAILURES.with_label_values(&amp;[reason]).inc();
+}
+
+pub fn proposal_execution_duration_record(payload_type: &amp;str, duration: f64) {
+    PROPOSAL_EXECUTION_DURATION
+        .with_label_values(&amp;[payload_type])
+        .observe(duration);
+}
+</code></pre>
+<h2>Success Criteria</h2>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> Budget proposals automatically execute ledger transactions ✅</li>
+<li><input disabled="" type="checkbox"> ConfigChange proposals update system configuration (TODO: Phase 5 - OPTIONAL)</li>
+<li><input checked="" disabled="" type="checkbox"> Complete audit trail: proposal → decision → ledger entry ✅</li>
+<li><input checked="" disabled="" type="checkbox"> Events broadcast across gossip network ✅</li>
+<li><input checked="" disabled="" type="checkbox"> Integration test demonstrates end-to-end flow ✅</li>
+<li><input disabled="" type="checkbox"> Metrics track execution success/failure (TODO: Future work)</li>
+<li><input checked="" disabled="" type="checkbox"> Documentation with examples ✅</li>
+</ul>
+<h2>Implementation Status</h2>
+<h3>✅ Phase 1: Event Infrastructure (COMPLETE)</h3>
+<ul>
+<li>Created <code>icn-core/src/events.rs</code> with <code>SystemEvent</code> enum</li>
+<li>Implemented <code>EventBus</code> with <code>tokio::sync::RwLock</code></li>
+<li>All 3 unit tests passing</li>
+</ul>
+<h3>✅ Phase 2: Governance Event Emission (COMPLETE)</h3>
+<ul>
+<li>Added <code>event_bus: Option&lt;Arc&lt;EventBus&gt;&gt;</code> to <code>GovernanceActor</code></li>
+<li>Updated <code>spawn()</code> signature to accept event bus</li>
+<li>Event emission in <code>CloseProposal</code> handler</li>
+<li>Emits <code>ProposalAccepted</code> or <code>ProposalRejected</code></li>
+</ul>
+<h3>✅ Phase 3: Ledger Event Handler (COMPLETE)</h3>
+<ul>
+<li>Created event bus in supervisor</li>
+<li>Subscribed to governance events</li>
+<li>Ledger handler for <code>Budget</code> proposals:<ul>
+<li>Creates double-entry journal entry</li>
+<li>Debits cooperative (currently using node DID)</li>
+<li>Credits recipient</li>
+<li>Logs execution with emoji indicators</li>
+</ul>
+</li>
+</ul>
+<h3>✅ Phase 4: Audit Trail (COMPLETE)</h3>
+<ul>
+<li>Stores governance decision → ledger entry mapping</li>
+<li>Storage key: <code>gov:audit:{proposal_id}</code></li>
+<li>Audit record includes:<ul>
+<li>proposal_id</li>
+<li>ledger_entry_hash (hex-encoded)</li>
+<li>amount, currency, recipient</li>
+<li>executed_at timestamp</li>
+</ul>
+</li>
+<li>Persisted in governance store</li>
+<li>Logged with 📋 indicator</li>
+</ul>
+<h3>✅ Phase 6: Integration Test (COMPLETE)</h3>
+<ul>
+<li>Created <code>icn-core/tests/governance_ledger_integration.rs</code></li>
+<li>Test 1: Budget proposal execution with ledger transaction validation</li>
+<li>Test 2: Rejected proposal does NOT execute</li>
+<li>Validates correct debit/credit semantics</li>
+<li>Verifies audit trail storage</li>
+<li>All tests passing (2/2)</li>
+<li>Fixed critical bug: inverted debit/credit semantics in event handler</li>
+</ul>
+<h3>✅ Production Hardening (COMPLETE - 2025-01-17 &amp; 2025-11-17)</h3>
+<p>After initial implementation, comprehensive code review identified and fixed 6 issues:</p>
+<h4>CRITICAL: Idempotency Bug (FIXED)</h4>
+<ul>
+<li><strong>Problem</strong>: Duplicate ProposalAccepted events caused double-counting of balances</li>
+<li><strong>Root cause</strong>: No check if proposal already executed before ledger write</li>
+<li><strong>Fix</strong>: Check audit trail existence before execution</li>
+<li><strong>Safety improvement</strong>: Fail-safe error handling refuses execution if audit check fails</li>
+<li><strong>Test</strong>: <code>test_duplicate_proposal_event_is_idempotent</code> validates fix</li>
+<li><strong>Location</strong>: <code>supervisor.rs:1010-1032</code></li>
+</ul>
+<h4>MEDIUM: Partial Failure Handling (FIXED)</h4>
+<ul>
+<li><strong>Problem</strong>: Ledger succeeds but audit trail write fails → money moves without governance record</li>
+<li><strong>Fix</strong>: Enhanced error logging with full context for manual reconciliation</li>
+<li><strong>Future</strong>: Implement dead-letter queue for automation</li>
+<li><strong>Location</strong>: <code>supervisor.rs:1045-1077</code></li>
+</ul>
+<h4>MEDIUM: Shutdown Race Condition (FIXED)</h4>
+<ul>
+<li><strong>Problem</strong>: In-flight tasks may be lost on shutdown</li>
+<li><strong>Fix</strong>: 2-second grace period for task completion</li>
+<li><strong>Tradeoff</strong>: Simple solution covering 99% of cases</li>
+<li><strong>Future</strong>: Replace with JoinSet for guaranteed completion</li>
+<li><strong>Location</strong>: <code>supervisor.rs:1258-1261</code></li>
+</ul>
+<h4>LOW: Missing Metrics (FIXED)</h4>
+<ul>
+<li><strong>Problem</strong>: No observability for execution success/failure</li>
+<li><strong>Fix</strong>: 5 Prometheus metrics added<ul>
+<li><code>icn_governance_proposals_executed_total{payload_type}</code></li>
+<li><code>icn_governance_execution_failures_total{reason}</code></li>
+<li><code>icn_governance_execution_duration_seconds{payload_type}</code></li>
+<li><code>icn_governance_audit_failures_total</code></li>
+<li><code>icn_governance_idempotent_skips_total</code></li>
+</ul>
+</li>
+<li><strong>Location</strong>: <code>icn-obs/src/metrics.rs:301-321</code></li>
+</ul>
+<h4>LOW: Audit Trail Timestamp Enhancement (FIXED - 2025-11-17)</h4>
+<ul>
+<li><strong>Problem</strong>: Audit trail only captured execution time, not governance decision time</li>
+<li><strong>Fix</strong>: Added <code>decided_at</code> field alongside <code>executed_at</code></li>
+<li><strong>Benefit</strong>: Complete timeline (proposal → decision → execution)</li>
+<li><strong>Location</strong>: <code>supervisor.rs:991,1002,1060</code></li>
+</ul>
+<h4>LOW: EventBus Unsubscribe Mechanism (FIXED - 2025-11-17)</h4>
+<ul>
+<li><strong>Problem</strong>: Potential memory leak if subscriptions become dynamic</li>
+<li><strong>Fix</strong>: Added SubscriptionHandle with automatic cleanup via Drop trait</li>
+<li><strong>Safety</strong>: Uses <code>try_write()</code> for safe cleanup during runtime shutdown</li>
+<li><strong>Test</strong>: <code>test_event_bus_unsubscribe_on_drop</code> validates cleanup</li>
+<li><strong>Location</strong>: <code>events.rs:49-116</code></li>
+</ul>
+<p><strong>All Issues Fixed</strong>: Critical (1), Medium (2), Low (3) = <strong>6/6 COMPLETE</strong></p>
+<p><strong>Status</strong>: Production-ready with full metrics &amp; safety</p>
+<h3>Remaining Work (Optional)</h3>
+<h4>Phase 5: Contract Execution Support (OPTIONAL - Future Work)</h4>
+<ul>
+<li>Handle <code>ConfigChange</code> proposals</li>
+<li>Handle <code>Membership</code> proposals</li>
+<li>Wire up contract execution</li>
+<li><strong>Note</strong>: Not required for pilot deployment</li>
+</ul>
+<h4>Optional Enhancements (Future Work)</h4>
+<ul>
+<li>Implement JoinSet for guaranteed task completion (replaces grace period)</li>
+<li>Implement dead-letter queue for failed audit trails (automated reconciliation)</li>
+</ul>
+<h2>Next Steps After Completion</h2>
+<p>This unlocks:</p>
+<ol>
+<li><strong>Pilot Deployment</strong>: Cooperatives can make real economic decisions ✅</li>
+<li><strong>Contract Integration</strong>: Contracts can listen to proposal events</li>
+<li><strong>Advanced Workflows</strong>: Multi-step governance flows</li>
+<li><strong>Dispute Resolution</strong>: Governance can reverse/freeze transactions</li>
+</ol>
+<h2>References</h2>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/GOVERNANCE-LEDGER-BUGS-FOUND">GOVERNANCE-LEDGER-BUGS-FOUND.md</a> - Complete bug analysis</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/pilot-readiness-gaps">pilot-readiness-gaps.md</a> - Section 1.4</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CLAUDE">CLAUDE.md</a> - Actor Communication Pattern</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-governance/src/proposal.rs">icn-governance/src/proposal.rs</a></li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-core/src/governance/actor.rs">icn-core/src/governance/actor.rs</a></li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

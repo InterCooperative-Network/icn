@@ -1,0 +1,190 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN State (living doc) | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>  <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>STATE</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/STATE.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN State (living doc)</h1>
+<h2>Architecture notes</h2>
+<ul>
+<li>Repo root is not a Cargo workspace; Rust workspace lives in icn/.</li>
+<li>Workspace members (icn/Cargo.toml):<ul>
+<li>Crates: icn-core, icn-identity, icn-trust, icn-net, icn-gossip, icn-ledger, icn-ccl, icn-store, icn-rpc, icn-obs, icn-snapshot, icn-testkit, icn-gateway, icn-governance, icn-compute, icn-security, icn-time, icn-privacy, icn-federation, icn-crypto-pq, icn-steward, icn-zkp, icn-community, icn-coop, icn-entity, icn-encoding.</li>
+<li>Binaries: icnd, icnctl, icn-console.</li>
+</ul>
+</li>
+<li>Web UI:<ul>
+<li>web/pilot-ui: static PWA; tests via npm run test, test:e2e, test:a11y, test:all.</li>
+<li>web/dashboard: static admin dashboard; start via python3 -m http.server 8080.</li>
+</ul>
+</li>
+<li>SDKs:<ul>
+<li>sdk/typescript: npm run build/dev/test/lint; generate-types uses docs/api/openapi.generated.yaml.</li>
+<li>sdk/react-native: npm run build/dev/test.</li>
+</ul>
+</li>
+<li>Deployment options (deploy/README.md): native/systemd, Docker Compose, Kubernetes, Helm. Secrets required (JWT/Grafana/keystore).</li>
+</ul>
+<h2>Decisions</h2>
+<ul>
+<li>Mutual TLS with client certificates enabled (2025-12-18 session).</li>
+<li>DID-TLS binding verification enabled; IdentityBundle TLS certs used by SessionManager.</li>
+<li>Some QUIC/chaos tests are ignored in CI due to timing; run manually as needed.</li>
+</ul>
+<h2>Constraints</h2>
+<ul>
+<li>Run Rust build/test commands from icn/.</li>
+<li>Tokio async only; avoid blocking operations in async paths.</li>
+<li>No panics in protocol/network/actor runtime paths.</li>
+<li>Demo status docs note STUN discovery disabled for local-only testing; re-validate before demo.</li>
+</ul>
+<h2>Governance Demo Sprint (2026-03-14)</h2>
+<ul>
+<li><strong>Fixed:</strong> Gateway governance routes returning 404 — actix-web <code>web::scope(&quot;&quot;)</code> ordering bug<ul>
+<li><code>web::scope(&quot;/gov&quot;)</code> now registered before empty-scope services in <code>server.rs</code></li>
+<li><code>configure.rs</code> route paths stripped of <code>/gov/</code> prefix (scope provides it)</li>
+</ul>
+</li>
+<li><strong>Fixed:</strong> Vote tally showing 1 instead of 2 — <code>GovernanceCommand::CastVote</code> was missing voter DID<ul>
+<li>All votes attributed to node&#39;s own DID; KV store key <code>(proposal_id, voter_did)</code> caused overwrites</li>
+<li>Threaded authenticated voter DID through <code>GovernanceOps</code> trait, actor command, and handle</li>
+</ul>
+</li>
+<li><strong>Built:</strong> Complete demo pipeline<ul>
+<li><code>demo/scripts/start-demo.sh</code> — cold-start script (build → init → start → health check)</li>
+<li><code>demo/scripts/demo-governance.py</code> — 18-step governance flow (auth, domains, proposals, votes, proofs)</li>
+<li><code>crates/icn-gateway/static/demo.html</code> — browser demo UI at <code>/static/demo.html</code></li>
+</ul>
+</li>
+<li><strong>Verified:</strong> 547 tests passing, cold-start demo 18/18, tally correct (2/2 votes)</li>
+<li><strong>API routes:</strong> Governance at <code>/v1/gov/*</code> (previously 404 due to scope shadowing)</li>
+</ul>
+<h2>Current status (2026-02-18 snapshot)</h2>
+<ul>
+<li><strong>Sprint 8-10 Economics Consolidation complete</strong> - Full deterministic economic receipt chain implemented:<ul>
+<li>CanonicalReceipt trait with Blake3-based deterministic hashing</li>
+<li>AllocationReceipt and SettlementIntent types with order-independent canonical hashes</li>
+<li>ReceiptStore with sled persistence and decision_hash indexing</li>
+<li>6 REST endpoints for receipt and ledger provenance queries</li>
+<li>Pilot UI Receipts tab with sorted verification badge</li>
+<li>icnctl receipts commands (chain/allocation/intent)</li>
+<li>Demo scripts and E2E tests for cross-node determinism</li>
+</ul>
+</li>
+<li>Historical roadmap reference: <code>docs/development/sessions/undated/ROADMAP.md</code> (point-in-time planning document).</li>
+<li>Current architecture and migration direction: <code>docs/PHASE_HISTORY.md</code> and <code>docs/architecture/KERNEL_APP_SEPARATION.md</code>.</li>
+<li>CI status docs (docs/ci/CI_CURRENT_STATUS.md) are snapshot-based; re-verify before release decisions.</li>
+<li>Local CI baseline 2026-02-11 passed with rustc 1.88.0 (icn/rust-toolchain.toml).</li>
+<li>K3s/self-hosted runner node down (2026-01-20 per user report); deploy workflows blocked.</li>
+<li>Demo status docs include 2025-12 historical snapshots; use docs/demo/ and live smoke checks for current operational truth.</li>
+<li>Homelab deployment (docs/operations/deployment/HOMELAB_DEPLOYMENT.md): K3s cluster running with self-hosted runner and monitoring stack (deployed 2025-12-03).</li>
+</ul>
+<h2>Code review findings (2026-01-20)</h2>
+<ul>
+<li>Repo-wide TODO scan across icn/ captured items below.</li>
+<li>icn-core supervisor: personhood store and anchor rate limit config are TODOs (icn-core/src/supervisor/mod.rs:499-500). [Requires config schema extension]</li>
+<li>✅ icn-core governance handlers: treasury disbursement/redemption/bond issuance implemented (icn-core/src/supervisor/governance_handlers.rs).</li>
+<li>✅ icn-core notifications: evidence validator wired up (icn-core/src/supervisor/init_notifications.rs).</li>
+<li>✅ icn-governance proposal cleanup: metrics implemented, archive store stubbed (icn-governance/src/proposal_cleanup.rs).</li>
+<li>✅ icn-gateway agreements: compensation_model and terms parsing implemented (icn-gateway/src/api/agreements.rs).</li>
+<li>icn-gateway governance domains: performance note for large domain counts (icn-gateway/src/api/governance.rs:174-176).</li>
+<li>icn-gateway SDIS enrollment: temporary VUI hash and steward rate limit TODOs (icn-gateway/src/api/sdis/simple_enrollment.rs:11-77, 477-484).</li>
+<li>✅ icn-steward: message-level signatures implemented for VUI sync (icn-steward/src/gossip.rs).</li>
+<li>icn-compute: federated task settlement TODO (icn-compute/src/actor/placement.rs:983-988).</li>
+<li>✅ icn-gossip storage challenge: ContentNotFound response implemented (icn-gossip/src/handlers/storage_challenge.rs).</li>
+<li>✅ icn-gossip storage challenge: timestamp validation for replay attack prevention added (icn-gossip/src/handlers/storage_challenge.rs).</li>
+<li>✅ icn-gossip storage challenge: comprehensive metrics added (icn-obs/src/metrics/storage.rs).</li>
+<li>✅ icn-gateway agreements: comprehensive input validation for all API types (icn-gateway/src/api/agreements.rs).</li>
+<li>icnctl: automatic daemon start TODO (bins/icnctl/src/main.rs:6532-6541).</li>
+<li>✅ deny.toml: license field added to all crates (icn/deny.toml).</li>
+</ul>
+<h2>Code quality notes (2026-01-20)</h2>
+<ul>
+<li>No dead code warnings from clippy or rustc.</li>
+<li>Large module candidates for future modularization:<ul>
+<li>bins/icnctl/src/main.rs (9445 lines) - CLI should be split into subcommand modules</li>
+<li>crates/icn-ledger/src/ledger.rs (5447 lines)</li>
+<li>crates/icn-gateway/src/api/governance.rs (4650 lines)</li>
+<li>crates/icn-core/src/supervisor/governance_handlers.rs (4243 lines)</li>
+</ul>
+</li>
+</ul>
+<h2>References</h2>
+<ul>
+<li>docs/development/sessions/undated/ROADMAP.md</li>
+<li>docs/architecture/KERNEL_APP_SEPARATION.md</li>
+<li>docs/ci/CI_CURRENT_STATUS.md</li>
+<li>docs/status/TESTS_FIXED_STATUS.md</li>
+<li>docs/status/CURRENT_SYSTEM_STATUS.md</li>
+<li>docs/operations/deployment/HOMELAB_DEPLOYMENT.md</li>
+<li>deploy/README.md</li>
+</ul>
+<h2>Current status (2026-03-18 snapshot)</h2>
+<ul>
+<li><strong>Phase 0 (Close the Demo) nearly complete</strong> — all 4 flows passing on K3s cluster</li>
+<li>New binary deployed: icn:20260318 (includes all S14 PRs through #1327, settlements:* and treasury:* scopes)</li>
+<li>Init container keystore fix deployed across all 4 coop pods — eliminates manual copy-after-restart toil</li>
+<li>Governance demo (demo-governance.py): 19/19 steps green including cryptographic proof</li>
+<li>All 4 script flows: green (Flow 1 governance, Flow 2 patronage, Flow 3 federation, Flow 4 reporting)</li>
+<li>Remaining: recorded demo asset + handoff documentation for Layer 3</li>
+<li>Two non-blocking bugs filed: Flow 2 receipts/allocations 400 (decision_hash deserialization), Flow 3 clearing ID capture</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

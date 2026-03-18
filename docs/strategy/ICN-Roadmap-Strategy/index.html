@@ -1,0 +1,567 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Roadmap &amp; Strategy: From Solo Developer to Cooperative Infrastructure | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>strategy</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ICN Roadmap Strategy</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/strategy/ICN-Roadmap-Strategy.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Roadmap &amp; Strategy: From Solo Developer to Cooperative Infrastructure</h1>
+<p><strong>March 17, 2026</strong></p>
+<p>This document maps the path from where ICN is today to its first external deployment. It ties technical milestones to adoption milestones to funding milestones. Every section addresses the question: what must be true before the next gate can open?</p>
+<hr>
+<h2>Where We Are</h2>
+<p><strong>Codebase:</strong> 38 Rust crates, ~414K LOC, 2,287 tests, 70+ real API endpoints. Three binaries (icnd, icnctl, icn-console). TypeScript and React Native SDKs. K3s cluster running four federated cooperative pods. Four demo flows with presenter mode. Phase 0+1 complete. Roughly 75% to first external deployment.</p>
+<p><strong>Funding:</strong> Zero external funding. Solo developer on SSDI with a $1,210/month income ceiling. ACCES-VR ($11K) stalled since November 2025. Sovereign Tech Fund application in preparation. NLnet NGI Zero deadline passed (April 1).</p>
+<p><strong>Organization:</strong> No legal entity. No fiscal sponsor yet. Hack Club Bank identified as the target Model A fiscal sponsor. BCL Corporation formation blocked until fiscal sponsor is in place. Article 5-A worker cooperative conversion requires 5 members (currently 1).</p>
+<p><strong>Network:</strong> The NY cooperative movement knows ICN exists. Joe Marraffino (CFNE) is the primary ally. Frank Cetera (Institute.coop) is the summit co-organizer. The Rochester Cooperative Collective meets biweekly. The 3rd NY Coop Summit is planned for October 2026.</p>
+<hr>
+<h2>The Three Gates</h2>
+<p>ICN&#39;s path from solo project to funded cooperative follows three sequential gates from the Foundation Launch Kit. No skipping.</p>
+<h3>Gate A: Foundation Viability (Survival &amp; Ops)</h3>
+<p><strong>Passage criteria:</strong></p>
+<ol>
+<li>Model A fiscal sponsor secured (Hack Club Bank), W-2 payroll active at $1,200/month</li>
+<li>Maintainer pay capped below SSA thresholds ($1,210 TWP, $1,690 SGA)</li>
+<li>Tech stack locked to non-transferable data objects only (no FinCEN/IRS triggers)</li>
+</ol>
+<p><strong>Fatal failures:</strong> 1099 contractor payment. Fiscal sponsor refuses W-2. Token architecture allows peer-to-peer asset transfer.</p>
+<p><strong>Current status:</strong> Pre-Gate A. Fiscal sponsor not yet onboarded. ACCES-VR medical release unsigned since November. Business plan drafted but not submitted.</p>
+<p><strong>Blockers:</strong></p>
+<ul>
+<li>Sign and return ACCES-VR medical release to Brenda Harner (immediate)</li>
+<li>Complete Hack Club Bank onboarding</li>
+<li>Set W-2 payroll to $1,200/month</li>
+<li>Strip remaining &quot;payment/currency/balance&quot; language from codebase (Compliance Epic #1302)</li>
+</ul>
+<h3>Gate B: Pilot-Ready Adoption (Product &amp; Partner)</h3>
+<p><strong>Passage criteria:</strong></p>
+<ol>
+<li>Local anchor (cooperative or municipality) commits to 8-10 month pilot</li>
+<li>Metrics defined (governance auditability, reduced coordination overhead)</li>
+<li>Integration architecture scoped</li>
+</ol>
+<p><strong>Fatal failures:</strong> Anchor demands &quot;crypto&quot; functionality. Scope creep introduces financial clearing before legal review.</p>
+<p><strong>Requires:</strong> Working vertical slice demo. Narrative documentation for non-technical audiences. Summit workshop demonstrating ICN to cooperative organizers.</p>
+<h3>Gate C: Institutional Scale (Independence)</h3>
+<p><strong>Passage criteria:</strong></p>
+<ol>
+<li>Core team reaches 5+ members</li>
+<li>BCL Corporation formed</li>
+<li>BCL §82 election filed (Article 5-A Worker Cooperative)</li>
+<li>Multi-year grant secured</li>
+</ol>
+<p><strong>Fatal failures:</strong> Cannot recruit 5 members (blocks NY cooperative incorporation). Funding relies on venture capital.</p>
+<hr>
+<h2>Technical Roadmap</h2>
+<h3>Phase 2: Demo-Ready (March 17 - April 17, 2026)</h3>
+<p><strong>Objective:</strong> A recorded walkthrough demonstrating ICN&#39;s federation capabilities to cooperative organizers, funders, and technologists. Doubles as a grant application artifact and summit workshop proposal.</p>
+<p><strong>Week 1 (Mar 17-23): Assess &amp; Scope</strong></p>
+<ul>
+<li>Walk through merged federation demo end-to-end</li>
+<li>Catalog what works, what&#39;s fragile, what&#39;s missing for a convincing story</li>
+<li>Define demo scenario: two cooperatives federating to coordinate a shared decision</li>
+<li>Write 1-page demo script + blocker list with severity ratings</li>
+</ul>
+<p><strong>Week 2 (Mar 24-30): Stabilize &amp; Build</strong></p>
+<ul>
+<li>Fix demo-path bugs from blocker list (critical path only)</li>
+<li>Fill narrow gaps (finish 80% features, simplify around 0% features)</li>
+<li>Stand up clean demo environment on K3s</li>
+</ul>
+<p><strong>Week 3 (Mar 31 - Apr 6): Document &amp; Narrate</strong></p>
+<ul>
+<li>Plain-language overview for cooperative organizers (ICN-Pitch.md is the starting point)</li>
+<li>One-page architecture diagram for technical reviewers</li>
+<li>Draft summit workshop proposal: &quot;Live Demo: Spin Up a Cooperative in 5 Minutes&quot;</li>
+</ul>
+<p><strong>Week 4 (Apr 7-17): Record &amp; Package</strong></p>
+<ul>
+<li>Screen recording with narration (5-10 minutes)</li>
+<li>README refresh + GitHub landing section</li>
+<li>Phase 2 retro</li>
+</ul>
+<p><strong>Deliverables:</strong> Recorded demo. Workshop proposal ready for May submission. Enough documentation to support Sovereign Tech Fund application.</p>
+<h3>Phase 2.5: Compliance Completion (Parallel)</h3>
+<p>Closes Epic #1302. Required before any grant application.</p>
+<table>
+<thead>
+<tr>
+<th>Issue</th>
+<th>Work</th>
+<th>Priority</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>#1303</td>
+<td>Rename payment→settlement, currency→unit, balance→position</td>
+<td>P0</td>
+</tr>
+<tr>
+<td>#1304</td>
+<td>UX language guide + Seven Invariants PR checklist</td>
+<td>P0</td>
+</tr>
+<tr>
+<td>#1305</td>
+<td>JournalEntry.provenance required (ProvenanceRef)</td>
+<td>P1</td>
+</tr>
+<tr>
+<td>#1306</td>
+<td>Obligation type with lifecycle (Issued→Accepted→Settled→Defaulted)</td>
+<td>P1</td>
+</tr>
+<tr>
+<td>#1308</td>
+<td>Extract commons credit formula to CCL PolicyOracle</td>
+<td>P1</td>
+</tr>
+<tr>
+<td>#1311</td>
+<td>AllocationProposal for participatory budgeting</td>
+<td>P1</td>
+</tr>
+<tr>
+<td>#1312</td>
+<td>CI compliance linter (blocks payment-rail patterns)</td>
+<td>P0</td>
+</tr>
+</tbody></table>
+<p>Already done: #1307 (PatronageTracker), #1309 (DelegationManager), #1310 (ExecutionReceiptGate).</p>
+<h3>Phase 3: Vertical Slice (April - May 2026)</h3>
+<p>The proof that ICN works end-to-end. Success criteria:</p>
+<pre><code>icnctl coop create --name &quot;Harbor Homes&quot; --charter ./charters/default.toml
+  → DID created, treasury DID linked
+icnctl member apply --coop did:icn:harbor-homes --identity did:icn:alice
+  → application recorded
+icnctl vote --proposal governance/001 --choice yes
+  → vote counted, Decision Receipt produced
+icnctl audit verify --receipt did:icn:receipt/decision/001
+  → chain verified: Decision → Allocation → Execution ✓
+cargo test --test vertical_slice_integration -- --nocapture
+  → PASS in CI
+</code></pre>
+<p><strong>Track execution:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Track</th>
+<th>Duration</th>
+<th>Work</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>B: Treasury &amp; Economics</td>
+<td>~5 days</td>
+<td>Treasury-coop integration, asset type hierarchy, allocation receipt chain</td>
+</tr>
+<tr>
+<td>A: Kernel/App Separation</td>
+<td>~4 days (parallel with B)</td>
+<td>State generalization, governance extraction, membership consolidation, kernel cleanup</td>
+</tr>
+<tr>
+<td>C: Ops &amp; Pilot Prep</td>
+<td>~3 days</td>
+<td>Backup validation, pre-deployment health check, NAT traversal</td>
+</tr>
+<tr>
+<td>D: Integration</td>
+<td>~2 days</td>
+<td>Vertical slice test + demo scripts calling real icnctl</td>
+</tr>
+</tbody></table>
+<p><strong>After Phase 3: tag v1.0.0.</strong> The vertical slice test passing is the definition of 1.0.</p>
+<h3>Phase 4: Meaning Firewall Cleanup (May - June 2026)</h3>
+<p>The single most important technical task. 11 crates currently contain semantic business logic that belongs in the application layer, not the kernel.</p>
+<p><code>kernel_surface.toml</code> tracks the audit. The goal: 29 crates, all clean. Zero semantic leakage across the boundary. CI enforces it permanently.</p>
+<p>This is what makes ICN defensibly infrastructure rather than a product. Without a clean Meaning Firewall, the regulatory argument and the architectural purity both collapse.</p>
+<h3>Phase 5: Website Overhaul (Parallel)</h3>
+<p>The current website (intercooperative.network) is stale — stats last synced February 18, one blog post, no community links beyond GitHub. It needs:</p>
+<ul>
+<li>Live stats sync (PRs, contributors, deployment status)</li>
+<li>Narrative content for non-developers (adapted from ICN-Pitch.md)</li>
+<li>Architecture overview for technical reviewers (adapted from whitepaper)</li>
+<li>Community links (Matrix/Discord/mailing list — need to set up)</li>
+<li>Blog with regular posts (summit preparation, development updates, cooperative movement)</li>
+<li>Automated CI deploy from <code>icn-website</code> repo</li>
+</ul>
+<h3>Phases 6-8: Hardening (June - September 2026)</h3>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Focus</th>
+<th>Key Items</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>6</td>
+<td>Network &amp; Security</td>
+<td>IPv6 dual-stack (#1295), post-quantum crypto integration, penetration testing</td>
+</tr>
+<tr>
+<td>7</td>
+<td>SDK &amp; Mobile</td>
+<td>React Native SDK stabilization, mobile key management, push notification flow</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Federation &amp; Scale</td>
+<td>Federation settlement finality spec, multi-federation routing, 50+ node testing</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Funding Strategy</h2>
+<h3>Immediate Targets</h3>
+<table>
+<thead>
+<tr>
+<th>Opportunity</th>
+<th>Amount</th>
+<th>Deadline</th>
+<th>Fit</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Sovereign Tech Fund</strong></td>
+<td>€50K+</td>
+<td>Rolling (target: April)</td>
+<td>8/10 — open digital infrastructure</td>
+<td>Preparing application</td>
+</tr>
+<tr>
+<td>ACCES-VR</td>
+<td>Up to $11K</td>
+<td>Stalled</td>
+<td>Primary — self-employment startup costs</td>
+<td>Blocked: medical release unsigned</td>
+</tr>
+<tr>
+<td>SSA PASS</td>
+<td>Variable</td>
+<td>Not yet applied</td>
+<td>Work incentive — business investment plan</td>
+<td>Requires Form SSA-545-BK</td>
+</tr>
+<tr>
+<td>Outta Excuses Grant</td>
+<td>$500-$3K</td>
+<td>March 31</td>
+<td>Low barrier, quick cash</td>
+<td>Not started</td>
+</tr>
+<tr>
+<td>Verizon Digital Ready</td>
+<td>$10K</td>
+<td>March 31</td>
+<td>Requires 1 free course completion</td>
+<td>Not started</td>
+</tr>
+</tbody></table>
+<h3>Medium-Term</h3>
+<table>
+<thead>
+<tr>
+<th>Opportunity</th>
+<th>Amount</th>
+<th>Timeline</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Capital Impact Partners</td>
+<td>$10K-$50K</td>
+<td>Annual (watch 2026)</td>
+<td>Cooperative innovation</td>
+</tr>
+<tr>
+<td>USDA RCDG</td>
+<td>Up to $200K</td>
+<td>Annual</td>
+<td>Rural cooperative development — research eligibility</td>
+</tr>
+<tr>
+<td>NYS CFA</td>
+<td>Variable</td>
+<td>July cycle</td>
+<td>High admin burden; partner with municipality as lead</td>
+</tr>
+<tr>
+<td>NLnet NGI Zero</td>
+<td>€20-25K</td>
+<td>Next cycle</td>
+<td>Rated 10/10 fit in Foundation Launch Kit</td>
+</tr>
+</tbody></table>
+<h3>Non-Extractive Loans (No Credit Score Required)</h3>
+<table>
+<thead>
+<tr>
+<th>Lender</th>
+<th>Terms</th>
+<th>Connection</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>CFNE</td>
+<td>Never uses credit scores</td>
+<td>Joe Marraffino works here</td>
+</tr>
+<tr>
+<td>The Working World</td>
+<td>No profits = no payback</td>
+<td>Worker co-op focus</td>
+</tr>
+<tr>
+<td>Shared Capital Cooperative</td>
+<td>Mission-driven, flexible</td>
+<td>Worker Ownership Loan Fund</td>
+</tr>
+<tr>
+<td>KIVA</td>
+<td>Up to $15K, 0% interest</td>
+<td>Community endorsement model</td>
+</tr>
+</tbody></table>
+<h3>Fiscal Sponsor Pathway</h3>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Entity</th>
+<th>Timeline</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>Hack Club Bank (Model A fiscal sponsor)</td>
+<td>Months 1-10: W-2 payroll at $1,200/mo, 7% fee</td>
+</tr>
+<tr>
+<td>2</td>
+<td>BCL Bridge Corporation</td>
+<td>Month 10+: when contract-signing needed, before 5 members</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Article 5-A Worker Cooperative</td>
+<td>When 5+ members: BCL §82 election, patronage-based capital accounts</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Adoption Strategy</h2>
+<h3>The Entry Point</h3>
+<p>A single organization runs <code>icnd</code> and uses it for proposals and votes. Every decision gets a cryptographic receipt. That&#39;s the minimum viable adoption. No federation required. No mutual credit required. Just provable governance.</p>
+<p><strong>Target first adopters:</strong> Upstate NY cooperatives and community organizations reachable through the summit network and Joe Marraffino&#39;s connections. Housing co-ops, community land trusts, worker cooperatives. Organizations that already value democratic governance and would benefit from being able to prove it.</p>
+<h3>Pilot Recruitment</h3>
+<p><strong>3-Touch Outreach:</strong></p>
+<ol>
+<li>Email: &quot;Your co-op makes decisions democratically. What if you could prove it — cryptographically — to a grant funder? 5-minute demo?&quot;</li>
+<li>Demo: Show the governance flow. Proposal → vote → receipt. Frame as &quot;decision infrastructure,&quot; not technology.</li>
+<li>Ask: &quot;Free pilot partner for 8 months. We build what you need; we get a case study.&quot;</li>
+</ol>
+<p><strong>Pilot Onboarding:</strong></p>
+<ul>
+<li>Day 30: Map their governance rules to ICN ConstraintSets</li>
+<li>Day 60: Issue non-transferable member credentials to test group</li>
+<li>Day 90: Execute one real-world decision through ICN</li>
+<li>Day 180: Federation with one other pilot organization</li>
+<li>Day 240: Case study documenting before/after</li>
+</ul>
+<h3>Summit as Launchpad</h3>
+<p>The 3rd NY Cooperative Summit (October 2026, Albany/Schenectady area) is the primary adoption event. Matt is a core organizer for the second year running.</p>
+<p><strong>Timeline:</strong></p>
+<ul>
+<li>March: Location selection</li>
+<li>April: Organizing team formalized</li>
+<li>May: Call for presenters opens — submit ICN workshop proposal</li>
+<li>June: Sponsor outreach ($24K budget, $27K income target)</li>
+<li>October: Event — live demo, pilot partner recruitment</li>
+</ul>
+<p>The workshop proposal: &quot;Live Demo: Spin Up a Cooperative in 5 Minutes.&quot; Audience is cooperative organizers, not developers. The pitch is provable governance — something they care about deeply and cannot get from any existing tool.</p>
+<h3>Developer Attraction</h3>
+<p>The longer-term play. Once ICN has pilot deployments and a clean Meaning Firewall, the developer story becomes compelling:</p>
+<ul>
+<li>38-crate Rust workspace with real architecture (not a toy)</li>
+<li>Eight well-defined kernel primitives that apps compose</li>
+<li>PolicyOracle interface as the extension point</li>
+<li>Regulatory-safe by architecture, not by promises</li>
+<li>Cooperative ownership means contributors can become worker-owners</li>
+</ul>
+<p><strong>Funnel:</strong> GitHub → Contributing guide → Good first issues → Mentorship → Worker-owner track</p>
+<hr>
+<h2>Timeline Summary</h2>
+<table>
+<thead>
+<tr>
+<th>Period</th>
+<th>Technical</th>
+<th>Funding</th>
+<th>Adoption</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Mar 17 - Apr 17</strong></td>
+<td>Phase 2: Demo-ready + compliance completion</td>
+<td>Sovereign Tech Fund application prep</td>
+<td>Summit planning call Mar 19</td>
+</tr>
+<tr>
+<td><strong>Apr - May</strong></td>
+<td>Phase 3: Vertical slice → v1.0.0 tag</td>
+<td>STF application submitted. ACCES-VR unblocked.</td>
+<td>Workshop proposal submitted</td>
+</tr>
+<tr>
+<td><strong>May - Jun</strong></td>
+<td>Phase 4: Meaning Firewall cleanup</td>
+<td>STF decision timeline (~6 months from application)</td>
+<td>First pilot partner identified</td>
+</tr>
+<tr>
+<td><strong>Jun - Sep</strong></td>
+<td>Phases 5-8: Website, hardening, mobile, federation</td>
+<td>Gate A passage (fiscal sponsor + W-2)</td>
+<td>Pilot onboarding begins</td>
+</tr>
+<tr>
+<td><strong>Oct 2026</strong></td>
+<td>Live demo at summit</td>
+<td>STF funding arrives (if approved)</td>
+<td>Summit workshop + pilot partner recruitment</td>
+</tr>
+<tr>
+<td><strong>Q1 2027</strong></td>
+<td>v2.0 with clean Meaning Firewall + mobile</td>
+<td>Gate B passage (pilot commitment)</td>
+<td>3-5 organizations running ICN</td>
+</tr>
+<tr>
+<td><strong>2027</strong></td>
+<td>Scale, harden, recruit</td>
+<td>Gate C (5+ members → Article 5-A co-op)</td>
+<td>Federation of pilot organizations</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Risks</h2>
+<table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Impact</th>
+<th>Probability</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ACCES-VR remains stalled</td>
+<td>No startup funding, delays Gate A</td>
+<td>High</td>
+<td>Sign medical release immediately; escalate through Brenda Harner</td>
+</tr>
+<tr>
+<td>Sovereign Tech Fund rejects application</td>
+<td>Primary grant pathway lost</td>
+<td>Medium</td>
+<td>Diversify: NLnet next cycle, Capital Impact Partners, USDA RCDG</td>
+</tr>
+<tr>
+<td>No pilot partner found</td>
+<td>Gate B blocked</td>
+<td>Medium</td>
+<td>Leverage summit network; Joe Marraffino has warm intros to 50+ co-ops</td>
+</tr>
+<tr>
+<td>Solo developer burnout</td>
+<td>Everything stops</td>
+<td>High</td>
+<td>Gate A payroll ($1,200/mo) provides sustainable base; summit community provides motivation</td>
+</tr>
+<tr>
+<td>Meaning Firewall cleanup reveals deeper architectural issues</td>
+<td>Phase 4 extends significantly</td>
+<td>Medium</td>
+<td>kernel_surface.toml already identifies the 11 infected crates; scope is known</td>
+</tr>
+<tr>
+<td>hyperion remains offline</td>
+<td>Reduced cluster capacity</td>
+<td>Low</td>
+<td>K3s runs fine on VLAN 30 without hyperion</td>
+</tr>
+<tr>
+<td>Income exceeds SSDI thresholds</td>
+<td>Benefits suspended</td>
+<td>Critical</td>
+<td>W-2 payroll at $1,200/mo (below $1,210 TWP). No 1099. No LLC.</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>The Honest Assessment</h2>
+<p>ICN is architecturally real. 38 crates, 70+ endpoints, cryptographic receipts, federation protocol, working demo flows. This isn&#39;t a whiteboard drawing.</p>
+<p>ICN is not yet deployable. The Meaning Firewall has 11 infected crates. The vertical slice integration test doesn&#39;t pass yet. The compliance epic is 60% done. The website is stale. There is no legal entity, no fiscal sponsor, no external funding, and no pilot partner.</p>
+<p>The path from here to first deployment is narrow but clear. Phase 2 gets the demo. Phase 3 gets the proof. Phase 4 cleans the architecture. The summit gets the audience. The Sovereign Tech Fund gets the funding. The pilot gets the validation.</p>
+<p>Everything depends on execution. One person, constrained income, chronic pain, and a conviction that democratic organizations deserve infrastructure they own.</p>
+<p>That&#39;s where it stands.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

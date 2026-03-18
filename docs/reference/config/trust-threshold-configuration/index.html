@@ -1,0 +1,227 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Trust Threshold Configuration | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>reference</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>config</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>trust threshold configuration</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/reference/config/trust-threshold-configuration.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Trust Threshold Configuration</h1>
+<h2>Overview</h2>
+<p>The <code>min_trust_threshold</code> setting controls trust-gated TLS verification at the network transport layer. This setting determines the minimum trust score required for a peer to establish a QUIC/TLS connection.</p>
+<h2>Configuration</h2>
+<p>Add to your <code>icn.toml</code> configuration file under the <code>[network]</code> section:</p>
+<pre><code class="language-toml">[network]
+listen_addr = &quot;0.0.0.0:7777&quot;
+rpc_port = 5601
+mdns_enabled = true
+bootstrap_peers = []
+min_trust_threshold = 0.1  # Default: 0.1
+</code></pre>
+<h2>Trust Score Thresholds</h2>
+<table>
+<thead>
+<tr>
+<th>Threshold</th>
+<th>Trust Class</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>0.0</td>
+<td>None (disabled)</td>
+<td>Accept all authenticated DIDs. Trust-gated TLS is disabled but DID-TLS binding still provides cryptographic authentication.</td>
+</tr>
+<tr>
+<td>0.1</td>
+<td>Known</td>
+<td>Require at least one trust edge. Peer must have at least one trust relationship.</td>
+</tr>
+<tr>
+<td>0.4</td>
+<td>Partner</td>
+<td>Require &quot;Partner&quot; trust class. Peer is a known collaborator.</td>
+</tr>
+<tr>
+<td>0.7</td>
+<td>Federated</td>
+<td>Require &quot;Federated&quot; trust class. Peer is highly trusted.</td>
+</tr>
+</tbody></table>
+<h2>Use Cases</h2>
+<h3>Local Development (min_trust_threshold = 0.0)</h3>
+<p>For local testing with multiple nodes that don&#39;t have pre-established trust relationships:</p>
+<pre><code class="language-toml">[network]
+min_trust_threshold = 0.0
+</code></pre>
+<p><strong>Benefits:</strong></p>
+<ul>
+<li>Nodes can connect immediately without trust setup</li>
+<li>Simplifies local development and testing</li>
+<li>Still maintains DID-TLS binding for authentication</li>
+</ul>
+<p><strong>Security Note:</strong> This is only recommended for controlled environments where all nodes are pre-authorized.</p>
+<h3>Cooperative Deployments (min_trust_threshold = 0.0)</h3>
+<p>For closed cooperative networks where all nodes are known and trusted:</p>
+<pre><code class="language-toml">[network]
+min_trust_threshold = 0.0
+</code></pre>
+<p><strong>Use When:</strong></p>
+<ul>
+<li>All nodes in the deployment are pre-authorized</li>
+<li>Network is isolated or behind firewall</li>
+<li>Nodes are managed by the same organization/cooperative</li>
+<li>Trust relationships are managed out-of-band</li>
+</ul>
+<h3>Public Networks (min_trust_threshold = 0.1 or higher)</h3>
+<p>For networks that accept connections from external peers:</p>
+<pre><code class="language-toml">[network]
+min_trust_threshold = 0.1  # or higher
+</code></pre>
+<p><strong>Benefits:</strong></p>
+<ul>
+<li>Protects against untrusted connections</li>
+<li>Enforces trust-based access control</li>
+<li>Only peers with established trust relationships can connect</li>
+</ul>
+<p><strong>Recommended for:</strong></p>
+<ul>
+<li>Public-facing nodes</li>
+<li>Federation endpoints</li>
+<li>Nodes accepting external connections</li>
+</ul>
+<h2>Deployment Examples</h2>
+<h3>Docker/Kubernetes Cooperative Deployment</h3>
+<p>The <code>deploy-coop.sh</code> script automatically sets <code>min_trust_threshold = 0.0</code> for cooperative deployments:</p>
+<pre><code class="language-bash">./deploy/k8s/multi-node/scripts/deploy-coop.sh alpha &quot;Alpha Cooperative&quot;
+</code></pre>
+<p>This allows cooperative nodes to connect without pre-established trust relationships.</p>
+<h3>Manual Configuration</h3>
+<p>Edit <code>/etc/icn/icn.toml</code> or your config file:</p>
+<pre><code class="language-toml">[network]
+listen_addr = &quot;0.0.0.0:7777&quot;
+rpc_port = 5601
+mdns_enabled = true
+bootstrap_peers = []
+min_trust_threshold = 0.0  # For cooperative deployment
+</code></pre>
+<p>Then restart the daemon:</p>
+<pre><code class="language-bash">sudo systemctl restart icnd
+# or
+kubectl rollout restart deployment/icn-alpha -n icn-coop-alpha
+</code></pre>
+<h2>Security Considerations</h2>
+<h3>What min_trust_threshold = 0.0 Still Provides</h3>
+<p>Even with trust-gated TLS disabled, you still get:</p>
+<ol>
+<li><strong>DID-TLS Binding</strong>: Every connection is authenticated to a specific DID using Ed25519 signatures</li>
+<li><strong>Transport Encryption</strong>: All connections use TLS 1.3 with QUIC</li>
+<li><strong>Message Signing</strong>: All messages are cryptographically signed by the sender</li>
+<li><strong>Replay Protection</strong>: Nonce-based replay guards prevent message replay attacks</li>
+</ol>
+<h3>What Changes</h3>
+<p>With <code>min_trust_threshold = 0.0</code>:</p>
+<ul>
+<li>Any authenticated DID can establish a connection</li>
+<li>Trust scores are still computed and used for rate limiting</li>
+<li>Access control is enforced at the application layer (gossip topics, contracts, etc.)</li>
+</ul>
+<h3>Best Practices</h3>
+<ol>
+<li><strong>Controlled Environments</strong>: Use 0.0 only in trusted, controlled deployments</li>
+<li><strong>Monitor Connections</strong>: Even with 0.0, monitor who connects to your node</li>
+<li><strong>Application-Layer Security</strong>: Trust-gated gossip topics and contracts still enforce trust requirements</li>
+<li><strong>Review Periodically</strong>: Re-evaluate trust threshold as your network grows</li>
+</ol>
+<h2>Troubleshooting</h2>
+<h3>Issue: Nodes reject each other with &quot;insufficient trust&quot;</h3>
+<p><strong>Symptoms:</strong></p>
+<pre><code>🔒 Connection rejected: DID did:icn:z... has insufficient trust (score: 0.000, required: 0.100)
+</code></pre>
+<p><strong>Solution:</strong>
+Set <code>min_trust_threshold = 0.0</code> in the network configuration for cooperative deployments.</p>
+<h3>Issue: Want to re-enable trust gating</h3>
+<p><strong>Solution:</strong></p>
+<ol>
+<li><p>Establish trust relationships between nodes:</p>
+<pre><code class="language-bash">icnctl trust add &lt;peer-did&gt; --score 0.5
+</code></pre>
+</li>
+<li><p>Update configuration to re-enable trust threshold:</p>
+<pre><code class="language-toml">[network]
+min_trust_threshold = 0.1
+</code></pre>
+</li>
+<li><p>Restart the daemon</p>
+</li>
+</ol>
+<h2>Related Documentation</h2>
+<ul>
+<li><a href="/docs/ARCHITECTURE">ARCHITECTURE.md</a> - System architecture and trust model</li>
+<li><a href="/docs/security/production-hardening">production-hardening.md</a> - Security hardening measures</li>
+<li><a href="/docs/operations/deployment/deployment-guide">DEPLOYMENT_GUIDE.md</a> - Kubernetes deployment guide</li>
+</ul>
+<h2>Version History</h2>
+<ul>
+<li><strong>v0.1.0</strong>: Trust threshold is hardcoded to 0.1</li>
+<li><strong>v0.2.0</strong>: Trust threshold is configurable via <code>network.min_trust_threshold</code></li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

@@ -1,0 +1,631 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Workshop 9: Local Deployment and Observability | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>onboarding</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>workshops</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>workshop 09 ops</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/onboarding/workshops/workshop-09-ops.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Workshop 9: Local Deployment and Observability</h1>
+<h2>Learning Objectives</h2>
+<p>By the end of this workshop, you will be able to:</p>
+<ol>
+<li><strong>Deploy ICN locally</strong> - Run ICN via native binary or Docker</li>
+<li><strong>Verify health status</strong> - Check component health via API endpoints</li>
+<li><strong>Monitor with Prometheus</strong> - Scrape and query ICN metrics</li>
+<li><strong>Configure logging</strong> - Adjust log levels and understand log output</li>
+<li><strong>Troubleshoot issues</strong> - Diagnose common deployment problems</li>
+</ol>
+<h2>Goal</h2>
+<p>Deploy ICN locally using Docker or native binaries, verify health endpoints,
+explore Prometheus metrics, and understand logging and tracing.</p>
+<h2>Prerequisites</h2>
+<ul>
+<li>Completed <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/reference/module-09-ops-deploy">Module 9: Operations</a></li>
+<li>Docker installed (for container deployment) or Rust toolchain (for native)</li>
+<li>curl and jq installed</li>
+</ul>
+<h2>Estimated time</h2>
+<p>2-3 hours</p>
+<h2>Related Materials</h2>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/reference/module-09-ops-deploy">Module 9: Operations</a> - Background reading</li>
+<li><a href="/docs/operations/deployment/HOMELAB_DEPLOYMENT">HOMELAB_DEPLOYMENT.md</a> - K3s production deployment</li>
+<li><a href="/docs/security/production-hardening">production-hardening.md</a> - Security hardening</li>
+</ul>
+<h2>Part 1: Deployment Options</h2>
+<h3>Overview</h3>
+<p>ICN can be deployed in several ways:</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Use Case</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Native binary</td>
+<td>Development, single-node testing</td>
+</tr>
+<tr>
+<td>Docker</td>
+<td>Local testing, reproducible environments</td>
+</tr>
+<tr>
+<td>Docker Compose</td>
+<td>Multi-node local clusters</td>
+</tr>
+<tr>
+<td>Kubernetes/K3s</td>
+<td>Production deployment</td>
+</tr>
+</tbody></table>
+<h3>Locate deployment files</h3>
+<pre><code class="language-bash">ls -la deploy/
+ls -la deploy/docker/ 2&gt;/dev/null
+ls -la deploy/k8s/ 2&gt;/dev/null
+</code></pre>
+<h3>Checkpoint</h3>
+<ul>
+<li><input disabled="" type="checkbox"> You identified available deployment methods</li>
+<li><input disabled="" type="checkbox"> You know which files configure each method</li>
+</ul>
+<h2>Part 2: Native Binary Deployment</h2>
+<h3>Steps</h3>
+<ol>
+<li><p>Build release binaries:</p>
+<pre><code class="language-bash">cd icn &amp;&amp; cargo build --release
+</code></pre>
+</li>
+<li><p>Create a data directory:</p>
+<pre><code class="language-bash">export ICN_DATA=$(mktemp -d)
+export ICN_PASSPHRASE=&quot;workshop&quot;
+</code></pre>
+</li>
+<li><p>Initialize identity:</p>
+<pre><code class="language-bash">./target/release/icnctl --data-dir &quot;$ICN_DATA&quot; id init
+</code></pre>
+</li>
+<li><p>Start the daemon:</p>
+<pre><code class="language-bash">./target/release/icnd --data-dir &quot;$ICN_DATA&quot;
+</code></pre>
+</li>
+</ol>
+<h3>Configuration file</h3>
+<p>Create <code>$ICN_DATA/config.toml</code>:</p>
+<pre><code class="language-toml">data_dir = &quot;$ICN_DATA&quot;
+
+[network]
+listen_addr = &quot;0.0.0.0:4001&quot;
+mdns_enabled = true
+
+[gateway]
+enabled = true
+bind_addr = &quot;0.0.0.0:8080&quot;
+
+[observability]
+metrics_port = 9100
+health_port = 8081
+log_level = &quot;info&quot;
+</code></pre>
+<h3>Questions to answer</h3>
+<ol>
+<li>What ports are used by default?</li>
+<li>How do you change the gateway port?</li>
+<li>Where are logs written?</li>
+</ol>
+<h3>Checkpoint</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Daemon starts successfully</li>
+<li><input disabled="" type="checkbox"> You can access the gateway</li>
+</ul>
+<h2>Part 3: Docker Deployment</h2>
+<h3>Steps</h3>
+<ol>
+<li><p>Build the Docker image:</p>
+<pre><code class="language-bash">docker build -t icn:local -f deploy/docker/Dockerfile .
+</code></pre>
+</li>
+<li><p>Run the container:</p>
+<pre><code class="language-bash">docker run -d \
+  --name icn-node \
+  -p 8080:8080 \
+  -p 9100:9100 \
+  -p 8081:8081 \
+  -p 4001:4001 \
+  -e ICN_KEYSTORE_PASSPHRASE=workshop \
+  icn:local
+</code></pre>
+<blockquote>
+<p><strong>Security Note</strong>: The example above passes the passphrase via environment
+variable for simplicity. In production, use Docker secrets or mount a
+credentials file to avoid exposing passphrases in process listings or
+container inspect output.</p>
+</blockquote>
+</li>
+<li><p>Check logs:</p>
+<pre><code class="language-bash">docker logs -f icn-node
+</code></pre>
+</li>
+</ol>
+<h3>Docker Compose (multi-node)</h3>
+<p>If available:</p>
+<pre><code class="language-bash">cd deploy/docker
+docker-compose up -d
+docker-compose logs -f
+</code></pre>
+<h3>Questions to answer</h3>
+<ol>
+<li>How are secrets passed to the container?</li>
+<li>What volumes are mounted?</li>
+<li>How do containers discover each other?</li>
+</ol>
+<h3>Checkpoint</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Docker container running</li>
+<li><input disabled="" type="checkbox"> Gateway accessible from host</li>
+</ul>
+<h2>Part 4: Health Endpoint</h2>
+<h3>Steps</h3>
+<ol>
+<li><p>Check the basic health endpoint:</p>
+<pre><code class="language-bash">curl -s http://localhost:8080/v1/health | jq
+</code></pre>
+</li>
+<li><p>Basic health response:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;ok&quot;,
+  &quot;version&quot;: &quot;0.1.0&quot;
+}
+</code></pre>
+</li>
+<li><p>For detailed component checks, use <code>/v1/health/detailed</code>:</p>
+<pre><code class="language-bash">curl -s http://localhost:8080/v1/health/detailed | jq
+</code></pre>
+</li>
+<li><p>Detailed health response:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;healthy&quot;,
+  &quot;version&quot;: &quot;0.1.0&quot;,
+  &quot;checks&quot;: {
+    &quot;cooperative_manager&quot;: {&quot;status&quot;: &quot;ok&quot;, &quot;details&quot;: &quot;...&quot;},
+    &quot;notification_queue&quot;: {&quot;status&quot;: &quot;ok&quot;, &quot;details&quot;: &quot;...&quot;},
+    &quot;system&quot;: {&quot;status&quot;: &quot;ok&quot;, &quot;details&quot;: &quot;...&quot;}
+  }
+}
+</code></pre>
+</li>
+</ol>
+<h3>Health check details</h3>
+<p>Find the health endpoint implementation:</p>
+<pre><code class="language-bash">grep -r &quot;health&quot; icn/crates/icn-gateway/src/ --include=&quot;*.rs&quot; | head -10
+</code></pre>
+<h3>Questions to answer</h3>
+<ol>
+<li>What components are checked in <code>/v1/health/detailed</code>?</li>
+<li>What&#39;s the difference between <code>/v1/health</code> and <code>/v1/health/detailed</code>?</li>
+<li>How often should health be polled?</li>
+</ol>
+<h3>Checkpoint</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Basic health endpoint returns 200</li>
+<li><input disabled="" type="checkbox"> Detailed health shows component status</li>
+</ul>
+<h2>Part 5: Prometheus Metrics</h2>
+<h3>Steps</h3>
+<ol>
+<li><p>Access the metrics endpoint:</p>
+<pre><code class="language-bash">curl -s http://localhost:9100/metrics | head -50
+</code></pre>
+</li>
+<li><p>Identify key metric types:</p>
+<ul>
+<li>Counters (total counts)</li>
+<li>Gauges (current values)</li>
+<li>Histograms (distributions)</li>
+</ul>
+</li>
+</ol>
+<h3>Key metrics to find</h3>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icn_gateway_requests_total</code></td>
+<td>Counter</td>
+<td>Total HTTP requests</td>
+</tr>
+<tr>
+<td><code>icn_gossip_messages_received_total</code></td>
+<td>Counter</td>
+<td>Gossip messages received</td>
+</tr>
+<tr>
+<td><code>icn_ledger_entries_total</code></td>
+<td>Counter</td>
+<td>Total ledger entries</td>
+</tr>
+<tr>
+<td><code>icn_trust_edges_total</code></td>
+<td>Gauge</td>
+<td>Current trust edges</td>
+</tr>
+<tr>
+<td><code>icn_network_peers_connected</code></td>
+<td>Gauge</td>
+<td>Connected peers</td>
+</tr>
+</tbody></table>
+<h3>Exercise</h3>
+<p>Search for metric definitions:</p>
+<pre><code class="language-bash">grep -r &quot;counter!\|gauge!\|histogram!&quot; icn/crates/icn-obs/src/ --include=&quot;*.rs&quot; | head -20
+</code></pre>
+<h3>Questions to answer</h3>
+<ol>
+<li>What naming convention do metrics follow?</li>
+<li>How are labels used?</li>
+<li>What is the scrape interval for Prometheus?</li>
+</ol>
+<h3>Checkpoint</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Metrics endpoint accessible</li>
+<li><input disabled="" type="checkbox"> You can identify key metrics</li>
+</ul>
+<h2>Part 6: Prometheus + Grafana Setup (Optional)</h2>
+<h3>Steps</h3>
+<ol>
+<li><p>Create <code>prometheus.yml</code>:</p>
+<pre><code class="language-yaml">global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: &#39;icn&#39;
+    static_configs:
+      - targets: [&#39;localhost:9100&#39;]
+</code></pre>
+</li>
+<li><p>Run Prometheus:</p>
+<pre><code class="language-bash">docker run -d \
+  --name prometheus \
+  -p 9090:9090 \
+  -v $(pwd)/prometheus.yml:/etc/prometheus/prometheus.yml \
+  prom/prometheus
+</code></pre>
+</li>
+<li><p>Access Prometheus UI: <a href="http://localhost:9090" target="_blank" rel="noopener">http://localhost:9090</a></p>
+</li>
+<li><p>Run Grafana (optional):</p>
+<pre><code class="language-bash">docker run -d \
+  --name grafana \
+  -p 3000:3000 \
+  grafana/grafana
+</code></pre>
+</li>
+<li><p>Access Grafana: <a href="http://localhost:3000" target="_blank" rel="noopener">http://localhost:3000</a> (admin/admin)</p>
+</li>
+</ol>
+<h3>PromQL queries to try</h3>
+<pre><code class="language-promql"># Request rate over 5 minutes
+rate(icn_gateway_requests_total[5m])
+
+# Current connected peers
+icn_network_peers_connected
+
+# Gossip message rate by type
+rate(icn_gossip_messages_received_total[5m])
+</code></pre>
+<h3>Checkpoint</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Prometheus scraping ICN metrics</li>
+<li><input disabled="" type="checkbox"> You can query metrics in PromQL</li>
+</ul>
+<h2>Part 7: Logging Configuration</h2>
+<h3>Steps</h3>
+<ol>
+<li><p>Find logging configuration:</p>
+<pre><code class="language-bash">grep -r &quot;tracing\|logging&quot; icn/crates/icn-obs/src/ --include=&quot;*.rs&quot; | head -15
+</code></pre>
+</li>
+<li><p>Test different log levels:</p>
+<pre><code class="language-bash">RUST_LOG=debug ./target/release/icnd --data-dir &quot;$ICN_DATA&quot;
+RUST_LOG=icn_gossip=trace ./target/release/icnd --data-dir &quot;$ICN_DATA&quot;
+</code></pre>
+</li>
+</ol>
+<h3>Log levels</h3>
+<table>
+<thead>
+<tr>
+<th>Level</th>
+<th>Use Case</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>error</td>
+<td>Critical failures</td>
+</tr>
+<tr>
+<td>warn</td>
+<td>Recoverable issues</td>
+</tr>
+<tr>
+<td>info</td>
+<td>Normal operations</td>
+</tr>
+<tr>
+<td>debug</td>
+<td>Development debugging</td>
+</tr>
+<tr>
+<td>trace</td>
+<td>Deep inspection</td>
+</tr>
+</tbody></table>
+<h3>Log format (JSON)</h3>
+<pre><code class="language-json">{
+  &quot;timestamp&quot;: &quot;2024-01-01T12:00:00Z&quot;,
+  &quot;level&quot;: &quot;INFO&quot;,
+  &quot;target&quot;: &quot;icn_gossip::actor&quot;,
+  &quot;message&quot;: &quot;Subscribed to topic&quot;,
+  &quot;topic&quot;: &quot;ledger:entries&quot;
+}
+</code></pre>
+<h3>Questions to answer</h3>
+<ol>
+<li>How do you filter logs by module?</li>
+<li>What format is used for timestamps?</li>
+<li>How are structured fields included?</li>
+</ol>
+<h3>Checkpoint</h3>
+<ul>
+<li><input disabled="" type="checkbox"> You can adjust log levels</li>
+<li><input disabled="" type="checkbox"> You understand log format</li>
+</ul>
+<h2>Part 8: Distributed Tracing (Optional)</h2>
+<h3>Steps</h3>
+<ol>
+<li>Find tracing configuration in <code>icn-obs</code></li>
+<li>Look for OpenTelemetry integration</li>
+<li>Understand span structure</li>
+</ol>
+<h3>Tracing concepts</h3>
+<pre><code>Request arrives at gateway
+  └── Span: &quot;gateway.handle_request&quot;
+        └── Span: &quot;ledger.create_entry&quot;
+              └── Span: &quot;store.put&quot;
+        └── Span: &quot;gossip.announce&quot;
+              └── Span: &quot;network.broadcast&quot;
+</code></pre>
+<h3>Jaeger setup (optional)</h3>
+<pre><code class="language-bash">docker run -d \
+  --name jaeger \
+  -p 16686:16686 \
+  -p 6831:6831/udp \
+  jaegertracing/all-in-one
+</code></pre>
+<h3>Questions to answer</h3>
+<ol>
+<li>What is a trace vs a span?</li>
+<li>How are trace IDs propagated?</li>
+<li>What exporter is configured?</li>
+</ol>
+<h3>Checkpoint</h3>
+<ul>
+<li><input disabled="" type="checkbox"> You understand tracing structure</li>
+<li><input disabled="" type="checkbox"> You know how to enable tracing</li>
+</ul>
+<h2>Part 9: Troubleshooting Checklist</h2>
+<h3>Common issues and diagnostics</h3>
+<p><strong>Daemon won&#39;t start:</strong></p>
+<pre><code class="language-bash"># Check port availability
+lsof -i :8080
+lsof -i :4001
+
+# Check keystore
+./target/release/icnctl --data-dir &quot;$ICN_DATA&quot; id show
+</code></pre>
+<p><strong>Gateway not responding:</strong></p>
+<pre><code class="language-bash"># Check health
+curl -v http://localhost:8080/v1/health
+
+# Check logs
+RUST_LOG=debug ./target/release/icnd --data-dir &quot;$ICN_DATA&quot; 2&gt;&amp;1 | head -50
+</code></pre>
+<p><strong>Metrics not available:</strong></p>
+<pre><code class="language-bash"># Check metrics endpoint
+curl -v http://localhost:9100/metrics
+
+# Verify metrics are enabled in config
+</code></pre>
+<p><strong>Gossip not working:</strong></p>
+<pre><code class="language-bash"># Check network connectivity
+./target/release/icnctl --data-dir &quot;$ICN_DATA&quot; status
+
+# Check for mDNS
+RUST_LOG=icn_net=debug ./target/release/icnd --data-dir &quot;$ICN_DATA&quot;
+</code></pre>
+<h3>Checkpoint</h3>
+<ul>
+<li><input disabled="" type="checkbox"> You can diagnose common issues</li>
+<li><input disabled="" type="checkbox"> You know which logs to check</li>
+</ul>
+<h2>Part 10: Production Considerations</h2>
+<h3>Security checklist</h3>
+<ul>
+<li><input disabled="" type="checkbox"> TLS certificates configured</li>
+<li><input disabled="" type="checkbox"> Keystore passphrase secured</li>
+<li><input disabled="" type="checkbox"> Rate limiting enabled</li>
+<li><input disabled="" type="checkbox"> CORS origins restricted</li>
+</ul>
+<h3>Monitoring checklist</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Prometheus scraping metrics</li>
+<li><input disabled="" type="checkbox"> Alerting configured for critical metrics</li>
+<li><input disabled="" type="checkbox"> Log aggregation in place</li>
+<li><input disabled="" type="checkbox"> Dashboards created for key metrics</li>
+</ul>
+<h3>Backup checklist</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Keystore backed up securely</li>
+<li><input disabled="" type="checkbox"> Sled database backup strategy</li>
+<li><input disabled="" type="checkbox"> Configuration versioned</li>
+</ul>
+<h2>Summary</h2>
+<p>After completing this workshop you should be able to:</p>
+<ul>
+<li>Deploy ICN using native binaries or Docker</li>
+<li>Verify health and component status</li>
+<li>Access and understand Prometheus metrics</li>
+<li>Configure and filter logging</li>
+<li>Troubleshoot common operational issues</li>
+</ul>
+<h2>Key Takeaways</h2>
+<table>
+<thead>
+<tr>
+<th>Concept</th>
+<th>Key Point</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Health Endpoints</strong></td>
+<td><code>/v1/health</code> (basic), <code>/v1/health/detailed</code> (component status)</td>
+</tr>
+<tr>
+<td><strong>Metrics Port</strong></td>
+<td>9100 by default; Prometheus format</td>
+</tr>
+<tr>
+<td><strong>Gateway Port</strong></td>
+<td>8080 by default; REST + WebSocket</td>
+</tr>
+<tr>
+<td><strong>Network Port</strong></td>
+<td>4001 by default; QUIC/UDP</td>
+</tr>
+<tr>
+<td><strong>Log Levels</strong></td>
+<td>error &lt; warn &lt; info &lt; debug &lt; trace</td>
+</tr>
+<tr>
+<td><strong>Log Filtering</strong></td>
+<td><code>RUST_LOG=icn_gossip=debug,icn_ledger=trace</code></td>
+</tr>
+</tbody></table>
+<h2>Try It Yourself</h2>
+<p><strong>Challenge 1</strong>: Create a Grafana dashboard</p>
+<ol>
+<li>Set up Prometheus + Grafana (as shown in Part 6)</li>
+<li>Create a dashboard with:<ul>
+<li>Connected peers gauge</li>
+<li>Request rate graph</li>
+<li>Gossip message throughput</li>
+<li>Ledger entry count</li>
+</ul>
+</li>
+</ol>
+<p><strong>Challenge 2</strong>: Alert configuration
+Create a Prometheus alerting rule for:</p>
+<ul>
+<li>Health check failure</li>
+<li>No connected peers for 5 minutes</li>
+<li>Gossip message rate drops to zero</li>
+</ul>
+<p><strong>Challenge 3</strong>: Log analysis</p>
+<ol>
+<li>Run with <code>RUST_LOG=debug</code> for 10 minutes</li>
+<li>Analyze the logs to answer:<ul>
+<li>How many gossip messages were processed?</li>
+<li>Were there any warnings or errors?</li>
+<li>What was the most chatty component?</li>
+</ul>
+</li>
+</ol>
+<p><strong>Challenge 4</strong>: Multi-node deployment
+Use Docker Compose to deploy 3 ICN nodes that form a network:</p>
+<ol>
+<li>Nodes discover each other via mDNS</li>
+<li>Subscribe to a shared topic</li>
+<li>Verify message propagation across all nodes</li>
+</ol>
+<h2>Cleanup</h2>
+<pre><code class="language-bash"># Stop containers
+docker stop icn-node prometheus grafana jaeger 2&gt;/dev/null
+docker rm icn-node prometheus grafana jaeger 2&gt;/dev/null
+
+# Remove temp data
+rm -rf &quot;$ICN_DATA&quot;
+</code></pre>
+<h2>Troubleshooting</h2>
+<h3>Port already in use</h3>
+<p>Stop any existing processes using the ports or change the configuration.</p>
+<h3>Docker image build fails</h3>
+<p>Ensure you&#39;re in the repository root and Docker daemon is running.</p>
+<h3>Metrics not appearing in Prometheus</h3>
+<p>Check that the scrape target is accessible and the job is configured correctly.</p>
+<h2>Next steps</h2>
+<p>Proceed to Workshop 10: Contributor Workflow</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

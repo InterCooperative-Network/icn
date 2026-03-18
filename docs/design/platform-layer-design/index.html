@@ -1,0 +1,846 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Platform Layer Design | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>platform layer design</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/platform-layer-design.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Platform Layer Design</h1>
+<p><strong>Date</strong>: 2025-01-15
+<strong>Status</strong>: Implementation Phase (Phase 14)
+<strong>Strategic Shift</strong>: ICN as Cooperative Backend Platform</p>
+<h2>Vision</h2>
+<p><strong>NOT</strong>: &quot;People run ICN&quot;
+<strong>BUT</strong>: &quot;Co-ops build apps that use ICN as backend&quot;</p>
+<p>A food co-op builds their Shopper&#39;s Club app (React + Node), uses ICN under the hood for members/balances/contracts, and members just log in - never seeing <code>icnd</code>.</p>
+<h2>What This Platform IS and IS NOT</h2>
+<p><strong>This IS:</strong></p>
+<ul>
+<li>A developer-facing API layer (REST + WebSocket)</li>
+<li>TypeScript SDK for easy integration</li>
+<li>Reference apps as starting points</li>
+<li>Multi-tenant hosting for early pilots</li>
+</ul>
+<p><strong>This is NOT:</strong></p>
+<ul>
+<li>An app runtime (like AWS Lambda, Cloudflare Workers)</li>
+<li>A place to deploy custom backend code</li>
+<li>A &quot;cooperative cloud&quot; (that&#39;s Phase 16+, conditional on pilot validation)</li>
+</ul>
+<p><strong>Why not a runtime now?</strong></p>
+<ul>
+<li>We have zero pilots - don&#39;t know what co-ops need</li>
+<li>6-12 month investment without user signal</li>
+<li>Gateway + SDK ships in 2-3 months, validates faster</li>
+<li>Runtime can be added later if pilots prove it&#39;s needed</li>
+</ul>
+<p><strong>The path:</strong></p>
+<ol>
+<li><strong>Phase 14</strong>: Build gateway + SDK + reference app</li>
+<li><strong>Phase 15</strong>: Host reference app for 1-2 pilot co-ops</li>
+<li><strong>Phase 16+</strong>: Let pilot feedback drive what&#39;s next (runtime, templates, self-hosting tools, etc.)</li>
+</ol>
+<h2>Layer Cake Architecture</h2>
+<pre><code>┌─────────────────────────────────────────────────────────────┐
+│  Apps (what co-ops build)                                   │
+│  - Food Co-op Shopper&#39;s Club                                │
+│  - Housing Maintenance Portal                               │
+│  - Timebank Scheduler                                       │
+│  - Community Tool Library                                   │
+└─────────────────────────────────────────────────────────────┘
+                           ↕
+┌─────────────────────────────────────────────────────────────┐
+│  Platform Layer (what we build now)                         │
+│  - REST + WebSocket API (icn-gateway)                       │
+│  - App auth &amp; capability tokens                             │
+│  - Coop namespaces &amp; isolation                              │
+│  - Event streaming                                          │
+│  - TypeScript/Python SDKs                                   │
+└─────────────────────────────────────────────────────────────┘
+                           ↕
+┌─────────────────────────────────────────────────────────────┐
+│  Substrate (what we have)                                   │
+│  - Identity, Trust, Ledger, Gossip, Storage, Contracts      │
+│  - icnd daemon, icnctl CLI                                  │
+└─────────────────────────────────────────────────────────────┘
+</code></pre>
+<h2>What Co-ops Actually Need</h2>
+<h3>1. Identity &amp; Membership</h3>
+<p><strong>Questions apps ask:</strong></p>
+<ul>
+<li>&quot;Who is this user?&quot; → DID</li>
+<li>&quot;Which co-op(s) are they part of?&quot; → Coop namespace</li>
+<li>&quot;What role are they in?&quot; → member / worker / admin / treasurer</li>
+</ul>
+<p><strong>API Examples:</strong></p>
+<pre><code class="language-typescript">// TypeScript SDK
+const user = await icn.auth.getCurrentUser();
+// → { did: &quot;did:icn:abc123&quot;, name: &quot;Alice&quot; }
+
+const memberships = await icn.membership.getCoops(user.did);
+// → [{ coopId: &quot;food-coop-pdx&quot;, role: &quot;member&quot; }, ...]
+
+const role = await icn.membership.getRole(&quot;food-coop-pdx&quot;, user.did);
+// → &quot;member&quot; | &quot;worker&quot; | &quot;admin&quot; | &quot;treasurer&quot;
+</code></pre>
+<h3>2. Auth from App&#39;s POV</h3>
+<p>App can say: &quot;User X (DID) is logged in, here&#39;s a token that lets me:</p>
+<ul>
+<li>Read their balances in this co-op</li>
+<li>Initiate a payment on their behalf</li>
+<li>Read/write certain contract state&quot;</li>
+</ul>
+<p><strong>Auth Flow (Capability Tokens):</strong></p>
+<pre><code>User Device                  App Server               icn-gateway
+    │                            │                        │
+    │ 1. Sign auth challenge     │                        │
+    ├───────────────────────────&gt;│                        │
+    │                            │ 2. Verify + request    │
+    │                            │    scoped token        │
+    │                            ├───────────────────────&gt;│
+    │                            │                        │
+    │                            │ 3. Issue capability    │
+    │                            │    token (JWT-ish)     │
+    │                            │&lt;───────────────────────┤
+    │                            │                        │
+    │ 4. Token (to use in API)   │                        │
+    │&lt;───────────────────────────┤                        │
+    │                            │                        │
+    │ 5. API calls with token    │                        │
+    ├────────────────────────────┼───────────────────────&gt;│
+    │                            │                        │
+</code></pre>
+<p><strong>Token Structure:</strong></p>
+<pre><code class="language-json">{
+  &quot;sub&quot;: &quot;did:icn:abc123&quot;,
+  &quot;coop&quot;: &quot;food-coop-pdx&quot;,
+  &quot;app&quot;: &quot;shoppers-club&quot;,
+  &quot;capabilities&quot;: [
+    &quot;read:balance&quot;,
+    &quot;write:payment&quot;,
+    &quot;read:members&quot;
+  ],
+  &quot;exp&quot;: 1234567890,
+  &quot;iat&quot;: 1234560000
+}
+</code></pre>
+<h3>3. Ledger &amp; Payments</h3>
+<p><strong>Simple API:</strong></p>
+<pre><code class="language-typescript">// Get balance
+const balance = await icn.ledger.getBalance({
+  coopId: &quot;food-coop-pdx&quot;,
+  did: user.did,
+  currency: &quot;coop-credits&quot;
+});
+// → { balance: 150, creditLimit: -50 }
+
+// Send payment
+const tx = await icn.ledger.sendPayment({
+  coopId: &quot;food-coop-pdx&quot;,
+  from: user.did,
+  to: &quot;did:icn:coop-till&quot;,
+  amount: 25,
+  currency: &quot;coop-credits&quot;,
+  memo: &quot;Purchased groceries&quot;
+});
+// → { txId: &quot;tx_123...&quot;, timestamp: 1234567890 }
+
+// Get transaction history
+const history = await icn.ledger.getHistory({
+  coopId: &quot;food-coop-pdx&quot;,
+  did: user.did,
+  limit: 50
+});
+</code></pre>
+<p>All the hard work (mutual credit, Merkle-DAG, signatures) stays inside ICN substrate.</p>
+<h3>4. Groups / Spaces (Coop Namespaces)</h3>
+<p>Each co-op = a namespace with:</p>
+<ul>
+<li>Members list</li>
+<li>Role bindings</li>
+<li>Trust rules</li>
+<li>Ledger domains (currencies)</li>
+<li>Contract set</li>
+</ul>
+<p><strong>Data Model:</strong></p>
+<pre><code class="language-rust">pub struct CoopNamespace {
+    /// Unique co-op ID
+    pub id: CoopId,
+
+    /// Human-readable name
+    pub name: String,
+
+    /// Member DIDs
+    pub members: Vec&lt;Did&gt;,
+
+    /// Role assignments (did -&gt; roles)
+    pub roles: HashMap&lt;Did, Vec&lt;String&gt;&gt;,
+
+    /// Ledger currencies for this co-op
+    pub currencies: Vec&lt;String&gt;,
+
+    /// Trust rules (optional, per-coop overrides)
+    pub trust_rules: Option&lt;TrustConfig&gt;,
+
+    /// Installed contracts
+    pub contracts: Vec&lt;ContentHash&gt;,
+
+    /// Apps authorized for this co-op
+    pub apps: Vec&lt;AppRegistration&gt;,
+
+    /// Created timestamp
+    pub created_at: u64,
+}
+
+pub struct AppRegistration {
+    /// Unique app ID
+    pub id: AppId,
+
+    /// App name
+    pub name: String,
+
+    /// Allowed capabilities
+    pub capabilities: Vec&lt;String&gt;,
+
+    /// App public key (for verifying requests)
+    pub public_key: Vec&lt;u8&gt;,
+}
+</code></pre>
+<p><strong>API Examples:</strong></p>
+<pre><code class="language-typescript">// Create a new co-op namespace
+const coop = await icn.coops.create({
+  name: &quot;Portland Food Co-op&quot;,
+  foundingMembers: [alice.did, bob.did, carol.did],
+  currencies: [&quot;coop-credits&quot;],
+});
+// → { coopId: &quot;food-coop-pdx&quot;, ... }
+
+// Add member
+await icn.coops.addMember({
+  coopId: &quot;food-coop-pdx&quot;,
+  member: dave.did,
+  role: &quot;member&quot;
+});
+
+// List co-op members
+const members = await icn.coops.getMembers(&quot;food-coop-pdx&quot;);
+// → [{ did: &quot;did:icn:...&quot;, role: &quot;member&quot;, joinedAt: 123... }, ...]
+</code></pre>
+<h3>5. Events (Real-Time Subscriptions)</h3>
+<p>App can subscribe to:</p>
+<ul>
+<li>New transactions</li>
+<li>Member joined/left</li>
+<li>Contract state changes</li>
+<li>Governance proposals/votes</li>
+</ul>
+<p><strong>WebSocket API:</strong></p>
+<pre><code class="language-typescript">// Subscribe to co-op events
+const stream = icn.events.subscribe({
+  coopId: &quot;food-coop-pdx&quot;,
+  eventTypes: [&quot;transaction&quot;, &quot;member_joined&quot;, &quot;proposal_created&quot;]
+});
+
+stream.on(&quot;transaction&quot;, (event) =&gt; {
+  console.log(`New transaction: ${event.from} → ${event.to}: ${event.amount}`);
+  // Update UI live
+});
+
+stream.on(&quot;member_joined&quot;, (event) =&gt; {
+  console.log(`${event.member} joined as ${event.role}`);
+});
+</code></pre>
+<p><strong>Event Types:</strong></p>
+<pre><code class="language-typescript">type ICNEvent =
+  | { type: &quot;transaction&quot;, coopId: string, from: DID, to: DID, amount: number, currency: string, timestamp: number }
+  | { type: &quot;member_joined&quot;, coopId: string, member: DID, role: string, timestamp: number }
+  | { type: &quot;member_left&quot;, coopId: string, member: DID, timestamp: number }
+  | { type: &quot;role_changed&quot;, coopId: string, member: DID, oldRole: string, newRole: string, timestamp: number }
+  | { type: &quot;proposal_created&quot;, coopId: string, proposalId: string, author: DID, subject: string, timestamp: number }
+  | { type: &quot;proposal_voted&quot;, coopId: string, proposalId: string, voter: DID, vote: Vote, timestamp: number }
+  | { type: &quot;contract_executed&quot;, coopId: string, contractHash: string, caller: DID, result: any, timestamp: number };
+</code></pre>
+<hr>
+<h2>Platform Components</h2>
+<h3>1. icn-gateway (New Crate)</h3>
+<p><strong>Purpose</strong>: Expose stable, language-agnostic API for co-op apps.</p>
+<p><strong>Stack</strong>:</p>
+<ul>
+<li>Actix-web (Rust async HTTP server)</li>
+<li>REST endpoints (JSON)</li>
+<li>WebSocket for event streaming</li>
+<li>Talks to <code>icnd</code> via internal RPC</li>
+</ul>
+<p><strong>Directory Structure</strong>:</p>
+<pre><code>icn/crates/icn-gateway/
+├── src/
+│   ├── lib.rs           # Gateway server
+│   ├── auth.rs          # Capability token handling
+│   ├── api/
+│   │   ├── mod.rs
+│   │   ├── coops.rs     # /coops/* endpoints
+│   │   ├── ledger.rs    # /ledger/* endpoints
+│   │   ├── members.rs   # /members/* endpoints
+│   │   ├── contracts.rs # /contracts/* endpoints
+│   │   └── events.rs    # WebSocket event streaming
+│   ├── models.rs        # API request/response types
+│   └── error.rs         # HTTP error responses
+└── Cargo.toml
+</code></pre>
+<p><strong>API Surface</strong> (detailed below)</p>
+<hr>
+<h3>2. Coop Namespaces (Extend icn-store)</h3>
+<p><strong>Purpose</strong>: Isolate co-ops from each other. Each co-op = separate namespace for members, ledgers, contracts.</p>
+<p><strong>Storage Schema</strong> (in Sled):</p>
+<pre><code>Prefix: &quot;coop:{coop_id}:*&quot;
+
+coop:{coop_id}:meta          → CoopNamespace (bincode)
+coop:{coop_id}:members       → Vec&lt;Did&gt; (bincode)
+coop:{coop_id}:roles:{did}   → Vec&lt;String&gt; (roles)
+coop:{coop_id}:apps          → Vec&lt;AppRegistration&gt; (bincode)
+
+# Ledger entries scoped per co-op
+coop:{coop_id}:ledger:balance:{did}:{currency} → i64
+coop:{coop_id}:ledger:tx:{tx_id}               → JournalEntry
+
+# Governance scoped per co-op
+coop:{coop_id}:proposals:{prop_id}             → Proposal
+</code></pre>
+<p><strong>Implementation</strong>:</p>
+<ul>
+<li>Add <code>icn-store/src/coops.rs</code> for CRUD operations</li>
+<li>Add namespace isolation to ledger operations</li>
+<li>Add per-coop governance storage (proposals, votes)</li>
+</ul>
+<hr>
+<h3>3. App Auth &amp; Capability Tokens</h3>
+<p><strong>Purpose</strong>: Apps get scoped tokens to act on behalf of users. Not OAuth (no third-party IdP), but similar flow.</p>
+<p><strong>Token Issuance Flow</strong>:</p>
+<ol>
+<li>User signs a challenge with their DID keypair</li>
+<li>App verifies signature, requests token from <code>icn-gateway</code></li>
+<li>Gateway issues short-lived JWT-like token with capabilities</li>
+<li>App includes token in <code>Authorization: Bearer &lt;token&gt;</code> header</li>
+</ol>
+<p><strong>Token Claims</strong>:</p>
+<pre><code class="language-json">{
+  &quot;sub&quot;: &quot;did:icn:abc123&quot;,        // User DID
+  &quot;coop&quot;: &quot;food-coop-pdx&quot;,        // Coop namespace
+  &quot;app&quot;: &quot;shoppers-club&quot;,         // App ID
+  &quot;capabilities&quot;: [
+    &quot;read:balance&quot;,
+    &quot;write:payment&quot;,
+    &quot;read:members&quot;,
+    &quot;read:proposals&quot;
+  ],
+  &quot;exp&quot;: 1234567890,              // Expiration (1 hour default)
+  &quot;iat&quot;: 1234560000,              // Issued at
+  &quot;jti&quot;: &quot;token_unique_id&quot;        // Token ID (for revocation)
+}
+</code></pre>
+<p><strong>Capability Scopes</strong>:</p>
+<ul>
+<li><code>read:balance</code> - Read user&#39;s balance in co-op</li>
+<li><code>write:payment</code> - Initiate payment on user&#39;s behalf</li>
+<li><code>read:members</code> - List co-op members</li>
+<li><code>write:members</code> - Add/remove members (admin only)</li>
+<li><code>read:proposals</code> - View governance proposals</li>
+<li><code>write:proposals</code> - Create proposals</li>
+<li><code>vote:proposals</code> - Vote on proposals</li>
+<li><code>execute:contract:{hash}</code> - Execute specific contract</li>
+</ul>
+<p><strong>Revocation</strong>:</p>
+<ul>
+<li>Gateway maintains revocation list (Redis or in-memory)</li>
+<li>On token verification, check if <code>jti</code> is revoked</li>
+<li>User can revoke all tokens for an app</li>
+<li>Tokens auto-expire after 1 hour (refresh flow)</li>
+</ul>
+<p><strong>Implementation</strong>:</p>
+<ul>
+<li><code>icn-gateway/src/auth.rs</code> - Token issuance/verification</li>
+<li>Use <code>jsonwebtoken</code> crate for JWT handling</li>
+<li>Ed25519 signing (same as DID keypairs)</li>
+</ul>
+<hr>
+<h3>4. TypeScript SDK (@icn/client)</h3>
+<p><strong>Purpose</strong>: Make ICN trivial to use from JavaScript/TypeScript apps.</p>
+<p><strong>Package Structure</strong>:</p>
+<pre><code>sdk/typescript/
+├── package.json
+├── src/
+│   ├── index.ts          # Main exports
+│   ├── client.ts         # ICNClient class
+│   ├── auth.ts           # Authentication
+│   ├── coops.ts          # Coop management
+│   ├── ledger.ts         # Ledger operations
+│   ├── members.ts        # Membership
+│   ├── events.ts         # WebSocket event streaming
+│   ├── types.ts          # TypeScript types
+│   └── utils.ts          # Helpers
+└── tsconfig.json
+</code></pre>
+<p><strong>Usage Example</strong>:</p>
+<pre><code class="language-typescript">import { ICNClient } from &#39;@icn/client&#39;;
+
+// Initialize client
+const icn = new ICNClient({
+  gatewayUrl: &#39;http://localhost:8000&#39;,
+});
+
+// Authenticate (user signs challenge with wallet/device)
+const user = await icn.auth.login({
+  did: &#39;did:icn:abc123&#39;,
+  signChallenge: async (challenge) =&gt; {
+    // Sign with device key
+    return await wallet.sign(challenge);
+  }
+});
+
+// Get token for co-op app
+const token = await icn.auth.getToken({
+  coopId: &#39;food-coop-pdx&#39;,
+  appId: &#39;shoppers-club&#39;,
+  capabilities: [&#39;read:balance&#39;, &#39;write:payment&#39;]
+});
+
+// Use token for API calls
+icn.setToken(token);
+
+// Get balance
+const balance = await icn.ledger.getBalance({
+  coopId: &#39;food-coop-pdx&#39;,
+  did: user.did,
+  currency: &#39;coop-credits&#39;
+});
+
+// Send payment
+const tx = await icn.ledger.sendPayment({
+  coopId: &#39;food-coop-pdx&#39;,
+  from: user.did,
+  to: &#39;did:icn:coop-till&#39;,
+  amount: 25,
+  currency: &#39;coop-credits&#39;,
+  memo: &#39;Groceries&#39;
+});
+
+// Subscribe to events
+const stream = icn.events.subscribe({
+  coopId: &#39;food-coop-pdx&#39;,
+  eventTypes: [&#39;transaction&#39;, &#39;member_joined&#39;]
+});
+
+stream.on(&#39;transaction&#39;, (event) =&gt; {
+  console.log(&#39;New transaction:&#39;, event);
+});
+</code></pre>
+<hr>
+<h2>icn-gateway API Reference</h2>
+<h3>Base URL</h3>
+<pre><code>http://localhost:8000/api/v1
+</code></pre>
+<h3>Authentication</h3>
+<p>All endpoints except <code>/auth/*</code> require <code>Authorization: Bearer &lt;token&gt;</code> header.</p>
+<h4>POST /auth/challenge</h4>
+<p>Generate authentication challenge for DID.</p>
+<p><strong>Request:</strong></p>
+<pre><code class="language-json">{
+  &quot;did&quot;: &quot;did:icn:abc123&quot;
+}
+</code></pre>
+<p><strong>Response:</strong></p>
+<pre><code class="language-json">{
+  &quot;challenge&quot;: &quot;random_base64_string&quot;,
+  &quot;expiresAt&quot;: 1234567890
+}
+</code></pre>
+<h4>POST /auth/verify</h4>
+<p>Verify signed challenge and issue token.</p>
+<p><strong>Request:</strong></p>
+<pre><code class="language-json">{
+  &quot;did&quot;: &quot;did:icn:abc123&quot;,
+  &quot;challenge&quot;: &quot;random_base64_string&quot;,
+  &quot;signature&quot;: &quot;ed25519_signature_base64&quot;,
+  &quot;coopId&quot;: &quot;food-coop-pdx&quot;,
+  &quot;appId&quot;: &quot;shoppers-club&quot;,
+  &quot;capabilities&quot;: [&quot;read:balance&quot;, &quot;write:payment&quot;]
+}
+</code></pre>
+<p><strong>Response:</strong></p>
+<pre><code class="language-json">{
+  &quot;token&quot;: &quot;jwt_token_string&quot;,
+  &quot;expiresAt&quot;: 1234567890
+}
+</code></pre>
+<h4>POST /auth/revoke</h4>
+<p>Revoke a token.</p>
+<p><strong>Request:</strong></p>
+<pre><code class="language-json">{
+  &quot;tokenId&quot;: &quot;token_unique_id&quot;
+}
+</code></pre>
+<p><strong>Response:</strong></p>
+<pre><code class="language-json">{
+  &quot;success&quot;: true
+}
+</code></pre>
+<hr>
+<h3>Co-ops</h3>
+<h4>POST /coops</h4>
+<p>Create a new co-op namespace.</p>
+<p><strong>Request:</strong></p>
+<pre><code class="language-json">{
+  &quot;name&quot;: &quot;Portland Food Co-op&quot;,
+  &quot;foundingMembers&quot;: [&quot;did:icn:abc&quot;, &quot;did:icn:def&quot;],
+  &quot;currencies&quot;: [&quot;coop-credits&quot;],
+  &quot;roles&quot;: {
+    &quot;did:icn:abc&quot;: [&quot;admin&quot;, &quot;member&quot;],
+    &quot;did:icn:def&quot;: [&quot;member&quot;]
+  }
+}
+</code></pre>
+<p><strong>Response:</strong></p>
+<pre><code class="language-json">{
+  &quot;coopId&quot;: &quot;food-coop-pdx&quot;,
+  &quot;name&quot;: &quot;Portland Food Co-op&quot;,
+  &quot;createdAt&quot;: 1234567890
+}
+</code></pre>
+<h4>GET /coops/{coopId}</h4>
+<p>Get co-op details.</p>
+<p><strong>Response:</strong></p>
+<pre><code class="language-json">{
+  &quot;id&quot;: &quot;food-coop-pdx&quot;,
+  &quot;name&quot;: &quot;Portland Food Co-op&quot;,
+  &quot;memberCount&quot;: 42,
+  &quot;currencies&quot;: [&quot;coop-credits&quot;],
+  &quot;createdAt&quot;: 1234567890
+}
+</code></pre>
+<h4>GET /coops/{coopId}/members</h4>
+<p>List co-op members.</p>
+<p><strong>Response:</strong></p>
+<pre><code class="language-json">{
+  &quot;members&quot;: [
+    {
+      &quot;did&quot;: &quot;did:icn:abc123&quot;,
+      &quot;roles&quot;: [&quot;admin&quot;, &quot;member&quot;],
+      &quot;joinedAt&quot;: 1234567890
+    },
+    ...
+  ]
+}
+</code></pre>
+<h4>POST /coops/{coopId}/members</h4>
+<p>Add a member to co-op.</p>
+<p><strong>Request:</strong></p>
+<pre><code class="language-json">{
+  &quot;member&quot;: &quot;did:icn:xyz789&quot;,
+  &quot;role&quot;: &quot;member&quot;
+}
+</code></pre>
+<p><strong>Response:</strong></p>
+<pre><code class="language-json">{
+  &quot;success&quot;: true,
+  &quot;member&quot;: &quot;did:icn:xyz789&quot;,
+  &quot;role&quot;: &quot;member&quot;
+}
+</code></pre>
+<hr>
+<h3>Ledger</h3>
+<h4>GET /ledger/{coopId}/balance/{did}</h4>
+<p>Get balance for a DID in a co-op.</p>
+<p><strong>Query Parameters:</strong></p>
+<ul>
+<li><code>currency</code> (optional) - Filter by currency</li>
+</ul>
+<p><strong>Response:</strong></p>
+<pre><code class="language-json">{
+  &quot;balances&quot;: [
+    {
+      &quot;currency&quot;: &quot;coop-credits&quot;,
+      &quot;balance&quot;: 150,
+      &quot;creditLimit&quot;: -50
+    }
+  ]
+}
+</code></pre>
+<h4>POST /ledger/{coopId}/payment</h4>
+<p>Send a payment.</p>
+<p><strong>Request:</strong></p>
+<pre><code class="language-json">{
+  &quot;from&quot;: &quot;did:icn:abc123&quot;,
+  &quot;to&quot;: &quot;did:icn:coop-till&quot;,
+  &quot;amount&quot;: 25,
+  &quot;currency&quot;: &quot;coop-credits&quot;,
+  &quot;memo&quot;: &quot;Purchased groceries&quot;
+}
+</code></pre>
+<p><strong>Response:</strong></p>
+<pre><code class="language-json">{
+  &quot;txId&quot;: &quot;tx_1234567890_abc&quot;,
+  &quot;from&quot;: &quot;did:icn:abc123&quot;,
+  &quot;to&quot;: &quot;did:icn:coop-till&quot;,
+  &quot;amount&quot;: 25,
+  &quot;currency&quot;: &quot;coop-credits&quot;,
+  &quot;timestamp&quot;: 1234567890,
+  &quot;newBalance&quot;: 125
+}
+</code></pre>
+<h4>GET /ledger/{coopId}/history/{did}</h4>
+<p>Get transaction history.</p>
+<p><strong>Query Parameters:</strong></p>
+<ul>
+<li><code>limit</code> (optional, default 50)</li>
+<li><code>offset</code> (optional, default 0)</li>
+<li><code>currency</code> (optional)</li>
+</ul>
+<p><strong>Response:</strong></p>
+<pre><code class="language-json">{
+  &quot;transactions&quot;: [
+    {
+      &quot;txId&quot;: &quot;tx_...&quot;,
+      &quot;from&quot;: &quot;did:icn:abc&quot;,
+      &quot;to&quot;: &quot;did:icn:def&quot;,
+      &quot;amount&quot;: 25,
+      &quot;currency&quot;: &quot;coop-credits&quot;,
+      &quot;memo&quot;: &quot;Groceries&quot;,
+      &quot;timestamp&quot;: 1234567890
+    },
+    ...
+  ],
+  &quot;total&quot;: 234
+}
+</code></pre>
+<hr>
+<h3>Events (WebSocket)</h3>
+<h4>WS /events/subscribe</h4>
+<p><strong>Connect:</strong></p>
+<pre><code>ws://localhost:8000/api/v1/events/subscribe?token=&lt;jwt_token&gt;
+</code></pre>
+<p><strong>Subscribe Message:</strong></p>
+<pre><code class="language-json">{
+  &quot;action&quot;: &quot;subscribe&quot;,
+  &quot;coopId&quot;: &quot;food-coop-pdx&quot;,
+  &quot;eventTypes&quot;: [&quot;transaction&quot;, &quot;member_joined&quot;, &quot;proposal_created&quot;]
+}
+</code></pre>
+<p><strong>Event Messages:</strong></p>
+<pre><code class="language-json">{
+  &quot;type&quot;: &quot;transaction&quot;,
+  &quot;coopId&quot;: &quot;food-coop-pdx&quot;,
+  &quot;from&quot;: &quot;did:icn:abc&quot;,
+  &quot;to&quot;: &quot;did:icn:def&quot;,
+  &quot;amount&quot;: 25,
+  &quot;currency&quot;: &quot;coop-credits&quot;,
+  &quot;timestamp&quot;: 1234567890
+}
+</code></pre>
+<hr>
+<h2>Food Co-op Example Walkthrough</h2>
+<h3>Phase 1: Identity + Anchor</h3>
+<p>Co-op builds basic web app:</p>
+<p><strong>Member Onboarding:</strong></p>
+<ol>
+<li>New member downloads ICN wallet app (or web extension)</li>
+<li>Generates DID keypair on device</li>
+<li>Admin adds them to co-op: <code>POST /coops/food-coop-pdx/members</code></li>
+<li>Member can now log into Shopper&#39;s Club app</li>
+</ol>
+<p><strong>App Auth:</strong></p>
+<ol>
+<li>User clicks &quot;Sign In&quot; in Shopper&#39;s Club</li>
+<li>App requests challenge: <code>POST /auth/challenge</code></li>
+<li>Wallet signs challenge with DID key</li>
+<li>App verifies: <code>POST /auth/verify</code> → gets token</li>
+<li>App uses token for all API calls</li>
+</ol>
+<p>At this stage: ICN = identity + event anchor. App uses Postgres for inventory.</p>
+<h3>Phase 2: Loyalty Points (Mutual Credit)</h3>
+<p>Co-op adds &quot;Shopper Points&quot;:</p>
+<p><strong>Earning Points:</strong></p>
+<pre><code class="language-typescript">// When member works a shift
+await icn.ledger.sendPayment({
+  coopId: &#39;food-coop-pdx&#39;,
+  from: &#39;did:icn:coop-treasury&#39;,
+  to: member.did,
+  amount: 10,
+  currency: &#39;coop-credits&#39;,
+  memo: &#39;Worked Friday stocking shift&#39;
+});
+</code></pre>
+<p><strong>Displaying Balance:</strong></p>
+<pre><code class="language-typescript">const balance = await icn.ledger.getBalance({
+  coopId: &#39;food-coop-pdx&#39;,
+  did: member.did,
+  currency: &#39;coop-credits&#39;
+});
+// Show: &quot;You have 150 co-op credits&quot;
+</code></pre>
+<p>At this stage: ICN = identity + mutual credit ledger. App still uses Postgres for products.</p>
+<h3>Phase 3: Payment at Checkout</h3>
+<p><strong>Checkout Flow:</strong></p>
+<pre><code class="language-typescript">// Show payment options
+const balance = await icn.ledger.getBalance({ ... });
+// Display: &quot;Pay with: [Credit Card] [Co-op Credits (balance: 150)]&quot;
+
+// User chooses co-op credits
+await icn.ledger.sendPayment({
+  coopId: &#39;food-coop-pdx&#39;,
+  from: member.did,
+  to: &#39;did:icn:coop-till&#39;,
+  amount: 25,
+  currency: &#39;coop-credits&#39;,
+  memo: &#39;Purchase #4567&#39;
+});
+// → Transaction recorded, balance updated
+</code></pre>
+<p>Now: ICN is doing real value accounting, but user just sees &quot;payment completed.&quot;</p>
+<hr>
+<h2>Implementation Plan</h2>
+<h3>Milestone 1: Gateway + Namespaces (2 weeks)</h3>
+<ol>
+<li>Create <code>icn-gateway</code> crate with Actix-web</li>
+<li>Implement <code>/auth/*</code> endpoints (challenge, verify, revoke)</li>
+<li>Extend <code>icn-store</code> with coop namespace storage</li>
+<li>Implement <code>/coops/*</code> endpoints (create, get, members)</li>
+<li>Add capability token verification middleware</li>
+</ol>
+<h3>Milestone 2: Ledger API (1 week)</h3>
+<ol>
+<li>Implement <code>/ledger/*</code> endpoints (balance, payment, history)</li>
+<li>Add ledger scoping per co-op namespace</li>
+<li>Test with manual curl/Postman requests</li>
+</ol>
+<h3>Milestone 3: Events (1 week)</h3>
+<ol>
+<li>Implement WebSocket event streaming</li>
+<li>Hook ledger operations to emit events</li>
+<li>Hook membership operations to emit events</li>
+<li>Test real-time updates</li>
+</ol>
+<h3>Milestone 4: TypeScript SDK (2 weeks)</h3>
+<ol>
+<li>Set up <code>sdk/typescript</code> package</li>
+<li>Implement <code>ICNClient</code> class</li>
+<li>Implement auth, coops, ledger, events modules</li>
+<li>Write comprehensive tests</li>
+<li>Publish to npm as <code>@icn/client</code></li>
+</ol>
+<h3>Milestone 5: Reference App (2 weeks)</h3>
+<ol>
+<li>Build &quot;Tiny Food Co-op Shopper&#39;s Club&quot; (Next.js)</li>
+<li>Features:<ul>
+<li>Member login (DID auth)</li>
+<li>View balance</li>
+<li>Send payment</li>
+<li>Transaction history</li>
+<li>Live event updates</li>
+</ul>
+</li>
+<li>Deploy as demo</li>
+</ol>
+<p><strong>Total: ~8 weeks for complete platform layer</strong></p>
+<hr>
+<h2>Open Questions</h2>
+<ol>
+<li><strong>Token Refresh</strong>: How long should tokens last? Refresh flow needed?</li>
+<li><strong>Rate Limiting</strong>: Per-app? Per-user? Per-co-op?</li>
+<li><strong>Multi-Coop Users</strong>: Can one user be in multiple co-ops? (Yes, but which token structure?)</li>
+<li><strong>Contract Execution</strong>: Should gateway expose contract execution API, or only via SDK helpers?</li>
+<li><strong>Event Filtering</strong>: Can apps subscribe to events for specific DIDs (privacy concern)?</li>
+<li><strong>Governance Integration</strong>: Should governance be in v1 of gateway, or phase 2?</li>
+</ol>
+<hr>
+<h2>Success Criteria</h2>
+<p><strong>For a co-op app developer:</strong></p>
+<ul>
+<li>Can build a working app in &lt; 1 day</li>
+<li>Doesn&#39;t need to understand QUIC, gossip, Merkle-DAG, or vector clocks</li>
+<li>SDK docs answer 90% of questions</li>
+<li>Reference app is copy-paste starting point</li>
+</ul>
+<p><strong>For co-op members:</strong></p>
+<ul>
+<li>Sign in with wallet (or eventually phone biometric)</li>
+<li>See balance, send payment, view history</li>
+<li>Updates are instant (WebSocket events)</li>
+<li>Never hear the word &quot;daemon&quot; or &quot;CLI&quot;</li>
+</ul>
+<p><strong>For ICN:</strong></p>
+<ul>
+<li>Platform layer is stable API boundary</li>
+<li>Substrate can evolve underneath without breaking apps</li>
+<li>Multiple co-ops can run on one ICN node (isolation via namespaces)</li>
+<li>Apps &quot;just work&quot; and don&#39;t feel blockchain-y or crypto-y</li>
+</ul>
+<hr>
+<p><strong>Next Steps:</strong></p>
+<ol>
+<li>✅ Design complete (this doc)</li>
+<li>⏭️ Implement icn-gateway Milestone 1 (auth + namespaces)</li>
+<li>⏭️ Implement TypeScript SDK</li>
+<li>⏭️ Build reference app (Food Co-op Shopper&#39;s Club)</li>
+</ol>
+<hr>
+<p><strong>Last Updated</strong>: 2025-01-15
+<strong>Contributors</strong>: This design is a living document. Propose changes via issues/PRs.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

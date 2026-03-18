@@ -1,0 +1,625 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>CCL + Disputes — Repo State &amp; Gap Analysis | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>plans</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>.scratch</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ccl disputes</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/plans/.scratch/ccl-disputes.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>CCL + Disputes — Repo State &amp; Gap Analysis</h1>
+<h2>1. Current State</h2>
+<h3>1.1 CCL Language Model</h3>
+<p><strong>AST</strong> (<code>icn-ccl/src/ast.rs</code>):</p>
+<ul>
+<li><code>Contract</code> (line 42): name, participants (<code>Vec&lt;Did&gt;</code>), currency (<code>Option&lt;String&gt;</code>), state_vars, rules, triggers</li>
+<li><code>Rule</code> (line 74): name, params, requires (preconditions), body</li>
+<li><code>Stmt</code> (line 110): Assign, SetState, LedgerTransfer, SetCreditLimit, If, For, Return, Expr</li>
+<li><code>Expr</code> (line 157): Literal, Var, FieldAccess, BinOp, UnOp, Call, List, Set, Map, In</li>
+<li><code>BinOp</code> (line 198): Add/Sub/Mul/Div/Mod + Eq/Ne/Lt/Le/Gt/Ge + And/Or</li>
+<li><code>Trigger</code> (line 97): Scheduled actions with cron expressions</li>
+<li>Validation: name length (128), loop depth (5), expr depth (50), max participants (100), state vars (100), rules (50), reserved keywords</li>
+</ul>
+<p><strong>Value Types</strong> (<code>icn-ccl/src/types.rs:111</code>):</p>
+<ul>
+<li><code>Value</code>: Int(i64), String, Bool, Did, List, Set, Map, None</li>
+</ul>
+<p><strong>Capabilities</strong> (<code>icn-ccl/src/types.rs:14</code>):</p>
+<ul>
+<li><code>Capability</code> enum: ReadLedger, WriteLedger, SendMessage, ReadState, WriteState, CreateSubContract, InvokeContract, CreateProposal, VoteProposal, ReadProposal, ExecuteProposal, ManageRoles</li>
+</ul>
+<p><strong>Fuel Metering</strong> (<code>icn-ccl/src/types.rs:272</code>):</p>
+<ul>
+<li><code>FuelConfig</code>: stmt_cost, expr_cost, call_cost, loop_iteration_cost, max_loop_iterations</li>
+<li>Presets: <code>default()</code>, <code>restrictive()</code> (2x costs, 500 max loops), <code>permissive()</code> (reduced costs, 2000 max loops)</li>
+<li><code>FuelEstimate</code> (line 489): minimum/expected/maximum with branch/loop scaling</li>
+</ul>
+<p><strong>Execution Context</strong> (<code>icn-ccl/src/types.rs:330</code>):</p>
+<ul>
+<li><code>ExecutionContext</code>: caller (Did), timestamp, fuel, capabilities, participants, determinism_class</li>
+<li><code>DeterminismClass</code>: Canonical (can mutate state) vs Advisory (read-only suggestions)</li>
+</ul>
+<p><strong>Execution Result</strong> (<code>icn-ccl/src/types.rs:431</code>):</p>
+<ul>
+<li><code>ExecutionResult</code>: return value, fuel_consumed, state_changes, ledger_ops</li>
+</ul>
+<h3>1.2 Contract Registry</h3>
+<p><strong>Location</strong>: <code>icn-ccl/src/registry.rs</code></p>
+<p><strong>ContractRegistry</strong> (line 333): In-memory HashMap caches with optional persistent <code>icn_store::Store</code> backend.</p>
+<p><strong>Storage schema</strong>:</p>
+<pre><code>contract:&lt;hash&gt;          → Contract (icn_encoding::encode_versioned)
+metadata:&lt;hash&gt;          → ContractMetadata
+index:name:&lt;name&gt;        → Vec&lt;(version, hash)&gt;
+index:owner:&lt;did&gt;        → Vec&lt;hash&gt;
+</code></pre>
+<p><strong>ContractMetadata</strong> (line 175): code_hash, name, version (u32), semantic_version (<code>SemanticVersion</code>), min_interpreter_version, compatible_versions, deprecated flag + reason + successor, owner, deployed_at, description, participants, currency, rules, visibility</p>
+<p><strong>Visibility</strong> (line 163): <code>Private | Coop(String) | Public</code></p>
+<p><strong>SemanticVersion</strong> (line 37): major.minor.patch with semver compatibility rules (pre-1.0: minor must match)</p>
+<p><strong>Operations</strong>:</p>
+<ul>
+<li><code>deploy()</code> / <code>deploy_with_visibility()</code> — validates contract, computes blake3 hash, stores</li>
+<li><code>get()</code> / <code>get_metadata()</code> — cache-first with store fallback</li>
+<li><code>resolve(name, version)</code> — name+version lookup (latest if None)</li>
+<li><code>get_by_semantic_version()</code> — semver-based resolution</li>
+<li><code>mark_deprecated()</code> — sets deprecated flag with reason + successor</li>
+<li><code>set_semantic_version()</code> — post-deployment version update</li>
+<li><code>get_upgrade_path()</code> — checks semver compatibility for upgrades</li>
+<li><code>list_all()</code>, <code>list_by_owner()</code>, <code>get_versions()</code>, <code>list_versions_metadata()</code></li>
+<li><code>load_from_store()</code> — hydrates caches from persistent storage</li>
+</ul>
+<p><strong>Registry Actor</strong> (<code>icn-ccl/src/registry_actor/</code>): Actor wrapper for ContractRegistry with command-based message passing.</p>
+<p><strong>Missing</strong>: No revoke/delete operation (only deprecate), no gossip distribution, no access control on deploy (any owner string accepted).</p>
+<h3>1.3 Entity Schema in CCL</h3>
+<p>Rich YAML-based schema system in <code>icn-ccl/src/schema/</code>:</p>
+<p><strong>EntitySchema</strong> (<code>schema/entity.rs:183</code>):</p>
+<ul>
+<li><code>EntityType</code>: Cooperative, Community, Federation</li>
+<li><code>EntitySubtype</code>: Worker, Consumer, Producer, MultiStakeholder (coop); Municipal, Regional, Sectoral, Purpose (community); Trade, Geographic, FederationSectoral (federation); Custom</li>
+<li><code>MembershipConfig</code>: open_to (Individual/Cooperative/Community/Federation), classes with criteria (all/any conditions), rights_by_class</li>
+<li><code>Right</code>: Vote, PatronageRefund, RunForBoard, WorkplaceGovernance, Propose, AccessResources, Custom</li>
+<li><code>Jurisdiction</code>: Geographic, Network, Hybrid with bounds</li>
+</ul>
+<p><strong>GovernanceSchema</strong> (<code>schema/governance.rs:222</code>):</p>
+<ul>
+<li><code>GovernanceBody</code>: name, composition, seats, elected_by, term (years/months/staggered), recall (petition/vote), convenes (regular/special)</li>
+<li><code>DecisionType</code>: name, authority (body), threshold (SimpleMajority/Supermajority/Unanimous/Consensus/Fraction/Expression), quorum, ratification_period, constraint (must_ratify body)</li>
+<li><code>DelegationConfig</code>: allowed, transitive, revocable (Instant/EndOfSession/EndOfTerm), scope (Vote/Propose/Speak/Candidacy)</li>
+</ul>
+<p><strong>EconomicsSchema</strong> (<code>schema/economics.rs:133</code>):</p>
+<ul>
+<li><code>CapitalConfig</code>: member_equity (min/max/interest/refund)</li>
+<li><code>SurplusConfig</code>: allocation rules with targets (Reserves, PatronageRefund, CommunityFund, WorkerBonus, EducationFund, IndivisibleReserves, Custom), fractions, conditions</li>
+<li><code>CreditConfig</code>: eligibility criteria, limit expression, payment terms (Net7-Net90)</li>
+</ul>
+<p><strong>AgreementSchema</strong> (<code>schema/agreement.rs:347</code>):</p>
+<ul>
+<li>Parties with types (Federation/Cooperative/Community/Individual) and DID IDs</li>
+<li><code>BoundaryProtocol</code>: transfers (denominations, exchange rates, settlement), credentials (mutual recognition), joint decisions</li>
+<li><code>DisputeResolution</code>: ladder (Negotiation→Mediation→Arbitration→Adjudication), prohibited methods</li>
+<li><code>ExitConfig</code>: notice period, surviving obligations</li>
+<li><code>IncompatibilityHandling</code>: value_incompatible, governance_deadlock, credential_unknown — each with action + fallback</li>
+</ul>
+<p><strong>Key Insight</strong>: These schemas are structural definitions — they describe WHAT governance looks like but are not yet wired to the CCL execution engine or the runtime governance system. They exist as validated data types.</p>
+<h3>1.4 CCL Disputes</h3>
+<p><strong>Location</strong>: <code>icn-ccl/src/disputes.rs</code></p>
+<p><strong>DisputeResolutionSystem</strong> (line 261): Stateful system with in-memory dispute tracking, mediator pool, and callback-based integration.</p>
+<p><strong>Dispute types</strong>:</p>
+<ul>
+<li><code>DisputeReason</code> (line 142): IncorrectResult, FuelLimitExceeded, ExecutionFailed, TimeoutNotReported</li>
+<li><code>DisputeStatus</code> (line 180): Pending → Investigating → Resolved | UnderMediation → Closed</li>
+<li><code>DisputeOutcome</code> (line 123): SubmitterCorrect, ExecutorCorrect, BothWrong, Inconclusive (with optional mediator)</li>
+<li><code>DisputeEvidence</code> (line 161): task_hash, claimed_result, reason, additional_data, filed_at</li>
+<li><code>Dispute</code> (line 209): dispute_id, task_hash, challenger, executor, evidence, status, timestamps</li>
+</ul>
+<p><strong>Gossip integration</strong>:</p>
+<ul>
+<li>Topics: <code>disputes:file</code>, <code>disputes:resolved</code></li>
+<li><code>DisputeMessage</code> (line 103): DisputeFiled, DisputeResolved — broadcast via callbacks</li>
+<li><code>DisputeGossipCallback</code>, <code>MisbehaviorCallback</code>, <code>TrustCallback</code>, <code>TrustPenaltyCallback</code></li>
+</ul>
+<p><strong>Penalty system</strong>:</p>
+<ul>
+<li><code>PenaltyConfig</code> (line 46): per-offense trust penalties (0.02–0.10) with escalation multiplier (1.5x after threshold)</li>
+<li><code>OffenderRecord</code> (line 81): tracks disputes_lost, incorrect_results, unreported_timeouts, total_trust_penalty</li>
+<li>Escalating penalties for repeat offenders, capped at 1.0</li>
+</ul>
+<p><strong>Mediation</strong>:</p>
+<ul>
+<li><code>MediatorInfo</code> (line 253): DID + expertise tags</li>
+<li>Trust-weighted selection with conflict-of-interest filtering (mediator ≠ executor or challenger)</li>
+<li>Min trust threshold: 0.7 (Federated class)</li>
+<li>Auto-assignment configurable</li>
+</ul>
+<p><strong>Investigation flow</strong>:</p>
+<ol>
+<li><code>file_dispute()</code> → creates record, broadcasts via gossip</li>
+<li><code>investigate_dispute()</code> → re-executes contract with fresh interpreter</li>
+<li>Compares results → determines outcome → applies penalties</li>
+<li>Inconclusive → assigns mediator</li>
+</ol>
+<p><strong>Metrics</strong>: dispute counts, penalties applied, repeat offenders, escalated penalties (via <code>icn_obs::metrics::disputes</code>)</p>
+<h3>1.5 Governance Appeals</h3>
+<p><strong>Location</strong>: <code>icn-governance/src/appeal.rs</code></p>
+<p><strong>Appeal</strong> (line 419): Full appeal record with comprehensive lifecycle.</p>
+<p><strong>AppealType</strong> (line 66):</p>
+<ul>
+<li>Revocation (revocation_id, type)</li>
+<li>Suspension (target_id, type)</li>
+<li>GovernanceDecision (proposal_id, decision)</li>
+<li>DisputeResolution (dispute_id, resolution) — <strong>bridges CCL disputes</strong></li>
+<li>MembershipDenial (jurisdiction_id, application_id)</li>
+<li>StewardAction (steward_did, action)</li>
+<li>Other (category, description)</li>
+</ul>
+<p><strong>AppealGrounds</strong> (line 269): 8 variants — ProceduralError, NewEvidence, ExceededAuthority, RightsViolation, FactualError, Bias, DisproportionatePenalty, Other</p>
+<p><strong>AppealRemedy</strong> (line 252): 6 variants — Reverse, Reinstate, Modify, Compensation, Custom, None</p>
+<p><strong>AppealStatus</strong> (line 155): Filed → UnderReview → Hearing → Resolved/Dismissed/Withdrawn</p>
+<p><strong>AppealOutcome</strong> (line 221): Upheld (with remedy), Denied, PartiallyUpheld (with remedy), Remanded (to body)</p>
+<p><strong>AppealScope</strong> (line 134): Jurisdiction, Federation, Network — determines appeal body</p>
+<p><strong>Evidence</strong> (line 350): <code>AppealEvidence</code> — evidence_id, type (Document/Transaction/Communication/WitnessStatement/ExpertOpinion/Technical), description, content_hash, URI, submitted_by, submitted_at</p>
+<p><strong>Deadlines</strong> (line 305): filing window (30d default), review (14d), hearing (7d), max duration (90d) — with expedited (7d/3d/2d/21d) and extended (60d/30d/14d/180d) presets</p>
+<p><strong>Lifecycle methods</strong>: new(), begin_review(), begin_hearing(), resolve(), dismiss(), withdraw(), add_evidence(), add_response()</p>
+<p><strong>Responses</strong> (line 389): <code>AppealResponse</code> with responder, response_type (InitialResponse/Reply/Comment/Question/Clarification), content, evidence</p>
+<h3>1.6 Federation Agreements</h3>
+<p><strong>Two separate implementations exist</strong>:</p>
+<p><strong>1. CCL Schema</strong> (<code>icn-ccl/src/schema/agreement.rs</code>):</p>
+<ul>
+<li><code>AgreementSchema</code>: Declarative YAML schema with parties, boundary protocol, dispute resolution ladder, exit config, incompatibility handling</li>
+<li>Rich type system for transfers, credentials, joint governance</li>
+<li>This is the &quot;constitution&quot; layer — what an agreement looks like</li>
+</ul>
+<p><strong>2. icn-federation</strong> (<code>icn/crates/icn-federation/</code>):</p>
+<ul>
+<li>Runtime agreement management with lifecycle states</li>
+<li><code>AgreementType</code>: Trade, Credit, ResourceSharing, FederationMembership, LaborReciprocity, SharedServices</li>
+<li><code>AgreementStatus</code>: Draft → Proposed → Signed → Active → Expired/Terminated/Disputed</li>
+<li>Amendment system with amendment proposals</li>
+</ul>
+<p><strong>3. Gateway Agreements</strong> (<code>icn-gateway/src/api/agreements.rs</code>):</p>
+<ul>
+<li>Full CRUD: list, create, get, delete</li>
+<li>Lifecycle: propose, sign, suspend, resume, terminate</li>
+<li>Amendments: list, propose, sign</li>
+<li>Party management: add_party, set_terms</li>
+</ul>
+<p><strong>Gap</strong>: The CCL AgreementSchema and the federation runtime Agreement are separate type systems. No bridge converts a CCL agreement schema into a runtime agreement or vice versa.</p>
+<h3>1.7 Gateway Endpoints</h3>
+<p><strong>Contract endpoints</strong> (<code>icn-gateway/src/api/contracts.rs</code>):</p>
+<ul>
+<li><code>deploy_contract</code> — deploy to registry</li>
+<li><code>list_contracts</code> — list all</li>
+<li><code>get_contract</code> — get by hash</li>
+<li><code>revoke_contract</code> — revoke</li>
+<li><code>get_contract_metadata</code> — metadata by hash</li>
+<li><code>deprecate_contract</code> — mark deprecated</li>
+<li><code>get_contract_status</code> — active/deprecated status</li>
+<li><code>get_version_history</code> — all versions of a contract</li>
+</ul>
+<p><strong>Governance endpoints</strong> (<code>icn-gateway/src/api/governance.rs</code>):</p>
+<ul>
+<li>Domain management: create_domain, list_domains, get_domain, add_domain_member</li>
+<li>Proposals: create_proposal, list_proposals, get_proposal, open_proposal, close_proposal, get_votes, get_proposal_proof</li>
+<li>Federation proposals: create_join/leave/establish_clearing/terminate_clearing/vouch/revoke_vouch/update_policy proposals</li>
+<li>Voting: cast_vote</li>
+<li>Delegation: create/list/get/revoke delegation</li>
+<li>Discussion: start/end deliberation, add/list/edit/delete comment, add/remove reaction, get_discussion</li>
+<li>Action items: create/list/get/update/delete, add_note, update_status</li>
+</ul>
+<p><strong>Constitutional</strong> (<code>icn-gateway/src/api/constitutional/</code>):</p>
+<ul>
+<li><code>appeals_ui.rs</code> — Appeal UI endpoints</li>
+<li><code>voting.rs</code> — Constitutional voting endpoints</li>
+</ul>
+<p><strong>Agreement endpoints</strong> (<code>icn-gateway/src/api/agreements.rs</code>):</p>
+<ul>
+<li>Full CRUD + lifecycle + amendments (14 endpoints total)</li>
+</ul>
+<p><strong>Steward dispute endpoints</strong> (<code>icn-gateway/src/api/steward/mod.rs</code>):</p>
+<ul>
+<li><code>POST /{steward_id}/dispute</code> — record dispute</li>
+<li><code>POST /{steward_id}/dispute-won</code> — record dispute won</li>
+</ul>
+<p><strong>Missing endpoints</strong>:</p>
+<ul>
+<li>No general dispute filing endpoint (only steward-specific)</li>
+<li>No dispute evidence submission endpoint</li>
+<li>No &quot;what governs this action?&quot; query endpoint</li>
+<li>No human-readable contract/policy rendering endpoint</li>
+<li>No policy lookup by scope+action endpoint</li>
+</ul>
+<h2>2. &quot;Living Law&quot; Readiness Audit</h2>
+<table>
+<thead>
+<tr>
+<th>Requirement</th>
+<th>Status</th>
+<th>Evidence</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Policies expressible in CCL</td>
+<td><strong>Partial</strong></td>
+<td>Contract AST supports rules, conditions, state, ledger ops. Schema types express governance/economics/agreements as YAML. But schemas aren&#39;t executable — they&#39;re structural definitions.</td>
+</tr>
+<tr>
+<td>Policies deployable to registry</td>
+<td><strong>Yes</strong></td>
+<td><code>ContractRegistry.deploy()</code> with content hash, versioning, visibility</td>
+</tr>
+<tr>
+<td>Policies human-readable</td>
+<td><strong>No</strong></td>
+<td>No rendering/display layer. Contracts are JSON AST. Schemas are YAML but no display endpoint exists.</td>
+</tr>
+<tr>
+<td>&quot;What governs this?&quot; queryable</td>
+<td><strong>No</strong></td>
+<td>No policy lookup by scope/action/entity. Would need to index contracts by capability scope.</td>
+</tr>
+<tr>
+<td>Policy changes produce receipts</td>
+<td><strong>Partial</strong></td>
+<td><code>GovernanceProof</code> exists (<code>icn-governance/src/proof.rs</code>). Contract deployment creates metadata with timestamps/owner. But no receipt for policy <em>changes</em> (deprecation, version updates).</td>
+</tr>
+<tr>
+<td>Disputes fileable via API</td>
+<td><strong>Partial</strong></td>
+<td>Steward disputes: <code>POST /v1/steward/{id}/dispute</code>. No general CCL dispute filing via API. <code>DisputeResolutionSystem.file_dispute()</code> exists but isn&#39;t gateway-exposed.</td>
+</tr>
+<tr>
+<td>Evidence chain-of-custody</td>
+<td><strong>Partial</strong></td>
+<td><code>AppealEvidence</code> has content_hash + submitted_by + submitted_at. <code>DisputeEvidence</code> has task_hash + filed_at. But no cryptographic chain linking evidence items.</td>
+</tr>
+<tr>
+<td>Mediation workflow exists</td>
+<td><strong>Yes</strong></td>
+<td><code>DisputeResolutionSystem</code> with mediator pool, trust-weighted selection, conflict-of-interest filtering</td>
+</tr>
+<tr>
+<td>Appeal path exists</td>
+<td><strong>Yes</strong></td>
+<td>Full <code>Appeal</code> type with Filed→UnderReview→Hearing→Resolved lifecycle, 8 grounds, 6 remedies, 3 scopes</td>
+</tr>
+<tr>
+<td>Cross-org disputes escalable</td>
+<td><strong>Partial</strong></td>
+<td><code>AppealScope::Federation</code> and <code>AppealScope::Network</code> exist. Agreement schema has dispute ladder (Negotiation→Mediation→Arbitration). But no runtime implementation of cross-org escalation.</td>
+</tr>
+<tr>
+<td>Federation agreements in CCL</td>
+<td><strong>Partial</strong></td>
+<td><code>AgreementSchema</code> in CCL schema module is rich (boundary protocols, credentials, joint governance, incompatibility handling). But not bridged to runtime <code>icn-federation</code> agreements.</td>
+</tr>
+</tbody></table>
+<h2>3. Four Dispute/Appeal Systems Analysis</h2>
+<h3>CCL Disputes (<code>icn-ccl/src/disputes.rs</code>)</h3>
+<ul>
+<li><strong>Focus</strong>: Contract execution correctness (compute task results)</li>
+<li><strong>Trigger</strong>: Challenger disputes a compute result</li>
+<li><strong>Resolution</strong>: Automatic re-execution of contract → compare results</li>
+<li><strong>Fallback</strong>: Mediator assignment for inconclusive cases</li>
+<li><strong>Penalties</strong>: Trust score reduction (escalating for repeat offenders)</li>
+<li><strong>Scope</strong>: Single contract execution</li>
+<li><strong>Evidence model</strong>: <code>DisputeEvidence</code> — task_hash, claimed_result, reason, raw bytes</li>
+<li><strong>Gossip</strong>: <code>disputes:file</code>, <code>disputes:resolved</code> topics</li>
+</ul>
+<h3>Governance Appeals (<code>icn-governance/src/appeal.rs</code>)</h3>
+<ul>
+<li><strong>Focus</strong>: Due process for governance decisions</li>
+<li><strong>Trigger</strong>: Appellant challenges any governance action</li>
+<li><strong>Resolution</strong>: Appeal body review → hearing → decision</li>
+<li><strong>Scope</strong>: Jurisdiction/Federation/Network level</li>
+<li><strong>Evidence model</strong>: <code>AppealEvidence</code> — typed evidence (Document/Transaction/Communication/WitnessStatement/ExpertOpinion/Technical) with content_hash + URI</li>
+<li><strong>No gossip integration</strong> — appeal state is local</li>
+</ul>
+<h3>Ledger Disputes (Third Runtime System)</h3>
+<p><strong>Location</strong>: <code>icn-ledger/src/dispute.rs</code></p>
+<ul>
+<li><strong>Focus</strong>: Financial mediation — incorrect amounts, unauthorized transactions</li>
+<li><strong>Trigger</strong>: Member files dispute about a ledger entry</li>
+<li><strong>Evidence</strong>: <code>Vec&lt;String&gt;</code> (simple text-based)</li>
+<li><strong>Resolution</strong>: Mediator judgment</li>
+<li><strong>Escalation</strong>: <code>escalate_to_governance()</code> creates a governance proposal for community vote; <code>resolve_escalated_dispute()</code> completes the cycle</li>
+<li><strong>Status</strong>: Normal → Contested → Resolved | Escalated</li>
+</ul>
+<p>This is the <strong>only system with explicit governance escalation</strong> built in.</p>
+<h3>Relationship</h3>
+<p><strong>They are NOT unified.</strong> They share no evidence model, no receipt format, no common types.</p>
+<p><strong>Bridge points</strong>:</p>
+<ol>
+<li><code>AppealType::DisputeResolution</code> allows appealing a CCL dispute outcome via governance appeals</li>
+<li>Ledger disputes can escalate to governance proposals via <code>escalate_to_governance()</code></li>
+</ol>
+<p><strong>Divergence</strong>:</p>
+<ol>
+<li>Evidence types are incompatible (<code>DisputeEvidence</code> vs <code>AppealEvidence</code> vs <code>Vec&lt;String&gt;</code>)</li>
+<li>Resolution mechanisms differ (automatic re-execution vs mediator judgment vs appeal body review)</li>
+<li>Penalty systems differ (trust reduction vs remedy ordering vs none for ledger)</li>
+<li>Gossip integration: CCL disputes broadcast, appeals and ledger disputes don&#39;t</li>
+<li>Storage: CCL disputes in <code>icn_store</code>, appeals have no persistent store, ledger disputes in ledger store</li>
+</ol>
+<p><strong>What should converge</strong>:</p>
+<ul>
+<li>Evidence model: All should use a common <code>Evidence</code> type with content_hash and chain-of-custody</li>
+<li>Receipts: All should produce <code>ArtifactReceipt</code> on resolution</li>
+<li>Gossip: Appeal and dispute events should broadcast for transparency</li>
+<li>Escalation: All dispute types should have a clear escalation path to governance</li>
+</ul>
+<h3>Agreement Dispute Resolution (Fourth System — Schema Only)</h3>
+<p>The CCL agreement schema (<code>schema/agreement.rs</code>) defines a FOURTH dispute model:</p>
+<ul>
+<li><code>DisputeResolution</code> with <code>ladder: Vec&lt;DisputeStage&gt;</code> (Negotiation→Mediation→Arbitration→Adjudication)</li>
+<li><code>MediatorSelection</code>: MutualAgreement, Rotation, RandomFromPool, ThirdParty</li>
+<li>Binding/non-binding stages</li>
+</ul>
+<p>This is <strong>schema-only</strong> — no runtime implementation connects the agreement dispute ladder to either the CCL dispute system or governance appeals.</p>
+<h2>4. Gap Analysis</h2>
+<h3>Gap 1: No Human-Readable Policy Display</h3>
+<ul>
+<li><strong>User story blocked</strong>: &quot;As a cooperative member, I want to read the policies that govern my community in plain language&quot;</li>
+<li><strong>Missing</strong>: Rendering layer for CCL contracts and governance schemas</li>
+<li><strong>Where it belongs</strong>: <code>icn-ccl</code> (renderer) + <code>icn-gateway</code> (endpoint)</li>
+<li><strong>Receipt expectation</strong>: N/A (read-only)</li>
+<li><strong>Phase</strong>: 0 (legibility foundation)</li>
+</ul>
+<h3>Gap 2: No &quot;What Governs This?&quot; Query</h3>
+<ul>
+<li><strong>User story blocked</strong>: &quot;As a member, I want to know what policies apply when I make a transfer&quot;</li>
+<li><strong>Missing</strong>: Policy index by scope/action/entity + query endpoint</li>
+<li><strong>Where it belongs</strong>: <code>icn-ccl/src/registry.rs</code> (index) + <code>icn-gateway</code> (endpoint)</li>
+<li><strong>Receipt expectation</strong>: N/A (read-only)</li>
+<li><strong>Phase</strong>: 0 (legibility foundation)</li>
+</ul>
+<h3>Gap 3: No General Dispute Filing via API</h3>
+<ul>
+<li><strong>User story blocked</strong>: &quot;As a cooperative member, I want to file a dispute about an incorrect computation&quot;</li>
+<li><strong>Missing</strong>: Gateway endpoint for <code>DisputeResolutionSystem.file_dispute()</code></li>
+<li><strong>Where it belongs</strong>: <code>icn-gateway/src/api/disputes.rs</code> (new file)</li>
+<li><strong>Receipt expectation</strong>: Dispute receipt with ID, parties, evidence hash</li>
+<li><strong>Phase</strong>: 2</li>
+</ul>
+<h3>Gap 4: No Unified Evidence Model</h3>
+<ul>
+<li><strong>User story blocked</strong>: &quot;As a mediator, I want to see all evidence in one format regardless of dispute vs appeal&quot;</li>
+<li><strong>Missing</strong>: Common evidence type shared between CCL disputes and governance appeals</li>
+<li><strong>Where it belongs</strong>: <code>icn-kernel-api/src/proofs.rs</code> or new <code>icn-kernel-api/src/evidence.rs</code></li>
+<li><strong>Receipt expectation</strong>: Evidence receipt with chain-of-custody</li>
+<li><strong>Phase</strong>: 2</li>
+</ul>
+<h3>Gap 5: CCL Schema ↔ Runtime Bridge</h3>
+<ul>
+<li><strong>User story blocked</strong>: &quot;As a cooperative founder, I want to write our governance rules in CCL and have them enforced&quot;</li>
+<li><strong>Missing</strong>: Bridge that converts CCL entity/governance/economics schemas into runtime governance configurations and PolicyOracle constraints</li>
+<li><strong>Where it belongs</strong>: New module in <code>icn-ccl</code> or new <code>apps/governance</code> crate</li>
+<li><strong>Receipt expectation</strong>: Activation receipt when schema becomes enforceable</li>
+<li><strong>Phase</strong>: 2-3</li>
+</ul>
+<h3>Gap 6: Agreement Schema ↔ Federation Bridge</h3>
+<ul>
+<li><strong>User story blocked</strong>: &quot;As a federation coordinator, I want to author a mutual aid compact in CCL format&quot;</li>
+<li><strong>Missing</strong>: Bridge between <code>AgreementSchema</code> (CCL) and <code>icn-federation</code> runtime agreements</li>
+<li><strong>Where it belongs</strong>: <code>icn-federation</code> or new bridge module</li>
+<li><strong>Receipt expectation</strong>: Agreement activation receipt</li>
+<li><strong>Phase</strong>: 3</li>
+</ul>
+<h3>Gap 7: Appeal System Has No Persistent Store</h3>
+<ul>
+<li><strong>User story blocked</strong>: &quot;As an appellant, I want my appeal to survive node restarts&quot;</li>
+<li><strong>Missing</strong>: <code>icn-governance</code> appeal store (appeals are in-memory struct only)</li>
+<li><strong>Where it belongs</strong>: <code>icn-governance/src/appeal_store.rs</code></li>
+<li><strong>Receipt expectation</strong>: Appeal filing receipt, resolution receipt</li>
+<li><strong>Phase</strong>: 2</li>
+</ul>
+<h3>Gap 8: No Cross-System Dispute Escalation Runtime</h3>
+<ul>
+<li><strong>User story blocked</strong>: &quot;As a federation member, I want a contract dispute to escalate through the agreement&#39;s dispute ladder&quot;</li>
+<li><strong>Missing</strong>: Runtime implementation of agreement dispute ladder (Negotiation→Mediation→Arbitration)</li>
+<li><strong>Where it belongs</strong>: <code>icn-federation</code> or <code>icn-ccl</code></li>
+<li><strong>Receipt expectation</strong>: Escalation receipt at each stage</li>
+<li><strong>Phase</strong>: 3</li>
+</ul>
+<h3>Gap 9: No Policy Change Receipts</h3>
+<ul>
+<li><strong>User story blocked</strong>: &quot;As a member, I want proof that the policy was different when my transaction was evaluated&quot;</li>
+<li><strong>Missing</strong>: Receipts for contract deployment, deprecation, version changes</li>
+<li><strong>Where it belongs</strong>: <code>icn-ccl/src/registry.rs</code> (emit <code>ArtifactReceipt</code>)</li>
+<li><strong>Receipt expectation</strong>: PolicyChangeReceipt with before/after hash, authority, timestamp</li>
+<li><strong>Phase</strong>: 2</li>
+</ul>
+<h3>Gap 10: No Gossip for Appeals</h3>
+<ul>
+<li><strong>User story blocked</strong>: &quot;As a federation partner, I want to be notified when an appeal is filed against a shared governance decision&quot;</li>
+<li><strong>Missing</strong>: Gossip integration for appeal events</li>
+<li><strong>Where it belongs</strong>: <code>icn-governance/src/appeal.rs</code> (add gossip callbacks like disputes have)</li>
+<li><strong>Receipt expectation</strong>: Appeal notification receipt</li>
+<li><strong>Phase</strong>: 2</li>
+</ul>
+<h2>5. Phase 0 Tasks (2-3 tasks)</h2>
+<p>CCL/dispute contributions to legibility:</p>
+<h3>P0-CCL-1: Policy Reference Display</h3>
+<ul>
+<li><strong>What</strong>: When displaying any governance action (proposal, vote, decision), include the policy ID + version + authority that authorizes it</li>
+<li><strong>Where</strong>: <code>icn-gateway</code> governance endpoints should return <code>policy_ref: { contract_hash, version, authority_did }</code> in responses</li>
+<li><strong>How</strong>: Add optional <code>policy_ref</code> field to governance response DTOs; populate from contract registry when available</li>
+<li><strong>Effort</strong>: Small — DTO changes + optional registry lookup</li>
+</ul>
+<h3>P0-CCL-2: &quot;What Law Applies Here?&quot; — Scope-Based Policy Lookup</h3>
+<ul>
+<li><strong>What</strong>: Given a scope (coop DID + action type), return the list of active contracts/policies that govern that scope</li>
+<li><strong>Where</strong>: New method on <code>ContractRegistry</code> to index by capability scope; new gateway endpoint <code>GET /v1/policies?scope={scope}&amp;action={action}</code></li>
+<li><strong>How</strong>: Build a secondary index mapping <code>(scope, capability_type)</code> → <code>Vec&lt;ContentHash&gt;</code>; query returns metadata for matching contracts</li>
+<li><strong>Effort</strong>: Medium — index building + new endpoint</li>
+</ul>
+<h3>P0-CCL-3: Contract Summary Display</h3>
+<ul>
+<li><strong>What</strong>: Return a human-readable summary of a deployed contract (name, version, participants, rules, capabilities, state variables)</li>
+<li><strong>Where</strong>: New <code>GET /v1/contracts/{hash}/summary</code> endpoint returning structured but readable JSON</li>
+<li><strong>How</strong>: Extract metadata + contract AST → produce summary with rule names, capability names, participant DIDs</li>
+<li><strong>Effort</strong>: Small — formatting logic + new endpoint</li>
+</ul>
+<h2>6. Phase 2 Tasks (4-6 tasks)</h2>
+<h3>P2-CCL-1: Human-Readable Policy Rendering</h3>
+<ul>
+<li><strong>What</strong>: Render CCL contracts and governance schemas as human-readable text (Markdown or structured HTML)</li>
+<li><strong>Where</strong>: New <code>icn-ccl/src/render.rs</code> module; gateway endpoint <code>GET /v1/contracts/{hash}/readable</code></li>
+<li><strong>How</strong>: Walk AST/schema → produce natural language descriptions (&quot;If caller&#39;s equity &gt;= 100, they may transfer up to...&quot;)</li>
+<li><strong>Effort</strong>: Medium-Large</li>
+</ul>
+<h3>P2-CCL-2: Unified Evidence Model</h3>
+<ul>
+<li><strong>What</strong>: Create common <code>Evidence</code> type shared between CCL disputes and governance appeals</li>
+<li><strong>Where</strong>: <code>icn-kernel-api/src/evidence.rs</code> with types used by both <code>icn-ccl/disputes.rs</code> and <code>icn-governance/appeal.rs</code></li>
+<li><strong>How</strong>: Extract common fields (content_hash, type, submitted_by, timestamp, chain_id) into shared type; migrate both systems</li>
+<li><strong>Effort</strong>: Medium (migration of two systems)</li>
+</ul>
+<h3>P2-CCL-3: General Dispute Filing API</h3>
+<ul>
+<li><strong>What</strong>: Expose <code>DisputeResolutionSystem.file_dispute()</code> via gateway</li>
+<li><strong>Where</strong>: New <code>icn-gateway/src/api/disputes.rs</code> with endpoints: <code>POST /v1/disputes</code>, <code>GET /v1/disputes/{id}</code>, <code>GET /v1/disputes</code></li>
+<li><strong>How</strong>: Wire gateway → CCL dispute system; add evidence submission endpoint</li>
+<li><strong>Effort</strong>: Medium</li>
+</ul>
+<h3>P2-CCL-4: Appeal Persistent Storage</h3>
+<ul>
+<li><strong>What</strong>: Persist appeals to <code>icn_store</code> so they survive restarts</li>
+<li><strong>Where</strong>: New <code>icn-governance/src/appeal_store.rs</code></li>
+<li><strong>How</strong>: Sled-backed store with <code>appeal:{id}</code> → serialized Appeal; index by appellant, scope, status</li>
+<li><strong>Effort</strong>: Medium</li>
+</ul>
+<h3>P2-CCL-5: Policy Change Receipts</h3>
+<ul>
+<li><strong>What</strong>: Emit <code>ArtifactReceipt</code> when contracts are deployed, deprecated, or version-updated</li>
+<li><strong>Where</strong>: <code>icn-ccl/src/registry.rs</code> — add receipt generation to deploy/deprecate/set_semantic_version</li>
+<li><strong>How</strong>: Create <code>PolicyChangeReceipt</code> variant; sign with deployer&#39;s key; store in receipt log</li>
+<li><strong>Effort</strong>: Small-Medium</li>
+</ul>
+<h3>P2-CCL-6: CCL Schema → Runtime Governance Bridge (Design)</h3>
+<ul>
+<li><strong>What</strong>: Design the bridge between CCL entity/governance schemas and runtime governance system</li>
+<li><strong>Where</strong>: Design document + interface definitions</li>
+<li><strong>How</strong>: Map GovernanceSchema.decisions → proposal types, thresholds, quorum rules; map membership.classes → member roles</li>
+<li><strong>Effort</strong>: Design only — Large implementation deferred to Phase 3</li>
+</ul>
+<h2>7. Phase 3 Tasks (2-3 tasks)</h2>
+<h3>P3-CCL-1: Federation Agreement Authoring in CCL</h3>
+<ul>
+<li><strong>What</strong>: Bridge <code>AgreementSchema</code> to <code>icn-federation</code> runtime agreements</li>
+<li><strong>Where</strong>: New bridge module in <code>icn-federation/src/ccl_bridge.rs</code></li>
+<li><strong>How</strong>: Parse AgreementSchema YAML → create runtime Agreement with matching lifecycle, boundary protocol, dispute ladder</li>
+<li><strong>Effort</strong>: Large</li>
+</ul>
+<h3>P3-CCL-2: Cross-Organization Dispute Escalation Runtime</h3>
+<ul>
+<li><strong>What</strong>: Implement agreement dispute ladder as a runtime state machine</li>
+<li><strong>Where</strong>: New <code>icn-federation/src/dispute_ladder.rs</code> or <code>icn-ccl/src/agreement_disputes.rs</code></li>
+<li><strong>How</strong>: State machine: Negotiation(timeout) → Mediation(mediator_selection) → Arbitration(panel) → Adjudication; each stage produces receipts</li>
+<li><strong>Effort</strong>: Large</li>
+</ul>
+<h3>P3-CCL-3: CCL Schema → Runtime Governance Implementation</h3>
+<ul>
+<li><strong>What</strong>: Implement the bridge designed in P2-CCL-6</li>
+<li><strong>Where</strong>: <code>apps/governance</code> crate or <code>icn-ccl/src/schema_runtime.rs</code></li>
+<li><strong>How</strong>: Parse GovernanceSchema → register decision types as proposal templates; wire MembershipConfig → role assignments; activate EconomicsSchema → ledger constraints</li>
+<li><strong>Effort</strong>: Very Large</li>
+</ul>
+<h2>8. Relevant Open Issues</h2>
+<p>Based on codebase analysis, the following areas have TODO/incomplete markers:</p>
+<ol>
+<li><strong>Contract revocation</strong>: <code>revoke_contract</code> gateway endpoint exists but registry only has <code>mark_deprecated</code> — no true revocation that prevents execution</li>
+<li><strong>Schema version field</strong>: <code>schema/version.rs</code> exists but wasn&#39;t analyzed — may contain version compatibility for schemas</li>
+<li><strong>Charter validation</strong>: <code>icn-ccl/src/charter_validator.rs</code> and <code>charter_rules.rs</code> exist — may provide policy validation that partially addresses &quot;what governs this?&quot;</li>
+<li><strong>Governance proof</strong>: <code>icn-governance/src/proof.rs</code> — <code>GovernanceProof</code> exists but relationship to dispute receipts unclear</li>
+<li><strong>Constitutional module</strong>: <code>icn-gateway/src/api/constitutional/</code> has <code>appeals_ui.rs</code> and <code>voting.rs</code> — may already expose some appeal functionality via gateway</li>
+</ol>
+<h2>9. Architecture Notes</h2>
+<h3>The Three-Layer &quot;Living Law&quot; Stack</h3>
+<pre><code>┌─────────────────────────────────────────────┐
+│  Layer 3: Federation Agreements              │
+│  (Cross-org compacts, boundary protocols)    │
+│  CCL: AgreementSchema                        │
+│  Runtime: icn-federation Agreement           │
+│  Gap: No bridge between them                 │
+├─────────────────────────────────────────────┤
+│  Layer 2: Governance                         │
+│  (Proposals, voting, appeals)                │
+│  CCL: GovernanceSchema + EntitySchema        │
+│  Runtime: icn-governance proposals/appeals   │
+│  Gap: Schemas aren&#39;t executable              │
+├─────────────────────────────────────────────┤
+│  Layer 1: Contracts                          │
+│  (Executable rules, state mutations)         │
+│  CCL: Contract AST + interpreter             │
+│  Runtime: ContractRegistry + fuel metering   │
+│  Most complete layer                         │
+├─────────────────────────────────────────────┤
+│  Kernel: Constraint Enforcement              │
+│  (PolicyOracle → ConstraintSet → enforce)    │
+│  MEANING FIREWALL                            │
+└─────────────────────────────────────────────┘
+</code></pre>
+<h3>Key Architectural Observation</h3>
+<p>CCL is simultaneously two things:</p>
+<ol>
+<li><strong>An execution engine</strong> (Contract AST → interpreter → state changes) — this works</li>
+<li><strong>A constitutional schema</strong> (Entity/Governance/Economics/Agreement YAML types) — these are definitions only</li>
+</ol>
+<p>The &quot;living law&quot; vision requires both: executable rules that humans can also read and inspect. The gap is the bridge between the constitutional schemas (which are human-readable) and the execution engine (which is machine-enforceable).</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

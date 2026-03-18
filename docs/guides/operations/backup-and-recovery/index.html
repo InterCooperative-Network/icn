@@ -1,0 +1,439 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Backup and Recovery Guide | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>guides</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>operations</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>backup and recovery</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/guides/operations/backup-and-recovery.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Backup and Recovery Guide</h1>
+<p>This guide covers backup and recovery procedures for ICN nodes, focusing on identity preservation and operational continuity.</p>
+<h2>Overview</h2>
+<p>ICN backup and restore functionality allows you to:</p>
+<ul>
+<li><strong>Create encrypted backups</strong> of your ICN data directory</li>
+<li><strong>Restore identities</strong> to new devices or recover from failures</li>
+<li><strong>Migrate identities</strong> between environments</li>
+<li><strong>Verify integrity</strong> of backups with SHA256 checksums</li>
+</ul>
+<h2>What Gets Backed Up</h2>
+<p>The backup includes all data in your ICN data directory (default: <code>~/.icn</code>):</p>
+<ul>
+<li><strong>Identity keystore</strong> (<code>identity.age</code>) - Your Ed25519 signing key, X25519 encryption key, and TLS certificate</li>
+<li><strong>DID Document</strong> - Your multi-device identity configuration</li>
+<li><strong>Rotation chain</strong> - Complete audit trail of device additions/revocations</li>
+<li><strong>Trust graph data</strong> (if present) - Your local trust relationships</li>
+<li><strong>Ledger database</strong> (if present) - Your mutual credit ledger state</li>
+<li><strong>Configuration files</strong> (if present)</li>
+</ul>
+<p><strong>Note</strong>: The backup does NOT include:</p>
+<ul>
+<li>Gossip state (reconstructed from peers on restart)</li>
+<li>Active network connections</li>
+<li>In-memory caches</li>
+</ul>
+<h2>Creating a Backup</h2>
+<h3>Basic Usage</h3>
+<pre><code class="language-bash">icnctl backup /path/to/backup.tar
+</code></pre>
+<p>This creates a tarball backup with:</p>
+<ul>
+<li>All files from your data directory</li>
+<li>Metadata file with ICN version, timestamp, and checksum</li>
+<li>SHA256 integrity verification</li>
+</ul>
+<h3>Example Output</h3>
+<pre><code>Creating backup of /home/user/.icn...
+Archiving data directory...
+Calculating checksum...
+✓ Backup created successfully
+  Output: /home/user/backups/icn-2025-01-14.tar
+  ICN version: 0.1.0
+  Checksum: a455524be49ebd31071587200bb3cde9c2827517696b40935ded6efaf423f2fd
+
+IMPORTANT: Store this backup securely. It contains your identity keystore.
+</code></pre>
+<h3>Custom Data Directory</h3>
+<pre><code class="language-bash">icnctl --data-dir /custom/path backup /path/to/backup.tar
+</code></pre>
+<h2>Restoring from Backup</h2>
+<h3>Basic Restore</h3>
+<pre><code class="language-bash">icnctl restore /path/to/backup.tar
+</code></pre>
+<p>This will:</p>
+<ol>
+<li>Verify the backup file exists</li>
+<li>Check if data directory already exists (fails if it does)</li>
+<li>Extract backup metadata and display information</li>
+<li>Extract all files to the data directory</li>
+<li>Verify integrity with SHA256 checksum</li>
+</ol>
+<h3>Example Output</h3>
+<pre><code>Restoring backup from /home/user/backups/icn-2025-01-14.tar...
+Reading backup metadata...
+Backup information:
+  ICN version: 0.1.0
+  Created: 2025-01-14T10:23:45+00:00
+  Checksum: a455524be49ebd31071587200bb3cde9c2827517696b40935ded6efaf423f2fd
+
+Extracting backup...
+Verifying checksum...
+✓ Backup restored successfully
+  Restored to: /home/user/.icn
+  Checksum verified: a455524be49ebd31071587200bb3cde9c2827517696b40935ded6efaf423f2fd
+
+You can now use &#39;icnctl id show&#39; to verify your restored identity.
+</code></pre>
+<h3>Force Restore (Overwrite Existing)</h3>
+<p>If your data directory already exists, use <code>--force</code> to overwrite:</p>
+<pre><code class="language-bash">icnctl restore /path/to/backup.tar --force
+</code></pre>
+<p>This will:</p>
+<ol>
+<li>Move existing data directory to <code>&lt;data-dir&gt;.backup-&lt;timestamp&gt;</code></li>
+<li>Extract the backup to the original location</li>
+<li>Preserve the old data in case you need it</li>
+</ol>
+<h3>Restore to Custom Location</h3>
+<pre><code class="language-bash">icnctl --data-dir /new/location restore /path/to/backup.tar
+</code></pre>
+<h2>Best Practices</h2>
+<h3>1. Regular Backups</h3>
+<p><strong>Recommendation</strong>: Create backups after significant identity changes:</p>
+<ul>
+<li>After initial identity creation</li>
+<li>After adding new devices</li>
+<li>After rotating keys</li>
+<li>Before major upgrades</li>
+<li>Weekly for active nodes</li>
+</ul>
+<p><strong>Automation Example</strong>:</p>
+<pre><code class="language-bash">#!/bin/bash
+# Daily backup script
+DATE=$(date +%Y-%m-%d)
+BACKUP_DIR=&quot;$HOME/icn-backups&quot;
+mkdir -p &quot;$BACKUP_DIR&quot;
+
+icnctl backup &quot;$BACKUP_DIR/icn-backup-$DATE.tar&quot;
+
+# Keep only last 30 days
+find &quot;$BACKUP_DIR&quot; -name &quot;icn-backup-*.tar&quot; -mtime +30 -delete
+</code></pre>
+<h3>2. Secure Storage</h3>
+<p><strong>Passphrase Protection</strong>: The keystore itself is encrypted with Age using your passphrase. The backup tarball does NOT add additional encryption.</p>
+<p><strong>Storage Options</strong>:</p>
+<ul>
+<li>✅ <strong>Encrypted external drive</strong> - Good for local backups</li>
+<li>✅ <strong>Encrypted cloud storage</strong> (with additional encryption layer)</li>
+<li>✅ <strong>Hardware security module</strong> - Best for production</li>
+<li>❌ <strong>Unencrypted cloud storage</strong> - Never store keystores here</li>
+<li>❌ <strong>Public repositories</strong> - Absolutely never</li>
+</ul>
+<p><strong>Additional Encryption</strong> (recommended for cloud storage):</p>
+<pre><code class="language-bash"># Encrypt the backup tarball with GPG
+gpg -c icn-backup.tar
+
+# Upload encrypted file
+aws s3 cp icn-backup.tar.gpg s3://your-bucket/backups/
+
+# To restore:
+aws s3 cp s3://your-bucket/backups/icn-backup.tar.gpg .
+gpg -d icn-backup.tar.gpg &gt; icn-backup.tar
+icnctl restore icn-backup.tar
+</code></pre>
+<h3>3. Verify Backups</h3>
+<p><strong>Test your backups regularly</strong>:</p>
+<pre><code class="language-bash"># Restore to temporary directory
+icnctl --data-dir /tmp/test-restore restore icn-backup.tar
+
+# Verify identity
+export ICN_PASSPHRASE=&quot;your-passphrase&quot;
+icnctl --data-dir /tmp/test-restore id show
+
+# Clean up
+rm -rf /tmp/test-restore
+</code></pre>
+<h3>4. Multiple Copies</h3>
+<p>Follow the <strong>3-2-1 backup rule</strong>:</p>
+<ul>
+<li><strong>3</strong> copies of your data</li>
+<li><strong>2</strong> different storage media types</li>
+<li><strong>1</strong> off-site copy</li>
+</ul>
+<p>Example:</p>
+<ol>
+<li>Primary copy: Active node data directory</li>
+<li>Local backup: External encrypted drive</li>
+<li>Remote backup: Encrypted cloud storage</li>
+</ol>
+<h3>5. Document Recovery Procedures</h3>
+<p>Store recovery instructions separately from backups:</p>
+<pre><code># ICN Recovery Procedure
+
+1. Install ICN on new system
+2. Retrieve backup from secure storage
+3. Decrypt if encrypted: gpg -d icn-backup.tar.gpg &gt; icn-backup.tar
+4. Restore: icnctl restore icn-backup.tar
+5. Verify identity: icnctl id show
+6. Verify passphrase: Enter it when prompted
+7. Check device list: icnctl device list
+8. Revoke compromised devices if needed
+</code></pre>
+<h2>Recovery Scenarios</h2>
+<h3>Scenario 1: Lost Device</h3>
+<p><strong>Situation</strong>: Laptop with ICN identity was lost/stolen.</p>
+<p><strong>Steps</strong>:</p>
+<ol>
+<li><p>On trusted device with backup:</p>
+<pre><code class="language-bash">icnctl restore /path/to/backup.tar
+</code></pre>
+</li>
+<li><p>Revoke the lost device:</p>
+<pre><code class="language-bash">icnctl device list  # Find lost device ID
+icnctl device revoke device-abc123 --reason lost
+</code></pre>
+</li>
+<li><p>Add new device:</p>
+<pre><code class="language-bash"># On new device
+icnctl device add new-laptop
+
+# On trusted device
+icnctl device approve new-laptop-request.json
+</code></pre>
+</li>
+</ol>
+<h3>Scenario 2: Corrupted Data Directory</h3>
+<p><strong>Situation</strong>: Data directory corrupted due to disk failure.</p>
+<p><strong>Steps</strong>:</p>
+<ol>
+<li><p>Stop ICNd if running:</p>
+<pre><code class="language-bash">pkill icnd
+</code></pre>
+</li>
+<li><p>Restore from backup:</p>
+<pre><code class="language-bash">icnctl restore /path/to/backup.tar --force
+</code></pre>
+</li>
+<li><p>Verify restoration:</p>
+<pre><code class="language-bash">icnctl id show
+</code></pre>
+</li>
+<li><p>Restart ICNd:</p>
+<pre><code class="language-bash">icnd
+</code></pre>
+</li>
+</ol>
+<h3>Scenario 3: Migrate to New Server</h3>
+<p><strong>Situation</strong>: Moving ICN identity to new server.</p>
+<p><strong>Steps</strong>:</p>
+<ol>
+<li><p>On old server, create backup:</p>
+<pre><code class="language-bash">icnctl backup /tmp/icn-migration.tar
+</code></pre>
+</li>
+<li><p>Transfer to new server securely:</p>
+<pre><code class="language-bash">scp /tmp/icn-migration.tar new-server:/tmp/
+</code></pre>
+</li>
+<li><p>On new server, restore:</p>
+<pre><code class="language-bash">icnctl restore /tmp/icn-migration.tar
+</code></pre>
+</li>
+<li><p>Verify identity:</p>
+<pre><code class="language-bash">icnctl id show
+</code></pre>
+</li>
+<li><p>Update network configuration if needed</p>
+</li>
+</ol>
+<h3>Scenario 4: Forgotten Passphrase</h3>
+<p><strong>Situation</strong>: Lost passphrase for encrypted keystore.</p>
+<p><strong>Unfortunately</strong>: <strong>Passphrase cannot be recovered</strong>. This is by design for security.</p>
+<p><strong>Prevention</strong>:</p>
+<ul>
+<li>Store passphrase in password manager (e.g., 1Password, Bitwarden)</li>
+<li>Write down on paper and store in physical safe</li>
+<li>Use social recovery (future feature - Phase 11.6)</li>
+</ul>
+<p><strong>If passphrase is lost</strong>:</p>
+<ol>
+<li>Identity is permanently inaccessible</li>
+<li>Must create new identity with <code>icnctl id init</code></li>
+<li>Inform cooperative members of new DID</li>
+<li>Rebuild trust relationships</li>
+</ol>
+<h2>Integrity Verification</h2>
+<h3>Understanding Checksums</h3>
+<p>Each backup includes a SHA256 checksum of all files in the data directory. This detects:</p>
+<ul>
+<li>File corruption during backup/restore</li>
+<li>Tampering with backup contents</li>
+<li>Incomplete extractions</li>
+</ul>
+<h3>Manual Verification</h3>
+<p>To verify a backup without restoring:</p>
+<pre><code class="language-bash"># Extract metadata
+tar -xf icn-backup.tar backup_metadata.json
+cat backup_metadata.json
+
+# Output:
+{
+  &quot;icn_version&quot;: &quot;0.1.0&quot;,
+  &quot;created_at&quot;: 1736860986,
+  &quot;checksum&quot;: &quot;a455524be49ebd31071587200bb3cde9c2827517696b40935ded6efaf423f2fd&quot;
+}
+</code></pre>
+<h3>Checksum Mismatch</h3>
+<p>If you see <code>Checksum mismatch</code> error during restore:</p>
+<ol>
+<li><strong>Do not use the restored data</strong></li>
+<li>Try restoring from a different backup</li>
+<li>Check backup file integrity:<pre><code class="language-bash">sha256sum icn-backup.tar
+</code></pre>
+</li>
+<li>Verify backup was not corrupted during transfer</li>
+<li>Contact support if issue persists</li>
+</ol>
+<h2>Security Considerations</h2>
+<h3>Keystore Encryption</h3>
+<ul>
+<li>Keystore is encrypted with Age using your passphrase</li>
+<li>Uses scrypt for key derivation (memory-hard, resistant to brute-force)</li>
+<li>Passphrase is zeroized from memory after use</li>
+</ul>
+<h3>Backup Security</h3>
+<ul>
+<li>Backup tarball does <strong>NOT</strong> add additional encryption</li>
+<li>Keystore inside backup is still Age-encrypted</li>
+<li>Anyone with backup + passphrase can access your identity</li>
+<li>Treat backups as <strong>highly sensitive</strong></li>
+</ul>
+<h3>Threat Model</h3>
+<p><strong>Protects against</strong>:</p>
+<ul>
+<li>✅ Hardware failure</li>
+<li>✅ Accidental deletion</li>
+<li>✅ Data corruption</li>
+<li>✅ Physical device loss (if passphrase secure)</li>
+</ul>
+<p><strong>Does NOT protect against</strong>:</p>
+<ul>
+<li>❌ Compromised passphrase</li>
+<li>❌ Malware on backup system</li>
+<li>❌ Stolen backup + passphrase</li>
+</ul>
+<h2>Troubleshooting</h2>
+<h3>&quot;Backup file not found&quot;</h3>
+<p><strong>Cause</strong>: File path incorrect or file deleted.</p>
+<p><strong>Solution</strong>: Verify file exists with <code>ls -l /path/to/backup.tar</code></p>
+<h3>&quot;Data directory already exists&quot;</h3>
+<p><strong>Cause</strong>: Trying to restore to existing directory without <code>--force</code>.</p>
+<p><strong>Solutions</strong>:</p>
+<ul>
+<li>Use <code>--force</code> flag to overwrite</li>
+<li>Restore to different directory with <code>--data-dir</code></li>
+<li>Manually backup and remove existing directory</li>
+</ul>
+<h3>&quot;Failed to extract backup&quot;</h3>
+<p><strong>Cause</strong>: Corrupted tarball or permission issues.</p>
+<p><strong>Solutions</strong>:</p>
+<ul>
+<li>Verify file integrity: <code>tar -tf backup.tar</code></li>
+<li>Check disk space: <code>df -h</code></li>
+<li>Verify permissions on target directory</li>
+</ul>
+<h3>&quot;Checksum mismatch&quot;</h3>
+<p><strong>Cause</strong>: Backup corrupted or tampered with.</p>
+<p><strong>Solutions</strong>:</p>
+<ul>
+<li>Use a different backup from earlier date</li>
+<li>Verify backup file wasn&#39;t partially transferred</li>
+<li>Check for disk errors</li>
+</ul>
+<h2>Command Reference</h2>
+<h3>Backup Command</h3>
+<pre><code>icnctl backup &lt;OUTPUT&gt;
+
+Arguments:
+  &lt;OUTPUT&gt;  Path for backup archive (e.g., /backup/icn.tar)
+
+Flags:
+  --data-dir &lt;DIR&gt;  Data directory to backup (default: ~/.icn)
+  -h, --help        Print help
+</code></pre>
+<h3>Restore Command</h3>
+<pre><code>icnctl restore &lt;INPUT&gt; [--force]
+
+Arguments:
+  &lt;INPUT&gt;  Path to backup archive
+
+Flags:
+  --force          Overwrite existing data directory
+  --data-dir &lt;DIR&gt; Target directory for restore (default: ~/.icn)
+  -h, --help       Print help
+</code></pre>
+<h2>See Also</h2>
+<ul>
+<li><a href="/docs/development/sessions/2025-11/2025-11-14-phase-11-multi-device-identity">Multi-Device Identity Guide</a> - Device management</li>
+<li><a href="/docs/operations/deployment/deployment-guide">Deployment Guide</a> - Production deployment</li>
+<li><a href="/docs/ARCHITECTURE">ARCHITECTURE.md</a> - System architecture</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

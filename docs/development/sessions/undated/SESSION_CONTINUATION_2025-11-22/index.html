@@ -1,0 +1,316 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Session Continuation - Documentation Integration | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>development</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>sessions</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>undated</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>SESSION CONTINUATION 2025 11 22</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/development/sessions/undated/SESSION_CONTINUATION_2025-11-22.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Session Continuation - Documentation Integration</h1>
+<p><strong>Date</strong>: 2025-11-22
+<strong>Duration</strong>: Brief continuation session
+<strong>Scope</strong>: Documentation integration and discoverability</p>
+<hr>
+<h2>Work Completed</h2>
+<h3>1. README.md Updates ✓</h3>
+<p><strong>Enhanced &quot;Next Steps&quot; Section:</strong></p>
+<ul>
+<li>Added <strong>Getting Started Guide</strong> and <strong>FAQ</strong> as primary links</li>
+<li>Highlighted documentation with bold formatting</li>
+<li>Maintained existing links to config, docker, examples</li>
+</ul>
+<p><strong>New &quot;Documentation&quot; Section:</strong>
+Organized by user type for easy navigation:</p>
+<ul>
+<li><p><strong>For Users:</strong></p>
+<ul>
+<li>Getting Started Guide (5-minute quickstart)</li>
+<li>FAQ (30+ questions)</li>
+<li>Migration Guides (keystore and version upgrades)</li>
+</ul>
+</li>
+<li><p><strong>For Developers:</strong></p>
+<ul>
+<li>Contributing Guide (code style, testing, PR process)</li>
+<li>Architecture documentation</li>
+<li>Code of Conduct</li>
+<li>API documentation</li>
+</ul>
+</li>
+<li><p><strong>For Operators:</strong></p>
+<ul>
+<li>Deployment Guide</li>
+<li>Project Governance</li>
+</ul>
+</li>
+</ul>
+<p><strong>Updated &quot;Project Status&quot; Section:</strong></p>
+<ul>
+<li>Consolidated Phases 0-7 into summary</li>
+<li>Added Phases 8-15 (DID-TLS, encryption, governance, gateway, compute)</li>
+<li>Added operational tracks (B1, B3)</li>
+<li>Listed production features with checkmarks</li>
+<li>Clear &quot;Next Milestone&quot; callout</li>
+</ul>
+<p><strong>New &quot;Community &amp; Contributing&quot; Section:</strong></p>
+<ul>
+<li>Welcoming message (&quot;designed for cooperatives, by cooperatives&quot;)</li>
+<li>Clear 3-step onboarding</li>
+<li>5 ways to contribute (bugs, docs, code, pilots, feedback)</li>
+<li>Development quick start with git clone example</li>
+</ul>
+<p><strong>Added &quot;Shell Completions&quot; Usage:</strong></p>
+<ul>
+<li>Instructions for bash, zsh, fish</li>
+<li>Proper installation paths for each shell</li>
+</ul>
+<p><strong>Impact:</strong></p>
+<ul>
+<li>First-time users now see Getting Started Guide immediately</li>
+<li>Contributors have clear path from README → CONTRIBUTING.md → Code of Conduct</li>
+<li>Operators can find deployment and governance docs easily</li>
+<li>Documentation organized by user role (user/developer/operator)</li>
+</ul>
+<h3>2. CHANGELOG.md Updates ✓</h3>
+<p><strong>New Entry: &quot;Comprehensive Documentation &amp; Community Readiness (2025-11-21)&quot;</strong></p>
+<p>Added detailed changelog entry with 8 sections:</p>
+<ol>
+<li><p><strong>User Documentation</strong> (4 major guides)</p>
+<ul>
+<li>Getting Started Guide (450+ lines)</li>
+<li>FAQ (600+ lines, 30+ Q&amp;A)</li>
+<li>Keystore migration guide</li>
+<li>Version upgrade guide</li>
+</ul>
+</li>
+<li><p><strong>Developer Documentation</strong> (2 guides)</p>
+<ul>
+<li>Contributing Guide (400+ lines)</li>
+<li>Code of Conduct (Contributor Covenant v2.1)</li>
+</ul>
+</li>
+<li><p><strong>Operational Documentation</strong> (3 guides)</p>
+<ul>
+<li>Project Governance</li>
+<li>Code Quality Tracker</li>
+<li>Dev journal for security hardening</li>
+</ul>
+</li>
+<li><p><strong>Updated README.md</strong></p>
+<ul>
+<li>All sections enhanced</li>
+<li>Clear navigation structure</li>
+</ul>
+</li>
+<li><p><strong>Production Security Hardening</strong></p>
+<ul>
+<li>Gateway security module (267 lines)</li>
+<li>7 security headers detailed</li>
+<li>CORS middleware</li>
+<li>Request size limiting</li>
+</ul>
+</li>
+<li><p><strong>Developer Experience Improvements</strong></p>
+<ul>
+<li>Shell completions</li>
+<li>Clippy configuration</li>
+<li>cargo-deny auditing</li>
+</ul>
+</li>
+<li><p><strong>Test Coverage</strong></p>
+<ul>
+<li>423 tests passing</li>
+<li>Security middleware verified</li>
+</ul>
+</li>
+<li><p><strong>Strategic Deferments</strong></p>
+<ul>
+<li>Documented future work</li>
+<li>Clear rationale for deferments</li>
+</ul>
+</li>
+</ol>
+<p><strong>Impact:</strong></p>
+<ul>
+<li>Complete record of documentation sprint in formal changelog</li>
+<li>Users can understand what changed in 2025-11-21 work</li>
+<li>Follows &quot;Keep a Changelog&quot; format</li>
+<li>References SESSION_COMPLETE_2025-11-21.md for details</li>
+</ul>
+<hr>
+<h2>Commits</h2>
+<h3>Commit 1: README Documentation Integration</h3>
+<pre><code>docs: update README with comprehensive documentation references
+
+Enhancements:
+- Add Getting Started Guide and FAQ to &quot;Next Steps&quot;
+- Add &quot;Documentation&quot; section organized by user type
+- Update &quot;Project Status&quot; to reflect all completed phases (0-15)
+- Add &quot;Community &amp; Contributing&quot; section
+- Add shell completions usage guide
+</code></pre>
+<h3>Commit 2: CHANGELOG Entry</h3>
+<pre><code>docs: add comprehensive CHANGELOG entry for documentation sprint
+
+Added detailed entry for 2025-11-21 documentation and security work:
+- Documentation (8,500+ lines)
+- Production Security (7 headers, CORS, limits)
+- Developer Experience (completions, clippy, deny)
+- Test Coverage (423 tests passing)
+</code></pre>
+<hr>
+<h2>Verification</h2>
+<p><strong>Tests:</strong> ✅ All 551 library tests passing</p>
+<ul>
+<li>icn-ccl: 36 passed</li>
+<li>icn-compute: 41 passed</li>
+<li>icn-core: 33 passed</li>
+<li>icn-gateway: 98 passed</li>
+<li>icn-governance: 55 passed (1 ignored)</li>
+<li>icn-gossip: 39 passed</li>
+<li>icn-identity: 19 passed</li>
+<li>icn-ledger: 41 passed</li>
+<li>icn-net: 42 passed</li>
+<li>icn-obs: 4 passed</li>
+<li>icn-rpc: 25 passed</li>
+<li>icn-trust: 94 passed (3 ignored)</li>
+<li>icn-snapshot: 24 passed</li>
+</ul>
+<p><strong>Build:</strong> ✅ Clean (no warnings)</p>
+<p><strong>Git:</strong> ✅ Clean working directory</p>
+<hr>
+<h2>Documentation Discoverability Path</h2>
+<p><strong>Before:</strong></p>
+<ul>
+<li>User reads README → sees generic &quot;Documentation&quot; link → must explore docs/</li>
+</ul>
+<p><strong>After:</strong></p>
+<ul>
+<li>User reads README → sees <strong>Getting Started Guide</strong> prominently</li>
+<li>User knows if they&#39;re a user/developer/operator → finds relevant docs immediately</li>
+<li>Clear path: README → Getting Started → FAQ → Specific guides</li>
+<li>Community members: README → Code of Conduct → Contributing Guide</li>
+</ul>
+<hr>
+<h2>Impact Summary</h2>
+<p><strong>From &quot;Documentation Exists&quot; to &quot;Documentation Discoverable&quot;</strong></p>
+<p>The 2025-11-21 sprint created 8,500+ lines of comprehensive documentation. Today&#39;s work ensures users can <strong>find</strong> it:</p>
+<ul>
+<li>✅ <strong>Entry points clear</strong>: Getting Started and FAQ in &quot;Next Steps&quot;</li>
+<li>✅ <strong>Organization logical</strong>: By user type (user/developer/operator)</li>
+<li>✅ <strong>Navigation complete</strong>: README → guides → specific topics</li>
+<li>✅ <strong>History documented</strong>: CHANGELOG entries explain what changed</li>
+<li>✅ <strong>Community welcoming</strong>: Clear contribution path from README</li>
+</ul>
+<p><strong>Result:</strong> Documentation is now as accessible as it is comprehensive.</p>
+<hr>
+<h2>Session Metrics</h2>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Count</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Files modified</td>
+<td>2</td>
+</tr>
+<tr>
+<td>Lines added</td>
+<td>218</td>
+</tr>
+<tr>
+<td>Lines removed</td>
+<td>52</td>
+</tr>
+<tr>
+<td>Commits</td>
+<td>2</td>
+</tr>
+<tr>
+<td>Tests verified</td>
+<td>551 ✅</td>
+</tr>
+<tr>
+<td>Documentation guides made discoverable</td>
+<td>14</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>What&#39;s Next</h2>
+<p>ICN is now <strong>ready for pilot communities</strong> with:</p>
+<ol>
+<li>✅ <strong>User onboarding</strong> - 5-minute quickstart to first transaction</li>
+<li>✅ <strong>Developer onboarding</strong> - Contributing guide with code style</li>
+<li>✅ <strong>Operator guides</strong> - Deployment, migration, governance</li>
+<li>✅ <strong>Community standards</strong> - Code of Conduct, clear contribution path</li>
+<li>✅ <strong>Production security</strong> - 7 security headers, CORS, rate limiting</li>
+<li>✅ <strong>Comprehensive FAQ</strong> - 30+ common questions answered</li>
+<li>✅ <strong>All documentation discoverable</strong> - Clear navigation from README</li>
+</ol>
+<p><strong>Next Milestone:</strong> Track C1 - Pilot Community Selection &amp; Deployment</p>
+<hr>
+<p><em>Session completed: 2025-11-22</em>
+<em>Continuation of: SESSION_COMPLETE_2025-11-21.md</em>
+<em>Status: ✅ Documentation fully integrated and discoverable</em></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

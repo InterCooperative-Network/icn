@@ -1,0 +1,808 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Canonical Encoding Specification | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>CANONICAL ENCODING</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/CANONICAL_ENCODING.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Canonical Encoding Specification</h1>
+<p><strong>Version:</strong> 1.0<br><strong>Status:</strong> NORMATIVE<br><strong>Last Updated:</strong> 2026-02-02</p>
+<h2>Abstract</h2>
+<p>This document specifies the deterministic serialization rules for ICN federation protocol objects. Canonical encoding ensures that identical logical objects produce byte-identical serializations, enabling cryptographic verification across implementations.</p>
+<h2>Keywords</h2>
+<p>The key words &quot;MUST&quot;, &quot;MUST NOT&quot;, &quot;REQUIRED&quot;, &quot;SHALL&quot;, &quot;SHALL NOT&quot;, &quot;SHOULD&quot;, &quot;SHOULD NOT&quot;, &quot;RECOMMENDED&quot;, &quot;MAY&quot;, and &quot;OPTIONAL&quot; in this document are to be interpreted as described in <a href="https://www.rfc-editor.org/rfc/rfc2119" target="_blank" rel="noopener">RFC 2119</a>.</p>
+<hr>
+<h2>1. Overview</h2>
+<p>Canonical encoding is REQUIRED for:</p>
+<ul>
+<li>Objects that are cryptographically signed</li>
+<li>Objects that are cryptographically hashed</li>
+<li>Objects included in consensus state</li>
+<li>Objects used in cross-implementation verification</li>
+</ul>
+<p>Non-canonical encoding MAY be used for:</p>
+<ul>
+<li>Wire protocol serialization (where explicit versioning is present)</li>
+<li>Local storage (where only one implementation reads the data)</li>
+<li>Debug output and logging</li>
+</ul>
+<hr>
+<h2>2. Encoding Format</h2>
+<h3>2.1 Primary Format: CBOR</h3>
+<p>ICN uses <strong>CBOR (RFC 8949)</strong> as its canonical encoding format with the following constraints:</p>
+<h4>2.1.1 Definite Length Encoding</h4>
+<p>All CBOR objects MUST use definite-length encoding:</p>
+<ul>
+<li>Arrays MUST use definite-length array encoding (major type 4)</li>
+<li>Maps MUST use definite-length map encoding (major type 5)</li>
+<li>Byte strings MUST use definite-length encoding (major type 2)</li>
+<li>Text strings MUST use definite-length encoding (major type 3)</li>
+</ul>
+<p>Indefinite-length encoding (break stop code 0xFF) MUST NOT be used.</p>
+<h4>2.1.2 Integer Encoding</h4>
+<p>Integers MUST be encoded in their shortest form:</p>
+<ul>
+<li>Values 0-23: Encode in initial byte (major type 0 or 1)</li>
+<li>Values 24-255: Use 1-byte argument (additional information 24)</li>
+<li>Values 256-65535: Use 2-byte argument (additional information 25)</li>
+<li>Values 65536-4294967295: Use 4-byte argument (additional information 26)</li>
+<li>Values ≥4294967296: Use 8-byte argument (additional information 27)</li>
+</ul>
+<p>Negative integers MUST use major type 1 (negative integer).</p>
+<h4>2.1.3 Map Key Ordering</h4>
+<p>All CBOR maps MUST have keys sorted in bytewise lexicographic order:</p>
+<pre><code class="language-rust">// CORRECT: Keys sorted by byte representation
+{
+  &quot;action_hash&quot;: ...,
+  &quot;action_type&quot;: ...,
+  &quot;confirmations&quot;: ...,
+  &quot;state_root&quot;: ...,
+  &quot;timestamp&quot;: ...
+}
+
+// INCORRECT: Keys in insertion order
+{
+  &quot;timestamp&quot;: ...,
+  &quot;action_type&quot;: ...,
+  &quot;state_root&quot;: ...,
+  &quot;action_hash&quot;: ...,
+  &quot;confirmations&quot;: ...
+}
+</code></pre>
+<p><strong>Implementation Note:</strong> Use <code>BTreeMap&lt;K, V&gt;</code> in Rust, not <code>HashMap&lt;K, V&gt;</code>.</p>
+<h4>2.1.4 Floating Point</h4>
+<p>Floating-point numbers SHOULD be avoided in canonical encoding contexts.</p>
+<p>If floating-point values are unavoidable, they MUST be encoded as:</p>
+<ul>
+<li>64-bit IEEE 754 binary64 (CBOR major type 7, additional information 27)</li>
+<li>NaN values MUST use the canonical NaN representation (0x7FF8000000000000)</li>
+<li>Negative zero MUST be normalized to positive zero</li>
+</ul>
+<p><strong>Rationale:</strong> Floating-point representations are non-deterministic across architectures and rounding modes. Use rational numbers or fixed-point arithmetic instead.</p>
+<h3>2.2 Fallback Format: Canonical JSON</h3>
+<p>For human-readable serialization (e.g., debugging, configuration), <strong>Canonical JSON (RFC 8785)</strong> MAY be used:</p>
+<h4>2.2.1 Key Ordering</h4>
+<p>Object keys MUST be sorted lexicographically by UTF-16 code unit:</p>
+<pre><code class="language-json">{
+  &quot;action_hash&quot;: &quot;...&quot;,
+  &quot;action_type&quot;: &quot;...&quot;,
+  &quot;confirmations&quot;: [...],
+  &quot;state_root&quot;: &quot;...&quot;,
+  &quot;timestamp&quot;: 1735905000
+}
+</code></pre>
+<h4>2.2.2 Whitespace</h4>
+<p>Canonical JSON MUST NOT contain:</p>
+<ul>
+<li>Insignificant whitespace (spaces, tabs, newlines outside strings)</li>
+<li>Comments</li>
+</ul>
+<h4>2.2.3 Number Encoding</h4>
+<p>Numbers MUST be encoded without leading zeros or trailing decimal points:</p>
+<ul>
+<li><code>42</code> (not <code>042</code> or <code>42.0</code>)</li>
+<li><code>-123</code> (not <code>-0123</code>)</li>
+</ul>
+<h4>2.2.4 String Escaping</h4>
+<p>String escaping MUST follow JSON rules:</p>
+<ul>
+<li>Control characters (U+0000 to U+001F) MUST be escaped</li>
+<li>Forward slash (U+002F) MAY be escaped (optional)</li>
+<li>Unicode escapes MUST use lowercase hexadecimal</li>
+</ul>
+<h3>2.3 Wire Format: Postcard</h3>
+<p>For network transmission, ICN uses <strong>Postcard</strong> (compact binary format):</p>
+<pre><code class="language-rust">use serde::{Serialize, Deserialize};
+
+#[derive(Serialize, Deserialize)]
+struct Message {
+    // ...
+}
+
+let encoded = postcard::to_allocvec(&amp;msg)?;
+let decoded: Message = postcard::from_bytes(&amp;encoded)?;
+</code></pre>
+<p>Postcard is NOT canonical and MUST NOT be used for:</p>
+<ul>
+<li>Signature payloads</li>
+<li>Hash preimages</li>
+<li>Consensus state</li>
+</ul>
+<hr>
+<h2>3. Data Type Constraints</h2>
+<h3>3.1 Ordered Collections</h3>
+<p><strong>CRITICAL:</strong> Data structures that are hashed or signed MUST use ordered collections:</p>
+<pre><code class="language-rust">// CORRECT: Deterministic ordering
+use std::collections::BTreeMap;
+
+#[derive(Serialize, Deserialize)]
+pub struct GovernanceProof {
+    pub metadata: BTreeMap&lt;String, String&gt;,  // ✅ Ordered
+    pub confirmations: Vec&lt;Did&gt;,              // ✅ Sorted (see 3.2)
+}
+
+// INCORRECT: Non-deterministic ordering
+// This example shows what NOT to do - HashMap iteration order is undefined,
+// causing different implementations to produce different byte sequences for
+// the same logical data, breaking cross-language interoperability.
+use std::collections::HashMap;
+
+#[derive(Serialize, Deserialize)]
+pub struct BadGovernanceProof {
+    pub metadata: HashMap&lt;String, String&gt;,    // ❌ Non-deterministic iteration order
+    pub confirmations: Vec&lt;Did&gt;,              // ⚠️  Must be sorted (but not enforced here)
+}
+</code></pre>
+<p><strong>Rules:</strong></p>
+<ul>
+<li>Use <code>BTreeMap&lt;K, V&gt;</code>, not <code>HashMap&lt;K, V&gt;</code> (deterministic key ordering)</li>
+<li>Use <code>BTreeSet&lt;T&gt;</code>, not <code>HashSet&lt;T&gt;</code> (deterministic element ordering)</li>
+<li>For <code>Vec&lt;T&gt;</code> representing sets, explicitly sort before encoding (see 3.2)</li>
+</ul>
+<h3>3.2 Set-Like Vectors</h3>
+<p>When using <code>Vec&lt;T&gt;</code> to represent a set (unordered collection), elements MUST be sorted before canonical encoding:</p>
+<pre><code class="language-rust">impl GovernanceProof {
+    pub fn canonicalize(&amp;mut self) {
+        // Sort confirmations (DIDs are UTF-8 strings)
+        self.confirmations.sort();
+        
+        // Sort allocations by recipient DID
+        self.allocations.sort_by_key(|a| a.recipient.clone());
+    }
+}
+</code></pre>
+<p><strong>Sorting Rules:</strong></p>
+<ul>
+<li>String-like types (Did, CurrencyId, CellId): UTF-8 lexicographic order</li>
+<li>Numeric types: Numeric ascending order</li>
+<li>Compound types: Sort by first differing field (lexicographic tuple order)</li>
+</ul>
+<h3>3.3 Optional Fields</h3>
+<p>Optional fields MUST be handled consistently:</p>
+<pre><code class="language-rust">#[derive(Serialize)]
+pub struct Proposal {
+    pub id: ProposalId,
+    pub description: String,
+    
+    // CBOR: Omit field if None (default)
+    #[serde(skip_serializing_if = &quot;Option::is_none&quot;)]
+    pub comment: Option&lt;String&gt;,
+}
+</code></pre>
+<p><strong>Rules:</strong></p>
+<ul>
+<li><code>None</code> values SHOULD be omitted from CBOR maps</li>
+<li>Empty strings MUST be encoded as empty strings, not omitted</li>
+<li>Empty collections (Vec, BTreeMap) MUST be encoded as empty, not omitted</li>
+</ul>
+<h3>3.4 Binary Data</h3>
+<p>Binary data MUST be encoded as:</p>
+<ul>
+<li><strong>CBOR:</strong> Byte string (major type 2)</li>
+<li><strong>JSON:</strong> Hexadecimal string with <code>0x</code> prefix or Base58btc multibase</li>
+</ul>
+<pre><code class="language-rust">#[derive(Serialize, Deserialize)]
+pub struct SignedData {
+    #[serde(with = &quot;hex::serde&quot;)]
+    pub signature: [u8; 64],  // JSON: &quot;0xabcd...&quot; / CBOR: byte string
+}
+</code></pre>
+<h3>3.5 Enum Serialization</h3>
+<p>Enum types (such as <code>ActionType</code>, <code>ProposalState</code>, <code>DecisionOutcome</code>) MUST serialize consistently across implementations:</p>
+<p><strong>String Serialization (for JSON and human-readable formats):</strong></p>
+<ul>
+<li>Enum variants MUST serialize as <strong>snake_case</strong> ASCII strings</li>
+<li>Transformation rule: Convert PascalCase to snake_case by inserting underscores before uppercase letters (except the first) and lowercasing all characters</li>
+<li>Acronyms are treated as single words and lowercased as a unit</li>
+</ul>
+<p><strong>Examples:</strong></p>
+<pre><code class="language-rust">ActionType::SettleCrossCoop   → &quot;settle_cross_coop&quot;
+ActionType::AdmitMember       → &quot;admit_member&quot;
+ActionType::RotateKey         → &quot;rotate_key&quot;
+ActionType::DIDRotate         → &quot;did_rotate&quot;  // Acronym treated as single word
+</code></pre>
+<p><strong>Numeric Serialization (for binary formats):</strong></p>
+<ul>
+<li>When serializing to u8 (e.g., in CBOR or state root computation), use the explicit numeric mapping defined for each enum type</li>
+<li>Numeric mappings are defined in the specification for each enum (see GOVERNANCE_STATE_MACHINE.md for ProposalState mapping)</li>
+</ul>
+<p><strong>Cross-Language Consistency:</strong>
+All implementations MUST produce identical string and numeric representations for the same enum variant to ensure interoperability.</p>
+<hr>
+<h2>4. Cryptographic Primitives</h2>
+<h3>4.1 Hash Functions</h3>
+<h4>4.1.1 BLAKE3</h4>
+<p>ICN uses <strong>BLAKE3</strong> for content hashing:</p>
+<pre><code class="language-rust">use blake3;
+
+fn hash_content(data: &amp;[u8]) -&gt; [u8; 32] {
+    blake3::hash(data).into()
+}
+</code></pre>
+<p><strong>Properties:</strong></p>
+<ul>
+<li>Output: 32 bytes (256 bits)</li>
+<li>Collision resistance: 128-bit security</li>
+<li>Preimage resistance: 256-bit security</li>
+</ul>
+<h4>4.1.2 Domain Separation</h4>
+<p>All hashes MUST use domain separation to prevent cross-protocol attacks:</p>
+<pre><code class="language-rust">fn typed_hash(domain: &amp;str, data: &amp;[u8]) -&gt; [u8; 32] {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(domain.as_bytes());
+    hasher.update(&amp;[0x00]);  // Null separator
+    hasher.update(data);
+    hasher.finalize().into()
+}
+</code></pre>
+<p><strong>Format:</strong> <code>BLAKE3(domain || 0x00 || data)</code></p>
+<p><strong>Domain Strings:</strong></p>
+<ul>
+<li><code>icn-federation:governance-proof:v1</code></li>
+<li><code>icn-federation:action:v1</code></li>
+<li><code>icn-federation:state-root:v1</code></li>
+<li><code>icn-federation:constitution:v1</code></li>
+<li><code>icn-governance:proposal:v1</code></li>
+<li><code>icn-governance:vote:v1</code></li>
+<li><code>icn-ledger:settlement:v1</code></li>
+<li><code>icn-ledger:journal-entry:v1</code></li>
+</ul>
+<h3>4.2 Signatures</h3>
+<h4>4.2.1 Ed25519</h4>
+<p>ICN uses <strong>Ed25519</strong> (RFC 8032) for digital signatures:</p>
+<pre><code class="language-rust">use ed25519_dalek::{Signer, Verifier, SigningKey, VerifyingKey};
+
+// Signing
+let signature = signing_key.sign(canonical_payload);
+
+// Verification
+verifying_key.verify(canonical_payload, &amp;signature)?;
+</code></pre>
+<p><strong>Properties:</strong></p>
+<ul>
+<li>Public key: 32 bytes</li>
+<li>Signature: 64 bytes</li>
+<li>Security: ~128-bit (curve25519)</li>
+</ul>
+<p><strong>Payload:</strong> MUST be the canonical CBOR encoding of the signed object.</p>
+<h4>4.2.2 ML-DSA (Post-Quantum)</h4>
+<p>For post-quantum security, ICN uses <strong>ML-DSA (Dilithium)</strong> in hybrid mode:</p>
+<pre><code class="language-rust">pub struct HybridSignature {
+    pub ed25519: ed25519_dalek::Signature,  // 64 bytes
+    pub ml_dsa: Vec&lt;u8&gt;,                    // ~2420 bytes (ML-DSA-65)
+}
+</code></pre>
+<p>Verification MUST succeed for BOTH signatures.</p>
+<h4>4.2.3 Signature Encoding</h4>
+<p>Signatures in canonical objects MUST be encoded as:</p>
+<ul>
+<li><strong>CBOR:</strong> Byte string (64 bytes for Ed25519, struct for hybrid)</li>
+<li><strong>JSON:</strong> Hexadecimal string with <code>0x</code> prefix</li>
+</ul>
+<pre><code class="language-rust">#[derive(Serialize, Deserialize)]
+pub struct GovernanceProof {
+    // ...
+    #[serde(with = &quot;hex::serde&quot;)]
+    pub signature: [u8; 64],
+}
+</code></pre>
+<hr>
+<h2>5. Identifier Normalization</h2>
+<h3>5.1 DID (Decentralized Identifier)</h3>
+<p>DIDs MUST be normalized before encoding:</p>
+<p><strong>Format:</strong> <code>did:icn:&lt;base58btc-pubkey&gt;</code></p>
+<p><strong>Normalization:</strong></p>
+<ol>
+<li>Lowercase the <code>did</code> and <code>icn</code> components</li>
+<li>Preserve case of the Base58btc identifier (case-sensitive)</li>
+<li>Verify the identifier is valid multibase Base58btc</li>
+<li>Verify the decoded public key is exactly 32 bytes</li>
+</ol>
+<pre><code class="language-rust">impl Did {
+    pub fn normalize(&amp;self) -&gt; Result&lt;Did&gt; {
+        let s = self.0.as_str();
+        if !s.starts_with(&quot;did:icn:&quot;) {
+            return Err(Error::InvalidDidPrefix);
+        }
+        
+        let identifier = &amp;s[8..];  // Skip &quot;did:icn:&quot;
+        
+        // Verify Base58btc encoding
+        let decoded = bs58::decode(identifier).into_vec()?;
+        if decoded.len() != 32 {
+            return Err(Error::InvalidDidLength);
+        }
+        
+        Ok(Did(s.to_string()))
+    }
+}
+</code></pre>
+<h3>5.2 CurrencyId</h3>
+<p>Currency identifiers MUST be normalized:</p>
+<p><strong>Format:</strong> <code>&lt;scope&gt;:&lt;symbol&gt;</code> (e.g., <code>food-coop:HOURS</code>)</p>
+<p><strong>Normalization:</strong></p>
+<ol>
+<li>Lowercase the scope component</li>
+<li>Uppercase the symbol component</li>
+<li>Verify scope matches <code>[a-z0-9-]+</code></li>
+<li>Verify symbol matches <code>[A-Z]{2,6}</code></li>
+</ol>
+<pre><code class="language-rust">impl CurrencyId {
+    pub fn normalize(&amp;self) -&gt; Result&lt;CurrencyId&gt; {
+        let parts: Vec&lt;&amp;str&gt; = self.0.split(&#39;:&#39;).collect();
+        if parts.len() != 2 {
+            return Err(Error::InvalidCurrencyFormat);
+        }
+        
+        let scope = parts[0].to_lowercase();
+        let symbol = parts[1].to_uppercase();
+        
+        // Validate format
+        if !scope.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == &#39;-&#39;) {
+            return Err(Error::InvalidScope);
+        }
+        if !symbol.chars().all(|c| c.is_ascii_uppercase()) || symbol.len() &lt; 2 || symbol.len() &gt; 6 {
+            return Err(Error::InvalidSymbol);
+        }
+        
+        Ok(CurrencyId(format!(&quot;{}:{}&quot;, scope, symbol)))
+    }
+}
+</code></pre>
+<h3>5.3 CellId</h3>
+<p>Cell identifiers MUST be normalized:</p>
+<p><strong>Format:</strong> <code>cell:&lt;base58btc-hash&gt;</code> (e.g., <code>cell:z3v8AqW...</code>)</p>
+<p><strong>Normalization:</strong></p>
+<ol>
+<li>Lowercase the <code>cell</code> prefix</li>
+<li>Preserve case of the Base58btc hash (case-sensitive)</li>
+<li>Verify the identifier is valid multibase Base58btc</li>
+<li>Verify the decoded hash is exactly 32 bytes</li>
+</ol>
+<hr>
+<h2>6. Integer Overflow Protection</h2>
+<h3>6.1 Checked Arithmetic</h3>
+<p>All arithmetic operations in canonical encoding contexts MUST use checked arithmetic:</p>
+<pre><code class="language-rust">impl Settlement {
+    pub fn compute_balance(&amp;self) -&gt; Result&lt;i64&gt; {
+        let mut balance: i64 = 0;
+        
+        for txn in &amp;self.transactions {
+            // CORRECT: Checked addition
+            balance = balance.checked_add(txn.amount)
+                .ok_or(Error::IntegerOverflow)?;
+        }
+        
+        Ok(balance)
+    }
+}
+</code></pre>
+<p><strong>Rules:</strong></p>
+<ul>
+<li>Use <code>checked_add</code>, <code>checked_sub</code>, <code>checked_mul</code></li>
+<li>Never use <code>+</code>, <code>-</code>, <code>*</code> for consensus-critical arithmetic</li>
+<li>Return <code>Error::IntegerOverflow</code> on overflow</li>
+<li>Explicitly document overflow behavior in spec</li>
+</ul>
+<h3>6.2 Range Validation</h3>
+<p>Numeric fields MUST validate ranges before encoding:</p>
+<pre><code class="language-rust">impl GovernanceProof {
+    pub fn validate(&amp;self) -&gt; Result&lt;()&gt; {
+        // Timestamp: Must be within reasonable bounds
+        if self.timestamp == 0 || self.timestamp &gt; 2147483647 {
+            return Err(Error::InvalidTimestamp);
+        }
+        
+        // Sequence: Must be monotonically increasing
+        if self.sequence == 0 {
+            return Err(Error::InvalidSequence);
+        }
+        
+        Ok(())
+    }
+}
+</code></pre>
+<hr>
+<h2>7. Canonical Encoding Trait</h2>
+<h3>7.1 Canonicalize Trait</h3>
+<p>All objects that require canonical encoding MUST implement the <code>Canonicalize</code> trait:</p>
+<pre><code class="language-rust">pub trait Canonicalize {
+    /// Modify self to canonical form (sort collections, normalize identifiers)
+    fn canonicalize(&amp;mut self);
+    
+    /// Verify self is in canonical form
+    fn is_canonical(&amp;self) -&gt; bool;
+}
+
+pub trait CanonicalEncode: Canonicalize + Serialize {
+    /// Encode to canonical CBOR
+    fn encode_canonical(&amp;mut self) -&gt; Result&lt;Vec&lt;u8&gt;&gt; {
+        self.canonicalize();
+        let mut buf = Vec::new();
+        ciborium::ser::into_writer(self, &amp;mut buf)
+            .map_err(|e| Error::EncodingError(e.to_string()))?;
+        Ok(buf)
+    }
+    
+    /// Compute typed hash
+    fn hash_canonical(&amp;mut self, domain: &amp;str) -&gt; Result&lt;[u8; 32]&gt; {
+        let encoded = self.encode_canonical()?;
+        Ok(typed_hash(domain, &amp;encoded))
+    }
+}
+</code></pre>
+<h3>7.2 Example Implementation</h3>
+<pre><code class="language-rust">impl Canonicalize for GovernanceProof {
+    fn canonicalize(&amp;mut self) {
+        // Sort confirmations (DIDs)
+        self.confirmations.sort();
+        
+        // Sort decision records by key
+        // (BTreeMap is already ordered)
+        
+        // Normalize identifiers
+        self.federation_id = self.federation_id.normalize().unwrap();
+        
+        // Clamp timestamps to valid range
+        if self.timestamp &gt; 2147483647 {
+            self.timestamp = 2147483647;
+        }
+    }
+    
+    fn is_canonical(&amp;self) -&gt; bool {
+        // Check if confirmations are sorted
+        for i in 1..self.confirmations.len() {
+            if self.confirmations[i] &lt;= self.confirmations[i - 1] {
+                return false;
+            }
+        }
+        
+        // Check identifier normalization
+        // Note: federation_id is a String; to verify normalization, parse as Did
+        if let Ok(did) = Did::new(&amp;self.federation_id) {
+            if let Ok(normalized) = did.normalize() {
+                if self.federation_id != normalized.as_str() {
+                    return false;
+                }
+            } else {
+                return false; // Invalid DID format
+            }
+        } else {
+            return false; // Not a valid DID
+        }
+        
+        true
+    }
+}
+
+impl CanonicalEncode for GovernanceProof {}
+</code></pre>
+<hr>
+<h2>8. Test Vectors</h2>
+<h3>8.1 Minimal GovernanceProof</h3>
+<p><strong>Input:</strong></p>
+<pre><code class="language-json">{
+  &quot;federation_id&quot;: &quot;fed:z5AqBkLuA...&quot;,
+  &quot;action_type&quot;: &quot;SettleCrossCoop&quot;,
+  &quot;action_hash&quot;: &quot;0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef&quot;,
+  &quot;state_root&quot;: &quot;0xfedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210&quot;,
+  &quot;prev_state_root&quot;: &quot;0x0000000000000000000000000000000000000000000000000000000000000000&quot;,
+  &quot;sequence&quot;: 1,
+  &quot;timestamp&quot;: 1735905000,
+  &quot;confirmations&quot;: [
+    &quot;did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK&quot;,
+    &quot;did:icn:z6MkfNzT9bU9Ua5fHKwBpWJVN8XEfBD6e7o4kEwV9RxYnRpd&quot;
+  ],
+  &quot;decision_records&quot;: {},
+  &quot;signature&quot;: &quot;0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef&quot;
+}
+</code></pre>
+<p><strong>Canonical CBOR (hex):</strong></p>
+<pre><code>a9                                      # map(9)
+   6c 666564657261 74696f6e5f6964       # text(13) &quot;federation_id&quot;
+   71 6665643a7a 354171426b4c75 41...   # text(17) &quot;fed:z5AqBkLuA...&quot;
+   6b 616374696f 6e5f74797065           # text(11) &quot;action_type&quot;
+   70 536574746c 6543726f7373 436f6f70 # text(16) &quot;SettleCrossCoop&quot;
+   6b 616374696f 6e5f68617368           # text(11) &quot;action_hash&quot;
+   5820 12345678 90abcdef 12345678...   # bytes(32)
+   6a 73746174 655f726f6f74             # text(10) &quot;state_root&quot;
+   5820 fedcba98 76543210 fedcba98...   # bytes(32)
+   70 707265765f 73746174 655f726f6f74 # text(15) &quot;prev_state_root&quot;
+   5820 00000000 00000000 00000000...   # bytes(32)
+   68 73657175 656e6365                 # text(8) &quot;sequence&quot;
+   01                                   # unsigned(1)
+   69 74696d65 7374616d70               # text(9) &quot;timestamp&quot;
+   1a 67679a88                          # unsigned(1735905000)
+   6d 636f6e66 69726d61 74696f6e73     # text(13) &quot;confirmations&quot;
+   82                                   # array(2)
+      78 3c 6469643a 69636e3a 7a364d6b 686158674... # text(60) &quot;did:icn:z6Mkha...&quot;
+      78 3c 6469643a 69636e3a 7a364d6b 664e7a54... # text(60) &quot;did:icn:z6MkfN...&quot;
+   70 64656369 73696f6e 5f726563 6f726473 # text(16) &quot;decision_records&quot;
+   a0                                   # map(0)
+   69 7369676e 61747572 65             # text(9) &quot;signature&quot;
+   5840 01234567 89abcdef 01234567...   # bytes(64)
+</code></pre>
+<p><strong>Typed Hash (domain: <code>icn-federation:governance-proof:v1</code>):</strong></p>
+<pre><code>0x3f8c9d2e1a7b6c4d5e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d
+</code></pre>
+<h3>8.2 Action Hash Computation</h3>
+<p><strong>Input FederationAction (SettleCrossCoop):</strong></p>
+<pre><code class="language-json">{
+  &quot;settlements&quot;: [
+    {
+      &quot;from_coop&quot;: &quot;did:icn:food-coop:z6Mkh...&quot;,
+      &quot;to_coop&quot;: &quot;did:icn:tool-coop:z6Mkf...&quot;,
+      &quot;amount&quot;: 1000,
+      &quot;currency&quot;: &quot;food-coop:HOURS&quot;
+    }
+  ]
+}
+</code></pre>
+<p><strong>Canonical CBOR:</strong></p>
+<pre><code>a1                                      # map(1)
+   6b 73657474 6c656d65 6e7473         # text(11) &quot;settlements&quot;
+   81                                   # array(1)
+      a4                                # map(4)
+         69 66726f6d 5f636f6f 70       # text(9) &quot;from_coop&quot;
+         78 2c 6469643a 69636e3a 666f6f642d... # text(44) &quot;did:icn:food-coop:...&quot;
+         67 746f5f63 6f6f70             # text(7) &quot;to_coop&quot;
+         78 2c 6469643a 69636e3a 746f6f6c2d... # text(44) &quot;did:icn:tool-coop:...&quot;
+         66 616d6f75 6e74                # text(6) &quot;amount&quot;
+         1903e8                          # unsigned(1000)
+         68 63757272 656e6379           # text(8) &quot;currency&quot;
+         72 666f6f64 2d636f6f 703a484f 555253 # text(18) &quot;food-coop:HOURS&quot;
+</code></pre>
+<p><strong>Typed Hash (domain: <code>icn-federation:action:v1</code>):</strong></p>
+<pre><code>0x7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b
+</code></pre>
+<hr>
+<h2>9. Compliance Checklist</h2>
+<p>Implementations MUST satisfy the following requirements:</p>
+<h3>9.1 Encoding Format</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Uses CBOR for canonical encoding</li>
+<li><input disabled="" type="checkbox"> Uses definite-length encoding (no break codes)</li>
+<li><input disabled="" type="checkbox"> Encodes integers in shortest form</li>
+<li><input disabled="" type="checkbox"> Sorts CBOR map keys bytewise lexicographically</li>
+<li><input disabled="" type="checkbox"> Uses <code>BTreeMap&lt;K, V&gt;</code>, not <code>HashMap&lt;K, V&gt;</code></li>
+<li><input disabled="" type="checkbox"> Uses <code>BTreeSet&lt;T&gt;</code>, not <code>HashSet&lt;T&gt;</code></li>
+<li><input disabled="" type="checkbox"> Sorts set-like <code>Vec&lt;T&gt;</code> before encoding</li>
+</ul>
+<h3>9.2 Cryptographic Primitives</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Uses BLAKE3 for content hashing</li>
+<li><input disabled="" type="checkbox"> Uses typed hashing with domain separation</li>
+<li><input disabled="" type="checkbox"> Uses Ed25519 for signatures</li>
+<li><input disabled="" type="checkbox"> Supports ML-DSA for post-quantum signatures</li>
+<li><input disabled="" type="checkbox"> Verifies signatures against canonical payloads</li>
+</ul>
+<h3>9.3 Identifiers</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Normalizes DIDs before encoding</li>
+<li><input disabled="" type="checkbox"> Normalizes CurrencyIds before encoding</li>
+<li><input disabled="" type="checkbox"> Normalizes CellIds before encoding</li>
+<li><input disabled="" type="checkbox"> Validates identifier formats</li>
+</ul>
+<h3>9.4 Arithmetic</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Uses checked arithmetic for all consensus-critical operations</li>
+<li><input disabled="" type="checkbox"> Validates numeric ranges before encoding</li>
+<li><input disabled="" type="checkbox"> Returns errors on overflow/underflow</li>
+</ul>
+<h3>9.5 Trait Implementation</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Implements <code>Canonicalize</code> trait for all signed/hashed objects</li>
+<li><input disabled="" type="checkbox"> Implements <code>CanonicalEncode</code> trait</li>
+<li><input disabled="" type="checkbox"> Provides <code>is_canonical()</code> verification</li>
+</ul>
+<h3>9.6 Test Coverage</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Includes test vectors for all canonical objects</li>
+<li><input disabled="" type="checkbox"> Tests hash stability across versions</li>
+<li><input disabled="" type="checkbox"> Tests cross-implementation compatibility</li>
+<li><input disabled="" type="checkbox"> Tests edge cases (empty collections, max values, special characters)</li>
+</ul>
+<hr>
+<h2>10. Security Considerations</h2>
+<h3>10.1 Hash Collision Attacks</h3>
+<p><strong>Threat:</strong> An attacker creates two different objects with the same hash.</p>
+<p><strong>Mitigation:</strong></p>
+<ul>
+<li>Use BLAKE3 (128-bit collision resistance)</li>
+<li>Use typed hashing to prevent cross-protocol collisions</li>
+<li>Validate object structure before hashing</li>
+</ul>
+<h3>10.2 Signature Malleability</h3>
+<p><strong>Threat:</strong> An attacker modifies a signature without invalidating it.</p>
+<p><strong>Mitigation:</strong></p>
+<ul>
+<li>Ed25519 signatures are non-malleable (RFC 8032)</li>
+<li>Verify signatures against canonical payloads only</li>
+<li>Reject non-canonical encodings</li>
+</ul>
+<h3>10.3 Integer Overflow</h3>
+<p><strong>Threat:</strong> Arithmetic overflow causes incorrect state transitions.</p>
+<p><strong>Mitigation:</strong></p>
+<ul>
+<li>Use checked arithmetic</li>
+<li>Validate ranges before encoding</li>
+<li>Use larger integer types where appropriate (i64, u64)</li>
+</ul>
+<h3>10.4 Identifier Confusion</h3>
+<p><strong>Threat:</strong> Similar-looking identifiers are confused (homograph attack).</p>
+<p><strong>Mitigation:</strong></p>
+<ul>
+<li>Normalize identifiers before comparison</li>
+<li>Validate identifier formats</li>
+<li>Use case-sensitive comparison for Base58btc components</li>
+</ul>
+<h3>10.5 Canonicalization Bypass</h3>
+<p><strong>Threat:</strong> An attacker submits non-canonical objects that pass validation.</p>
+<p><strong>Mitigation:</strong></p>
+<ul>
+<li>Always canonicalize before signing/hashing</li>
+<li>Reject non-canonical objects at verification</li>
+<li>Implement <code>is_canonical()</code> checks</li>
+</ul>
+<hr>
+<h2>11. References</h2>
+<ul>
+<li><a href="https://www.rfc-editor.org/rfc/rfc2119" target="_blank" rel="noopener">RFC 2119</a> - Key words for use in RFCs</li>
+<li><a href="https://www.rfc-editor.org/rfc/rfc8949" target="_blank" rel="noopener">RFC 8949</a> - Concise Binary Object Representation (CBOR)</li>
+<li><a href="https://www.rfc-editor.org/rfc/rfc8785" target="_blank" rel="noopener">RFC 8785</a> - JSON Canonicalization Scheme (JCS)</li>
+<li><a href="https://www.rfc-editor.org/rfc/rfc8032" target="_blank" rel="noopener">RFC 8032</a> - Edwards-Curve Digital Signature Algorithm (EdDSA)</li>
+<li><a href="https://github.com/BLAKE3-team/BLAKE3-specs/blob/master/blake3.pdf" target="_blank" rel="noopener">BLAKE3 Specification</a></li>
+<li><a href="https://github.com/multiformats/multibase" target="_blank" rel="noopener">Multibase Specification</a></li>
+</ul>
+<hr>
+<h2>Appendix A: Rust Implementation Example</h2>
+<pre><code class="language-rust">use serde::{Serialize, Deserialize};
+use std::collections::BTreeMap;
+
+/// Trait for objects requiring canonical encoding
+pub trait Canonicalize {
+    fn canonicalize(&amp;mut self);
+    fn is_canonical(&amp;self) -&gt; bool;
+}
+
+/// Trait for canonical CBOR encoding
+pub trait CanonicalEncode: Canonicalize + Serialize {
+    fn encode_canonical(&amp;mut self) -&gt; Result&lt;Vec&lt;u8&gt;, Error&gt; {
+        self.canonicalize();
+        let mut buf = Vec::new();
+        ciborium::ser::into_writer(self, &amp;mut buf)
+            .map_err(|e| Error::EncodingError(e.to_string()))?;
+        Ok(buf)
+    }
+    
+    fn hash_canonical(&amp;mut self, domain: &amp;str) -&gt; Result&lt;[u8; 32], Error&gt; {
+        let encoded = self.encode_canonical()?;
+        Ok(typed_hash(domain, &amp;encoded))
+    }
+}
+
+/// Typed hash with domain separation
+pub fn typed_hash(domain: &amp;str, data: &amp;[u8]) -&gt; [u8; 32] {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(domain.as_bytes());
+    hasher.update(&amp;[0x00]);
+    hasher.update(data);
+    (*hasher.finalize().as_bytes()).into()
+}
+
+/// Example: GovernanceProof with canonical encoding
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct GovernanceProof {
+    pub federation_id: String,
+    pub action_type: ActionType,
+    pub action_hash: [u8; 32],
+    pub state_root: [u8; 32],
+    pub prev_state_root: [u8; 32],
+    pub sequence: u64,
+    pub timestamp: u64,
+    pub decision_records: BTreeMap&lt;String, Vec&lt;u8&gt;&gt;,  // Ordered map
+    /// Multi-signature map: keyed by signer DID (string form), values are Ed25519 signatures.
+    /// BTreeMap ensures deterministic ordering for canonical encoding.
+    pub signatures: BTreeMap&lt;String, [u8; 64]&gt;,
+}
+
+impl Canonicalize for GovernanceProof {
+    fn canonicalize(&amp;mut self) {
+        // BTreeMap fields (signatures, decision_records) are already ordered by key
+        
+        // Normalize identifiers (omitted for brevity)
+    }
+    
+    fn is_canonical(&amp;self) -&gt; bool {
+        // BTreeMap guarantees sorted keys, so signatures are already canonical
+        true
+    }
+}
+
+impl CanonicalEncode for GovernanceProof {}
+</code></pre>
+<hr>
+<p><strong>Document Status:</strong> NORMATIVE - Implementations MUST comply with this specification.</p>
+<p><strong>Change History:</strong></p>
+<ul>
+<li>2026-02-02: Initial version 1.0</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

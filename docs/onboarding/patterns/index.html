@@ -1,0 +1,686 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Common Patterns Reference | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>onboarding</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>patterns</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/onboarding/patterns.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Common Patterns Reference</h1>
+<p>This guide documents recurring patterns used throughout the ICN codebase. Use
+it as a quick reference when reading or writing code.</p>
+<p>Each pattern includes:</p>
+<ul>
+<li><strong>Template code</strong> showing the pattern</li>
+<li><strong>Where to find examples</strong> in the codebase</li>
+<li><strong>Introduced in</strong> which path layer introduces the pattern</li>
+<li><strong>Exercised by</strong> which lab practices the pattern</li>
+<li><strong>Failure mode</strong> what breaks if the pattern is misused</li>
+</ul>
+<hr>
+<h2>Pattern 1: Actor</h2>
+<p>ICN uses an actor model for concurrent subsystems. Each actor encapsulates
+state and exposes a handle for interaction.</p>
+<h3>Structure</h3>
+<pre><code class="language-rust">// The actor struct holds state
+pub struct MyActor {
+    state: InternalState,
+    // ...
+}
+
+// The handle provides concurrent access
+pub struct MyActorHandle {
+    inner: Arc&lt;RwLock&lt;MyActor&gt;&gt;,
+}
+
+impl MyActorHandle {
+    pub async fn do_something(&amp;self) -&gt; Result&lt;()&gt; {
+        let actor = self.inner.write().await;
+        actor.internal_operation()
+    }
+}
+</code></pre>
+<h3>Where to find examples</h3>
+<ul>
+<li><code>icn/crates/icn-gossip/src/gossip.rs</code>: GossipActor</li>
+<li><code>icn/crates/icn-net/src/actor/mod.rs</code>: NetworkActor</li>
+<li><code>icn/crates/icn-ledger/src/ledger.rs</code>: Ledger</li>
+</ul>
+<h3>Introduced in</h3>
+<p><code>path/phase-2-architecture/04-actors-and-concurrency.md</code> (Phase 2, Layer 04)</p>
+<h3>Exercised by</h3>
+<p><code>labs/lab-03-mini-actor/</code> — Build actor with bounded mailbox and sequential message processing</p>
+<h3>Failure mode</h3>
+<p><strong>Shared mutable state without locks</strong>: If multiple threads access actor state directly (bypassing the handle), you get data races. The actor pattern prevents this by encapsulating state and forcing message-based communication.</p>
+<hr>
+<h2>Pattern 2: Error Handling</h2>
+<p>Use thiserror for domain-specific errors, anyhow for error propagation at boundaries.</p>
+<h3>Domain errors with thiserror</h3>
+<pre><code class="language-rust">#[derive(Debug, thiserror::Error)]
+pub enum MyError {
+    #[error(&quot;Not found: {0}&quot;)]
+    NotFound(String),
+    #[error(&quot;Invalid state: {reason}&quot;)]
+    InvalidState { reason: String },
+}
+</code></pre>
+<h3>Propagation with anyhow</h3>
+<pre><code class="language-rust">use anyhow::{Context, Result};
+
+fn load_config(path: &amp;Path) -&gt; Result&lt;Config&gt; {
+    let data = std::fs::read_to_string(path)
+        .context(&quot;Failed to read config file&quot;)?;
+    let config: Config = toml::from_str(&amp;data)
+        .context(&quot;Failed to parse config&quot;)?;
+    Ok(config)
+}
+</code></pre>
+<h3>Where to find examples</h3>
+<ul>
+<li><code>icn/crates/icn-federation/src/error.rs</code>: Domain errors</li>
+<li><code>icn/crates/icn-core/src/runtime.rs</code>: Error propagation</li>
+</ul>
+<h2>Async Callbacks for Inter-Actor Communication</h2>
+<p>Actors communicate via callbacks instead of direct dependencies.</p>
+<h3>Pattern</h3>
+<pre><code class="language-rust">pub type SendCallback = Arc&lt;dyn Fn(&amp;str, Vec&lt;u8&gt;) -&gt; Result&lt;()&gt; + Send + Sync&gt;;
+
+impl MyActor {
+    pub fn set_send_callback(&amp;mut self, callback: SendCallback) {
+        self.send_callback = Some(callback);
+    }
+
+    fn send_message(&amp;self, topic: &amp;str, data: Vec&lt;u8&gt;) -&gt; Result&lt;()&gt; {
+        if let Some(ref cb) = self.send_callback {
+            cb(topic, data)?;
+        }
+        Ok(())
+    }
+}
+</code></pre>
+<h3>Where to find examples</h3>
+<ul>
+<li><code>icn/crates/icn-gossip/src/gossip.rs</code>: Send callbacks</li>
+<li><code>icn/crates/icn-federation/src/gossip.rs</code>: GossipSendCallback</li>
+</ul>
+<h2>Store Abstraction for Persistence</h2>
+<p>Storage is abstracted behind traits, allowing different backends.</p>
+<h3>Pattern</h3>
+<pre><code class="language-rust">pub trait Store: Send + Sync {
+    fn get(&amp;self, key: &amp;[u8]) -&gt; Result&lt;Option&lt;Vec&lt;u8&gt;&gt;&gt;;
+    fn put(&amp;self, key: &amp;[u8], value: &amp;[u8]) -&gt; Result&lt;()&gt;;
+    fn delete(&amp;self, key: &amp;[u8]) -&gt; Result&lt;()&gt;;
+}
+
+// Concrete implementation
+pub struct SledStore {
+    db: sled::Db,
+}
+</code></pre>
+<h3>Namespaced storage</h3>
+<pre><code class="language-rust">const KEY_PREFIX: &amp;[u8] = b&quot;agreement:&quot;;
+
+fn make_key(id: &amp;str) -&gt; Vec&lt;u8&gt; {
+    let mut key = KEY_PREFIX.to_vec();
+    key.extend(id.as_bytes());
+    key
+}
+</code></pre>
+<h3>Where to find examples</h3>
+<ul>
+<li><code>icn/crates/icn-store/src/lib.rs</code>: Store trait</li>
+<li><code>icn/crates/icn-federation/src/agreement/store.rs</code>: Namespaced storage</li>
+</ul>
+<h2>Builder Pattern for Complex Configuration</h2>
+<h3>Pattern</h3>
+<pre><code class="language-rust">pub struct ConfigBuilder {
+    timeout: Option&lt;Duration&gt;,
+    max_retries: Option&lt;u32&gt;,
+}
+
+impl ConfigBuilder {
+    pub fn new() -&gt; Self {
+        Self { timeout: None, max_retries: None }
+    }
+
+    pub fn timeout(mut self, d: Duration) -&gt; Self {
+        self.timeout = Some(d);
+        self
+    }
+
+    pub fn max_retries(mut self, n: u32) -&gt; Self {
+        self.max_retries = Some(n);
+        self
+    }
+
+    pub fn build(self) -&gt; Config {
+        Config {
+            timeout: self.timeout.unwrap_or(Duration::from_secs(30)),
+            max_retries: self.max_retries.unwrap_or(3),
+        }
+    }
+}
+</code></pre>
+<h3>Where to find examples</h3>
+<ul>
+<li><code>icn/crates/icn-obs/src/otel.rs</code>: TracingConfig</li>
+<li><code>icn/crates/icn-core/src/config/</code>: Configuration builders</li>
+</ul>
+<h2>Lifecycle State Machines</h2>
+<p>Many components have explicit lifecycle states.</p>
+<h3>Pattern</h3>
+<pre><code class="language-rust">#[derive(Debug, Clone, PartialEq)]
+pub enum Status {
+    Draft,
+    Pending,
+    Active,
+    Terminated,
+}
+
+impl MyEntity {
+    pub fn transition_to(&amp;mut self, new_status: Status) -&gt; Result&lt;()&gt; {
+        match (&amp;self.status, &amp;new_status) {
+            (Status::Draft, Status::Pending) =&gt; {}
+            (Status::Pending, Status::Active) =&gt; {}
+            (Status::Active, Status::Terminated) =&gt; {}
+            _ =&gt; return Err(Error::InvalidTransition),
+        }
+        self.status = new_status;
+        Ok(())
+    }
+}
+</code></pre>
+<h3>Where to find examples</h3>
+<ul>
+<li><code>icn/crates/icn-federation/src/agreement/types.rs</code>: AgreementStatus</li>
+<li><code>icn/crates/icn-governance/src/proposal.rs</code>: ProposalStatus</li>
+</ul>
+<h2>Metrics Integration</h2>
+<p>Metrics follow a consistent naming and registration pattern.</p>
+<h3>Pattern</h3>
+<pre><code class="language-rust">use metrics::{counter, gauge, histogram};
+
+pub fn init_descriptions() {
+    metrics::describe_counter!(
+        &quot;icn_my_counter_total&quot;,
+        &quot;Description of what this counter measures&quot;
+    );
+}
+
+pub fn my_counter_inc() {
+    counter!(&quot;icn_my_counter_total&quot;).increment(1);
+}
+
+pub fn my_gauge_set(value: f64) {
+    gauge!(&quot;icn_my_gauge&quot;).set(value);
+}
+
+pub fn my_histogram_observe(value: f64) {
+    histogram!(&quot;icn_my_duration_seconds&quot;).record(value);
+}
+</code></pre>
+<h3>Naming convention</h3>
+<ul>
+<li><code>icn_{subsystem}_{metric}_{unit}</code></li>
+<li>Counters end with <code>_total</code></li>
+<li>Histograms for durations end with <code>_seconds</code></li>
+</ul>
+<h3>Where to find examples</h3>
+<ul>
+<li><code>icn/crates/icn-obs/src/metrics/</code>: All metric modules</li>
+<li><code>icn/crates/icn-federation/src/metrics.rs</code>: Federation metrics</li>
+</ul>
+<h2>Trust-Gated Operations</h2>
+<p>Operations may be gated based on trust scores.</p>
+<h3>Pattern</h3>
+<pre><code class="language-rust">pub enum TrustClass {
+    Isolated,   // &lt; 0.1
+    Known,      // 0.1 - 0.4
+    Partner,    // 0.4 - 0.7
+    Federated,  // &gt; 0.7
+}
+
+impl TrustClass {
+    pub fn from_score(score: f64) -&gt; Self {
+        match score {
+            s if s &lt; 0.1 =&gt; Self::Isolated,
+            s if s &lt; 0.4 =&gt; Self::Known,
+            s if s &lt; 0.7 =&gt; Self::Partner,
+            _ =&gt; Self::Federated,
+        }
+    }
+
+    pub fn rate_limit(&amp;self) -&gt; u32 {
+        match self {
+            Self::Isolated =&gt; 10,
+            Self::Known =&gt; 50,
+            Self::Partner =&gt; 100,
+            Self::Federated =&gt; 200,
+        }
+    }
+}
+</code></pre>
+<h3>Where to find examples</h3>
+<ul>
+<li><code>icn-security/src/rate_limit.rs</code>: Trust-based rate limiting</li>
+<li><code>icn-gossip/src/access.rs</code>: Topic access control</li>
+</ul>
+<h2>Shutdown Coordination</h2>
+<p>Graceful shutdown uses broadcast channels.</p>
+<h3>Pattern</h3>
+<pre><code class="language-rust">use tokio::sync::broadcast;
+
+let (shutdown_tx, _) = broadcast::channel::&lt;()&gt;(1);
+
+// In each actor
+let mut shutdown_rx = shutdown_tx.subscribe();
+tokio::select! {
+    _ = normal_work() =&gt; {}
+    _ = shutdown_rx.recv() =&gt; {
+        info!(&quot;Received shutdown signal&quot;);
+        break;
+    }
+}
+
+// To trigger shutdown
+drop(shutdown_tx);
+// Or explicit send
+shutdown_tx.send(())?;
+</code></pre>
+<h3>Where to find examples</h3>
+<ul>
+<li><code>icn/crates/icn-core/src/runtime.rs</code>: Shutdown channel setup</li>
+<li><code>icn/crates/icn-core/src/supervisor/init_federation.rs</code>: Shutdown receiver in tasks</li>
+</ul>
+<h2>Serialization with Postcard</h2>
+<p>Binary serialization uses postcard for compact encoding.</p>
+<h3>Pattern</h3>
+<pre><code class="language-rust">use serde::{Serialize, Deserialize};
+use postcard;
+
+#[derive(Serialize, Deserialize)]
+pub struct Message {
+    pub id: u64,
+    pub payload: Vec&lt;u8&gt;,
+}
+
+// Serialize
+let bytes = postcard::to_allocvec(&amp;msg)?;
+
+// Deserialize
+let msg: Message = postcard::from_bytes(&amp;bytes)?;
+</code></pre>
+<h3>Where to find examples</h3>
+<ul>
+<li><code>icn-gossip/src/message.rs</code>: Gossip message encoding</li>
+<li><code>icn/crates/icn-federation/src/agreement/types.rs</code>: Agreement serialization</li>
+</ul>
+<hr>
+<h2>Pattern 11: PolicyOracle / Meaning Firewall</h2>
+<p>The central architectural pattern: apps translate domain semantics into generic constraints the kernel enforces.</p>
+<h3>Structure</h3>
+<pre><code class="language-rust">// In icn/crates/icn-kernel-api/src/authz.rs
+#[async_trait]
+pub trait PolicyOracle: Send + Sync {
+    fn evaluate(&amp;self, request: &amp;PolicyRequest) -&gt; PolicyDecision;
+}
+
+pub struct PolicyRequest {
+    pub core: PolicyRequestCore,
+    pub context: PolicyContext,
+}
+
+pub enum PolicyDecision {
+    Allow { constraints: ConstraintSet },
+    Deny { reason: PolicyError },
+}
+
+pub struct ConstraintSet {
+    pub rate_limit: Option&lt;RateLimit&gt;,
+    pub custom: HashMap&lt;String, ConstraintValue&gt;,
+}
+
+// In icn/crates/icn-gateway/src/trust_mgr.rs
+impl PolicyOracle for TrustPolicyOracle {
+    fn evaluate(&amp;self, request: &amp;PolicyRequest) -&gt; PolicyDecision {
+        // 1. Query domain-specific state
+        let trust_score = self.trust_graph.compute_trust(request.actor(), request.actor());
+        
+        // 2. Translate to constraints (THIS IS THE FIREWALL BOUNDARY)
+        let constraints = self.trust_score_to_constraints(trust_score);
+        
+        // 3. Return generic decision
+        PolicyDecision::allow_with(constraints)
+    }
+}
+
+fn trust_score_to_constraints(&amp;self, score: f64) -&gt; ConstraintSet {
+    ConstraintSet {
+        rate_limit: Some(RateLimit {
+            max_requests: (score * 100.0) as u32,
+            window: Duration::from_secs(60),
+        }),
+        ..Default::default()
+    }
+}
+</code></pre>
+<h3>Where to find examples</h3>
+<ul>
+<li><code>icn/crates/icn-kernel-api/src/authz.rs</code>: PolicyOracle trait definition</li>
+<li><code>icn/crates/icn-gateway/src/trust_mgr.rs</code>: Trust scores → constraints</li>
+<li><code>icn/crates/icn-kernel-api/src/bootstrap.rs</code>: Oracle registry + domain routing</li>
+</ul>
+<h3>Introduced in</h3>
+<p><code>path/phase-2-architecture/05-the-meaning-firewall.md</code> (Phase 2, Layer 05 — <strong>KEYSTONE</strong>)</p>
+<h3>Exercised by</h3>
+<p><code>labs/lab-04-firewall-oracle/</code> — <strong>THE KEYSTONE LAB</strong> — Build kernel, domain, oracle crates with compile-time boundary enforcement</p>
+<h3>Failure mode</h3>
+<p><strong>Kernel importing domain crates</strong>: If <code>icn-core</code> imports <code>icn-trust</code> directly, the kernel now understands trust semantics, breaking the firewall. This prevents cooperative governance from changing policy without kernel rewrites. CI tests enforce this via compile-time dependency checks.</p>
+<hr>
+<h2>Pattern 12: Receipt Pattern</h2>
+<p>Operations return structured receipts (Accepted, Rejected, Quarantined), not &quot;accepted&quot; lies.</p>
+<h3>Structure</h3>
+<pre><code class="language-rust">pub enum Receipt&lt;T&gt; {
+    Accepted(T),
+    Rejected { reason: String },
+    Quarantined { id: String, reason: String },
+}
+
+impl Ledger {
+    pub fn submit_entry(&amp;mut self, entry: JournalEntry) -&gt; Receipt&lt;EntryId&gt; {
+        match self.validate(&amp;entry) {
+            Ok(()) =&gt; {
+                let id = self.store_entry(entry)?;
+                Receipt::Accepted(id)
+            }
+            Err(e) if e.is_recoverable() =&gt; {
+                self.quarantine.insert(entry.id.clone(), QuarantinedEntry {
+                    entry,
+                    reason: e.to_string(),
+                    timestamp: Timestamp::now(),
+                });
+                Receipt::Quarantined {
+                    id: entry.id,
+                    reason: e.to_string(),
+                }
+            }
+            Err(e) =&gt; {
+                Receipt::Rejected {
+                    reason: e.to_string(),
+                }
+            }
+        }
+    }
+}
+</code></pre>
+<h3>Where to find examples</h3>
+<ul>
+<li><code>icn/crates/icn-ledger/src/ledger.rs</code>: Quarantine system (submit_entry path)</li>
+<li><code>icn/crates/icn-core/src/dead_letter.rs</code>: DeadLetterQueue for failed operations</li>
+</ul>
+<h3>Introduced in</h3>
+<p><code>path/phase-1-foundations/03-errors-and-tracing.md</code> (Phase 1, Layer 03)</p>
+<h3>Exercised by</h3>
+<p><code>labs/lab-02-error-receipt/</code> — Add structured receipts and tracing to workspace</p>
+<h3>Failure mode</h3>
+<p><strong>Silently dropping failures</strong>: If you return <code>Ok(())</code> for entries that failed validation, users think their data was accepted when it wasn&#39;t. Quarantine makes failures visible and debuggable.</p>
+<hr>
+<h2>Pattern 13: OracleRegistry</h2>
+<p>Phase-aware bootstrap with atomic oracle replacement via ArcSwap.</p>
+<h3>Structure</h3>
+<pre><code class="language-rust">// In icn/crates/icn-kernel-api/src/bootstrap.rs
+pub struct OracleRegistry {
+    oracles: Arc&lt;DashMap&lt;Domain, Arc&lt;dyn PolicyOracle&gt;&gt;&gt;,
+    phase: Arc&lt;ArcSwap&lt;BootstrapPhase&gt;&gt;,
+}
+
+pub enum BootstrapPhase {
+    Genesis,        // No oracles, fallback to AllowAllOracle
+    CoreApps,       // Trust/Ledger loaded, limited functionality
+    Running,        // Full system operational
+}
+
+impl OracleRegistry {
+    pub fn register(&amp;self, domain: Domain, oracle: Arc&lt;dyn PolicyOracle&gt;) {
+        self.oracles.insert(domain, oracle);
+    }
+    
+    pub fn set_phase(&amp;self, phase: BootstrapPhase) {
+        self.phase.store(Arc::new(phase));
+    }
+    
+    pub async fn evaluate(&amp;self, domain: Domain, request: PolicyRequest) -&gt; PolicyDecision {
+        let phase = self.phase.load();
+        
+        match **phase {
+            BootstrapPhase::Genesis =&gt; {
+                // Fallback: allow everything during bootstrap
+                PolicyDecision::allow()
+            }
+            _ =&gt; {
+                let oracle = self.oracles.get(&amp;domain)?;
+                oracle.evaluate(request).await
+            }
+        }
+    }
+}
+</code></pre>
+<h3>Where to find examples</h3>
+<ul>
+<li><code>icn/crates/icn-kernel-api/src/bootstrap.rs</code>: OracleRegistry implementation</li>
+<li><code>icn/crates/icn-core/src/supervisor/mod.rs</code>: Oracle registration during startup</li>
+</ul>
+<h3>Introduced in</h3>
+<p><code>path/phase-2-architecture/05-the-meaning-firewall.md</code> (Phase 2, Layer 05)</p>
+<h3>Exercised by</h3>
+<p><code>labs/lab-04-firewall-oracle/</code> — Implement phased oracle loading</p>
+<h3>Failure mode</h3>
+<p><strong>Oracles not ready during startup</strong>: If the kernel tries to evaluate requests before oracles are registered, it either panics or allows everything (insecure). Phased bootstrap allows graceful degradation.</p>
+<hr>
+<h2>Pattern 14: Double-Entry Invariant</h2>
+<p>Enforce balanced entries at validation time, reject unbalanced entries.</p>
+<h3>Structure</h3>
+<pre><code class="language-rust">impl Ledger {
+    fn validate_entry(&amp;self, entry: &amp;JournalEntry) -&gt; Result&lt;(), LedgerError&gt; {
+        // Invariant: Sum of all postings must be zero (double-entry)
+        let sum: i64 = entry.postings.iter().map(|p| p.amount).sum();
+        
+        if sum != 0 {
+            return Err(LedgerError::UnbalancedEntry { sum });
+        }
+        
+        // Other invariants...
+        Ok(())
+    }
+    
+    pub fn submit_entry(&amp;mut self, entry: JournalEntry) -&gt; Result&lt;(), LedgerError&gt; {
+        self.validate_entry(&amp;entry)?;
+        self.store.put(entry_key(&amp;entry.id), serialize(&amp;entry)?)?;
+        self.update_cached_balances(&amp;entry);
+        Ok(())
+    }
+}
+</code></pre>
+<h3>Where to find examples</h3>
+<ul>
+<li><code>icn/crates/icn-ledger/src/ledger.rs</code>: <code>validate_entry()</code> function (lines ~487-520)</li>
+<li><code>icn/crates/icn-ledger/tests/dynamic_limits_integration.rs</code>: Tests proving invariants</li>
+</ul>
+<h3>Introduced in</h3>
+<p><code>path/phase-2-architecture/06-persistence-and-ledger.md</code> (Phase 2, Layer 06)</p>
+<h3>Exercised by</h3>
+<p><code>labs/lab-05-mini-ledger/</code> — Implement double-entry ledger with quarantine</p>
+<h3>Failure mode</h3>
+<p><strong>Accepting unbalanced entries</strong>: If you skip the sum check, you violate conservation of value. This breaks accounting integrity and causes mysterious balance mismatches. The invariant must be enforced at the storage boundary.</p>
+<hr>
+<h2>Pattern 15: Handle Holder</h2>
+<p>Use <code>Arc&lt;RwLock&lt;Option&lt;Handle&gt;&gt;&gt;</code> for late-bound actors during phased initialization.</p>
+<h3>Structure</h3>
+<pre><code class="language-rust">// During supervisor initialization
+let gossip_handle_holder = Arc::new(RwLock::new(None));
+
+// Clone for callback setup (before actor spawned)
+let gossip_handle_clone = gossip_handle_holder.clone();
+
+// Spawn actor
+let gossip_handle = spawn_gossip_actor(config).await?;
+
+// Store handle
+*gossip_handle_holder.write().await = Some(gossip_handle);
+
+// Later use (in callback or other actor)
+if let Some(ref handle) = *gossip_handle_clone.read().await {
+    handle.announce(topic, data).await?;
+} else {
+    return Err(&quot;Gossip actor not initialized yet&quot;);
+}
+</code></pre>
+<h3>Where to find examples</h3>
+<ul>
+<li><code>icn/crates/icn-core/src/supervisor/init_gossip.rs</code>: Gossip handle holder</li>
+<li><code>icn/crates/icn-core/src/supervisor/init_network.rs</code>: Network handle holder</li>
+</ul>
+<h3>Introduced in</h3>
+<p><code>path/phase-2-architecture/04-actors-and-concurrency.md</code> (Phase 2, Layer 04)</p>
+<h3>Exercised by</h3>
+<p><code>labs/lab-03-mini-actor/</code> — Implement late-bound handle pattern</p>
+<h3>Failure mode</h3>
+<p><strong>Circular dependencies</strong>: If Actor A needs Actor B&#39;s handle and Actor B needs Actor A&#39;s handle, you can&#39;t spawn either first. Handle holders break the cycle: spawn A with empty holder, spawn B with A&#39;s handle, fill A&#39;s holder with B&#39;s handle.</p>
+<hr>
+<h2>Pattern 16: Quarantine</h2>
+<p>Isolate entries that fail validation instead of dropping them.</p>
+<h3>Structure</h3>
+<pre><code class="language-rust">pub struct QuarantinedEntry {
+    pub entry: JournalEntry,
+    pub reason: String,
+    pub timestamp: Timestamp,
+}
+
+pub struct Ledger {
+    store: Arc&lt;dyn Store&gt;,
+    quarantine: HashMap&lt;EntryId, QuarantinedEntry&gt;,
+    // ...
+}
+
+impl Ledger {
+    pub fn submit_entry(&amp;mut self, entry: JournalEntry) -&gt; Result&lt;(), LedgerError&gt; {
+        match self.validate_entry(&amp;entry) {
+            Ok(()) =&gt; {
+                self.store.put(entry_key(&amp;entry.id), serialize(&amp;entry)?)?;
+                Ok(())
+            }
+            Err(e) =&gt; {
+                // Don&#39;t drop — quarantine with reason
+                self.quarantine.insert(entry.id.clone(), QuarantinedEntry {
+                    entry,
+                    reason: e.to_string(),
+                    timestamp: Timestamp::now(),
+                });
+                
+                metrics::counter!(&quot;ledger_validation_failures_total&quot;,
+                    &quot;reason&quot; =&gt; error_type(&amp;e)).increment(1);
+                
+                Err(e)
+            }
+        }
+    }
+    
+    pub fn get_quarantine(&amp;self) -&gt; &amp;HashMap&lt;EntryId, QuarantinedEntry&gt; {
+        &amp;self.quarantine
+    }
+    
+    pub fn retry_quarantined(&amp;mut self, entry_id: &amp;EntryId) -&gt; Result&lt;(), LedgerError&gt; {
+        let quarantined = self.quarantine.remove(entry_id)?;
+        self.submit_entry(quarantined.entry)  // Retry with current validation rules
+    }
+}
+</code></pre>
+<h3>Where to find examples</h3>
+<ul>
+<li><code>icn/crates/icn-ledger/src/ledger.rs</code>: Quarantine system</li>
+<li><code>icn/crates/icn-ledger/tests/dynamic_limits_integration.rs</code>: Quarantine tests</li>
+</ul>
+<h3>Introduced in</h3>
+<p><code>path/phase-2-architecture/06-persistence-and-ledger.md</code> (Phase 2, Layer 06)</p>
+<h3>Exercised by</h3>
+<p><code>labs/lab-05-mini-ledger/</code> — Implement quarantine for unbalanced entries</p>
+<h3>Failure mode</h3>
+<p><strong>Silent data loss</strong>: If you drop failed entries without recording them, you lose data with no trace. Users can&#39;t debug why their entry disappeared. Quarantine makes failures visible and provides a recovery path if validation rules change.</p>
+<hr>
+<h2>Metadata Updates for Existing Patterns</h2>
+<h3>Pattern 2: Error Handling</h3>
+<p><strong>Introduced in</strong>: <code>path/phase-1-foundations/03-errors-and-tracing.md</code> (Phase 1, Layer 03)<br><strong>Exercised by</strong>: <code>labs/lab-02-error-receipt/</code></p>
+<h3>Pattern 3: Async Callbacks</h3>
+<p><strong>Introduced in</strong>: <code>path/phase-2-architecture/04-actors-and-concurrency.md</code> (Phase 2, Layer 04)<br><strong>Exercised by</strong>: <code>labs/lab-03-mini-actor/</code></p>
+<h3>Pattern 4: Store Abstraction</h3>
+<p><strong>Introduced in</strong>: <code>path/phase-2-architecture/06-persistence-and-ledger.md</code> (Phase 2, Layer 06)<br><strong>Exercised by</strong>: <code>labs/lab-05-mini-ledger/</code></p>
+<h3>Pattern 5: Builder</h3>
+<p><strong>Introduced in</strong>: <code>path/phase-1-foundations/02-rust-through-icn.md</code> (Phase 1, Layer 02)<br><strong>Exercised by</strong>: <code>labs/lab-01-workspace/</code></p>
+<h3>Pattern 6: Lifecycle State Machine</h3>
+<p><strong>Introduced in</strong>: <code>path/phase-1-foundations/02-rust-through-icn.md</code> (Phase 1, Layer 02)<br><strong>Exercised by</strong>: <code>labs/lab-08-governance-flow/</code> (proposal lifecycle)</p>
+<h3>Pattern 7: Metrics Integration</h3>
+<p><strong>Introduced in</strong>: <code>path/phase-1-foundations/03-errors-and-tracing.md</code> (Phase 1, Layer 03)<br><strong>Exercised by</strong>: <code>labs/lab-02-error-receipt/</code></p>
+<h3>Pattern 8: Trust-Gated Operations</h3>
+<p><strong>Introduced in</strong>: <code>path/phase-2-architecture/05-the-meaning-firewall.md</code> (Phase 2, Layer 05)<br><strong>Exercised by</strong>: <code>labs/lab-04-firewall-oracle/</code> (domain concept → constraint translation)</p>
+<h3>Pattern 9: Shutdown Coordination</h3>
+<p><strong>Introduced in</strong>: <code>path/phase-2-architecture/04-actors-and-concurrency.md</code> (Phase 2, Layer 04)<br><strong>Exercised by</strong>: <code>labs/lab-03-mini-actor/</code></p>
+<h3>Pattern 10: Serialization</h3>
+<p><strong>Introduced in</strong>: <code>path/phase-3-systems/08-network-and-gossip.md</code> (Phase 3, Layer 08)<br><strong>Exercised by</strong>: <code>labs/lab-07-gossip-sync/</code></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

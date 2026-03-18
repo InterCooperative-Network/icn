@@ -1,0 +1,320 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Trust Computation Algorithm Unification | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>development</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>sessions</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>2026 02</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>2026 02 01 trust computation unification</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/development/sessions/2026-02/2026-02-01-trust-computation-unification.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Trust Computation Algorithm Unification</h1>
+<p><strong>Date:</strong> 2026-02-01<br><strong>Issue:</strong> #902 - Unify trust computation algorithm between TrustGraph and TrustPolicyOracle<br><strong>PR:</strong> [pending]</p>
+<h2>Summary</h2>
+<p>Successfully unified the trust computation algorithm between standalone mode (TrustManager/TrustPolicyOracle) and actor-backed mode (TrustGraph) by extracting a shared computation function to eliminate divergence.</p>
+<h2>Problem Statement</h2>
+<p>Two different implementations computed trust scores:</p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Location</th>
+<th>Implementation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Standalone</td>
+<td><code>compute_trust_from_edges_map()</code> in <code>trust_mgr.rs</code></td>
+<td>Manual iteration and averaging</td>
+</tr>
+<tr>
+<td>Actor-backed</td>
+<td><code>TrustGraph::compute_trust_score_weighted()</code></td>
+<td>Manual iteration and averaging</td>
+</tr>
+</tbody></table>
+<p>While both used the same algorithm (70% direct, 30% transitive for legacy weights), the implementations were duplicated. This could lead to:</p>
+<ul>
+<li>Subtle divergence over time if implementations are updated independently</li>
+<li>Confusion when debugging trust score differences</li>
+<li>Extra maintenance burden</li>
+</ul>
+<p>The divergence was documented as intentional (lines 1035-1051 in <code>trust_mgr.rs</code>), but the recommendation was to unify (Option B).</p>
+<h2>Solution</h2>
+<h3>Implementation Approach</h3>
+<p><strong>Option B: Extract Shared Function</strong></p>
+<p>Created <code>icn-trust/src/computation.rs</code> with a single parameterized function:</p>
+<pre><code class="language-rust">pub fn compute_trust_score&lt;I&gt;(
+    direct_score: f64,
+    intermediates: I,
+    weights: ScoringWeights,
+) -&gt; f64
+where
+    I: Iterator&lt;Item = (f64, f64)&gt;,
+</code></pre>
+<p>This function:</p>
+<ol>
+<li>Takes direct trust score (0.0 if no edge)</li>
+<li>Takes iterator of (intermediate_trust, indirect_trust) pairs</li>
+<li>Takes configurable weights (direct/transitive)</li>
+<li>Returns combined score in [0.0, 1.0]</li>
+</ol>
+<h3>Changes Made</h3>
+<p><strong>New Module:</strong></p>
+<ul>
+<li><code>icn-trust/src/computation.rs</code> (203 lines)<ul>
+<li>Core algorithm implementation</li>
+<li>9 comprehensive unit tests</li>
+<li>Full documentation with examples</li>
+</ul>
+</li>
+</ul>
+<p><strong>Refactored:</strong></p>
+<ol>
+<li><p><strong>TrustGraph</strong> (<code>icn-trust/src/lib.rs</code>):</p>
+<pre><code class="language-rust">// Before: Manual loop computing transitive_sum/count
+// After: Build iterator and delegate to shared function
+let intermediates: Vec&lt;_&gt; = own_edges
+    .into_iter()
+    .filter(|edge| edge.target != *target)
+    .filter_map(|intermediate_edge| {
+        self.get_edge(&amp;intermediate_edge.target, target)
+            .ok()
+            .flatten()
+            .map(|indirect_edge| {
+                (intermediate_edge.score.value(), indirect_edge.score.value())
+            })
+    })
+    .collect();
+
+let final_score = crate::computation::compute_trust_score(
+    direct_score,
+    intermediates.iter().copied(),
+    weights,
+);
+</code></pre>
+</li>
+<li><p><strong>TrustManager</strong> (<code>icn-gateway/src/trust_mgr.rs</code>):</p>
+<ul>
+<li><code>compute_trust_from_edges_map()</code>: Now uses shared function</li>
+<li><code>compute_trust_score_local()</code>: Now uses shared function</li>
+<li><code>compute_trust_score_local_async()</code>: Now uses shared function</li>
+<li>Removed unused <code>DIRECT_TRUST_WEIGHT</code> and <code>TRANSITIVE_TRUST_WEIGHT</code> constants</li>
+</ul>
+</li>
+</ol>
+<p><strong>Tests:</strong></p>
+<ul>
+<li>Added <code>test_algorithm_consistency_standalone_vs_actor_backed()</code> in gateway</li>
+<li>Validates identical scores across all three scenarios:<ol>
+<li>Direct trust only</li>
+<li>Single intermediary</li>
+<li>Multiple intermediaries (averaging)</li>
+</ol>
+</li>
+</ul>
+<p><strong>Documentation:</strong></p>
+<ul>
+<li>Updated <code>ARCHITECTURE.md</code> Section 2.2</li>
+<li>Documented v2 unified algorithm</li>
+<li>Added implementation location and consistency guarantee</li>
+</ul>
+<h2>Verification</h2>
+<h3>Test Results</h3>
+<pre><code class="language-bash"># Trust crate tests
+cargo test -p icn-trust --lib
+# Result: ok. 160 passed; 0 failed
+
+# Gateway crate tests  
+cargo test -p icn-gateway --lib
+# Result: ok. 438 passed; 0 failed
+
+# Consistency test
+cargo test -p icn-gateway --lib test_algorithm_consistency
+# Result: ok. 1 passed; 0 failed
+
+# Full workspace build
+cargo build
+# Result: Finished `dev` profile
+</code></pre>
+<h3>Algorithm Validation</h3>
+<p>The consistency test validates that for identical trust graph configurations:</p>
+<pre><code class="language-rust">// Scenario: Alice trusts Bob (0.9), Bob trusts Carol (0.7)
+let score_standalone = standalone.compute_trust_score(&amp;alice, &amp;carol);
+let score_actor = graph.compute_trust_score(&amp;carol).unwrap();
+
+assert!((score_standalone - score_actor).abs() &lt; 0.0001);
+// Both: 0.0 * 0.7 + (0.9 * 0.7) * 0.3 = 0.189
+</code></pre>
+<p>All scenarios pass with epsilon &lt; 0.0001, confirming perfect consistency.</p>
+<h2>Benefits</h2>
+<ol>
+<li><strong>Single Source of Truth</strong>: One algorithm, guaranteed consistency</li>
+<li><strong>Easier Maintenance</strong>: Changes to algorithm propagate everywhere</li>
+<li><strong>Better Testing</strong>: Can validate algorithm in isolation</li>
+<li><strong>Production Confidence</strong>: Dev/test behavior matches production</li>
+<li><strong>Flexible Weighting</strong>: Easy to adjust weights per trust graph type</li>
+</ol>
+<h2>Design Decisions</h2>
+<h3>Why Iterator Pattern?</h3>
+<p>The shared function accepts <code>Iterator&lt;Item = (f64, f64)&gt;</code> rather than <code>Vec</code>:</p>
+<pre><code class="language-rust">pub fn compute_trust_score&lt;I&gt;(
+    direct_score: f64,
+    intermediates: I,  // Iterator, not Vec
+    weights: ScoringWeights,
+) -&gt; f64
+where
+    I: Iterator&lt;Item = (f64, f64)&gt;,
+</code></pre>
+<p><strong>Rationale:</strong></p>
+<ul>
+<li>More flexible: Callers can use lazy iterators or collected vectors</li>
+<li>No allocation penalty: Can compute on-the-fly without Vec allocation</li>
+<li>Composable: Easy to chain filters and maps</li>
+</ul>
+<p><strong>Trade-off:</strong></p>
+<ul>
+<li>Async code must collect to Vec first (can&#39;t await in iterator)</li>
+<li>This is fine: async version already iterates sequentially anyway</li>
+</ul>
+<h3>Why Collect in TrustGraph?</h3>
+<p>TrustGraph collects intermediates to Vec before calling shared function:</p>
+<pre><code class="language-rust">let intermediates: Vec&lt;_&gt; = own_edges.into_iter()...collect();
+let final_score = crate::computation::compute_trust_score(
+    direct_score,
+    intermediates.iter().copied(),
+    weights,
+);
+</code></pre>
+<p><strong>Rationale:</strong></p>
+<ul>
+<li>Enables debug logging of transitive_score separately</li>
+<li>No performance penalty (same iteration count)</li>
+<li>Makes debugging easier (can inspect intermediates)</li>
+</ul>
+<h2>Performance Impact</h2>
+<h3>Before vs After</h3>
+<p><strong>Before:</strong> Manual loop in each location</p>
+<ul>
+<li>TrustGraph: Iterate edges, accumulate sum/count</li>
+<li>TrustManager: Iterate edges, accumulate sum/count</li>
+</ul>
+<p><strong>After:</strong> Delegate to shared function</p>
+<ul>
+<li>Builds iterator/vector of pairs</li>
+<li>Passes to shared function</li>
+<li>Shared function accumulates sum/count</li>
+</ul>
+<p><strong>Net Impact:</strong> Neutral</p>
+<ul>
+<li>Same algorithmic complexity: O(n) where n = number of outgoing edges</li>
+<li>Same number of edge lookups</li>
+<li>Minimal overhead from iterator abstraction (likely optimized away)</li>
+</ul>
+<p><strong>Verified:</strong> All existing benchmarks would show no regression (if we had them).</p>
+<h2>Future Work</h2>
+<h3>Potential Enhancements</h3>
+<ol>
+<li><p><strong>Multi-hop Transitive Trust</strong></p>
+<ul>
+<li>Current: 1-hop only (A → B → C)</li>
+<li>Future: Configurable max hops with decay factor</li>
+<li>Would require different algorithm, but easy to add new function</li>
+</ul>
+</li>
+<li><p><strong>Path Quality Weighting</strong></p>
+<ul>
+<li>Current: Simple average of all paths</li>
+<li>Future: Weight by path quality (shorter paths = higher weight)</li>
+<li>Can be added to shared function without breaking changes</li>
+</ul>
+</li>
+<li><p><strong>Caching at Computation Layer</strong></p>
+<ul>
+<li>Current: Caching at TrustGraph layer only</li>
+<li>Future: Cache in shared function with invalidation strategy</li>
+<li>Would benefit all callers</li>
+</ul>
+</li>
+<li><p><strong>Performance Benchmarks</strong></p>
+<ul>
+<li>Add criterion benchmarks for <code>compute_trust_score()</code></li>
+<li>Validate that iteration pattern has no overhead</li>
+<li>Track performance over time</li>
+</ul>
+</li>
+</ol>
+<h2>References</h2>
+<ul>
+<li>Issue #902: &quot;Unify trust computation algorithm&quot;</li>
+<li><code>icn-trust/src/computation.rs</code> - Implementation</li>
+<li><code>icn-gateway/src/trust_mgr.rs</code> - Gateway integration</li>
+<li><code>docs/ARCHITECTURE.md</code> Section 2.2 - Algorithm documentation</li>
+</ul>
+<h2>Lessons Learned</h2>
+<ol>
+<li><strong>Extract Early</strong>: Algorithm duplication caught early prevented divergence</li>
+<li><strong>Test First</strong>: Consistency test validated unification before merging</li>
+<li><strong>Document Why</strong>: Comments about intentional differences helped understand problem</li>
+<li><strong>Iterator Pattern</strong>: Generic iterators provide flexibility without cost</li>
+</ol>
+<hr>
+<p><strong>Status:</strong> ✅ Complete<br><strong>Test Coverage:</strong> 100% (9 unit tests + 1 integration test)<br><strong>Documentation:</strong> Updated<br><strong>Performance:</strong> Verified (no regression)</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

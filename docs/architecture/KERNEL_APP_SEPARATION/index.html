@@ -1,0 +1,1442 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Kernel/App Separation Architecture | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>KERNEL APP SEPARATION</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/KERNEL_APP_SEPARATION.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Kernel/App Separation Architecture</h1>
+<p><strong>Status</strong>: Living Document<br><strong>Last Updated</strong>: 2026-02-01
+<strong>Related Issues</strong>: Phase 19+ (Trust Extraction, PolicyOracle Migration), <a href="https://github.com/InterCooperative-Network/icn/issues/1007" target="_blank" rel="noopener">#1007</a> (Wave 1 Firewall Contract)</p>
+<hr>
+<h2>Executive Summary</h2>
+<blockquote>
+<p><strong>ICN is a constraint engine: apps translate meaning into constraints; the kernel enforces constraints without understanding meaning.</strong></p>
+</blockquote>
+<p>ICN&#39;s kernel/app separation architecture enforces a strict boundary—the <strong>Meaning Firewall</strong>—between infrastructure mechanisms (kernel) and domain semantics (apps). This document describes the architectural principles, implementation patterns, and migration path for this separation.</p>
+<p><strong>Key Insight</strong>: The kernel enforces constraints WITHOUT understanding their semantic origin. Trust scores, governance rules, and membership criteria are domain concepts that apps translate into generic constraints the kernel can enforce blindly.</p>
+<p>This is the <strong>constraint engine model</strong>: Policy Oracles (apps) decide constraint values → Kernel enforces constraints without knowing why.</p>
+<hr>
+<h2>Firewall Contract (Non-Negotiable Invariants)</h2>
+<blockquote>
+<p><strong>Status</strong>: Enforced via CI<br><strong>Tracking Issue</strong>: <a href="https://github.com/InterCooperative-Network/icn/issues/1007" target="_blank" rel="noopener">#1007</a> (Wave 1)</p>
+</blockquote>
+<p>These invariants are mechanically enforced to ensure the kernel remains semantically blind.</p>
+<h3>Invariant 1: Kernel Must Not Import Domain Crates</h3>
+<p><strong>Rule</strong>: Kernel crates (<code>icn-core</code>, <code>icn-kernel-api</code>, <code>icn-net</code>, <code>icn-gossip</code>, <code>icn-store</code>) must NOT depend on:</p>
+<ul>
+<li>Domain crates: <code>icn-trust</code>, <code>icn-governance</code>, <code>icn-ledger</code> (internals)</li>
+<li>App crates: runtime app crates under <code>icn/apps/*</code> (canonical) or legacy top-level <code>apps/*</code> during migration</li>
+</ul>
+<p><strong>Rationale</strong>: Direct imports create compile-time coupling. If kernel code can import <code>TrustGraph</code>, it can call domain-specific methods, violating the meaning firewall.</p>
+<p><strong>Enforcement</strong>: CI checks dependency closure via <code>cargo metadata</code> (see <code>.github/scripts/firewall_denylist.py</code>).</p>
+<p><strong>Example Violation</strong>:</p>
+<pre><code class="language-rust">// ❌ FORBIDDEN in icn-core
+use icn_trust::TrustGraph;
+
+fn select_replica(&amp;self, candidates: &amp;[Did]) -&gt; Did {
+    let score = self.trust_graph.compute_trust_score(&amp;candidates[0]);
+    // Kernel now &quot;knows&quot; what trust scores mean
+}
+</code></pre>
+<p><strong>Correct Pattern</strong>:</p>
+<pre><code class="language-rust">// ✅ ALLOWED - kernel reads typed ConstraintSet fields, not custom keys
+fn select_replica(&amp;self, candidates: &amp;[Did], constraints: &amp;ConstraintSet) -&gt; Did {
+    let min_score = constraints
+        .replica_selection
+        .min_trust_score
+        .unwrap_or(0.0);
+    // Kernel enforces the constraint without knowing WHY min_score=0.7
+}
+</code></pre>
+<h3>Invariant 2: Kernel Only Accepts Pure Data Types</h3>
+<p><strong>Rule</strong>: Kernel entrypoints must accept only:</p>
+<ul>
+<li><strong>Cryptographic proofs</strong>: <code>IdentityProof</code>, Ed25519 signatures</li>
+<li><strong>Pure data</strong>: <code>ConstraintSet</code>, <code>CapabilityToken</code>, <code>RateLimitPolicy</code></li>
+<li><strong>Kernel primitives</strong>: <code>Did</code>, <code>Timestamp</code>, <code>Hash</code></li>
+</ul>
+<p><strong>Rationale</strong>: Pure data types have no behavior. Accepting <code>&amp;TrustGraph</code> or <code>GovernanceConfig</code> allows kernel code to call semantic methods.</p>
+<p><strong>Example Violation</strong>:</p>
+<pre><code class="language-rust">// ❌ FORBIDDEN - accepting domain type
+pub fn authorize_action(
+    &amp;self,
+    actor: &amp;Did,
+    trust_graph: &amp;TrustGraph,  // Domain type with semantic methods
+) -&gt; bool {
+    trust_graph.compute_trust_score(actor) &gt;= 0.4
+}
+</code></pre>
+<p><strong>Correct Pattern</strong>:</p>
+<pre><code class="language-rust">// ✅ ALLOWED - kernel uses PolicyOracle decision, not domain lookups
+pub fn authorize_action(
+    &amp;self,
+    actor: &amp;Did,
+    decision: &amp;PolicyDecision,  // Pre-computed by PolicyOracle
+) -&gt; bool {
+    matches!(decision, PolicyDecision::Allow { .. })
+}
+</code></pre>
+<h3>Invariant 3: All Semantic Lookup Confined to PolicyOracle</h3>
+<p><strong>Rule</strong>: Any decision based on trust scores, governance rules, membership status, or credit limits MUST happen in a <code>PolicyOracle</code> implementation, NOT in kernel code.</p>
+<p><strong>Rationale</strong>: PolicyOracles are the translation boundary. They convert domain semantics into <code>ConstraintSet</code> values the kernel can enforce blindly.</p>
+<p><strong>Example Violation</strong>:</p>
+<pre><code class="language-rust">// ❌ FORBIDDEN in icn-core
+fn rate_limit_for(&amp;self, actor: &amp;Did) -&gt; RateLimit {
+    let score = self.trust_graph.compute_trust_score(actor);
+    if score &gt;= 0.7 {  // Kernel &quot;knows&quot; 0.7 means &quot;Federated&quot;
+        RateLimit::new(200, 50)
+    } else {
+        RateLimit::new(20, 5)
+    }
+}
+</code></pre>
+<p><strong>Correct Pattern</strong>:</p>
+<pre><code class="language-rust">// ✅ In icn/apps/trust/src/oracle.rs (or apps/trust/src/oracle.rs during migration)
+impl PolicyOracle for TrustPolicyOracle {
+    fn evaluate(&amp;self, request: &amp;PolicyRequest) -&gt; PolicyDecision {
+        let score = self.graph.compute_trust_score(&amp;request.actor);
+        
+        // Semantic logic ENDS here ═══════════════════════════
+        // Convert to pure constraints below the firewall
+        
+        let rate_limit = if score &gt;= 0.7 {
+            RateLimit::new(200, 50)
+        } else {
+            RateLimit::new(20, 5)
+        };
+        
+        PolicyDecision::allow_with(
+            ConstraintSet::new().with_rate_limit(rate_limit)
+        )
+    }
+}
+
+// ✅ In icn-core (kernel code)
+fn apply_rate_limit(&amp;self, actor: &amp;Did, constraints: &amp;ConstraintSet) {
+    if let Some(limit) = constraints.rate_limit {
+        self.rate_limiter.apply(&amp;actor, limit);
+        // Kernel doesn&#39;t know WHY limit is 200/50 vs 20/5
+    }
+}
+</code></pre>
+<h3>Invariant 4: Kernel Must Not Pattern-Match on <code>ConstraintSet.custom</code> Keys</h3>
+<p><strong>Rule</strong>: Kernel enforcement logic must ONLY use typed <code>ConstraintSet</code> fields:</p>
+<ul>
+<li><code>rate_limit: Option&lt;RateLimit&gt;</code></li>
+<li><code>max_topics: Option&lt;u32&gt;</code></li>
+<li><code>max_connections: Option&lt;u32&gt;</code></li>
+<li>etc.</li>
+</ul>
+<p>Kernel code MUST NOT:</p>
+<ul>
+<li>Check for specific <code>custom</code> keys (e.g., <code>constraints.custom.get(&quot;trust_score&quot;)</code>)</li>
+<li>Branch on <code>custom</code> key presence</li>
+<li>Extract <code>custom</code> values to affect enforcement</li>
+</ul>
+<p><strong>Rationale</strong>: <code>custom</code> is an escape hatch for app-specific data. If kernel code depends on <code>custom</code> keys, it&#39;s indirectly depending on app semantics.</p>
+<p><strong>Example Violation</strong>:</p>
+<pre><code class="language-rust">// ❌ FORBIDDEN - kernel branching on custom key
+fn should_replicate(&amp;self, constraints: &amp;ConstraintSet) -&gt; bool {
+    if let Some(trust_score) = constraints.custom.get(&quot;trust_score&quot;) {
+        trust_score.as_float().unwrap() &gt;= 0.4  // Kernel &quot;knows&quot; trust_score semantics
+    } else {
+        false
+    }
+}
+</code></pre>
+<p><strong>Correct Pattern</strong>:</p>
+<pre><code class="language-rust">// ✅ ALLOWED - PolicyOracle sets typed field
+impl PolicyOracle for TrustPolicyOracle {
+    fn evaluate(&amp;self, request: &amp;PolicyRequest) -&gt; PolicyDecision {
+        let score = self.graph.compute_trust_score(&amp;request.actor);
+        
+        PolicyDecision::allow_with(
+            ConstraintSet::new()
+                .with_custom(&quot;can_replicate&quot;, ConstraintValue::Bool(score &gt;= 0.4))
+        )
+    }
+}
+
+// ✅ Kernel checks typed field (if added to ConstraintSet)
+// OR kernel remains completely agnostic and lets app handle it
+fn should_replicate(&amp;self, constraints: &amp;ConstraintSet) -&gt; bool {
+    // Option A: Add typed field to ConstraintSet
+    constraints.can_replicate.unwrap_or(false)
+    
+    // Option B: Don&#39;t check at all - let replication be a higher-level decision
+}
+</code></pre>
+<h3>Invariant 5: Kernel Contains Enforcement Mechanisms, Not Policy Decisions</h3>
+<p><strong>Rule</strong>: Kernel provides enforcement infrastructure. Apps provide policy values.</p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Kernel Owns (Mechanism)</th>
+<th>Apps Own (Value)</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Rate limiting</strong></td>
+<td><code>RateLimiter</code> struct, token bucket algorithm</td>
+<td><code>rate_limit: RateLimit(messages_per_second, burst_size)</code> in <code>ConstraintSet</code></td>
+<td>Kernel enforces rate; app decides rate</td>
+</tr>
+<tr>
+<td><strong>Credit gating</strong></td>
+<td><code>CreditGate</code> check logic (<code>balance &gt;= ceiling?</code>)</td>
+<td><code>credit_ceiling: 1000</code> in <code>ConstraintSet</code></td>
+<td>Kernel checks ceiling; app computes ceiling</td>
+</tr>
+<tr>
+<td><strong>Capability gating</strong></td>
+<td><code>CapabilityGate</code> check logic (<code>caps.contains(required)?</code>)</td>
+<td><code>capabilities: [Read, Write]</code> in <code>ConstraintSet</code></td>
+<td>Kernel checks presence; app grants capabilities</td>
+</tr>
+<tr>
+<td><strong>Topic access</strong></td>
+<td>Topic subscription acceptance logic</td>
+<td><code>allowed_topics: Vec&lt;String&gt;</code> in <code>ConstraintSet</code></td>
+<td>Kernel enforces list; app computes list</td>
+</tr>
+<tr>
+<td><strong>Replay guard</strong></td>
+<td><code>ReplayGuard</code> sequence tracking and rejection logic</td>
+<td>N/A (no tunable values)</td>
+<td>Pure mechanism, no policy knobs</td>
+</tr>
+<tr>
+<td><strong>Transport auth</strong></td>
+<td>TLS certificate verification, DID-TLS binding</td>
+<td>N/A (no tunable values)</td>
+<td>Pure cryptographic check, no policy</td>
+</tr>
+</tbody></table>
+<p><strong>Example</strong>: Rate limiting mechanism vs value</p>
+<pre><code class="language-rust">// ✅ Kernel provides the mechanism
+pub struct RateLimiter {
+    limiters: HashMap&lt;Did, TokenBucket&gt;,
+}
+
+impl RateLimiter {
+    pub fn check(&amp;mut self, actor: &amp;Did, limit: &amp;RateLimit) -&gt; Result&lt;(), RateLimitError&gt; {
+        let bucket = self.limiters.entry(*actor).or_insert_with(|| {
+            TokenBucket::new(limit.messages_per_second, limit.burst_size)
+        });
+        bucket.consume(1)  // Mechanism: token bucket algorithm
+    }
+}
+
+// ✅ App provides the value
+impl PolicyOracle for TrustPolicyOracle {
+    fn evaluate(&amp;self, request: &amp;PolicyRequest) -&gt; PolicyDecision {
+        let score = self.graph.compute_trust_score(&amp;request.actor);
+        
+        // App decides the rate based on trust class
+        let rate = if score &gt;= 0.7 { RateLimit::new(200, 50) }
+                   else if score &gt;= 0.4 { RateLimit::new(100, 25) }
+                   else { RateLimit::new(20, 5) };
+        
+        PolicyDecision::allow_with(ConstraintSet::new().with_rate_limit(rate))
+    }
+}
+</code></pre>
+<h3>Violation Examples (What NOT to Do)</h3>
+<p><strong>❌ Direct trust-score call in kernel</strong>:</p>
+<pre><code class="language-rust">// icn/crates/icn-core/src/supervisor/init_gossip.rs
+fn select_anti_entropy_peers(&amp;self) -&gt; Vec&lt;Did&gt; {
+    self.peers.iter()
+        .filter(|peer| {
+            let score = self.trust_graph.compute_trust_score(peer);  // VIOLATION
+            score &gt;= 0.4
+        })
+        .collect()
+}
+</code></pre>
+<p><strong>❌ Importing domain types in kernel</strong>:</p>
+<pre><code class="language-rust">// icn/crates/icn-net/src/rate_limit.rs
+use icn_trust::{TrustGraph, TrustClass};  // VIOLATION
+</code></pre>
+<p><strong>❌ Hardcoded policy constants in kernel</strong>:</p>
+<pre><code class="language-rust">// icn/crates/icn-core/src/supervisor/mod.rs
+const MIN_TRUST_FOR_REPLICATION: f64 = 0.4;  // VIOLATION - kernel defines policy
+</code></pre>
+<p><strong>❌ Pattern-matching on custom keys</strong>:</p>
+<pre><code class="language-rust">// icn/crates/icn-core/src/supervisor/replication.rs
+fn should_replicate(&amp;self, constraints: &amp;ConstraintSet) -&gt; bool {
+    if let Some(class) = constraints.custom.get(&quot;trust_class&quot;) {  // VIOLATION
+        class.as_string() == Some(&quot;Partner&quot;)
+    }
+}
+</code></pre>
+<h3>Migration Path</h3>
+<ol>
+<li><strong>Wave 1 (This Issue)</strong>: Document contract, add CI enforcement</li>
+<li><strong>Waves 2-6</strong>: Migrate existing violations to PolicyOracle pattern</li>
+<li><strong>Enforcement</strong>: CI reports violations as advisory during migration (<code>continue-on-error: true</code>). After all waves complete, the job becomes a hard gate (<code>continue-on-error</code> removed)</li>
+</ol>
+<hr>
+<h2>Table of Contents</h2>
+<ol>
+<li><a href="#firewall-contract-non-negotiable-invariants">Firewall Contract</a></li>
+<li><a href="#1-the-meaning-firewall">The Meaning Firewall</a></li>
+<li><a href="#2-architectural-layers">Architectural Layers</a></li>
+<li><a href="#3-core-abstractions">Core Abstractions</a><ul>
+<li><a href="#31-policyoracle">PolicyOracle</a></li>
+<li><a href="#32-trustservice">TrustService</a></li>
+<li><a href="#33-serviceregistry">ServiceRegistry</a></li>
+<li><a href="#34-constraintset">ConstraintSet</a></li>
+<li><a href="#35-oracleregistry">OracleRegistry</a></li>
+</ul>
+</li>
+<li><a href="#4-request-flow">Request Flow</a></li>
+<li><a href="#5-implementation-guide">Implementation Guide</a></li>
+<li><a href="#6-migration-status">Migration Status</a></li>
+<li><a href="#7-testing-patterns">Testing Patterns</a></li>
+<li><a href="#8-faq">FAQ</a></li>
+</ol>
+<hr>
+<h2>1. The Meaning Firewall</h2>
+<h3>1.1 Core Principle</h3>
+<p>The <strong>Meaning Firewall</strong> is the conceptual boundary where domain semantics end and kernel enforcement begins. </p>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────┐
+│                           APPLICATION LAYER                              │
+│                                                                          │
+│   ┌───────────┐    ┌────────────┐    ┌─────────────┐    ┌───────────┐   │
+│   │   Trust   │    │ Governance │    │    Ledger   │    │ Membership│   │
+│   │   Graph   │    │   Rules    │    │   Policy    │    │   Roles   │   │
+│   └─────┬─────┘    └──────┬─────┘    └──────┬──────┘    └─────┬─────┘   │
+│         │                 │                  │                 │         │
+│         ▼                 ▼                  ▼                 ▼         │
+│   ┌───────────────────────────────────────────────────────────────────┐ │
+│   │                        PolicyOracle                                │ │
+│   │   (Translates domain semantics → ConstraintSet)                   │ │
+│   └───────────────────────────────────────────────────────────────────┘ │
+│                                   │                                      │
+└───────────────────────────────────┼──────────────────────────────────────┘
+                                    │
+════════════════════════════════════╪══════════════════════════════════════
+                          MEANING FIREWALL
+                     (Domain semantics END here)
+════════════════════════════════════╪══════════════════════════════════════
+                                    │
+                                    ▼
+┌───────────────────────────────────────────────────────────────────────────┐
+│                             KERNEL LAYER                                   │
+│                                                                            │
+│   ┌─────────────────────────────────────────────────────────────────────┐ │
+│   │                         ConstraintSet                                │ │
+│   │   - rate_limit: RateLimit                                           │ │
+│   │   - credit_multiplier: f64                                          │ │
+│   │   - max_topics: u32                                                 │ │
+│   │   - custom: HashMap&lt;String, ConstraintValue&gt;                        │ │
+│   └─────────────────────────────────────────────────────────────────────┘ │
+│                                   │                                        │
+│                                   ▼                                        │
+│   ┌─────────────┐    ┌────────────┐    ┌─────────────┐    ┌────────────┐  │
+│   │    Rate     │    │   Credit   │    │   Topic     │    │   Route    │  │
+│   │  Limiting   │    │  Control   │    │   Access    │    │  Priority  │  │
+│   └─────────────┘    └────────────┘    └─────────────┘    └────────────┘  │
+│                                                                            │
+│           The kernel enforces these WITHOUT understanding WHY              │
+└───────────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<h3>1.2 Why This Matters</h3>
+<p><strong>Before (Tight Coupling)</strong>:</p>
+<pre><code class="language-rust">// ❌ Kernel code directly using domain types
+use icn_trust::{TrustGraph, TrustClass};
+
+fn select_replica_candidates(&amp;self) -&gt; Vec&lt;Did&gt; {
+    let score = self.trust_graph.compute_trust_score(&amp;peer);
+    if TrustClass::from_score(score) &gt;= TrustClass::Partner {
+        // Kernel now &quot;knows&quot; what Partner means
+        candidates.push(peer);
+    }
+}
+</code></pre>
+<p><strong>After (Meaning Firewall)</strong>:</p>
+<pre><code class="language-rust">// ✅ Kernel using abstract interfaces
+use icn_kernel_api::services::TrustService;
+
+fn select_replica_candidates(&amp;self) -&gt; Vec&lt;Did&gt; {
+    let score = self.trust_service.trust_score(&amp;peer);
+    if score &gt;= self.config.min_trust_score {  // Just a number!
+        candidates.push(peer);
+    }
+}
+</code></pre>
+<h3>1.3 Decision Criteria</h3>
+<p>Before adding code to kernel crates, ask:</p>
+<table>
+<thead>
+<tr>
+<th>Question</th>
+<th>If YES →</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Does this interpret domain semantics?</td>
+<td>Must be an app</td>
+</tr>
+<tr>
+<td>Does this hardcode a schema?</td>
+<td>Must be an app</td>
+</tr>
+<tr>
+<td>Does this privilege a specific application?</td>
+<td>Must be an app</td>
+</tr>
+<tr>
+<td>Does this require knowing what a trust score <em>means</em>?</td>
+<td>Must be an app</td>
+</tr>
+</tbody></table>
+<p>The kernel is deliberately dumb. It provides <strong>pipes, not policies</strong>.</p>
+<hr>
+<h2>2. Architectural Layers</h2>
+<h3>2.1 Crate Classification</h3>
+<pre><code>KERNEL CRATES (domain-agnostic)              APP CRATES (domain-specific)
+────────────────────────────────             ────────────────────────────
+icn-kernel-api   ← Trait definitions          icn-trust    ← Trust graph
+icn-core         ← Runtime, supervisor        icn-governance ← Voting, proposals  
+icn-net          ← QUIC, mDNS, sessions       icn-ledger   ← Credit, accounts
+icn-gossip       ← Topics, vector clocks      icn-ccl      ← Contract execution
+icn-store        ← Sled persistence           icn-entity   ← Organizations
+icn-obs          ← Metrics, tracing           icn-community ← Membership
+                                              icn-federation ← Cross-coop
+</code></pre>
+<h3>2.2 Dependency Rules</h3>
+<pre><code>                    ┌─────────────────┐
+                    │ icn-kernel-api  │  ← Trait definitions
+                    └────────┬────────┘
+                             │
+              ┌──────────────┼──────────────┐
+              │              │              │
+              ▼              ▼              ▼
+        ┌──────────┐   ┌──────────┐   ┌──────────┐
+        │ icn-core │   │ icn-net  │   │icn-gossip│
+        └────┬─────┘   └──────────┘   └──────────┘
+             │
+             │  ❌ FORBIDDEN: Direct imports of domain crates
+             │
+             │  ✅ ALLOWED: Through TrustService, PolicyOracle, etc.
+             │
+</code></pre>
+<p><strong>CI Enforcement</strong>: The <code>kernel-deps</code> CI job checks that kernel crates don&#39;t depend on forbidden domain crates:</p>
+<pre><code class="language-yaml"># From .github/workflows/ci.yml
+kernel-deps:
+  name: Kernel Forbidden Dependencies
+  steps:
+    - name: Check kernel crates for forbidden deps
+      run: |
+        KERNEL_CRATES=(&quot;icn-core&quot; &quot;icn-net&quot; &quot;icn-gossip&quot;)
+        FORBIDDEN=(&quot;icn-trust&quot; &quot;icn-governance&quot; &quot;icn-ledger&quot; ...)
+        for crate in &quot;${KERNEL_CRATES[@]}&quot;; do
+          for dep in &quot;${FORBIDDEN[@]}&quot;; do
+            if cargo tree -p &quot;$crate&quot; | grep -q &quot;${dep}&quot;; then
+              echo &quot;Forbidden dependency: ${crate} -&gt; ${dep}&quot;
+              exit 1
+            fi
+          done
+        done
+</code></pre>
+<hr>
+<h2>3. Core Abstractions</h2>
+<h3>3.1 PolicyOracle</h3>
+<p>The <code>PolicyOracle</code> trait is the primary interface for authorization decisions. Apps implement it to translate domain-specific rules into generic constraints.</p>
+<pre><code class="language-rust">/// File: icn/crates/icn-kernel-api/src/authz.rs
+
+pub trait PolicyOracle: Send + Sync {
+    /// Evaluate a policy request and return a decision
+    fn evaluate(&amp;self, request: &amp;PolicyRequest) -&gt; PolicyDecision;
+    
+    /// Domain this oracle handles (e.g., &quot;trust&quot;, &quot;governance&quot;)
+    fn domain(&amp;self) -&gt; Domain;
+}
+
+pub enum PolicyDecision {
+    /// Allow with constraints
+    Allow { constraints: ConstraintSet },
+    /// Deny with reason
+    Deny { reason: String },
+    /// Abstain (let other oracles decide)
+    Abstain,
+}
+</code></pre>
+<p><strong>Example Implementation</strong> (TrustPolicyOracle):</p>
+<pre><code class="language-rust">/// File: icn/crates/icn-gateway/src/trust_policy.rs
+
+impl PolicyOracle for TrustPolicyOracle {
+    fn evaluate(&amp;self, request: &amp;PolicyRequest) -&gt; PolicyDecision {
+        // 1. Extract actor from request
+        let actor = &amp;request.actor;
+        
+        // 2. Compute trust score (domain logic)
+        let score = self.graph.compute_trust_score(actor);
+        
+        // ════════════════════════════════════════════
+        // ▼▼▼ MEANING FIREWALL CROSSING ▼▼▼
+        // Trust semantics END here
+        // ════════════════════════════════════════════
+        
+        // 3. Convert to generic constraints (kernel-safe)
+        let constraints = ConstraintSet::new()
+            .with_rate_limit(score_to_rate_limit(score))
+            .with_credit_multiplier(score)
+            .with_custom(&quot;trust_score&quot;, ConstraintValue::Float(score));
+        
+        PolicyDecision::Allow { constraints }
+    }
+    
+    fn domain(&amp;self) -&gt; Domain {
+        Domain::Trust
+    }
+}
+
+fn score_to_rate_limit(score: f64) -&gt; RateLimit {
+    // Trust class boundaries, but kernel sees only numbers
+    if score &gt;= 0.7 {      // Federated
+        RateLimit { messages_per_sec: 200, burst: 50 }
+    } else if score &gt;= 0.4 { // Partner
+        RateLimit { messages_per_sec: 100, burst: 25 }
+    } else if score &gt;= 0.1 { // Known
+        RateLimit { messages_per_sec: 20, burst: 5 }
+    } else {                 // Isolated
+        RateLimit { messages_per_sec: 10, burst: 2 }
+    }
+}
+</code></pre>
+<h3>3.2 TrustService</h3>
+<p>The <code>TrustService</code> trait provides trust-related functionality without exposing <code>TrustGraph</code>, <code>TrustClass</code>, or other domain types.</p>
+<pre><code class="language-rust">/// File: icn/crates/icn-kernel-api/src/services.rs
+
+pub trait TrustService: Send + Sync {
+    /// Get the PolicyOracle for this trust service
+    fn oracle(&amp;self) -&gt; Arc&lt;dyn PolicyOracle&gt;;
+    
+    /// Get trust score for an actor (opaque value 0.0-1.0)
+    fn trust_score(&amp;self, actor: &amp;Did) -&gt; f64;
+    
+    /// Check if actor meets minimum trust threshold
+    fn meets_trust_threshold(&amp;self, actor: &amp;Did, min_score: f64) -&gt; bool {
+        self.trust_score(actor) &gt;= min_score
+    }
+    
+    /// Record a trust-affecting event
+    fn record_event(&amp;self, actor: &amp;Did, event: TrustEvent);
+}
+</code></pre>
+<p><strong>Kernel-Level TrustClass</strong>:</p>
+<p>For convenience, the kernel defines its own <code>TrustClass</code> enum that apps can use for boundary conversions:</p>
+<pre><code class="language-rust">/// File: icn/crates/icn-kernel-api/src/services.rs
+
+pub const TRUST_THRESHOLD_KNOWN: f64 = 0.1;
+pub const TRUST_THRESHOLD_PARTNER: f64 = 0.4;
+pub const TRUST_THRESHOLD_FEDERATED: f64 = 0.7;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TrustClass {
+    #[default]
+    Isolated = 0,   // score &lt; 0.1
+    Known = 1,      // 0.1 &lt;= score &lt; 0.4
+    Partner = 2,    // 0.4 &lt;= score &lt; 0.7
+    Federated = 3,  // score &gt;= 0.7
+}
+
+impl TrustClass {
+    pub fn from_score(score: f64) -&gt; Self { /* ... */ }
+    pub fn min_score(&amp;self) -&gt; f64 { /* ... */ }
+}
+</code></pre>
+<h3>3.3 ServiceRegistry</h3>
+<p>The <code>ServiceRegistry</code> allows the daemon to inject domain services into the kernel at startup:</p>
+<pre><code class="language-rust">/// File: icn/crates/icn-kernel-api/src/services.rs
+
+pub struct ServiceRegistry {
+    trust: Option&lt;Arc&lt;dyn TrustService&gt;&gt;,
+    security: Option&lt;Arc&lt;dyn SecurityService&gt;&gt;,
+    governance: Option&lt;Arc&lt;dyn GovernanceService&gt;&gt;,
+    ledger: Option&lt;Arc&lt;dyn LedgerService&gt;&gt;,
+}
+
+impl ServiceRegistry {
+    pub fn new() -&gt; Self;
+    pub fn with_trust(self, service: Arc&lt;dyn TrustService&gt;) -&gt; Self;
+    pub fn with_security(self, service: Arc&lt;dyn SecurityService&gt;) -&gt; Self;
+    pub fn with_governance(self, service: Arc&lt;dyn GovernanceService&gt;) -&gt; Self;
+    pub fn with_ledger(self, service: Arc&lt;dyn LedgerService&gt;) -&gt; Self;
+}
+</code></pre>
+<p>Concrete domain objects that need to be shared with the supervisor (ledger handle,
+contract runtime, dispute/treasury managers, etc.) are passed via typed
+<code>BootstrapHandles</code> instead of type-erased <code>raw_handle()</code> calls:</p>
+<pre><code class="language-rust">/// File: icn/crates/icn-core/src/supervisor/actors.rs
+
+pub struct BootstrapHandles {
+    pub ledger: Arc&lt;RwLock&lt;Ledger&gt;&gt;,
+    pub ledger_store: Arc&lt;SledStore&gt;,
+    pub dispute_manager: Arc&lt;RwLock&lt;DisputeManager&gt;&gt;,
+    pub treasury_manager: Arc&lt;RwLock&lt;TreasuryManager&gt;&gt;,
+    pub contract_runtime: Arc&lt;RwLock&lt;ContractRuntime&gt;&gt;,
+    pub contract_actor: Arc&lt;RwLock&lt;ContractActor&gt;&gt;,
+    pub protocol_parameter_store: Arc&lt;dyn ProtocolParameterStore&gt;,
+}
+</code></pre>
+<p><strong>Usage in icnd</strong>:</p>
+<pre><code class="language-rust">// In icnd main.rs — trait-based services go in ServiceRegistry
+let trust_service = icn_trust_app::create_service_tokio(trust_graph_handle.clone());
+let registry = ServiceRegistry::new().with_trust(trust_service);
+let runtime = Runtime::new(config, identity)
+    .with_services(registry);
+
+// Concrete domain handles go in BootstrapHandles
+let handles = BootstrapHandles {
+    ledger: ledger_handle,
+    ledger_store,
+    dispute_manager,
+    treasury_manager,
+    contract_runtime,
+    contract_actor,
+    protocol_parameter_store,
+};
+let runtime = runtime.with_bootstrap_handles(handles);
+</code></pre>
+<p><strong>Why the daemon passes stores separately</strong>: Sled uses exclusive file locking (<code>flock</code> on Linux). Opening the same sled path twice in the same process fails. The daemon creates stores once and passes them through <code>BootstrapHandles</code> so the supervisor can reuse them for ancillary services (DisputeManager, TreasuryManager) without re-opening.</p>
+<h3>3.4 ConstraintSet</h3>
+<p>The <code>ConstraintSet</code> is the sole output format for <code>PolicyOracle</code>. It&#39;s designed to be domain-blind:</p>
+<pre><code class="language-rust">/// File: icn/crates/icn-kernel-api/src/authz.rs
+
+pub struct ConstraintSet {
+    pub rate_limit: Option&lt;RateLimit&gt;,
+    pub credit_multiplier: Option&lt;f64&gt;,
+    pub max_topics: Option&lt;u32&gt;,
+    pub priority_class: Option&lt;u8&gt;,
+    pub custom: HashMap&lt;String, ConstraintValue&gt;,
+}
+
+pub struct RateLimit {
+    pub messages_per_sec: u32,
+    pub burst: u32,
+}
+
+pub enum ConstraintValue {
+    Bool(bool),
+    Int(i64),
+    Float(f64),
+    String(String),
+    List(Vec&lt;ConstraintValue&gt;),
+}
+</code></pre>
+<p>The kernel enforces these without knowing whether they came from trust scores, governance rules, or membership status.</p>
+<h3>3.5 OracleRegistry</h3>
+<p>The <code>OracleRegistry</code> is the centralized authorization gateway that routes policy requests to domain-specific oracles. It implements <code>PolicyOracle</code> so kernel components (GossipActor, NetworkActor, RPC server) can use it as their single authorization endpoint.</p>
+<p><strong>Key features:</strong></p>
+<ul>
+<li><strong>Per-domain routing</strong>: Requests are dispatched to the oracle registered for the request&#39;s domain (e.g., <code>trust</code>, <code>ledger</code>, <code>governance</code>)</li>
+<li><strong>Bootstrap phases</strong>: Genesis (allow all) → CoreApps (allow all) → Running (deny unknown domains)</li>
+<li><strong>Decision caching</strong>: TTL-based cache with automatic invalidation on oracle swap</li>
+<li><strong>Atomic oracle replacement</strong>: Uses <code>ArcSwap</code> for lock-free reads during hot path evaluation</li>
+</ul>
+<p><strong>Supervisor lifecycle integration:</strong></p>
+<pre><code>1. Supervisor creates OracleRegistry (Genesis phase - AllowAll)
+2. Daemon registers TrustPolicyOracle for &quot;trust&quot; domain
+3. Registry transitions to CoreApps phase
+4. All actors initialize with OracleRegistry as their PolicyOracle
+5. Registry transitions to Running phase (deny-by-default for unknown domains)
+</code></pre>
+<p><strong>Usage in kernel components:</strong></p>
+<pre><code class="language-rust">// The supervisor passes OracleRegistry as Arc&lt;dyn PolicyOracle&gt;
+let oracle_registry = Arc::new(OracleRegistry::new());
+oracle_registry.register(Domain::trust(), trust_oracle);
+oracle_registry.set_phase(BootstrapPhase::Running);
+
+// Kernel components receive it as a generic PolicyOracle
+let oracle: Arc&lt;dyn PolicyOracle&gt; = oracle_registry;
+let gossip = GossipActor::new(did, Some(oracle));
+</code></pre>
+<p><strong>Location</strong>: <code>icn-kernel-api/src/bootstrap.rs</code></p>
+<hr>
+<h2>4. Request Flow</h2>
+<h3>4.1 TrustPolicyOracle Flow Diagram</h3>
+<pre><code>┌──────────────────────────────────────────────────────────────────────────┐
+│                         API Request Arrives                               │
+└───────────────────────────────────┬──────────────────────────────────────┘
+                                    │
+                                    ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│                         TrustPolicyOracle                                 │
+│                         ─────────────────                                 │
+│   fn evaluate(&amp;self, request: &amp;PolicyRequest) -&gt; PolicyDecision          │
+└───────────────────────────────────┬──────────────────────────────────────┘
+                                    │
+                    ┌───────────────┴───────────────┐
+                    │                               │
+                    ▼                               ▼
+            ┌───────────────┐              ┌───────────────────┐
+            │ domain check  │              │ domain != &quot;trust&quot; │
+            │ domain ==     │              │                   │
+            │   &quot;trust&quot;     │              │ Return: Abstain   │
+            └───────┬───────┘              └───────────────────┘
+                    │
+                    ▼
+            ┌───────────────────────────────────────────────────┐
+            │              Parse Actor DID                       │
+            │    ┌─────────────────────────────────────────┐    │
+            │    │ Invalid DID? → Return score = 0.0       │    │
+            │    └─────────────────────────────────────────┘    │
+            └───────────────────────────┬───────────────────────┘
+                                        │
+                                        ▼
+            ┌───────────────────────────────────────────────────┐
+            │         Trust Graph Lookup                         │
+            │   ────────────────────────────                     │
+            │   graph.compute_trust_score(actor) → f64          │
+            │                                                    │
+            │   ┌─────────────────────────────────────────┐     │
+            │   │ Lock Strategy:                          │     │
+            │   │   1. Try try_read() first               │     │
+            │   │   2. If contention → block_in_place()   │     │
+            │   │   3. Increment counter metric           │     │
+            │   └─────────────────────────────────────────┘     │
+            └───────────────────────────┬───────────────────────┘
+                                        │
+                                        │ trust_score: f64
+                                        │
+════════════════════════════════════════╪═══════════════════════════════════
+                              MEANING FIREWALL
+                         Trust semantics END here
+════════════════════════════════════════╪═══════════════════════════════════
+                                        │
+                                        ▼
+            ┌───────────────────────────────────────────────────┐
+            │         score_to_constraints(score: f64)          │
+            │   ─────────────────────────────────────────────   │
+            │                                                    │
+            │   ConstraintSet {                                  │
+            │       rate_limit: score_to_rate_limit(score),     │
+            │       credit_multiplier: score,                    │
+            │       max_topics: score_to_max_topics(score),     │
+            │       custom: { &quot;trust_score&quot;: Float(score) }     │
+            │   }                                                │
+            └───────────────────────────┬───────────────────────┘
+                                        │
+                                        ▼
+            ┌───────────────────────────────────────────────────┐
+            │   Return: PolicyDecision::Allow { constraints }    │
+            └───────────────────────────┬───────────────────────┘
+                                        │
+                                        ▼
+            ┌───────────────────────────────────────────────────┐
+            │                   KERNEL                           │
+            │   ────────────────────────────────                 │
+            │   Enforces rate_limit, credit_multiplier, etc.    │
+            │   WITHOUT knowing they came from trust scores      │
+            └───────────────────────────────────────────────────┘
+</code></pre>
+<h3>4.2 Component Integration</h3>
+<p>The following components have been migrated to use <code>TrustService</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Location</th>
+<th>Before</th>
+<th>After</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ReplicationManager</td>
+<td>icn-core/replication</td>
+<td><code>Arc&lt;RwLock&lt;TrustGraph&gt;&gt;</code></td>
+<td><code>Arc&lt;dyn TrustService&gt;</code></td>
+</tr>
+<tr>
+<td>ForkResolver</td>
+<td>icn-ledger</td>
+<td><code>Arc&lt;RwLock&lt;TrustGraph&gt;&gt;</code></td>
+<td><code>Option&lt;Arc&lt;dyn TrustService&gt;&gt;</code></td>
+</tr>
+<tr>
+<td>TrustManager</td>
+<td>icn-gateway</td>
+<td><code>Arc&lt;RwLock&lt;TrustGraph&gt;&gt;</code></td>
+<td><code>Option&lt;Arc&lt;dyn TrustService&gt;&gt;</code></td>
+</tr>
+<tr>
+<td>ChallengeScheduler</td>
+<td>icn-core</td>
+<td><code>Arc&lt;RwLock&lt;TrustGraph&gt;&gt;</code></td>
+<td><code>Option&lt;Arc&lt;dyn TrustService&gt;&gt;</code></td>
+</tr>
+<tr>
+<td>PolicySource</td>
+<td>icn-core/policy</td>
+<td><code>icn_trust::TrustClass</code></td>
+<td><code>icn_kernel_api::TrustClass</code></td>
+</tr>
+<tr>
+<td>IdentityHandle</td>
+<td>icn-core/identity</td>
+<td><code>icn_trust::TrustClass</code></td>
+<td><code>icn_kernel_api::TrustClass</code></td>
+</tr>
+</tbody></table>
+<hr>
+<h2>5. Implementation Guide</h2>
+<h3>5.1 Adding a New PolicyOracle</h3>
+<ol>
+<li><strong>Define your domain</strong> in <code>icn-kernel-api/src/authz.rs</code>:</li>
+</ol>
+<pre><code class="language-rust">pub enum Domain {
+    Trust,
+    Governance,
+    Ledger,
+    Membership,  // ← Add new domain
+}
+</code></pre>
+<ol start="2">
+<li><strong>Implement PolicyOracle</strong> in your app crate:</li>
+</ol>
+<pre><code class="language-rust">// In icn/apps/membership/src/oracle.rs
+use icn_kernel_api::{PolicyOracle, PolicyRequest, PolicyDecision, ConstraintSet, Domain};
+
+pub struct MembershipOracle {
+    membership_db: Arc&lt;MembershipDb&gt;,
+}
+
+impl PolicyOracle for MembershipOracle {
+    fn evaluate(&amp;self, request: &amp;PolicyRequest) -&gt; PolicyDecision {
+        if request.domain != Domain::Membership {
+            return PolicyDecision::Abstain;
+        }
+        
+        let actor = &amp;request.actor;
+        let role = self.membership_db.get_role(actor);
+        
+        // ═══ MEANING FIREWALL ═══
+        // Convert role → constraints
+        let constraints = role_to_constraints(role);
+        
+        PolicyDecision::Allow { constraints }
+    }
+    
+    fn domain(&amp;self) -&gt; Domain {
+        Domain::Membership
+    }
+}
+</code></pre>
+<ol start="3">
+<li><strong>Register in ServiceRegistry</strong>:</li>
+</ol>
+<pre><code class="language-rust">// In icnd or your app&#39;s initialization
+let membership_oracle = Arc::new(MembershipOracle::new(db));
+let registry = registry.with_oracle(membership_oracle);
+</code></pre>
+<h3>5.2 Migrating a Component from TrustGraph to TrustService</h3>
+<p><strong>Step 1</strong>: Add optional <code>TrustService</code> field:</p>
+<pre><code class="language-rust">pub struct MyComponent {
+    // Keep during transition
+    trust_graph: Option&lt;Arc&lt;RwLock&lt;TrustGraph&gt;&gt;&gt;,
+    // New: prefer this
+    trust_service: Option&lt;Arc&lt;dyn TrustService&gt;&gt;,
+}
+</code></pre>
+<p><strong>Step 2</strong>: Add helper method that prefers TrustService:</p>
+<pre><code class="language-rust">impl MyComponent {
+    fn get_trust_score(&amp;self, did: &amp;Did) -&gt; f64 {
+        // Prefer TrustService (kernel/app separation)
+        if let Some(ref service) = self.trust_service {
+            let kernel_did = icn_kernel_api::types::Did::from(did.to_string());
+            return service.trust_score(&amp;kernel_did);
+        }
+        
+        // Fallback to TrustGraph (deprecated path)
+        if let Some(ref graph) = self.trust_graph {
+            if let Ok(guard) = graph.try_read() {
+                return guard.compute_trust_score(did);
+            }
+        }
+        
+        0.0  // Default if neither available
+    }
+}
+</code></pre>
+<p><strong>Step 3</strong>: Update callers to pass <code>TrustService</code>:</p>
+<pre><code class="language-rust">// In supervisor/lifecycle.rs
+let trust_service = registry.trust().cloned();
+let component = MyComponent::new()
+    .with_trust_service(trust_service);
+</code></pre>
+<p><strong>Step 4</strong>: Remove TrustGraph field once migration is complete.</p>
+<h3>5.3 Converting TrustClass Types</h3>
+<p>When migrating from <code>icn_trust::TrustClass</code> to <code>icn_kernel_api::TrustClass</code>:</p>
+<pre><code class="language-rust">// Before
+use icn_trust::TrustClass;
+
+fn check_access(&amp;self, score: f64) -&gt; bool {
+    TrustClass::from_score(score) &gt;= TrustClass::Partner
+}
+
+// After
+use icn_kernel_api::TrustClass;
+
+fn check_access(&amp;self, score: f64) -&gt; bool {
+    TrustClass::from_score(score) &gt;= TrustClass::Partner
+}
+// Or more directly:
+fn check_access(&amp;self, score: f64) -&gt; bool {
+    score &gt;= icn_kernel_api::TRUST_THRESHOLD_PARTNER  // 0.4
+}
+</code></pre>
+<hr>
+<h2>6. Migration Status</h2>
+<h3>6.0 Wave-Based Migration Progress</h3>
+<p><strong>Current Status</strong>: Wave 1 Complete ✅</p>
+<p>The kernel/app separation is being executed in waves, with each wave building on previous work:</p>
+<table>
+<thead>
+<tr>
+<th>Wave</th>
+<th>Tracking Issue</th>
+<th>Status</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Wave 0</strong></td>
+<td><a href="https://github.com/InterCooperative-Network/icn/issues/1006" target="_blank" rel="noopener">#1006</a></td>
+<td>✅ Complete</td>
+<td>Canonical Mental Model documentation</td>
+</tr>
+<tr>
+<td><strong>Wave 1</strong></td>
+<td><a href="https://github.com/InterCooperative-Network/icn/issues/1007" target="_blank" rel="noopener">#1007</a></td>
+<td>✅ Complete</td>
+<td>Firewall Contract documentation + CI enforcement</td>
+</tr>
+<tr>
+<td><strong>Wave 2</strong></td>
+<td><a href="https://github.com/InterCooperative-Network/icn/issues/1008" target="_blank" rel="noopener">#1008</a></td>
+<td>⏳ Planned</td>
+<td>Scope-Bounded Trust: structural centralization prevention</td>
+</tr>
+<tr>
+<td><strong>Wave 3</strong></td>
+<td><a href="https://github.com/InterCooperative-Network/icn/issues/1009" target="_blank" rel="noopener">#1009</a></td>
+<td>⏳ Planned</td>
+<td>Attestation Model: canonical schema and dispute pathway</td>
+</tr>
+<tr>
+<td><strong>Wave 4</strong></td>
+<td><a href="https://github.com/InterCooperative-Network/icn/issues/1010" target="_blank" rel="noopener">#1010</a></td>
+<td>⏳ Planned</td>
+<td>Adversarial Model: threat documentation and chaos harness</td>
+</tr>
+<tr>
+<td><strong>Wave 5</strong></td>
+<td><a href="https://github.com/InterCooperative-Network/icn/issues/1011" target="_blank" rel="noopener">#1011</a></td>
+<td>⏳ Planned</td>
+<td>Constitutional Genesis: canonical bootstrap documentation</td>
+</tr>
+<tr>
+<td><strong>Wave 6</strong></td>
+<td><a href="https://github.com/InterCooperative-Network/icn/issues/1012" target="_blank" rel="noopener">#1012</a></td>
+<td>⏳ Planned</td>
+<td>Legibility Dashboards: UX spec for constraint visibility</td>
+</tr>
+</tbody></table>
+<p><strong>Wave 1 Deliverables</strong> (✅ Complete as of 2026-02-01):</p>
+<ul>
+<li>✅ Firewall Contract section added to this document</li>
+<li>✅ 5 non-negotiable invariants documented with rationale</li>
+<li>✅ Mechanism vs value distinction table</li>
+<li>✅ Violation examples (what NOT to do)</li>
+<li>✅ <code>.github/scripts/firewall_denylist.py</code> CI enforcement script</li>
+<li>✅ CI job integrated (non-blocking until migrations complete)</li>
+</ul>
+<p><strong>Known Violations</strong> (to be resolved in Waves 2-6):</p>
+<p>Currently detected by <code>firewall_denylist.py</code>:</p>
+<ul>
+<li><code>icn-core -&gt; icn-ccl</code></li>
+<li><code>icn-core -&gt; icn-community</code></li>
+<li><code>icn-core -&gt; icn-compute</code></li>
+<li><code>icn-core -&gt; icn-coop</code></li>
+<li><code>icn-core -&gt; icn-entity</code></li>
+<li><code>icn-core -&gt; icn-federation</code></li>
+<li><code>icn-core -&gt; icn-governance</code></li>
+<li><code>icn-core -&gt; icn-ledger</code></li>
+<li><code>icn-core -&gt; icn-steward</code></li>
+<li><code>icn-core -&gt; icn-trust</code></li>
+</ul>
+<p><strong>Definition of Done for Complete Separation</strong>:</p>
+<ul>
+<li><input disabled="" type="checkbox"> CI <code>firewall-contract</code> job passes without violations</li>
+<li><input disabled="" type="checkbox"> <code>continue-on-error</code> removed from CI job</li>
+<li><input checked="" disabled="" type="checkbox"> All <code>raw_handles</code> removed from ServiceRegistry (completed in #911)</li>
+<li><input disabled="" type="checkbox"> No kernel crate depends on any domain/app crate</li>
+</ul>
+<h3>6.0.1 Enforcement Mechanism Status</h3>
+<p>The table below shows the current state of kernel enforcement mechanisms and policy value sources:</p>
+<table>
+<thead>
+<tr>
+<th>Enforcement</th>
+<th>Kernel-Pure?</th>
+<th>Status</th>
+<th>Migration Target</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Transport auth</strong></td>
+<td>✅ Yes</td>
+<td>Complete</td>
+<td>No changes needed - pure cryptographic check</td>
+</tr>
+<tr>
+<td><strong>Replay guard</strong></td>
+<td>✅ Yes</td>
+<td>Complete</td>
+<td>No changes needed - pure sequence tracking</td>
+</tr>
+<tr>
+<td><strong>Rate limiter (mechanism)</strong></td>
+<td>✅ Yes</td>
+<td>Complete</td>
+<td>Kernel provides token bucket algorithm</td>
+</tr>
+<tr>
+<td><strong>Rate limit values</strong></td>
+<td>🟡 Partial</td>
+<td>Wave 2</td>
+<td>Some hardcoded, needs full migration to ConstraintSet</td>
+</tr>
+<tr>
+<td><strong>Capability gate (mechanism)</strong></td>
+<td>✅ Yes</td>
+<td>Complete</td>
+<td>Kernel checks capability presence</td>
+</tr>
+<tr>
+<td><strong>Capability grants</strong></td>
+<td>🟡 Partial</td>
+<td>Wave 3</td>
+<td>Needs migration to PolicyOracle-provided values</td>
+</tr>
+<tr>
+<td><strong>Credit gate (mechanism)</strong></td>
+<td>✅ Yes</td>
+<td>Complete</td>
+<td>Kernel enforces ceiling checks</td>
+</tr>
+<tr>
+<td><strong>Credit ceiling values</strong></td>
+<td>🟡 Partial</td>
+<td>Wave 4</td>
+<td>Needs migration to ConstraintSet</td>
+</tr>
+<tr>
+<td><strong>Topic access control</strong></td>
+<td>🟡 Partial</td>
+<td>Wave 2</td>
+<td>Some direct trust checks, needs PolicyOracle</td>
+</tr>
+<tr>
+<td><strong>Replication selection</strong></td>
+<td>❌ No</td>
+<td>Wave 2</td>
+<td>Direct trust-score calls need migration</td>
+</tr>
+</tbody></table>
+<p><strong>Legend</strong>:</p>
+<ul>
+<li>✅ <strong>Kernel-Pure</strong>: Mechanism and values properly separated</li>
+<li>🟡 <strong>Partial</strong>: Mechanism separated, but some values still hardcoded in kernel</li>
+<li>❌ <strong>No</strong>: Still has semantic knowledge, needs migration</li>
+</ul>
+<h3>6.1 Completed Migrations</h3>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Migration Date</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ReplicationManager → TrustService</td>
+<td>2026-01-27</td>
+<td>Full migration</td>
+</tr>
+<tr>
+<td>ForkResolver → TrustService</td>
+<td>2026-01-27</td>
+<td>Optional field, fallback preserved</td>
+</tr>
+<tr>
+<td>TrustManager (gateway) → TrustService</td>
+<td>2026-01-27</td>
+<td>Optional field</td>
+</tr>
+<tr>
+<td>ChallengeScheduler → TrustService</td>
+<td>2026-01-28</td>
+<td>Full migration</td>
+</tr>
+<tr>
+<td>PolicySource → kernel TrustClass</td>
+<td>2026-01-28</td>
+<td>Type migration</td>
+</tr>
+<tr>
+<td>IdentityHandle → kernel TrustClass</td>
+<td>2026-01-28</td>
+<td>Type migration</td>
+</tr>
+<tr>
+<td>GossipDeps → PolicyOracle</td>
+<td>2026-01-27</td>
+<td>Removed TrustGraphOracle fallback</td>
+</tr>
+<tr>
+<td>GovernanceService wired in icnd</td>
+<td>2026-01-30</td>
+<td>Daemon owns SledParameterStore lifecycle</td>
+</tr>
+<tr>
+<td>LedgerService wired in icnd</td>
+<td>2026-01-30</td>
+<td>Daemon owns Ledger + SledStore lifecycle</td>
+</tr>
+<tr>
+<td>MisbehaviorDetector → TrustService</td>
+<td>2026-01-30</td>
+<td>Full migration (#910)</td>
+</tr>
+<tr>
+<td>Ledger → TrustService (no TrustGraph)</td>
+<td>2026-01-30</td>
+<td>icn-trust moved to dev-dep (#867)</td>
+</tr>
+<tr>
+<td>OracleRegistry wired in supervisor</td>
+<td>2026-01-30</td>
+<td>Bootstrap phases, domain routing (#869)</td>
+</tr>
+<tr>
+<td>Network rate limiting → OracleRegistry</td>
+<td>2026-01-30</td>
+<td>Wired OracleRegistry as PolicyOracle; functional when trust oracle registered (#869)</td>
+</tr>
+<tr>
+<td>RPC PolicyOracle → OracleRegistry</td>
+<td>2026-01-30</td>
+<td>Passed to RpcDeps; rate-limiting wiring TBD (#869)</td>
+</tr>
+<tr>
+<td>AllowAllOracle fallback removed</td>
+<td>2026-01-30</td>
+<td>Gossip uses OracleRegistry (#869)</td>
+</tr>
+</tbody></table>
+<h3>6.2 Remaining Work</h3>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Location</th>
+<th>Status</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GatewayServer trust routes</td>
+<td>icn-gateway</td>
+<td>Partial</td>
+<td>Some endpoints still use TrustGraph</td>
+</tr>
+<tr>
+<td>ContractActor</td>
+<td>icn-ccl</td>
+<td>Needs TrustService</td>
+<td>Still accepts <code>Option&lt;Arc&lt;RwLock&lt;TrustGraph&gt;&gt;&gt;</code></td>
+</tr>
+<tr>
+<td>icn-trust dep in icn-core</td>
+<td>icn-core/Cargo.toml</td>
+<td>#912</td>
+<td>Kernel crate still imports domain crate</td>
+</tr>
+<tr>
+<td>icn-governance dep in icn-core</td>
+<td>icn-core/Cargo.toml</td>
+<td>#913</td>
+<td>Kernel crate still imports domain crate</td>
+</tr>
+<tr>
+<td>icn-ledger dep in icn-core</td>
+<td>icn-core/Cargo.toml</td>
+<td>#914</td>
+<td>Kernel crate still imports domain crate</td>
+</tr>
+</tbody></table>
+<h3>6.3 Transition Handles (Completed)</h3>
+<p>The <code>raw_handles</code> transition mechanism has been fully removed (#911). All domain
+objects are now provided via:</p>
+<ul>
+<li><strong><code>BootstrapHandles</code></strong> (<code>icn-core/src/supervisor/actors.rs</code>) -- Typed handles
+for ledger, contract runtime, dispute/treasury managers, and protocol parameter
+store. Passed from daemon to supervisor via <code>Runtime::with_bootstrap_handles()</code>.</li>
+<li><strong><code>ServiceRegistry</code></strong> (<code>icn-kernel-api/src/services.rs</code>) -- Trait-based service
+injection for TrustService, GovernanceService, LedgerService, SecurityService.
+Passed via <code>Runtime::with_services()</code>.</li>
+</ul>
+<hr>
+<h2>7. Testing Patterns</h2>
+<h3>7.1 Mock TrustService</h3>
+<pre><code class="language-rust">/// For tests that don&#39;t need trust-gated behavior
+pub struct MockTrustService {
+    default_score: f64,
+}
+
+impl MockTrustService {
+    pub fn new(default_score: f64) -&gt; Self {
+        Self { default_score }
+    }
+    
+    pub fn fully_trusted() -&gt; Self {
+        Self::new(1.0)
+    }
+    
+    pub fn untrusted() -&gt; Self {
+        Self::new(0.0)
+    }
+}
+
+impl TrustService for MockTrustService {
+    fn oracle(&amp;self) -&gt; Arc&lt;dyn PolicyOracle&gt; {
+        Arc::new(AllowAllOracle::default())
+    }
+    
+    fn trust_score(&amp;self, _actor: &amp;Did) -&gt; f64 {
+        self.default_score
+    }
+    
+    fn record_event(&amp;self, _actor: &amp;Did, _event: TrustEvent) {
+        // No-op for tests
+    }
+}
+</code></pre>
+<h3>7.2 AllowAllOracle</h3>
+<p>For tests that don&#39;t need authorization enforcement:</p>
+<pre><code class="language-rust">use icn_kernel_api::AllowAllOracle;
+
+let deps = GossipDeps {
+    policy_oracle: Some(Arc::new(AllowAllOracle::default())),
+    trust_service: None,
+    // ...
+};
+</code></pre>
+<h3>7.3 Integration Test Pattern</h3>
+<pre><code class="language-rust">#[tokio::test]
+async fn test_component_with_trust_service() {
+    // Create mock trust service
+    let trust_service = Arc::new(MockTrustService::new(0.5));
+    
+    // Create component with injected service
+    let component = MyComponent::new()
+        .with_trust_service(Some(trust_service));
+    
+    // Test behavior
+    let result = component.do_something(&amp;test_did).await;
+    assert!(result.is_ok());
+}
+</code></pre>
+<hr>
+<h2>8. FAQ</h2>
+<h3>Q: Why not just pass TrustGraph everywhere?</h3>
+<p><strong>A</strong>: Direct TrustGraph access creates tight coupling:</p>
+<ul>
+<li>Kernel code &quot;knows&quot; about trust class semantics</li>
+<li>Cannot swap trust implementations</li>
+<li>Testing requires real TrustGraph instances</li>
+<li>Violates separation of concerns</li>
+</ul>
+<h3>Q: What if a component needs both TrustService and TrustGraph?</h3>
+<p><strong>A</strong>: During transition, use both:</p>
+<pre><code class="language-rust">struct Component {
+    trust_service: Option&lt;Arc&lt;dyn TrustService&gt;&gt;,  // Preferred
+    trust_graph: Option&lt;Arc&lt;RwLock&lt;TrustGraph&gt;&gt;&gt;,  // Fallback
+}
+</code></pre>
+<p>When fully migrated, remove <code>trust_graph</code>.</p>
+<h3>Q: How do I know if my code crosses the Meaning Firewall?</h3>
+<p><strong>A</strong>: Your code crosses the firewall when:</p>
+<ol>
+<li>It converts domain types to kernel types (✅ correct direction)</li>
+<li>It converts kernel types to domain types (❌ wrong direction)</li>
+</ol>
+<p>Example of correct crossing:</p>
+<pre><code class="language-rust">// In app code:
+let trust_score = graph.compute_trust_score(&amp;did);
+let constraints = ConstraintSet::new()
+    .with_rate_limit(score_to_limit(trust_score));
+// ↑ trust_score (domain) → rate_limit (kernel)
+</code></pre>
+<h3>Q: What&#39;s the difference between <code>icn_trust::TrustClass</code> and <code>icn_kernel_api::TrustClass</code>?</h3>
+<p><strong>A</strong>: They have identical values but different purposes:</p>
+<ul>
+<li><code>icn_trust::TrustClass</code> - Domain concept, used in trust graph operations</li>
+<li><code>icn_kernel_api::TrustClass</code> - Kernel abstraction, used for policy decisions</li>
+</ul>
+<p>Kernel code should only use <code>icn_kernel_api::TrustClass</code>.</p>
+<h3>Q: When were raw_handles removed?</h3>
+<p><strong>A</strong>: Completed in #911. All components now use typed <code>BootstrapHandles</code> or trait-based <code>ServiceRegistry</code> injection.</p>
+<hr>
+<h2>Appendix A: Store Path Structure</h2>
+<p>The daemon creates sled-backed stores under <code>config.store_path()</code> (default: <code>~/.local/share/icn/store/</code> on Linux):</p>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Owner</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>store/trust/</code></td>
+<td>Daemon → TrustGraph</td>
+<td>Trust attestations, scores</td>
+</tr>
+<tr>
+<td><code>store/protocol_params/</code></td>
+<td>Daemon → GovernanceService</td>
+<td>Protocol parameter values</td>
+</tr>
+<tr>
+<td><code>store/ledger/</code></td>
+<td>Daemon → Ledger + DisputeManager + TreasuryManager</td>
+<td>Double-entry transactions, disputes</td>
+</tr>
+</tbody></table>
+<p>Each path is opened exactly once by the daemon. The supervisor receives handles via <code>BootstrapHandles</code> to avoid double-opening sled databases.</p>
+<p>Helper methods on <code>Config</code>:</p>
+<ul>
+<li><code>config.store_path()</code> → base store directory</li>
+<li><code>config.protocol_params_path()</code> → <code>store/protocol_params/</code></li>
+<li><code>config.ledger_store_path()</code> → <code>store/ledger/</code></li>
+</ul>
+<h2>Appendix B: Key Files</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icn/crates/icn-kernel-api/src/lib.rs</code></td>
+<td>Kernel API trait exports</td>
+</tr>
+<tr>
+<td><code>icn/crates/icn-kernel-api/src/authz.rs</code></td>
+<td>PolicyOracle, ConstraintSet</td>
+</tr>
+<tr>
+<td><code>icn/crates/icn-kernel-api/src/services.rs</code></td>
+<td>TrustService, ServiceRegistry</td>
+</tr>
+<tr>
+<td><code>icn/crates/icn-core/src/supervisor/lifecycle.rs</code></td>
+<td>Service injection</td>
+</tr>
+<tr>
+<td><code>icn/crates/icn-core/src/supervisor/init_trust.rs</code></td>
+<td>Trust initialization</td>
+</tr>
+<tr>
+<td><code>icn/crates/icn-core/src/supervisor/init_governance.rs</code></td>
+<td>Governance initialization</td>
+</tr>
+<tr>
+<td><code>icn/crates/icn-core/src/supervisor/init_ledger.rs</code></td>
+<td>Ledger initialization</td>
+</tr>
+<tr>
+<td><code>icn/crates/icn-gateway/src/trust_policy.rs</code></td>
+<td>TrustPolicyOracle implementation</td>
+</tr>
+<tr>
+<td><code>icn/apps/*</code></td>
+<td>Canonical runtime app implementations</td>
+</tr>
+<tr>
+<td><code>apps/*</code></td>
+<td>Legacy runtime app location during migration</td>
+</tr>
+<tr>
+<td><code>CLAUDE.md</code></td>
+<td>Agent guidance (Kernel/App section)</td>
+</tr>
+</tbody></table>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

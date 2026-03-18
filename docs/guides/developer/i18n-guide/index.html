@@ -1,0 +1,472 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Internationalization (i18n) Migration Guide | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>guides</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>developer</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>i18n guide</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/guides/developer/i18n-guide.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Internationalization (i18n) Migration Guide</h1>
+<p>This guide explains how to add internationalization to ICN components across Rust, React Native, and web platforms.</p>
+<h2>Overview</h2>
+<p>ICN uses different i18n libraries optimized for each platform:</p>
+<table>
+<thead>
+<tr>
+<th>Platform</th>
+<th>Library</th>
+<th>Locale Format</th>
+<th>Location</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Rust (CLI, Gateway)</td>
+<td><code>rust-i18n</code></td>
+<td>YAML</td>
+<td><code>&lt;crate&gt;/locales/</code></td>
+</tr>
+<tr>
+<td>React Native</td>
+<td><code>react-i18next</code></td>
+<td>JSON</td>
+<td><code>src/i18n/locales/</code></td>
+</tr>
+<tr>
+<td>Web (Vanilla JS)</td>
+<td>Custom module</td>
+<td>JSON</td>
+<td><code>locales/</code></td>
+</tr>
+</tbody></table>
+<h3>Translation Key Naming Convention</h3>
+<p>Use dot-notation with consistent hierarchy:</p>
+<pre><code>{component}.{section}.{message}
+</code></pre>
+<p>Examples:</p>
+<ul>
+<li><code>cli.status.connected</code> - CLI status message</li>
+<li><code>nav.overview</code> - Navigation item</li>
+<li><code>common.loading</code> - Shared UI string</li>
+<li><code>auth.signIn</code> - Authentication action</li>
+</ul>
+<h3>Variable Interpolation</h3>
+<table>
+<thead>
+<tr>
+<th>Platform</th>
+<th>Syntax</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Rust</td>
+<td><code>{variable}</code></td>
+<td><code>t!(&quot;greeting&quot;, name = &quot;Alice&quot;)</code></td>
+</tr>
+<tr>
+<td>React/JS</td>
+<td><code>{{variable}}</code></td>
+<td><code>t(&#39;greeting&#39;, { name: &#39;Alice&#39; })</code></td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Rust Components</h2>
+<h3>Adding rust-i18n to a Crate</h3>
+<p><strong>1. Add dependency to <code>Cargo.toml</code>:</strong></p>
+<pre><code class="language-toml">[dependencies]
+rust-i18n = &quot;3&quot;
+</code></pre>
+<p><strong>2. Initialize in <code>main.rs</code> or <code>lib.rs</code>:</strong></p>
+<pre><code class="language-rust">use rust_i18n::t;
+
+// Load translations from ./locales directory, fallback to English
+rust_i18n::i18n!(&quot;locales&quot;, fallback = &quot;en&quot;);
+</code></pre>
+<p><strong>3. Create locale file at <code>locales/en.yaml</code>:</strong></p>
+<pre><code class="language-yaml"># ICN Component Translations - English
+# Format: {component}.{section}.{message}
+# Variables: {var_name} for interpolation
+
+cli:
+  common:
+    no_identity: &quot;No identity found. Run &#39;icnctl id init&#39; to create one.&quot;
+    error: &quot;Error&quot;
+    success: &quot;Success&quot;
+
+  status:
+    checking: &quot;Checking daemon status...&quot;
+    connected: &quot;Connected to ICN daemon&quot;
+    not_running: &quot;Daemon is not running&quot;
+</code></pre>
+<h3>Using the <code>t!()</code> Macro</h3>
+<p><strong>Basic translation:</strong></p>
+<pre><code class="language-rust">println!(&quot;{}&quot;, t!(&quot;cli.status.connected&quot;));
+</code></pre>
+<p><strong>With variable interpolation:</strong></p>
+<pre><code class="language-rust">// Locale file: greeting: &quot;Welcome, {name}!&quot;
+println!(&quot;{}&quot;, t!(&quot;greeting&quot;, name = user_name));
+</code></pre>
+<p><strong>Setting locale at runtime:</strong></p>
+<pre><code class="language-rust">// Get locale from environment or config
+let locale = std::env::var(&quot;ICN_LOCALE&quot;).unwrap_or_else(|_| &quot;en&quot;.into());
+rust_i18n::set_locale(&amp;locale);
+</code></pre>
+<h3>Example: icnctl CLI</h3>
+<p>See <code>icn/bins/icnctl/</code> for a complete example:</p>
+<pre><code class="language-rust">// icn/bins/icnctl/src/main.rs
+use rust_i18n::t;
+
+rust_i18n::i18n!(&quot;locales&quot;, fallback = &quot;en&quot;);
+
+fn main() {
+    // Set locale from environment
+    if let Ok(locale) = std::env::var(&quot;ICN_LOCALE&quot;) {
+        rust_i18n::set_locale(&amp;locale);
+    }
+
+    println!(&quot;{}\n&quot;, t!(&quot;cli.id.init.starting&quot;));
+    // ... rest of implementation
+}
+</code></pre>
+<hr>
+<h2>React Native</h2>
+<h3>Setting Up react-i18next</h3>
+<p><strong>1. Install dependencies:</strong></p>
+<pre><code class="language-bash">npm install i18next react-i18next expo-localization
+</code></pre>
+<p><strong>2. Create <code>src/i18n/index.ts</code>:</strong></p>
+<pre><code class="language-typescript">import i18n from &#39;i18next&#39;;
+import { initReactI18next } from &#39;react-i18next&#39;;
+import * as Localization from &#39;expo-localization&#39;;
+
+// Import locale files
+import en from &#39;./locales/en.json&#39;;
+
+const resources = {
+  en: { translation: en },
+  // Add more locales here:
+  // es: { translation: es },
+};
+
+// Get device locale
+const getDeviceLocale = (): string =&gt; {
+  try {
+    const deviceLocale = Localization.locale?.split(&#39;-&#39;)[0] || &#39;en&#39;;
+    return deviceLocale in resources ? deviceLocale : &#39;en&#39;;
+  } catch {
+    return &#39;en&#39;;
+  }
+};
+
+i18n.use(initReactI18next).init({
+  resources,
+  lng: getDeviceLocale(),
+  fallbackLng: &#39;en&#39;,
+  interpolation: {
+    escapeValue: false, // React already escapes
+  },
+  react: {
+    useSuspense: false,
+  },
+});
+
+export default i18n;
+</code></pre>
+<p><strong>3. Create locale file at <code>src/i18n/locales/en.json</code>:</strong></p>
+<pre><code class="language-json">{
+  &quot;common&quot;: {
+    &quot;loading&quot;: &quot;Loading...&quot;,
+    &quot;error&quot;: &quot;An error occurred&quot;,
+    &quot;retry&quot;: &quot;Retry&quot;,
+    &quot;cancel&quot;: &quot;Cancel&quot;
+  },
+
+  &quot;nav&quot;: {
+    &quot;home&quot;: &quot;Home&quot;,
+    &quot;payments&quot;: &quot;Payments&quot;,
+    &quot;settings&quot;: &quot;Settings&quot;
+  },
+
+  &quot;home&quot;: {
+    &quot;title&quot;: &quot;Home&quot;,
+    &quot;welcome&quot;: &quot;Welcome back&quot;,
+    &quot;balance&quot;: {
+      &quot;label&quot;: &quot;Available Balance&quot;,
+      &quot;currency&quot;: &quot;hours&quot;
+    }
+  }
+}
+</code></pre>
+<p><strong>4. Initialize in app entry point:</strong></p>
+<pre><code class="language-typescript">// App.tsx or index.ts
+import &#39;./i18n&#39;;
+</code></pre>
+<h3>Using the useTranslation Hook</h3>
+<pre><code class="language-tsx">import { useTranslation } from &#39;react-i18next&#39;;
+
+function HomeScreen() {
+  const { t } = useTranslation();
+
+  return (
+    &lt;View&gt;
+      &lt;Text&gt;{t(&#39;home.title&#39;)}&lt;/Text&gt;
+      &lt;Text&gt;{t(&#39;home.welcome&#39;)}&lt;/Text&gt;
+      &lt;Text&gt;{t(&#39;home.balance.label&#39;)}: 42 {t(&#39;home.balance.currency&#39;)}&lt;/Text&gt;
+    &lt;/View&gt;
+  );
+}
+</code></pre>
+<p><strong>With interpolation:</strong></p>
+<pre><code class="language-tsx">// Locale: &quot;greeting&quot;: &quot;Hello, {{name}}!&quot;
+&lt;Text&gt;{t(&#39;greeting&#39;, { name: &#39;Alice&#39; })}&lt;/Text&gt;
+</code></pre>
+<p><strong>Changing language at runtime:</strong></p>
+<pre><code class="language-typescript">import i18n from &#39;./i18n&#39;;
+
+const changeLanguage = async (lang: string) =&gt; {
+  await i18n.changeLanguage(lang);
+};
+</code></pre>
+<hr>
+<h2>Web (Vanilla JavaScript)</h2>
+<h3>Using the i18n Module</h3>
+<p>ICN includes a lightweight, framework-agnostic i18n module for vanilla JavaScript.</p>
+<p><strong>1. Import and initialize:</strong></p>
+<pre><code class="language-javascript">import { initI18n, t, setLocale } from &#39;./i18n.js&#39;;
+
+// Initialize (call once at app startup)
+await initI18n();
+</code></pre>
+<p><strong>2. Create locale file at <code>locales/en.json</code>:</strong></p>
+<pre><code class="language-json">{
+  &quot;app&quot;: {
+    &quot;title&quot;: &quot;ICN Timebank&quot;,
+    &quot;subtitle&quot;: &quot;Cooperative Time Banking&quot;
+  },
+
+  &quot;nav&quot;: {
+    &quot;overview&quot;: &quot;Overview&quot;,
+    &quot;network&quot;: &quot;Network&quot;,
+    &quot;ledger&quot;: &quot;Ledger&quot;
+  },
+
+  &quot;status&quot;: {
+    &quot;online&quot;: &quot;Online&quot;,
+    &quot;offline&quot;: &quot;Offline&quot;,
+    &quot;connecting&quot;: &quot;Connecting...&quot;
+  }
+}
+</code></pre>
+<h3>Using Translations</h3>
+<p><strong>Basic translation:</strong></p>
+<pre><code class="language-javascript">const title = t(&#39;app.title&#39;); // &quot;ICN Timebank&quot;
+</code></pre>
+<p><strong>With interpolation:</strong></p>
+<pre><code class="language-javascript">// Locale: &quot;welcome&quot;: &quot;Welcome, {{name}}!&quot;
+const greeting = t(&#39;common.welcome&#39;, { name: &#39;Alice&#39; }); // &quot;Welcome, Alice!&quot;
+</code></pre>
+<p><strong>Changing locale at runtime:</strong></p>
+<pre><code class="language-javascript">await setLocale(&#39;es&#39;);
+</code></pre>
+<h3>XSS Prevention</h3>
+<p>When rendering translations to the DOM, always use safe methods:</p>
+<pre><code class="language-javascript">// SAFE: Use textContent for plain text (recommended)
+element.textContent = t(&#39;app.title&#39;);
+
+// SAFE: Use DOM methods for structured content
+const span = document.createElement(&#39;span&#39;);
+span.textContent = t(&#39;greeting&#39;, { name: userName });
+container.appendChild(span);
+</code></pre>
+<p>The i18n module returns raw strings. Locale files are trusted, but interpolated params could contain user input.</p>
+<h3>Listening for Locale Changes</h3>
+<pre><code class="language-javascript">window.addEventListener(&#39;localechange&#39;, (event) =&gt; {
+  console.log(`Locale changed to: ${event.detail.locale}`);
+  // Update UI components
+});
+</code></pre>
+<hr>
+<h2>Adding New Languages</h2>
+<h3>Checklist</h3>
+<p>For each platform, create the corresponding locale file:</p>
+<ul>
+<li><input disabled="" type="checkbox"> <strong>Rust</strong>: <code>&lt;crate&gt;/locales/&lt;lang&gt;.yaml</code></li>
+<li><input disabled="" type="checkbox"> <strong>React Native</strong>: <code>src/i18n/locales/&lt;lang&gt;.json</code></li>
+<li><input disabled="" type="checkbox"> <strong>Web</strong>: <code>locales/&lt;lang&gt;.json</code></li>
+</ul>
+<p>Then register the new locale:</p>
+<ul>
+<li><input disabled="" type="checkbox"> <strong>Rust</strong>: No registration needed (auto-loaded)</li>
+<li><input disabled="" type="checkbox"> <strong>React Native</strong>: Import and add to <code>resources</code> in <code>src/i18n/index.ts</code></li>
+<li><input disabled="" type="checkbox"> <strong>Web</strong>: Auto-loaded by <code>loadLocale()</code> function</li>
+</ul>
+<h3>Translation Process</h3>
+<ol>
+<li><strong>Copy the English locale file</strong> as a starting point</li>
+<li><strong>Translate all strings</strong> while preserving:<ul>
+<li>Key structure (don&#39;t rename keys)</li>
+<li>Variable placeholders (<code>{var}</code> or <code>{{var}}</code>)</li>
+<li>HTML entities if present</li>
+</ul>
+</li>
+<li><strong>Request review</strong> from native speakers in the community</li>
+<li><strong>Test the translations</strong> in the actual UI</li>
+</ol>
+<h3>Testing Translations</h3>
+<p><strong>Rust:</strong></p>
+<pre><code class="language-bash">ICN_LOCALE=es cargo run -- status
+</code></pre>
+<p><strong>React Native:</strong></p>
+<pre><code class="language-typescript">import i18n from &#39;./i18n&#39;;
+i18n.changeLanguage(&#39;es&#39;);
+</code></pre>
+<p><strong>Web:</strong></p>
+<pre><code class="language-javascript">await setLocale(&#39;es&#39;);
+</code></pre>
+<h3>Language Codes</h3>
+<p>Use <a href="https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes" target="_blank" rel="noopener">ISO 639-1</a> two-letter codes:</p>
+<table>
+<thead>
+<tr>
+<th>Language</th>
+<th>Code</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>English</td>
+<td><code>en</code></td>
+</tr>
+<tr>
+<td>Spanish</td>
+<td><code>es</code></td>
+</tr>
+<tr>
+<td>French</td>
+<td><code>fr</code></td>
+</tr>
+<tr>
+<td>German</td>
+<td><code>de</code></td>
+</tr>
+<tr>
+<td>Portuguese</td>
+<td><code>pt</code></td>
+</tr>
+<tr>
+<td>Chinese</td>
+<td><code>zh</code></td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Best Practices</h2>
+<h3>1. Avoid Concatenating Translated Strings</h3>
+<p>Word order varies by language.</p>
+<pre><code class="language-javascript">// BAD: &quot;Hello&quot; + &quot; &quot; + name
+t(&#39;hello&#39;) + &#39; &#39; + name;
+
+// GOOD: Use interpolation
+t(&#39;greeting&#39;, { name });
+</code></pre>
+<h3>2. Keep Translations Context-Aware</h3>
+<p>Include context in key names:</p>
+<pre><code class="language-yaml"># BAD: ambiguous
+button: &quot;Submit&quot;
+
+# GOOD: clear context
+payment.submitButton: &quot;Send Payment&quot;
+proposal.submitButton: &quot;Submit Proposal&quot;
+</code></pre>
+<h3>3. Handle Pluralization</h3>
+<p>Some languages have complex plural rules.</p>
+<pre><code class="language-javascript">// Use count-based keys
+{
+  &quot;items&quot;: {
+    &quot;one&quot;: &quot;{{count}} item&quot;,
+    &quot;other&quot;: &quot;{{count}} items&quot;
+  }
+}
+</code></pre>
+<h3>4. Test with Long Strings</h3>
+<p>German and Finnish often produce longer strings than English. Test UI layout with these languages.</p>
+<h3>5. Keep Locale Files Organized</h3>
+<p>Group related strings:</p>
+<pre><code class="language-yaml"># Group by feature/screen
+payments:
+  title: &quot;Payments&quot;
+  send: &quot;Send Payment&quot;
+  receive: &quot;Receive&quot;
+  history: &quot;Transaction History&quot;
+
+governance:
+  title: &quot;Governance&quot;
+  proposals: &quot;Proposals&quot;
+  vote: &quot;Vote&quot;
+</code></pre>
+<hr>
+<h2>Related Documentation</h2>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING">Contributing Guide</a> - General contribution guidelines</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/bins/icnctl/locales/">icnctl locales</a> - CLI translation files</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-gateway/locales/">Gateway locales</a> - Gateway API messages</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/web/pilot-ui/locales/">Web UI locales</a> - Web interface translations</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/sdk/react-native/examples/CoopWallet/src/i18n/">CoopWallet i18n</a> - Mobile app example</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

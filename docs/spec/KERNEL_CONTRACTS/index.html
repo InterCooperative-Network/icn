@@ -1,0 +1,1657 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Democratic infrastructure for cooperatives, communities, and federations.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Kernel Contracts Specification | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.ctHTYQhS.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>spec</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>KERNEL CONTRACTS</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/spec/KERNEL_CONTRACTS.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Kernel Contracts Specification</h1>
+<p><strong>Version</strong>: 0.1.0
+<strong>Status</strong>: Draft
+<strong>Last Updated</strong>: 2025-01-25</p>
+<p>This document defines the contracts for ICN kernel primitives. It is the constitutional document for the kernel architecture - all kernel code must conform to these contracts.</p>
+<hr>
+<h2>Table of Contents</h2>
+<ol>
+<li><a href="#0-contract-rules">Contract Rules</a></li>
+<li><a href="#1-common-types">Common Types</a></li>
+<li><a href="#2-identity-primitive">Identity Primitive</a></li>
+<li><a href="#3-authorization-primitive">Authorization Primitive</a></li>
+<li><a href="#4-state-primitive">State Primitive</a></li>
+<li><a href="#5-compute-primitive">Compute Primitive</a></li>
+<li><a href="#6-communication-primitive">Communication Primitive</a></li>
+<li><a href="#7-time-primitive">Time Primitive</a></li>
+<li><a href="#8-coordination-primitive">Coordination Primitive</a></li>
+<li><a href="#9-naming-primitive">Naming Primitive</a></li>
+<li><a href="#10-app-runtime-contract">App Runtime Contract</a></li>
+</ol>
+<hr>
+<h2>0. Contract Rules</h2>
+<h3>0.1 Stability Policy</h3>
+<p>The kernel follows semantic versioning for API stability:</p>
+<table>
+<thead>
+<tr>
+<th>Version Type</th>
+<th>Allowed Changes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Patch (0.1.x)</td>
+<td>Bugfixes only. No API or wire format changes.</td>
+</tr>
+<tr>
+<td>Minor (0.x.0)</td>
+<td>Additive changes only. New methods, new optional fields.</td>
+</tr>
+<tr>
+<td>Major (x.0.0)</td>
+<td>Breaking changes allowed with migration path.</td>
+</tr>
+</tbody></table>
+<p><strong>Wire format stability</strong>: All serialized formats (events, capabilities, messages) MUST be versioned and support at least N-2 versions for reading.</p>
+<h3>0.2 The Meaning Firewall</h3>
+<p>The kernel provides <strong>mechanisms</strong>, not <strong>semantics</strong>.</p>
+<p><strong>The kernel MUST NOT:</strong></p>
+<ul>
+<li>Define domain schemas (ledger transactions, governance proposals, membership records)</li>
+<li>Embed trust computation logic (trust scores, reputation algorithms)</li>
+<li>Embed membership logic (who&#39;s in an org, role definitions)</li>
+<li>Privilege &quot;official&quot; apps over third-party apps</li>
+<li>Interpret the meaning of events or credentials</li>
+</ul>
+<p><strong>The kernel MUST:</strong></p>
+<ul>
+<li>Provide generic, domain-agnostic primitives</li>
+<li>Treat all apps equally (same APIs for core and third-party apps)</li>
+<li>Use policy oracles for authorization decisions</li>
+<li>Accept arbitrary bytes/schemas without interpretation</li>
+</ul>
+<p><strong>Litmus test</strong>: &quot;Could a developer build a DIFFERENT economic model / governance system / trust algorithm using these primitives?&quot; If no, the primitives are too specific.</p>
+<h3>0.3 Extension Points</h3>
+<p>Each primitive MUST define:</p>
+<ol>
+<li><strong>Adapter interfaces</strong>: Pluggable implementations (e.g., different storage backends, different DID methods)</li>
+<li><strong>Policy oracle hooks</strong>: Points where apps can inject authorization decisions</li>
+<li><strong>Resource accounting hooks</strong>: Metering points for quotas and limits</li>
+</ol>
+<h3>0.4 PR Checklist</h3>
+<p>Every PR touching kernel code MUST answer:</p>
+<ul>
+<li><input disabled="" type="checkbox"> Does this add a new kernel operation? → Update <code>kernel_surface.toml</code></li>
+<li><input disabled="" type="checkbox"> Does this interpret domain semantics? → Must be an app, not kernel</li>
+<li><input disabled="" type="checkbox"> Does this hardcode a schema? → Must be an app, not kernel</li>
+<li><input disabled="" type="checkbox"> Does this privilege a specific application? → Reject or use oracle pattern</li>
+<li><input disabled="" type="checkbox"> Does this add policy logic? → Must use policy oracle hook</li>
+<li><input disabled="" type="checkbox"> Does this break wire format compatibility? → Requires major version bump</li>
+</ul>
+<hr>
+<h2>1. Common Types</h2>
+<p>All primitives share these foundational types:</p>
+<pre><code class="language-rust">// === Identifiers ===
+
+/// Decentralized Identifier (e.g., &quot;did:icn:z6MkABC...&quot;)
+pub type Did = String;
+
+/// Node identifier (unique per physical/virtual node)
+pub type NodeId = String;
+
+/// Organization identifier (maps to a DID)
+pub type OrgId = Did;
+
+/// Namespace identifier (hierarchical: &quot;/org/app/sub&quot;)
+pub type NamespaceId = String;
+
+/// Application identifier
+pub type AppId = String;
+
+/// Capability token identifier
+pub type CapabilityId = String;
+
+// === Time and Ordering ===
+
+/// Logical timestamp for causal ordering
+/// Monotonically increasing within a node, comparable across nodes via vector clocks
+pub type LogicalTimestamp = u64;
+
+/// Version number for optimistic concurrency (CAS operations)
+pub type Version = u64;
+
+/// Offset position in a log
+pub type Offset = u64;
+
+// === Storage ===
+
+/// Content hash for content-addressed storage (SHA-256)
+pub type Hash = [u8; 32];
+
+/// Generic key for KV operations
+pub type Key = Vec&lt;u8&gt;;
+
+/// Generic value for KV operations
+pub type Value = Vec&lt;u8&gt;;
+
+// === Namespace ===
+
+/// Hierarchical namespace for resource isolation
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Namespace {
+    /// Organization that owns this namespace
+    pub org: OrgId,
+    /// Application within the org
+    pub app: AppId,
+    /// Optional sub-namespace for further isolation
+    pub sub: Option&lt;String&gt;,
+}
+
+impl Namespace {
+    /// Creates a new namespace: /&lt;org&gt;/&lt;app&gt;/
+    pub fn new(org: impl Into&lt;String&gt;, app: impl Into&lt;String&gt;) -&gt; Self {
+        Self {
+            org: org.into(),
+            app: app.into(),
+            sub: None,
+        }
+    }
+
+    /// Adds a sub-namespace: /&lt;org&gt;/&lt;app&gt;/&lt;sub&gt;/
+    pub fn with_sub(mut self, sub: impl Into&lt;String&gt;) -&gt; Self {
+        self.sub = Some(sub.into());
+        self
+    }
+
+    /// Returns the full path as a string
+    pub fn to_path(&amp;self) -&gt; String {
+        match &amp;self.sub {
+            Some(s) =&gt; format!(&quot;/{}/{}/{}&quot;, self.org, self.app, s),
+            None =&gt; format!(&quot;/{}/{}&quot;, self.org, self.app),
+        }
+    }
+}
+
+// === Errors ===
+
+/// Standard error structure for kernel operations
+#[derive(Debug, Clone)]
+pub struct KernelError {
+    /// Error code for programmatic handling
+    pub code: ErrorCode,
+    /// Human-readable message
+    pub message: String,
+    /// Whether the operation can be retried
+    pub retryable: bool,
+    /// Who is at fault: caller, kernel, or adapter
+    pub blame: Blame,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ErrorCode {
+    // Authorization errors
+    Unauthorized,
+    CapabilityExpired,
+    CapabilityRevoked,
+    InsufficientCapability,
+
+    // State errors
+    NotFound,
+    AlreadyExists,
+    VersionMismatch,
+    NamespaceNotFound,
+
+    // Resource errors
+    QuotaExceeded,
+    RateLimited,
+
+    // System errors
+    Internal,
+    Unavailable,
+    Timeout,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Blame {
+    /// Caller made an invalid request
+    Caller,
+    /// Kernel had an internal error
+    Kernel,
+    /// External adapter/service failed
+    Adapter,
+}
+</code></pre>
+<hr>
+<h2>2. Identity Primitive</h2>
+<p>The Identity primitive provides decentralized identity management without credential semantics.</p>
+<h3>2.1 Contract</h3>
+<p><strong>Provides:</strong></p>
+<ul>
+<li>DID creation, rotation, and deactivation</li>
+<li>Cryptographic signing and verification</li>
+<li>DID document resolution via pluggable resolvers</li>
+<li>Keystore interface (sign without key export)</li>
+</ul>
+<p><strong>Does NOT provide:</strong></p>
+<ul>
+<li>Credential semantics (what credentials mean)</li>
+<li>Membership (who&#39;s in an org)</li>
+<li>Trust/reputation scores</li>
+<li>Steward ceremonies or verification rituals</li>
+</ul>
+<h3>2.2 Trait Definitions</h3>
+<pre><code class="language-rust">/// Core identity operations
+pub trait IdentityService: Send + Sync {
+    /// Create a new DID with the specified method
+    fn did_create(&amp;self, method: DidMethod) -&gt; Result&lt;(Did, DidDocument), IdentityError&gt;;
+
+    /// Rotate keys for an existing DID
+    fn did_rotate(&amp;self, did: &amp;Did, new_keys: KeyBundle) -&gt; Result&lt;DidDocument, IdentityError&gt;;
+
+    /// Deactivate a DID (mark as no longer valid)
+    fn did_deactivate(&amp;self, did: &amp;Did) -&gt; Result&lt;(), IdentityError&gt;;
+
+    /// Sign arbitrary bytes with a DID&#39;s signing key
+    fn sign(&amp;self, did: &amp;Did, payload: &amp;[u8]) -&gt; Result&lt;Signature, IdentityError&gt;;
+
+    /// Verify a signature against a DID&#39;s public key
+    fn verify(&amp;self, did: &amp;Did, payload: &amp;[u8], signature: &amp;Signature) -&gt; Result&lt;bool, IdentityError&gt;;
+}
+
+/// DID document resolution
+pub trait DidResolver: Send + Sync {
+    /// Resolve a DID to its document
+    fn resolve(&amp;self, did: &amp;Did) -&gt; Result&lt;DidDocument, ResolveError&gt;;
+
+    /// Check if a DID is still active
+    fn is_active(&amp;self, did: &amp;Did) -&gt; Result&lt;bool, ResolveError&gt;;
+}
+
+/// Keystore for secure key management
+pub trait Keystore: Send + Sync {
+    /// Sign payload using a key (key never exported)
+    fn sign(&amp;self, key_id: &amp;KeyId, payload: &amp;[u8]) -&gt; Result&lt;Signature, KeystoreError&gt;;
+
+    /// Get public key for a key ID
+    fn public_key(&amp;self, key_id: &amp;KeyId) -&gt; Result&lt;PublicKey, KeystoreError&gt;;
+
+    /// List all key IDs in the keystore
+    fn list_keys(&amp;self) -&gt; Result&lt;Vec&lt;KeyId&gt;, KeystoreError&gt;;
+
+    // Note: No export_private_key - signing without exposure
+}
+
+/// Supported DID methods
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DidMethod {
+    /// did:key - self-certifying, no network lookup
+    Key,
+    /// did:icn - ICN-native, resolved via ICN network
+    Icn,
+    /// did:web - web-based, requires HTTP lookup
+    Web { domain: String },
+}
+
+/// DID Document structure
+#[derive(Debug, Clone)]
+pub struct DidDocument {
+    pub id: Did,
+    pub verification_methods: Vec&lt;VerificationMethod&gt;,
+    pub authentication: Vec&lt;KeyId&gt;,
+    pub assertion_method: Vec&lt;KeyId&gt;,
+    pub key_agreement: Vec&lt;KeyId&gt;,
+    pub created: LogicalTimestamp,
+    pub updated: LogicalTimestamp,
+}
+
+/// Key bundle for rotation
+#[derive(Debug, Clone)]
+pub struct KeyBundle {
+    pub signing_key: PublicKey,
+    pub encryption_key: Option&lt;PublicKey&gt;,
+}
+
+/// Cryptographic signature
+#[derive(Debug, Clone)]
+pub struct Signature {
+    pub algorithm: SignatureAlgorithm,
+    pub value: Vec&lt;u8&gt;,
+    pub key_id: KeyId,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SignatureAlgorithm {
+    Ed25519,
+    // Future: post-quantum algorithms
+}
+</code></pre>
+<h3>2.3 Design Notes</h3>
+<ul>
+<li><strong>DID resolution for networked methods</strong> (did:web) runs as an adapter/service with egress capability</li>
+<li><strong>Pure methods</strong> (did:key, did:icn) can resolve in deterministic compute</li>
+<li><strong>Credentials</strong> are &quot;signed blobs with schema reference&quot; - kernel verifies signature, apps interpret meaning</li>
+<li><strong>Steward ceremonies</strong> and identity verification are apps built on top, not kernel features</li>
+</ul>
+<hr>
+<h2>3. Authorization Primitive</h2>
+<p>The Authorization primitive provides object-capability tokens and policy oracle integration.</p>
+<h3>3.1 Contract</h3>
+<p><strong>Provides:</strong></p>
+<ul>
+<li>Object-capability tokens (NOT RBAC)</li>
+<li>Issue, verify, delegate, revoke capabilities</li>
+<li>Policy oracle interface for external decisions</li>
+<li>Rate limiting hooks based on oracle decisions</li>
+</ul>
+<p><strong>Does NOT provide:</strong></p>
+<ul>
+<li>Role hierarchies</li>
+<li>Trust scores or reputation</li>
+<li>Predefined capability taxonomies</li>
+<li>Any policy logic (just enforcement)</li>
+</ul>
+<h3>3.2 Trait Definitions</h3>
+<pre><code class="language-rust">/// Capability token granting specific access
+#[derive(Clone, Debug)]
+pub struct Capability {
+    /// Unique identifier for this capability
+    pub id: CapabilityId,
+    /// What resource this grants access to
+    pub resource: String,
+    /// What action is permitted
+    pub action: String,
+    /// Additional constraints on use
+    pub constraints: Constraints,
+    /// If set, holder must co-sign operations
+    pub holder: Option&lt;Did&gt;,
+    /// Who issued this capability
+    pub issuer: Did,
+    /// When this capability expires
+    pub expiration: LogicalTimestamp,
+    /// Cryptographic proof of issuance
+    pub signature: Signature,
+}
+
+/// Constraints on capability use
+#[derive(Clone, Debug, Default)]
+pub struct Constraints {
+    /// Maximum amount (for numeric resources)
+    pub max_amount: Option&lt;u64&gt;,
+    /// Maximum number of uses
+    pub max_uses: Option&lt;u32&gt;,
+    /// Restrict to specific targets
+    pub allowed_targets: Option&lt;Vec&lt;String&gt;&gt;,
+    /// Additional app-defined constraints (opaque to kernel)
+    pub custom: Option&lt;Vec&lt;u8&gt;&gt;,
+}
+
+/// Result of a policy evaluation
+#[derive(Clone, Debug)]
+pub enum PolicyDecision {
+    /// Request is allowed to proceed
+    Allow,
+    /// Request is denied
+    Deny { reason: String },
+    /// Request is allowed but rate-limited
+    RateLimit { class: RateLimitClass },
+}
+
+/// Rate limit classification
+#[derive(Clone, Debug, Copy, PartialEq, Eq)]
+pub enum RateLimitClass {
+    /// No rate limiting applied
+    Unlimited,
+    /// Standard rate limits
+    Standard,
+    /// Reduced limits (e.g., low trust)
+    Throttled,
+    /// Severely restricted
+    Restricted,
+}
+
+/// Context for policy evaluation
+#[derive(Clone, Debug)]
+pub struct PolicyContext {
+    /// Who is making the request
+    pub actor: Did,
+    /// What resource is being accessed
+    pub resource: String,
+    /// What action is being performed
+    pub action: String,
+    /// Namespace context (if applicable)
+    pub namespace: Option&lt;Namespace&gt;,
+    /// Whether this is a cross-org request
+    pub cross_org: bool,
+    /// Source org for cross-org requests
+    pub source_org: Option&lt;OrgId&gt;,
+    /// App-specific metadata
+    pub metadata: std::collections::HashMap&lt;String, String&gt;,
+}
+
+/// Request being evaluated
+#[derive(Clone, Debug)]
+pub struct PolicyRequest {
+    pub context: PolicyContext,
+    pub capability: Option&lt;Capability&gt;,
+}
+
+/// Policy oracle interface - implemented by apps (e.g., trust app)
+pub trait PolicyOracle: Send + Sync {
+    /// Evaluate whether a request should be allowed
+    fn evaluate(&amp;self, request: &amp;PolicyRequest) -&gt; PolicyDecision;
+
+    /// Get cache TTL for decisions (allows kernel to cache)
+    fn cache_ttl(&amp;self) -&gt; std::time::Duration {
+        std::time::Duration::from_secs(60)
+    }
+
+    /// Whether this oracle handles cross-org requests
+    fn handles_cross_org(&amp;self) -&gt; bool {
+        false
+    }
+}
+
+/// Default oracle that allows everything (for bootstrap and simple deployments)
+pub struct AllowAllOracle;
+
+impl PolicyOracle for AllowAllOracle {
+    fn evaluate(&amp;self, _request: &amp;PolicyRequest) -&gt; PolicyDecision {
+        PolicyDecision::Allow
+    }
+}
+
+/// Capability management engine
+pub trait CapabilityEngine: Send + Sync {
+    /// Issue a new capability
+    fn issue(
+        &amp;self,
+        resource: &amp;str,
+        action: &amp;str,
+        holder: Option&lt;&amp;Did&gt;,
+        constraints: Constraints,
+        expiration: LogicalTimestamp,
+    ) -&gt; Result&lt;Capability, CapabilityError&gt;;
+
+    /// Check if a capability authorizes a request
+    fn check(
+        &amp;self,
+        capability: &amp;Capability,
+        resource: &amp;str,
+        action: &amp;str,
+    ) -&gt; Result&lt;(), CapabilityError&gt;;
+
+    /// Delegate a capability with additional restrictions
+    fn delegate(
+        &amp;self,
+        capability: &amp;Capability,
+        to: &amp;Did,
+        restrictions: Constraints,
+    ) -&gt; Result&lt;Capability, CapabilityError&gt;;
+
+    /// Revoke a capability by ID
+    fn revoke(&amp;self, capability_id: &amp;CapabilityId) -&gt; Result&lt;(), CapabilityError&gt;;
+
+    /// Check if a capability has been revoked
+    fn is_revoked(&amp;self, capability_id: &amp;CapabilityId) -&gt; Result&lt;bool, CapabilityError&gt;;
+}
+
+#[derive(Debug)]
+pub enum CapabilityError {
+    NotFound,
+    Expired,
+    Revoked,
+    Unauthorized,
+    InvalidDelegation,
+    ConstraintViolation(String),
+    Internal(String),
+}
+</code></pre>
+<h3>3.3 Bootstrap Sequence</h3>
+<p>The capability bootstrapping paradox (trust is an app, but apps need capabilities) is solved via genesis bootstrap:</p>
+<pre><code class="language-rust">/// Bootstrap phases for node startup
+pub enum BootstrapPhase {
+    /// Phase 0: Kernel only, no apps loaded
+    /// - Node identity established
+    /// - Genesis capabilities issued to operator DID
+    /// - AllowAllOracle active
+    Genesis,
+
+    /// Phase 1: Core apps loading
+    /// - Trust app loads with genesis capabilities
+    /// - Trust app registers as PolicyOracle
+    /// - Other core apps load
+    CoreApps,
+
+    /// Phase 2: Normal operation
+    /// - PolicyOracle now active
+    /// - User apps can load
+    /// - Full capability checking enabled
+    Running,
+}
+
+/// Genesis capabilities issued to node operator
+/// These CANNOT be revoked by apps
+pub struct GenesisCapabilities {
+    /// Can install/uninstall apps
+    pub app_management: Capability,
+    /// Can issue capabilities to apps
+    pub capability_issuance: Capability,
+    /// Can configure node settings
+    pub node_admin: Capability,
+}
+</code></pre>
+<h3>3.4 Design Notes</h3>
+<ul>
+<li><strong>Bearer tokens</strong> for automation; <strong>holder-bound tokens</strong> for humans (require co-signature)</li>
+<li><strong>Short expirations + refresh model</strong> because revocation lists don&#39;t scale globally</li>
+<li><strong>Trust computation is an APP</strong> that implements PolicyOracle; kernel just enforces decisions</li>
+<li><strong>Default oracle = AllowAllOracle</strong> for simple single-coop deployments</li>
+</ul>
+<hr>
+<h2>4. State Primitive</h2>
+<p>The State primitive provides namespaced, typed storage without domain semantics.</p>
+<h3>4.1 Contract</h3>
+<p><strong>Provides:</strong></p>
+<ul>
+<li>Namespaced storage: <code>/&lt;org&gt;/&lt;app&gt;/&lt;sub&gt;/</code></li>
+<li>Three storage types: Logs (append-only), Blobs (content-addressed), KV (mutable)</li>
+<li>Replication policies per namespace</li>
+<li>Cross-namespace access via capability only</li>
+</ul>
+<p><strong>Does NOT provide:</strong></p>
+<ul>
+<li>Projections/materialized views (runtime layer)</li>
+<li>Search/indexing (runtime layer)</li>
+<li>Domain-specific schemas</li>
+<li>&quot;Ledger&quot; or &quot;governance&quot; data types</li>
+</ul>
+<h3>4.2 Trait Definitions</h3>
+<pre><code class="language-rust">/// Append-only, ordered event streams
+pub trait LogService: Send + Sync {
+    /// Create a new log in a namespace
+    fn create(
+        &amp;self,
+        namespace: &amp;Namespace,
+        name: &amp;str,
+        schema: Option&lt;SchemaRef&gt;,
+        replication: ReplicationPolicy,
+    ) -&gt; Result&lt;LogId, StateError&gt;;
+
+    /// Append an event to a log
+    fn append(&amp;self, log: &amp;LogId, event: &amp;[u8]) -&gt; Result&lt;Offset, StateError&gt;;
+
+    /// Read events from a log
+    fn read(&amp;self, log: &amp;LogId, from: Offset, limit: usize) -&gt; Result&lt;Vec&lt;LogEntry&gt;, StateError&gt;;
+
+    /// Get current log length
+    fn length(&amp;self, log: &amp;LogId) -&gt; Result&lt;Offset, StateError&gt;;
+
+    /// Subscribe to new events
+    fn subscribe(&amp;self, log: &amp;LogId, from: Offset) -&gt; Result&lt;Subscription&lt;LogEntry&gt;, StateError&gt;;
+}
+
+/// Content-addressed immutable blob storage
+pub trait BlobService: Send + Sync {
+    /// Store a blob, returns content hash
+    fn put(&amp;self, namespace: &amp;Namespace, data: &amp;[u8]) -&gt; Result&lt;Hash, StateError&gt;;
+
+    /// Retrieve a blob by hash
+    fn get(&amp;self, hash: &amp;Hash) -&gt; Result&lt;Vec&lt;u8&gt;, StateError&gt;;
+
+    /// Check if a blob exists
+    fn exists(&amp;self, hash: &amp;Hash) -&gt; Result&lt;bool, StateError&gt;;
+
+    /// Delete a blob (if permitted by retention policy)
+    fn delete(&amp;self, hash: &amp;Hash) -&gt; Result&lt;(), StateError&gt;;
+}
+
+/// Mutable key-value storage with optimistic concurrency
+pub trait KvService: Send + Sync {
+    /// Get a value and its version
+    fn get(&amp;self, namespace: &amp;Namespace, key: &amp;[u8]) -&gt; Result&lt;(Value, Version), StateError&gt;;
+
+    /// Put a value with CAS (compare-and-swap)
+    fn put(
+        &amp;self,
+        namespace: &amp;Namespace,
+        key: &amp;[u8],
+        value: &amp;[u8],
+        expected_version: Version,
+    ) -&gt; Result&lt;Version, StateError&gt;;
+
+    /// Delete a key with CAS
+    fn delete(
+        &amp;self,
+        namespace: &amp;Namespace,
+        key: &amp;[u8],
+        expected_version: Version,
+    ) -&gt; Result&lt;(), StateError&gt;;
+
+    /// List keys with a prefix
+    fn list(&amp;self, namespace: &amp;Namespace, prefix: &amp;[u8]) -&gt; Result&lt;Vec&lt;Key&gt;, StateError&gt;;
+
+    /// Watch for changes to a key
+    fn watch(&amp;self, namespace: &amp;Namespace, key: &amp;[u8]) -&gt; Result&lt;Subscription&lt;KvChange&gt;, StateError&gt;;
+}
+
+/// Log entry returned from reads
+#[derive(Clone, Debug)]
+pub struct LogEntry {
+    pub offset: Offset,
+    pub timestamp: LogicalTimestamp,
+    pub author: Did,
+    pub data: Vec&lt;u8&gt;,
+}
+
+/// KV change notification
+#[derive(Clone, Debug)]
+pub struct KvChange {
+    pub key: Key,
+    pub old_value: Option&lt;Value&gt;,
+    pub new_value: Option&lt;Value&gt;,
+    pub new_version: Version,
+}
+
+/// Replication policy for storage
+#[derive(Clone, Debug, Copy, PartialEq, Eq)]
+pub enum ReplicationPolicy {
+    /// Single node, no replication
+    LocalOnly,
+    /// Consensus group, linearizable reads/writes
+    ClusterStrong,
+    /// Gossip/CRDT, eventually consistent
+    FederationEventual,
+    /// Durable archive, retained indefinitely
+    Archive,
+}
+
+/// Reference to a schema (for type checking)
+#[derive(Clone, Debug)]
+pub struct SchemaRef {
+    pub name: String,
+    pub version: String,
+    pub hash: Option&lt;Hash&gt;,
+}
+
+/// Unique log identifier
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct LogId {
+    pub namespace: Namespace,
+    pub name: String,
+}
+
+#[derive(Debug)]
+pub enum StateError {
+    NotFound,
+    AlreadyExists,
+    VersionMismatch { expected: Version, actual: Version },
+    NamespaceNotFound,
+    QuotaExceeded,
+    Unauthorized,
+    Internal(String),
+}
+</code></pre>
+<h3>4.3 Ordering Guarantees</h3>
+<ul>
+<li><strong>Logs</strong> are ordered per-writer by default (cheap, scalable)</li>
+<li><strong>Total ordering</strong> requires consensus group (<code>ClusterStrong</code>) - opt-in, expensive</li>
+<li><strong>Apps that need global order</strong> must explicitly request <code>ClusterStrong</code> replication</li>
+</ul>
+<hr>
+<h2>5. Compute Primitive</h2>
+<p>The Compute primitive provides WASM execution with metering and scheduling.</p>
+<h3>5.1 Contract</h3>
+<p><strong>Provides:</strong></p>
+<ul>
+<li>WASM execution with resource metering</li>
+<li>Two execution modes: deterministic and service</li>
+<li>Scheduling (immediate, triggered, periodic)</li>
+<li>Resource quotas per app</li>
+</ul>
+<p><strong>Does NOT provide:</strong></p>
+<ul>
+<li>Domain-specific libraries</li>
+<li>Privileged execution for &quot;official&quot; apps</li>
+<li>Any interpretation of what code does</li>
+</ul>
+<h3>5.2 Trait Definitions</h3>
+<pre><code class="language-rust">/// Compute execution engine
+pub trait ComputeEngine: Send + Sync {
+    /// Execute deterministic computation (no I/O, reproducible)
+    fn execute_deterministic(
+        &amp;self,
+        module: &amp;WasmModule,
+        function: &amp;str,
+        input: &amp;[u8],
+        fuel: u64,
+    ) -&gt; Result&lt;ExecutionResult, ComputeError&gt;;
+
+    /// Start a long-running service
+    fn start_service(
+        &amp;self,
+        module: &amp;WasmModule,
+        config: ServiceConfig,
+        quota: ResourceQuota,
+    ) -&gt; Result&lt;ServiceId, ComputeError&gt;;
+
+    /// Stop a running service
+    fn stop_service(&amp;self, id: &amp;ServiceId) -&gt; Result&lt;(), ComputeError&gt;;
+
+    /// Get service status
+    fn service_status(&amp;self, id: &amp;ServiceId) -&gt; Result&lt;ServiceStatus, ComputeError&gt;;
+
+    /// Schedule a job
+    fn schedule(&amp;self, job: Job, trigger: Trigger) -&gt; Result&lt;JobId, ComputeError&gt;;
+
+    /// Cancel a scheduled job
+    fn cancel(&amp;self, job_id: &amp;JobId) -&gt; Result&lt;(), ComputeError&gt;;
+}
+
+/// Result of deterministic execution
+#[derive(Clone, Debug)]
+pub struct ExecutionResult {
+    pub output: Vec&lt;u8&gt;,
+    pub fuel_consumed: u64,
+    pub logs: Vec&lt;String&gt;,
+}
+
+/// WASM module reference
+#[derive(Clone, Debug)]
+pub struct WasmModule {
+    pub hash: Hash,
+    pub abi: AbiVersion,
+}
+
+/// ABI version for WASM modules
+#[derive(Clone, Debug, Copy, PartialEq, Eq)]
+pub enum AbiVersion {
+    /// Deterministic compute: no I/O, no wall clock, no randomness
+    /// Same input → same output, always. Can be replayed to verify.
+    /// Use for: reducers, validators, governance tallying
+    IcnDeterministicV1,
+
+    /// Service compute: capability-gated I/O allowed
+    /// Long-running processes with network/storage access.
+    /// Use for: indexers, bridges, WebSocket handlers
+    IcnServiceV1,
+}
+
+/// Configuration for a service
+#[derive(Clone, Debug)]
+pub struct ServiceConfig {
+    pub name: String,
+    pub entry_point: String,
+    pub environment: std::collections::HashMap&lt;String, String&gt;,
+}
+
+/// Resource quota for compute
+#[derive(Clone, Debug)]
+pub struct ResourceQuota {
+    pub max_memory_bytes: u64,
+    pub max_cpu_ms_per_second: u64,
+    pub max_storage_bytes: u64,
+    pub max_network_bytes_per_second: u64,
+}
+
+/// Service status
+#[derive(Clone, Debug)]
+pub enum ServiceStatus {
+    Starting,
+    Running { uptime_seconds: u64 },
+    Stopping,
+    Stopped,
+    Failed { error: String },
+}
+
+/// Job definition for scheduling
+#[derive(Clone, Debug)]
+pub struct Job {
+    pub module: WasmModule,
+    pub function: String,
+    pub input: Vec&lt;u8&gt;,
+    pub fuel_limit: u64,
+}
+
+/// Trigger for scheduled jobs
+#[derive(Clone, Debug)]
+pub enum Trigger {
+    /// Execute immediately
+    Immediate,
+    /// Execute when an event appears on a log
+    OnEvent { log: LogId, filter: Option&lt;String&gt; },
+    /// Execute at a specific logical time
+    AtTime { time: LogicalTimestamp },
+    /// Execute periodically
+    Every { interval: std::time::Duration },
+}
+
+#[derive(Debug)]
+pub enum ComputeError {
+    ModuleNotFound,
+    FuelExhausted,
+    MemoryExceeded,
+    Timeout,
+    ServiceNotFound,
+    QuotaExceeded,
+    InvalidAbi,
+    ExecutionFailed(String),
+    Internal(String),
+}
+</code></pre>
+<h3>5.3 Design Notes</h3>
+<ul>
+<li><strong>ABIs are versioned and stable</strong> (like syscalls) - never break without major version</li>
+<li><strong>Scheduling is at-least-once</strong> - exactly-once requires coordination pattern at app layer</li>
+<li><strong>All apps use the same compute APIs</strong> - no privileged syscalls for &quot;core&quot; functionality</li>
+</ul>
+<hr>
+<h2>6. Communication Primitive</h2>
+<p>The Communication primitive provides messaging without message semantics.</p>
+<h3>6.1 Contract</h3>
+<p><strong>Provides:</strong></p>
+<ul>
+<li>Pub/sub with at-least-once delivery</li>
+<li>Request/response routing</li>
+<li>Long-lived bidirectional streams</li>
+<li>Adapter interface for external protocols</li>
+</ul>
+<p><strong>Does NOT provide:</strong></p>
+<ul>
+<li>Message semantics (what messages mean)</li>
+<li>Moderation/filtering logic (apps via oracles)</li>
+<li>Exactly-once delivery (apps build this if needed)</li>
+</ul>
+<h3>6.2 Trait Definitions</h3>
+<pre><code class="language-rust">/// Publish-subscribe messaging
+pub trait PubSub: Send + Sync {
+    /// Publish a message to a topic
+    fn publish(&amp;self, topic: &amp;TopicId, message: &amp;[u8]) -&gt; Result&lt;MessageId, CommsError&gt;;
+
+    /// Subscribe to a topic
+    fn subscribe(&amp;self, topic: &amp;TopicId, from: Offset) -&gt; Result&lt;Subscription&lt;Message&gt;, CommsError&gt;;
+
+    /// Unsubscribe from a topic
+    fn unsubscribe(&amp;self, subscription: SubscriptionId) -&gt; Result&lt;(), CommsError&gt;;
+}
+
+/// Request-response pattern
+pub trait RequestResponse: Send + Sync {
+    /// Register a handler for a path
+    fn register(&amp;self, path: &amp;Path, handler: HandlerId) -&gt; Result&lt;(), CommsError&gt;;
+
+    /// Unregister a handler
+    fn unregister(&amp;self, path: &amp;Path) -&gt; Result&lt;(), CommsError&gt;;
+
+    /// Send a request and await response
+    fn request(
+        &amp;self,
+        endpoint: &amp;Endpoint,
+        request: &amp;[u8],
+        timeout: std::time::Duration,
+    ) -&gt; Result&lt;Vec&lt;u8&gt;, CommsError&gt;;
+}
+
+/// Bidirectional streaming
+pub trait Streams: Send + Sync {
+    /// Open a bidirectional stream to an endpoint
+    fn open(&amp;self, endpoint: &amp;Endpoint) -&gt; Result&lt;BidirectionalStream, CommsError&gt;;
+
+    /// Accept incoming streams on a path
+    fn accept(&amp;self, path: &amp;Path) -&gt; Result&lt;Subscription&lt;BidirectionalStream&gt;, CommsError&gt;;
+}
+
+/// External protocol adapters
+pub trait Adapter: Send + Sync {
+    /// Send via external protocol (email, push, webhooks)
+    fn send(
+        &amp;self,
+        protocol: Protocol,
+        destination: &amp;str,
+        payload: &amp;[u8],
+    ) -&gt; Result&lt;(), CommsError&gt;;
+
+    /// Receive from external protocol
+    fn receive(&amp;self, protocol: Protocol) -&gt; Result&lt;Subscription&lt;ExternalMessage&gt;, CommsError&gt;;
+}
+
+/// Message from pub/sub
+#[derive(Clone, Debug)]
+pub struct Message {
+    pub id: MessageId,
+    pub topic: TopicId,
+    pub author: Did,
+    pub timestamp: LogicalTimestamp,
+    pub data: Vec&lt;u8&gt;,
+    pub signature: Signature,
+}
+
+/// Topic identifier
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct TopicId {
+    pub namespace: Namespace,
+    pub name: String,
+}
+
+/// Endpoint for request/response and streams
+#[derive(Clone, Debug)]
+pub struct Endpoint {
+    pub node: Option&lt;NodeId&gt;,
+    pub org: OrgId,
+    pub path: Path,
+}
+
+/// Path for routing
+pub type Path = String;
+
+/// Bidirectional stream handle
+pub struct BidirectionalStream {
+    // Implementation details hidden
+}
+
+impl BidirectionalStream {
+    pub fn send(&amp;self, data: &amp;[u8]) -&gt; Result&lt;(), CommsError&gt;;
+    pub fn recv(&amp;self) -&gt; Result&lt;Vec&lt;u8&gt;, CommsError&gt;;
+    pub fn close(&amp;self) -&gt; Result&lt;(), CommsError&gt;;
+}
+
+/// External protocol types
+#[derive(Clone, Debug)]
+pub enum Protocol {
+    Email,
+    WebPush,
+    Webhook { url: String },
+    Custom(String),
+}
+
+#[derive(Debug)]
+pub enum CommsError {
+    TopicNotFound,
+    EndpointUnreachable,
+    Timeout,
+    StreamClosed,
+    Unauthorized,
+    Internal(String),
+}
+</code></pre>
+<h3>6.3 Ordering Guarantees</h3>
+<ul>
+<li><strong>Per-topic partition ordering</strong> (not global)</li>
+<li><strong>Message IDs are stable and signed</strong> (can verify authenticity)</li>
+<li><strong>Consumer offsets are explicit</strong> (client tracks position)</li>
+<li><strong>Replay is first-class</strong> (projections can rebuild from any offset)</li>
+</ul>
+<hr>
+<h2>7. Time Primitive</h2>
+<p>The Time primitive provides logical clocks and scheduling.</p>
+<h3>7.1 Contract</h3>
+<p><strong>Provides:</strong></p>
+<ul>
+<li>Logical clocks for causal ordering</li>
+<li>Scheduling interface for deferred execution</li>
+<li>Leases for distributed coordination</li>
+</ul>
+<p><strong>Does NOT provide:</strong></p>
+<ul>
+<li>Wall-clock truth (impossible in distributed systems)</li>
+<li>Calendar/timezone concepts</li>
+<li>&quot;Vote ends at 5pm&quot; semantics (app layer)</li>
+</ul>
+<h3>7.2 Trait Definitions</h3>
+<pre><code class="language-rust">/// Time services
+pub trait TimeService: Send + Sync {
+    /// Get current logical timestamp
+    fn now(&amp;self) -&gt; LogicalTimestamp;
+
+    /// Compare two timestamps (happens-before relationship)
+    fn compare(&amp;self, a: LogicalTimestamp, b: LogicalTimestamp) -&gt; Ordering;
+
+    /// Schedule a callback at a logical time
+    fn schedule_at(
+        &amp;self,
+        time: LogicalTimestamp,
+        callback: CallbackId,
+    ) -&gt; Result&lt;ScheduleId, TimeError&gt;;
+
+    /// Schedule a callback after a duration
+    fn schedule_after(
+        &amp;self,
+        duration: std::time::Duration,
+        callback: CallbackId,
+    ) -&gt; Result&lt;ScheduleId, TimeError&gt;;
+
+    /// Cancel a scheduled callback
+    fn cancel(&amp;self, id: ScheduleId) -&gt; Result&lt;(), TimeError&gt;;
+
+    /// Acquire a lease on a resource
+    fn acquire_lease(
+        &amp;self,
+        resource: &amp;str,
+        duration: std::time::Duration,
+    ) -&gt; Result&lt;Lease, TimeError&gt;;
+
+    /// Renew an existing lease
+    fn renew_lease(
+        &amp;self,
+        lease: &amp;Lease,
+        duration: std::time::Duration,
+    ) -&gt; Result&lt;Lease, TimeError&gt;;
+
+    /// Release a lease early
+    fn release_lease(&amp;self, lease: Lease) -&gt; Result&lt;(), TimeError&gt;;
+}
+
+/// Lease for distributed coordination
+#[derive(Clone, Debug)]
+pub struct Lease {
+    pub id: LeaseId,
+    pub resource: String,
+    pub holder: Did,
+    pub expires: LogicalTimestamp,
+}
+
+pub type LeaseId = String;
+pub type ScheduleId = String;
+pub type CallbackId = String;
+
+#[derive(Debug)]
+pub enum TimeError {
+    LeaseNotAvailable,
+    LeaseExpired,
+    LeaseNotHeld,
+    ScheduleNotFound,
+    Internal(String),
+}
+</code></pre>
+<hr>
+<h2>8. Coordination Primitive</h2>
+<p>The Coordination primitive provides consensus and CRDTs.</p>
+<h3>8.1 Contract</h3>
+<p><strong>Provides:</strong></p>
+<ul>
+<li>Scoped consensus groups (Raft-like)</li>
+<li>CRDT replication for eventual consistency</li>
+<li>Atomic compare-and-swap operations</li>
+<li>Leader election with leases</li>
+</ul>
+<p><strong>Does NOT provide:</strong></p>
+<ul>
+<li>Global consensus (no global chain)</li>
+<li>Cross-scope transactions (app layer via sagas)</li>
+<li>Arbitrary merge functions (security risk)</li>
+</ul>
+<h3>8.2 Trait Definitions</h3>
+<pre><code class="language-rust">/// Coordination services
+pub trait Coordination: Send + Sync {
+    // === Consensus Groups ===
+
+    /// Create a consensus group with specified members
+    fn create_group(
+        &amp;self,
+        members: Vec&lt;NodeId&gt;,
+        config: ConsensusConfig,
+    ) -&gt; Result&lt;GroupId, CoordError&gt;;
+
+    /// Propose a value to a consensus group
+    fn propose(&amp;self, group: &amp;GroupId, value: &amp;[u8]) -&gt; Result&lt;Decision, CoordError&gt;;
+
+    /// Get current group status
+    fn group_status(&amp;self, group: &amp;GroupId) -&gt; Result&lt;GroupStatus, CoordError&gt;;
+
+    // === CRDTs ===
+
+    /// Create a CRDT in a namespace
+    fn create_crdt(
+        &amp;self,
+        namespace: &amp;Namespace,
+        name: &amp;str,
+        crdt_type: CrdtType,
+    ) -&gt; Result&lt;CrdtId, CoordError&gt;;
+
+    /// Apply an operation to a CRDT
+    fn update_crdt(&amp;self, id: &amp;CrdtId, op: CrdtOp) -&gt; Result&lt;(), CoordError&gt;;
+
+    /// Read current CRDT value
+    fn read_crdt(&amp;self, id: &amp;CrdtId) -&gt; Result&lt;CrdtValue, CoordError&gt;;
+
+    // === Leader Election ===
+
+    /// Elect a leader for a group
+    fn elect_leader(
+        &amp;self,
+        group: &amp;GroupId,
+        lease_duration: std::time::Duration,
+    ) -&gt; Result&lt;LeaderLease, CoordError&gt;;
+
+    /// Check if we hold leadership
+    fn is_leader(&amp;self, group: &amp;GroupId) -&gt; Result&lt;bool, CoordError&gt;;
+}
+
+/// Consensus group configuration
+#[derive(Clone, Debug)]
+pub struct ConsensusConfig {
+    pub min_quorum: usize,
+    pub election_timeout: std::time::Duration,
+    pub heartbeat_interval: std::time::Duration,
+}
+
+/// Consensus decision
+#[derive(Clone, Debug)]
+pub enum Decision {
+    Accepted { value: Vec&lt;u8&gt;, index: u64 },
+    Rejected { reason: String },
+}
+
+/// Group status
+#[derive(Clone, Debug)]
+pub struct GroupStatus {
+    pub leader: Option&lt;NodeId&gt;,
+    pub members: Vec&lt;NodeId&gt;,
+    pub commit_index: u64,
+}
+
+/// Supported CRDT types (finite set for security)
+#[derive(Clone, Debug, Copy, PartialEq, Eq)]
+pub enum CrdtType {
+    /// Grow-only counter
+    GCounter,
+    /// Positive-negative counter
+    PNCounter,
+    /// Observed-remove set
+    OrSet,
+    /// Last-writer-wins register
+    LwwRegister,
+}
+
+/// CRDT operation
+#[derive(Clone, Debug)]
+pub enum CrdtOp {
+    Increment(u64),
+    Decrement(u64),
+    Add(Vec&lt;u8&gt;),
+    Remove(Vec&lt;u8&gt;),
+    Set(Vec&lt;u8&gt;),
+}
+
+/// CRDT value
+#[derive(Clone, Debug)]
+pub enum CrdtValue {
+    Counter(i64),
+    Set(Vec&lt;Vec&lt;u8&gt;&gt;),
+    Register(Vec&lt;u8&gt;),
+}
+
+#[derive(Debug)]
+pub enum CoordError {
+    GroupNotFound,
+    NotLeader,
+    QuorumNotReached,
+    CrdtNotFound,
+    InvalidOperation,
+    Internal(String),
+}
+</code></pre>
+<h3>8.3 Critical Design Rule</h3>
+<p><strong>Consensus is always scoped</strong> (per namespace, per dataset). No global chain. This prevents:</p>
+<ul>
+<li>Imperial scaling (one chain to rule them all)</li>
+<li>Single points of failure</li>
+<li>Unbounded coordination costs</li>
+</ul>
+<hr>
+<h2>9. Naming Primitive</h2>
+<p>The Naming primitive provides name resolution and service discovery.</p>
+<h3>9.1 Contract</h3>
+<p><strong>Provides:</strong></p>
+<ul>
+<li>Name records (name → target, signed by authority)</li>
+<li>Resolution within scopes (local, org, federation)</li>
+<li>Service discovery and announcement</li>
+<li>Watch for changes</li>
+</ul>
+<p><strong>Does NOT provide:</strong></p>
+<ul>
+<li>Human-readable name policies</li>
+<li>Dispute resolution (just enforces signatures)</li>
+<li>Global namespace (scoped by design)</li>
+</ul>
+<h3>9.2 Trait Definitions</h3>
+<pre><code class="language-rust">/// Name resolution service
+pub trait NamingService: Send + Sync {
+    /// Register a name record
+    fn register(
+        &amp;self,
+        name: &amp;Name,
+        target: Target,
+        authority: &amp;Did,
+        signature: &amp;Signature,
+        ttl: std::time::Duration,
+    ) -&gt; Result&lt;(), NamingError&gt;;
+
+    /// Resolve a name to its target
+    fn resolve(&amp;self, name: &amp;Name) -&gt; Result&lt;ResolvedTarget, NamingError&gt;;
+
+    /// Update an existing name record
+    fn update(
+        &amp;self,
+        name: &amp;Name,
+        new_target: Target,
+        signature: &amp;Signature,
+    ) -&gt; Result&lt;(), NamingError&gt;;
+
+    /// Delete a name record
+    fn delete(&amp;self, name: &amp;Name, signature: &amp;Signature) -&gt; Result&lt;(), NamingError&gt;;
+
+    /// Watch for changes to a name
+    fn watch(&amp;self, name: &amp;Name) -&gt; Result&lt;Subscription&lt;NameChange&gt;, NamingError&gt;;
+
+    /// List names under a prefix
+    fn list(&amp;self, prefix: &amp;Name, scope: Scope) -&gt; Result&lt;Vec&lt;Name&gt;, NamingError&gt;;
+}
+
+/// Service discovery
+pub trait Discovery: Send + Sync {
+    /// Announce a service
+    fn announce(
+        &amp;self,
+        scope: Scope,
+        service_type: &amp;str,
+        endpoint: Endpoint,
+        metadata: DiscoveryMetadata,
+    ) -&gt; Result&lt;AnnouncementId, NamingError&gt;;
+
+    /// Discover services of a type
+    fn discover(
+        &amp;self,
+        scope: Scope,
+        service_type: &amp;str,
+    ) -&gt; Result&lt;Vec&lt;DiscoveredService&gt;, NamingError&gt;;
+
+    /// Stop announcing a service
+    fn withdraw(&amp;self, id: AnnouncementId) -&gt; Result&lt;(), NamingError&gt;;
+}
+
+/// Hierarchical name (e.g., &quot;/org-123/apps/ledger&quot;)
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Name(pub String);
+
+impl Name {
+    pub fn new(path: impl Into&lt;String&gt;) -&gt; Self {
+        Self(path.into())
+    }
+
+    pub fn join(&amp;self, segment: &amp;str) -&gt; Self {
+        Self(format!(&quot;{}/{}&quot;, self.0, segment))
+    }
+}
+
+/// Target of a name record
+#[derive(Clone, Debug)]
+pub enum Target {
+    /// Service endpoint
+    Service { endpoint: Endpoint },
+    /// Content-addressed blob
+    Blob { hash: Hash },
+    /// Namespace reference
+    Namespace { ns: Namespace },
+    /// Alias to another name
+    Alias { name: Name },
+}
+
+/// Name record with metadata
+#[derive(Clone, Debug)]
+pub struct NameRecord {
+    pub name: Name,
+    pub target: Target,
+    pub authority: Did,
+    pub signature: Signature,
+    pub ttl: std::time::Duration,
+    pub created: LogicalTimestamp,
+    pub updated: LogicalTimestamp,
+}
+
+/// Resolved target with resolution path
+#[derive(Clone, Debug)]
+pub struct ResolvedTarget {
+    pub target: Target,
+    pub path: Vec&lt;Name&gt;,  // Resolution path for debugging
+    pub cached: bool,
+}
+
+/// Resolution scope
+#[derive(Clone, Debug, Copy, PartialEq, Eq)]
+pub enum Scope {
+    /// This node only
+    Local,
+    /// Within organization
+    Org,
+    /// Across federated orgs
+    Federation,
+}
+
+/// Metadata for service discovery
+#[derive(Clone, Debug, Default)]
+pub struct DiscoveryMetadata {
+    pub version: Option&lt;String&gt;,
+    pub protocols: Vec&lt;String&gt;,
+    pub capabilities: Vec&lt;String&gt;,
+    pub custom: std::collections::HashMap&lt;String, String&gt;,
+}
+
+/// Discovered service
+#[derive(Clone, Debug)]
+pub struct DiscoveredService {
+    pub endpoint: Endpoint,
+    pub metadata: DiscoveryMetadata,
+    pub announced_by: Did,
+    pub last_seen: LogicalTimestamp,
+}
+
+#[derive(Debug)]
+pub enum NamingError {
+    NotFound,
+    AlreadyExists,
+    Unauthorized,
+    InvalidSignature,
+    ResolutionLoop,
+    Internal(String),
+}
+</code></pre>
+<h3>9.3 Why Naming Matters</h3>
+<p>Without naming, apps hardcode addresses. With naming:</p>
+<ul>
+<li>Apps compose via stable names that survive scaling, failover, and federation</li>
+<li>Service discovery enables dynamic topology</li>
+<li>Aliases enable gradual migrations</li>
+</ul>
+<hr>
+<h2>10. App Runtime Contract</h2>
+<p>This section defines how applications interact with kernel primitives.</p>
+<h3>10.1 App Manifest Schema (v0)</h3>
+<pre><code class="language-yaml"># Every app—official or third-party—uses this format
+name: my-app
+version: 1.0.0
+publisher: did:icn:publisher-did
+
+# What this app needs from other apps/kernel
+capabilities_required:
+  - identity:read
+  - state:logs:append:self      # Can append to own logs
+  - state:kv:write:self         # Can write to own KV
+  - comms:publish:my-app:*      # Can publish to own topics
+
+# What this app provides to others
+capabilities_provided:
+  - my-app:read
+  - my-app:write
+  - my-app:admin
+
+# Dependencies on other apps
+dependencies:
+  - app: trust
+    capabilities_needed:
+      - trust:query:score
+    required: true   # App won&#39;t start without this
+
+  - app: membership
+    capabilities_needed:
+      - membership:read
+    required: false  # Graceful degradation if unavailable
+    fallback:
+      strategy: cache_then_error
+      cache_ttl: 300
+
+# Event types this app produces
+event_types:
+  MyEvent:
+    fields:
+      foo: string
+      bar: integer
+
+# State this app uses
+state:
+  logs:
+    - name: events
+      schema: MyEvent
+      replication: cluster_strong
+  kv:
+    - name: cache
+      replication: local_only
+  blobs:
+    - name: attachments
+      replication: federation_eventual
+
+# Compute handlers
+handlers:
+  reducers:  # Deterministic (icn_abi_v1)
+    - trigger: on_event(events)
+      module: reducer.wasm
+
+  services:  # Long-running (icn_service_abi_v1)
+    - name: indexer
+      module: indexer.wasm
+
+  endpoints:  # Request/response
+    - path: /query
+      module: query_handler.wasm
+
+# Resource requirements
+resources:
+  compute:
+    cpu_limit: 100ms_per_event
+    memory_limit: 64mb
+  storage:
+    log_retention: 90d
+    blob_quota: 1gb
+
+# Scaling intent (not topology-specific)
+placement:
+  replicas: 3
+  locality: org_scope
+</code></pre>
+<h3>10.2 App Lifecycle</h3>
+<pre><code class="language-rust">pub enum AppState {
+    /// Manifest loaded, not yet configured
+    Installed,
+    /// Capabilities granted, ready to start
+    Configured,
+    /// Handlers running, processing events
+    Running,
+    /// Temporarily stopped
+    Stopped,
+    /// Upgrade in progress
+    Upgrading { from: Version, to: Version },
+    /// Uninstall in progress
+    Uninstalling,
+}
+
+pub trait AppRuntime: Send + Sync {
+    /// Install an app from manifest
+    fn install(&amp;self, manifest: AppManifest) -&gt; Result&lt;AppId, RuntimeError&gt;;
+
+    /// Configure an installed app (grant capabilities)
+    fn configure(&amp;self, app: &amp;AppId, config: AppConfig) -&gt; Result&lt;(), RuntimeError&gt;;
+
+    /// Start an app
+    fn start(&amp;self, app: &amp;AppId) -&gt; Result&lt;(), RuntimeError&gt;;
+
+    /// Stop an app
+    fn stop(&amp;self, app: &amp;AppId) -&gt; Result&lt;(), RuntimeError&gt;;
+
+    /// Upgrade an app to a new version
+    fn upgrade(&amp;self, app: &amp;AppId, new_manifest: AppManifest) -&gt; Result&lt;(), RuntimeError&gt;;
+
+    /// Uninstall an app
+    fn uninstall(&amp;self, app: &amp;AppId) -&gt; Result&lt;(), RuntimeError&gt;;
+
+    /// Get app state
+    fn state(&amp;self, app: &amp;AppId) -&gt; Result&lt;AppState, RuntimeError&gt;;
+}
+</code></pre>
+<h3>10.3 Isolation Guarantees</h3>
+<ol>
+<li><strong>Namespace isolation</strong>: Each app gets <code>/&lt;org&gt;/&lt;app&gt;/</code></li>
+<li><strong>Cross-namespace access</strong>: Requires explicit capability</li>
+<li><strong>Resource quotas</strong>: Enforced per-app</li>
+<li><strong>Private state</strong>: Apps cannot access other apps&#39; private state</li>
+<li><strong>Public streams</strong>: Apps CAN read other apps&#39; public event streams (with capability)</li>
+</ol>
+<h3>10.4 Handler Contracts</h3>
+<pre><code class="language-rust">/// Reducer (deterministic) handler contract
+/// Called for each event on subscribed logs
+pub trait Reducer {
+    /// Process an event, return state updates
+    /// MUST be deterministic: same input → same output
+    fn reduce(&amp;self, event: &amp;LogEntry) -&gt; Result&lt;Vec&lt;StateUpdate&gt;, ReducerError&gt;;
+}
+
+/// Service handler contract
+/// Long-running process with I/O capabilities
+pub trait Service {
+    /// Initialize the service
+    fn init(&amp;mut self, config: ServiceConfig) -&gt; Result&lt;(), ServiceError&gt;;
+
+    /// Handle incoming request
+    fn handle(&amp;mut self, request: &amp;[u8]) -&gt; Result&lt;Vec&lt;u8&gt;, ServiceError&gt;;
+
+    /// Periodic tick (for background work)
+    fn tick(&amp;mut self) -&gt; Result&lt;(), ServiceError&gt;;
+
+    /// Shutdown gracefully
+    fn shutdown(&amp;mut self) -&gt; Result&lt;(), ServiceError&gt;;
+}
+</code></pre>
+<hr>
+<h2>Appendix A: Capability Naming Convention</h2>
+<p>Standard capability format: <code>&lt;domain&gt;:&lt;resource&gt;:&lt;action&gt;</code></p>
+<p><strong>Examples:</strong></p>
+<ul>
+<li><code>identity:read</code> - Read any identity info</li>
+<li><code>state:logs:append:self</code> - Append to own logs</li>
+<li><code>state:kv:write:/org-123/ledger/*</code> - Write to specific namespace</li>
+<li><code>comms:publish:my-app:*</code> - Publish to own topics</li>
+<li><code>trust:query:score</code> - Query trust scores</li>
+<li><code>governance:propose</code> - Create proposals</li>
+</ul>
+<p><strong>Special scopes:</strong></p>
+<ul>
+<li><code>:self</code> - Own namespace only</li>
+<li><code>:*</code> - All resources in category</li>
+<li><code>:&lt;path&gt;</code> - Specific resource path</li>
+</ul>
+<hr>
+<h2>Appendix B: Wire Format Versioning</h2>
+<p>All serialized formats include version information:</p>
+<pre><code class="language-rust">/// Envelope for all wire messages
+pub struct WireEnvelope {
+    /// Format version
+    pub version: u8,
+    /// Message type
+    pub message_type: String,
+    /// Serialized payload
+    pub payload: Vec&lt;u8&gt;,
+    /// Signature over (version || message_type || payload)
+    pub signature: Signature,
+}
+</code></pre>
+<p><strong>Version compatibility:</strong></p>
+<ul>
+<li>Readers MUST handle versions N, N-1, N-2</li>
+<li>Writers SHOULD use latest version</li>
+<li>Unknown versions MUST be rejected with clear error</li>
+</ul>
+<hr>
+<h2>Appendix C: Error Handling Guidelines</h2>
+<ol>
+<li><strong>Errors include blame</strong>: Caller, Kernel, or Adapter</li>
+<li><strong>Errors indicate retryability</strong>: Can this be retried?</li>
+<li><strong>Error codes are stable</strong>: Numeric codes don&#39;t change</li>
+<li><strong>Messages are for humans</strong>: May change across versions</li>
+</ol>
+<pre><code class="language-rust">// Example error handling
+match result {
+    Err(e) if e.retryable =&gt; {
+        // Retry with backoff
+    }
+    Err(e) if e.blame == Blame::Caller =&gt; {
+        // Invalid request, don&#39;t retry
+    }
+    Err(e) =&gt; {
+        // Log and escalate
+    }
+    Ok(v) =&gt; { /* proceed */ }
+}
+</code></pre>
+<hr>
+<h2>Document History</h2>
+<table>
+<thead>
+<tr>
+<th>Version</th>
+<th>Date</th>
+<th>Changes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>0.1.0</td>
+<td>2025-01-25</td>
+<td>Initial draft</td>
+</tr>
+</tbody></table>
+<hr>
+<p><em>This document is the constitutional foundation for ICN kernel development. All kernel code must conform to these contracts.</em></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span> <span>Built with cooperation, not extraction</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 
