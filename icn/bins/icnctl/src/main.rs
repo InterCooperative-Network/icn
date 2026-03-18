@@ -1552,6 +1552,36 @@ enum CharterCommands {
         #[arg(short, long, default_value = "http://localhost:8080")]
         gateway: String,
     },
+
+    /// Validate a CCL charter document (parse + schema check, no network required)
+    Validate {
+        /// Path to charter YAML file
+        path: PathBuf,
+    },
+
+    /// Inspect a CCL charter document — show constraint table (no network required)
+    Inspect {
+        /// Path to charter YAML file
+        path: PathBuf,
+
+        /// Member count for expression evaluation (default: 100)
+        #[arg(long, default_value_t = 100)]
+        members: u64,
+
+        /// Patronage amount for expression evaluation (default: 1000.0)
+        #[arg(long, default_value_t = 1000.0)]
+        patronage: f64,
+    },
+
+    /// Deploy a CCL charter to a running node (gateway integration — not yet implemented)
+    Deploy {
+        /// Path to charter YAML file
+        path: PathBuf,
+
+        /// Charter ID to register (e.g., cooperative DID)
+        #[arg(short, long)]
+        id: String,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -8762,6 +8792,65 @@ async fn handle_charter_command(
                     print_gateway_error(&gateway, &e);
                 }
             }
+        }
+
+        CharterCommands::Validate { path } => {
+            let yaml = std::fs::read_to_string(&path)
+                .with_context(|| format!("Failed to read {}", path.display()))?;
+            let doc = icn_ccl::schema::CclDocument::from_yaml(&yaml)
+                .with_context(|| format!("Failed to parse {}", path.display()))?;
+            doc.validate()
+                .with_context(|| format!("Validation failed for {}", path.display()))?;
+            println!("✓  {} — valid CCL document", path.display());
+        }
+
+        CharterCommands::Inspect {
+            path,
+            members,
+            patronage,
+        } => {
+            let yaml = std::fs::read_to_string(&path)
+                .with_context(|| format!("Failed to read {}", path.display()))?;
+            let doc = icn_ccl::schema::CclDocument::from_yaml(&yaml)
+                .with_context(|| format!("Failed to parse {}", path.display()))?;
+            doc.validate()
+                .with_context(|| format!("Validation failed for {}", path.display()))?;
+            let ctx = icn_ccl::schema::CharterContext::new()
+                .with_members(members)
+                .with_patronage(patronage)
+                .with_membership_months(12)
+                .with_trust_score(0.8)
+                .with_reserves(0.0)
+                .with_monthly_operating(1000.0)
+                .with_worker_owners_exist(true);
+            let cs = icn_ccl::schema::charter_to_constraints(&doc, &ctx)
+                .context("Failed to compute constraints")?;
+            println!("Charter: {}", path.display());
+            println!("Context: {} members, {:.2} patronage\n", members, patronage);
+            println!("{:<40} Value", "Constraint");
+            println!("{}", "-".repeat(60));
+            let mut keys: Vec<_> = cs.custom.keys().collect();
+            keys.sort();
+            for key in keys {
+                if let Some(val) = cs.custom.get(key) {
+                    println!("{:<40} {:?}", key, val);
+                }
+            }
+            if cs.custom.is_empty() {
+                println!("(no constraints — empty charter)");
+            }
+        }
+
+        CharterCommands::Deploy { path, id } => {
+            // Validate the document locally before announcing anything.
+            let yaml = std::fs::read_to_string(&path)
+                .with_context(|| format!("Failed to read {}", path.display()))?;
+            let _doc = icn_ccl::schema::CclDocument::from_yaml(&yaml)
+                .with_context(|| format!("Failed to parse {}", path.display()))?;
+            println!("Charter '{}' parsed OK.", id);
+            println!(
+                "Not yet implemented — charter deployment requires gateway integration (Phase 1 follow-on)."
+            );
         }
     }
 
