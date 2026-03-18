@@ -29,6 +29,7 @@
 //! Expressions are deterministic (same input → same output) and bounded (no loops).
 
 pub mod agreement;
+pub mod bridge;
 pub mod economics;
 pub mod entity;
 pub mod expr;
@@ -36,6 +37,7 @@ pub mod governance;
 pub mod version;
 
 pub use agreement::*;
+pub use bridge::{charter_to_constraints, CharterContext};
 pub use economics::*;
 pub use entity::*;
 pub use expr::*;
