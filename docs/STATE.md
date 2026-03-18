@@ -90,3 +90,12 @@
 - docs/status/CURRENT_SYSTEM_STATUS.md
 - docs/operations/deployment/HOMELAB_DEPLOYMENT.md
 - deploy/README.md
+
+## Current status (2026-03-18 snapshot)
+- **Phase 0 (Close the Demo) nearly complete** — all 4 flows passing on K3s cluster
+- New binary deployed: icn:20260318 (includes all S14 PRs through #1327, settlements:* and treasury:* scopes)
+- Init container keystore fix deployed across all 4 coop pods — eliminates manual copy-after-restart toil
+- Governance demo (demo-governance.py): 19/19 steps green including cryptographic proof
+- All 4 script flows: green (Flow 1 governance, Flow 2 patronage, Flow 3 federation, Flow 4 reporting)
+- Remaining: recorded demo asset + handoff documentation for Layer 3
+- Two non-blocking bugs filed: Flow 2 receipts/allocations 400 (decision_hash deserialization), Flow 3 clearing ID capture

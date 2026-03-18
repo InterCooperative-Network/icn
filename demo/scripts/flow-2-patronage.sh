@@ -526,7 +526,7 @@ if [[ "$DEMO_LAST_HTTP_CODE" =~ ^2 ]]; then
   echo "    - The amount and recipient"
   echo "    - A cryptographic hash linking to the governance record"
 elif [ "$DEMO_LAST_HTTP_CODE" = "403" ] || [ "$DEMO_LAST_HTTP_CODE" = "401" ]; then
-  aside "Receipt chain query requires elevated scope (deployment gap)."
+  aside "Receipt chain scope error — verify token includes settlements:read scope"
   echo ""
   echo "  The allocation receipt schema includes:"
   echo "    decision_id:  the governance proposal that authorized the distribution"

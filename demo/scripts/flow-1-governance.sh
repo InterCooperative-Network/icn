@@ -22,8 +22,8 @@
 #
 # Known cluster constraints (as of 2026-03-18):
 #   - treasury:read/write scopes are in ALLOWED_SCOPES and DEMO_DEFAULT_SCOPES — resolved
-#   - Proof endpoint returns 404: signing key not configured in pod (deployment gap)
-#   - PR #1327 ExecutionReceiptGate is merged; signing key deployment is the remaining gap.
+#   - Proof endpoint: signing key deployed via init container (keystore path fix) — resolved
+#   - PR #1327 ExecutionReceiptGate merged; treasury spend endpoint planned for Flow 1B
 #
 # Usage:    ./demo/scripts/flow-1-governance.sh
 # Duration: ~5 minutes live
@@ -356,8 +356,8 @@ elif [ "$DEMO_LAST_HTTP_CODE" = "404" ]; then
   echo "    Final state:  ${FINAL_STATE}"
   echo "    Vote tally:   For=${FOR_VOTES}, Against=${AGAINST_VOTES}"
   echo ""
-  aside "GovernanceReceipt with cryptographic signature: pending pod signing key config"
-  aside "This is a deployment gap — the receipt schema is implemented and ready"
+  aside "Signing key not found in pod — verify init container copied identity keystore"
+  aside "(/data/.icn/identity.age → /data/identity.age) — check pod init container logs"
 else
   warn "Unexpected proof response (HTTP ${DEMO_LAST_HTTP_CODE}):"
   _pretty
@@ -402,9 +402,9 @@ if [ "$FINAL_STATE" = "Accepted" ]; then
   echo "    Authorization date:   $(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo "    Authorized by:        ${HARBOR_BOARD_DID:0:50}..."
   echo ""
-  aside "Treasury API is not yet reachable in this deployment (scope 'treasury:read'"
-  aside "is not in ALLOWED_SCOPES — this is a deployment gap, not a design gap)"
+  aside "treasury:read scope is authorized — treasury spend endpoint is planned for Flow 1B"
   aside "In Flow 1B: the treasury spend will be cryptographically bound to this proposal ID"
+  aside "Execution receipt will prove: the spend had governance authorization, not just a paper trail"
 else
   warn "Proposal final state is '${FINAL_STATE}' — authorization step requires 'Accepted'."
   warn "This may mean quorum or approval threshold was not met with the seeded member count."
