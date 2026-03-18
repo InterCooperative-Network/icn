@@ -40,54 +40,56 @@
 ---
 
 ### Phase 1: The Charter Engine
-**Status:** ⏳ Planned
-**Started:** —
+**Status:** 🚧 In Progress
+**Started:** 2026-03-18
 **Completed:** —
 **Sprint(s):** S17–S18
 
 **Objective:** YAML charter documents produce kernel-enforced constraints. Cooperatives define their own rules.
 
 **Deliverables:**
-- [ ] `charter_to_constraints()` bridge function — `icn-ccl/src/schema/bridge.rs`
-- [ ] `CharterContext` runtime bindings (member count, balances, trust scores)
-- [ ] `CharterPolicyOracle` — new `apps/charter` crate
-- [ ] Wire charter app into `icnd` daemon startup
-- [ ] Integration test: YAML → ConstraintSet → kernel enforcement
-- [ ] Worker cooperative charter template — `contracts/templates/worker-coop.yaml`
-- [ ] Consumer cooperative charter template — `contracts/templates/consumer-coop.yaml`
-- [ ] Housing cooperative charter template — `contracts/templates/housing-coop.yaml`
-- [ ] Community organization charter template — `contracts/templates/community-org.yaml`
-- [ ] Regional federation charter template — `contracts/templates/federation.yaml`
+- [x] `charter_to_constraints()` bridge function — `icn-ccl/src/schema/bridge.rs`
+- [x] `CharterContext` runtime bindings (member count, balances, trust scores)
+- [x] `CharterPolicyOracle` — new `apps/charter` crate
+- [x] Wire charter app into `icnd` daemon startup
+- [x] Integration test: YAML → ConstraintSet → kernel enforcement (20/20 passing)
+- [x] Worker cooperative charter template — `contracts/templates/worker-coop.yaml`
+- [x] Consumer cooperative charter template — `contracts/templates/consumer-coop.yaml`
+- [x] Housing cooperative charter template — `contracts/templates/housing-coop.yaml`
+- [x] Community organization charter template — `contracts/templates/community-org.yaml`
+- [x] Regional federation charter template — `contracts/templates/federation.yaml`
 - [ ] Charter ratification flow (governance vote triggers charter deployment)
-- [ ] `icnctl charter validate/deploy/inspect` subcommands
+- [x] `icnctl charter validate/inspect/deploy` subcommands
 - [ ] Demo Flow 1 updated to use real charter document
 
 **Blockers:**
-- Requires Phase 0 complete (demo must work before extending it)
+- (none blocking — ratification flow and demo update are additive)
 
 **Decisions Made:**
 - (2026-03-18) YAML schema system is the v1 charter interface. No custom text parser.
 - (2026-03-18) Expression strings (`"0.67 * members"`) parsed by existing `parse_expr()`. No new parser needed.
 - (2026-03-18) Start with governance thresholds + credit limits mapping. Expand incrementally.
+- (2026-03-18) `community-org` template uses `entity.type: cooperative / subtype: purpose` — `community` is an entity type (for `icn-community`), not a valid cooperative subtype.
+- (2026-03-18) Charter ratification flow is a separate PR: governance has no effect execution hook today. `GovernanceProposalClosed` event is logged only — no `deploy_charter()` call exists anywhere. Wiring requires: (a) add `Charter` variant to `ProposalPayload`, (b) listen for `Accepted` outcome in gateway, (c) call `charter_oracle.deploy_charter()` from gateway handler.
 
 **Metrics:**
-- Tests added: —
-- Lines changed: —
-- Kernel infection delta: —
+- Tests added: 32 (12 bridge unit, 9 oracle unit, 11 oracle unit, 1 template integration ratchet — but icn-charter-app lib tests = 11 total; icn-ccl integration = 20 total)
+- Lines changed: ~900 (bridge 350, oracle 200, daemon wiring 50, templates 350, CLI 90)
+- Kernel infection delta: 0 (charter oracle is an app — kernel sees only ConstraintSet)
 
 ### Schema → Constraint Mapping Status
 
 | Schema Type | Field | Expression Example | Constraint Key | Status |
 |-------------|-------|--------------------|----------------|--------|
-| GovernanceSchema | VoteThreshold | `"0.67 * members"` | `custom["min_votes"]` | ⏳ |
-| GovernanceSchema | DecisionType.quorum | `"0.25 * members"` | `custom["min_quorum"]` | ⏳ |
-| GovernanceSchema | DelegationConfig.max_depth | literal | `custom["max_delegation_depth"]` | ⏳ |
-| GovernanceSchema | TermDuration | literal | `custom["term_years"]` | ⏳ |
-| EconomicsSchema | CreditConfig.limit | `"min(1000, patronage * 0.5)"` | `custom["credit_limit"]` | ⏳ |
-| EconomicsSchema | MemberEquity.minimum | literal | `custom["equity_min"]` | ⏳ |
-| EconomicsSchema | SurplusConfig.allocation | `"0.20"` | `custom["surplus_reserves_pct"]` | ⏳ |
-| AgreementSchema | SettlementConfig.cycle | enum | `custom["settlement_cycle"]` | ⏳ |
-| AgreementSchema | DisputeResolution.stages | structured | `custom["dispute_stages"]` | ⏳ |
+| GovernanceSchema | VoteThreshold | `"0.67 * members"` | `custom["min_votes_<name>"]` | ✅ |
+| GovernanceSchema | DecisionType.quorum | `"0.25 * members"` | `custom["min_quorum_<name>"]` | ✅ |
+| GovernanceSchema | DelegationConfig.transitive | bool | `custom["delegation_transitive"]` | ✅ |
+| GovernanceSchema | TermDuration | literal | `custom["term_years"]` | ✅ |
+| EconomicsSchema | CreditConfig.limit | `"min(1000, patronage * 0.5)"` | `custom["credit_limit"]` | ✅ |
+| EconomicsSchema | MemberEquity.minimum | literal | `custom["equity_min"]` | ✅ |
+| EconomicsSchema | SurplusConfig.allocation | `"0.20"` | `custom["surplus_reserves_pct"]` | ✅ |
+| AgreementSchema | SettlementConfig.cycle | enum | `custom["settlement_cycle"]` | ✅ |
+| AgreementSchema | DisputeResolution.ladder | structured | `custom["dispute_stages"]` | ✅ |
 
 ---
 
