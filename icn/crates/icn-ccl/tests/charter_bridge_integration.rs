@@ -401,3 +401,46 @@ fn test_expected_constraint_keys_produced() {
         );
     }
 }
+
+/// Verify that every template in `contracts/templates/` parses and produces
+/// at least one constraint.  This catches YAML syntax errors and schema
+/// validation failures before they reach the oracle at runtime.
+#[test]
+fn test_all_templates_parse_and_produce_constraints() {
+    // CARGO_MANIFEST_DIR is `icn/crates/icn-ccl`; templates live three levels up.
+    let manifest_dir = env!("CARGO_MANIFEST_DIR");
+    let templates_dir = std::path::PathBuf::from(manifest_dir).join("../../../contracts/templates");
+
+    let templates = [
+        "worker-coop.yaml",
+        "consumer-coop.yaml",
+        "housing-coop.yaml",
+        "community-org.yaml",
+        "federation.yaml",
+    ];
+
+    let ctx = CharterContext::new()
+        .with_members(100)
+        .with_patronage(1000.0)
+        .with_membership_months(12)
+        .with_reserves(5000.0)
+        .with_monthly_operating(500.0)
+        .with_worker_owners_exist(true);
+
+    for name in &templates {
+        let path = templates_dir.join(name);
+        let yaml = std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("Failed to read template {name}: {e}"));
+
+        let doc = CclDocument::from_yaml(&yaml)
+            .unwrap_or_else(|e| panic!("Template {name} failed to parse: {e}"));
+
+        let cs = charter_to_constraints(&doc, &ctx)
+            .unwrap_or_else(|e| panic!("Template {name} failed charter_to_constraints: {e}"));
+
+        assert!(
+            !cs.custom.is_empty(),
+            "Template {name} produced an empty ConstraintSet — check governance section"
+        );
+    }
+}

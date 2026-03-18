@@ -1,0 +1,69 @@
+schema_version: v0
+
+# Finger Lakes Mutual Aid Network
+# Template for community organizations with purpose-based membership,
+# consensus decision-making, and transitive delegation.
+
+entity:
+  name: "Finger Lakes Mutual Aid Network"
+  type: cooperative
+  subtype: purpose
+  membership:
+    open_to: [individual]
+    classes:
+      - name: community_member
+        default: true
+        criteria:
+          all:
+            - field: signed_membership_agreement
+              op: "=="
+              value: true
+
+    rights_by_class:
+      community_member: [vote, propose, access_resources]
+
+governance:
+  bodies:
+    - name: general_assembly
+      composition: all_members
+      convenes:
+        regular: monthly
+        special:
+          trigger: petition
+          threshold: "0.10 * members"
+
+    - name: coordinating_circle
+      seats: 3
+      elected_by: general_assembly
+      term:
+        years: 1
+        staggered: false
+      recall:
+        petition: "0.20 * members"
+        vote: simple_majority
+
+  decisions:
+    - name: ordinary
+      authority: general_assembly
+      threshold: simple_majority
+      quorum: "0.20 * members"
+
+    - name: consensus
+      authority: general_assembly
+      threshold: simple_majority
+      quorum: "0.50 * members"
+
+  delegation:
+    allowed: true
+    transitive: true
+    revocable: instant
+    scope: [vote, propose]
+
+economics:
+  credit:
+    eligibility:
+      field: membership_months
+      op: ">="
+      value: 1
+    limit: "100"
+    terms: net30

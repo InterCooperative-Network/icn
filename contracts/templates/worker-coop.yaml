@@ -1,0 +1,96 @@
+schema_version: v0
+
+# BrightWorks Worker Cooperative
+# Template for worker-owned businesses with democratic governance,
+# patronage-based surplus allocation, and internal credit.
+
+entity:
+  name: "BrightWorks Worker Cooperative"
+  type: cooperative
+  subtype: worker
+  membership:
+    open_to: [individual]
+    classes:
+      - name: worker_owner
+        default: true
+        criteria:
+          all:
+            - field: hours_worked
+              op: ">="
+              value: 500
+            - field: signed_membership_agreement
+              op: "=="
+              value: true
+    rights_by_class:
+      worker_owner: [vote, patronage_refund, run_for_board, workplace_governance, propose]
+
+governance:
+  bodies:
+    - name: general_assembly
+      composition: all_members
+      convenes:
+        regular: quarterly
+        special:
+          trigger: petition
+          threshold: "0.10 * members"
+
+    - name: board
+      seats: 7
+      elected_by: general_assembly
+      term:
+        years: 2
+        staggered: true
+      recall:
+        petition: "0.25 * members"
+        vote: simple_majority
+
+  decisions:
+    - name: ordinary
+      authority: general_assembly
+      threshold: simple_majority
+      quorum: "0.25 * members"
+
+    - name: constitutional
+      authority: general_assembly
+      threshold:
+        fraction: "2/3"
+      quorum: "0.50 * members"
+      ratification_period:
+        days: 30
+
+  delegation:
+    allowed: true
+    transitive: false
+    revocable: instant
+    scope: [vote, propose]
+
+economics:
+  capital:
+    member_equity:
+      minimum: 100
+      maximum: 5000
+      interest_rate: 0.0
+      refund_on_exit:
+        full: true
+        within:
+          days: 90
+
+  credit:
+    eligibility:
+      field: membership_months
+      op: ">="
+      value: 6
+    limit: "min(1000, patronage * 0.5)"
+    terms: net30
+
+  surplus:
+    allocation:
+      - target: reserves
+        fraction: "0.20"
+        until: "reserves >= 6 * monthly_operating"
+      - target: patronage_refund
+        fraction: "0.70"
+        proportional_to: hours_worked
+      - target: worker_bonus
+        fraction: "0.10"
+        condition: "worker_owners_exist"

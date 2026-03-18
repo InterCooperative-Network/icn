@@ -1,0 +1,88 @@
+schema_version: v0
+
+# Abundance Food Cooperative
+# Template for consumer-owned retail cooperatives with geographic membership,
+# patronage refunds, and no delegation (all decisions stay with the assembly).
+
+entity:
+  name: "Abundance Food Cooperative"
+  type: cooperative
+  subtype: consumer
+  jurisdiction:
+    type: geographic
+    bounds: "Rochester, NY"
+  membership:
+    open_to: [individual]
+    classes:
+      - name: consumer_owner
+        default: true
+        criteria:
+          all:
+            - field: equity_paid
+              op: ">="
+              value: 100
+            - field: signed_bylaws
+              op: "=="
+              value: true
+    rights_by_class:
+      consumer_owner: [vote, patronage_refund, run_for_board, propose]
+
+governance:
+  bodies:
+    - name: member_assembly
+      composition: all_members
+      convenes:
+        regular: annually
+        special:
+          trigger: petition
+          threshold: "0.05 * members"
+
+    - name: board
+      seats: 9
+      elected_by: member_assembly
+      term:
+        years: 3
+        staggered: true
+      recall:
+        petition: "0.20 * members"
+        vote: simple_majority
+
+  decisions:
+    - name: ordinary
+      authority: member_assembly
+      threshold: simple_majority
+      quorum: "0.20 * members"
+
+    - name: bylaws_amendment
+      authority: member_assembly
+      threshold: supermajority
+      quorum: "0.33 * members"
+      ratification_period:
+        days: 60
+
+economics:
+  capital:
+    member_equity:
+      minimum: 100
+      interest_rate: 0.0
+      refund_on_exit:
+        full: true
+        within:
+          days: 90
+
+  credit:
+    eligibility:
+      field: membership_months
+      op: ">="
+      value: 3
+    limit: "min(500, patronage * 0.3)"
+    terms: net30
+
+  surplus:
+    allocation:
+      - target: reserves
+        fraction: "0.30"
+        until: "reserves >= 3 * monthly_operating"
+      - target: patronage_refund
+        fraction: "0.70"
+        proportional_to: purchases
