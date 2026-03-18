@@ -1,0 +1,23 @@
+# Mutual Credit Economic Simulation Requirements
+
+# Agent-based modeling framework
+mesa==2.1.5
+
+# Data analysis
+pandas==2.1.4
+numpy==1.26.3
+
+# Visualization
+matplotlib==3.8.2
+seaborn==0.13.1
+
+# Network analysis (for trust graph)
+networkx==3.2.1
+
+# Jupyter notebooks (for analysis)
+jupyter==1.0.0
+ipykernel==6.28.0
+
+# Optional: Interactive visualizations
+# plotly==5.18.0
+# bokeh==3.3.2

@@ -1,0 +1,145 @@
+# Full CI/CD workflow with self-hosted runner
+# Copy this to .github/workflows/docker-build-deploy.yml after setting up the runner
+
+name: Build and Deploy to K3s
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'icn/**'
+      - 'Dockerfile'
+      - '.github/workflows/docker-build-deploy.yml'
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: 'Deploy to K3s after build'
+        required: true
+        default: 'true'
+        type: boolean
+
+env:
+  IMAGE_NAME: icn
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  # Standard CI jobs run on GitHub-hosted runners
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "icn -> target"
+      - name: Run tests
+        run: cargo test --workspace
+        working-directory: ./icn
+
+  # Build and deploy runs on self-hosted runner
+  build-and-deploy:
+    name: Build and Deploy
+    needs: test
+    runs-on: [self-hosted, homelab, k3s]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: |
+          echo "Building image ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
+          docker build -t ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} -f Dockerfile ./icn
+          docker tag ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} ${{ env.IMAGE_NAME }}:latest
+          echo "✓ Image built successfully"
+
+      - name: Save and import to containerd
+        run: |
+          echo "Exporting image to containerd..."
+          docker save ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} | sudo k3s ctr images import -
+          docker save ${{ env.IMAGE_NAME }}:latest | sudo k3s ctr images import -
+          echo "✓ Image imported to containerd"
+
+          # Verify
+          sudo k3s ctr images ls | grep ${{ env.IMAGE_NAME }} || true
+
+      - name: Deploy to K3s
+        if: ${{ github.event.inputs.deploy != 'false' }}
+        run: |
+          echo "Deploying to K3s..."
+
+          # Update main daemon
+          sudo kubectl -n icn set image deployment/icn-daemon icnd=${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+
+          # Update coop nodes
+          for COOP in alpha beta gamma delta; do
+            NS="icn-coop-${COOP}"
+            if sudo kubectl get namespace ${NS} &>/dev/null; then
+              echo "Updating icn-${COOP}..."
+              sudo kubectl -n ${NS} set image deployment/icn-${COOP} icnd=${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} 2>/dev/null || true
+            fi
+          done
+
+          # Restart deployments
+          sudo kubectl -n icn rollout restart deployment/icn-daemon
+          for COOP in alpha beta gamma delta; do
+            NS="icn-coop-${COOP}"
+            if sudo kubectl get namespace ${NS} &>/dev/null; then
+              sudo kubectl -n ${NS} rollout restart deployment/icn-${COOP} 2>/dev/null || true
+            fi
+          done
+
+          echo "✓ Deployment initiated"
+
+      - name: Wait for rollout
+        if: ${{ github.event.inputs.deploy != 'false' }}
+        run: |
+          echo "Waiting for rollout..."
+          sudo kubectl -n icn rollout status deployment/icn-daemon --timeout=180s
+
+          for COOP in alpha beta gamma delta; do
+            NS="icn-coop-${COOP}"
+            if sudo kubectl get namespace ${NS} &>/dev/null; then
+              sudo kubectl -n ${NS} rollout status deployment/icn-${COOP} --timeout=120s 2>/dev/null || true
+            fi
+          done
+
+          echo "✓ Rollout complete"
+
+      - name: Show deployment status
+        if: always()
+        run: |
+          echo "=== Pod Status ==="
+          sudo kubectl get pods -A | grep icn || true
+
+          echo ""
+          echo "=== Recent Events ==="
+          sudo kubectl -n icn get events --sort-by='.lastTimestamp' | tail -10 || true
+
+      - name: Output summary
+        run: |
+          echo "## Deployment Summary 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Deployed Pods" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          sudo kubectl get pods -A | grep icn >> $GITHUB_STEP_SUMMARY || echo "No pods found" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+  # Cleanup old images (runs weekly)
+  cleanup:
+    name: Cleanup Old Images
+    runs-on: [self-hosted, homelab]
+    if: github.event_name == 'schedule'
+    steps:
+      - name: Remove old images
+        run: |
+          echo "Cleaning up old images..."
+          # Keep last 5 versions
+          sudo k3s ctr images ls | grep icn | sort -r | tail -n +6 | awk '{print $1}' | xargs -r sudo k3s ctr images rm
+          docker image prune -f
+          echo "✓ Cleanup complete"

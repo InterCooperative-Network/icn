@@ -1,0 +1,80 @@
+name: API Types Check
+
+on:
+  pull_request:
+    paths:
+      - 'icn/crates/icn-gateway/**'
+      - 'icn/crates/icn-store/src/notifications.rs'
+      - 'sdk/typescript/**'
+      - 'docs/api/openapi.generated.yaml'
+
+jobs:
+  check-api-types:
+    name: Check API Types Drift
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: sdk/typescript/package-lock.json
+
+      - name: Build icnctl
+        run: |
+          cd icn
+          cargo build -p icnctl --release
+
+      - name: Generate OpenAPI spec from Rust
+        run: |
+          ./icn/target/release/icnctl api export-openapi -o docs/api/openapi.check.yaml
+
+      - name: Check OpenAPI drift
+        run: |
+          if ! diff -q docs/api/openapi.generated.yaml docs/api/openapi.check.yaml > /dev/null; then
+            echo "ERROR: OpenAPI spec is out of sync with Rust code"
+            echo ""
+            echo "The generated OpenAPI specification differs from the committed version."
+            echo "Please regenerate and commit the updated spec:"
+            echo ""
+            echo "  cd icn && cargo build -p icnctl"
+            echo "  ./target/debug/icnctl api export-openapi -o ../docs/api/openapi.generated.yaml"
+            echo "  git add ../docs/api/openapi.generated.yaml && git commit -m 'Update OpenAPI spec'"
+            echo ""
+            diff docs/api/openapi.generated.yaml docs/api/openapi.check.yaml || true
+            exit 1
+          fi
+          echo "OpenAPI spec is in sync with Rust code"
+
+      - name: Install TypeScript SDK dependencies
+        run: |
+          cd sdk/typescript
+          npm ci
+
+      - name: Generate TypeScript types
+        run: |
+          cd sdk/typescript
+          npm run generate-types
+
+      - name: Check TypeScript types drift
+        run: |
+          cd sdk/typescript
+          if ! git diff --exit-code src/generated/; then
+            echo ""
+            echo "ERROR: Generated TypeScript types are out of date"
+            echo ""
+            echo "The generated types differ from the committed version."
+            echo "Please regenerate and commit the updated types:"
+            echo ""
+            echo "  cd sdk/typescript && npm run generate-types"
+            echo "  git add src/generated/ && git commit -m 'Update generated TypeScript types'"
+            exit 1
+          fi
+          echo "TypeScript types are in sync with OpenAPI spec"

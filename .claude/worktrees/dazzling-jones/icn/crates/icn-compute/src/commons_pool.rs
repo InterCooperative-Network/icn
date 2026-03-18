@@ -1,0 +1,451 @@
+//! Commons resource pool tracking.
+//!
+//! **Architectural invariant**: `CommonsPool` is advisory scheduling state.
+//! It is ephemeral, rebuilt from gossip announcements. The ledger is
+//! authoritative economic state — this pool must never mutate economic truth.
+//!
+//! **Architectural invariant**: Affiliated nodes without an explicit budget
+//! default to `CapacityBudget::default()` (0.10 commons share), not full
+//! commons. Omitting a budget must never accidentally opt a node fully into
+//! commons — that is a governance footgun.
+
+use std::collections::HashMap;
+use std::time::Instant;
+
+use crate::scheduler::{CapacityBudget, NodeCapacity};
+
+/// Sybil resistance policy for commons pool participation.
+///
+/// Gates admission to the commons pool based on trust score and
+/// proof-of-personhood level. Without these checks, an attacker
+/// could spin up many low-trust nodes to dilute or farm the pool.
+#[derive(Debug, Clone)]
+pub struct SybilPolicy {
+    /// Minimum trust score required to join the commons pool (0.0–1.0).
+    /// Nodes below this threshold are rejected.
+    pub min_trust_score: f64,
+    /// Maximum number of participants in the pool.
+    /// Prevents unbounded growth from sybil flooding.
+    pub max_participants: usize,
+}
+
+impl Default for SybilPolicy {
+    fn default() -> Self {
+        Self {
+            min_trust_score: 0.1,
+            max_participants: 10_000,
+        }
+    }
+}
+
+/// Error returned when a participant fails sybil resistance checks.
+#[derive(Debug, Clone, PartialEq)]
+pub enum SybilRejection {
+    /// Trust score is below the minimum threshold.
+    InsufficientTrust { score: f64, required: f64 },
+    /// Pool is at maximum capacity.
+    PoolFull { capacity: usize },
+}
+
+impl std::fmt::Display for SybilRejection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SybilRejection::InsufficientTrust { score, required } => {
+                write!(
+                    f,
+                    "insufficient trust score: {score:.2} < {required:.2} required"
+                )
+            }
+            SybilRejection::PoolFull { capacity } => {
+                write!(f, "commons pool full: {capacity} participants at capacity")
+            }
+        }
+    }
+}
+
+impl std::error::Error for SybilRejection {}
+
+/// A node participating in the commons resource pool.
+#[derive(Debug, Clone)]
+pub struct CommonsParticipant {
+    /// DID of the participating node.
+    pub did: String,
+    /// Reported capacity of the node.
+    pub capacity: NodeCapacity,
+    /// Capacity budget controlling how much is shared with each scope.
+    pub budget: CapacityBudget,
+    /// Trust score of this participant at the time of admission (0.0–1.0).
+    /// Used for sybil resistance: participants below the policy threshold
+    /// are rejected.
+    pub trust_score: f64,
+    /// When we last heard from this node. In-memory only — not serialized,
+    /// not sent over the wire. Enables future stale-participant expiry
+    /// without migration.
+    // TODO(#925): Implement stale participant expiry using last_announce.
+    // Nodes not announcing for >5 minutes should be removed from the pool.
+    pub last_announce: Instant,
+}
+
+/// Aggregate capacity across all commons participants.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AggregateCapacity {
+    /// Total commons-weighted CPU cores.
+    pub cpu_cores: f64,
+    /// Total commons-weighted memory in MB.
+    pub memory_mb: u64,
+    /// Total commons-weighted storage in MB.
+    pub storage_mb: u64,
+    /// Number of participating nodes.
+    pub node_count: usize,
+}
+
+/// Advisory pool of nodes contributing to the commons.
+///
+/// **This is advisory scheduling state.** Ephemeral, rebuilt from gossip.
+/// The ledger is authoritative economic state.
+///
+/// **Lock discipline**: Never hold a write lock on `CommonsPool` during
+/// heavy computation. Acquire, mutate, release.
+#[derive(Debug)]
+pub struct CommonsPool {
+    participants: HashMap<String, CommonsParticipant>,
+    sybil_policy: SybilPolicy,
+}
+
+impl CommonsPool {
+    /// Create an empty commons pool with default sybil policy.
+    pub fn new() -> Self {
+        Self {
+            participants: HashMap::new(),
+            sybil_policy: SybilPolicy::default(),
+        }
+    }
+
+    /// Create a commons pool with a custom sybil policy.
+    pub fn with_policy(policy: SybilPolicy) -> Self {
+        Self {
+            participants: HashMap::new(),
+            sybil_policy: policy,
+        }
+    }
+
+    /// Get the current sybil policy.
+    pub fn sybil_policy(&self) -> &SybilPolicy {
+        &self.sybil_policy
+    }
+
+    /// Add or update a participant in the pool.
+    ///
+    /// **Note**: This method bypasses sybil checks. Prefer [`try_add_participant`]
+    /// for admission from untrusted sources (e.g., gossip announcements).
+    pub fn add_participant(&mut self, participant: CommonsParticipant) {
+        self.participants
+            .insert(participant.did.clone(), participant);
+    }
+
+    /// Add a participant after validating against the sybil policy.
+    ///
+    /// Returns `Err(SybilRejection)` if the participant fails checks:
+    /// - Trust score below `min_trust_score` (both new and existing)
+    /// - Pool at `max_participants` capacity (new participants only)
+    ///
+    /// Existing participants whose trust drops below threshold are
+    /// **rejected** (returns `InsufficientTrust`). The caller is
+    /// responsible for evicting them from the pool if desired — this
+    /// method does not remove them automatically.
+    pub fn try_add_participant(
+        &mut self,
+        participant: CommonsParticipant,
+    ) -> Result<(), SybilRejection> {
+        let is_existing = self.participants.contains_key(&participant.did);
+
+        // Trust score check applies to both new and existing participants.
+        // A participant whose trust drops below threshold is evicted on
+        // next announce rather than silently remaining.
+        if participant.trust_score < self.sybil_policy.min_trust_score {
+            return Err(SybilRejection::InsufficientTrust {
+                score: participant.trust_score,
+                required: self.sybil_policy.min_trust_score,
+            });
+        }
+
+        // Capacity check only applies to new participants.
+        if !is_existing && self.participants.len() >= self.sybil_policy.max_participants {
+            return Err(SybilRejection::PoolFull {
+                capacity: self.sybil_policy.max_participants,
+            });
+        }
+
+        self.participants
+            .insert(participant.did.clone(), participant);
+        Ok(())
+    }
+
+    /// Remove a participant by DID. Returns the removed participant if present.
+    pub fn remove_participant(&mut self, did: &str) -> Option<CommonsParticipant> {
+        self.participants.remove(did)
+    }
+
+    /// Number of participants currently in the pool.
+    pub fn participant_count(&self) -> usize {
+        self.participants.len()
+    }
+
+    /// Check whether a DID is in the pool.
+    pub fn contains(&self, did: &str) -> bool {
+        self.participants.contains_key(did)
+    }
+
+    /// Get a participant by DID.
+    pub fn get_participant(&self, did: &str) -> Option<&CommonsParticipant> {
+        self.participants.get(did)
+    }
+
+    /// Iterate over all participants.
+    pub fn participants(&self) -> impl Iterator<Item = &CommonsParticipant> {
+        self.participants.values()
+    }
+
+    /// Compute the total commons-weighted capacity across all participants.
+    ///
+    /// Each node's capacity is weighted by its `budget.commons_share`.
+    ///
+    /// # Thread Safety
+    ///
+    /// This method takes `&self` and iterates over the participants map.
+    /// Callers are responsible for ensuring exclusive access — in practice
+    /// this is always called while holding an `RwLock` (read or write)
+    /// on the `CommonsPool`.
+    pub fn total_commons_capacity(&self) -> AggregateCapacity {
+        let mut cpu_cores: f64 = 0.0;
+        let mut memory_mb: u128 = 0;
+        let mut storage_mb: u128 = 0;
+
+        for p in self.participants.values() {
+            let share = p.budget.commons_share;
+            cpu_cores += p.capacity.cpu_cores_available * share;
+            memory_mb += (p.capacity.memory_mb_available as f64 * share) as u128;
+            storage_mb += (p.capacity.storage_mb_available as f64 * share) as u128;
+        }
+
+        AggregateCapacity {
+            cpu_cores,
+            // Saturate u128 → u64: values above u64::MAX are clamped.
+            memory_mb: memory_mb.min(u64::MAX as u128) as u64,
+            storage_mb: storage_mb.min(u64::MAX as u128) as u64,
+            node_count: self.participants.len(),
+        }
+    }
+}
+
+impl Default for CommonsPool {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_capacity(cpu: f64, mem: u64, storage: u64) -> NodeCapacity {
+        NodeCapacity {
+            cpu_cores_total: cpu,
+            cpu_cores_available: cpu,
+            memory_mb_total: mem,
+            memory_mb_available: mem,
+            storage_mb_available: storage,
+            network_mbps: 100.0,
+            gpu_devices: vec![],
+            updated_at: 1000,
+        }
+    }
+
+    fn make_participant(
+        did: &str,
+        cpu: f64,
+        mem: u64,
+        storage: u64,
+        share: f64,
+    ) -> CommonsParticipant {
+        CommonsParticipant {
+            did: did.to_string(),
+            capacity: make_capacity(cpu, mem, storage),
+            budget: CapacityBudget {
+                commons_share: share,
+                ..CapacityBudget::default()
+            },
+            trust_score: 0.5,
+            last_announce: Instant::now(),
+        }
+    }
+
+    #[test]
+    fn test_add_remove_participant() {
+        let mut pool = CommonsPool::new();
+        assert_eq!(pool.participant_count(), 0);
+        assert!(!pool.contains("did:icn:alice"));
+
+        pool.add_participant(make_participant("did:icn:alice", 4.0, 8192, 50000, 0.5));
+        assert_eq!(pool.participant_count(), 1);
+        assert!(pool.contains("did:icn:alice"));
+
+        let removed = pool.remove_participant("did:icn:alice");
+        assert!(removed.is_some());
+        assert_eq!(pool.participant_count(), 0);
+        assert!(!pool.contains("did:icn:alice"));
+    }
+
+    #[test]
+    fn test_weighted_aggregation() {
+        let mut pool = CommonsPool::new();
+
+        // Node A: 4 cores, 8GB, 50GB — 50% commons share
+        pool.add_participant(make_participant("did:icn:a", 4.0, 8192, 50000, 0.5));
+        // Node B: 8 cores, 16GB, 100GB — 100% commons share (unaffiliated)
+        pool.add_participant(make_participant("did:icn:b", 8.0, 16384, 100000, 1.0));
+
+        let agg = pool.total_commons_capacity();
+        assert_eq!(agg.node_count, 2);
+        // A contributes 4*0.5=2.0 cores, B contributes 8*1.0=8.0 cores → 10.0
+        assert!((agg.cpu_cores - 10.0).abs() < f64::EPSILON);
+        // A: 8192*0.5=4096, B: 16384*1.0=16384 → 20480
+        assert_eq!(agg.memory_mb, 20480);
+        // A: 50000*0.5=25000, B: 100000*1.0=100000 → 125000
+        assert_eq!(agg.storage_mb, 125000);
+    }
+
+    #[test]
+    fn test_empty_pool() {
+        let pool = CommonsPool::new();
+        let agg = pool.total_commons_capacity();
+        assert_eq!(agg.node_count, 0);
+        assert!((agg.cpu_cores).abs() < f64::EPSILON);
+        assert_eq!(agg.memory_mb, 0);
+        assert_eq!(agg.storage_mb, 0);
+    }
+
+    #[test]
+    fn test_contains_and_get() {
+        let mut pool = CommonsPool::new();
+        pool.add_participant(make_participant("did:icn:alice", 4.0, 8192, 50000, 0.5));
+
+        assert!(pool.contains("did:icn:alice"));
+        assert!(!pool.contains("did:icn:bob"));
+
+        let p = pool.get_participant("did:icn:alice");
+        assert!(p.is_some());
+        assert_eq!(p.unwrap().did, "did:icn:alice");
+
+        assert!(pool.get_participant("did:icn:bob").is_none());
+    }
+
+    fn make_participant_with_trust(did: &str, trust_score: f64) -> CommonsParticipant {
+        CommonsParticipant {
+            did: did.to_string(),
+            capacity: make_capacity(4.0, 8192, 50000),
+            budget: CapacityBudget {
+                commons_share: 0.5,
+                ..CapacityBudget::default()
+            },
+            trust_score,
+            last_announce: Instant::now(),
+        }
+    }
+
+    #[test]
+    fn test_sybil_rejects_low_trust() {
+        let policy = SybilPolicy {
+            min_trust_score: 0.2,
+            max_participants: 100,
+        };
+        let mut pool = CommonsPool::with_policy(policy);
+
+        // Trust score 0.1 < threshold 0.2 → rejected
+        let result = pool.try_add_participant(make_participant_with_trust("did:icn:low", 0.1));
+        assert_eq!(
+            result,
+            Err(SybilRejection::InsufficientTrust {
+                score: 0.1,
+                required: 0.2,
+            })
+        );
+        assert_eq!(pool.participant_count(), 0);
+    }
+
+    #[test]
+    fn test_sybil_accepts_sufficient_trust() {
+        let policy = SybilPolicy {
+            min_trust_score: 0.2,
+            max_participants: 100,
+        };
+        let mut pool = CommonsPool::with_policy(policy);
+
+        let result = pool.try_add_participant(make_participant_with_trust("did:icn:good", 0.3));
+        assert!(result.is_ok());
+        assert_eq!(pool.participant_count(), 1);
+    }
+
+    #[test]
+    fn test_sybil_rejects_pool_full() {
+        let policy = SybilPolicy {
+            min_trust_score: 0.0,
+            max_participants: 2,
+        };
+        let mut pool = CommonsPool::with_policy(policy);
+
+        pool.try_add_participant(make_participant_with_trust("did:icn:a", 0.5))
+            .unwrap();
+        pool.try_add_participant(make_participant_with_trust("did:icn:b", 0.5))
+            .unwrap();
+
+        // Third participant rejected — pool full
+        let result = pool.try_add_participant(make_participant_with_trust("did:icn:c", 0.5));
+        assert_eq!(result, Err(SybilRejection::PoolFull { capacity: 2 }));
+    }
+
+    #[test]
+    fn test_sybil_allows_existing_participant_update() {
+        let policy = SybilPolicy {
+            min_trust_score: 0.0,
+            max_participants: 1,
+        };
+        let mut pool = CommonsPool::with_policy(policy);
+
+        pool.try_add_participant(make_participant_with_trust("did:icn:a", 0.5))
+            .unwrap();
+
+        // Same DID can update even though pool is "full"
+        let result = pool.try_add_participant(make_participant_with_trust("did:icn:a", 0.6));
+        assert!(result.is_ok());
+        assert_eq!(pool.participant_count(), 1);
+    }
+
+    #[test]
+    fn test_sybil_evicts_on_trust_drop() {
+        let policy = SybilPolicy {
+            min_trust_score: 0.2,
+            max_participants: 100,
+        };
+        let mut pool = CommonsPool::with_policy(policy);
+
+        // Initially admitted
+        pool.try_add_participant(make_participant_with_trust("did:icn:a", 0.5))
+            .unwrap();
+        assert_eq!(pool.participant_count(), 1);
+
+        // Trust drops below threshold on re-announce → rejected
+        let result = pool.try_add_participant(make_participant_with_trust("did:icn:a", 0.1));
+        assert_eq!(
+            result,
+            Err(SybilRejection::InsufficientTrust {
+                score: 0.1,
+                required: 0.2,
+            })
+        );
+        // Pool does NOT auto-evict — it returns the error and the caller
+        // decides whether to evict. In production, placement.rs calls
+        // `pool.remove_participant()` on InsufficientTrust rejection.
+        assert_eq!(pool.participant_count(), 1);
+    }
+}

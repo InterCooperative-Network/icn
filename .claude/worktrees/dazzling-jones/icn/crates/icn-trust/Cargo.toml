@@ -1,0 +1,35 @@
+[package]
+name = "icn-trust"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+icn-identity.workspace = true
+icn-time = { path = "../icn-time" }
+icn-store.workspace = true
+icn-obs.workspace = true
+serde.workspace = true
+serde_json = "1.0"
+hex = "0.4"
+anyhow.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+ed25519-dalek.workspace = true
+multibase = "0.9"
+sha2 = "0.10"
+lru.workspace = true
+bloomfilter = "1.0"
+ordered-float = "5.1"
+
+[dev-dependencies]
+rand = "0.8"
+criterion = "0.5"
+tempfile = "3.24"
+
+[[bench]]
+name = "trust_bench"
+harness = false
+
+[lints]
+workspace = true

@@ -1,0 +1,3846 @@
+/**
+ * Coop Wallet - ICN React Native App
+ *
+ * Features:
+ * - Authentication with secure wallet
+ * - Balance display and payment
+ * - QR code scan-to-pay
+ * - Governance voting
+ * - SDIS Identity verification
+ */
+
+// Crypto polyfill for React Native (must be before any crypto imports)
+import 'react-native-get-random-values';
+
+// Initialize internationalization (must be early, before components render)
+import './src/i18n';
+
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import {
+  ActivityIndicator,
+  View,
+  StyleSheet,
+  Platform,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
+  RefreshControl,
+  KeyboardAvoidingView,
+  Clipboard,
+  Alert,
+  Animated,
+} from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+import { TrustAttestationScreen } from './src/screens/TrustAttestationScreen';
+import { MemberProfileScreen } from './src/screens/MemberProfileScreen';
+import { ContactsScreen } from './src/screens/ContactsScreen';
+import { StewardDashboardScreen } from './src/screens/StewardDashboardScreen';
+import { EnrollmentDetailScreen } from './src/screens/EnrollmentDetailScreen';
+import { VouchConfirmationScreen } from './src/screens/VouchConfirmationScreen';
+import { VouchHistoryScreen } from './src/screens/VouchHistoryScreen';
+import { TransactionDetailScreen } from './src/screens/TransactionDetailScreen';
+import { ICNProvider } from './src/contexts/ICNContext';
+import { ThemeProvider } from './src/contexts/ThemeContext';
+
+// QR Code - conditionally import for web compatibility
+let QRCode: any = null;
+try {
+  QRCode = require('react-native-qrcode-svg').default;
+} catch (e) {
+  console.log('QR Code library not available');
+}
+
+// Clipboard helper
+const copyToClipboard = async (text: string) => {
+  if (Platform.OS === 'web') {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      return false;
+    }
+  } else {
+    Clipboard.setString(text);
+    return true;
+  }
+};
+
+// Demo transaction data
+const DEMO_TRANSACTIONS = [
+  { id: '1', type: 'received', from: 'Alice', to: 'You', amount: 2, memo: 'Garden help', date: '2025-12-10' },
+  { id: '2', type: 'sent', from: 'You', to: 'Bob', amount: 1.5, memo: 'Tutoring', date: '2025-12-09' },
+  { id: '3', type: 'received', from: 'Carol', to: 'You', amount: 3, memo: 'Website design', date: '2025-12-08' },
+  { id: '4', type: 'sent', from: 'You', to: 'Dave', amount: 0.5, memo: 'Coffee meetup', date: '2025-12-07' },
+  { id: '5', type: 'received', from: 'Eve', to: 'You', amount: 4, memo: 'Car repair help', date: '2025-12-05' },
+];
+
+// Import client module - client is set after initializeClient() is called
+let clientModule: any = null;
+let initializeClient: () => Promise<boolean> = async () => {
+  console.log('initializeClient not loaded');
+  return false;
+};
+let retryInitialization: () => Promise<boolean> = async () => false;
+let resetClientState: () => void = () => {};
+let isClientReady: () => boolean = () => false;
+let getClientState: () => string = () => 'uninitialized';
+let getLastInitError: () => any = () => null;
+
+// Getter to always get the current client value
+const getClient = () => clientModule?.client || null;
+
+try {
+  console.log('Loading client module...');
+  clientModule = require('./src/client');
+  initializeClient = clientModule.initializeClient;
+  retryInitialization = clientModule.retryInitialization || (async () => initializeClient());
+  resetClientState = clientModule.resetClientState || (() => {});
+  isClientReady = clientModule.isClientReady || (() => getClient() !== null);
+  getClientState = () => clientModule?.clientState || 'uninitialized';
+  getLastInitError = () => clientModule?.lastInitError || null;
+  console.log('Client module loaded successfully');
+} catch (e) {
+  console.error('Failed to import client:', e);
+}
+
+// ============================================================================
+// Toast Notification Component
+// ============================================================================
+interface ToastProps {
+  message: string;
+  type?: 'success' | 'info' | 'warning' | 'error';
+  duration?: number;
+  onHide?: () => void;
+}
+
+function Toast({ message, type = 'info', duration = 3000, onHide }: ToastProps) {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    // Fade in
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+
+    // Auto-hide after duration
+    const timer = setTimeout(() => {
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start(() => {
+        onHide?.();
+      });
+    }, duration);
+
+    return () => clearTimeout(timer);
+  }, [fadeAnim, duration, onHide]);
+
+  const backgroundColor = {
+    success: '#4caf50',
+    info: '#2196f3',
+    warning: '#ff9800',
+    error: '#f44336',
+  }[type];
+
+  const icon = {
+    success: '✅',
+    info: 'ℹ️',
+    warning: '⚠️',
+    error: '❌',
+  }[type];
+
+  return (
+    <Animated.View
+      style={[
+        styles.toastContainer,
+        { opacity: fadeAnim, backgroundColor },
+      ]}
+    >
+      <Text style={styles.toastIcon}>{icon}</Text>
+      <Text style={styles.toastMessage}>{message}</Text>
+    </Animated.View>
+  );
+}
+
+// ============================================================================
+// Inline Screens (Web-safe, no external hook dependencies)
+// ============================================================================
+
+function LoginScreen({ onLogin }: { onLogin: (coopId: string, did: string) => void }) {
+  const [coopId, setCoopId] = useState('test-coop');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+
+  const handleLogin = async () => {
+    if (!coopId.trim()) {
+      setError('Please enter your cooperative ID');
+      return;
+    }
+
+    if (coopId.trim().length < 3) {
+      setError('Cooperative ID must be at least 3 characters');
+      return;
+    }
+
+    if (!/^[a-z0-9-]+$/.test(coopId.trim())) {
+      setError('Cooperative ID can only contain lowercase letters, numbers, and hyphens');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const client = getClient();
+      console.log('Client:', client);
+      console.log('Client baseUrl:', (client as any)?.baseUrl);
+
+      // Debug: Test direct fetch to gateway first
+      const baseUrl = (client as any)?.baseUrl || 'https://api.icn.zone';
+      console.log('Testing direct fetch to:', `${baseUrl}/v1/health`);
+      try {
+        const testResponse = await fetch(`${baseUrl}/v1/health`);
+        console.log('Health check status:', testResponse.status);
+        const healthData = await testResponse.json();
+        console.log('Health check response:', healthData);
+      } catch (fetchErr) {
+        console.error('Direct fetch error:', fetchErr);
+        console.error('Fetch error name:', (fetchErr as Error).name);
+        console.error('Fetch error message:', (fetchErr as Error).message);
+      }
+
+      if (client) {
+        // Get the wallet's DID for debugging
+        const walletModule = require('./src/client');
+        const wallet = walletModule.wallet;
+        if (wallet) {
+          const keyPair = await wallet.getKeyPair();
+          console.log('Wallet DID:', keyPair?.did);
+          if (keyPair?.did) {
+            console.log('DID length:', keyPair.did.length);
+            // Show first 50 chars to verify format
+            console.log('DID preview:', keyPair.did.substring(0, 50) + '...');
+          }
+        }
+
+        // Use real authentication with the gateway
+        console.log('Attempting login to:', coopId.trim());
+        const authState = await client.login(coopId.trim(), [
+          'coop:read',
+          'coop:write',
+          'ledger:read',
+          'ledger:write',
+        ]);
+        console.log('Login successful:', authState);
+        onLogin(coopId.trim(), authState.did || '');
+      } else {
+        throw new Error('Wallet not ready. Please wait for initialization or restart the app.');
+      }
+    } catch (err) {
+      console.error('Login error details:', err);
+      console.error('Error name:', (err as Error).name);
+      console.error('Error message:', (err as Error).message);
+      console.error('Error stack:', (err as Error).stack);
+      
+      // Provide user-friendly error messages
+      let errorMessage = 'Login failed. Please try again.';
+      const errMsg = (err as Error).message;
+      
+      if (errMsg?.includes('not found') || errMsg?.includes('404')) {
+        errorMessage = 'Cooperative not found. Check the ID and try again.';
+      } else if (errMsg?.includes('network') || errMsg?.includes('fetch')) {
+        errorMessage = 'Network error. Check your internet connection.';
+      } else if (errMsg?.includes('timeout')) {
+        errorMessage = 'Connection timeout. Please try again.';
+      } else if (errMsg) {
+        errorMessage = errMsg;
+      }
+      
+      setError(errorMessage);
+      setRetryCount(prev => prev + 1);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <KeyboardAvoidingView
+      style={styles.loginContainer}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <View style={styles.loginContent}>
+        <Text style={styles.loginTitle}>Coop Wallet</Text>
+        <Text style={styles.loginSubtitle}>InterCooperative Network</Text>
+
+        <View style={styles.loginForm}>
+          <Text style={styles.label}>Cooperative ID</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="e.g., my-timebank"
+            value={coopId}
+            onChangeText={setCoopId}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+
+          {error && (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorIcon}>⚠️</Text>
+              <Text style={styles.errorText}>{error}</Text>
+              {retryCount > 0 && retryCount < 5 && (
+                <Text style={styles.errorHint}>Attempt {retryCount} of 5</Text>
+              )}
+            </View>
+          )}
+
+          <TouchableOpacity
+            style={[styles.primaryButton, isLoading && styles.buttonDisabled]}
+            onPress={handleLogin}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.buttonText}>
+                {error && retryCount > 0 ? 'Retry Login' : 'Login'}
+              </Text>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        <Text style={styles.footerText}>
+          Your keys are stored securely on your device.
+        </Text>
+
+        <TouchableOpacity
+          style={[styles.secondaryButton, { marginTop: 20 }]}
+          onPress={async () => {
+            try {
+              // Clear localStorage on web
+              if (Platform.OS === 'web') {
+                localStorage.clear();
+                console.log('localStorage cleared');
+              }
+              // Reinitialize client
+              await initializeClient();
+              setError(null);
+              // Alert doesn't work on web, use console and update UI
+              console.log('Wallet reset! New keys generated.');
+              if (Platform.OS === 'web') {
+                window.alert('Wallet reset! New keys generated. Please try logging in again.');
+              } else {
+                Alert.alert('Wallet Reset', 'New keys generated. Please try logging in again.');
+              }
+            } catch (e) {
+              console.error('Reset error:', e);
+              setError('Failed to reset wallet: ' + (e as Error).message);
+            }
+          }}
+        >
+          <Text style={[styles.buttonText, { color: '#666' }]}>Reset Wallet</Text>
+        </TouchableOpacity>
+      </View>
+    </KeyboardAvoidingView>
+  );
+}
+
+interface Transaction {
+  id: string;
+  type: 'sent' | 'received';
+  from: string;
+  to: string;
+  amount: number;
+  memo: string;
+  date: string;
+  timestamp: number;
+  currency: string;
+}
+
+// Helper to format DIDs for display
+const formatDidDisplay = (did: string) => {
+  if (!did) return 'Unknown';
+  if (did.length > 16) return `${did.slice(0, 10)}...${did.slice(-4)}`;
+  return did;
+};
+
+function HomeScreen({
+  navigation,
+  coopId,
+  userDid,
+  onLogout
+}: {
+  navigation: any;
+  coopId: string;
+  userDid: string;
+  onLogout: () => void;
+}) {
+  const [balance, setBalance] = useState(0);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'info' = 'info') => {
+    setToast({ message, type });
+  };
+
+  const fetchData = useCallback(async () => {
+    const client = getClient();
+    if (!client || !coopId || !userDid) return;
+
+    setIsLoading(true);
+    try {
+      // Fetch balance
+      const balanceResult = await client.getBalance(coopId, userDid);
+      setBalance(balanceResult?.balance ?? 0);
+
+      // Fetch recent transactions
+      try {
+        const historyResult = await client.getHistory(coopId, { limit: 10 });
+        if (historyResult?.transactions) {
+          const txs: Transaction[] = historyResult.transactions.map((tx: any, idx: number) => ({
+            id: tx.id || `tx-${idx}`,
+            type: tx.to === userDid ? 'received' : 'sent',
+            from: tx.from,
+            to: tx.to,
+            amount: tx.amount,
+            memo: tx.memo || '',
+            date: tx.timestamp ? new Date(tx.timestamp).toLocaleDateString() : 'Unknown',
+            timestamp: tx.timestamp || Date.now() / 1000,
+            currency: tx.currency || 'hours',
+          }));
+          setTransactions(txs);
+        }
+      } catch (e) {
+        console.warn('Failed to fetch transactions:', e);
+        // Keep existing transactions or empty
+      }
+    } catch (e) {
+      console.warn('Failed to fetch balance:', e);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [coopId, userDid]);
+
+  useEffect(() => {
+    fetchData();
+
+    // Connect to WebSocket for real-time updates
+    const client = getClient();
+    if (client && coopId) {
+      try {
+        client.connectRealtime(coopId);
+        console.log('Connected to real-time updates for', coopId);
+
+        // Listen for payment events
+        const unsubscribe = client.onEvent('PaymentCreated', (event: any) => {
+          console.log('Payment event received:', event);
+          // Show toast notification
+          if (event.to === userDid) {
+            const amount = event.amount || 0;
+            const from = event.from?.substring(0, 12) || 'Someone';
+            showToast(`💰 Received ${amount} hours from ${from}...`, 'success');
+            fetchData();
+          } else if (event.from === userDid) {
+            const amount = event.amount || 0;
+            const to = event.to?.substring(0, 12) || 'recipient';
+            showToast(`📤 Sent ${amount} hours to ${to}...`, 'info');
+            fetchData();
+          }
+        });
+
+        return () => {
+          unsubscribe();
+          client.disconnectRealtime();
+        };
+      } catch (error) {
+        console.warn('Failed to connect WebSocket:', error);
+      }
+    }
+  }, [fetchData, coopId, userDid]);
+
+  const refresh = () => {
+    fetchData();
+  };
+
+  const formatDidShort = (did: string) => {
+    if (!did) return 'Unknown';
+    if (did.length > 16) return `${did.slice(0, 10)}...${did.slice(-4)}`;
+    return did;
+  };
+
+  const handleLogout = async () => {
+    onLogout();
+  };
+
+  const formatDid = (did: string) => {
+    if (did && did.length > 20) {
+      return `${did.slice(0, 12)}...${did.slice(-6)}`;
+    }
+    return did || 'Unknown';
+  };
+
+  return (
+    <ScrollView
+      style={styles.container}
+      refreshControl={
+        <RefreshControl refreshing={isLoading} onRefresh={refresh} />
+      }
+    >
+      {/* Balance Card */}
+      <View style={styles.balanceCard}>
+        <Text style={styles.balanceLabel}>Available Balance</Text>
+        <Text style={styles.balanceAmount}>
+          {balance}
+          <Text style={styles.balanceCurrency}> hours</Text>
+        </Text>
+        <Text style={styles.coopName}>{coopId}</Text>
+        <Text style={styles.didText}>{formatDid(userDid)}</Text>
+      </View>
+
+      {/* Quick Actions */}
+      <View style={styles.actionsGrid}>
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => navigation.navigate('Payment')}
+        >
+          <Text style={styles.actionIcon}>💸</Text>
+          <Text style={styles.actionLabel}>Send</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => navigation.navigate('Receive')}
+        >
+          <Text style={styles.actionIcon}>📥</Text>
+          <Text style={styles.actionLabel}>Receive</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => navigation.navigate('Scan')}
+        >
+          <Text style={styles.actionIcon}>📷</Text>
+          <Text style={styles.actionLabel}>Scan</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => navigation.navigate('Governance')}
+        >
+          <Text style={styles.actionIcon}>🗳️</Text>
+          <Text style={styles.actionLabel}>Vote</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Recent Transactions */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Recent Activity</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('Transactions')}>
+            <Text style={styles.seeAllLink}>See All</Text>
+          </TouchableOpacity>
+        </View>
+
+        {transactions.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyText}>No transactions yet</Text>
+          </View>
+        ) : (
+          transactions.slice(0, 3).map((tx) => (
+            <TouchableOpacity
+              key={tx.id}
+              style={styles.transactionItem}
+              onPress={() => navigation.navigate('TransactionDetail', {
+                transaction: {
+                  id: tx.id,
+                  from: tx.from,
+                  to: tx.to,
+                  amount: tx.amount,
+                  memo: tx.memo,
+                  timestamp: tx.timestamp,
+                  currency: tx.currency,
+                }
+              })}
+              activeOpacity={0.7}
+            >
+              <View style={[
+                styles.txIcon,
+                tx.type === 'received' ? styles.txIconReceived : styles.txIconSent
+              ]}>
+                <Text style={styles.txIconText}>{tx.type === 'received' ? '↓' : '↑'}</Text>
+              </View>
+              <View style={styles.txContent}>
+                <Text style={styles.txPerson}>
+                  {tx.type === 'received' ? `From ${formatDidDisplay(tx.from)}` : `To ${formatDidDisplay(tx.to)}`}
+                </Text>
+                {tx.memo ? <Text style={styles.txMemo}>{tx.memo}</Text> : null}
+              </View>
+              <View style={styles.txAmountContainer}>
+                <Text style={[
+                  styles.txAmount,
+                  tx.type === 'received' ? styles.txAmountReceived : styles.txAmountSent
+                ]}>
+                  {tx.type === 'received' ? '+' : '-'}{tx.amount}h
+                </Text>
+                <Text style={styles.txDate}>{tx.date}</Text>
+              </View>
+              <Text style={styles.txChevron}>›</Text>
+            </TouchableOpacity>
+          ))
+        )}
+      </View>
+
+      {/* Contacts Section */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>People</Text>
+
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => navigation.navigate('Contacts')}
+        >
+          <Text style={styles.menuIcon}>👥</Text>
+          <View style={styles.menuContent}>
+            <Text style={styles.menuLabel}>Contacts</Text>
+            <Text style={styles.menuDescription}>Saved recipients for quick payments</Text>
+          </View>
+          <Text style={styles.menuArrow}>›</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* SDIS Section */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Identity & Verification</Text>
+
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => navigation.navigate('Identity')}
+        >
+          <Text style={styles.menuIcon}>🪪</Text>
+          <View style={styles.menuContent}>
+            <Text style={styles.menuLabel}>My Identity</Text>
+            <Text style={styles.menuDescription}>View and share your identity</Text>
+          </View>
+          <Text style={styles.menuArrow}>›</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => navigation.navigate('Verify')}
+        >
+          <Text style={styles.menuIcon}>✅</Text>
+          <View style={styles.menuContent}>
+            <Text style={styles.menuLabel}>Verify Someone</Text>
+            <Text style={styles.menuDescription}>Scan and verify another member</Text>
+          </View>
+          <Text style={styles.menuArrow}>›</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => navigation.navigate('VerificationHistory')}
+        >
+          <Text style={styles.menuIcon}>📋</Text>
+          <View style={styles.menuContent}>
+            <Text style={styles.menuLabel}>Verification History</Text>
+            <Text style={styles.menuDescription}>View past verifications</Text>
+          </View>
+          <Text style={styles.menuArrow}>›</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Settings */}
+      <TouchableOpacity
+        style={styles.menuItem}
+        onPress={() => navigation.navigate('Settings')}
+      >
+        <Text style={styles.menuIcon}>⚙️</Text>
+        <View style={styles.menuContent}>
+          <Text style={styles.menuLabel}>Settings</Text>
+          <Text style={styles.menuDescription}>App preferences and account</Text>
+        </View>
+        <Text style={styles.menuArrow}>›</Text>
+      </TouchableOpacity>
+
+      {/* Logout Button */}
+      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+        <Text style={styles.logoutText}>Logout</Text>
+      </TouchableOpacity>
+
+      {/* Toast Notification */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onHide={() => setToast(null)}
+        />
+      )}
+    </ScrollView>
+  );
+}
+
+// ============================================================================
+// Payment Screen - Send hours to another member
+// ============================================================================
+function PaymentScreen({
+  navigation,
+  route,
+  coopId,
+  userDid,
+}: {
+  navigation: any;
+  route?: { params?: { recipient?: string; amount?: string; memo?: string } };
+  coopId: string;
+  userDid: string;
+}) {
+  const params = route?.params;
+  const [recipient, setRecipient] = useState(params?.recipient || '');
+  const [amount, setAmount] = useState(params?.amount || '');
+  const [memo, setMemo] = useState(params?.memo || '');
+  const [isLoading, setIsLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+
+  const validateRecipient = (did: string): string | null => {
+    if (!did.trim()) return 'Recipient is required';
+    if (!did.startsWith('did:icn:')) return 'Invalid DID format (must start with did:icn:)';
+    if (did.length < 20) return 'DID appears too short';
+    if (did === userDid) return 'Cannot send payment to yourself';
+    return null;
+  };
+
+  const validateAmount = (amountStr: string): { error: string | null; value: number } => {
+    if (!amountStr.trim()) return { error: 'Amount is required', value: 0 };
+    const amountNum = parseFloat(amountStr);
+    if (isNaN(amountNum)) return { error: 'Amount must be a number', value: 0 };
+    if (amountNum <= 0) return { error: 'Amount must be greater than zero', value: 0 };
+    if (amountNum > 1000000) return { error: 'Amount too large (max: 1,000,000)', value: 0 };
+    return { error: null, value: amountNum };
+  };
+
+  const handleSend = async () => {
+    // Validate recipient
+    const recipientError = validateRecipient(recipient);
+    if (recipientError) {
+      setError(recipientError);
+      return;
+    }
+
+    // Validate amount
+    const { error: amountError, value: amountNum } = validateAmount(amount);
+    if (amountError) {
+      setError(amountError);
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const client = getClient();
+      if (!client) {
+        throw new Error('Wallet not ready. Please wait for initialization or restart the app.');
+      }
+
+      // Make real payment via API
+      await client.pay(coopId, {
+        from: userDid,
+        to: recipient.trim(),
+        amount: amountNum,
+        currency: 'hours',
+        memo: memo.trim() || undefined,
+      });
+
+      setSuccess(true);
+      setRetryCount(0);
+    } catch (err: any) {
+      console.error('Payment error:', err);
+      
+      // Provide user-friendly error messages
+      let errorMessage = 'Payment failed. Please try again.';
+      
+      if (err.message?.includes('not found')) {
+        errorMessage = 'Recipient not found in this cooperative';
+      } else if (err.message?.includes('balance') || err.message?.includes('credit')) {
+        errorMessage = 'Insufficient balance or credit limit exceeded';
+      } else if (err.message?.includes('network') || err.message?.includes('fetch')) {
+        errorMessage = 'Network error. Check your connection and try again.';
+      } else if (err.message?.includes('auth') || err.message?.includes('token')) {
+        errorMessage = 'Session expired. Please log out and log in again.';
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
+      setRetryCount(prev => prev + 1);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (success) {
+    return (
+      <View style={styles.successContainer}>
+        <Text style={styles.successIcon}>✅</Text>
+        <Text style={styles.successTitle}>Payment Sent!</Text>
+        <Text style={styles.successAmount}>{amount} hours</Text>
+        <Text style={styles.successRecipient}>to {recipient}</Text>
+        {memo && <Text style={styles.successMemo}>"{memo}"</Text>}
+        <TouchableOpacity
+          style={styles.primaryButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={styles.buttonText}>Done</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  return (
+    <KeyboardAvoidingView
+      style={styles.formContainer}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <ScrollView style={styles.formScroll}>
+        <View style={styles.formSection}>
+          <Text style={styles.label}>Recipient DID or Name</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="did:icn:... or @username"
+            value={recipient}
+            onChangeText={setRecipient}
+            autoCapitalize="none"
+          />
+        </View>
+
+        <View style={styles.formSection}>
+          <Text style={styles.label}>Amount (hours)</Text>
+          <TextInput
+            style={styles.amountInput}
+            placeholder="0.0"
+            value={amount}
+            onChangeText={setAmount}
+            keyboardType="decimal-pad"
+          />
+        </View>
+
+        <View style={styles.formSection}>
+          <Text style={styles.label}>Memo (optional)</Text>
+          <TextInput
+            style={[styles.input, styles.memoInput]}
+            placeholder="What's this for?"
+            value={memo}
+            onChangeText={setMemo}
+            multiline
+            numberOfLines={3}
+          />
+        </View>
+
+        {error && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorIcon}>⚠️</Text>
+            <Text style={styles.errorText}>{error}</Text>
+            {retryCount > 0 && retryCount < 3 && (
+              <Text style={styles.errorHint}>Attempt {retryCount} of 3</Text>
+            )}
+          </View>
+        )}
+
+        <TouchableOpacity
+          style={[styles.primaryButton, styles.sendButton, isLoading && styles.buttonDisabled]}
+          onPress={handleSend}
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.buttonText}>
+              {error && retryCount > 0 ? 'Retry Payment' : 'Send Payment'}
+            </Text>
+          )}
+        </TouchableOpacity>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
+
+// ============================================================================
+// Receive Screen - Display QR code for receiving payments
+// ============================================================================
+function ReceiveScreen({ userDid, coopId }: { userDid: string; coopId: string }) {
+  const [amount, setAmount] = useState('');
+  const [copied, setCopied] = useState(false);
+  const did = userDid || 'did:icn:unknown';
+
+  const qrData = JSON.stringify({
+    type: 'icn-payment-request',
+    recipient: did,
+    coopId: coopId,
+    amount: amount ? parseFloat(amount) : undefined,
+    timestamp: Date.now(),
+  });
+
+  const handleCopyDid = async () => {
+    const success = await copyToClipboard(did);
+    if (success) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleShare = async () => {
+    const paymentLink = `icn://pay?to=${did}${amount ? `&amount=${amount}` : ''}`;
+    const success = await copyToClipboard(paymentLink);
+    if (success) {
+      if (Platform.OS === 'web') {
+        alert('Payment link copied to clipboard!');
+      } else {
+        Alert.alert('Copied', 'Payment link copied to clipboard');
+      }
+    }
+  };
+
+  return (
+    <ScrollView style={styles.receiveContainer}>
+      <View style={styles.qrCard}>
+        <Text style={styles.qrTitle}>Scan to Pay Me</Text>
+
+        {/* QR Code */}
+        <View style={styles.qrWrapper}>
+          {QRCode && Platform.OS !== 'web' ? (
+            <QRCode value={qrData} size={180} />
+          ) : (
+            <View style={styles.qrPlaceholder}>
+              <View style={styles.qrFallback}>
+                <Text style={styles.qrFallbackText}>⬛⬜⬛⬜⬛</Text>
+                <Text style={styles.qrFallbackText}>⬜⬛⬜⬛⬜</Text>
+                <Text style={styles.qrFallbackText}>⬛⬜⬛⬜⬛</Text>
+                <Text style={styles.qrFallbackText}>⬜⬛⬜⬛⬜</Text>
+                <Text style={styles.qrFallbackText}>⬛⬜⬛⬜⬛</Text>
+              </View>
+              <Text style={styles.qrPlaceholderLabel}>QR Code</Text>
+            </View>
+          )}
+        </View>
+
+        {amount && (
+          <View style={styles.requestAmount}>
+            <Text style={styles.requestAmountLabel}>Requesting</Text>
+            <Text style={styles.requestAmountValue}>{amount} hours</Text>
+          </View>
+        )}
+
+        <View style={styles.formSection}>
+          <Text style={styles.label}>Request Amount (optional)</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Enter amount in hours"
+            value={amount}
+            onChangeText={setAmount}
+            keyboardType="decimal-pad"
+          />
+        </View>
+
+        <View style={styles.didDisplay}>
+          <Text style={styles.didLabel}>Your DID:</Text>
+          <Text style={styles.didValue} selectable>{did}</Text>
+        </View>
+      </View>
+
+      <TouchableOpacity
+        style={[styles.copyButton, copied && styles.copyButtonSuccess]}
+        onPress={handleCopyDid}
+      >
+        <Text style={[styles.copyButtonText, copied && styles.copyButtonTextSuccess]}>
+          {copied ? '✓ Copied!' : '📋 Copy DID'}
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
+        <Text style={styles.shareButtonText}>📤 Share Payment Link</Text>
+      </TouchableOpacity>
+    </ScrollView>
+  );
+}
+
+// ============================================================================
+// Scan Screen - QR code scanner
+// ============================================================================
+function ScanScreen({ navigation, coopId, userDid }: { navigation: any; coopId: string; userDid: string }) {
+  const [manualEntry, setManualEntry] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [scanned, setScanned] = useState(false);
+
+  // Dynamic import of camera to avoid web errors
+  const [CameraView, setCameraView] = useState<any>(null);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') {
+      console.log('ScanScreen: Loading expo-camera...');
+      import('expo-camera').then(async (module: any) => {
+        console.log('ScanScreen: expo-camera loaded, requesting permission...');
+        setCameraView(() => module.CameraView);
+
+        // Use the Camera object's method
+        try {
+          const requestPermission = module.Camera?.requestCameraPermissionsAsync || module.requestCameraPermissionsAsync;
+          if (requestPermission) {
+            const { status } = await requestPermission();
+            console.log('ScanScreen: Permission status:', status);
+            setHasPermission(status === 'granted');
+          } else {
+            console.error('ScanScreen: No permission function found');
+            setHasPermission(false);
+          }
+        } catch (err) {
+          console.error('ScanScreen: Permission error:', err);
+          setHasPermission(false);
+        }
+      }).catch((err) => {
+        console.error('ScanScreen: Failed to load camera:', err);
+        setHasPermission(false);
+      });
+    }
+  }, []);
+
+  const handleBarCodeScanned = ({ type, data }: { type: string; data: string }) => {
+    setScanned(true);
+    processQRData(data);
+  };
+
+  const processQRData = (data: string) => {
+    try {
+      // Try to parse as JSON (payment request format)
+      const parsed = JSON.parse(data);
+
+      if (parsed.type === 'icn-payment-request') {
+        // Navigate to payment screen with prefilled data
+        navigation.navigate('Payment', {
+          recipient: parsed.recipient,
+          amount: parsed.amount?.toString() || '',
+          memo: parsed.memo || '',
+        });
+        return;
+      }
+
+      // If it looks like a DID, go to payment screen with recipient
+      if (data.startsWith('did:icn:')) {
+        navigation.navigate('Payment', {
+          recipient: data,
+          amount: '',
+          memo: '',
+        });
+        return;
+      }
+
+      setError('Unrecognized QR code format');
+    } catch {
+      // Not JSON, check if it's a DID
+      if (data.trim().startsWith('did:icn:')) {
+        navigation.navigate('Payment', {
+          recipient: data.trim(),
+          amount: '',
+          memo: '',
+        });
+        return;
+      }
+      setError('Could not parse QR code data');
+    }
+  };
+
+  if (Platform.OS === 'web') {
+    return (
+      <View style={styles.scanContainer}>
+        <View style={styles.cameraPlaceholder}>
+          <Text style={styles.cameraIcon}>📷</Text>
+          <Text style={styles.cameraText}>Camera not available on web</Text>
+        </View>
+
+        <View style={styles.manualEntrySection}>
+          <Text style={styles.sectionTitle}>Manual Entry</Text>
+          <Text style={styles.sectionSubtitle}>Paste a DID or payment request JSON</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="did:icn:... or JSON payment request"
+            value={manualEntry}
+            onChangeText={(text) => {
+              setManualEntry(text);
+              setError(null);
+            }}
+            multiline
+          />
+          {error && <Text style={styles.errorText}>{error}</Text>}
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={() => {
+              if (manualEntry.trim()) {
+                processQRData(manualEntry.trim());
+              }
+            }}
+          >
+            <Text style={styles.buttonText}>Process</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  // Native camera scanner
+  if (hasPermission === null) {
+    return (
+      <View style={styles.scanContainer}>
+        <ActivityIndicator size="large" color="#4A90A4" />
+        <Text style={styles.cameraText}>Requesting camera permission...</Text>
+      </View>
+    );
+  }
+
+  if (hasPermission === false) {
+    return (
+      <View style={styles.scanContainer}>
+        <Text style={styles.cameraIcon}>🚫</Text>
+        <Text style={styles.cameraText}>Camera permission denied</Text>
+        <Text style={styles.sectionSubtitle}>
+          Please enable camera access in your device settings to scan QR codes.
+        </Text>
+        
+        {/* Fallback to manual entry */}
+        <View style={styles.manualEntrySection}>
+          <Text style={styles.sectionTitle}>Manual Entry</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Paste DID or payment request"
+            value={manualEntry}
+            onChangeText={(text) => {
+              setManualEntry(text);
+              setError(null);
+            }}
+            multiline
+          />
+          {error && (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorIcon}>⚠️</Text>
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          )}
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={() => {
+              if (manualEntry.trim()) {
+                processQRData(manualEntry.trim());
+              }
+            }}
+          >
+            <Text style={styles.buttonText}>Process</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  if (!CameraView) {
+    return (
+      <View style={styles.scanContainer}>
+        <ActivityIndicator size="large" color="#4A90A4" />
+        <Text style={styles.cameraText}>Loading camera...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.scanContainer}>
+      <CameraView
+        style={styles.camera}
+        facing="back"
+        onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+        barcodeScannerSettings={{
+          barcodeTypes: ['qr'],
+        }}
+      >
+        <View style={styles.scanOverlay}>
+          <View style={styles.scanFrame} />
+          <Text style={styles.scanInstructions}>
+            {scanned ? '✓ Scanned!' : 'Point camera at QR code'}
+          </Text>
+
+          {scanned && (
+            <TouchableOpacity
+              style={styles.scanAgainButton}
+              onPress={() => setScanned(false)}
+            >
+              <Text style={styles.scanAgainText}>Scan Again</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </CameraView>
+
+      {/* Manual entry fallback */}
+      <View style={styles.manualEntrySection}>
+        <Text style={styles.sectionTitle}>Or Enter Manually</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Paste DID or payment request"
+          value={manualEntry}
+          onChangeText={(text) => {
+            setManualEntry(text);
+            setError(null);
+          }}
+          multiline
+        />
+        {error && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorIcon}>⚠️</Text>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
+        <TouchableOpacity
+          style={styles.primaryButton}
+          onPress={() => {
+            if (manualEntry.trim()) {
+              processQRData(manualEntry.trim());
+            }
+          }}
+        >
+          <Text style={styles.buttonText}>Process</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+// ============================================================================
+// Governance Screen - View and vote on proposals
+// ============================================================================
+interface DisplayProposal {
+  id: string;
+  title: string;
+  description: string;
+  status: string;
+  votesFor: number;
+  votesAgainst: number;
+  endDate: string;
+  myVote: 'for' | 'against' | null;
+}
+
+function GovernanceScreen({ coopId }: { coopId: string }) {
+  const [proposals, setProposals] = useState<DisplayProposal[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isVoting, setIsVoting] = useState<string | null>(null);
+
+  const fetchProposals = useCallback(async () => {
+    const client = getClient();
+    if (!client) return;
+
+    setIsLoading(true);
+    try {
+      // Get domain ID for the coop (format: coop:<coopId>)
+      const domainId = `coop:${coopId}`;
+      const proposalList = await client.listProposals(domainId);
+
+      // Map API proposals to display format
+      const displayProposals: DisplayProposal[] = await Promise.all(
+        proposalList.map(async (p: any) => {
+          // Try to fetch vote tally
+          let tally = { votes_for: 0, votes_against: 0, votes_abstain: 0 };
+          try {
+            tally = await client.getVotes(p.id);
+          } catch {
+            // Vote tally not available yet
+          }
+
+          return {
+            id: p.id,
+            title: p.title,
+            description: p.description || '',
+            status: p.state === 'open' ? 'active' : p.state,
+            votesFor: tally.votes_for,
+            votesAgainst: tally.votes_against,
+            endDate: p.closed_at
+              ? new Date(p.closed_at).toLocaleDateString()
+              : 'Open',
+            myVote: null, // Would need separate API to track user's vote
+          };
+        })
+      );
+
+      setProposals(displayProposals);
+    } catch (e) {
+      console.warn('Failed to fetch proposals:', e);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [coopId]);
+
+  useEffect(() => {
+    fetchProposals();
+
+    // Connect to WebSocket for real-time governance updates
+    const client = getClient();
+    if (client && coopId) {
+      try {
+        const unsubVote = client.onEvent('GovernanceVoteCast', (event: any) => {
+          console.log('Vote cast event:', event);
+          // Refresh proposals when a vote is cast
+          fetchProposals();
+        });
+
+        const unsubProposal = client.onEvent('GovernanceProposalCreated', (event: any) => {
+          console.log('New proposal event:', event);
+          // Refresh proposals when a new one is created
+          fetchProposals();
+        });
+
+        return () => {
+          unsubVote();
+          unsubProposal();
+        };
+      } catch (error) {
+        console.warn('Failed to connect WebSocket for governance:', error);
+      }
+    }
+  }, [fetchProposals, coopId]);
+
+  const handleVote = async (proposalId: string, voteType: 'for' | 'against') => {
+    const client = getClient();
+    if (!client) return;
+
+    setIsVoting(proposalId);
+    try {
+      await client.vote(proposalId, { choice: voteType });
+
+      // Refresh to get updated vote counts
+      await fetchProposals();
+
+      if (Platform.OS === 'web') {
+        alert('Vote recorded!');
+      } else {
+        Alert.alert('Success', 'Your vote has been recorded');
+      }
+    } catch (e) {
+      const message = (e as Error).message;
+      if (Platform.OS === 'web') {
+        alert('Failed to vote: ' + message);
+      } else {
+        Alert.alert('Error', 'Failed to vote: ' + message);
+      }
+    } finally {
+      setIsVoting(null);
+    }
+  };
+
+  const totalVotes = proposals.reduce((sum, p) => sum + p.votesFor + p.votesAgainst, 0);
+  const activeCount = proposals.filter(p => p.status === 'active').length;
+
+  return (
+    <ScrollView
+      style={styles.governanceContainer}
+      refreshControl={
+        <RefreshControl refreshing={isLoading} onRefresh={fetchProposals} />
+      }
+    >
+      <View style={styles.govStats}>
+        <View style={styles.govStat}>
+          <Text style={styles.govStatNumber}>{proposals.length}</Text>
+          <Text style={styles.govStatLabel}>Proposals</Text>
+        </View>
+        <View style={styles.govStat}>
+          <Text style={styles.govStatNumber}>{activeCount}</Text>
+          <Text style={styles.govStatLabel}>Active</Text>
+        </View>
+        <View style={styles.govStat}>
+          <Text style={styles.govStatNumber}>{totalVotes}</Text>
+          <Text style={styles.govStatLabel}>Total Votes</Text>
+        </View>
+      </View>
+
+      {proposals.map((proposal) => (
+        <View key={proposal.id} style={styles.proposalCard}>
+          <View style={styles.proposalHeader}>
+            <Text style={styles.proposalTitle}>{proposal.title}</Text>
+            <View style={[
+              styles.statusBadge,
+              proposal.status === 'active' ? styles.statusActive : styles.statusPassed
+            ]}>
+              <Text style={styles.statusText}>
+                {proposal.status === 'active' ? '🗳️ Active' : '✅ Passed'}
+              </Text>
+            </View>
+          </View>
+          <Text style={styles.proposalDescription}>{proposal.description}</Text>
+          <View style={styles.voteBar}>
+            <View style={[styles.voteFor, { flex: proposal.votesFor || 1 }]} />
+            <View style={[styles.voteAgainst, { flex: proposal.votesAgainst || 1 }]} />
+          </View>
+          <View style={styles.voteStats}>
+            <Text style={styles.voteText}>👍 {proposal.votesFor}</Text>
+            <Text style={styles.voteText}>👎 {proposal.votesAgainst}</Text>
+            <Text style={styles.endDate}>Ends: {proposal.endDate}</Text>
+          </View>
+
+          {proposal.myVote && (
+            <View style={styles.votedBadge}>
+              <Text style={styles.votedText}>
+                You voted {proposal.myVote === 'for' ? '👍 For' : '👎 Against'}
+              </Text>
+            </View>
+          )}
+
+          {proposal.status === 'active' && !proposal.myVote && (
+            <View style={styles.voteButtons}>
+              <TouchableOpacity
+                style={[styles.voteForButton, isVoting === proposal.id && styles.buttonDisabled]}
+                onPress={() => handleVote(proposal.id, 'for')}
+                disabled={isVoting === proposal.id}
+              >
+                {isVoting === proposal.id ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.voteButtonText}>Vote For</Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.voteAgainstButton, isVoting === proposal.id && styles.buttonDisabled]}
+                onPress={() => handleVote(proposal.id, 'against')}
+                disabled={isVoting === proposal.id}
+              >
+                {isVoting === proposal.id ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.voteButtonText}>Vote Against</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      ))}
+
+      {proposals.length === 0 && !isLoading && (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyIcon}>🗳️</Text>
+          <Text style={styles.emptyText}>No proposals yet</Text>
+        </View>
+      )}
+    </ScrollView>
+  );
+}
+
+// ============================================================================
+// Identity Screen - View and share your SDIS identity
+// ============================================================================
+function IdentityScreen({ navigation, userDid, coopId }: { navigation: any; userDid: string; coopId: string }) {
+  const [proofType, setProofType] = useState<'membership' | 'age' | 'reputation'>('membership');
+  const [profile, setProfile] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const did = userDid || 'did:icn:unknown';
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      const client = getClient();
+      if (!client || !coopId || !userDid) return;
+
+      setIsLoading(true);
+      try {
+        const profileData = await client.getMemberProfile(coopId, userDid);
+        setProfile(profileData);
+      } catch (error) {
+        console.warn('Failed to fetch profile:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, [coopId, userDid]);
+
+  const formatMemberSince = (timestamp?: number) => {
+    if (!timestamp) return 'Unknown';
+    const now = Date.now();
+    const seconds = Math.floor((now - timestamp * 1000) / 1000);
+    const days = Math.floor(seconds / 86400);
+    const months = Math.floor(days / 30);
+    const years = Math.floor(days / 365);
+
+    if (years > 0) return `${years}y`;
+    if (months > 0) return `${months}mo`;
+    if (days > 0) return `${days}d`;
+    return 'New';
+  };
+
+  const proofTypes = [
+    { id: 'membership', label: 'Membership', icon: '🏠', desc: 'Prove you are a member' },
+    { id: 'age', label: 'Age (18+)', icon: '🔞', desc: 'Prove you are 18 or older' },
+    { id: 'reputation', label: 'Reputation', icon: '⭐', desc: 'Show your trust score' },
+  ];
+
+  return (
+    <ScrollView style={styles.identityContainer}>
+      {/* Identity Card */}
+      <View style={styles.identityCard}>
+        <View style={styles.identityAvatar}>
+          <Text style={styles.avatarText}>👤</Text>
+        </View>
+        <Text style={styles.identityName}>{profile?.name || 'Member'}</Text>
+        <Text style={styles.identityDid} selectable>{did}</Text>
+        {profile && (
+          <View style={styles.identityBadge}>
+            <Text style={styles.identityBadgeText}>
+              {profile.role === 'Steward' ? '👑 Steward' : 
+               profile.role === 'Facilitator' ? '⚙️ Facilitator' : 
+               '👥 Participant'}
+            </Text>
+          </View>
+        )}
+        <View style={styles.identityStats}>
+          <View style={styles.identityStat}>
+            <Text style={styles.identityStatValue}>
+              {profile?.trust_score?.toFixed(1) || '—'}
+            </Text>
+            <Text style={styles.identityStatLabel}>Trust Score</Text>
+          </View>
+          <View style={styles.identityStat}>
+            <Text style={styles.identityStatValue}>
+              {isLoading ? '...' : profile?.transaction_count || 0}
+            </Text>
+            <Text style={styles.identityStatLabel}>Transactions</Text>
+          </View>
+          <View style={styles.identityStat}>
+            <Text style={styles.identityStatValue}>
+              {isLoading ? '...' : formatMemberSince(profile?.joined_at)}
+            </Text>
+            <Text style={styles.identityStatLabel}>Member Since</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Proof Generation */}
+      <View style={styles.proofSection}>
+        <Text style={styles.sectionTitle}>Generate Proof</Text>
+        <Text style={styles.sectionSubtitle}>
+          Create a one-time proof to share with others
+        </Text>
+
+        {proofTypes.map((type) => (
+          <TouchableOpacity
+            key={type.id}
+            style={[
+              styles.proofTypeOption,
+              proofType === type.id && styles.proofTypeSelected
+            ]}
+            onPress={() => setProofType(type.id as any)}
+          >
+            <Text style={styles.proofTypeIcon}>{type.icon}</Text>
+            <View style={styles.proofTypeContent}>
+              <Text style={styles.proofTypeLabel}>{type.label}</Text>
+              <Text style={styles.proofTypeDesc}>{type.desc}</Text>
+            </View>
+            {proofType === type.id && <Text style={styles.checkmark}>✓</Text>}
+          </TouchableOpacity>
+        ))}
+
+        <TouchableOpacity style={styles.generateButton}>
+          <Text style={styles.generateButtonText}>Generate QR Proof</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Credentials */}
+      <View style={styles.credentialsSection}>
+        <Text style={styles.sectionTitle}>My Credentials</Text>
+        <View style={styles.credentialItem}>
+          <Text style={styles.credentialIcon}>📧</Text>
+          <View style={styles.credentialContent}>
+            <Text style={styles.credentialLabel}>Email Verified</Text>
+            <Text style={styles.credentialValue}>user@example.com</Text>
+          </View>
+          <Text style={styles.credentialStatus}>✅</Text>
+        </View>
+        <View style={styles.credentialItem}>
+          <Text style={styles.credentialIcon}>📱</Text>
+          <View style={styles.credentialContent}>
+            <Text style={styles.credentialLabel}>Phone Verified</Text>
+            <Text style={styles.credentialValue}>+1 (555) 123-4567</Text>
+          </View>
+          <Text style={styles.credentialStatus}>✅</Text>
+        </View>
+        <View style={styles.credentialItem}>
+          <Text style={styles.credentialIcon}>🏠</Text>
+          <View style={styles.credentialContent}>
+            <Text style={styles.credentialLabel}>Cooperative Member</Text>
+            <Text style={styles.credentialValue}>Since Dec 2023</Text>
+          </View>
+          <Text style={styles.credentialStatus}>✅</Text>
+        </View>
+      </View>
+    </ScrollView>
+  );
+}
+
+// ============================================================================
+// Verify Screen - Verify another member's identity
+// ============================================================================
+function VerifyScreen({ navigation }: { navigation: any }) {
+  const [verificationResult, setVerificationResult] = useState<null | {
+    valid: boolean;
+    level: number;
+    proof_type?: string;
+    warnings: string[];
+    verified_at: number;
+    did?: string;
+  }>(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [manualQrData, setManualQrData] = useState('');
+
+  const handleScan = async (qrData: string) => {
+    setIsScanning(true);
+    setError(null);
+
+    try {
+      const client = getClient();
+      if (!client) {
+        throw new Error('Wallet not ready. Please wait for initialization or restart the app.');
+      }
+
+      // Call SDIS verification API
+      const result = await client.verifyLevel1(qrData);
+      setVerificationResult(result);
+    } catch (err: any) {
+      console.error('Verification error:', err);
+      setError(err.message || 'Verification failed. Please try again.');
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  const simulateVerification = () => {
+    // For demo purposes - generate a test QR data
+    const testQrData = 'test-qr-data-base64';
+    handleScan(testQrData);
+  };
+
+  if (verificationResult) {
+    return (
+      <View style={styles.verifyResultContainer}>
+        <View style={[
+          styles.verifyResultCard,
+          verificationResult.valid ? styles.verifyValid : styles.verifyInvalid
+        ]}>
+          <Text style={styles.verifyResultIcon}>
+            {verificationResult.valid ? '✅' : '❌'}
+          </Text>
+          <Text style={styles.verifyResultTitle}>
+            {verificationResult.valid ? 'Verified!' : 'Invalid'}
+          </Text>
+
+          {verificationResult.valid && (
+            <>
+              {verificationResult.did && (
+                <Text style={styles.verifyResultDid}>{verificationResult.did}</Text>
+              )}
+
+              <View style={styles.verifyResultDetails}>
+                <View style={styles.verifyResultDetail}>
+                  <Text style={styles.verifyDetailLabel}>Verification Level</Text>
+                  <Text style={styles.verifyDetailValue}>Level {verificationResult.level}</Text>
+                </View>
+                {verificationResult.proof_type && (
+                  <View style={styles.verifyResultDetail}>
+                    <Text style={styles.verifyDetailLabel}>Proof Type</Text>
+                    <Text style={styles.verifyDetailValue}>{verificationResult.proof_type}</Text>
+                  </View>
+                )}
+              </View>
+
+              {verificationResult.warnings.length > 0 && (
+                <View style={styles.verifyWarnings}>
+                  <Text style={styles.verifyWarningTitle}>⚠️ Warnings:</Text>
+                  {verificationResult.warnings.map((warning, idx) => (
+                    <Text key={idx} style={styles.verifyWarningText}>• {warning}</Text>
+                  ))}
+                </View>
+              )}
+
+              <Text style={styles.verifyResultTime}>
+                Verified {new Date(verificationResult.verified_at * 1000).toLocaleString()}
+              </Text>
+            </>
+          )}
+        </View>
+
+        <TouchableOpacity
+          style={styles.primaryButton}
+          onPress={() => setVerificationResult(null)}
+        >
+          <Text style={styles.buttonText}>Scan Another</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.verifyContainer}>
+      {Platform.OS === 'web' ? (
+        <View style={styles.cameraPlaceholder}>
+          <Text style={styles.cameraIcon}>📷</Text>
+          <Text style={styles.cameraText}>Camera not available on web</Text>
+          <TouchableOpacity
+            style={[styles.primaryButton, { marginTop: 20 }]}
+            onPress={simulateVerification}
+          >
+            <Text style={styles.buttonText}>Simulate Scan</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={styles.cameraPlaceholder}>
+          <Text style={styles.cameraIcon}>📷</Text>
+          <Text style={styles.cameraText}>Point at identity QR code</Text>
+        </View>
+      )}
+
+      <View style={styles.verifyInstructions}>
+        <Text style={styles.instructionTitle}>How to verify</Text>
+        <Text style={styles.instructionText}>
+          1. Ask the person to show their identity QR code{'\n'}
+          2. Point your camera at the code{'\n'}
+          3. Wait for verification result
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+// ============================================================================
+// Verification History Screen
+// ============================================================================
+function VerificationHistoryScreen() {
+  const [history] = useState([
+    {
+      id: '1',
+      name: 'Bob Builder',
+      did: 'did:icn:bob123',
+      date: '2025-12-10',
+      type: 'Membership',
+      direction: 'verified', // you verified them
+    },
+    {
+      id: '2',
+      name: 'Carol Worker',
+      did: 'did:icn:carol456',
+      date: '2025-12-09',
+      type: 'Age (18+)',
+      direction: 'verified',
+    },
+    {
+      id: '3',
+      name: 'Dave Helper',
+      did: 'did:icn:dave789',
+      date: '2025-12-08',
+      type: 'Reputation',
+      direction: 'was_verified', // they verified you
+    },
+  ]);
+
+  return (
+    <ScrollView style={styles.historyContainer}>
+      <View style={styles.historyStats}>
+        <View style={styles.historyStat}>
+          <Text style={styles.historyStatNumber}>12</Text>
+          <Text style={styles.historyStatLabel}>You Verified</Text>
+        </View>
+        <View style={styles.historyStat}>
+          <Text style={styles.historyStatNumber}>8</Text>
+          <Text style={styles.historyStatLabel}>Verified You</Text>
+        </View>
+      </View>
+
+      {history.map((item) => (
+        <View key={item.id} style={styles.historyItem}>
+          <View style={styles.historyIcon}>
+            <Text style={styles.historyIconText}>
+              {item.direction === 'verified' ? '→' : '←'}
+            </Text>
+          </View>
+          <View style={styles.historyContent}>
+            <Text style={styles.historyName}>{item.name}</Text>
+            <Text style={styles.historyDid}>{item.did.slice(0, 20)}...</Text>
+            <Text style={styles.historyMeta}>
+              {item.type} • {item.date}
+            </Text>
+          </View>
+          <Text style={styles.historyStatus}>✅</Text>
+        </View>
+      ))}
+
+      {history.length === 0 && (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyIcon}>📋</Text>
+          <Text style={styles.emptyText}>No verifications yet</Text>
+        </View>
+      )}
+    </ScrollView>
+  );
+}
+
+// ============================================================================
+// Transactions Screen - Full transaction history
+// ============================================================================
+function TransactionsScreen({ coopId, userDid, navigation }: { coopId: string; userDid: string; navigation: any }) {
+  const [filter, setFilter] = useState<'all' | 'sent' | 'received'>('all');
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchTransactions = useCallback(async () => {
+    const client = getClient();
+    if (!client || !coopId) return;
+
+    setIsLoading(true);
+    try {
+      const historyResult = await client.getHistory(coopId, { limit: 50 });
+      if (historyResult?.transactions) {
+        const txs: Transaction[] = historyResult.transactions.map((tx: any, idx: number) => ({
+          id: tx.id || `tx-${idx}`,
+          type: tx.to === userDid ? 'received' : 'sent',
+          from: tx.from,
+          to: tx.to,
+          amount: tx.amount,
+          memo: tx.memo || '',
+          date: tx.timestamp ? new Date(tx.timestamp).toLocaleDateString() : 'Unknown',
+          timestamp: tx.timestamp || Date.now() / 1000,
+          currency: tx.currency || 'hours',
+        }));
+        setTransactions(txs);
+      }
+    } catch (e) {
+      console.warn('Failed to fetch transactions:', e);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [coopId, userDid]);
+
+  useEffect(() => {
+    fetchTransactions();
+  }, [fetchTransactions]);
+
+  const filteredTx = transactions.filter(tx => {
+    if (filter === 'all') return true;
+    return tx.type === filter;
+  });
+
+  const totalSent = transactions.filter(t => t.type === 'sent')
+    .reduce((sum, t) => sum + t.amount, 0);
+  const totalReceived = transactions.filter(t => t.type === 'received')
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const formatDid = (did: string) => {
+    if (!did) return 'Unknown';
+    if (did.length > 16) return `${did.slice(0, 10)}...${did.slice(-4)}`;
+    return did;
+  };
+
+  return (
+    <ScrollView
+      style={styles.transactionsContainer}
+      refreshControl={
+        <RefreshControl refreshing={isLoading} onRefresh={fetchTransactions} />
+      }
+    >
+      <View style={styles.txSummary}>
+        <View style={styles.txSummaryItem}>
+          <Text style={styles.txSummaryLabel}>Total Received</Text>
+          <Text style={[styles.txSummaryValue, styles.txAmountReceived]}>+{totalReceived}h</Text>
+        </View>
+        <View style={styles.txSummaryItem}>
+          <Text style={styles.txSummaryLabel}>Total Sent</Text>
+          <Text style={[styles.txSummaryValue, styles.txAmountSent]}>-{totalSent}h</Text>
+        </View>
+      </View>
+
+      <View style={styles.filterRow}>
+        {(['all', 'received', 'sent'] as const).map((f) => (
+          <TouchableOpacity
+            key={f}
+            style={[styles.filterButton, filter === f && styles.filterButtonActive]}
+            onPress={() => setFilter(f)}
+          >
+            <Text style={[styles.filterText, filter === f && styles.filterTextActive]}>
+              {f.charAt(0).toUpperCase() + f.slice(1)}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {filteredTx.map((tx) => (
+        <TouchableOpacity
+          key={tx.id}
+          style={styles.transactionItem}
+          onPress={() => navigation.navigate('TransactionDetail', {
+            transaction: {
+              id: tx.id,
+              from: tx.from,
+              to: tx.to,
+              amount: tx.amount,
+              memo: tx.memo,
+              timestamp: tx.timestamp,
+              currency: tx.currency,
+            }
+          })}
+          activeOpacity={0.7}
+        >
+          <View style={[
+            styles.txIcon,
+            tx.type === 'received' ? styles.txIconReceived : styles.txIconSent
+          ]}>
+            <Text style={styles.txIconText}>{tx.type === 'received' ? '↓' : '↑'}</Text>
+          </View>
+          <View style={styles.txContent}>
+            <Text style={styles.txPerson}>
+              {tx.type === 'received' ? `From ${formatDid(tx.from)}` : `To ${formatDid(tx.to)}`}
+            </Text>
+            {tx.memo ? <Text style={styles.txMemo}>{tx.memo}</Text> : null}
+          </View>
+          <View style={styles.txAmountContainer}>
+            <Text style={[
+              styles.txAmount,
+              tx.type === 'received' ? styles.txAmountReceived : styles.txAmountSent
+            ]}>
+              {tx.type === 'received' ? '+' : '-'}{tx.amount}h
+            </Text>
+            <Text style={styles.txDate}>{tx.date}</Text>
+          </View>
+          <Text style={styles.txChevron}>›</Text>
+        </TouchableOpacity>
+      ))}
+
+      {filteredTx.length === 0 && !isLoading && (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyIcon}>📭</Text>
+          <Text style={styles.emptyText}>No transactions found</Text>
+        </View>
+      )}
+    </ScrollView>
+  );
+}
+
+// ============================================================================
+// Settings Screen - App preferences
+// ============================================================================
+function SettingsScreen({ onLogout, userDid }: { onLogout: () => void; userDid: string }) {
+  const [notifications, setNotifications] = useState(true);
+  const [biometrics, setBiometrics] = useState(false);
+  const did = userDid || 'did:icn:unknown';
+
+  const handleExportKeys = async () => {
+    if (Platform.OS === 'web') {
+      alert('Key export would be initiated here. In production, this would securely export your keys.');
+    } else {
+      Alert.alert(
+        'Export Keys',
+        'This will export your private keys. Keep them secure!',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Export', onPress: () => Alert.alert('Exported', 'Keys exported successfully') }
+        ]
+      );
+    }
+  };
+
+  return (
+    <ScrollView style={styles.settingsContainer}>
+      <View style={styles.settingsSection}>
+        <Text style={styles.settingsSectionTitle}>Account</Text>
+
+        <View style={styles.settingsItem}>
+          <View style={styles.settingsItemContent}>
+            <Text style={styles.settingsItemLabel}>Your DID</Text>
+            <Text style={styles.settingsItemValue} numberOfLines={1}>
+              {did.slice(0, 25)}...
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={async () => {
+              await copyToClipboard(did);
+              if (Platform.OS === 'web') {
+                alert('DID copied!');
+              } else {
+                Alert.alert('Copied', 'DID copied to clipboard');
+              }
+            }}
+          >
+            <Text style={styles.settingsAction}>Copy</Text>
+          </TouchableOpacity>
+        </View>
+
+        <TouchableOpacity style={styles.settingsItem} onPress={handleExportKeys}>
+          <View style={styles.settingsItemContent}>
+            <Text style={styles.settingsItemLabel}>Export Keys</Text>
+            <Text style={styles.settingsItemDescription}>Backup your private keys</Text>
+          </View>
+          <Text style={styles.settingsArrow}>›</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.settingsSection}>
+        <Text style={styles.settingsSectionTitle}>Preferences</Text>
+
+        <View style={styles.settingsItem}>
+          <View style={styles.settingsItemContent}>
+            <Text style={styles.settingsItemLabel}>Push Notifications</Text>
+            <Text style={styles.settingsItemDescription}>Receive payment alerts</Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.toggle, notifications && styles.toggleOn]}
+            onPress={() => setNotifications(!notifications)}
+          >
+            <View style={[styles.toggleThumb, notifications && styles.toggleThumbOn]} />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.settingsItem}>
+          <View style={styles.settingsItemContent}>
+            <Text style={styles.settingsItemLabel}>Biometric Auth</Text>
+            <Text style={styles.settingsItemDescription}>Use fingerprint or face ID</Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.toggle, biometrics && styles.toggleOn]}
+            onPress={() => setBiometrics(!biometrics)}
+          >
+            <View style={[styles.toggleThumb, biometrics && styles.toggleThumbOn]} />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={styles.settingsSection}>
+        <Text style={styles.settingsSectionTitle}>About</Text>
+
+        <View style={styles.settingsItem}>
+          <View style={styles.settingsItemContent}>
+            <Text style={styles.settingsItemLabel}>Version</Text>
+          </View>
+          <Text style={styles.settingsValue}>0.1.0</Text>
+        </View>
+
+        <View style={styles.settingsItem}>
+          <View style={styles.settingsItemContent}>
+            <Text style={styles.settingsItemLabel}>Network</Text>
+          </View>
+          <Text style={styles.settingsValue}>ICN Testnet</Text>
+        </View>
+      </View>
+
+      <TouchableOpacity style={styles.dangerButton} onPress={onLogout}>
+        <Text style={styles.dangerButtonText}>Logout</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={styles.dangerButtonOutline}>
+        <Text style={styles.dangerButtonOutlineText}>Delete Account</Text>
+      </TouchableOpacity>
+
+      <Text style={styles.settingsFooter}>
+        InterCooperative Network{'\n'}
+        Building the cooperative economy
+      </Text>
+    </ScrollView>
+  );
+}
+
+// ============================================================================
+// Biometric Lock Screen
+// ============================================================================
+function BiometricLockScreen({ onUnlock }: { onUnlock: () => void }) {
+  const [error, setError] = useState<string | null>(null);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
+
+  const handleBiometricAuth = async () => {
+    if (Platform.OS === 'web') {
+      onUnlock();
+      return;
+    }
+
+    setIsAuthenticating(true);
+    setError(null);
+
+    try {
+      const LocalAuthentication = await import('expo-local-authentication');
+
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: 'Unlock Coop Wallet',
+        fallbackLabel: 'Use passcode',
+        cancelLabel: 'Cancel',
+      });
+
+      if (result.success) {
+        onUnlock();
+      } else {
+        setError('Authentication failed. Please try again.');
+      }
+    } catch (err) {
+      console.error('Biometric auth error:', err);
+      setError('Authentication failed. Please try again.');
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
+
+  return (
+    <View style={styles.biometricContainer}>
+      <View style={styles.biometricContent}>
+        <Text style={styles.biometricIcon}>🔒</Text>
+        <Text style={styles.biometricTitle}>Wallet Locked</Text>
+        <Text style={styles.biometricSubtitle}>
+          Use your fingerprint or face to unlock
+        </Text>
+
+        <TouchableOpacity
+          style={[styles.biometricButton, isAuthenticating && styles.buttonDisabled]}
+          onPress={handleBiometricAuth}
+          disabled={isAuthenticating}
+        >
+          {isAuthenticating ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <>
+              <Text style={styles.biometricButtonIcon}>🔓</Text>
+              <Text style={styles.buttonText}>Unlock</Text>
+            </>
+          )}
+        </TouchableOpacity>
+
+        {error && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorIcon}>⚠️</Text>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
+
+        <TouchableOpacity
+          style={styles.skipButton}
+          onPress={onUnlock}
+        >
+          <Text style={styles.skipButtonText}>Skip for now</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+// ============================================================================
+// Initialization Error Screen
+// ============================================================================
+interface InitErrorInfo {
+  message: string;
+  code: string;
+  retriable: boolean;
+  details?: string;
+}
+
+function InitializationErrorScreen({
+  error,
+  onRetry,
+  onReset
+}: {
+  error: InitErrorInfo | null;
+  onRetry: () => void;
+  onReset: () => void;
+}) {
+  const [isRetrying, setIsRetrying] = useState(false);
+
+  const handleRetry = async () => {
+    setIsRetrying(true);
+    await onRetry();
+    setIsRetrying(false);
+  };
+
+  return (
+    <View style={styles.initErrorContainer}>
+      <View style={styles.initErrorContent}>
+        <Text style={styles.initErrorIcon}>⚠️</Text>
+        <Text style={styles.initErrorTitle}>Unable to Start</Text>
+        <Text style={styles.initErrorMessage}>
+          {error?.message || 'Failed to initialize the app'}
+        </Text>
+        {error?.details && (
+          <Text style={styles.initErrorDetails}>
+            Details: {error.details}
+          </Text>
+        )}
+
+        <View style={styles.initErrorActions}>
+          {(error?.retriable !== false) && (
+            <TouchableOpacity
+              style={[styles.initErrorButton, styles.initErrorPrimaryButton]}
+              onPress={handleRetry}
+              disabled={isRetrying}
+            >
+              {isRetrying ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.initErrorButtonText}>Try Again</Text>
+              )}
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity
+            style={[styles.initErrorButton, styles.initErrorSecondaryButton]}
+            onPress={onReset}
+          >
+            <Text style={[styles.initErrorButtonText, { color: '#666' }]}>
+              Reset Wallet
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <Text style={styles.initErrorHint}>
+          If problems persist, try resetting your wallet. This will generate new keys.
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+// ============================================================================
+// Navigation Setup
+// ============================================================================
+
+// Transaction type for navigation params
+export interface TransactionParam {
+  id: string;
+  from: string;
+  to: string;
+  amount: number;
+  currency: string;
+  memo?: string;
+  timestamp: number;
+}
+
+export type RootStackParamList = {
+  Login: {
+    coopId?: string;
+    gateway?: string;
+    coopName?: string;
+    // Enrollment params (when scanning enrollment QR)
+    enrollmentId?: string;
+    challenge?: string;
+    isEnrollment?: boolean;
+  } | undefined;
+  Home: undefined;
+  Payment: { recipient?: string; amount?: string; memo?: string; recipientDid?: string } | undefined;
+  Scan: { mode?: 'all' | 'payment' | 'contact' | 'join' | 'enrollment' } | undefined;
+  Receive: undefined;
+  Governance: undefined;
+  Identity: undefined;
+  Verify: undefined;
+  VerificationHistory: undefined;
+  Transactions: undefined;
+  TransactionDetail: { transaction: TransactionParam };
+  Settings: undefined;
+  TrustAttestation: { targetDid?: string; targetName?: string } | undefined;
+  Proposal: { proposalId: string };
+  History: undefined;
+  MemberProfile: { memberDid: string };
+  Contacts: undefined;
+  // Steward screens
+  StewardDashboard: undefined;
+  EnrollmentDetail: { enrollmentId: string };
+  VouchConfirmation: { enrollmentId: string; identityName: string };
+  VouchHistory: undefined;
+};
+
+const Stack = createNativeStackNavigator<RootStackParamList>();
+
+export default function App() {
+  const [isReady, setIsReady] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isBiometricLocked, setIsBiometricLocked] = useState(false);
+  const [coopId, setCoopId] = useState<string>('');
+  const [userDid, setUserDid] = useState<string>('');
+  const [initFailed, setInitFailed] = useState(false);
+  const [initError, setInitError] = useState<InitErrorInfo | null>(null);
+
+  const handleInitRetry = useCallback(async () => {
+    setInitFailed(false);
+    setInitError(null);
+
+    try {
+      const success = await retryInitialization();
+      if (success) {
+        const client = getClient();
+        if (client?.authState?.isAuthenticated) {
+          setIsAuthenticated(true);
+          setCoopId(client.authState.coopId || '');
+          setUserDid(client.authState.did || '');
+        }
+      } else {
+        setInitFailed(true);
+        setInitError(getLastInitError());
+      }
+    } catch (error) {
+      console.error('Retry init error:', error);
+      setInitFailed(true);
+      setInitError({
+        message: 'Retry failed',
+        code: 'RETRY_ERROR',
+        retriable: true,
+        details: (error as Error).message,
+      });
+    }
+  }, []);
+
+  const handleInitReset = useCallback(async () => {
+    resetClientState();
+
+    // Clear localStorage on web
+    if (Platform.OS === 'web') {
+      try {
+        localStorage.clear();
+        console.log('localStorage cleared');
+      } catch (e) {
+        console.error('Failed to clear localStorage:', e);
+      }
+    }
+
+    // Retry initialization
+    setInitFailed(false);
+    setInitError(null);
+
+    const success = await initializeClient();
+    if (!success) {
+      setInitFailed(true);
+      setInitError(getLastInitError());
+    }
+  }, []);
+
+  useEffect(() => {
+    async function init() {
+      console.log('App init starting...');
+      try {
+        console.log('Calling initializeClient...');
+        // Add timeout to prevent infinite hang
+        const timeoutPromise = new Promise<boolean>((_, reject) =>
+          setTimeout(() => reject(new Error('Init timeout after 15s')), 15000)
+        );
+        const success = await Promise.race([initializeClient(), timeoutPromise]);
+        console.log('initializeClient completed, success:', success);
+
+        if (!success) {
+          console.log('Initialization failed');
+          setInitFailed(true);
+          setInitError(getLastInitError());
+          setIsReady(true);
+          return;
+        }
+
+        const client = getClient();
+        console.log('Client:', client ? 'exists' : 'null');
+        if (client?.authState?.isAuthenticated) {
+          console.log('User is authenticated');
+          
+          // Check if biometric auth is available and enabled
+          if (Platform.OS !== 'web') {
+            try {
+              const LocalAuthentication = await import('expo-local-authentication');
+              const hasHardware = await LocalAuthentication.hasHardwareAsync();
+              const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+              
+              if (hasHardware && isEnrolled) {
+                console.log('Biometric available, requiring unlock');
+                setIsBiometricLocked(true);
+              }
+            } catch (error) {
+              console.warn('Biometric check failed:', error);
+            }
+          }
+          
+          setIsAuthenticated(true);
+          setCoopId(client.authState.coopId || '');
+          setUserDid(client.authState.did || '');
+        } else {
+          console.log('User not authenticated, authState:', client?.authState);
+        }
+      } catch (error) {
+        console.error('Init error:', error);
+        // Still mark as ready so user can see login screen
+      } finally {
+        console.log('Setting isReady=true');
+        setIsReady(true);
+      }
+    }
+    init();
+  }, []);
+
+  const handleLogin = (coop: string, did: string) => {
+    setCoopId(coop);
+    setUserDid(did);
+    setIsAuthenticated(true);
+  };
+
+  const handleLogout = async () => {
+    const client = getClient();
+    if (client) {
+      try {
+        await client.logout();
+      } catch (e) {
+        console.error('Logout error:', e);
+      }
+    }
+    setIsAuthenticated(false);
+    setCoopId('');
+    setUserDid('');
+  };
+
+  if (!isReady) {
+    return (
+      <View style={styles.loading}>
+        <ActivityIndicator size="large" color="#4A90A4" />
+        <Text style={styles.loadingText}>Loading...</Text>
+      </View>
+    );
+  }
+
+  // Show initialization error screen if init failed
+  if (initFailed) {
+    return (
+      <InitializationErrorScreen
+        error={initError}
+        onRetry={handleInitRetry}
+        onReset={handleInitReset}
+      />
+    );
+  }
+
+  // Show biometric lock if authenticated but locked
+  if (isAuthenticated && isBiometricLocked) {
+    return <BiometricLockScreen onUnlock={() => setIsBiometricLocked(false)} />;
+  }
+
+  return (
+    <ThemeProvider>
+      <ICNProvider client={getClient()}>
+        <NavigationContainer>
+        <StatusBar style="auto" />
+        <Stack.Navigator
+          screenOptions={{
+            headerStyle: { backgroundColor: '#4A90A4' },
+            headerTintColor: '#fff',
+            headerTitleStyle: { fontWeight: 'bold' },
+          }}
+        >
+        {!isAuthenticated ? (
+          <Stack.Screen name="Login" options={{ headerShown: false }}>
+            {() => <LoginScreen onLogin={handleLogin} />}
+          </Stack.Screen>
+        ) : (
+          <>
+            <Stack.Screen name="Home" options={{ title: 'Coop Wallet' }}>
+              {({ navigation }) => (
+                <HomeScreen
+                  navigation={navigation}
+                  coopId={coopId}
+                  userDid={userDid}
+                  onLogout={handleLogout}
+                />
+              )}
+            </Stack.Screen>
+            <Stack.Screen name="Payment" options={{ title: 'Send Payment' }}>
+              {({ navigation, route }) => (
+                <PaymentScreen navigation={navigation} route={route} coopId={coopId} userDid={userDid} />
+              )}
+            </Stack.Screen>
+            <Stack.Screen name="Scan" options={{ title: 'Scan QR Code' }}>
+              {({ navigation }) => (
+                <ScanScreen navigation={navigation} coopId={coopId} userDid={userDid} />
+              )}
+            </Stack.Screen>
+            <Stack.Screen name="Receive" options={{ title: 'Receive Payment' }}>
+              {() => <ReceiveScreen userDid={userDid} coopId={coopId} />}
+            </Stack.Screen>
+            <Stack.Screen name="Governance" options={{ title: 'Governance' }}>
+              {() => <GovernanceScreen coopId={coopId} />}
+            </Stack.Screen>
+            <Stack.Screen name="Identity" options={{ title: 'My Identity' }}>
+              {({ navigation }) => <IdentityScreen navigation={navigation} userDid={userDid} coopId={coopId} />}
+            </Stack.Screen>
+            <Stack.Screen name="Verify" component={VerifyScreen} options={{ title: 'Verify Identity' }} />
+            <Stack.Screen name="VerificationHistory" component={VerificationHistoryScreen} options={{ title: 'History' }} />
+            <Stack.Screen name="Transactions" options={{ title: 'Transactions' }}>
+              {({ navigation }) => <TransactionsScreen coopId={coopId} userDid={userDid} navigation={navigation} />}
+            </Stack.Screen>
+            <Stack.Screen
+              name="TransactionDetail"
+              component={TransactionDetailScreen}
+              options={{ title: 'Transaction Details' }}
+            />
+            <Stack.Screen name="Settings" options={{ title: 'Settings' }}>
+              {() => <SettingsScreen onLogout={handleLogout} userDid={userDid} />}
+            </Stack.Screen>
+            <Stack.Screen
+              name="TrustAttestation"
+              component={TrustAttestationScreen}
+              options={{ title: 'Trust Attestation' }}
+            />
+            <Stack.Screen name="MemberProfile" options={{ title: 'Member Profile' }}>
+              {({ route }) => (
+                <MemberProfileScreen
+                  client={getClient()!}
+                  coopId={coopId}
+                  memberDid={(route.params as any)?.memberDid || userDid}
+                  userDid={userDid}
+                />
+              )}
+            </Stack.Screen>
+            <Stack.Screen name="Contacts" options={{ title: 'Contacts' }}>
+              {() => <ContactsScreen client={getClient()!} coopId={coopId} />}
+            </Stack.Screen>
+            <Stack.Screen
+              name="StewardDashboard"
+              component={StewardDashboardScreen}
+              options={{ title: 'Steward Dashboard' }}
+            />
+            <Stack.Screen
+              name="EnrollmentDetail"
+              component={EnrollmentDetailScreen}
+              options={{ title: 'Enrollment Details' }}
+            />
+            <Stack.Screen
+              name="VouchConfirmation"
+              component={VouchConfirmationScreen}
+              options={{ title: 'Confirm Vouch' }}
+            />
+            <Stack.Screen
+              name="VouchHistory"
+              component={VouchHistoryScreen}
+              options={{ title: 'Vouch History' }}
+            />
+          </>
+        )}
+        </Stack.Navigator>
+        </NavigationContainer>
+      </ICNProvider>
+    </ThemeProvider>
+  );
+}
+
+// ============================================================================
+// Styles
+// ============================================================================
+
+const styles = StyleSheet.create({
+  // Loading
+  loading: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#666',
+  },
+
+  // Biometric lock screen
+  biometricContainer: {
+    flex: 1,
+    backgroundColor: '#4A90A4',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  biometricContent: {
+    alignItems: 'center',
+    padding: 32,
+  },
+  biometricIcon: {
+    fontSize: 80,
+    marginBottom: 24,
+  },
+  biometricTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 8,
+  },
+  biometricSubtitle: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.9)',
+    marginBottom: 48,
+    textAlign: 'center',
+  },
+  biometricButton: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    minWidth: 200,
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  biometricButtonIcon: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  skipButton: {
+    marginTop: 24,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+  },
+  skipButtonText: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 14,
+  },
+
+  // Initialization Error
+  initErrorContainer: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  initErrorContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 32,
+    alignItems: 'center',
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  initErrorIcon: {
+    fontSize: 64,
+    marginBottom: 16,
+  },
+  initErrorTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  initErrorMessage: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  initErrorDetails: {
+    fontSize: 12,
+    color: '#999',
+    marginBottom: 24,
+    textAlign: 'center',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  initErrorActions: {
+    width: '100%',
+    gap: 12,
+    marginBottom: 16,
+  },
+  initErrorButton: {
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  initErrorPrimaryButton: {
+    backgroundColor: '#4A90A4',
+  },
+  initErrorSecondaryButton: {
+    backgroundColor: '#f0f0f0',
+  },
+  initErrorButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  initErrorHint: {
+    fontSize: 12,
+    color: '#999',
+    textAlign: 'center',
+    marginTop: 8,
+  },
+
+  // Login
+  loginContainer: {
+    flex: 1,
+    backgroundColor: '#4A90A4',
+  },
+  loginContent: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: 24,
+  },
+  loginTitle: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: '#fff',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  loginSubtitle: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.8)',
+    textAlign: 'center',
+    marginBottom: 48,
+  },
+  loginForm: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 24,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  input: {
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    padding: 16,
+    fontSize: 16,
+    marginBottom: 16,
+  },
+  primaryButton: {
+    backgroundColor: '#4A90A4',
+    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+  },
+  secondaryButton: {
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  buttonDisabled: {
+    opacity: 0.7,
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  errorContainer: {
+    backgroundColor: '#ffebee',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#e53935',
+  },
+  errorIcon: {
+    fontSize: 24,
+    marginBottom: 8,
+  },
+  errorText: {
+    color: '#c62828',
+    fontSize: 14,
+    marginBottom: 4,
+    fontWeight: '500',
+  },
+  errorHint: {
+    color: '#e53935',
+    fontSize: 12,
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
+  footerText: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 24,
+  },
+
+  // Home
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  balanceCard: {
+    backgroundColor: '#4A90A4',
+    margin: 16,
+    padding: 24,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+  balanceLabel: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 14,
+  },
+  balanceAmount: {
+    color: '#fff',
+    fontSize: 48,
+    fontWeight: 'bold',
+    marginVertical: 8,
+  },
+  balanceCurrency: {
+    fontSize: 24,
+    fontWeight: 'normal',
+  },
+  coopName: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 16,
+    marginTop: 8,
+  },
+  didText: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 12,
+    marginTop: 4,
+  },
+
+  // Actions Grid
+  actionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    padding: 8,
+    justifyContent: 'center',
+  },
+  actionButton: {
+    width: '45%',
+    backgroundColor: '#fff',
+    margin: 8,
+    padding: 20,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  actionIcon: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
+  actionLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+
+  // Sections
+  section: {
+    margin: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 12,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  menuIcon: {
+    fontSize: 24,
+    marginRight: 16,
+  },
+  menuContent: {
+    flex: 1,
+  },
+  menuLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  menuDescription: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
+  menuArrow: {
+    fontSize: 24,
+    color: '#ccc',
+  },
+
+  // Logout
+  logoutButton: {
+    margin: 16,
+    padding: 16,
+    alignItems: 'center',
+  },
+  logoutText: {
+    color: '#e53935',
+    fontSize: 16,
+  },
+
+  // Form styles
+  formContainer: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  formScroll: {
+    padding: 16,
+  },
+  formSection: {
+    marginBottom: 20,
+  },
+  amountInput: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    fontSize: 32,
+    textAlign: 'center',
+    fontWeight: 'bold',
+  },
+  memoInput: {
+    height: 100,
+    textAlignVertical: 'top',
+  },
+  sendButton: {
+    marginTop: 20,
+  },
+
+  // Success screen
+  successContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    padding: 24,
+  },
+  successIcon: {
+    fontSize: 80,
+    marginBottom: 20,
+  },
+  successTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 16,
+  },
+  successAmount: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: '#4A90A4',
+  },
+  successRecipient: {
+    fontSize: 18,
+    color: '#666',
+    marginTop: 8,
+  },
+  successMemo: {
+    fontSize: 16,
+    color: '#999',
+    fontStyle: 'italic',
+    marginTop: 12,
+  },
+
+  // Receive screen
+  receiveContainer: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+    padding: 16,
+  },
+  qrCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+  },
+  qrTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 20,
+  },
+  qrPlaceholder: {
+    width: 200,
+    height: 200,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  qrPlaceholderText: {
+    fontSize: 64,
+  },
+  qrPlaceholderLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 8,
+  },
+  qrData: {
+    fontSize: 10,
+    color: '#999',
+    marginTop: 4,
+  },
+  didDisplay: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    width: '100%',
+  },
+  didLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 4,
+  },
+  didValue: {
+    fontSize: 12,
+    color: '#333',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  copyButton: {
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 16,
+    alignItems: 'center',
+  },
+  copyButtonText: {
+    fontSize: 16,
+    color: '#4A90A4',
+    fontWeight: '600',
+  },
+  shareButton: {
+    backgroundColor: '#4A90A4',
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  shareButtonText: {
+    fontSize: 16,
+    color: '#fff',
+    fontWeight: '600',
+  },
+
+  // Scan screen
+  scanContainer: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  camera: {
+    flex: 1,
+    minHeight: 400,
+  },
+  scanOverlay: {
+    flex: 1,
+    backgroundColor: 'transparent',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scanFrame: {
+    width: 250,
+    height: 250,
+    borderWidth: 2,
+    borderColor: '#4A90A4',
+    borderRadius: 12,
+    backgroundColor: 'transparent',
+  },
+  scanInstructions: {
+    fontSize: 16,
+    color: '#fff',
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 20,
+    textAlign: 'center',
+  },
+  scanAgainButton: {
+    backgroundColor: '#4A90A4',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 20,
+  },
+  scanAgainText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  cameraPlaceholder: {
+    flex: 1,
+    backgroundColor: '#1a1a2e',
+    justifyContent: 'center',
+    alignItems: 'center',
+    minHeight: 300,
+  },
+  cameraIcon: {
+    fontSize: 64,
+    marginBottom: 16,
+  },
+  cameraText: {
+    fontSize: 18,
+    color: '#fff',
+  },
+  manualEntrySection: {
+    padding: 16,
+  },
+
+  // Governance screen
+  governanceContainer: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  govStats: {
+    flexDirection: 'row',
+    backgroundColor: '#4A90A4',
+    padding: 20,
+    justifyContent: 'space-around',
+  },
+  govStat: {
+    alignItems: 'center',
+  },
+  govStatNumber: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  govStatLabel: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 4,
+  },
+  proposalCard: {
+    backgroundColor: '#fff',
+    margin: 16,
+    marginBottom: 8,
+    padding: 16,
+    borderRadius: 12,
+  },
+  proposalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  proposalTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    flex: 1,
+    marginRight: 8,
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusActive: {
+    backgroundColor: '#e3f2fd',
+  },
+  statusPassed: {
+    backgroundColor: '#e8f5e9',
+  },
+  statusText: {
+    fontSize: 12,
+  },
+  proposalDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 12,
+  },
+  voteBar: {
+    flexDirection: 'row',
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  voteFor: {
+    backgroundColor: '#4caf50',
+  },
+  voteAgainst: {
+    backgroundColor: '#f44336',
+  },
+  voteStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  voteText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  endDate: {
+    fontSize: 12,
+    color: '#999',
+  },
+  voteButtons: {
+    flexDirection: 'row',
+    marginTop: 12,
+    gap: 8,
+  },
+  voteForButton: {
+    flex: 1,
+    backgroundColor: '#4caf50',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  voteAgainstButton: {
+    flex: 1,
+    backgroundColor: '#f44336',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  voteButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+
+  // Identity screen
+  identityContainer: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  identityCard: {
+    backgroundColor: '#4A90A4',
+    padding: 24,
+    alignItems: 'center',
+  },
+  identityAvatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  avatarText: {
+    fontSize: 40,
+  },
+  identityName: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 8,
+  },
+  identityDid: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  identityBadge: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  identityBadgeText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  identityStats: {
+    flexDirection: 'row',
+    marginTop: 20,
+    justifyContent: 'space-around',
+    width: '100%',
+  },
+  identityStat: {
+    alignItems: 'center',
+  },
+  identityStatValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  identityStatLabel: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 4,
+  },
+  proofSection: {
+    padding: 16,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 16,
+  },
+  proofTypeOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  proofTypeSelected: {
+    borderWidth: 2,
+    borderColor: '#4A90A4',
+  },
+  proofTypeIcon: {
+    fontSize: 32,
+    marginRight: 16,
+  },
+  proofTypeContent: {
+    flex: 1,
+  },
+  proofTypeLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  proofTypeDesc: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
+  checkmark: {
+    fontSize: 24,
+    color: '#4A90A4',
+    fontWeight: 'bold',
+  },
+  generateButton: {
+    backgroundColor: '#4A90A4',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  generateButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  credentialsSection: {
+    padding: 16,
+  },
+  credentialItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  credentialIcon: {
+    fontSize: 24,
+    marginRight: 16,
+  },
+  credentialContent: {
+    flex: 1,
+  },
+  credentialLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+  credentialValue: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
+  credentialStatus: {
+    fontSize: 20,
+  },
+
+  // Verify screen
+  verifyContainer: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  verifyInstructions: {
+    padding: 16,
+  },
+  instructionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 12,
+  },
+  instructionText: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 24,
+  },
+  verifyResultContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    padding: 24,
+  },
+  verifyResultCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 32,
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: 24,
+  },
+  verifyValid: {
+    borderWidth: 3,
+    borderColor: '#4caf50',
+  },
+  verifyInvalid: {
+    borderWidth: 3,
+    borderColor: '#f44336',
+  },
+  verifyResultIcon: {
+    fontSize: 64,
+    marginBottom: 16,
+  },
+  verifyResultTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 16,
+  },
+  verifyResultName: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#333',
+  },
+  verifyResultDid: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  verifyResultDetails: {
+    flexDirection: 'row',
+    marginTop: 24,
+    justifyContent: 'space-around',
+    width: '100%',
+  },
+  verifyResultDetail: {
+    alignItems: 'center',
+  },
+  verifyDetailLabel: {
+    fontSize: 12,
+    color: '#666',
+  },
+  verifyDetailValue: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginTop: 4,
+  },
+  verifyWarnings: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: '#FFF3E0',
+    borderRadius: 8,
+    width: '100%',
+  },
+  verifyWarningTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#E65100',
+    marginBottom: 8,
+  },
+  verifyWarningText: {
+    fontSize: 13,
+    color: '#E65100',
+    marginBottom: 4,
+  },
+  verifyResultTime: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 16,
+  },
+
+  // History screen
+  historyContainer: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  historyStats: {
+    flexDirection: 'row',
+    backgroundColor: '#4A90A4',
+    padding: 20,
+    justifyContent: 'space-around',
+  },
+  historyStat: {
+    alignItems: 'center',
+  },
+  historyStatNumber: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  historyStatLabel: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 4,
+  },
+  historyItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    margin: 16,
+    marginBottom: 8,
+    padding: 16,
+    borderRadius: 12,
+  },
+  historyIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  historyIconText: {
+    fontSize: 18,
+    color: '#666',
+  },
+  historyContent: {
+    flex: 1,
+  },
+  historyName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  historyDid: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 2,
+  },
+  historyMeta: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+  },
+  historyStatus: {
+    fontSize: 20,
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 48,
+  },
+  emptyIcon: {
+    fontSize: 64,
+    marginBottom: 16,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+  },
+
+  // Transaction styles (Home)
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  seeAllLink: {
+    fontSize: 14,
+    color: '#4A90A4',
+    fontWeight: '600',
+  },
+  transactionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  txIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  txIconReceived: {
+    backgroundColor: '#e8f5e9',
+  },
+  txIconSent: {
+    backgroundColor: '#ffebee',
+  },
+  txIconText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  txContent: {
+    flex: 1,
+  },
+  txPerson: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+  txMemo: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
+  txAmountContainer: {
+    alignItems: 'flex-end',
+  },
+  txAmount: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  txAmountReceived: {
+    color: '#4caf50',
+  },
+  txAmountSent: {
+    color: '#f44336',
+  },
+  txDate: {
+    fontSize: 10,
+    color: '#999',
+    marginTop: 2,
+  },
+  txChevron: {
+    fontSize: 20,
+    color: '#ccc',
+    marginLeft: 8,
+  },
+
+  // QR Code styles
+  qrWrapper: {
+    marginBottom: 20,
+    alignItems: 'center',
+  },
+  qrFallback: {
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  qrFallbackText: {
+    fontSize: 24,
+    letterSpacing: 4,
+  },
+  requestAmount: {
+    backgroundColor: '#e3f2fd',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginBottom: 16,
+  },
+  requestAmountLabel: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+  },
+  requestAmountValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#4A90A4',
+    textAlign: 'center',
+  },
+  copyButtonSuccess: {
+    backgroundColor: '#4caf50',
+  },
+  copyButtonTextSuccess: {
+    color: '#fff',
+  },
+
+  // Voted badge
+  votedBadge: {
+    backgroundColor: '#e3f2fd',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  votedText: {
+    fontSize: 14,
+    color: '#4A90A4',
+    fontWeight: '600',
+  },
+
+  // Transactions screen
+  transactionsContainer: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  txSummary: {
+    flexDirection: 'row',
+    backgroundColor: '#4A90A4',
+    padding: 20,
+    justifyContent: 'space-around',
+  },
+  txSummaryItem: {
+    alignItems: 'center',
+  },
+  txSummaryLabel: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
+  },
+  txSummaryValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginTop: 4,
+  },
+  filterRow: {
+    flexDirection: 'row',
+    padding: 16,
+    gap: 8,
+  },
+  filterButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+  },
+  filterButtonActive: {
+    backgroundColor: '#4A90A4',
+  },
+  filterText: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '600',
+  },
+  filterTextActive: {
+    color: '#fff',
+  },
+
+  // Settings screen
+  settingsContainer: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  settingsSection: {
+    marginTop: 24,
+  },
+  settingsSectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+    marginLeft: 16,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+  },
+  settingsItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  settingsItemContent: {
+    flex: 1,
+  },
+  settingsItemLabel: {
+    fontSize: 16,
+    color: '#333',
+  },
+  settingsItemValue: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
+  settingsItemDescription: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 2,
+  },
+  settingsAction: {
+    fontSize: 14,
+    color: '#4A90A4',
+    fontWeight: '600',
+  },
+  settingsArrow: {
+    fontSize: 24,
+    color: '#ccc',
+  },
+  settingsValue: {
+    fontSize: 14,
+    color: '#666',
+  },
+  toggle: {
+    width: 50,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#ccc',
+    padding: 2,
+    justifyContent: 'center',
+  },
+  toggleOn: {
+    backgroundColor: '#4A90A4',
+  },
+  toggleThumb: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#fff',
+  },
+  toggleThumbOn: {
+    alignSelf: 'flex-end',
+  },
+  dangerButton: {
+    backgroundColor: '#f44336',
+    margin: 16,
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  dangerButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  dangerButtonOutline: {
+    borderWidth: 1,
+    borderColor: '#f44336',
+    marginHorizontal: 16,
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  dangerButtonOutlineText: {
+    color: '#f44336',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  settingsFooter: {
+    fontSize: 12,
+    color: '#999',
+    textAlign: 'center',
+    marginTop: 32,
+    marginBottom: 48,
+    lineHeight: 20,
+  },
+
+  // Toast notification
+  toastContainer: {
+    position: 'absolute',
+    top: 60,
+    left: 16,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+    zIndex: 1000,
+  },
+  toastIcon: {
+    fontSize: 20,
+    marginRight: 12,
+  },
+  toastMessage: {
+    flex: 1,
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+});

@@ -1,0 +1,39 @@
+[package]
+name = "icn-privacy"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+# Encryption
+chacha20poly1305.workspace = true
+x25519-dalek.workspace = true
+
+# Hashing & Random
+sha2.workspace = true
+rand.workspace = true
+rand_core.workspace = true
+
+# Serialization
+serde.workspace = true
+icn-encoding = { path = "../icn-encoding" }
+
+# Error handling
+anyhow.workspace = true
+thiserror.workspace = true
+
+# Logging
+tracing.workspace = true
+
+# Metrics
+icn-obs.workspace = true
+
+# ICN crates
+icn-identity.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true
+
+[lints]
+workspace = true

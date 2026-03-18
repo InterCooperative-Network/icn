@@ -1,0 +1,230 @@
+Found 5 scenarios
+
+================================================================================
+
+================================================================================
+SCENARIO: baseline.json
+================================================================================
+Loading scenario: scenarios/baseline.json
+Scenario: Baseline Scenario
+Description: Default parameters with no demurrage or special interventions. Establishes baseline for comparison.
+
+Running simulation: 100 agents, 12 months
+
+Month 1/12: 54 txns, velocity=0.0, defaults=0
+Month 2/12: 1337 txns, velocity=8026.5, defaults=0
+Month 3/12: 2404 txns, velocity=7235.5, defaults=0
+Month 4/12: 3500 txns, velocity=7035.3, defaults=0
+Month 5/12: 4610 txns, velocity=7015.1, defaults=0
+Month 6/12: 5706 txns, velocity=6954.3, defaults=0
+Month 7/12: 6852 txns, velocity=6969.9, defaults=0
+Month 8/12: 7961 txns, velocity=6976.0, defaults=0
+Month 9/12: 9036 txns, velocity=6920.0, defaults=0
+Month 10/12: 10121 txns, velocity=6903.2, defaults=0
+Month 11/12: 11242 txns, velocity=6898.1, defaults=0
+Month 12/12: 12332 txns, velocity=6887.3, defaults=0
+
+Simulation complete!
+Total transactions: 13359
+Default rate: 0.93%
+Final Gini: 0.48
+
+Exporting results to results/baseline/
+Results exported to results/baseline/
+
+=== Summary ===
+Total transactions: 13359
+Average velocity: 6862.3 credits/month
+Default rate: 0.93%
+Gini coefficient: 0.48
+Hoarding index: 22.73%
+Agents in default: 0
+Average trust: 0.50
+
+=== Failure Mode Detection ===
+✅ No critical failure modes detected
+
+
+================================================================================
+SCENARIO: dynamic_limits.json
+================================================================================
+Loading scenario: scenarios/dynamic_limits.json
+Scenario: Dynamic Credit Limits
+Description: Trust-gated credit limits with 2x multiplier to prevent gaming and reward trustworthiness.
+
+Running simulation: 100 agents, 12 months
+
+Month 1/12: 54 txns, velocity=0.0, defaults=0
+Month 2/12: 1337 txns, velocity=8026.5, defaults=0
+Month 3/12: 2404 txns, velocity=7235.5, defaults=0
+Month 4/12: 3500 txns, velocity=7035.3, defaults=0
+Month 5/12: 4610 txns, velocity=7015.1, defaults=0
+Month 6/12: 5706 txns, velocity=6954.3, defaults=0
+Month 7/12: 6852 txns, velocity=6969.9, defaults=0
+Month 8/12: 7961 txns, velocity=6976.0, defaults=0
+Month 9/12: 9036 txns, velocity=6920.0, defaults=0
+Month 10/12: 10121 txns, velocity=6903.2, defaults=0
+Month 11/12: 11242 txns, velocity=6898.1, defaults=0
+Month 12/12: 12332 txns, velocity=6887.3, defaults=0
+
+Simulation complete!
+Total transactions: 13359
+Default rate: 0.93%
+Final Gini: 0.48
+
+Exporting results to results/dynamic_limits/
+Results exported to results/dynamic_limits/
+
+=== Summary ===
+Total transactions: 13359
+Average velocity: 6862.3 credits/month
+Default rate: 0.93%
+Gini coefficient: 0.48
+Hoarding index: 22.73%
+Agents in default: 0
+Average trust: 0.50
+
+=== Failure Mode Detection ===
+✅ No critical failure modes detected
+
+
+================================================================================
+SCENARIO: high_demurrage.json
+================================================================================
+Loading scenario: scenarios/high_demurrage.json
+Scenario: High Demurrage
+Description: Tests 2% monthly demurrage to prevent hoarding and increase velocity.
+
+Running simulation: 100 agents, 12 months
+
+Month 1/12: 54 txns, velocity=0.0, defaults=0
+Month 2/12: 1337 txns, velocity=8026.5, defaults=0
+Month 3/12: 2404 txns, velocity=7235.5, defaults=0
+Month 4/12: 3500 txns, velocity=7035.3, defaults=0
+Month 5/12: 4610 txns, velocity=7015.1, defaults=0
+Month 6/12: 5706 txns, velocity=6954.3, defaults=0
+Month 7/12: 6852 txns, velocity=6969.9, defaults=0
+Month 8/12: 7961 txns, velocity=6976.0, defaults=0
+Month 9/12: 9036 txns, velocity=6920.0, defaults=0
+Month 10/12: 10121 txns, velocity=6903.2, defaults=0
+Month 11/12: 11242 txns, velocity=6898.1, defaults=0
+Month 12/12: 12332 txns, velocity=6887.3, defaults=0
+
+Simulation complete!
+Total transactions: 13359
+Default rate: 0.93%
+Final Gini: 0.48
+
+Exporting results to results/high_demurrage/
+Results exported to results/high_demurrage/
+
+=== Summary ===
+Total transactions: 13359
+Average velocity: 6862.3 credits/month
+Default rate: 0.93%
+Gini coefficient: 0.48
+Hoarding index: 22.73%
+Agents in default: 0
+Average trust: 0.50
+
+=== Failure Mode Detection ===
+✅ No critical failure modes detected
+
+
+================================================================================
+SCENARIO: high_free_riders.json
+================================================================================
+Loading scenario: scenarios/high_free_riders.json
+Scenario: High Free-Rider Ratio
+Description: Stress test with 20% free-riders to find system breaking point.
+
+Running simulation: 100 agents, 12 months
+
+Month 1/12: 55 txns, velocity=0.0, defaults=0
+Month 2/12: 1337 txns, velocity=7915.5, defaults=0
+Month 3/12: 2398 txns, velocity=7139.0, defaults=0
+Month 4/12: 3401 txns, velocity=6862.3, defaults=0
+Month 5/12: 4429 txns, velocity=6722.4, defaults=0
+Month 6/12: 5403 txns, velocity=6608.5, defaults=0
+Month 7/12: 6407 txns, velocity=6546.0, defaults=0
+Month 8/12: 7383 txns, velocity=6469.6, defaults=0
+Month 9/12: 8423 txns, velocity=6449.8, defaults=0
+Month 10/12: 9384 txns, velocity=6397.9, defaults=0
+Month 11/12: 10400 txns, velocity=6380.7, defaults=0
+Month 12/12: 11397 txns, velocity=6361.4, defaults=0
+
+Simulation complete!
+Total transactions: 12378
+Default rate: 1.48%
+Final Gini: 0.49
+
+Exporting results to results/high_free_riders/
+Results exported to results/high_free_riders/
+
+=== Summary ===
+Total transactions: 12378
+Average velocity: 6349.9 credits/month
+Default rate: 1.48%
+Gini coefficient: 0.49
+Hoarding index: 35.25%
+Agents in default: 0
+Average trust: 0.49
+
+=== Failure Mode Detection ===
+✅ No critical failure modes detected
+
+
+================================================================================
+SCENARIO: low_trust.json
+================================================================================
+Loading scenario: scenarios/low_trust.json
+Scenario: Low Trust Environment
+Description: Sparse trust network (30% density) to test if economy can function with low social capital.
+
+Running simulation: 100 agents, 12 months
+
+Month 1/12: 58 txns, velocity=0.0, defaults=0
+Month 2/12: 1376 txns, velocity=7973.5, defaults=0
+Month 3/12: 2491 txns, velocity=7525.0, defaults=0
+Month 4/12: 3584 txns, velocity=7270.2, defaults=0
+Month 5/12: 4738 txns, velocity=7293.2, defaults=0
+Month 6/12: 5846 txns, velocity=7233.0, defaults=0
+Month 7/12: 6949 txns, velocity=7157.4, defaults=0
+Month 8/12: 8056 txns, velocity=7111.0, defaults=0
+Month 9/12: 9169 txns, velocity=7076.3, defaults=0
+Month 10/12: 10281 txns, velocity=7064.7, defaults=0
+Month 11/12: 11431 txns, velocity=7068.4, defaults=0
+Month 12/12: 12528 txns, velocity=7049.0, defaults=0
+
+Simulation complete!
+Total transactions: 13575
+Default rate: 0.93%
+Final Gini: 0.49
+
+Exporting results to results/low_trust/
+Results exported to results/low_trust/
+
+=== Summary ===
+Total transactions: 13575
+Average velocity: 7024.0 credits/month
+Default rate: 0.93%
+Gini coefficient: 0.49
+Hoarding index: 19.62%
+Agents in default: 0
+Average trust: 0.51
+
+=== Failure Mode Detection ===
+✅ No critical failure modes detected
+
+
+================================================================================
+COMPARATIVE SUMMARY
+================================================================================
+
+Scenario             Velocity     Default%   Gini     Hoarding%   
+--------------------------------------------------------------------------------
+baseline                  6862.3      0.9%    0.48       22.7%
+dynamic_limits            6862.3      0.9%    0.48       22.7%
+high_demurrage            6862.3      0.9%    0.48       22.7%
+high_free_riders          6349.9      1.5%    0.49       35.2%
+low_trust                 7024.0      0.9%    0.49       19.6%

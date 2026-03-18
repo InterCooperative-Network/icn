@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ICN Node Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="dashboard">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <h1>🌐 ICN</h1>
+                <p>Node Dashboard</p>
+            </div>
+            <nav class="nav">
+                <a href="#overview" class="nav-item active" data-view="overview">
+                    <span class="icon">📊</span> Overview
+                </a>
+                <a href="#network" class="nav-item" data-view="network">
+                    <span class="icon">🔗</span> Network
+                </a>
+                <a href="#ledger" class="nav-item" data-view="ledger">
+                    <span class="icon">💰</span> Ledger
+                </a>
+                <a href="#governance" class="nav-item" data-view="governance">
+                    <span class="icon">🗳️</span> Governance
+                </a>
+                <a href="#compute" class="nav-item" data-view="compute">
+                    <span class="icon">⚙️</span> Compute
+                </a>
+                <a href="#federation" class="nav-item" data-view="federation">
+                    <span class="icon">🤝</span> Federation
+                </a>
+                <a href="#metrics" class="nav-item" data-view="metrics">
+                    <span class="icon">📈</span> Metrics
+                </a>
+                <a href="#logs" class="nav-item" data-view="logs">
+                    <span class="icon">📋</span> Logs
+                </a>
+                <a href="#settings" class="nav-item" data-view="settings">
+                    <span class="icon">⚙️</span> Settings
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="content">
+            <!-- Header -->
+            <header class="header">
+                <div class="header-left">
+                    <h2 id="view-title">Overview</h2>
+                </div>
+                <div class="header-right">
+                    <div class="status-badge" id="node-status">
+                        <span class="status-dot status-unknown"></span>
+                        <span>Connecting...</span>
+                    </div>
+                    <div class="node-info">
+                        <span class="node-did" id="node-did">Not connected</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Overview View -->
+            <div id="overview-view" class="view active">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">👥</div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="peer-count">--</div>
+                            <div class="stat-label">Connected Peers</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">💳</div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="ledger-entries">--</div>
+                            <div class="stat-label">Ledger Entries</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">🗳️</div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="active-proposals">--</div>
+                            <div class="stat-label">Active Proposals</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">⚙️</div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="compute-tasks">--</div>
+                            <div class="stat-label">Compute Tasks</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <h3>Network Activity</h3>
+                        <div id="network-chart" class="chart-placeholder">
+                            <p>Loading network data...</p>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Ledger Volume</h3>
+                        <div id="ledger-chart" class="chart-placeholder">
+                            <p>Loading ledger data...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="recent-activity">
+                    <h3>Recent Activity</h3>
+                    <div id="activity-feed" class="activity-list">
+                        <p class="loading">Loading recent activity...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Network View -->
+            <div id="network-view" class="view">
+                <div class="section-header">
+                    <h3>Connected Peers</h3>
+                    <button class="btn btn-secondary" onclick="app.refreshPeers()">Refresh</button>
+                </div>
+                <div id="peers-list" class="data-table">
+                    <p class="loading">Loading peers...</p>
+                </div>
+            </div>
+
+            <!-- Ledger View -->
+            <div id="ledger-view" class="view">
+                <div class="section-header">
+                    <h3>Ledger Entries</h3>
+                    <div class="filters">
+                        <select id="ledger-filter" onchange="app.filterLedger(this.value)">
+                            <option value="all">All Entries</option>
+                            <option value="today">Today</option>
+                            <option value="week">This Week</option>
+                            <option value="month">This Month</option>
+                        </select>
+                        <button class="btn btn-secondary" onclick="app.exportLedger()">Export CSV</button>
+                    </div>
+                </div>
+                <div id="ledger-list" class="data-table">
+                    <p class="loading">Loading ledger entries...</p>
+                </div>
+            </div>
+
+            <!-- Governance View -->
+            <div id="governance-view" class="view">
+                <div class="section-header">
+                    <h3>Governance Proposals</h3>
+                    <button class="btn btn-primary" onclick="app.showCreateProposal()">New Proposal</button>
+                </div>
+                <div id="proposals-list" class="proposals-grid">
+                    <p class="loading">Loading proposals...</p>
+                </div>
+            </div>
+
+            <!-- Compute View -->
+            <div id="compute-view" class="view">
+                <div class="section-header">
+                    <h3>Compute Tasks</h3>
+                    <div class="filters">
+                        <select id="task-filter" onchange="app.filterTasks(this.value)">
+                            <option value="all">All Tasks</option>
+                            <option value="queued">Queued</option>
+                            <option value="running">Running</option>
+                            <option value="completed">Completed</option>
+                            <option value="failed">Failed</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="tasks-list" class="data-table">
+                    <p class="loading">Loading compute tasks...</p>
+                </div>
+            </div>
+
+            <!-- Federation View -->
+            <div id="federation-view" class="view">
+                <div class="section-header">
+                    <h3>Federated Cooperatives</h3>
+                    <button class="btn btn-secondary" onclick="app.refreshFederation()">Refresh</button>
+                </div>
+                <div id="federation-list" class="data-table">
+                    <p class="loading">Loading federation info...</p>
+                </div>
+            </div>
+
+            <!-- Metrics View -->
+            <div id="metrics-view" class="view">
+                <h3>System Metrics</h3>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <h4>Gossip Performance</h4>
+                        <div class="metric-value" id="gossip-msgs">--</div>
+                        <div class="metric-label">Messages/sec</div>
+                    </div>
+                    <div class="metric-card">
+                        <h4>Trust Graph Size</h4>
+                        <div class="metric-value" id="trust-edges">--</div>
+                        <div class="metric-label">Trust Edges</div>
+                    </div>
+                    <div class="metric-card">
+                        <h4>Storage Used</h4>
+                        <div class="metric-value" id="storage-used">--</div>
+                        <div class="metric-label">MB</div>
+                    </div>
+                    <div class="metric-card">
+                        <h4>Network Bandwidth</h4>
+                        <div class="metric-value" id="bandwidth">--</div>
+                        <div class="metric-label">KB/s</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Logs View -->
+            <div id="logs-view" class="view">
+                <div class="section-header">
+                    <h3>System Logs</h3>
+                    <div class="filters">
+                        <select id="log-level" onchange="app.filterLogs(this.value)">
+                            <option value="all">All Levels</option>
+                            <option value="error">Error</option>
+                            <option value="warn">Warning</option>
+                            <option value="info" selected>Info</option>
+                            <option value="debug">Debug</option>
+                        </select>
+                        <button class="btn btn-secondary" onclick="app.clearLogs()">Clear</button>
+                    </div>
+                </div>
+                <div id="logs-container" class="logs-terminal">
+                    <p class="loading">Loading logs...</p>
+                </div>
+            </div>
+
+            <!-- Settings View -->
+            <div id="settings-view" class="view">
+                <h3>Node Settings</h3>
+                <div class="settings-form">
+                    <div class="form-group">
+                        <label>Gateway API Endpoint</label>
+                        <input type="text" id="api-endpoint" value="http://localhost:8000" />
+                    </div>
+                    <div class="form-group">
+                        <label>WebSocket Endpoint</label>
+                        <input type="text" id="ws-endpoint" value="ws://localhost:8000/ws" />
+                    </div>
+                    <div class="form-group">
+                        <label>Refresh Interval (seconds)</label>
+                        <input type="number" id="refresh-interval" value="5" min="1" max="60" />
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="auto-refresh" checked />
+                            Auto-refresh data
+                        </label>
+                    </div>
+                    <button class="btn btn-primary" onclick="app.saveSettings()">Save Settings</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>

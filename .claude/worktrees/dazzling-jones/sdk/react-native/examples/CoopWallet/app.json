@@ -1,0 +1,47 @@
+{
+  "expo": {
+    "name": "Coop Wallet",
+    "slug": "icn",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#4A90A4"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "org.icn.coopwallet"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#4A90A4"
+      },
+      "package": "org.icn.coopwallet",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Coop Wallet to access your camera to scan QR codes for payments."
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "093b8861-b40a-4c15-8bb9-6dbd2902e7fb"
+      }
+    },
+    "owner": "fahertyms-organization"
+  }
+}

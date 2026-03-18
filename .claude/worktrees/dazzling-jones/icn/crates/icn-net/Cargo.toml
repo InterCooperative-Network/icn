@@ -1,0 +1,61 @@
+[package]
+name = "icn-net"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[features]
+default = []
+post-quantum = ["icn-identity/post-quantum", "icn-crypto-pq"]
+
+[dependencies]
+tokio.workspace = true
+quinn.workspace = true
+rustls.workspace = true
+tokio-rustls.workspace = true
+mdns-sd.workspace = true
+icn-identity.workspace = true
+icn-encoding = { path = "../icn-encoding" }
+icn-crypto-pq = { path = "../icn-crypto-pq", optional = true }
+icn-time = { path = "../icn-time" }
+icn-gossip.workspace = true
+icn-kernel-api = { path = "../icn-kernel-api" }
+icn-store.workspace = true
+icn-obs.workspace = true
+icn-snapshot.workspace = true
+icn-security.workspace = true
+icn-privacy.workspace = true
+sha2.workspace = true
+serde.workspace = true
+serde_json = "1.0"
+anyhow.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+bytes.workspace = true
+futures.workspace = true
+rcgen = "0.14"
+time = "0.3"
+ed25519-dalek.workspace = true
+x25519-dalek.workspace = true
+chacha20poly1305.workspace = true
+zeroize.workspace = true
+hostname = "0.4"
+x509-parser = "0.18"
+rand = "0.8"
+bitflags = "2.4"
+zstd = "0.13"
+
+[dev-dependencies]
+icn-store.workspace = true
+tracing-subscriber.workspace = true
+rand_core.workspace = true
+criterion = "0.5"
+tempfile = "3.24"
+portpicker.workspace = true
+
+[[bench]]
+name = "net_bench"
+harness = false
+
+[lints]
+workspace = true

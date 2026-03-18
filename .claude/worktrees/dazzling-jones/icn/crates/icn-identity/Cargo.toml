@@ -1,0 +1,52 @@
+[package]
+name = "icn-identity"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[features]
+default = []
+post-quantum = []
+hsm = ["cryptoki"]
+# TPM backend is not implemented - requires explicit experimental flag
+tpm-experimental = ["tss-esapi"]
+
+[dependencies]
+tokio.workspace = true
+ed25519-dalek.workspace = true
+x25519-dalek.workspace = true
+rand_core.workspace = true
+rand.workspace = true
+zeroize.workspace = true
+serde.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+icn-obs.workspace = true
+icn-crypto-pq.workspace = true
+icn-time.workspace = true
+icn-encoding = { path = "../icn-encoding" }
+multibase = "0.9"
+age = "0.11"
+secrecy = "0.10"
+serde_json = "1.0"
+base64 = "0.22"
+rcgen.workspace = true
+sha2.workspace = true
+rustls.workspace = true
+pem.workspace = true
+hex = "0.4"
+lru = "0.16"
+utoipa = { version = "5.4.0", optional = true }
+
+# HSM support (optional)
+cryptoki = { version = "0.12", optional = true }
+
+# TPM support (optional)
+tss-esapi = { version = "7.6", optional = true }
+
+[dev-dependencies]
+tempfile = "3.24"
+
+[lints]
+workspace = true

@@ -1,0 +1,67 @@
+# ICN Daemon Docker Image
+#
+# Build from repo root (context = repo root):
+#   docker build -f deploy/Dockerfile.icnd -t icn/icnd .
+
+FROM rust:1.88-slim as builder
+
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    protobuf-compiler \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+# Build-time provenance args
+ARG GIT_SHA=unknown
+ARG BUILD_TIME=unknown
+
+# Copy workspace and external app crates (context is repo root)
+COPY icn/Cargo.toml icn/Cargo.lock icn/rust-toolchain.toml ./icn/
+COPY icn/crates ./icn/crates
+COPY icn/bins ./icn/bins
+COPY icn/apps ./icn/apps
+COPY apps ./apps
+
+WORKDIR /build/icn
+
+# Build release binaries
+# RUST_MIN_STACK: Increase rustc stack size to prevent SIGSEGV on complex crates
+# -j 2: Limit parallelism to reduce peak memory usage
+ENV RUST_MIN_STACK=33554432
+ENV GIT_SHA=${GIT_SHA}
+ENV BUILD_TIME=${BUILD_TIME}
+RUN cargo build --release --bin icnd --bin icnctl --features wasm -j 2
+
+# Runtime image
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy binaries
+COPY --from=builder /build/icn/target/release/icnd /usr/local/bin/
+COPY --from=builder /build/icn/target/release/icnctl /usr/local/bin/
+
+# Copy devnet entrypoint script
+COPY deploy/devnet/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+# Create data directory
+RUN mkdir -p /root/.icn
+
+# Expose ports: 8000=gateway, 9000=p2p
+EXPOSE 8000 9000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8000/v1/health || exit 1
+
+# Run icnd
+ENTRYPOINT ["icnd"]
+CMD ["--config", "/root/.icn/icn.toml"]

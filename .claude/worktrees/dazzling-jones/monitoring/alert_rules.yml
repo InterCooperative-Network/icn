@@ -1,0 +1,271 @@
+# Prometheus Alert Rules for ICN Internal Testing
+# Phase 18: Byzantine Fault Detection + Governance
+
+groups:
+  # Byzantine Detection Alerts
+  - name: byzantine_detection
+    interval: 10s
+    rules:
+      - alert: ByzantineNodeQuarantined
+        expr: icn_misbehavior_quarantined_peers > 0
+        for: 1m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "Byzantine node quarantined"
+          description: "{{ $value }} nodes have been quarantined due to misbehavior on {{ $labels.instance }}"
+
+      - alert: ByzantineNodeAutoBanned
+        expr: increase(icn_misbehavior_auto_bans_total[5m]) > 0
+        labels:
+          severity: critical
+          component: security
+        annotations:
+          summary: "Critical violation auto-ban triggered"
+          description: "A node has been auto-banned for critical Byzantine violations on {{ $labels.instance }}"
+
+      - alert: HighViolationRate
+        expr: rate(icn_misbehavior_violations_total[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "High Byzantine violation rate detected"
+          description: "{{ $value }} violations/sec detected on {{ $labels.instance }}"
+
+      - alert: MultipleViolationTypes
+        expr: count by (instance) (rate(icn_misbehavior_violations_total[10m]) > 0) > 2
+        for: 2m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "Multiple violation types detected"
+          description: "{{ $value }} different violation types active on {{ $labels.instance }}"
+
+  # Network Health Alerts
+  - name: network_health
+    interval: 10s
+    rules:
+      - alert: NetworkPartitionSuspected
+        expr: icn_network_connections_active < 2
+        for: 2m
+        labels:
+          severity: warning
+          component: network
+        annotations:
+          summary: "Possible network partition"
+          description: "{{ $labels.instance }} has only {{ $value }} active connections (expected: 2+)"
+
+      - alert: HighMessageFailureRate
+        expr: rate(icn_network_messages_failed_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: network
+        annotations:
+          summary: "High message failure rate"
+          description: "{{ $value }} messages/sec failing on {{ $labels.instance }}"
+
+      - alert: NoNetworkConnections
+        expr: icn_network_connections_active == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: network
+        annotations:
+          summary: "Node is isolated from network"
+          description: "{{ $labels.instance }} has no active network connections"
+
+      - alert: HighRateLimitingRate
+        expr: rate(icn_network_messages_rate_limited_total[5m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+          component: network
+        annotations:
+          summary: "High rate limiting activity"
+          description: "{{ $value }} messages/sec being rate-limited on {{ $labels.instance }}"
+
+  # Ledger Consistency Alerts
+  - name: ledger_consistency
+    interval: 30s
+    rules:
+      - alert: LedgerEntriesQuarantined
+        expr: icn_ledger_entries_quarantined > 0
+        for: 1m
+        labels:
+          severity: critical
+          component: ledger
+        annotations:
+          summary: "Ledger entries quarantined"
+          description: "{{ $value }} ledger entries in quarantine on {{ $labels.instance }} (possible fork attack)"
+
+      - alert: HighLedgerEntryRate
+        expr: rate(icn_ledger_entries_total[1m]) > 100
+        for: 5m
+        labels:
+          severity: info
+          component: ledger
+        annotations:
+          summary: "High ledger transaction rate"
+          description: "{{ $value }} entries/sec on {{ $labels.instance }} (may indicate load test or attack)"
+
+      - alert: LedgerBalanceInconsistency
+        expr: abs(icn_ledger_balances_total) > 0.01
+        labels:
+          severity: critical
+          component: ledger
+        annotations:
+          summary: "Ledger balance sum non-zero"
+          description: "Sum of all balances = {{ $value }} on {{ $labels.instance }} (should be 0 for double-entry)"
+
+  # Gossip Performance Alerts
+  - name: gossip_performance
+    interval: 15s
+    rules:
+      - alert: GossipHighLatency
+        expr: histogram_quantile(0.99, rate(icn_gossip_latency_seconds_bucket[5m])) > 1.0
+        for: 5m
+        labels:
+          severity: warning
+          component: gossip
+        annotations:
+          summary: "High gossip message latency"
+          description: "P99 gossip latency = {{ $value }}s on {{ $labels.instance }} (target: <0.5s)"
+
+      - alert: GossipMessageLoss
+        expr: rate(icn_gossip_messages_lost_total[5m]) > 0.01
+        for: 5m
+        labels:
+          severity: warning
+          component: gossip
+        annotations:
+          summary: "Gossip message loss detected"
+          description: "{{ $value }} messages/sec lost on {{ $labels.instance }}"
+
+  # Compute Layer Alerts
+  - name: compute_layer
+    interval: 15s
+    rules:
+      - alert: ComputeTaskTimeout
+        expr: rate(icn_compute_tasks_timeout_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: compute
+        annotations:
+          summary: "Compute tasks timing out"
+          description: "{{ $value }} tasks/sec timing out on {{ $labels.instance }}"
+
+      - alert: ComputeSignatureFailures
+        expr: rate(icn_compute_signatures_invalid_total[5m]) > 0
+        labels:
+          severity: critical
+          component: compute
+        annotations:
+          summary: "Invalid compute result signatures detected"
+          description: "{{ $value }} invalid signatures/sec on {{ $labels.instance }} (possible Byzantine executor)"
+
+      - alert: ComputeHighFailureRate
+        expr: rate(icn_compute_tasks_failed_total[5m]) / rate(icn_compute_tasks_completed_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: compute
+        annotations:
+          summary: "High compute task failure rate"
+          description: "{{ $value | humanizePercentage }} of tasks failing on {{ $labels.instance }}"
+
+  # Governance Alerts
+  - name: governance
+    interval: 30s
+    rules:
+      - alert: GovernanceProposalRejectedQuorum
+        expr: increase(icn_governance_proposals_rejected_total{reason="quorum"}[1h]) > 3
+        labels:
+          severity: warning
+          component: governance
+        annotations:
+          summary: "Multiple proposals failing quorum"
+          description: "{{ $value }} proposals rejected for insufficient quorum in the last hour on {{ $labels.instance }}"
+
+      - alert: GovernanceHighProposalRate
+        expr: rate(icn_governance_proposals_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: info
+          component: governance
+        annotations:
+          summary: "High governance proposal creation rate"
+          description: "{{ $value }} proposals/sec being created on {{ $labels.instance }} (may indicate spam)"
+
+      - alert: GovernanceNoActivity
+        expr: increase(icn_governance_votes_total[1h]) == 0 and icn_governance_proposals_total{state="open"} > 0
+        for: 1h
+        labels:
+          severity: info
+          component: governance
+        annotations:
+          summary: "No governance activity despite open proposals"
+          description: "{{ $labels.instance }} has open proposals but no votes cast in 1 hour"
+
+  # System Resource Alerts
+  - name: system_resources
+    interval: 30s
+    rules:
+      - alert: HighMemoryUsage
+        expr: process_resident_memory_bytes / (1024^3) > 2
+        for: 10m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High memory usage"
+          description: "{{ $labels.instance }} using {{ $value }}GB RAM (threshold: 2GB)"
+
+      - alert: MemoryLeak
+        expr: rate(process_resident_memory_bytes[1h]) > 1024^2
+        for: 1h
+        labels:
+          severity: critical
+          component: system
+        annotations:
+          summary: "Possible memory leak detected"
+          description: "Memory growing at {{ $value | humanize }}B/sec on {{ $labels.instance }}"
+
+      - alert: HighCPUUsage
+        expr: rate(process_cpu_seconds_total[5m]) > 0.8
+        for: 10m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High CPU usage"
+          description: "{{ $labels.instance }} using {{ $value | humanizePercentage }} CPU"
+
+  # Monitoring System Alerts
+  - name: monitoring
+    interval: 30s
+    rules:
+      - alert: PrometheusTargetDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: monitoring
+        annotations:
+          summary: "Prometheus target is down"
+          description: "{{ $labels.instance }} is unreachable by Prometheus"
+
+      - alert: PrometheusScrapeDurationHigh
+        expr: scrape_duration_seconds > 5
+        for: 5m
+        labels:
+          severity: warning
+          component: monitoring
+        annotations:
+          summary: "Prometheus scrape taking too long"
+          description: "Scraping {{ $labels.instance }} takes {{ $value }}s (threshold: 5s)"

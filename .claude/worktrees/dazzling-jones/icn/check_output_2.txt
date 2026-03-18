@@ -1,0 +1,58 @@
+warning: unused import: `icn_identity::Did`
+ --> crates/icn-store/src/notifications.rs:2:5
+  |
+2 | use icn_identity::Did;
+  |     ^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `Context`
+ --> crates/icn-store/src/recurring_payments.rs:1:14
+  |
+1 | use anyhow::{Context, Result};
+  |              ^^^^^^^
+
+warning: unused import: `std::time::SystemTime`
+ --> crates/icn-store/src/recurring_payments.rs:4:5
+  |
+4 | use std::time::SystemTime;
+  |     ^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `Context`
+ --> crates/icn-store/src/escrow.rs:1:14
+  |
+1 | use anyhow::{Context, Result};
+  |              ^^^^^^^
+
+warning: `icn-store` (lib) generated 4 warnings (run `cargo fix --lib -p icn-store` to apply 4 suggestions)
+    Checking icn-gateway v0.1.0 (/home/matt/projects/icn/icn/crates/icn-gateway)
+warning: unused imports: `Deserialize` and `Serialize`
+ --> crates/icn-gateway/src/notification_processor.rs:8:13
+  |
+8 | use serde::{Deserialize, Serialize};
+  |             ^^^^^^^^^^^  ^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unexpected `cfg` condition value: `sled-storage`
+    --> crates/icn-gateway/src/commons_store.rs:1193:11
+     |
+1193 |     #[cfg(feature = "sled-storage")]
+     |           ^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: expected values for `feature` are: `default`
+     = help: consider adding `sled-storage` as a feature in `Cargo.toml`
+     = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+     = note: `#[warn(unexpected_cfgs)]` on by default
+
+warning: `icn-gateway` (lib) generated 1 warning (run `cargo fix --lib -p icn-gateway` to apply 1 suggestion)
+warning: function `create_test_processor` is never used
+   --> crates/icn-gateway/src/api/notifications.rs:259:8
+    |
+259 |     fn create_test_processor() -> Arc<NotificationProcessor> {
+    |        ^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` on by default
+
+warning: `icn-gateway` (lib test) generated 3 warnings (1 duplicate)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.37s

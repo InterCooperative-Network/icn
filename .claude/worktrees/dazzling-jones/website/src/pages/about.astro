@@ -1,0 +1,207 @@
+---
+// src/pages/about.astro — About ICN
+import Layout from '../layouts/Layout.astro';
+import fs from 'node:fs';
+import { renderMarkdown } from '../lib/markdown';
+import { resolveRepoDoc } from '../lib/paths';
+
+// VISION.md from repo root docs/
+const visionPath = resolveRepoDoc('VISION.md');
+let visionHtml = '';
+if (fs.existsSync(visionPath)) {
+  visionHtml = renderMarkdown(fs.readFileSync(visionPath, 'utf-8'));
+}
+---
+
+<Layout title="About" activeNav="about">
+  <section class="section" style="padding-top: calc(64px + var(--space-3xl));">
+    <div class="container">
+      <div class="about-hero">
+        <span class="badge badge-purple">About the Project</span>
+        <h1>InterCooperative Network</h1>
+        <p class="about-lead">
+          ICN treats systemic transformation as an infrastructure challenge. We're building the 
+          substrate that lets cooperatives, communities, and federations govern themselves 
+          democratically and coordinate economically — without extractive platforms or central authorities.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section-alt">
+    <div class="container">
+      <div class="grid grid-2" style="gap: var(--space-2xl);">
+        <div>
+          <h2>What is ICN?</h2>
+          <p style="margin-top: var(--space-md);">
+            ICN is a P2P coordination daemon — a background service that runs on your machine (or server) 
+            and connects with other ICN nodes to form cooperative networks. It provides four 
+            foundational "institution primitives":
+          </p>
+          <div class="primitive-list">
+            <div class="primitive">
+              <div class="primitive-icon">🔐</div>
+              <div>
+                <strong>Identity & Membership</strong>
+                <p>Self-sovereign DIDs, capability-based access, web-of-participation trust</p>
+              </div>
+            </div>
+            <div class="primitive">
+              <div class="primitive-icon">📜</div>
+              <div>
+                <strong>Rules & Governance</strong>
+                <p>CCL contracts encode bylaws as executable code — democratic decisions at any scale</p>
+              </div>
+            </div>
+            <div class="primitive">
+              <div class="primitive-icon">💰</div>
+              <div>
+                <strong>Economics</strong>
+                <p>Mutual credit ledger, mana-based resource allocation, cooperative treasury</p>
+              </div>
+            </div>
+            <div class="primitive">
+              <div class="primitive-icon">🌐</div>
+              <div>
+                <strong>Interoperation</strong>
+                <p>Federation agreements, cross-group trust, clearing, and resource sharing</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h2>How is it different?</h2>
+          <div class="comparison-table">
+            <div class="comp-row comp-header">
+              <span></span>
+              <span>Traditional</span>
+              <span>ICN</span>
+            </div>
+            <div class="comp-row">
+              <span>Governance</span>
+              <span class="comp-old">Bureaucratic / Centralized</span>
+              <span class="comp-new">Programmable democracy (CCL)</span>
+            </div>
+            <div class="comp-row">
+              <span>Economics</span>
+              <span class="comp-old">Extractive finance</span>
+              <span class="comp-new">Mutual credit + mana</span>
+            </div>
+            <div class="comp-row">
+              <span>Identity</span>
+              <span class="comp-old">Platform accounts</span>
+              <span class="comp-new">Self-sovereign DIDs</span>
+            </div>
+            <div class="comp-row">
+              <span>Trust</span>
+              <span class="comp-old">Reputation scores</span>
+              <span class="comp-new">Attestation-based trust graph</span>
+            </div>
+            <div class="comp-row">
+              <span>Infrastructure</span>
+              <span class="comp-old">Central servers / Blockchain</span>
+              <span class="comp-new">P2P daemon, no mining</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Vision from repo -->
+  <section class="section">
+    <div class="container-narrow">
+      <span class="badge badge-teal mb-lg">From VISION.md</span>
+      <article class="prose" set:html={visionHtml} />
+    </div>
+  </section>
+</Layout>
+
+<style>
+  .about-hero {
+    max-width: 720px;
+  }
+
+  .about-hero h1 {
+    margin: var(--space-md) 0;
+  }
+
+  .about-lead {
+    font-size: 1.25rem;
+    line-height: 1.8;
+  }
+
+  .primitive-list {
+    margin-top: var(--space-xl);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+
+  .primitive {
+    display: flex;
+    gap: var(--space-md);
+    padding: var(--space-md);
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-subtle);
+  }
+
+  .primitive-icon {
+    font-size: 1.5rem;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .primitive strong {
+    color: var(--text-heading);
+    display: block;
+    margin-bottom: var(--space-xs);
+  }
+
+  .primitive p {
+    font-size: 0.875rem;
+    margin: 0;
+  }
+
+  .comparison-table {
+    margin-top: var(--space-xl);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+
+  .comp-row {
+    display: grid;
+    grid-template-columns: 100px 1fr 1fr;
+    border-bottom: 1px solid var(--border-subtle);
+    font-size: 0.8125rem;
+  }
+
+  .comp-row:last-child { border-bottom: none; }
+
+  .comp-row span {
+    padding: var(--space-sm) var(--space-md);
+    color: var(--text-secondary);
+  }
+
+  .comp-header span {
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    font-size: 0.6875rem;
+    letter-spacing: 0.1em;
+    background: var(--bg-card);
+  }
+
+  .comp-old {
+    color: var(--text-muted) !important;
+    text-decoration: line-through;
+    opacity: 0.7;
+  }
+
+  .comp-new {
+    color: var(--accent-teal) !important;
+  }
+</style>

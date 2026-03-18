@@ -1,0 +1,82 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: icn-config
+  namespace: icn
+  labels:
+    app: icn
+data:
+  # External URL where the gateway is accessible (used for QR login)
+  # Update this to your actual domain or external IP
+  # Examples: "https://icn.example.com", "http://10.8.10.40:30080"
+  gateway_base_url: "http://10.8.10.40:30080"
+
+  # Trusted proxy IPs that can set X-Forwarded-* headers (comma-separated)
+  # Only needed if GATEWAY_BASE_URL is not set and you're behind a reverse proxy
+  # Example: "10.42.0.1,10.43.0.1" (K8s cluster IPs)
+  # If not set, only localhost (127.0.0.1, ::1) is trusted
+  # trusted_proxy_ips: "10.42.0.1"
+  icn.toml: |
+    data_dir = "/data"
+
+    [network]
+    listen_addr = "0.0.0.0:7777"
+    rpc_port = 5601
+    mdns_enabled = true
+    bootstrap_peers = []
+    stun_servers = []
+
+    [observability]
+    metrics_port = 9100
+    health_port = 8080
+    log_level = "info"
+
+    [gateway]
+    enabled = true
+    bind_addr = "0.0.0.0:8080"
+    # JWT token validity period (1-168 hours typical; longer = more convenience, shorter = more secure)
+    token_expiry_hours = 24
+    # Auth challenge validity period in minutes (1-15 minutes typical; shorter = more secure)
+    challenge_ttl_minutes = 5
+    # jwt_secret is loaded from ICN_GATEWAY_JWT_SECRET environment variable
+
+    [rate_limiting]
+    enabled = true
+    refill_interval_ms = 100
+
+    [rate_limiting.isolated]
+    max_messages_per_second = 10
+    burst_capacity = 2
+
+    [rate_limiting.known]
+    max_messages_per_second = 50
+    burst_capacity = 10
+
+    [rate_limiting.partner]
+    max_messages_per_second = 100
+    burst_capacity = 20
+
+    [rate_limiting.federated]
+    max_messages_per_second = 200
+    burst_capacity = 50
+
+    [rate_limiting.fallback]
+    max_messages_per_second = 100
+    burst_capacity = 20
+
+    [topology]
+    region = "faherty-homelab"
+    cluster_id = "k3s-icn"
+    role = "edge"
+
+    [topology.neighbor_limits]
+    max_local_cluster = 10
+    max_regional = 10
+    max_backbone = 5
+    max_trusted = 20
+
+    [topology.fanout]
+    local_cluster = 8
+    regional = 6
+    global = 4
+

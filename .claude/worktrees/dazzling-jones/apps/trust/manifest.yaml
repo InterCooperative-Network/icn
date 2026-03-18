@@ -1,0 +1,57 @@
+# Trust App Manifest
+#
+# This app provides trust-based policy decisions for the ICN kernel.
+# It wraps the internal TrustGraph implementation and exposes it via
+# the PolicyOracle interface, maintaining the Meaning Firewall.
+
+schema_version: 1
+name: trust
+version: 0.1.0
+publisher: did:icn:icn-foundation
+
+description: |
+  Trust app providing trust-based policy decisions. The kernel calls this
+  app's PolicyOracle to get rate limits, credit multipliers, and other
+  constraints based on trust scores. The kernel never sees trust scores
+  directly - only the constraints derived from them.
+
+# Capabilities this app needs from the kernel
+capabilities_required:
+  - state:kv:read:self
+  - state:kv:write:self
+  - state:logs:append:self
+
+# Capabilities this app provides to others
+capabilities_provided:
+  - oracle:trust:policy
+
+# State configuration
+state:
+  logs:
+    - name: attestations
+      ordering: causal
+  kv:
+    # Edge stores scale with membership (1000+ members = 1M+ potential edges)
+    - name: social_edges
+      max_keys: 100000
+    - name: economic_edges
+      max_keys: 100000
+    - name: technical_edges
+      max_keys: 100000
+    # Score cache only needs active peer working set
+    - name: scores_cache
+      max_keys: 5000
+
+# Compute handlers (TODO: See #877 for implementation)
+# Commented out until attestation_reducer and score_query are implemented.
+# compute:
+#   reducers:
+#     - name: attestation_reducer
+#       event_type: trust:attestation
+#   services:
+#     - name: score_query
+#       request_type: trust:query
+
+# Oracle configuration
+oracle:
+  domain: trust

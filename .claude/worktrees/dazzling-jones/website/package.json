@@ -1,0 +1,32 @@
+{
+  "name": "icn-website",
+  "type": "module",
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "prebuild": "node scripts/gen-stats.mjs",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro",
+    "deploy": "astro build && npx gh-pages -d dist",
+    "lint": "astro check",
+    "format": "prettier --write ."
+  },
+  "dependencies": {
+    "@astrojs/check": "^0.9.6",
+    "@astrojs/rss": "^4.0.15",
+    "@astrojs/sitemap": "^3.7.0",
+    "@types/d3": "^7.4.3",
+    "astro": "^5.16.5",
+    "d3": "^7.9.0",
+    "fuse.js": "^7.1.0",
+    "marked": "^17.0.3",
+    "typescript": "^5.8.3"
+  },
+  "devDependencies": {
+    "gh-pages": "^6.3.0",
+    "prettier": "^3.0.0",
+    "prettier-plugin-astro": "^0.12.0"
+  }
+}

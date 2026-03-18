@@ -1,0 +1,23 @@
+[build]
+# Limit parallel jobs to avoid OOM on CI runner (11GB RAM)
+# CI will override with CARGO_BUILD_JOBS if needed
+jobs = 4
+
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-C", "debuginfo=1"]
+
+[profile.dev]
+opt-level = 0
+debug = 1
+incremental = true
+# Reduced from 256 to prevent rustc OOM/SIGSEGV on memory-constrained CI
+codegen-units = 64
+
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 16
+strip = true

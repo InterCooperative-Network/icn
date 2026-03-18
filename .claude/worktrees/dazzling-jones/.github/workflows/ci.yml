@@ -1,0 +1,627 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  # CI gate ratchet phases (observational | warning | blocking)
+  GATE_RATCHET_PHASE_MEANING_FIREWALL: warning
+  GATE_RATCHET_PHASE_KERNEL_DEPS: blocking
+  GATE_RATCHET_PHASE_FIREWALL_CONTRACT: warning
+  GATE_RATCHET_PHASE_COVERAGE: observational
+  GATE_RATCHET_PHASE_SDK_TESTS: warning
+  GATE_RATCHET_PHASE_A11Y: warning
+  # Scope controls for staged boundary enforcement
+  GATE_RATCHET_KERNEL_DEPS_SCOPE: core-only
+
+jobs:
+  changes:
+    name: Change Scope
+    runs-on: ubuntu-latest
+    outputs:
+      docs_only: ${{ steps.filter.outputs.docs_only }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            docs_only:
+              - 'docs/**'
+              - '*.md'
+              - '.github/**/*.md'
+
+  secrets-check:
+    name: Secrets Placeholder Check
+    needs: [changes]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Check for placeholder secrets in deployable manifests
+        run: |
+          echo "Checking for placeholder secrets in deployment files..."
+
+          # Define patterns that indicate placeholder secrets (in value positions)
+          # These patterns look for actual secret values, not comments
+          PLACEHOLDERS='change-me-in-production|changeme|your-secret-here'
+
+          FAILED=false
+
+          # Check Kubernetes manifests (excluding .example files and comments)
+          for file in $(find deploy -name "*.yaml" -o -name "*.yml" | grep -v '\.example'); do
+            # Only check lines that aren't comments (don't start with #) and contain key: value patterns
+            if grep -v '^\s*#' "$file" 2>/dev/null | grep -qiE "$PLACEHOLDERS"; then
+              echo "ERROR: Placeholder secret found in $file"
+              grep -v '^\s*#' "$file" | grep -niE "$PLACEHOLDERS" || true
+              FAILED=true
+            fi
+          done
+
+          # Check for non-example secret.yaml files that shouldn't exist
+          for file in $(find deploy -name "secret.yaml" -o -name "secrets.yaml" 2>/dev/null); do
+            echo "ERROR: Secret file found that should be .example: $file"
+            FAILED=true
+          done
+
+          if [ "$FAILED" = "true" ]; then
+            echo ""
+            echo "FAILURE: Found placeholder secrets or non-example secret files."
+            echo "See https://github.com/InterCooperative-Network/icn/blob/main/deploy/README.md for safe secret provisioning."
+            exit 1
+          fi
+
+          echo "All deployment files pass secret checks."
+
+  fmt:
+    name: Format Check
+    needs: [changes]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Docs-only fast path
+        if: needs.changes.outputs.docs_only == 'true'
+        run: echo "Docs-only PR; skipping rustfmt check."
+
+      - uses: dtolnay/rust-toolchain@stable
+        if: needs.changes.outputs.docs_only != 'true'
+        with:
+          components: rustfmt
+
+      - name: Check formatting
+        if: needs.changes.outputs.docs_only != 'true'
+        run: cargo fmt --all --check
+        working-directory: ./icn
+
+  meaning-firewall:
+    name: Meaning Firewall Check
+    needs: [changes]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Check kernel/app separation
+        run: |
+          set -euo pipefail
+          if ./scripts/check-meaning-firewall.sh; then
+            echo "Meaning Firewall check passed"
+            exit 0
+          fi
+
+          PHASE="${GATE_RATCHET_PHASE_MEANING_FIREWALL}"
+          echo "Ratchet phase: $PHASE"
+          if [ "$PHASE" != "observational" ]; then
+            echo "::warning title=Meaning Firewall violated::Meaning Firewall violations detected. Phase=$PHASE. See docs/ci/GATE_RATCHET_PLAN.md"
+          fi
+          echo "WARNING: Meaning Firewall violations detected. See docs/ci/GATE_RATCHET_PLAN.md"
+          if [ "$PHASE" = "blocking" ]; then
+            echo "::error title=Meaning Firewall (blocking)::Failing CI because phase=blocking and Meaning Firewall violations were detected."
+            echo "BLOCKING: failing CI due to Meaning Firewall violations"
+            exit 1
+          fi
+
+          echo "Non-blocking phase ($PHASE): allowing CI to continue"
+          exit 0
+
+  kernel-deps:
+    name: Kernel Forbidden Dependencies
+    needs: [changes]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install build tools
+        uses: ./.github/actions/install-build-tools
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Check kernel crates for forbidden deps (bash version)
+        run: |
+          set -euo pipefail
+          SCOPE="${GATE_RATCHET_KERNEL_DEPS_SCOPE}"
+          case "$SCOPE" in
+            core-only)
+              KERNEL_CRATES=("icn-core")
+              ;;
+            all-kernel)
+              KERNEL_CRATES=("icn-core" "icn-net" "icn-gossip")
+              ;;
+            *)
+              echo "Unknown GATE_RATCHET_KERNEL_DEPS_SCOPE: $SCOPE"
+              exit 1
+              ;;
+          esac
+          FORBIDDEN=("icn-trust" "icn-governance" "icn-ledger" "icn-ccl" "icn-compute" "icn-entity" "icn-community" "icn-federation" "icn-steward")
+          PHASE="${GATE_RATCHET_PHASE_KERNEL_DEPS}"
+          ALLOWLIST_FILE="../scripts/forbidden-deps-allowlist.txt"
+          violations=()
+          echo "Ratchet phase: $PHASE"
+          echo "Kernel dependency check scope: $SCOPE (${KERNEL_CRATES[*]})"
+          echo "Accepted scopes: core-only | all-kernel"
+          echo "Rollout: Wave 2 (core-only) enforcement active when scope=core-only and phase=blocking"
+          if [ -f "$ALLOWLIST_FILE" ]; then
+            # Read allowlist, filtering out comments and empty lines
+            mapfile -t ALLOWLIST < <(grep -v '^\s*#' "$ALLOWLIST_FILE" | grep -v '^\s*$')
+          else
+            ALLOWLIST=()
+          fi
+          for crate in "${KERNEL_CRATES[@]}"; do
+            for dep in "${FORBIDDEN[@]}"; do
+              if cargo tree -p "$crate" --edges normal | grep -q "\\b${dep}\\b"; then
+                entry="${crate}->${dep}"
+                if printf '%s\n' "${ALLOWLIST[@]}" | grep -qx "$entry"; then
+                  echo "Allowed dependency (allowlist): ${entry}"
+                else
+                  violations+=("$entry")
+                fi
+              fi
+            done
+          done
+
+          if [ "${#violations[@]}" -gt 0 ]; then
+            if [ "$PHASE" != "observational" ]; then
+              echo "::warning title=Kernel dependency boundary violated::Forbidden dependency edges detected in scope=$SCOPE phase=$PHASE. See docs/ci/GATE_RATCHET_PLAN.md"
+            fi
+            printf 'WARNING: Forbidden kernel dependency edges detected:\n'
+            printf '  - %s\n' "${violations[@]}"
+            if [ "$PHASE" != "observational" ]; then
+              for v in "${violations[@]}"; do
+                echo "::warning title=Forbidden kernel dep edge::$v"
+              done
+            fi
+            echo
+            echo "Remediation order:"
+            echo "  1) Remove the dependency from icn-core (preferred)"
+            echo "  2) Move the dependency behind a kernel API/service boundary"
+            echo "  3) If this edge is temporarily unavoidable, add a scoped entry to: $ALLOWLIST_FILE"
+            echo
+            echo "Reference: docs/ci/GATE_RATCHET_PLAN.md"
+            echo
+
+            if [ "$PHASE" = "blocking" ]; then
+              echo "::error title=Kernel dependency boundary (blocking)::Failing CI because phase=blocking and forbidden edges were found. Fix or add scoped allowlist entry."
+              echo "BLOCKING: failing CI due to forbidden kernel dependencies"
+              exit 1
+            fi
+
+            echo "Non-blocking phase ($PHASE): allowing CI to continue"
+          fi
+        working-directory: ./icn
+
+  firewall-contract:
+    name: Firewall Contract Enforcement
+    needs: [changes]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Run firewall denylist check
+        run: |
+          set -euo pipefail
+          if python3 .github/scripts/firewall_denylist.py; then
+            echo "Firewall contract check passed"
+            exit 0
+          fi
+
+          PHASE="${GATE_RATCHET_PHASE_FIREWALL_CONTRACT}"
+          echo "Ratchet phase: $PHASE"
+          if [ "$PHASE" != "observational" ]; then
+            echo "::warning title=Firewall contract violated::Firewall contract violations detected. Phase=$PHASE. See docs/ci/GATE_RATCHET_PLAN.md"
+          fi
+          echo "WARNING: Firewall contract violations detected. See docs/ci/GATE_RATCHET_PLAN.md"
+          if [ "$PHASE" = "blocking" ]; then
+            echo "::error title=Firewall contract (blocking)::Failing CI because phase=blocking and firewall contract violations were detected."
+            echo "BLOCKING: failing CI due to firewall contract violations"
+            exit 1
+          fi
+
+          echo "Non-blocking phase ($PHASE): allowing CI to continue"
+          exit 0
+
+  clippy:
+    name: Clippy
+    needs: [changes]
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Docs-only fast path
+        if: needs.changes.outputs.docs_only == 'true'
+        run: echo "Docs-only PR; skipping clippy."
+
+      - name: Free disk space
+        if: needs.changes.outputs.docs_only != 'true'
+        uses: ./.github/actions/free-disk-space
+
+      - name: Install build tools
+        if: needs.changes.outputs.docs_only != 'true'
+        uses: ./.github/actions/install-build-tools
+
+      - uses: dtolnay/rust-toolchain@stable
+        if: needs.changes.outputs.docs_only != 'true'
+        with:
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+        if: needs.changes.outputs.docs_only != 'true'
+        with:
+          workspaces: "icn -> target"
+          cache-on-failure: true
+          prefix-key: "v0-rust-ci"
+
+      - name: Run Clippy
+        if: needs.changes.outputs.docs_only != 'true'
+        run: cargo clippy --workspace --all-targets --features "hsm,post-quantum" -- -D warnings
+        working-directory: ./icn
+
+  test:
+    name: Test
+    needs: [changes]
+    timeout-minutes: 90
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Docs-only fast path
+        if: needs.changes.outputs.docs_only == 'true'
+        run: echo "Docs-only PR; skipping test suites."
+
+      - name: Free disk space
+        if: needs.changes.outputs.docs_only != 'true'
+        uses: ./.github/actions/free-disk-space
+        with:
+          verbose: 'true'
+          aggressive: 'true'
+
+      - name: Install build tools
+        if: needs.changes.outputs.docs_only != 'true'
+        uses: ./.github/actions/install-build-tools
+
+      - uses: dtolnay/rust-toolchain@stable
+        if: needs.changes.outputs.docs_only != 'true'
+
+      - uses: Swatinem/rust-cache@v2
+        if: needs.changes.outputs.docs_only != 'true'
+        with:
+          workspaces: "icn -> target"
+          cache-on-failure: true
+          prefix-key: "v0-rust-ci"
+
+      - name: Run unit tests (parallel)
+        if: needs.changes.outputs.docs_only != 'true'
+        run: cargo test --workspace --lib
+        working-directory: ./icn
+
+      - name: Run integration tests (serial to avoid port conflicts)
+        if: needs.changes.outputs.docs_only != 'true'
+        run: cargo test --workspace --test '*' -- --test-threads=1
+        working-directory: ./icn
+
+      - name: Run sled storage tests
+        if: needs.changes.outputs.docs_only != 'true'
+        run: cargo test -p icn-gateway --features sled-storage
+        working-directory: ./icn
+
+  backup-validation:
+    name: Backup Validation
+    needs: [changes]
+    if: needs.changes.outputs.docs_only != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Free disk space
+        uses: ./.github/actions/free-disk-space
+
+      - name: Install build tools
+        uses: ./.github/actions/install-build-tools
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "icn -> target"
+          cache-on-failure: true
+          prefix-key: "v0-rust-ci"
+
+      - name: Build icnctl
+        run: cargo build -p icnctl --release
+        working-directory: ./icn
+
+      - name: Create test identity and backup
+        run: |
+          export ICN_PASSPHRASE="ci-test-passphrase-$(date +%s)"
+          export DATA_DIR=$(mktemp -d)
+          export BACKUP_FILE=$(mktemp).tar
+
+          echo "Creating test identity..."
+          ./target/release/icnctl --data-dir "$DATA_DIR" id init
+
+          echo "Creating backup..."
+          ./target/release/icnctl --data-dir "$DATA_DIR" backup "$BACKUP_FILE"
+
+          echo "Verifying backup..."
+          ./target/release/icnctl verify-backup "$BACKUP_FILE"
+
+          echo "Cleanup..."
+          rm -rf "$DATA_DIR" "$BACKUP_FILE"
+        working-directory: ./icn
+
+  coverage:
+    name: Test Coverage
+    needs: [changes]
+    if: needs.changes.outputs.docs_only != 'true'
+    timeout-minutes: 45
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Free disk space
+        uses: ./.github/actions/free-disk-space
+        with:
+          verbose: 'true'
+          aggressive: 'true'
+
+      - name: Install build tools
+        uses: ./.github/actions/install-build-tools
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      # NOTE: No rust-cache for coverage job - tarpaulin needs fresh instrumented
+      # builds anyway, and the cache just wastes disk space
+
+      - name: Install cargo-tarpaulin
+        run: cargo install cargo-tarpaulin --locked
+
+      - name: Pre-tarpaulin cleanup
+        run: |
+          echo "Additional disk cleanup for coverage job..."
+          
+          # Remove cargo caches to free space (tarpaulin downloads what it needs)
+          # These are safe to remove - they're user-level caches, not system files
+          rm -rf ~/.cargo/registry/cache || true
+          rm -rf ~/.cargo/git/db || true
+          
+          # Show remaining space
+          echo "Disk space before tarpaulin:"
+          df -h /
+
+      - name: Generate coverage
+        run: cargo tarpaulin --workspace --timeout 300 --out Xml --output-dir ./coverage
+        working-directory: ./icn
+        continue-on-error: ${{ env.GATE_RATCHET_PHASE_COVERAGE != 'blocking' }}  # Tarpaulin can have spurious failures even when tests pass
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./icn/coverage/cobertura.xml
+          fail_ci_if_error: false
+
+  security:
+    name: Security Audit
+    needs: [changes]
+    if: needs.changes.outputs.docs_only != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install build tools
+        uses: ./.github/actions/install-build-tools
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install security tools
+        run: |
+          cargo install cargo-audit --locked
+          cargo install cargo-deny --locked
+
+      - name: Run cargo-audit
+        run: cargo audit
+        working-directory: ./icn
+
+      - name: Run cargo-deny advisories check
+        run: cargo deny check advisories
+        working-directory: ./icn
+
+      - name: Run cargo-deny licenses check
+        run: cargo deny check licenses
+        working-directory: ./icn
+
+  build:
+    name: Build Release
+    needs: [changes]
+    timeout-minutes: 45
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Docs-only fast path
+        if: needs.changes.outputs.docs_only == 'true'
+        run: echo "Docs-only PR; skipping release build."
+
+      - name: Free disk space
+        if: needs.changes.outputs.docs_only != 'true'
+        uses: ./.github/actions/free-disk-space
+        with:
+          aggressive: 'true'
+
+      - name: Install build tools
+        if: needs.changes.outputs.docs_only != 'true'
+        uses: ./.github/actions/install-build-tools
+
+      - uses: dtolnay/rust-toolchain@stable
+        if: needs.changes.outputs.docs_only != 'true'
+
+      - uses: Swatinem/rust-cache@v2
+        if: needs.changes.outputs.docs_only != 'true'
+        with:
+          workspaces: "icn -> target"
+          cache-on-failure: true
+          prefix-key: "v0-rust-ci"
+
+      - name: Build release binaries
+        if: needs.changes.outputs.docs_only != 'true'
+        run: cargo build --release
+        working-directory: ./icn
+
+      - name: Upload binaries
+        if: needs.changes.outputs.docs_only != 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: icn-binaries
+          path: |
+            icn/target/release/icnd
+            icn/target/release/icnctl
+            icn/target/release/icn-console
+
+  sdk:
+    name: TypeScript SDK
+    needs: [changes]
+    if: needs.changes.outputs.docs_only != 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./sdk/typescript
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Free disk space
+        uses: ./.github/actions/free-disk-space
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: sdk/typescript/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build SDK
+        run: npm run build
+
+      - name: Run tests
+        run: npm test
+        continue-on-error: ${{ env.GATE_RATCHET_PHASE_SDK_TESTS != 'blocking' }}  # SDK tests may need gateway running
+
+  web-ui:
+    name: Web UI
+    needs: [changes]
+    if: needs.changes.outputs.docs_only != 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./web/pilot-ui
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Free disk space
+        uses: ./.github/actions/free-disk-space
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: web/pilot-ui/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+  accessibility:
+    name: Accessibility Tests
+    needs: [changes]
+    if: needs.changes.outputs.docs_only != 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./web/pilot-ui
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: web/pilot-ui/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run accessibility tests
+        id: a11y-tests
+        run: npm run test:a11y
+        continue-on-error: ${{ env.GATE_RATCHET_PHASE_A11Y != 'blocking' }}  # Don't fail build initially while fixing violations
+
+      - name: Upload accessibility report
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: accessibility-report
+          path: web/pilot-ui/test-results/
+
+  pilot-provenance:
+    name: Pilot Provenance Invariant
+    if: needs.changes.outputs.docs_only != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [changes, test]
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Free disk space
+        uses: ./.github/actions/free-disk-space
+
+      - name: Install build tools
+        uses: ./.github/actions/install-build-tools
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "icn -> target"
+          cache-on-failure: true
+          prefix-key: "v0-rust-ci"
+
+      - name: Run pilot chain demo
+        env:
+          PILOT_DETERMINISTIC: "1"
+        run: ./scripts/pilot_chain_demo.sh

@@ -1,0 +1,71 @@
+[package]
+name = "icn-compute"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Distributed compute layer for ICN"
+
+[dependencies]
+# ICN crates
+icn-encoding = { path = "../icn-encoding" }
+icn-identity = { path = "../icn-identity" }
+icn-kernel-api = { path = "../icn-kernel-api" }
+icn-time = { path = "../icn-time" }
+icn-trust = { path = "../icn-trust" }
+icn-ccl = { path = "../icn-ccl" }
+icn-obs = { path = "../icn-obs" }
+icn-security = { path = "../icn-security" }
+icn-federation = { path = "../icn-federation" }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Crypto
+blake3 = "1.8"
+ed25519-dalek = { version = "2.1", features = ["serde"] }
+sha2 = "0.10"
+
+# Async
+tokio = { version = "1.49", features = ["sync", "time", "rt"] }
+
+# Logging
+tracing = "0.1"
+
+# Error handling
+thiserror = "2.0"
+
+# Utilities
+hex = "0.4"
+rand = "0.8"
+chrono = "0.4"
+num_cpus = "1.16"
+
+# Storage
+sled.workspace = true
+
+# WASM runtime (optional)
+# NOTE: wasmtime is pinned to 24.0.5 due to rustc/cranelift compatibility constraints
+# and security vulnerabilities in newer versions (RUSTSEC-2025-0118, RUSTSEC-2025-0046).
+# TODO(icn-compute): Upgrade to latest compatible wasmtime when security patches available.
+wasmtime = { version = "24.0.5", optional = true }
+
+[dev-dependencies]
+tokio = { version = "1.49", features = ["rt-multi-thread", "macros"] }
+wat = "1.244"
+criterion = "0.5"
+tempfile = "3.24"
+icn-identity = { path = "../icn-identity" }
+icn-ledger = { path = "../icn-ledger" }
+
+[[bench]]
+name = "compute_bench"
+harness = false
+
+[features]
+default = []
+wasm = ["wasmtime"]
+
+[lints]
+workspace = true

@@ -1,0 +1,197 @@
+{
+  "app": {
+    "title": "ICN Banco de Tiempo",
+    "subtitle": "Banco de Tiempo Cooperativo"
+  },
+
+  "nav": {
+    "overview": "Resumen",
+    "network": "Red",
+    "ledger": "Libro Mayor",
+    "governance": "Gobernanza",
+    "compute": "Tareas de Computo",
+    "federation": "Federacion",
+    "metrics": "Metricas del Sistema",
+    "logs": "Registros del Sistema",
+    "settings": "Configuracion"
+  },
+
+  "status": {
+    "online": "En linea",
+    "offline": "Sin conexion",
+    "connecting": "Conectando...",
+    "syncing": "Sincronizando...",
+    "error": "Error"
+  },
+
+  "common": {
+    "loading": "Cargando...",
+    "noData": "No hay datos disponibles",
+    "error": "Ocurrio un error",
+    "retry": "Reintentar",
+    "refresh": "Actualizar",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "confirm": "Confirmar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "close": "Cerrar",
+    "search": "Buscar",
+    "filter": "Filtrar",
+    "all": "Todos",
+    "none": "Ninguno",
+    "yes": "Si",
+    "no": "No"
+  },
+
+  "auth": {
+    "title": "Autenticacion",
+    "signIn": "Iniciar Sesion",
+    "signOut": "Cerrar Sesion",
+    "challenge": "Desafio de Autenticacion",
+    "verify": "Verificar",
+    "enterDid": "Introduce tu DID",
+    "enterSignature": "Introduce la firma",
+    "help": {
+      "title": "Ayuda de Autenticacion",
+      "step1": "1. Copia el desafio a continuacion",
+      "step2": "2. Firmalo con tu identidad ICN",
+      "step3": "3. Pega la firma para autenticarte"
+    },
+    "errors": {
+      "invalidDid": "Formato de DID invalido",
+      "invalidSignature": "Firma invalida",
+      "expired": "Desafio expirado, por favor actualiza",
+      "failed": "Autenticacion fallida"
+    }
+  },
+
+  "overview": {
+    "title": "Resumen del Panel",
+    "nodeInfo": "Informacion del Nodo",
+    "did": "DID del Nodo",
+    "version": "Version",
+    "uptime": "Tiempo Activo",
+    "recentActivity": "Actividad Reciente",
+    "noActivity": "Sin actividad reciente"
+  },
+
+  "network": {
+    "title": "Estado de la Red",
+    "connectedPeers": "Pares Conectados",
+    "noPeers": "Sin pares conectados",
+    "peerDid": "DID del Par",
+    "address": "Direccion",
+    "latency": "Latencia",
+    "lastSeen": "Ultima Vez Visto",
+    "errors": {
+      "loadFailed": "Error al cargar pares"
+    }
+  },
+
+  "ledger": {
+    "title": "Libro Mayor",
+    "entries": "Entradas",
+    "balance": "Saldo",
+    "transactions": "Transacciones",
+    "filter": {
+      "all": "Todas las Entradas",
+      "today": "Hoy",
+      "week": "Esta Semana",
+      "month": "Este Mes"
+    },
+    "columns": {
+      "date": "Fecha",
+      "from": "De",
+      "to": "A",
+      "amount": "Cantidad",
+      "currency": "Moneda",
+      "memo": "Memo"
+    },
+    "noEntries": "No se encontraron entradas en el libro mayor",
+    "errors": {
+      "loadFailed": "Error al cargar entradas del libro mayor"
+    }
+  },
+
+  "governance": {
+    "title": "Gobernanza",
+    "proposals": "Propuestas",
+    "voting": "Votacion",
+    "domains": "Dominios",
+    "noProposals": "Sin propuestas activas"
+  },
+
+  "compute": {
+    "title": "Tareas de Computo",
+    "filter": {
+      "all": "Todas las Tareas",
+      "queued": "En Cola",
+      "running": "En Ejecucion",
+      "completed": "Completadas",
+      "failed": "Fallidas"
+    },
+    "columns": {
+      "taskId": "ID de Tarea",
+      "status": "Estado",
+      "submitted": "Enviada",
+      "duration": "Duracion"
+    },
+    "noTasks": "Sin tareas de computo"
+  },
+
+  "federation": {
+    "title": "Federacion",
+    "networks": "Redes Federadas",
+    "noNetworks": "Sin redes federadas"
+  },
+
+  "metrics": {
+    "title": "Metricas del Sistema",
+    "noMetrics": "Sin metricas disponibles"
+  },
+
+  "logs": {
+    "title": "Registros del Sistema",
+    "level": {
+      "all": "Todos los Niveles",
+      "error": "Error",
+      "warn": "Advertencia",
+      "info": "Informacion",
+      "debug": "Depuracion"
+    },
+    "noLogs": "Sin entradas de registro"
+  },
+
+  "settings": {
+    "title": "Configuracion",
+    "gateway": {
+      "title": "Configuracion del Gateway",
+      "apiEndpoint": "Punto de Acceso API del Gateway",
+      "wsEndpoint": "Punto de Acceso WebSocket",
+      "refreshInterval": "Intervalo de Actualizacion (segundos)"
+    },
+    "appearance": {
+      "title": "Apariencia",
+      "theme": "Tema",
+      "darkMode": "Modo Oscuro",
+      "lightMode": "Modo Claro"
+    },
+    "save": "Guardar Configuracion",
+    "reset": "Restablecer Valores Predeterminados"
+  },
+
+  "errors": {
+    "connectionFailed": "Error al conectar con el nodo",
+    "fetchFailed": "Error al obtener datos",
+    "saveFailed": "Error al guardar cambios",
+    "unknownError": "Ocurrio un error desconocido"
+  },
+
+  "accessibility": {
+    "skipToContent": "Saltar al contenido principal",
+    "toggleTheme": "Alternar modo oscuro/claro",
+    "openMenu": "Abrir menu de navegacion",
+    "closeMenu": "Cerrar menu de navegacion"
+  }
+}

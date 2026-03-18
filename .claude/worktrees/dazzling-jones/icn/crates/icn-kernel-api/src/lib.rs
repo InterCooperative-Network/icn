@@ -1,0 +1,129 @@
+//! # ICN Kernel API
+//!
+//! This crate defines the trait interfaces for all ICN kernel primitives.
+//! Implementations live in other crates; this crate provides only contracts.
+//!
+//! ## Architecture
+//!
+//! The kernel provides **mechanisms**, not **semantics**. Domain logic
+//! (membership, governance, ledger, trust) lives in apps that use these
+//! primitives. The kernel treats all apps equally - "official" apps use
+//! the same APIs as third-party apps.
+//!
+//! ## Primitives
+//!
+//! The kernel consists of eight primitives:
+//!
+//! 1. **Identity** - DID operations, signing, verification
+//! 2. **Authorization** - Object-capabilities, policy oracles
+//! 3. **State** - Logs, blobs, KV storage
+//! 4. **Compute** - WASM execution, scheduling
+//! 5. **Communication** - Pub/sub, request/response, streams
+//! 6. **Time** - Logical clocks, scheduling, leases
+//! 7. **Coordination** - Consensus groups, CRDTs
+//! 8. **Naming** - Name resolution, service discovery
+//!
+//! ## The Meaning Firewall
+//!
+//! Before adding code to kernel crates, ask:
+//! - Does this interpret domain semantics? → Must be an app
+//! - Does this hardcode a schema? → Must be an app
+//! - Does this privilege a specific application? → Must be an app
+//!
+//! The kernel is deliberately dumb. It provides pipes, not policies.
+
+pub mod authz;
+pub mod bootstrap;
+pub mod budget;
+pub mod comms;
+pub mod compute;
+pub mod coord;
+pub mod economics;
+pub mod effects;
+pub mod error;
+pub mod escrow;
+pub mod events;
+pub mod execution;
+pub mod governance;
+pub mod identity;
+pub mod invariants;
+pub mod naming;
+pub mod proofs;
+pub mod protocol_params;
+pub mod receipts;
+pub mod scope;
+pub mod services;
+pub mod state;
+pub mod storage;
+pub mod time;
+pub mod types;
+pub mod version;
+
+// Re-export primary traits for convenience
+pub use authz::{
+    ActionKind, AllowAllOracle, CapabilityEngine, ConstraintSet, ConstraintValue, DenyAllOracle,
+    Domain, PolicyContext, PolicyDecision, PolicyError, PolicyOracle, PolicyRequest,
+    PolicyRequestCore, RateLimit,
+};
+pub use bootstrap::{
+    BootstrapPhase, CacheStats, CapabilityRequest, CapabilitySet, DecisionCache,
+    GenesisCapabilities, OracleRegistry,
+};
+pub use budget::{
+    BeginSpendOutcome, BudgetRecord, BudgetSpendError, BudgetStatus, BudgetStore, PendingSpend,
+};
+pub use comms::{PubSub, RequestResponse, Streams};
+pub use compute::{ComputeEngine, DeterminismClass, Job, OperatorMode, PrivacyClass, Trigger};
+pub use coord::Coordination;
+pub use economics::{AssetType, DepreciationSchedule, SettlementIntent};
+pub use effects::{
+    ControlEffect, DisputeEffect, EffectResult, FederationEffect, KernelEffect, MembershipEffect,
+    ProtocolEffect, ResourceEffect, SdisEffect, TreasuryEffect,
+};
+pub use error::{ErrCode, IcnError};
+pub use escrow::{
+    BeginReleaseOutcome, EscrowRecord, EscrowReleaseError, EscrowStatus, EscrowStore,
+};
+pub use events::{EventCallback, EventEmitter, SystemEvent};
+pub use execution::{ExecutionRecord, ExecutionStatus, ExecutionStore};
+pub use governance::{
+    federation_effect_to_operation, treasury_effect_to_operation, DecisionReceiptId,
+    DefaultEffectExecutor, EffectExecutor, ExecutionOutcome, FederationExecutor,
+    FederationOperation, FederationOperationType, GovernanceExecutor, ProtocolChange,
+    ProtocolExecutor, TreasuryExecutor, TreasuryOperation, TreasuryOperationType,
+};
+pub use identity::{DidResolver, IdentityService, Keystore};
+pub use naming::{
+    Discovery, EndpointType, NamingService, ScopedDiscovery, ServiceEndpoint, ServiceEndpointId,
+};
+pub use proofs::ArtifactReceipt;
+pub use receipts::{
+    compute_canonical_hash, AllocationReceipt, CanonicalReceipt, Hash, ProvenanceAnchors, ReceiptId,
+};
+pub use scope::{CellId, MockCellService, ScopeLevel};
+pub use services::{
+    AddMemberRequest, AddMemberResult, CellService, ControlService, FederationJoinRequest,
+    FederationJoinResult, FederationService, FederationVouchRequest, FederationVouchResult,
+    ForceCloseProposalRequest, ForceCloseProposalResult, FreezeMemberRequest, FreezeMemberResult,
+    GovernanceEvent, GovernanceService, LedgerEvent, LedgerService, MembershipService,
+    RemoveMemberRequest, RemoveMemberResult, SecurityService, SecurityViolation, ServiceRegistry,
+    TreasuryEntryRequest, TreasuryEntryResult,
+    TreasuryOperationType as ServicesTreasuryOperationType, TrustClass, TrustEvent, TrustService,
+    UnfreezeMemberRequest, UnfreezeMemberResult, UpdateMemberRequest, UpdateMemberResult,
+    VetoProposalRequest, VetoProposalResult, TRUST_THRESHOLD_FEDERATED, TRUST_THRESHOLD_KNOWN,
+    TRUST_THRESHOLD_PARTNER,
+};
+pub use state::{
+    BlobService, KvService, LogService, ObjectReplication, ReplicationPolicy, StateBackend,
+    StateKey, StateOp, StateScope, StateValue,
+};
+pub use storage::{DataLocality, StorageClass, StorageValidationError};
+pub use time::TimeService;
+pub use version::Version;
+
+pub use invariants::{
+    BlockHeight, InvariantDomain, InvariantId, InvariantReport, InvariantViolation,
+};
+
+// Re-export common types
+pub use types::*;

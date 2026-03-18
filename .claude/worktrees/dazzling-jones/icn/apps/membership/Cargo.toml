@@ -1,0 +1,81 @@
+[package]
+name = "icn-membership-app"
+version = "0.1.0"
+edition = "2021"
+description = "Membership app - unified entity and membership management for ICN"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[dependencies]
+# Kernel API for PolicyOracle trait and types
+icn-kernel-api = { path = "../../crates/icn-kernel-api" }
+
+# Identity types (for Did, KeyPair)
+icn-identity = { path = "../../crates/icn-identity" }
+
+# Encoding (versioned serialization)
+icn-encoding = { path = "../../crates/icn-encoding" }
+
+# Gossip (for actor gossip sync)
+icn-gossip = { path = "../../crates/icn-gossip" }
+
+# Governance (charter types used by coop lifecycle)
+icn-governance = { path = "../../crates/icn-governance" }
+
+# Ledger (treasury manager used by coop actor)
+icn-ledger = { path = "../../crates/icn-ledger" }
+
+# Trust (used by coop membership checks)
+icn-trust = { path = "../../crates/icn-trust" }
+
+# Storage
+icn-store = { path = "../../crates/icn-store" }
+sled.workspace = true
+
+# Time utilities
+icn-time = { path = "../../crates/icn-time" }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "2.0"
+
+# Logging
+tracing = "0.1"
+
+# Async runtime
+tokio.workspace = true
+
+# Sync primitives
+parking_lot = "0.12"
+
+# Date/time (used by coop types)
+chrono = { version = "0.4", features = ["serde"] }
+
+# UUID generation (used by coop/community types)
+uuid = { version = "1", features = ["v4"] }
+
+# Hashing (used by treasury anchor derivation)
+blake3 = "1"
+hex = "0.4"
+bs58 = "0.5"
+
+# Optional: OpenAPI schema generation
+utoipa = { version = "5.4.0", optional = true }
+
+[features]
+default = []
+utoipa = ["dep:utoipa"]
+test_deterministic_keys = []
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+tempfile = "3"
+ed25519-dalek = { version = "2.1", features = ["rand_core"] }
+rand = "0.8"
+
+[lints]
+workspace = true

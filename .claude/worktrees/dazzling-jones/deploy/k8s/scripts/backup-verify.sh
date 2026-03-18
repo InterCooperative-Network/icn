@@ -1,0 +1,185 @@
+#!/bin/sh
+# ICN Backup Verification Script
+# Validates backup integrity and database consistency
+# Part of Issue #320: Automated backup verification
+#
+# Note: This script relies on Kubernetes job status metrics for alerting.
+# Job success/failure is tracked via kube_job_status_* metrics in Prometheus.
+
+set -e
+
+BACKUP_DIR="${BACKUP_DIR:-/backups}"
+VERIFY_DIR="${VERIFY_DIR:-/tmp/backup-verify}"
+MAX_AGE_HOURS="${MAX_AGE_HOURS:-26}"  # Fail if newest backup > 26 hours old
+REQUIRE_SLED="${REQUIRE_SLED:-false}"  # Set to 'true' to require Sled structure
+
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+}
+
+error() {
+    log "ERROR: $1"
+    exit 1
+}
+
+cleanup() {
+    rm -rf "$VERIFY_DIR" 2>/dev/null || true
+}
+trap cleanup EXIT
+
+# Get file modification time (portable: Linux and BSD/macOS)
+get_mtime() {
+    local file="$1"
+    # Try GNU stat first, then BSD stat
+    stat -c %Y "$file" 2>/dev/null || stat -f %m "$file" 2>/dev/null || {
+        log "ERROR: Cannot determine file modification time for $file"
+        echo "0"
+    }
+}
+
+# Get file size (portable: Linux and BSD/macOS)
+get_size() {
+    local file="$1"
+    stat -c %s "$file" 2>/dev/null || stat -f %z "$file" 2>/dev/null || echo "0"
+}
+
+# Start verification
+START_TIME=$(date +%s)
+log "Starting backup verification"
+log "Backup directory: $BACKUP_DIR"
+
+# Check backup directory exists
+if [ ! -d "$BACKUP_DIR" ]; then
+    error "Backup directory does not exist: $BACKUP_DIR"
+fi
+
+# Find all backup files (exclude verify jobs output)
+BACKUP_FILES=$(find "$BACKUP_DIR" -name "icn-backup-*.tar.gz" -type f 2>/dev/null | sort -r || true)
+
+# Count backup files safely
+if [ -z "$BACKUP_FILES" ]; then
+    BACKUP_COUNT=0
+else
+    BACKUP_COUNT=$(echo "$BACKUP_FILES" | wc -l | tr -d ' ')
+fi
+
+if [ "$BACKUP_COUNT" -eq 0 ]; then
+    error "No backup files found in $BACKUP_DIR"
+fi
+
+log "Found $BACKUP_COUNT backup file(s)"
+
+# Get newest backup
+NEWEST_BACKUP=$(echo "$BACKUP_FILES" | head -1)
+log "Newest backup: $NEWEST_BACKUP"
+
+# Calculate backup age
+BACKUP_MTIME=$(get_mtime "$NEWEST_BACKUP")
+if [ "$BACKUP_MTIME" = "0" ]; then
+    error "Failed to get modification time for backup"
+fi
+
+CURRENT_TIME=$(date +%s)
+BACKUP_AGE_SECONDS=$((CURRENT_TIME - BACKUP_MTIME))
+BACKUP_AGE_HOURS=$((BACKUP_AGE_SECONDS / 3600))
+
+log "Backup age: ${BACKUP_AGE_HOURS} hours (${BACKUP_AGE_SECONDS} seconds)"
+
+# Fail if backup is too old - this ensures the job fails and alerts fire
+if [ "$BACKUP_AGE_HOURS" -gt "$MAX_AGE_HOURS" ]; then
+    error "Newest backup is older than $MAX_AGE_HOURS hours (age: ${BACKUP_AGE_HOURS}h)"
+fi
+
+# Calculate total backup size
+TOTAL_SIZE=0
+for f in $BACKUP_FILES; do
+    SIZE=$(get_size "$f")
+    TOTAL_SIZE=$((TOTAL_SIZE + SIZE))
+done
+log "Total backup size: $((TOTAL_SIZE / 1024 / 1024)) MB"
+
+# Verify archive integrity
+log "Verifying archive integrity..."
+if ! tar -tzf "$NEWEST_BACKUP" > /dev/null 2>&1; then
+    error "Archive integrity check failed for $NEWEST_BACKUP"
+fi
+log "Archive integrity: OK"
+
+# Extract backup to temporary directory for content verification
+log "Extracting backup for content verification..."
+mkdir -p "$VERIFY_DIR"
+tar -xzf "$NEWEST_BACKUP" -C "$VERIFY_DIR"
+
+# Verify Sled database files exist
+log "Checking Sled database structure..."
+SLED_FOUND=false
+
+# Check subdirectories for Sled structure
+for dir in "$VERIFY_DIR"/*; do
+    if [ -d "$dir" ]; then
+        # Check for Sled database markers (conf file or db directory structure)
+        if [ -f "$dir/conf" ] || [ -d "$dir/db" ]; then
+            SLED_FOUND=true
+            db_name=$(basename "$dir")
+            log "  - $db_name: Sled database found"
+            if [ -f "$dir/conf" ]; then
+                log "    - conf file present"
+            fi
+            # Count segment files (blobs directory)
+            if [ -d "$dir/blobs" ]; then
+                blob_count=$(find "$dir/blobs" -type f 2>/dev/null | wc -l | tr -d ' ')
+                log "    - $blob_count blob files"
+            fi
+        fi
+    fi
+done
+
+# Also check root level for flat Sled structure
+if [ -f "$VERIFY_DIR/conf" ]; then
+    SLED_FOUND=true
+    log "  - Root level: Sled database found"
+fi
+
+# Validate Sled structure if required
+if [ "$REQUIRE_SLED" = "true" ] && [ "$SLED_FOUND" = "false" ]; then
+    error "No Sled database structure found in backup (REQUIRE_SLED=true)"
+fi
+
+if [ "$SLED_FOUND" = "false" ]; then
+    log "  - No Sled database structure found (may be empty or different format)"
+fi
+
+# Verify essential files/directories exist
+log "Checking for essential data..."
+
+# Check for keystore (identity)
+if [ -f "$VERIFY_DIR/keystore.age" ] || [ -f "$VERIFY_DIR/keystore" ]; then
+    log "  - Keystore: present"
+else
+    log "  - Keystore: not found (may be stored separately)"
+fi
+
+# Check for any data files
+DATA_FILE_COUNT=$(find "$VERIFY_DIR" -type f 2>/dev/null | wc -l | tr -d ' ')
+log "  - Total files in backup: $DATA_FILE_COUNT"
+
+if [ "$DATA_FILE_COUNT" -eq 0 ]; then
+    error "Backup appears to be empty (no files found)"
+fi
+
+# Calculate verification duration
+END_TIME=$(date +%s)
+DURATION=$((END_TIME - START_TIME))
+
+log "Verification completed successfully in ${DURATION} seconds"
+
+# Print summary
+echo ""
+echo "=== Verification Summary ==="
+echo "Backup count: $BACKUP_COUNT"
+echo "Newest backup age: ${BACKUP_AGE_HOURS}h"
+echo "Total backup size: $((TOTAL_SIZE / 1024 / 1024)) MB"
+echo "Files in newest backup: $DATA_FILE_COUNT"
+echo "Sled database found: $SLED_FOUND"
+echo "Verification time: ${DURATION}s"
+echo "Status: SUCCESS"

@@ -1,0 +1,316 @@
+# ICN Daemon Configuration
+# =========================
+# Copy this file to icn.toml and customize for your deployment.
+# All values shown are defaults unless noted otherwise.
+#
+# Environment variable overrides:
+#   ICN_GATEWAY_JWT_SECRET - Gateway JWT signing key (required if gateway enabled)
+#   ICN_KEYSTORE_PASSPHRASE - Keystore unlock passphrase
+#   ICN_SKIP_CORS - Skip CORS validation (development only)
+
+# Data directory for ICN state (keystore, ledger, gossip data)
+data_dir = "~/.icn"
+
+# =============================================================================
+# NETWORK CONFIGURATION
+# =============================================================================
+[network]
+# Enable mDNS local network discovery
+mdns_enabled = true
+
+# QUIC/TLS listen address (format: "IP:PORT")
+listen_addr = "0.0.0.0:7777"
+
+# RPC (JSON-RPC over HTTP) listen port
+rpc_port = 5601
+
+# Bootstrap rendezvous endpoints (format: "icn://DID@IP:PORT")
+# Leave empty for isolated local network, or add known peers
+bootstrap_peers = [
+    # "icn://did:icn:z6MkExample@192.168.1.100:7777",
+]
+
+# STUN servers for NAT traversal (multiple servers enable majority vote)
+stun_servers = [
+    "stun.l.google.com:19302",
+    "stun1.l.google.com:19302",
+]
+
+# Minimum trust score for TLS connection acceptance (0.0 to 1.0)
+# - 0.0 = Accept all authenticated DIDs (trust-gating disabled)
+# - 0.1 = Require at least "Known" trust class
+# - 0.4 = Require "Partner" trust class
+min_trust_threshold = 0.1
+
+# TURN relay configuration (optional, for symmetric NAT fallback)
+# turn_server = "turn.example.com:3478"
+# turn_username = "icn"
+# turn_password = "secret"
+
+# =============================================================================
+# OBSERVABILITY
+# =============================================================================
+[observability]
+# Prometheus metrics server port
+metrics_port = 9100
+
+# Health check server port
+health_port = 8080
+
+# Log level: trace, debug, info, warn, error
+log_level = "info"
+
+# =============================================================================
+# RATE LIMITING (Trust-Gated)
+# =============================================================================
+[rate_limiting]
+# Enable trust-gated rate limiting
+enabled = true
+
+# Token bucket refill interval in milliseconds
+refill_interval_ms = 100
+
+# Rate limits for isolated peers (trust score < 0.1)
+[rate_limiting.isolated]
+max_messages_per_second = 10
+burst_capacity = 2
+
+# Rate limits for known peers (trust score 0.1-0.4)
+[rate_limiting.known]
+max_messages_per_second = 50
+burst_capacity = 10
+
+# Rate limits for partner peers (trust score 0.4-0.7)
+[rate_limiting.partner]
+max_messages_per_second = 100
+burst_capacity = 20
+
+# Rate limits for federated peers (trust score 0.7+)
+[rate_limiting.federated]
+max_messages_per_second = 200
+burst_capacity = 50
+
+# Fallback rate limit when trust graph unavailable
+[rate_limiting.fallback]
+max_messages_per_second = 100
+burst_capacity = 20
+
+# =============================================================================
+# TOPOLOGY (Regional/Cluster-Based Networking)
+# =============================================================================
+[topology]
+# Geographic region for this node
+region = "default"
+
+# Cluster identifier within the region
+cluster_id = "default"
+
+# Node role: "edge", "rendezvous", or "archive"
+role = "edge"
+
+# Gossip fanout configuration (how many peers to forward to)
+[topology.fanout]
+local_cluster = 8  # Fanout within same cluster
+regional = 6       # Fanout to regional peers
+global = 4         # Fanout to global/backbone peers
+
+# Maximum neighbors per topology tier
+[topology.neighbor_limits]
+max_local_cluster = 50
+max_regional = 30
+max_backbone = 20
+max_trusted = 10
+
+# =============================================================================
+# GATEWAY API (REST + WebSocket)
+# =============================================================================
+[gateway]
+# Enable the Gateway API server
+# Default: false (opt-in)
+enabled = false
+
+# Gateway HTTP bind address
+# Use 127.0.0.1 for local development, 0.0.0.0 for production (with reverse proxy)
+bind_addr = "127.0.0.1:8080"
+
+# JWT token expiration time in hours
+token_expiry_hours = 24
+
+# Challenge TTL in minutes (how long DID auth challenges are valid)
+challenge_ttl_minutes = 5
+
+# JWT secret key for signing tokens
+# REQUIRED if gateway is enabled. Options:
+#   1. Set here: jwt_secret = "your-strong-secret-32-chars-min"
+#   2. Environment: export ICN_GATEWAY_JWT_SECRET="your-secret"
+#   3. CLI: --gateway-jwt-secret "your-secret"
+jwt_secret = ""
+
+# =============================================================================
+# FEDERATION (Cross-Cooperative Connectivity)
+# =============================================================================
+[federation]
+# Enable federation features
+enabled = false
+
+# Cooperative identifier (unique in the federation)
+coop_id = ""
+
+# Human-readable cooperative name
+coop_name = ""
+
+# Federation network name (nodes with same name preferentially connect)
+network_name = "icn-mainnet"
+
+# Initial trust score for bootstrap peers (0.0 to 1.0)
+bootstrap_peer_trust = 0.3
+
+# Auto-accept federation invites from trusted peers
+auto_accept_invites = false
+
+# Minimum trust score to auto-accept invites
+min_invite_trust = 0.5
+
+# Maximum federated networks to join
+max_federations = 10
+
+# Announce public address to federation peers
+announce_public_addr = true
+
+# Connection retry settings
+[federation.retry]
+max_retries = 5
+initial_delay_secs = 1
+max_delay_secs = 60
+reconnect_interval_secs = 30
+
+# =============================================================================
+# PRIVACY (Onion Routing & Metadata Protection)
+# =============================================================================
+[privacy]
+# Enable privacy features
+enabled = false
+
+# Enable onion routing for anonymous message delivery
+onion_routing_enabled = false
+
+# Number of relay hops (2-5 recommended, more = more privacy, higher latency)
+onion_hops = 2
+
+# Minimum trust score for relay selection (0.0 to 1.0)
+min_relay_trust = 0.3
+
+# Enable topic name encryption
+topic_encryption_enabled = false
+
+# Enable traffic obfuscation (padding, delays, cover traffic)
+traffic_obfuscation_enabled = false
+
+# Message padding target size in bytes (0 = disabled)
+padding_target = 0
+
+# Maximum random delay in milliseconds (0 = disabled)
+max_delay_ms = 0
+
+# Cover traffic rate (messages per minute, 0 = disabled)
+cover_traffic_rate = 0
+
+# =============================================================================
+# COOPERATIVE SETTINGS
+# =============================================================================
+[cooperative]
+# Treasury DID for this cooperative (receives fees, issues credits)
+# treasury_did = "did:icn:z6MkTreasury..."
+
+# Cooperative name
+# name = "My Cooperative"
+
+# Cooperative description
+# description = "A cooperative for..."
+
+# =============================================================================
+# STEWARD (SDIS Steward Network)
+# =============================================================================
+[steward]
+# Enable steward functionality (identity verification network)
+enabled = false
+
+# VUI threshold - minimum stewards for VUI computation (t in t-of-n)
+vui_threshold = 3
+
+# Total stewards holding pepper shares (n in t-of-n)
+vui_total_shares = 5
+
+# Maximum concurrent enrollment ceremonies
+max_concurrent_enrollments = 100
+
+# Maximum concurrent recovery ceremonies
+max_concurrent_recoveries = 50
+
+# Token validity period in seconds (default: 7 days)
+token_validity_secs = 604800
+
+# =============================================================================
+# LEDGER & ORACLE (Exchange Rates)
+# =============================================================================
+[ledger.oracle]
+# Default TTL for cached exchange rates (seconds)
+default_ttl_secs = 3600
+
+# Minimum sources required for rate consensus
+min_sources_for_consensus = 1
+
+# Maximum deviation from median for valid rate (0.15 = 15%)
+outlier_threshold = 0.15
+
+# Staleness threshold for rates (seconds)
+staleness_threshold_secs = 86400
+
+# Default suspicious rate threshold for unconfigured currency pairs.
+# Rates exceeding this trigger additional validation.
+# Most major pairs (EUR/USD, GBP/USD) range 0.01 to ~150.
+default_suspicious_rate_threshold = 1000.0
+
+# Per-currency-pair rate thresholds.
+# Use for pairs that legitimately exceed the default (e.g., JPY, crypto).
+# Key format: "FROM:TO" (e.g., "USD:JPY", "BTC:USD")
+[ledger.oracle.suspicious_rate_thresholds]
+# "USD:JPY" = 200.0      # JPY pairs typically ~100-150
+# "BTC:USD" = 100000.0   # Crypto pairs can be very high
+# "hours:USD" = 500.0    # Cooperative time credits
+
+# =============================================================================
+# SUPERVISOR (Background Tasks & Timeouts)
+# =============================================================================
+[supervisor]
+# Candidate cache cleanup interval in seconds
+candidate_cleanup_interval_secs = 300
+
+# Delay before requesting peer exchange in milliseconds
+peer_exchange_delay_ms = 500
+
+# Maximum peers to request in peer exchange
+peer_exchange_max_peers = 50
+
+# Metrics update interval in seconds
+metrics_update_interval_secs = 10
+
+# Graceful shutdown timeout in seconds
+shutdown_timeout_secs = 5
+
+# Clock synchronization interval in seconds
+clock_sync_interval_secs = 600
+
+# Storage maintenance configuration
+# Periodic maintenance keeps the Sled database optimized
+[supervisor.storage_maintenance]
+# Enable periodic maintenance (default: true)
+enabled = true
+# Interval between maintenance runs in seconds (default: 3600 = 1 hour)
+interval_secs = 3600
+# Warn if space amplification exceeds this threshold (default: 2.0)
+amplification_threshold = 2.0
+# Warn if database size exceeds this threshold in bytes (default: 1GB)
+size_threshold_bytes = 1073741824
+# Flush data to disk during maintenance (default: true)
+flush_on_maintenance = true

@@ -1,0 +1,40 @@
+[package]
+name = "icn-gossip"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+tokio.workspace = true
+icn-encoding = { path = "../icn-encoding" }
+icn-identity.workspace = true
+icn-time = { path = "../icn-time" }
+icn-obs.workspace = true
+icn-snapshot.workspace = true
+icn-store.workspace = true
+icn-security.workspace = true
+icn-kernel-api = { path = "../icn-kernel-api" }
+serde.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+bytes.workspace = true
+futures.workspace = true
+rand.workspace = true
+sha2 = "0.10"
+hex = "0.4"
+zstd = "0.13"
+blake3 = "1.8"
+ed25519-dalek = { version = "2.1", features = ["rand_core"] }
+
+[dev-dependencies]
+icn-store.workspace = true
+criterion = "0.5"
+tempfile = "3"
+
+[[bench]]
+name = "gossip_bench"
+harness = false
+
+[lints]
+workspace = true

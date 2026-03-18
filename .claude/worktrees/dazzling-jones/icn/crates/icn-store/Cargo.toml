@@ -1,0 +1,30 @@
+[package]
+name = "icn-store"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+icn-kernel-api = { path = "../icn-kernel-api" }
+icn-identity.workspace = true
+icn-obs = { path = "../icn-obs" }
+sled.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tokio = { workspace = true, features = ["time", "sync"] }
+bytes.workspace = true
+sha2.workspace = true
+blake3 = "1.8"
+hex = "0.4"
+rand.workspace = true
+ed25519-dalek.workspace = true
+
+
+[dev-dependencies]
+tempfile = "3.24"
+
+[lints]
+workspace = true

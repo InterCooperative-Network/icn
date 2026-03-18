@@ -1,0 +1,121 @@
+groups:
+  - name: icn_gateway_alerts
+    interval: 30s
+    rules:
+      # High error rate alert
+      - alert: HighErrorRate
+        expr: |
+          100 * (
+            sum(rate(icn_gateway_requests_total{status=~"5.."}[5m]))
+            /
+            sum(rate(icn_gateway_requests_total[5m]))
+          ) > 5
+        for: 5m
+        labels:
+          severity: critical
+          component: gateway
+        annotations:
+          summary: "High HTTP 5xx error rate"
+          description: "Gateway is returning {{ $value | humanizePercentage }} 5xx errors (threshold: 5%)"
+
+      # High latency alert
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(icn_gateway_request_duration_seconds_bucket[5m])) by (le, endpoint)
+          ) > 1.0
+        for: 10m
+        labels:
+          severity: warning
+          component: gateway
+        annotations:
+          summary: "High request latency on {{ $labels.endpoint }}"
+          description: "p95 latency is {{ $value }}s (threshold: 1s)"
+
+      # Authentication failure spike
+      - alert: AuthenticationFailureSpike
+        expr: |
+          rate(icn_gateway_auth_failures_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: gateway
+        annotations:
+          summary: "High authentication failure rate"
+          description: "{{ $value }} auth failures/sec by reason: {{ $labels.reason }}"
+
+      # Rate limiting active
+      - alert: RateLimitingActive
+        expr: |
+          rate(icn_gateway_rate_limit_exceeded_total[5m]) > 1
+        for: 10m
+        labels:
+          severity: info
+          component: gateway
+        annotations:
+          summary: "Rate limiting is actively rejecting requests"
+          description: "{{ $value }} requests/sec rate limited for DID: {{ $labels.did }}"
+
+      # WebSocket connection drop
+      - alert: WebSocketConnectionDrop
+        expr: |
+          rate(icn_gateway_websocket_disconnections_total[5m]) > 5
+        for: 5m
+        labels:
+          severity: warning
+          component: gateway
+        annotations:
+          summary: "High WebSocket disconnection rate"
+          description: "{{ $value }} disconnections/sec - check network stability"
+
+      # Authorization failures indicate missing scopes
+      - alert: AuthorizationFailures
+        expr: |
+          sum(rate(icn_gateway_authorization_failures_total[5m])) by (required_scope) > 1
+        for: 10m
+        labels:
+          severity: info
+          component: gateway
+        annotations:
+          summary: "Clients missing required scope"
+          description: "{{ $value }} requests/sec failing authorization for scope: {{ $labels.required_scope }}"
+
+      # Low authentication success rate
+      - alert: LowAuthSuccessRate
+        expr: |
+          100 * (
+            rate(icn_gateway_auth_successes_total[5m])
+            /
+            rate(icn_gateway_auth_verifications_total[5m])
+          ) < 50
+        for: 5m
+        labels:
+          severity: critical
+          component: gateway
+        annotations:
+          summary: "Low authentication success rate"
+          description: "Only {{ $value | humanizePercentage }} of auth attempts succeeding"
+
+      # No requests (possible outage)
+      - alert: NoTraffic
+        expr: |
+          sum(rate(icn_gateway_requests_total[5m])) == 0
+        for: 5m
+        labels:
+          severity: warning
+          component: gateway
+        annotations:
+          summary: "No API traffic detected"
+          description: "Gateway receiving zero requests - check if service is accessible"
+
+      # Payment system stalled
+      - alert: NoPaymentActivity
+        expr: |
+          rate(icn_gateway_payments_created_total[1h]) == 0
+        for: 2h
+        labels:
+          severity: info
+          component: gateway
+        annotations:
+          summary: "No payment activity"
+          description: "No payments created in last 2 hours - may indicate issue or expected downtime"

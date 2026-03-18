@@ -1,0 +1,1401 @@
+//! Core entity types for the ICN unified cooperative model
+//!
+//! This module defines the foundational types for representing entities at all scales:
+//! - Individuals (backed by DIDs)
+//! - Cooperatives (worker, consumer, multi-stakeholder)
+//! - Communities (geographic, interest-based, or practice-based groups)
+//! - Federations (cooperatives of cooperatives)
+//!
+//! The key insight is that membership is recursive: a cooperative's members
+//! can themselves be cooperatives. Communities bridge individuals and cooperatives,
+//! allowing diverse membership models.
+
+use crate::error::{EntityError, Result};
+use icn_identity::Did;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::fmt;
+use std::str::FromStr;
+
+// ============================================================================
+// EntityId
+// ============================================================================
+
+/// Unique identifier for any entity (individual, cooperative, community, or federation)
+///
+/// EntityId is designed to be compatible with DIDs:
+/// - For individuals: wraps their DID directly
+/// - For cooperatives: derived from cooperative creation ceremony
+/// - For communities: derived from community formation
+/// - For federations: derived from federation charter
+///
+/// # Format
+///
+/// `entity:icn:<type>:<identifier>`
+///
+/// # Examples
+///
+/// - `entity:icn:individual:z5TrA8...` (wraps DID)
+/// - `entity:icn:cooperative:food-coop-2024`
+/// - `entity:icn:community:neighborhood-2024`
+/// - `entity:icn:federation:midwest-fed`
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct EntityId(String);
+
+impl EntityId {
+    /// Create an EntityId from an individual's DID
+    ///
+    /// This wraps the DID in the entity format, allowing individuals
+    /// to participate in the entity system while maintaining their
+    /// cryptographic identity.
+    pub fn from_did(did: &Did) -> Self {
+        let did_str = did.as_str();
+        let identifier = did_str.strip_prefix("did:icn:").unwrap_or(did_str);
+        EntityId(format!("entity:icn:individual:{identifier}"))
+    }
+
+    /// Create an EntityId for a cooperative
+    ///
+    /// The slug should be a URL-safe identifier for the cooperative.
+    /// It will be validated for allowed characters.
+    pub fn cooperative(slug: &str) -> Result<Self> {
+        Self::validate_slug(slug)?;
+        Ok(EntityId(format!("entity:icn:cooperative:{slug}")))
+    }
+
+    /// Create an EntityId for a federation
+    ///
+    /// The slug should be a URL-safe identifier for the federation.
+    pub fn federation(slug: &str) -> Result<Self> {
+        Self::validate_slug(slug)?;
+        Ok(EntityId(format!("entity:icn:federation:{slug}")))
+    }
+
+    /// Create an EntityId for a community
+    ///
+    /// The slug should be a URL-safe identifier for the community.
+    /// Communities can have both Individual and Cooperative members,
+    /// and can join Federations.
+    pub fn community(slug: &str) -> Result<Self> {
+        Self::validate_slug(slug)?;
+        Ok(EntityId(format!("entity:icn:community:{slug}")))
+    }
+
+    /// Validate a slug for use in EntityId
+    ///
+    /// Rules:
+    /// - 4-64 characters (minimum 4 to avoid namespace collisions)
+    /// - Lowercase letters, numbers, hyphens only
+    /// - Must start with a letter
+    /// - No consecutive hyphens
+    fn validate_slug(slug: &str) -> Result<()> {
+        if slug.len() < 4 {
+            return Err(EntityError::InvalidFormat(
+                "Slug must be at least 4 characters".into(),
+            ));
+        }
+        if slug.len() > 64 {
+            return Err(EntityError::InvalidFormat(
+                "Slug cannot exceed 64 characters".into(),
+            ));
+        }
+
+        let mut chars = slug.chars().peekable();
+
+        // Must start with a lowercase letter
+        match chars.next() {
+            Some(c) if c.is_ascii_lowercase() => {}
+            _ => {
+                return Err(EntityError::InvalidFormat(
+                    "Slug must start with a lowercase letter".into(),
+                ));
+            }
+        }
+
+        // Check remaining characters
+        let mut prev_hyphen = false;
+        for c in chars {
+            if c == '-' {
+                if prev_hyphen {
+                    return Err(EntityError::InvalidFormat(
+                        "Slug cannot contain consecutive hyphens".into(),
+                    ));
+                }
+                prev_hyphen = true;
+            } else if c.is_ascii_lowercase() || c.is_ascii_digit() {
+                prev_hyphen = false;
+            } else {
+                return Err(EntityError::InvalidFormat(
+                    "Slug can only contain lowercase letters, numbers, and hyphens".into(),
+                ));
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Get the entity type from this ID
+    ///
+    /// Parses the format `entity:icn:<type>:<identifier>` and extracts the type.
+    pub fn entity_type(&self) -> EntityType {
+        // Expected format: entity:icn:<type>:<identifier>
+        let mut parts = self.0.split(':');
+        // Skip "entity" and "icn"
+        let _ = parts.next();
+        let _ = parts.next();
+        match parts.next() {
+            Some("individual") => EntityType::Individual,
+            Some("cooperative") => EntityType::Cooperative,
+            Some("community") => EntityType::Community,
+            Some("federation") => EntityType::Federation,
+            _ => EntityType::Unknown,
+        }
+    }
+
+    /// Try to extract the underlying DID (only works for individuals)
+    ///
+    /// Returns `Some(Did)` if this entity represents an individual,
+    /// `None` for cooperatives and federations.
+    pub fn to_did(&self) -> Option<Did> {
+        if self.entity_type() == EntityType::Individual {
+            let identifier = self.0.strip_prefix("entity:icn:individual:")?;
+            Did::from_str(&format!("did:icn:{identifier}")).ok()
+        } else {
+            None
+        }
+    }
+
+    /// Get the raw identifier portion (after the type prefix)
+    pub fn identifier(&self) -> &str {
+        self.0.split(':').next_back().unwrap_or(&self.0)
+    }
+
+    /// Get the full entity ID string
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    /// Check if this entity represents an individual
+    pub fn is_individual(&self) -> bool {
+        self.entity_type() == EntityType::Individual
+    }
+
+    /// Check if this entity represents a cooperative
+    pub fn is_cooperative(&self) -> bool {
+        self.entity_type() == EntityType::Cooperative
+    }
+
+    /// Check if this entity represents a federation
+    pub fn is_federation(&self) -> bool {
+        self.entity_type() == EntityType::Federation
+    }
+
+    /// Check if this entity represents a community
+    pub fn is_community(&self) -> bool {
+        self.entity_type() == EntityType::Community
+    }
+
+    /// Check if this entity represents an organization (cooperative, community, or federation)
+    pub fn is_organization(&self) -> bool {
+        matches!(
+            self.entity_type(),
+            EntityType::Cooperative | EntityType::Community | EntityType::Federation
+        )
+    }
+}
+
+impl FromStr for EntityId {
+    type Err = EntityError;
+
+    fn from_str(s: &str) -> Result<Self> {
+        if !s.starts_with("entity:icn:") {
+            return Err(EntityError::InvalidFormat(
+                "EntityId must start with 'entity:icn:'".into(),
+            ));
+        }
+
+        let parts: Vec<&str> = s.split(':').collect();
+        if parts.len() != 4 {
+            return Err(EntityError::InvalidFormat(
+                "EntityId must have format 'entity:icn:<type>:<identifier>'".into(),
+            ));
+        }
+
+        let type_part = parts[2];
+        let identifier = parts[3];
+
+        match type_part {
+            "individual" => {
+                // Individual identifiers are base58-encoded public keys
+                // Just verify it's non-empty
+                if identifier.is_empty() {
+                    return Err(EntityError::InvalidFormat(
+                        "Individual identifier cannot be empty".into(),
+                    ));
+                }
+            }
+            "cooperative" | "community" | "federation" => {
+                // Cooperative/community/federation identifiers must be valid slugs
+                Self::validate_slug(identifier)?;
+            }
+            _ => {
+                return Err(EntityError::InvalidFormat(format!(
+                    "Unknown entity type: {type_part}"
+                )));
+            }
+        }
+
+        Ok(EntityId(s.to_string()))
+    }
+}
+
+impl fmt::Display for EntityId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+// ============================================================================
+// EntityType
+// ============================================================================
+
+/// Entity types supported by ICN
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum EntityType {
+    /// An individual person (backed by DID/SDIS anchor)
+    Individual,
+
+    /// A cooperative (worker, consumer, producer, multi-stakeholder, etc.)
+    Cooperative,
+
+    /// A community (geographic, interest-based, or practice-based group)
+    ///
+    /// Communities can have both Individual and Cooperative members.
+    /// They can join Federations, and Cooperatives can join Communities.
+    Community,
+
+    /// A federation of cooperatives
+    Federation,
+
+    /// Unknown/unrecognized type
+    Unknown,
+}
+
+impl fmt::Display for EntityType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            EntityType::Individual => write!(f, "individual"),
+            EntityType::Cooperative => write!(f, "cooperative"),
+            EntityType::Community => write!(f, "community"),
+            EntityType::Federation => write!(f, "federation"),
+            EntityType::Unknown => write!(f, "unknown"),
+        }
+    }
+}
+
+// ============================================================================
+// EntityStatus
+// ============================================================================
+
+/// Entity lifecycle status
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EntityStatus {
+    /// Entity is being formed (pre-charter ratification)
+    #[default]
+    Forming,
+
+    /// Entity is active and operational
+    Active,
+
+    /// Entity is suspended (frozen)
+    Suspended {
+        /// Reason for suspension
+        reason: String,
+        /// When suspended (Unix timestamp)
+        suspended_at: u64,
+    },
+
+    /// Entity is in the process of dissolving
+    Dissolving {
+        /// When dissolution started
+        started_at: u64,
+    },
+
+    /// Entity has been dissolved
+    Dissolved {
+        /// When dissolved
+        dissolved_at: u64,
+    },
+
+    /// Entity has merged into another entity
+    Merged {
+        /// The entity this was merged into
+        into: EntityId,
+        /// When merged
+        merged_at: u64,
+    },
+
+    /// Entity has split into multiple entities
+    Split {
+        /// The entities created from this split
+        into: Vec<EntityId>,
+        /// When split
+        split_at: u64,
+    },
+
+    /// Entity has been deleted (tombstone for gossip sync)
+    Deleted,
+}
+
+impl EntityStatus {
+    /// Check if entity is operational (can perform normal operations)
+    pub fn is_operational(&self) -> bool {
+        matches!(self, EntityStatus::Active)
+    }
+
+    /// Check if entity lifecycle has ended
+    pub fn is_terminated(&self) -> bool {
+        matches!(
+            self,
+            EntityStatus::Dissolved { .. }
+                | EntityStatus::Merged { .. }
+                | EntityStatus::Split { .. }
+                | EntityStatus::Deleted
+        )
+    }
+}
+
+impl std::fmt::Display for EntityStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            EntityStatus::Forming => write!(f, "Forming"),
+            EntityStatus::Active => write!(f, "Active"),
+            EntityStatus::Suspended { reason, .. } => write!(f, "Suspended: {reason}"),
+            EntityStatus::Dissolving { .. } => write!(f, "Dissolving"),
+            EntityStatus::Dissolved { .. } => write!(f, "Dissolved"),
+            EntityStatus::Merged { into, .. } => write!(f, "Merged into {}", into.identifier()),
+            EntityStatus::Split { into, .. } => {
+                write!(f, "Split into {} entities", into.len())
+            }
+            EntityStatus::Deleted => write!(f, "Deleted"),
+        }
+    }
+}
+
+// ============================================================================
+// AccountReference
+// ============================================================================
+
+/// Reference to an account in the ledger
+///
+/// This links an entity to its treasury/ledger account.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AccountReference {
+    /// The account identifier (can be EntityId string or legacy Did string)
+    pub account_id: String,
+
+    /// Primary currency managed by this account
+    pub currency: String,
+}
+
+impl AccountReference {
+    /// Create a new account reference
+    pub fn new(account_id: impl Into<String>, currency: impl Into<String>) -> Self {
+        AccountReference {
+            account_id: account_id.into(),
+            currency: currency.into(),
+        }
+    }
+}
+
+// ============================================================================
+// EntityKind — type-safe entity profiles
+// ============================================================================
+
+/// Type-safe entity classification with required per-type fields.
+///
+/// Unlike `EntityType` (a simple tag), `EntityKind` carries the data that
+/// is **required** for each entity type. A cooperative without a governance
+/// domain ID is meaningless — `EntityKind::Cooperative` enforces this at
+/// construction time.
+///
+/// `EntityKind` is additive: `CooperativeEntity` keeps its existing
+/// `entity_type: EntityType` field for backward-compatible serialization.
+/// The `kind` field is the source of truth for new code.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EntityKind {
+    /// An individual person — no additional required fields.
+    Individual,
+
+    /// A cooperative — governance domain and treasury are required.
+    Cooperative(CooperativeProfile),
+
+    /// A community — governance domain is required (civic charter).
+    Community(CommunityProfile),
+
+    /// A federation — governance domain and member tracking are required.
+    Federation(FederationProfile),
+}
+
+impl EntityKind {
+    /// Derive the corresponding `EntityType` tag.
+    pub fn entity_type(&self) -> EntityType {
+        match self {
+            EntityKind::Individual => EntityType::Individual,
+            EntityKind::Cooperative(_) => EntityType::Cooperative,
+            EntityKind::Community(_) => EntityType::Community,
+            EntityKind::Federation(_) => EntityType::Federation,
+        }
+    }
+}
+
+/// Profile data required for a cooperative entity.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CooperativeProfile {
+    /// Governance domain ID (links to icn-governance). Required.
+    pub governance_domain_id: String,
+
+    /// Treasury account reference. Required.
+    pub treasury_account: AccountReference,
+}
+
+/// Profile data required for a community entity.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CommunityProfile {
+    /// Governance domain ID — a community without civic governance is meaningless.
+    pub governance_domain_id: String,
+}
+
+/// Profile data required for a federation entity.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FederationProfile {
+    /// Governance domain ID for federation-level decisions.
+    pub governance_domain_id: String,
+
+    /// Member entity IDs tracked by this federation.
+    pub member_entities: Vec<EntityId>,
+
+    /// Parent federation for hierarchical nesting.
+    ///
+    /// When `Some`, this federation is nested within a larger parent federation.
+    /// Root (top-level) federations have `None`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_id: Option<EntityId>,
+}
+
+impl FederationProfile {
+    /// Check if this federation has a parent federation.
+    pub fn has_parent(&self) -> bool {
+        self.parent_id.is_some()
+    }
+
+    /// Check if this is a top-level (root) federation.
+    pub fn is_root(&self) -> bool {
+        self.parent_id.is_none()
+    }
+
+    /// Get nesting depth (0 for root federations).
+    ///
+    /// Note: This returns 1 for any federation with a parent. Full depth
+    /// calculation requires registry lookup to traverse the parent chain.
+    pub fn depth(&self) -> usize {
+        if self.is_root() {
+            0
+        } else {
+            1
+        }
+    }
+}
+
+// ============================================================================
+// EntityRelationship
+// ============================================================================
+
+/// A directed relationship between two entities.
+///
+/// Relationships are distinct from memberships: a membership grants rights
+/// (voting, proposals), while a relationship is a structural link tracked
+/// for federation and cross-entity queries.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EntityRelationship {
+    /// The source entity (e.g., individual or cooperative).
+    pub source: EntityId,
+
+    /// The target entity (e.g., cooperative or federation).
+    pub target: EntityId,
+
+    /// The type of relationship.
+    pub relationship: RelationType,
+
+    /// When this relationship was established (Unix timestamp).
+    pub established_at: u64,
+
+    /// Arbitrary metadata for extensibility.
+    pub metadata: HashMap<String, String>,
+}
+
+/// Types of structural relationships between entities.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RelationType {
+    /// Member → Parent container (directed membership edge).
+    ///
+    /// The `source` is the member entity; the `target` is the parent entity
+    /// (e.g., individual → cooperative, cooperative/community → federation).
+    MemberOf,
+
+    /// Cooperative ↔ Cooperative (federation peers)
+    FederatedWith,
+
+    /// Parent entity → child entity (e.g., federation → cooperative)
+    ParentOf,
+}
+
+impl EntityRelationship {
+    /// Create a new relationship with current timestamp.
+    pub fn new(source: EntityId, target: EntityId, relationship: RelationType) -> Self {
+        Self {
+            source,
+            target,
+            relationship,
+            established_at: icn_time::current_timestamp_secs(),
+            metadata: HashMap::new(),
+        }
+    }
+
+    /// Add metadata to this relationship.
+    #[must_use]
+    pub fn with_metadata(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.metadata.insert(key.into(), value.into());
+        self
+    }
+}
+
+// ============================================================================
+// CooperativeEntity
+// ============================================================================
+
+/// A cooperative entity that works at all scales
+///
+/// This is the unified model that can represent:
+/// - Individuals (with DID binding)
+/// - Cooperatives of various types
+/// - Federations of cooperatives
+///
+/// The recursive membership model allows entities to contain other entities
+/// as members, enabling arbitrary organizational hierarchies.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CooperativeEntity {
+    /// Unique entity identifier
+    pub id: EntityId,
+
+    /// Human-readable name
+    pub name: String,
+
+    /// Entity type (individual, cooperative, federation)
+    pub entity_type: EntityType,
+
+    /// Type-safe entity kind with required per-type profile data.
+    ///
+    /// This is the source of truth for new code. The `entity_type` field
+    /// is kept for backward-compatible serialization; `kind` carries
+    /// the required fields that `entity_type` + Option fields cannot enforce.
+    ///
+    /// Defaults to `None` for entities created before this field existed.
+    ///
+    /// Note: We keep `#[serde(default)]` for JSON backward compat (gateway APIs),
+    /// but do NOT use `skip_serializing_if` because postcard (used by sled storage)
+    /// is a non-self-describing format and needs fixed struct layout.
+    #[serde(default)]
+    pub kind: Option<EntityKind>,
+
+    /// Lifecycle status
+    pub status: EntityStatus,
+
+    /// Parent entity (for hierarchical membership)
+    /// None for top-level entities or individuals not in any organization
+    pub parent_id: Option<EntityId>,
+
+    /// Governance domain ID (links to icn-governance)
+    /// Individuals typically don't have governance domains
+    pub governance_domain_id: Option<String>,
+
+    /// Treasury account (links to icn-ledger)
+    /// Individuals may not have treasury; coops always do
+    pub treasury_account: Option<AccountReference>,
+
+    /// When the entity was created (Unix timestamp)
+    pub created_at: u64,
+
+    /// When the entity was last updated (Unix timestamp)
+    pub updated_at: u64,
+
+    /// Optional description
+    pub description: Option<String>,
+
+    /// Arbitrary metadata for extensibility
+    pub metadata: HashMap<String, String>,
+}
+
+impl CooperativeEntity {
+    /// Create a new entity for an individual
+    pub fn individual(did: &Did, name: impl Into<String>) -> Self {
+        let now = icn_time::current_timestamp_secs();
+        CooperativeEntity {
+            id: EntityId::from_did(did),
+            name: name.into(),
+            entity_type: EntityType::Individual,
+            kind: Some(EntityKind::Individual),
+            status: EntityStatus::Active, // Individuals are active immediately
+            parent_id: None,
+            governance_domain_id: None,
+            treasury_account: None,
+            created_at: now,
+            updated_at: now,
+            description: None,
+            metadata: HashMap::new(),
+        }
+    }
+
+    /// Create a new cooperative entity (legacy constructor — `kind` left empty).
+    ///
+    /// Prefer [`new_cooperative`] which requires governance domain and treasury.
+    pub fn cooperative(slug: &str, name: impl Into<String>) -> Result<Self> {
+        let now = icn_time::current_timestamp_secs();
+        Ok(CooperativeEntity {
+            id: EntityId::cooperative(slug)?,
+            name: name.into(),
+            entity_type: EntityType::Cooperative,
+            kind: None,
+            status: EntityStatus::Forming,
+            parent_id: None,
+            governance_domain_id: None,
+            treasury_account: None,
+            created_at: now,
+            updated_at: now,
+            description: None,
+            metadata: HashMap::new(),
+        })
+    }
+
+    /// Create a new cooperative entity with required governance and treasury.
+    ///
+    /// This is the preferred constructor — it populates `kind` with a
+    /// `CooperativeProfile` and also sets the legacy `Option` fields for
+    /// backward-compatible serialization.
+    pub fn new_cooperative(
+        slug: &str,
+        name: impl Into<String>,
+        governance_domain_id: impl Into<String>,
+        treasury_account: AccountReference,
+    ) -> Result<Self> {
+        let domain_id = governance_domain_id.into();
+        let now = icn_time::current_timestamp_secs();
+        Ok(CooperativeEntity {
+            id: EntityId::cooperative(slug)?,
+            name: name.into(),
+            entity_type: EntityType::Cooperative,
+            kind: Some(EntityKind::Cooperative(CooperativeProfile {
+                governance_domain_id: domain_id.clone(),
+                treasury_account: treasury_account.clone(),
+            })),
+            status: EntityStatus::Forming,
+            parent_id: None,
+            governance_domain_id: Some(domain_id),
+            treasury_account: Some(treasury_account),
+            created_at: now,
+            updated_at: now,
+            description: None,
+            metadata: HashMap::new(),
+        })
+    }
+
+    /// Create a new federation entity (legacy constructor — `kind` left empty).
+    ///
+    /// Prefer [`new_federation`] which requires governance domain.
+    pub fn federation(slug: &str, name: impl Into<String>) -> Result<Self> {
+        let now = icn_time::current_timestamp_secs();
+        Ok(CooperativeEntity {
+            id: EntityId::federation(slug)?,
+            name: name.into(),
+            entity_type: EntityType::Federation,
+            kind: None,
+            status: EntityStatus::Forming,
+            parent_id: None,
+            governance_domain_id: None,
+            treasury_account: None,
+            created_at: now,
+            updated_at: now,
+            description: None,
+            metadata: HashMap::new(),
+        })
+    }
+
+    /// Create a new federation entity with required governance domain.
+    pub fn new_federation(
+        slug: &str,
+        name: impl Into<String>,
+        governance_domain_id: impl Into<String>,
+    ) -> Result<Self> {
+        let domain_id = governance_domain_id.into();
+        let now = icn_time::current_timestamp_secs();
+        Ok(CooperativeEntity {
+            id: EntityId::federation(slug)?,
+            name: name.into(),
+            entity_type: EntityType::Federation,
+            kind: Some(EntityKind::Federation(FederationProfile {
+                governance_domain_id: domain_id.clone(),
+                member_entities: Vec::new(),
+                parent_id: None,
+            })),
+            status: EntityStatus::Forming,
+            parent_id: None,
+            governance_domain_id: Some(domain_id),
+            treasury_account: None,
+            created_at: now,
+            updated_at: now,
+            description: None,
+            metadata: HashMap::new(),
+        })
+    }
+
+    /// Create a new community entity (legacy constructor — `kind` left empty).
+    ///
+    /// Prefer [`new_community`] which requires governance domain.
+    pub fn community(slug: &str, name: impl Into<String>) -> Result<Self> {
+        let now = icn_time::current_timestamp_secs();
+        Ok(CooperativeEntity {
+            id: EntityId::community(slug)?,
+            name: name.into(),
+            entity_type: EntityType::Community,
+            kind: None,
+            status: EntityStatus::Forming,
+            parent_id: None,
+            governance_domain_id: None,
+            treasury_account: None,
+            created_at: now,
+            updated_at: now,
+            description: None,
+            metadata: HashMap::new(),
+        })
+    }
+
+    /// Create a new community entity with required governance domain.
+    pub fn new_community(
+        slug: &str,
+        name: impl Into<String>,
+        governance_domain_id: impl Into<String>,
+    ) -> Result<Self> {
+        let domain_id = governance_domain_id.into();
+        let now = icn_time::current_timestamp_secs();
+        Ok(CooperativeEntity {
+            id: EntityId::community(slug)?,
+            name: name.into(),
+            entity_type: EntityType::Community,
+            kind: Some(EntityKind::Community(CommunityProfile {
+                governance_domain_id: domain_id.clone(),
+            })),
+            status: EntityStatus::Forming,
+            parent_id: None,
+            governance_domain_id: Some(domain_id),
+            treasury_account: None,
+            created_at: now,
+            updated_at: now,
+            description: None,
+            metadata: HashMap::new(),
+        })
+    }
+
+    // ========================================================================
+    // Builder methods
+    //
+    // Note: Builder methods are for initial construction and do NOT update
+    // the `updated_at` timestamp. When modifying an existing entity, use
+    // `EntityRegistry::update()` which should update the timestamp.
+    // ========================================================================
+
+    /// Set the parent entity
+    #[must_use]
+    pub fn with_parent(mut self, parent_id: EntityId) -> Self {
+        self.parent_id = Some(parent_id);
+        self
+    }
+
+    /// Set the governance domain
+    #[must_use]
+    pub fn with_governance_domain(mut self, domain_id: impl Into<String>) -> Self {
+        self.governance_domain_id = Some(domain_id.into());
+        self
+    }
+
+    /// Set the treasury account
+    #[must_use]
+    pub fn with_treasury(mut self, account: AccountReference) -> Self {
+        self.treasury_account = Some(account);
+        self
+    }
+
+    /// Set the description
+    #[must_use]
+    pub fn with_description(mut self, description: impl Into<String>) -> Self {
+        self.description = Some(description.into());
+        self
+    }
+
+    /// Add metadata
+    #[must_use]
+    pub fn with_metadata(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.metadata.insert(key.into(), value.into());
+        self
+    }
+
+    /// Check if entity can be activated
+    pub fn can_activate(&self) -> bool {
+        matches!(self.status, EntityStatus::Forming)
+    }
+
+    /// Check if entity can be suspended
+    pub fn can_suspend(&self) -> bool {
+        matches!(self.status, EntityStatus::Active)
+    }
+
+    /// Check if entity can be dissolved
+    pub fn can_dissolve(&self) -> bool {
+        matches!(
+            self.status,
+            EntityStatus::Active | EntityStatus::Suspended { .. }
+        )
+    }
+
+    // ========================================================================
+    // Kind-aware accessors
+    // ========================================================================
+
+    /// Get the cooperative profile, if this entity has one.
+    pub fn cooperative_profile(&self) -> Option<&CooperativeProfile> {
+        match &self.kind {
+            Some(EntityKind::Cooperative(p)) => Some(p),
+            _ => None,
+        }
+    }
+
+    /// Get the community profile, if this entity has one.
+    pub fn community_profile(&self) -> Option<&CommunityProfile> {
+        match &self.kind {
+            Some(EntityKind::Community(p)) => Some(p),
+            _ => None,
+        }
+    }
+
+    /// Get the federation profile, if this entity has one.
+    pub fn federation_profile(&self) -> Option<&FederationProfile> {
+        match &self.kind {
+            Some(EntityKind::Federation(p)) => Some(p),
+            _ => None,
+        }
+    }
+
+    /// Returns true if this entity has a populated `kind` field.
+    pub fn has_kind(&self) -> bool {
+        self.kind.is_some()
+    }
+}
+
+// ============================================================================
+// AccountId (Backward Compatibility)
+// ============================================================================
+
+/// Account identifier that works with both legacy DIDs and new EntityIds
+///
+/// This type provides backward compatibility during the migration from
+/// DID-based account identification to EntityId-based identification.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum AccountId {
+    /// Legacy DID-based account (individual)
+    Did(Did),
+
+    /// New EntityId-based account (individual, cooperative, or federation)
+    Entity(EntityId),
+}
+
+impl AccountId {
+    /// Get string representation
+    pub fn as_str(&self) -> String {
+        match self {
+            AccountId::Did(did) => did.to_string(),
+            AccountId::Entity(id) => id.to_string(),
+        }
+    }
+
+    /// Check if this is an individual account
+    pub fn is_individual(&self) -> bool {
+        match self {
+            AccountId::Did(_) => true,
+            AccountId::Entity(id) => id.is_individual(),
+        }
+    }
+}
+
+impl From<Did> for AccountId {
+    fn from(did: Did) -> Self {
+        AccountId::Did(did)
+    }
+}
+
+impl From<EntityId> for AccountId {
+    fn from(id: EntityId) -> Self {
+        AccountId::Entity(id)
+    }
+}
+
+impl fmt::Display for AccountId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+    use icn_identity::KeyPair;
+
+    #[test]
+    fn test_entity_id_from_did() {
+        let keypair = KeyPair::generate().unwrap();
+        let did = keypair.did().clone();
+        let entity_id = EntityId::from_did(&did);
+
+        assert!(entity_id.is_individual());
+        assert!(!entity_id.is_cooperative());
+        assert!(!entity_id.is_federation());
+        assert_eq!(entity_id.entity_type(), EntityType::Individual);
+
+        // Should be able to convert back to DID
+        let recovered_did = entity_id.to_did().unwrap();
+        assert_eq!(recovered_did, did);
+    }
+
+    #[test]
+    fn test_entity_id_cooperative() {
+        let entity_id = EntityId::cooperative("food-coop-2024").unwrap();
+
+        assert!(!entity_id.is_individual());
+        assert!(entity_id.is_cooperative());
+        assert!(!entity_id.is_federation());
+        assert!(entity_id.is_organization());
+        assert_eq!(entity_id.entity_type(), EntityType::Cooperative);
+        assert_eq!(entity_id.identifier(), "food-coop-2024");
+
+        // Should not be able to convert to DID
+        assert!(entity_id.to_did().is_none());
+    }
+
+    #[test]
+    fn test_entity_id_federation() {
+        let entity_id = EntityId::federation("midwest-fed").unwrap();
+
+        assert!(entity_id.is_federation());
+        assert!(entity_id.is_organization());
+        assert_eq!(entity_id.entity_type(), EntityType::Federation);
+    }
+
+    #[test]
+    fn test_entity_id_community() {
+        let entity_id = EntityId::community("neighborhood-2024").unwrap();
+
+        assert!(!entity_id.is_individual());
+        assert!(!entity_id.is_cooperative());
+        assert!(!entity_id.is_federation());
+        assert!(entity_id.is_community());
+        assert!(entity_id.is_organization());
+        assert_eq!(entity_id.entity_type(), EntityType::Community);
+        assert_eq!(entity_id.identifier(), "neighborhood-2024");
+
+        // Should not be able to convert to DID
+        assert!(entity_id.to_did().is_none());
+    }
+
+    #[test]
+    fn test_community_entity_creation() {
+        let entity =
+            CooperativeEntity::community("local-community", "Local Community Network").unwrap();
+
+        assert!(entity.id.is_community());
+        assert_eq!(entity.entity_type, EntityType::Community);
+        assert_eq!(entity.name, "Local Community Network");
+        assert!(matches!(entity.status, EntityStatus::Forming));
+    }
+
+    #[test]
+    fn test_is_organization_includes_community() {
+        let keypair = KeyPair::generate().unwrap();
+        let individual_id = EntityId::from_did(keypair.did());
+        let coop_id = EntityId::cooperative("test-coop").unwrap();
+        let community_id = EntityId::community("test-community").unwrap();
+        let fed_id = EntityId::federation("test-fed").unwrap();
+
+        // Individuals are NOT organizations
+        assert!(!individual_id.is_organization());
+
+        // Cooperatives, communities, and federations ARE organizations
+        assert!(coop_id.is_organization());
+        assert!(community_id.is_organization());
+        assert!(fed_id.is_organization());
+    }
+
+    #[test]
+    fn test_entity_id_parse() {
+        let id_str = "entity:icn:cooperative:test-coop";
+        let entity_id: EntityId = id_str.parse().unwrap();
+        assert_eq!(entity_id.as_str(), id_str);
+        assert!(entity_id.is_cooperative());
+    }
+
+    #[test]
+    fn test_entity_id_invalid_format() {
+        assert!(EntityId::from_str("invalid").is_err());
+        assert!(EntityId::from_str("entity:other:cooperative:test").is_err());
+        assert!(EntityId::from_str("entity:icn:unknown:test").is_err());
+    }
+
+    #[test]
+    fn test_entity_id_fromstr_validates_slug() {
+        // Valid FromStr parsing
+        assert!(EntityId::from_str("entity:icn:cooperative:valid-slug").is_ok());
+        assert!(EntityId::from_str("entity:icn:federation:test-fed").is_ok());
+        assert!(EntityId::from_str("entity:icn:individual:z5TrA8Qk").is_ok());
+
+        // Invalid: cooperative/federation slugs must pass validation
+        assert!(EntityId::from_str("entity:icn:cooperative:ab").is_err()); // too short
+        assert!(EntityId::from_str("entity:icn:cooperative:abc").is_err()); // too short (< 4)
+        assert!(EntityId::from_str("entity:icn:federation:123").is_err()); // doesn't start with letter
+        assert!(EntityId::from_str("entity:icn:cooperative:Test").is_err()); // uppercase
+
+        // Individual identifiers just need to be non-empty
+        assert!(EntityId::from_str("entity:icn:individual:").is_err()); // empty
+    }
+
+    #[test]
+    fn test_entity_id_slug_validation() {
+        // Valid slugs (lowercase, 4-64 chars, start with letter)
+        assert!(EntityId::cooperative("valid-slug").is_ok());
+        assert!(EntityId::cooperative("abcd").is_ok());
+        assert!(EntityId::cooperative("test123").is_ok());
+        assert!(EntityId::cooperative("food-coop-2024").is_ok());
+
+        // Invalid: too short (minimum 4 chars)
+        assert!(EntityId::cooperative("abc").is_err());
+        assert!(EntityId::cooperative("ab").is_err());
+
+        // Invalid: doesn't start with letter
+        assert!(EntityId::cooperative("123-coop").is_err());
+        assert!(EntityId::cooperative("-test").is_err());
+
+        // Invalid: uppercase
+        assert!(EntityId::cooperative("ValidSlug").is_err());
+
+        // Invalid: underscores not allowed
+        assert!(EntityId::cooperative("valid_slug").is_err());
+
+        // Invalid: consecutive hyphens
+        assert!(EntityId::cooperative("test--coop").is_err());
+
+        // Invalid: empty or spaces
+        assert!(EntityId::cooperative("").is_err());
+        assert!(EntityId::cooperative("invalid slug").is_err());
+        assert!(EntityId::cooperative("invalid/slug").is_err());
+    }
+
+    #[test]
+    fn test_cooperative_entity_creation() {
+        let entity = CooperativeEntity::cooperative("test-coop", "Test Cooperative").unwrap();
+
+        assert_eq!(entity.name, "Test Cooperative");
+        assert!(entity.id.is_cooperative());
+        assert!(matches!(entity.status, EntityStatus::Forming));
+        assert!(entity.can_activate());
+    }
+
+    #[test]
+    fn test_individual_entity_creation() {
+        let keypair = KeyPair::generate().unwrap();
+        let did = keypair.did().clone();
+        let entity = CooperativeEntity::individual(&did, "Alice");
+
+        assert_eq!(entity.name, "Alice");
+        assert!(entity.id.is_individual());
+        assert!(matches!(entity.status, EntityStatus::Active));
+    }
+
+    #[test]
+    fn test_entity_serialization() {
+        let entity = CooperativeEntity::cooperative("test", "Test").unwrap();
+        let json = serde_json::to_string(&entity).unwrap();
+        let parsed: CooperativeEntity = serde_json::from_str(&json).unwrap();
+        assert_eq!(entity.id, parsed.id);
+        assert_eq!(entity.name, parsed.name);
+    }
+
+    #[test]
+    fn test_account_id_from_did() {
+        let keypair = KeyPair::generate().unwrap();
+        let did = keypair.did().clone();
+        let account_id: AccountId = did.clone().into();
+
+        assert!(account_id.is_individual());
+        assert!(matches!(account_id, AccountId::Did(_)));
+    }
+
+    #[test]
+    fn test_account_id_from_entity() {
+        let entity_id = EntityId::cooperative("test").unwrap();
+        let account_id: AccountId = entity_id.into();
+
+        assert!(!account_id.is_individual());
+        assert!(matches!(account_id, AccountId::Entity(_)));
+    }
+
+    // ========================================================================
+    // EntityKind and new constructor tests
+    // ========================================================================
+
+    #[test]
+    fn test_new_cooperative_has_kind() {
+        let treasury = AccountReference::new("acct-1", "ICN");
+        let entity = CooperativeEntity::new_cooperative(
+            "typed-coop",
+            "Typed Coop",
+            "gov-domain-1",
+            treasury,
+        )
+        .unwrap();
+
+        // Kind populated
+        assert!(entity.has_kind());
+        let profile = entity.cooperative_profile().unwrap();
+        assert_eq!(profile.governance_domain_id, "gov-domain-1");
+        assert_eq!(profile.treasury_account.account_id, "acct-1");
+
+        // Legacy fields also populated for backward compat
+        assert_eq!(entity.governance_domain_id.as_deref(), Some("gov-domain-1"));
+        assert!(entity.treasury_account.is_some());
+        assert_eq!(entity.entity_type, EntityType::Cooperative);
+    }
+
+    #[test]
+    fn test_legacy_cooperative_has_no_kind() {
+        let entity = CooperativeEntity::cooperative("legacy-coop", "Legacy Coop").unwrap();
+        assert!(!entity.has_kind());
+        assert!(entity.cooperative_profile().is_none());
+    }
+
+    #[test]
+    fn test_new_federation_has_kind() {
+        let entity =
+            CooperativeEntity::new_federation("typed-fed", "Typed Federation", "fed-gov-domain")
+                .unwrap();
+
+        assert!(entity.has_kind());
+        let profile = entity.federation_profile().unwrap();
+        assert_eq!(profile.governance_domain_id, "fed-gov-domain");
+        assert!(profile.member_entities.is_empty());
+        assert_eq!(
+            entity.governance_domain_id.as_deref(),
+            Some("fed-gov-domain")
+        );
+    }
+
+    #[test]
+    fn test_new_community_has_kind() {
+        let entity = CooperativeEntity::new_community(
+            "typed-community",
+            "Typed Community",
+            "community-gov-domain",
+        )
+        .unwrap();
+
+        assert!(entity.has_kind());
+        let profile = entity.community_profile().unwrap();
+        assert_eq!(profile.governance_domain_id, "community-gov-domain");
+    }
+
+    #[test]
+    fn test_individual_has_kind() {
+        let keypair = KeyPair::generate().unwrap();
+        let entity = CooperativeEntity::individual(keypair.did(), "Alice");
+        assert!(entity.has_kind());
+        assert!(matches!(entity.kind, Some(EntityKind::Individual)));
+        assert!(entity.cooperative_profile().is_none());
+    }
+
+    #[test]
+    fn test_entity_kind_derives_entity_type() {
+        let treasury = AccountReference::new("acct-1", "ICN");
+        let kind = EntityKind::Cooperative(CooperativeProfile {
+            governance_domain_id: "test".into(),
+            treasury_account: treasury,
+        });
+        assert_eq!(kind.entity_type(), EntityType::Cooperative);
+
+        let kind = EntityKind::Individual;
+        assert_eq!(kind.entity_type(), EntityType::Individual);
+    }
+
+    #[test]
+    fn test_new_cooperative_serde_roundtrip() {
+        let treasury = AccountReference::new("acct-1", "ICN");
+        let entity =
+            CooperativeEntity::new_cooperative("serde-coop", "Serde Coop", "gov-domain", treasury)
+                .unwrap();
+
+        let json = serde_json::to_string(&entity).unwrap();
+        let parsed: CooperativeEntity = serde_json::from_str(&json).unwrap();
+
+        assert!(parsed.has_kind());
+        let profile = parsed.cooperative_profile().unwrap();
+        assert_eq!(profile.governance_domain_id, "gov-domain");
+        assert_eq!(profile.treasury_account.account_id, "acct-1");
+    }
+
+    #[test]
+    fn test_legacy_entity_deserializes_without_kind() {
+        // Simulate an entity serialized before the kind field existed
+        let json = r#"{
+            "id": "entity:icn:cooperative:old-coop",
+            "name": "Old Coop",
+            "entity_type": "cooperative",
+            "status": "forming",
+            "parent_id": null,
+            "governance_domain_id": null,
+            "treasury_account": null,
+            "created_at": 1000,
+            "updated_at": 1000,
+            "description": null,
+            "metadata": {}
+        }"#;
+
+        let parsed: CooperativeEntity = serde_json::from_str(json).unwrap();
+        assert!(!parsed.has_kind());
+        assert!(parsed.cooperative_profile().is_none());
+        assert_eq!(parsed.entity_type, EntityType::Cooperative);
+    }
+
+    #[test]
+    fn test_postcard_roundtrip_legacy_cooperative() {
+        let entity = CooperativeEntity::cooperative("test-coop", "Test").unwrap();
+        let encoded = icn_encoding::encode_versioned(&entity).unwrap();
+        let decoded: CooperativeEntity = icn_encoding::decode_versioned(&encoded).unwrap();
+        assert_eq!(decoded.name, "Test");
+        assert_eq!(decoded.id, entity.id);
+    }
+
+    #[test]
+    fn test_postcard_roundtrip_typed_cooperative() {
+        let treasury = AccountReference::new("acct-1", "ICN");
+        let entity =
+            CooperativeEntity::new_cooperative("test-coop", "Test", "gov-domain", treasury)
+                .unwrap();
+        let encoded = icn_encoding::encode_versioned(&entity).unwrap();
+        let decoded: CooperativeEntity = icn_encoding::decode_versioned(&encoded).unwrap();
+        assert_eq!(decoded.name, "Test");
+        assert!(decoded.has_kind());
+    }
+
+    #[test]
+    fn test_entity_relationship_new() {
+        let source = EntityId::cooperative("coop-a").unwrap();
+        let target = EntityId::federation("test-fed").unwrap();
+        let rel = EntityRelationship::new(source.clone(), target.clone(), RelationType::MemberOf);
+
+        assert_eq!(rel.source, source);
+        assert_eq!(rel.target, target);
+        assert_eq!(rel.relationship, RelationType::MemberOf);
+        assert!(rel.established_at > 0);
+    }
+
+    #[test]
+    fn test_entity_relationship_serde_roundtrip() {
+        let source = EntityId::cooperative("coop-a").unwrap();
+        let target = EntityId::cooperative("coop-b").unwrap();
+        let rel = EntityRelationship::new(source, target, RelationType::FederatedWith)
+            .with_metadata("reason", "joint purchasing");
+
+        let json = serde_json::to_string(&rel).unwrap();
+        let parsed: EntityRelationship = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(parsed.relationship, RelationType::FederatedWith);
+        assert_eq!(parsed.metadata.get("reason").unwrap(), "joint purchasing");
+    }
+
+    #[test]
+    fn test_federation_profile_nesting() {
+        // Test root federation (no parent)
+        let root_fed =
+            CooperativeEntity::new_federation("root-fed", "Root Federation", "gov-domain").unwrap();
+        let root_profile = root_fed.federation_profile().unwrap();
+
+        assert!(root_profile.is_root());
+        assert!(!root_profile.has_parent());
+        assert_eq!(root_profile.depth(), 0);
+        assert!(root_profile.parent_id.is_none());
+
+        // Test nested federation (has parent)
+        let parent_id = EntityId::federation("parent-fed").unwrap();
+        let child_profile = FederationProfile {
+            governance_domain_id: "child-gov".to_string(),
+            member_entities: Vec::new(),
+            parent_id: Some(parent_id.clone()),
+        };
+
+        assert!(!child_profile.is_root());
+        assert!(child_profile.has_parent());
+        assert_eq!(child_profile.depth(), 1);
+        assert_eq!(child_profile.parent_id, Some(parent_id));
+    }
+
+    #[test]
+    fn test_federation_profile_serde_with_parent() {
+        // Test serialization with parent_id
+        let parent_id = EntityId::federation("parent-fed").unwrap();
+        let profile = FederationProfile {
+            governance_domain_id: "nested-gov".to_string(),
+            member_entities: vec![EntityId::cooperative("member-coop").unwrap()],
+            parent_id: Some(parent_id.clone()),
+        };
+
+        let json = serde_json::to_string(&profile).unwrap();
+        let parsed: FederationProfile = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(parsed.governance_domain_id, "nested-gov");
+        assert_eq!(parsed.member_entities.len(), 1);
+        assert_eq!(parsed.parent_id, Some(parent_id));
+    }
+
+    #[test]
+    fn test_federation_profile_serde_without_parent() {
+        // Test serialization without parent_id (should be skipped in JSON)
+        let profile = FederationProfile {
+            governance_domain_id: "root-gov".to_string(),
+            member_entities: Vec::new(),
+            parent_id: None,
+        };
+
+        let json = serde_json::to_string(&profile).unwrap();
+        // parent_id should not appear in JSON due to skip_serializing_if
+        assert!(!json.contains("parent_id"));
+
+        // But deserialization should still work with default
+        let parsed: FederationProfile = serde_json::from_str(&json).unwrap();
+        assert!(parsed.parent_id.is_none());
+        assert!(parsed.is_root());
+    }
+}

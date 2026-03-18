@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ICN Node Monitoring</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 2rem;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        h1 { font-size: 2rem; margin-bottom: 0.5rem; color: #38bdf8; }
+        .subtitle { color: #94a3b8; margin-bottom: 2rem; }
+
+        .status-banner {
+            padding: 1rem 1.5rem;
+            border-radius: 0.5rem;
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .status-healthy { background: #064e3b; border: 1px solid #10b981; }
+        .status-degraded { background: #713f12; border: 1px solid #f59e0b; }
+        .status-unhealthy { background: #7f1d1d; border: 1px solid #ef4444; }
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 0.75rem;
+            animation: pulse 2s infinite;
+        }
+        .healthy-dot { background: #10b981; }
+        .degraded-dot { background: #f59e0b; }
+        .unhealthy-dot { background: #ef4444; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .metric-card {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+        }
+        .metric-card h3 {
+            font-size: 0.875rem;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.75rem;
+        }
+        .metric-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #38bdf8;
+            margin-bottom: 0.5rem;
+        }
+        .metric-label {
+            font-size: 0.875rem;
+            color: #64748b;
+        }
+
+        .section {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .section h2 {
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+            color: #f1f5f9;
+        }
+
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid #334155;
+        }
+        .metric-row:last-child { border-bottom: none; }
+        .metric-name { color: #cbd5e1; }
+        .metric-number { color: #38bdf8; font-weight: 600; }
+
+        .error {
+            background: #7f1d1d;
+            border: 1px solid #ef4444;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin: 1rem 0;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            color: #64748b;
+        }
+
+        .timestamp {
+            text-align: right;
+            color: #64748b;
+            font-size: 0.875rem;
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ICN Node Monitoring</h1>
+        <p class="subtitle">Real-time metrics and health status</p>
+
+        <div id="app">
+            <div class="loading">Loading metrics...</div>
+        </div>
+    </div>
+
+    <script>
+        // Use relative URL for same-origin requests (dashboard and metrics both served by icnd on :8080)
+        // For embedding in external sites, set window.METRICS_URL = 'http://icnd.monitoring:9100/metrics'
+        const METRICS_URL = window.METRICS_URL || '/metrics';
+        const HEALTH_URL = window.HEALTH_URL || '/health';
+        const REFRESH_INTERVAL = 5000; // 5 seconds
+
+        async function fetchHealth() {
+            const response = await fetch(HEALTH_URL);
+            return await response.json();
+        }
+
+        async function fetchMetrics() {
+            const response = await fetch(METRICS_URL);
+            const text = await response.text();
+            return parsePrometheusMetrics(text);
+        }
+
+        function parsePrometheusMetrics(text) {
+            const metrics = {};
+            const lines = text.split('\n');
+
+            for (const line of lines) {
+                if (line.startsWith('#') || line.trim() === '') continue;
+
+                const match = line.match(/^(\w+)(?:\{([^}]*)\})?\s+(.+)$/);
+                if (match) {
+                    const [, name, labels, value] = match;
+                    if (!metrics[name]) metrics[name] = [];
+                    metrics[name].push({
+                        labels: labels ? parseLabels(labels) : {},
+                        value: parseFloat(value)
+                    });
+                }
+            }
+
+            return metrics;
+        }
+
+        function parseLabels(labelsStr) {
+            const labels = {};
+            const pairs = labelsStr.match(/(\w+)="([^"]*)"/g) || [];
+            for (const pair of pairs) {
+                const [key, value] = pair.split('=');
+                labels[key] = value.replace(/"/g, '');
+            }
+            return labels;
+        }
+
+        function getMetricValue(metrics, name, defaultValue = 0) {
+            const metric = metrics[name];
+            if (!metric || metric.length === 0) return defaultValue;
+            return metric[0].value;
+        }
+
+        function sumMetricValues(metrics, name) {
+            const metric = metrics[name];
+            if (!metric) return 0;
+            return metric.reduce((sum, m) => sum + m.value, 0);
+        }
+
+        function formatNumber(num) {
+            if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+            if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+            return Math.round(num).toString();
+        }
+
+        function formatBytes(bytes) {
+            if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(2) + ' GB';
+            if (bytes >= 1048576) return (bytes / 1048576).toFixed(2) + ' MB';
+            if (bytes >= 1024) return (bytes / 1024).toFixed(2) + ' KB';
+            return bytes + ' B';
+        }
+
+        function formatUptime(seconds) {
+            const days = Math.floor(seconds / 86400);
+            const hours = Math.floor((seconds % 86400) / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+
+            if (days > 0) return `${days}d ${hours}h`;
+            if (hours > 0) return `${hours}h ${minutes}m`;
+            return `${minutes}m`;
+        }
+
+        function renderDashboard(health, metrics) {
+            const statusClass = `status-${health.status}`;
+            const statusDot = `${health.status}-dot`;
+
+            return `
+                <div class="status-banner ${statusClass}">
+                    <div style="display: flex; align-items: center;">
+                        <div class="status-dot ${statusDot}"></div>
+                        <div>
+                            <strong>Status: ${health.status.toUpperCase()}</strong>
+                            <div style="font-size: 0.875rem; margin-top: 0.25rem;">
+                                Uptime: ${formatUptime(health.uptime_seconds)}
+                            </div>
+                        </div>
+                    </div>
+                    <div style="text-align: right; font-size: 0.875rem;">
+                        Last updated: ${new Date().toLocaleTimeString()}
+                    </div>
+                </div>
+
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <h3>Network Peers</h3>
+                        <div class="metric-value">${Math.round(getMetricValue(metrics, 'icn_network_connections_active'))}</div>
+                        <div class="metric-label">Active connections</div>
+                    </div>
+
+                    <div class="metric-card">
+                        <h3>Gossip Topics</h3>
+                        <div class="metric-value">${Math.round(getMetricValue(metrics, 'icn_gossip_topics_total'))}</div>
+                        <div class="metric-label">Total topics</div>
+                    </div>
+
+                    <div class="metric-card">
+                        <h3>Gossip Entries</h3>
+                        <div class="metric-value">${formatNumber(getMetricValue(metrics, 'icn_gossip_entries_total'))}</div>
+                        <div class="metric-label">Total entries</div>
+                    </div>
+
+                    <div class="metric-card">
+                        <h3>Ledger Quarantine</h3>
+                        <div class="metric-value">${Math.round(getMetricValue(metrics, 'icn_ledger_quarantine_size'))}</div>
+                        <div class="metric-label">Entries in quarantine</div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h2>Network Activity</h2>
+                    <div class="metric-row">
+                        <span class="metric-name">Messages Sent</span>
+                        <span class="metric-number">${formatNumber(getMetricValue(metrics, 'icn_network_messages_sent_total'))}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-name">Messages Received</span>
+                        <span class="metric-number">${formatNumber(getMetricValue(metrics, 'icn_network_messages_received_total'))}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-name">Bytes Sent</span>
+                        <span class="metric-number">${formatBytes(getMetricValue(metrics, 'icn_network_bytes_sent_total'))}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-name">Bytes Received</span>
+                        <span class="metric-number">${formatBytes(getMetricValue(metrics, 'icn_network_bytes_received_total'))}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-name">Rate Limited Messages</span>
+                        <span class="metric-number">${formatNumber(getMetricValue(metrics, 'icn_network_messages_rate_limited_total'))}</span>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h2>Gossip Protocol</h2>
+                    <div class="metric-row">
+                        <span class="metric-name">Entries Published</span>
+                        <span class="metric-number">${formatNumber(getMetricValue(metrics, 'icn_gossip_entries_published_total'))}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-name">Entries Received</span>
+                        <span class="metric-number">${formatNumber(getMetricValue(metrics, 'icn_gossip_entries_received_total'))}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-name">Active Subscriptions</span>
+                        <span class="metric-number">${Math.round(getMetricValue(metrics, 'icn_gossip_subscriptions_total'))}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-name">Announces Sent</span>
+                        <span class="metric-number">${formatNumber(getMetricValue(metrics, 'icn_gossip_announces_sent_total'))}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-name">Pull Requests</span>
+                        <span class="metric-number">${formatNumber(getMetricValue(metrics, 'icn_gossip_pull_requests_sent_total'))}</span>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h2>Ledger</h2>
+                    <div class="metric-row">
+                        <span class="metric-name">Total Accounts</span>
+                        <span class="metric-number">${Math.round(getMetricValue(metrics, 'icn_ledger_accounts_total'))}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-name">Total Transactions</span>
+                        <span class="metric-number">${formatNumber(getMetricValue(metrics, 'icn_ledger_transactions_total'))}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-name">Merge Conflicts</span>
+                        <span class="metric-number">${formatNumber(getMetricValue(metrics, 'icn_ledger_merge_conflicts_total'))}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-name">Entries Quarantined</span>
+                        <span class="metric-number">${formatNumber(getMetricValue(metrics, 'icn_ledger_entries_quarantined_total'))}</span>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h2>Trust Graph</h2>
+                    <div class="metric-row">
+                        <span class="metric-name">Total Trust Edges</span>
+                        <span class="metric-number">${Math.round(getMetricValue(metrics, 'icn_trust_edges_total'))}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-name">Trust Lookups</span>
+                        <span class="metric-number">${formatNumber(getMetricValue(metrics, 'icn_trust_lookups_total'))}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-name">Cache Hit Rate</span>
+                        <span class="metric-number">${calculateCacheHitRate(metrics)}%</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-name">Attestations Received</span>
+                        <span class="metric-number">${formatNumber(getMetricValue(metrics, 'icn_trust_attestations_received_total'))}</span>
+                    </div>
+                </div>
+
+                <div class="timestamp">
+                    Auto-refreshing every ${REFRESH_INTERVAL / 1000}s
+                </div>
+            `;
+        }
+
+        function calculateCacheHitRate(metrics) {
+            const hits = getMetricValue(metrics, 'icn_trust_cache_hits_total');
+            const misses = getMetricValue(metrics, 'icn_trust_cache_misses_total');
+            const total = hits + misses;
+            if (total === 0) return '0.0';
+            return ((hits / total) * 100).toFixed(1);
+        }
+
+        async function updateDashboard() {
+            try {
+                const [health, metrics] = await Promise.all([fetchHealth(), fetchMetrics()]);
+                document.getElementById('app').innerHTML = renderDashboard(health, metrics);
+            } catch (error) {
+                console.error('Failed to fetch metrics:', error);
+                document.getElementById('app').innerHTML = `
+                    <div class="error">
+                        <strong>Error loading metrics</strong>
+                        <p style="margin-top: 0.5rem;">${error.message}</p>
+                        <p style="margin-top: 0.5rem; font-size: 0.875rem;">
+                            Make sure ICNd is running and Prometheus metrics are enabled on port 9100.
+                        </p>
+                    </div>
+                `;
+            }
+        }
+
+        // Initial load
+        updateDashboard();
+
+        // Auto-refresh
+        setInterval(updateDashboard, REFRESH_INTERVAL);
+    </script>
+</body>
+</html>

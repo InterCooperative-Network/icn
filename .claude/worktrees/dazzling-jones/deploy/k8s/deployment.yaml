@@ -1,0 +1,180 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: icn-daemon
+  namespace: icn
+  labels:
+    app: icn
+    component: daemon
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: icn
+  template:
+    metadata:
+      labels:
+        app: icn
+        component: daemon
+    spec:
+      initContainers:
+      - name: init-identity
+        image: 10.8.10.40:30500/icn:latest
+        imagePullPolicy: Always
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            set -e
+            if [ -f /data/identity.age ]; then
+              echo "Identity keystore already exists, skipping init"
+            else
+              echo "Initializing identity keystore..."
+              icnctl --data-dir /data id init
+              echo "Identity keystore created at /data/identity.age"
+            fi
+        env:
+        - name: ICN_KEYSTORE_PASSPHRASE
+          valueFrom:
+            secretKeyRef:
+              name: icn-secrets
+              key: passphrase
+        - name: ICN_DATA_DIR
+          value: "/data"
+        - name: HOME
+          value: "/data"
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: tmp
+          mountPath: /tmp
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+              - ALL
+      containers:
+      - name: icnd
+        image: 10.8.10.40:30500/icn:latest
+        imagePullPolicy: Always
+        args:
+          - --config
+          - /etc/icn/icn.toml
+        env:
+        - name: ICN_KEYSTORE_PASSPHRASE
+          valueFrom:
+            secretKeyRef:
+              name: icn-secrets
+              key: passphrase
+        - name: ICN_PASSPHRASE
+          valueFrom:
+            secretKeyRef:
+              name: icn-secrets
+              key: passphrase
+        - name: ICN_GATEWAY_JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: icn-secrets
+              key: jwt-secret
+        - name: ICN_DATA_DIR
+          value: "/data"
+        - name: HOME
+          value: "/data"
+        # CORS: allow Pilot UI origin for cross-origin API access
+        - name: ICN_CORS_ORIGINS
+          value: "http://10.8.10.40:30030"
+        # Gateway base URL for QR login - set this to the external URL where the gateway is accessible
+        # This is used in QR codes for mobile wallet login
+        - name: GATEWAY_BASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: icn-config
+              key: gateway_base_url
+              optional: true
+        # Trusted proxy IPs for X-Forwarded-* header validation (comma-separated)
+        # Only these IPs can set X-Forwarded-Host/Proto headers
+        # If not set, only localhost (127.0.0.1, ::1) is trusted
+        - name: TRUSTED_PROXY_IPS
+          valueFrom:
+            configMapKeyRef:
+              name: icn-config
+              key: trusted_proxy_ips
+              optional: true
+        # CORS is handled by the gateway directly (not via reverse proxy)
+        # Uncomment ICN_SKIP_CORS=1 only when behind Cloudflare or similar proxy
+        # - name: ICN_SKIP_CORS
+        #   value: "1"
+        # OpenTelemetry distributed tracing configuration
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: "http://tempo:4317"
+        - name: OTEL_SERVICE_NAME
+          value: "icnd"
+        ports:
+        - name: quic
+          containerPort: 7777
+          protocol: UDP
+        - name: rpc
+          containerPort: 5601
+          protocol: TCP
+        - name: metrics
+          containerPort: 9100
+          protocol: TCP
+        - name: gateway
+          containerPort: 8080
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /v1/health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /v1/health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        resources:
+          requests:
+            cpu: 100m
+            memory: 512Mi
+          limits:
+            cpu: "1"
+            memory: 2Gi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+              - ALL
+        volumeMounts:
+        - name: config
+          mountPath: /etc/icn
+          readOnly: true
+        - name: data
+          mountPath: /data
+        - name: tmp
+          mountPath: /tmp
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      volumes:
+      - name: config
+        configMap:
+          name: icn-config
+      - name: data
+        persistentVolumeClaim:
+          claimName: icn-data
+      - name: tmp
+        emptyDir: {}
+

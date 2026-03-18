@@ -1,0 +1,48 @@
+[package]
+name = "icn-ccl-fuzz"
+version = "0.0.0"
+authors = ["Automatically generated"]
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+arbitrary = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dependencies.icn-ccl]
+path = ".."
+
+[dependencies.icn-identity]
+path = "../../icn-identity"
+
+# Prevent this from interfering with workspaces
+[workspace]
+members = ["."]
+
+[profile.release]
+debug = 1
+
+[[bin]]
+name = "fuzz_contract_json"
+path = "fuzz_targets/fuzz_contract_json.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_contract_validate"
+path = "fuzz_targets/fuzz_contract_validate.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_interpreter"
+path = "fuzz_targets/fuzz_interpreter.rs"
+test = false
+doc = false
+bench = false

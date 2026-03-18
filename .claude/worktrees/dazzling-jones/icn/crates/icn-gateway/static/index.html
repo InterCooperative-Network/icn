@@ -1,0 +1,1750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <meta name="description" content="ICN Timebank - Community time exchange and mutual credit system for cooperatives">
+    <meta name="theme-color" content="#2563eb" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#1a1a1a" media="(prefers-color-scheme: dark)">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="ICN Timebank">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>ICN Timebank</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <!-- QR Code library for wallet login -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+    <!-- Skip Navigation Link -->
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+
+    <div id="app">
+        <!-- Toast Notifications (ARIA live region) -->
+        <div id="toast-container" role="status" aria-live="polite" aria-atomic="true"></div>
+
+        <!-- Screen Reader Announcements -->
+        <div id="sr-announcements" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+
+        <!-- Login Screen -->
+        <div id="login-screen" class="screen">
+            <div class="card login-card">
+                <h1>ICN Timebank</h1>
+                <p class="subtitle">Community Time Exchange</p>
+
+                <form id="login-form" aria-label="Sign in to your cooperative">
+                    <div class="form-group">
+                        <label for="gateway-url">Gateway URL</label>
+                        <input
+                            type="url"
+                            id="gateway-url"
+                            value="http://localhost:8080"
+                            aria-required="true"
+                            aria-describedby="gateway-url-hint"
+                        />
+                        <small id="gateway-url-hint" class="sr-only">The URL of your ICN gateway server</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="coop-id">Cooperative ID</label>
+                        <input
+                            type="text"
+                            id="coop-id"
+                            placeholder="e.g., timebank-coop"
+                            aria-required="true"
+                            aria-describedby="coop-id-hint"
+                        />
+                        <small id="coop-id-hint">The unique identifier for your cooperative</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="did">Your DID</label>
+                        <input
+                            type="text"
+                            id="did"
+                            placeholder="did:icn:..."
+                            aria-required="true"
+                            aria-describedby="did-hint"
+                        />
+                        <small id="did-hint">Don't know your DID? Run <code>icnctl id show</code></small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="token">Authentication Token</label>
+                        <input
+                            type="password"
+                            id="token"
+                            placeholder="Paste your token here"
+                            aria-required="true"
+                            aria-describedby="token-hint"
+                        />
+                        <button type="button" id="show-auth-help" class="btn-link" aria-label="Open help dialog for getting authentication token">How do I get a token?</button>
+                        <small id="token-hint" class="sr-only">Your 24-hour authentication token from icnctl</small>
+                    </div>
+
+                    <button id="login-btn" type="submit" class="btn btn-primary">Connect</button>
+
+                    <div id="login-error" class="error-message" role="alert" aria-live="assertive"></div>
+                </form>
+
+                <div class="login-divider">
+                    <span>or</span>
+                </div>
+
+                <button id="show-qr-login-btn" type="button" class="btn btn-secondary btn-qr">
+                    <span class="qr-icon">📱</span>
+                    Scan with Mobile Wallet
+                </button>
+
+                <div class="login-divider">
+                    <span>or</span>
+                </div>
+
+                <button id="show-join-btn" type="button" class="btn btn-secondary">Join with Invite Code</button>
+            </div>
+        </div>
+
+        <!-- Join Screen -->
+        <div id="join-screen" class="screen hidden">
+            <div class="card login-card">
+                <h1>Join a Cooperative</h1>
+                <p class="subtitle">Enter your invite code to get started</p>
+
+                <form id="join-form" aria-label="Join cooperative with invite code">
+                    <div class="form-group">
+                        <label for="join-gateway-url">Gateway URL</label>
+                        <input
+                            type="url"
+                            id="join-gateway-url"
+                            value="http://localhost:8080"
+                            aria-required="true"
+                        />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="invite-code">Invite Code</label>
+                        <input
+                            type="text"
+                            id="invite-code"
+                            placeholder="XXXX-XXXX-XXXX"
+                            aria-required="true"
+                            aria-describedby="invite-code-hint"
+                            maxlength="12"
+                            style="text-transform: uppercase;"
+                        />
+                        <small id="invite-code-hint">12-character code from your cooperative admin</small>
+                    </div>
+
+                    <button id="join-btn" type="submit" class="btn btn-primary">Join Cooperative</button>
+
+                    <div id="join-error" class="error-message" role="alert" aria-live="assertive"></div>
+                    <div id="join-success" class="success-message hidden" role="alert" aria-live="polite"></div>
+                </form>
+
+                <button id="back-to-login-btn" type="button" class="btn btn-link">Back to Sign In</button>
+            </div>
+        </div>
+
+        <!-- Auth Help Modal -->
+        <div
+            id="auth-help-modal"
+            class="modal hidden"
+            role="dialog"
+            aria-labelledby="modal-title"
+            aria-modal="true"
+            aria-hidden="true"
+        >
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="modal-title">Getting Your Authentication Token</h2>
+                    <button id="close-auth-help" class="modal-close" aria-label="Close help dialog">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p class="help-intro">To sign in securely, you'll need to get an authentication token using the command-line tool.</p>
+
+                    <div class="help-step">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <h3>Open your terminal</h3>
+                            <p>Open a command line terminal on the same computer where ICN is running.</p>
+                        </div>
+                    </div>
+
+                    <div class="help-step">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <h3>Get your authentication token</h3>
+                            <p>Run this command (replace the values with your own):</p>
+                            <div class="code-block">
+                                <code id="auth-command">icnctl auth login --gateway <span id="help-gateway">http://localhost:8080</span> --coop <span id="help-coop">your-coop-id</span></code>
+                                <button id="copy-command" class="btn-copy" title="Copy command">Copy</button>
+                            </div>
+                            <small>This command will display your token. Token is valid for 24 hours.</small>
+                        </div>
+                    </div>
+
+                    <div class="help-step">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <h3>Copy and paste the token</h3>
+                            <p>Copy the token from the terminal and paste it into the "Authentication Token" field above.</p>
+                        </div>
+                    </div>
+
+                    <div class="help-note">
+                        <strong>Note:</strong> Your token is like a password - keep it secure and don't share it. It expires after 24 hours for security.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- QR Login Modal -->
+        <div
+            id="qr-login-modal"
+            class="modal hidden"
+            role="dialog"
+            aria-labelledby="qr-modal-title"
+            aria-modal="true"
+            aria-hidden="true"
+        >
+            <div class="modal-content modal-qr">
+                <div class="modal-header">
+                    <h2 id="qr-modal-title">Scan to Login</h2>
+                    <button id="close-qr-login" class="modal-close" aria-label="Close QR login dialog">&times;</button>
+                </div>
+                <div class="modal-body qr-modal-body">
+                    <div id="qr-code-container" class="qr-code-container">
+                        <p class="loading">Generating QR code...</p>
+                    </div>
+
+                    <p id="qr-login-status" class="qr-status">
+                        Open your ICN Wallet app and scan this code
+                    </p>
+
+                    <div id="qr-countdown" class="qr-countdown">
+                        Expires in: <span id="qr-time-left">5:00</span>
+                    </div>
+
+                    <div class="qr-instructions">
+                        <h3>How to use:</h3>
+                        <ol>
+                            <li>Open the ICN Wallet app on your phone</li>
+                            <li>Tap "Approve Web Login"</li>
+                            <li>Point your camera at this QR code</li>
+                            <li>Confirm the login on your phone</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main App -->
+        <div id="main-screen" class="screen hidden">
+            <!-- Header -->
+            <header role="banner">
+                <div class="header-left">
+                    <h1>ICN Timebank</h1>
+                    <span id="coop-name" class="coop-badge" aria-label="Current cooperative"></span>
+                </div>
+                <div class="header-right">
+                    <!-- Theme Toggle -->
+                    <button
+                        id="theme-toggle"
+                        class="btn-icon"
+                        aria-label="Toggle dark mode"
+                        title="Toggle dark mode"
+                    >
+                        <span class="theme-icon">🌙</span>
+                    </button>
+
+                    <!-- Notification Center (hidden for demo) -->
+                    <div class="notification-container" style="display:none">
+                        <button
+                            id="notification-bell"
+                            class="btn-icon"
+                            aria-label="Notifications"
+                            aria-haspopup="true"
+                            aria-expanded="false"
+                            title="Notifications"
+                        >
+                            <span class="bell-icon">🔔</span>
+                            <span id="notification-badge" class="notification-badge hidden" aria-label="Unread notifications">0</span>
+                        </button>
+
+                        <div id="notification-panel" class="notification-panel hidden" role="menu" aria-label="Notifications">
+                            <div class="notification-header">
+                                <h3>Notifications</h3>
+                                <button id="mark-all-read" class="btn-link" title="Mark all as read">
+                                    Mark all read
+                                </button>
+                            </div>
+
+                            <div id="notification-list" class="notification-list">
+                                <!-- Notifications will be inserted here -->
+                            </div>
+
+                            <div id="notification-empty" class="notification-empty">
+                                <p>No notifications</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Language Switcher (hidden for demo) -->
+                    <div class="language-switcher" style="display:none">
+                        <button
+                            id="language-btn"
+                            class="btn-icon"
+                            aria-label="Change language"
+                            aria-haspopup="true"
+                            aria-expanded="false"
+                            title="Change language"
+                        >
+                            <span class="language-icon">🌐</span>
+                        </button>
+
+                        <div id="language-menu" class="language-menu hidden" role="menu" aria-label="Language selection">
+                            <button class="language-option" data-lang="en" role="menuitem">
+                                <span class="flag">🇺🇸</span>
+                                <span class="language-name">English</span>
+                            </button>
+                            <button class="language-option" data-lang="es" role="menuitem">
+                                <span class="flag">🇪🇸</span>
+                                <span class="language-name">Español</span>
+                            </button>
+                            <button class="language-option" data-lang="fr" role="menuitem">
+                                <span class="flag">🇫🇷</span>
+                                <span class="language-name">Français</span>
+                            </button>
+                            <button class="language-option" data-lang="de" role="menuitem">
+                                <span class="flag">🇩🇪</span>
+                                <span class="language-name">Deutsch</span>
+                            </button>
+                            <button class="language-option" data-lang="zh" role="menuitem">
+                                <span class="flag">🇨🇳</span>
+                                <span class="language-name">中文</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <span id="token-expires" class="token-info" aria-label="Token expiration time"></span>
+                    <span id="user-did" class="user-info" aria-label="Your DID"></span>
+                    <button id="edit-name-btn" class="btn-icon" title="Edit display name" aria-label="Edit display name" style="display:none;background:none;border:none;cursor:pointer;padding:2px 6px;font-size:0.9em;opacity:0.7;">&#9998;</button>
+                    <button id="logout-btn" class="btn btn-small" aria-label="Sign out" data-i18n="logout">Logout</button>
+                </div>
+            </header>
+
+            <!-- Navigation -->
+            <nav role="navigation" aria-label="Main navigation">
+                <button class="nav-btn active" data-tab="dashboard" aria-current="page">
+                    <span aria-label="Dashboard">Dashboard</span>
+                </button>
+                <button class="nav-btn" data-tab="log-hours">
+                    <span aria-label="Log service hours">Log Hours</span>
+                </button>
+                <button class="nav-btn" data-tab="history">
+                    <span aria-label="Transaction history">History</span>
+                </button>
+                <button class="nav-btn" data-tab="members">
+                    <span aria-label="Member directory">Members</span>
+                </button>
+                <button class="nav-btn hidden" data-tab="service-board">
+                    <span aria-label="Service marketplace">Services</span>
+                </button>
+                <button class="nav-btn" data-tab="member-profile">
+                    <span aria-label="Your profile">Profile</span>
+                </button>
+                <button class="nav-btn" data-tab="governance">
+                    <span aria-label="Governance and proposals">Governance</span>
+                </button>
+                <button class="nav-btn hidden" data-tab="exchange">
+                    <span aria-label="Internal exchange marketplace">Exchange</span>
+                </button>
+                <button class="nav-btn hidden" data-tab="receipts">
+                    <span aria-label="Economic receipt chain viewer">Receipts</span>
+                </button>
+            </nav>
+
+            <!-- Dashboard Tab -->
+            <main id="main-content" class="tab-container">
+                <div id="dashboard" class="tab-content active" role="tabpanel" aria-labelledby="tab-dashboard">
+                <div class="stats-grid" role="region" aria-label="Account statistics">
+                    <div class="stat-card">
+                        <div class="stat-value" id="my-balance" aria-label="Current balance">--</div>
+                        <div class="stat-label">My Balance</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="total-members" aria-label="Total cooperative members">--</div>
+                        <div class="stat-label">Members</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="monthly-hours" aria-label="Hours logged this month">--</div>
+                        <div class="stat-label">Hours This Month</div>
+                    </div>
+                </div>
+
+                <div class="card" role="region" aria-label="Balance history chart">
+                    <h2>Balance Over Time</h2>
+                    <canvas id="balance-chart" width="800" height="300" role="img" aria-label="Line chart showing balance over the last 30 days"></canvas>
+                    <div id="chart-description" class="sr-only">
+                        A line chart showing your timebank balance over the last 30 days
+                    </div>
+                </div>
+
+                <!-- Advanced Reports Section -->
+                <div class="card" role="region" aria-label="Advanced economic reports">
+                    <div class="card-header">
+                        <h2>Economic Health Dashboard</h2>
+                        <button id="toggle-advanced-reports" class="btn btn-small" aria-expanded="false">
+                            Show Details
+                        </button>
+                    </div>
+
+                    <div id="advanced-reports" class="advanced-reports hidden">
+                        <!-- Economic Health Metrics -->
+                        <div class="metrics-grid">
+                            <div class="metric-card">
+                                <div class="metric-label">Transaction Velocity</div>
+                                <div class="metric-value" id="metric-velocity">--</div>
+                                <div class="metric-desc">Transactions per member per month</div>
+                                <div class="metric-indicator" id="velocity-indicator"></div>
+                            </div>
+
+                            <div class="metric-card">
+                                <div class="metric-label">Participation Rate</div>
+                                <div class="metric-value" id="metric-participation">--</div>
+                                <div class="metric-desc">Active members (30 days)</div>
+                                <div class="metric-indicator" id="participation-indicator"></div>
+                            </div>
+
+                            <div class="metric-card">
+                                <div class="metric-label">Economic Inequality</div>
+                                <div class="metric-value" id="metric-gini">--</div>
+                                <div class="metric-desc">Gini coefficient (lower is better)</div>
+                                <div class="metric-indicator" id="gini-indicator"></div>
+                            </div>
+
+                            <div class="metric-card">
+                                <div class="metric-label">Hoarding Index</div>
+                                <div class="metric-value" id="metric-hoarding">--</div>
+                                <div class="metric-desc">High balances without transactions</div>
+                                <div class="metric-indicator" id="hoarding-indicator"></div>
+                            </div>
+                        </div>
+
+                        <!-- Velocity Chart (Transactions Over Time) -->
+                        <div class="chart-container">
+                            <h3>Transaction Velocity (Last 90 Days)</h3>
+                            <canvas id="velocity-chart" width="800" height="250" role="img" aria-label="Bar chart showing transaction volume over time"></canvas>
+                        </div>
+
+                        <!-- Participation Heatmap -->
+                        <div class="chart-container">
+                            <h3>Member Participation Heatmap (Last 30 Days)</h3>
+                            <div id="participation-heatmap" class="heatmap">
+                                <p class="loading">Loading participation data...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-row">
+                    <div class="card">
+                        <h2>Pending Proposals</h2>
+                        <div id="dashboard-proposals" class="proposal-summary">
+                            <p class="loading">Loading...</p>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h2>Top Contributors</h2>
+                        <div id="top-contributors" class="contributors-list">
+                            <p class="loading">Loading...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Recent Activity</h2>
+                    <div id="recent-activity" class="activity-list">
+                        <p class="loading">Loading...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Member Profile Tab -->
+            <div id="member-profile" class="tab-content" role="tabpanel" aria-labelledby="tab-profile">
+                <div class="card">
+                    <div class="profile-header">
+                        <div class="profile-avatar">
+                            <div class="avatar-placeholder" id="profile-avatar">
+                                <span id="profile-initials">?</span>
+                            </div>
+                        </div>
+                        <div class="profile-info">
+                            <h2 id="profile-name">Member Profile</h2>
+                            <p id="profile-did" class="did-display">did:icn:...</p>
+                            <div class="profile-stats">
+                                <span class="profile-stat">
+                                    <strong id="profile-balance">0</strong> balance
+                                </span>
+                                <span class="profile-stat">
+                                    <strong id="profile-tx-count">0</strong> transactions
+                                </span>
+                                <span class="profile-stat">
+                                    <strong id="profile-member-since">--</strong> member since
+                                </span>
+                            </div>
+                        </div>
+                        <button id="edit-profile-btn" class="btn btn-primary">Edit Profile</button>
+                    </div>
+
+                    <div class="profile-content">
+                        <!-- Bio Section -->
+                        <div class="profile-section">
+                            <h3>About</h3>
+                            <p id="profile-bio" class="profile-bio">No bio added yet.</p>
+                        </div>
+
+                        <!-- Skills Section -->
+                        <div class="profile-section">
+                            <h3>Skills & Services Offered</h3>
+                            <div id="profile-skills" class="skills-list">
+                                <p class="empty-state">No skills added yet.</p>
+                            </div>
+                        </div>
+
+                        <!-- Availability -->
+                        <div class="profile-section">
+                            <h3>Availability</h3>
+                            <div id="profile-availability" class="availability-display">
+                                <p class="empty-state">Availability not set.</p>
+                            </div>
+                        </div>
+
+                        <!-- Contact Preferences -->
+                        <div class="profile-section">
+                            <h3>Contact Preferences</h3>
+                            <div id="profile-contact" class="contact-info">
+                                <p class="empty-state">Contact information not provided.</p>
+                            </div>
+                        </div>
+
+                        <!-- Service History -->
+                        <div class="profile-section">
+                            <h3>Service History</h3>
+                            <div class="service-history-tabs">
+                                <button class="tab-btn active" data-history="given">Services Given</button>
+                                <button class="tab-btn" data-history="received">Services Received</button>
+                            </div>
+                            <div id="profile-service-history" class="service-history">
+                                <p class="loading">Loading service history...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Edit Profile Modal -->
+                <div id="edit-profile-modal" class="modal hidden" role="dialog" aria-labelledby="edit-profile-title" aria-modal="true">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h2 id="edit-profile-title">Edit Your Profile</h2>
+                            <button id="close-edit-profile" class="modal-close" aria-label="Close edit profile dialog">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="edit-profile-form">
+                                <div class="form-group">
+                                    <label for="edit-bio">Bio</label>
+                                    <textarea id="edit-bio" rows="4" placeholder="Tell others about yourself..."></textarea>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="edit-skills">Skills (comma-separated)</label>
+                                    <input type="text" id="edit-skills" placeholder="e.g., Gardening, Cooking, Teaching, Carpentry" />
+                                    <small>Add skills you can offer to the community</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="edit-availability">Availability</label>
+                                    <select id="edit-availability">
+                                        <option value="">Not specified</option>
+                                        <option value="weekdays">Weekdays</option>
+                                        <option value="weekends">Weekends</option>
+                                        <option value="flexible">Flexible</option>
+                                        <option value="by-appointment">By appointment only</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="edit-contact">Contact Information (optional)</label>
+                                    <textarea id="edit-contact" rows="2" placeholder="Email, phone, or preferred contact method"></textarea>
+                                    <small>This will be visible to other cooperative members</small>
+                                </div>
+
+                                <div class="form-actions">
+                                    <button type="button" class="btn btn-secondary" id="cancel-edit-profile">Cancel</button>
+                                    <button type="submit" class="btn btn-primary">Save Profile</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Service Board Tab -->
+            <div id="service-board" class="tab-content" role="tabpanel" aria-labelledby="tab-services">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Service Request Board</h2>
+                        <button id="post-service-btn" class="btn btn-primary">Post Request/Offer</button>
+                    </div>
+
+                    <!-- Service Board Filters -->
+                    <div class="service-filters">
+                        <div class="filter-group">
+                            <label for="service-type-filter">Type</label>
+                            <select id="service-type-filter">
+                                <option value="all">All</option>
+                                <option value="offer">Offers</option>
+                                <option value="request">Requests</option>
+                            </select>
+                        </div>
+
+                        <div class="filter-group">
+                            <label for="service-category-filter">Category</label>
+                            <select id="service-category-filter">
+                                <option value="all">All Categories</option>
+                                <option value="gardening">Gardening</option>
+                                <option value="cooking">Cooking</option>
+                                <option value="childcare">Childcare</option>
+                                <option value="teaching">Teaching</option>
+                                <option value="repairs">Repairs</option>
+                                <option value="transportation">Transportation</option>
+                                <option value="tech">Tech Support</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+
+                        <div class="filter-group">
+                            <label for="service-search">Search</label>
+                            <input type="text" id="service-search" placeholder="Search services..." />
+                        </div>
+                    </div>
+
+                    <!-- Service Listings -->
+                    <div id="service-listings" class="service-listings">
+                        <p class="loading">Loading services...</p>
+                    </div>
+                </div>
+
+                <!-- Post Service Modal -->
+                <div id="post-service-modal" class="modal hidden" role="dialog" aria-labelledby="post-service-title" aria-modal="true">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h2 id="post-service-title">Post Service Request/Offer</h2>
+                            <button id="close-post-service" class="modal-close" aria-label="Close post service dialog">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="post-service-form">
+                                <div class="form-group">
+                                    <label>Type</label>
+                                    <div class="radio-group">
+                                        <label>
+                                            <input type="radio" name="service-type" value="offer" checked />
+                                            I'm offering a service
+                                        </label>
+                                        <label>
+                                            <input type="radio" name="service-type" value="request" />
+                                            I need a service
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="service-title">Title</label>
+                                    <input type="text" id="service-title" required placeholder="e.g., Garden help needed" />
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="service-category">Category</label>
+                                    <select id="service-category" required>
+                                        <option value="">Select category...</option>
+                                        <option value="gardening">Gardening</option>
+                                        <option value="cooking">Cooking</option>
+                                        <option value="childcare">Childcare</option>
+                                        <option value="teaching">Teaching</option>
+                                        <option value="repairs">Repairs</option>
+                                        <option value="transportation">Transportation</option>
+                                        <option value="tech">Tech Support</option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="service-description">Description</label>
+                                    <textarea id="service-description" rows="4" required placeholder="Describe the service in detail..."></textarea>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="service-hours">Estimated Hours</label>
+                                    <input type="number" id="service-hours" min="0.25" step="0.25" placeholder="e.g., 2.5" />
+                                    <small>Optional: Estimated time for this service</small>
+                                </div>
+
+                                <div class="form-actions">
+                                    <button type="button" class="btn btn-secondary" id="cancel-post-service">Cancel</button>
+                                    <button type="submit" class="btn btn-primary">Post</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            </main>
+
+            <!-- Log Hours Tab -->
+            <main id="log-hours" class="tab-content">
+                <div class="card">
+                    <h2>Send Hours</h2>
+                    <p class="help-text">Give hours to a member who provided a service to you.</p>
+
+                    <form id="log-hours-form">
+                        <div class="form-group">
+                            <label for="recipient">Send To (who helped you)</label>
+                            <select id="recipient" required>
+                                <option value="">Select member...</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="hours">Hours</label>
+                            <input type="number" id="hours" min="0.25" step="0.25" required placeholder="e.g., 2.5" />
+                        </div>
+
+                        <div class="form-group">
+                            <label for="memo">Description</label>
+                            <textarea id="memo" rows="3" placeholder="What service did they provide?"></textarea>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">Send Hours</button>
+                    </form>
+
+                    <div id="log-result" class="result-message"></div>
+                </div>
+            </main>
+
+            <!-- History Tab -->
+            <main id="history" class="tab-content">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Transaction History</h2>
+                        <button id="toggle-advanced-filters" class="btn btn-small">Advanced Filters</button>
+                    </div>
+
+                    <!-- Basic Filters -->
+                    <div class="history-filters">
+                        <div class="filter-row">
+                            <div class="filter-group">
+                                <label for="transaction-search">Search</label>
+                                <input 
+                                    type="text" 
+                                    id="transaction-search" 
+                                    placeholder="Search by memo, DID, or amount..." 
+                                    aria-label="Search transactions"
+                                />
+                            </div>
+                            <div class="filter-group">
+                                <label for="history-filter">Time Period</label>
+                                <select id="history-filter" aria-label="Filter by time period">
+                                    <option value="all">All Time</option>
+                                    <option value="today">Today</option>
+                                    <option value="week">This Week</option>
+                                    <option value="month" selected>This Month</option>
+                                    <option value="year">This Year</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label for="transaction-sort">Sort By</label>
+                                <select id="transaction-sort" aria-label="Sort transactions">
+                                    <option value="date-desc">Newest First</option>
+                                    <option value="date-asc">Oldest First</option>
+                                    <option value="amount-desc">Highest Amount</option>
+                                    <option value="amount-asc">Lowest Amount</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Advanced Filters (Hidden by default) -->
+                    <div id="advanced-transaction-filters" class="advanced-filters hidden">
+                        <div class="filter-row">
+                            <div class="filter-group">
+                                <label for="filter-from-did">From (Sender)</label>
+                                <input 
+                                    type="text" 
+                                    id="filter-from-did" 
+                                    placeholder="DID or member name..." 
+                                    aria-label="Filter by sender"
+                                />
+                            </div>
+                            <div class="filter-group">
+                                <label for="filter-to-did">To (Recipient)</label>
+                                <input 
+                                    type="text" 
+                                    id="filter-to-did" 
+                                    placeholder="DID or member name..." 
+                                    aria-label="Filter by recipient"
+                                />
+                            </div>
+                        </div>
+                        <div class="filter-row">
+                            <div class="filter-group">
+                                <label for="filter-min-amount">Min Amount</label>
+                                <input 
+                                    type="number" 
+                                    id="filter-min-amount" 
+                                    min="0" 
+                                    step="0.5" 
+                                    placeholder="0" 
+                                    aria-label="Minimum amount"
+                                />
+                            </div>
+                            <div class="filter-group">
+                                <label for="filter-max-amount">Max Amount</label>
+                                <input 
+                                    type="number" 
+                                    id="filter-max-amount" 
+                                    min="0" 
+                                    step="0.5" 
+                                    placeholder="Any" 
+                                    aria-label="Maximum amount"
+                                />
+                            </div>
+                            <div class="filter-group">
+                                <label for="filter-currency">Currency</label>
+                                <select id="filter-currency" aria-label="Filter by currency">
+                                    <option value="all">All Currencies</option>
+                                    <option value="hours">Hours</option>
+                                    <option value="credits">Credits</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="filter-row">
+                            <div class="filter-group">
+                                <label for="filter-start-date">Start Date</label>
+                                <input 
+                                    type="date" 
+                                    id="filter-start-date" 
+                                    aria-label="Start date"
+                                />
+                            </div>
+                            <div class="filter-group">
+                                <label for="filter-end-date">End Date</label>
+                                <input 
+                                    type="date" 
+                                    id="filter-end-date" 
+                                    aria-label="End date"
+                                />
+                            </div>
+                            <div class="filter-actions">
+                                <button id="apply-transaction-filters" class="btn btn-primary">Apply Filters</button>
+                                <button id="clear-transaction-filters" class="btn btn-secondary">Clear</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Filter Summary -->
+                    <div id="filter-summary" class="filter-summary hidden">
+                        <span class="filter-label">Active Filters:</span>
+                        <div id="active-filter-tags" class="filter-tags"></div>
+                    </div>
+
+                    <!-- Export Controls -->
+                    <div class="export-controls">
+                        <button id="import-batch-btn" class="btn btn-small btn-primary">Import Batch</button>
+                        <button id="export-csv" class="btn btn-small">Export CSV</button>
+                        <button id="export-filtered-csv" class="btn btn-small" disabled>Export Filtered</button>
+                    </div>
+
+                    <div id="transaction-list" class="transaction-list">
+                        <p class="loading">Loading...</p>
+                    </div>
+
+                    <!-- Transaction Pagination -->
+                    <div id="transaction-pagination" class="pagination-controls hidden">
+                        <div class="pagination-info">
+                            <span id="transaction-page-info">Showing 1-10 of 0 transactions</span>
+                            <select id="transaction-page-size" aria-label="Items per page">
+                                <option value="10">10 per page</option>
+                                <option value="25" selected>25 per page</option>
+                                <option value="50">50 per page</option>
+                                <option value="100">100 per page</option>
+                            </select>
+                        </div>
+                        <div class="pagination-buttons">
+                            <button id="transaction-first-page" class="btn btn-small" aria-label="First page" disabled>
+                                ⟨⟨
+                            </button>
+                            <button id="transaction-prev-page" class="btn btn-small" aria-label="Previous page" disabled>
+                                ⟨
+                            </button>
+                            <span id="transaction-page-numbers" class="page-numbers"></span>
+                            <button id="transaction-next-page" class="btn btn-small" aria-label="Next page" disabled>
+                                ⟩
+                            </button>
+                            <button id="transaction-last-page" class="btn btn-small" aria-label="Last page" disabled>
+                                ⟩⟩
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Members Tab -->
+            <main id="members" class="tab-content">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Community Members</h2>
+                        <div class="member-controls">
+                            <input type="text" id="member-search" placeholder="Search members..." />
+                            <button id="add-member-btn" class="btn btn-primary admin-only hidden">+ Add Member</button>
+                            <button id="import-members-btn" class="btn btn-secondary">Import CSV</button>
+                        </div>
+                    </div>
+                    <div id="member-list" class="member-list">
+                        <p class="loading">Loading...</p>
+                    </div>
+
+                    <!-- Member Pagination -->
+                    <div id="member-pagination" class="pagination-controls hidden">
+                        <div class="pagination-info">
+                            <span id="member-page-info">Showing 1-10 of 0 members</span>
+                            <select id="member-page-size" aria-label="Items per page">
+                                <option value="10">10 per page</option>
+                                <option value="25" selected>25 per page</option>
+                                <option value="50">50 per page</option>
+                                <option value="100">100 per page</option>
+                            </select>
+                        </div>
+                        <div class="pagination-buttons">
+                            <button id="member-first-page" class="btn btn-small" aria-label="First page" disabled>
+                                ⟨⟨
+                            </button>
+                            <button id="member-prev-page" class="btn btn-small" aria-label="Previous page" disabled>
+                                ⟨
+                            </button>
+                            <span id="member-page-numbers" class="page-numbers"></span>
+                            <button id="member-next-page" class="btn btn-small" aria-label="Next page" disabled>
+                                ⟩
+                            </button>
+                            <button id="member-last-page" class="btn btn-small" aria-label="Last page" disabled>
+                                ⟩⟩
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Invites Card (Admin Only) -->
+                <div class="card admin-only hidden" id="invites-card">
+                    <div class="card-header">
+                        <h2>Member Invitations</h2>
+                        <button id="create-invite-btn" class="btn btn-primary">+ Create Invite</button>
+                    </div>
+                    <div id="invite-list" class="invite-list">
+                        <p class="loading">Loading invites...</p>
+                    </div>
+                </div>
+
+                <!-- Import Members Modal -->
+                <div id="import-members-modal" class="modal hidden" role="dialog" aria-labelledby="import-members-title" aria-modal="true">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h2 id="import-members-title">Import Members from CSV</h2>
+                            <button id="close-import-members" class="modal-close" aria-label="Close import members dialog">&times;</button>
+                        </div>
+
+                        <div class="modal-body">
+                            <div id="import-step-1" class="import-step">
+                                <h3>Step 1: Upload CSV File</h3>
+                                <p class="help-text">
+                                    Upload a CSV file with member data. Required columns: <code>did</code>, <code>role</code>, <code>balance</code>
+                                </p>
+
+                                <div class="csv-template">
+                                    <h4>Template Format:</h4>
+                                    <pre><code>did,role,balance
+did:icn:alice123,member,10.5
+did:icn:bob456,admin,-5.0
+did:icn:charlie789,member,0</code></pre>
+                                    <button id="download-template" class="btn btn-small btn-secondary">Download Template</button>
+                                </div>
+
+                                <div class="file-upload-area" id="csv-upload-area">
+                                    <input type="file" id="csv-file-input" accept=".csv" hidden />
+                                    <label for="csv-file-input" class="file-upload-label">
+                                        <span class="upload-icon">📁</span>
+                                        <span class="upload-text">Click to select CSV file or drag and drop</span>
+                                        <span class="upload-hint">CSV files only</span>
+                                    </label>
+                                </div>
+
+                                <div id="file-info" class="file-info hidden">
+                                    <p><strong>Selected file:</strong> <span id="file-name"></span></p>
+                                    <p><strong>File size:</strong> <span id="file-size"></span></p>
+                                </div>
+                            </div>
+
+                            <div id="import-step-2" class="import-step hidden">
+                                <h3>Step 2: Preview & Validate</h3>
+                                <div id="import-stats" class="import-stats">
+                                    <div class="stat">
+                                        <span class="stat-value" id="total-rows">0</span>
+                                        <span class="stat-label">Total Rows</span>
+                                    </div>
+                                    <div class="stat">
+                                        <span class="stat-value" id="valid-rows">0</span>
+                                        <span class="stat-label">Valid</span>
+                                    </div>
+                                    <div class="stat">
+                                        <span class="stat-value" id="invalid-rows">0</span>
+                                        <span class="stat-label">Invalid</span>
+                                    </div>
+                                </div>
+
+                                <div id="validation-errors" class="validation-errors hidden">
+                                    <h4>Validation Errors:</h4>
+                                    <ul id="error-list"></ul>
+                                </div>
+
+                                <div id="import-preview" class="import-preview">
+                                    <h4>Preview (first 10 rows):</h4>
+                                    <div class="table-wrapper">
+                                        <table id="preview-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>DID</th>
+                                                    <th>Role</th>
+                                                    <th>Balance</th>
+                                                    <th>Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="preview-body"></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="import-step-3" class="import-step hidden">
+                                <h3>Step 3: Import Complete</h3>
+                                <div class="import-success">
+                                    <div class="success-icon">✓</div>
+                                    <p><strong id="imported-count">0</strong> members imported successfully!</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="modal-footer">
+                            <button id="import-back-btn" class="btn btn-secondary hidden">Back</button>
+                            <button id="import-cancel-btn" class="btn btn-secondary">Cancel</button>
+                            <button id="import-next-btn" class="btn btn-primary" disabled>Next</button>
+                            <button id="import-confirm-btn" class="btn btn-primary hidden" disabled>Import Members</button>
+                            <button id="import-close-btn" class="btn btn-primary hidden">Close</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Add Member Modal -->
+                <div id="add-member-modal" class="modal hidden" role="dialog" aria-labelledby="add-member-title" aria-modal="true">
+                    <div class="modal-content modal-small">
+                        <div class="modal-header">
+                            <h2 id="add-member-title">Add Member</h2>
+                            <button id="close-add-member" class="modal-close" aria-label="Close add member dialog">&times;</button>
+                        </div>
+
+                        <div class="modal-body">
+                            <form id="add-member-form">
+                                <div class="form-group">
+                                    <label for="new-member-did">Member DID</label>
+                                    <input type="text" id="new-member-did" placeholder="did:icn:..." required />
+                                    <p class="help-text">The decentralized identifier of the member to add</p>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="new-member-role">Role</label>
+                                    <select id="new-member-role" required>
+                                        <option value="member">Member</option>
+                                        <option value="admin">Admin</option>
+                                    </select>
+                                    <p class="help-text">Admins can manage members and settings</p>
+                                </div>
+                            </form>
+                        </div>
+
+                        <div class="modal-footer">
+                            <button id="add-member-cancel-btn" class="btn btn-secondary">Cancel</button>
+                            <button id="add-member-submit-btn" class="btn btn-primary">Add Member</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Edit Member Role Modal -->
+                <div id="edit-member-modal" class="modal hidden" role="dialog" aria-labelledby="edit-member-title" aria-modal="true">
+                    <div class="modal-content modal-small">
+                        <div class="modal-header">
+                            <h2 id="edit-member-title">Edit Member Role</h2>
+                            <button id="close-edit-member" class="modal-close" aria-label="Close edit member dialog">&times;</button>
+                        </div>
+
+                        <div class="modal-body">
+                            <p id="edit-member-did-display" class="member-did-display"></p>
+                            <input type="hidden" id="edit-member-did" />
+
+                            <div class="form-group">
+                                <label for="edit-member-role">New Role</label>
+                                <select id="edit-member-role" required>
+                                    <option value="member">Member</option>
+                                    <option value="admin">Admin</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="modal-footer">
+                            <button id="edit-member-cancel-btn" class="btn btn-secondary">Cancel</button>
+                            <button id="edit-member-submit-btn" class="btn btn-primary">Update Role</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Remove Member Confirmation Modal -->
+                <div id="remove-member-modal" class="modal hidden" role="dialog" aria-labelledby="remove-member-title" aria-modal="true">
+                    <div class="modal-content modal-small">
+                        <div class="modal-header">
+                            <h2 id="remove-member-title">Remove Member</h2>
+                            <button id="close-remove-member" class="modal-close" aria-label="Close remove member dialog">&times;</button>
+                        </div>
+
+                        <div class="modal-body">
+                            <p class="warning-text">Are you sure you want to remove this member?</p>
+                            <p id="remove-member-did-display" class="member-did-display"></p>
+                            <input type="hidden" id="remove-member-did" />
+                            <p class="help-text">This action cannot be undone. The member will lose access to the cooperative.</p>
+                        </div>
+
+                        <div class="modal-footer">
+                            <button id="remove-member-cancel-btn" class="btn btn-secondary">Cancel</button>
+                            <button id="remove-member-submit-btn" class="btn btn-danger">Remove Member</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Create Invite Modal -->
+                <div id="create-invite-modal" class="modal hidden" role="dialog" aria-labelledby="create-invite-title" aria-modal="true">
+                    <div class="modal-content modal-small">
+                        <div class="modal-header">
+                            <h2 id="create-invite-title">Create Invite Code</h2>
+                            <button id="close-create-invite" class="modal-close" aria-label="Close create invite dialog">&times;</button>
+                        </div>
+
+                        <div class="modal-body">
+                            <form id="create-invite-form">
+                                <div class="form-group">
+                                    <label for="invite-role">Member Role</label>
+                                    <select id="invite-role" required>
+                                        <option value="member">Member</option>
+                                        <option value="admin">Admin</option>
+                                        <option value="participant">Participant</option>
+                                        <option value="facilitator">Facilitator</option>
+                                    </select>
+                                    <p class="help-text">The role this invite will grant</p>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="invite-expiration">Expires In</label>
+                                    <select id="invite-expiration" required>
+                                        <option value="86400">1 day</option>
+                                        <option value="259200">3 days</option>
+                                        <option value="604800" selected>7 days</option>
+                                        <option value="1209600">14 days</option>
+                                        <option value="2592000">30 days</option>
+                                    </select>
+                                    <p class="help-text">How long this invite code will be valid</p>
+                                </div>
+                            </form>
+
+                            <div id="invite-result" class="invite-result hidden">
+                                <div class="invite-code-display">
+                                    <label>Invite Code:</label>
+                                    <div class="code-box">
+                                        <code id="generated-invite-code"></code>
+                                        <button id="copy-invite-code" class="btn-copy" title="Copy code">Copy</button>
+                                    </div>
+                                </div>
+                                <div class="invite-url-display">
+                                    <label>Share Link:</label>
+                                    <div class="url-box">
+                                        <input type="text" id="generated-invite-url" readonly />
+                                        <button id="copy-invite-url" class="btn-copy" title="Copy link">Copy</button>
+                                    </div>
+                                </div>
+                                <p class="help-text">Share this code or link with the person you want to invite.</p>
+                            </div>
+                        </div>
+
+                        <div class="modal-footer">
+                            <button id="create-invite-cancel-btn" class="btn btn-secondary">Cancel</button>
+                            <button id="create-invite-submit-btn" class="btn btn-primary">Create Invite</button>
+                            <button id="create-invite-done-btn" class="btn btn-primary hidden">Done</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Batch Transaction Import Modal -->
+                <div id="import-batch-modal" class="modal hidden" role="dialog" aria-labelledby="import-batch-title" aria-modal="true">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h2 id="import-batch-title">Import Batch Transactions</h2>
+                            <button id="close-import-batch" class="modal-close" aria-label="Close import batch dialog">&times;</button>
+                        </div>
+
+                        <div class="modal-body">
+                            <div id="batch-step-1" class="import-step">
+                                <h3>Step 1: Upload CSV File</h3>
+                                <p class="help-text">
+                                    Upload a CSV file with transaction data. Required columns: <code>from</code>, <code>to</code>, <code>amount</code>, <code>memo</code>
+                                </p>
+
+                                <div class="csv-template">
+                                    <h4>Template Format:</h4>
+                                    <pre><code>from,to,amount,memo
+did:icn:alice,did:icn:bob,2.5,Garden work
+did:icn:bob,did:icn:charlie,1.0,Tech support
+did:icn:charlie,did:icn:alice,3.5,Childcare</code></pre>
+                                    <button id="download-batch-template" class="btn btn-small btn-secondary">Download Template</button>
+                                </div>
+
+                                <div class="file-upload-area" id="batch-upload-area">
+                                    <input type="file" id="batch-file-input" accept=".csv" hidden />
+                                    <label for="batch-file-input" class="file-upload-label">
+                                        <span class="upload-icon">📁</span>
+                                        <span class="upload-text">Click to select CSV file or drag and drop</span>
+                                        <span class="upload-hint">CSV files only</span>
+                                    </label>
+                                </div>
+
+                                <div id="batch-file-info" class="file-info hidden">
+                                    <p><strong>Selected file:</strong> <span id="batch-file-name"></span></p>
+                                    <p><strong>File size:</strong> <span id="batch-file-size"></span></p>
+                                </div>
+                            </div>
+
+                            <div id="batch-step-2" class="import-step hidden">
+                                <h3>Step 2: Preview & Validate</h3>
+                                <div id="batch-stats" class="import-stats">
+                                    <div class="stat">
+                                        <span class="stat-value" id="batch-total-rows">0</span>
+                                        <span class="stat-label">Total Rows</span>
+                                    </div>
+                                    <div class="stat">
+                                        <span class="stat-value" id="batch-valid-rows">0</span>
+                                        <span class="stat-label">Valid</span>
+                                    </div>
+                                    <div class="stat">
+                                        <span class="stat-value" id="batch-invalid-rows">0</span>
+                                        <span class="stat-label">Invalid</span>
+                                    </div>
+                                    <div class="stat">
+                                        <span class="stat-value" id="batch-total-amount">0.0</span>
+                                        <span class="stat-label">Total Hours</span>
+                                    </div>
+                                </div>
+
+                                <div id="batch-errors" class="validation-errors hidden">
+                                    <h4>Validation Errors:</h4>
+                                    <ul id="batch-error-list"></ul>
+                                </div>
+
+                                <div id="batch-preview" class="import-preview">
+                                    <h4>Preview (first 10 rows):</h4>
+                                    <div class="table-wrapper">
+                                        <table id="batch-preview-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>From</th>
+                                                    <th>To</th>
+                                                    <th>Amount</th>
+                                                    <th>Memo</th>
+                                                    <th>Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="batch-preview-body"></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="batch-step-3" class="import-step hidden">
+                                <h3>Step 3: Import Complete</h3>
+                                <div class="import-success">
+                                    <div class="success-icon">✓</div>
+                                    <p><strong id="batch-imported-count">0</strong> transactions imported successfully!</p>
+                                    <p><strong id="batch-imported-total">0.0</strong> total hours transferred</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="modal-footer">
+                            <button id="batch-back-btn" class="btn btn-secondary hidden">Back</button>
+                            <button id="batch-cancel-btn" class="btn btn-secondary">Cancel</button>
+                            <button id="batch-next-btn" class="btn btn-primary" disabled>Next</button>
+                            <button id="batch-confirm-btn" class="btn btn-primary hidden" disabled>Import Transactions</button>
+                            <button id="batch-close-btn" class="btn btn-primary hidden">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Governance Tab -->
+            <main id="governance" class="tab-content">
+                <!-- Governance Sub-tabs -->
+                <div class="governance-tabs">
+                    <button class="tab-btn active" data-governance-tab="proposals">Proposals</button>
+                    <button class="tab-btn" data-governance-tab="action-items">Action Items</button>
+                </div>
+
+                <!-- Proposals Sub-tab -->
+                <div id="governance-proposals" class="governance-subtab">
+                    <div class="card">
+                        <h2>Active Proposals</h2>
+                        <p class="subtitle">Vote on community decisions</p>
+                        <div id="proposal-list" class="proposal-list">
+                            <p class="loading">Loading...</p>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h2>Recent Decisions</h2>
+                        <div id="closed-proposals" class="proposal-list">
+                            <p class="empty-state">No closed proposals yet</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Proposal Detail Sub-tab (hidden by default, shown when a proposal is clicked) -->
+                <div id="governance-proposal-detail" class="governance-subtab hidden">
+                    <div class="proposal-detail-layout">
+                        <!-- Back button -->
+                        <button id="proposal-detail-back" class="btn btn-secondary btn-small">
+                            &larr; Back to Proposals
+                        </button>
+
+                        <!-- Main content area (2-column: content + sidebar) -->
+                        <div class="proposal-detail-grid">
+                            <div class="proposal-detail-main">
+                                <!-- Header: title, state badge, proposer -->
+                                <div id="proposal-detail-header" class="card"></div>
+                                <!-- Description + payload -->
+                                <div id="proposal-detail-body" class="card"></div>
+                                <!-- Vote panel: progress bars + vote buttons -->
+                                <div id="proposal-detail-votes" class="card"></div>
+                                <!-- Discussion thread -->
+                                <div id="proposal-detail-discussion" class="card"></div>
+                            </div>
+                            <div class="proposal-detail-sidebar">
+                                <!-- Metadata: state, dates, proposer, proof link -->
+                                <div id="proposal-detail-meta" class="card"></div>
+                                <!-- Timeline: created → deliberation → open → closed -->
+                                <div id="proposal-detail-timeline" class="card"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Items Sub-tab -->
+                <div id="governance-action-items" class="governance-subtab hidden">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2>Action Items</h2>
+                            <button id="add-action-item-btn" class="btn btn-small btn-primary">+ New Item</button>
+                        </div>
+
+                        <!-- Action Items Filter -->
+                        <div class="action-items-filter">
+                            <button class="filter-btn active" data-filter="all">All</button>
+                            <button class="filter-btn" data-filter="mine">My Items</button>
+                            <button class="filter-btn" data-filter="overdue">Overdue</button>
+                            <button class="filter-btn" data-filter="pending">Pending</button>
+                            <button class="filter-btn" data-filter="completed">Completed</button>
+                        </div>
+
+                        <div id="action-items-list" class="action-items-list">
+                            <p class="loading">Loading...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Create Action Item Modal -->
+                <div id="create-action-item-modal" class="modal hidden" role="dialog" aria-labelledby="create-action-item-title" aria-modal="true">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h2 id="create-action-item-title">New Action Item</h2>
+                            <button id="close-create-action-item" class="modal-close" aria-label="Close create action item dialog">&times;</button>
+                        </div>
+
+                        <div class="modal-body">
+                            <form id="create-action-item-form">
+                                <div class="form-group">
+                                    <label for="action-item-title">Title</label>
+                                    <input type="text" id="action-item-title" placeholder="e.g., Review budget proposal" required maxlength="200" />
+                                    <p class="help-text">A clear, actionable description</p>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="action-item-description">Description (optional)</label>
+                                    <textarea id="action-item-description" rows="3" placeholder="Additional context or details..."></textarea>
+                                </div>
+
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="action-item-assignee">Assignee</label>
+                                        <select id="action-item-assignee">
+                                            <option value="">Unassigned</option>
+                                        </select>
+                                        <p class="help-text">Who is responsible?</p>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="action-item-priority">Priority</label>
+                                        <select id="action-item-priority">
+                                            <option value="low">Low</option>
+                                            <option value="medium" selected>Medium</option>
+                                            <option value="high">High</option>
+                                            <option value="critical">Critical</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="action-item-due-date">Due Date (optional)</label>
+                                        <input type="date" id="action-item-due-date" />
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="action-item-meeting">Meeting Context (optional)</label>
+                                        <input type="text" id="action-item-meeting" placeholder="e.g., 2026-01-17 board meeting" />
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="action-item-tags">Tags (comma-separated, optional)</label>
+                                    <input type="text" id="action-item-tags" placeholder="e.g., budget, urgent, q1-2026" />
+                                </div>
+                            </form>
+                        </div>
+
+                        <div class="modal-footer">
+                            <button id="create-action-item-cancel-btn" class="btn btn-secondary">Cancel</button>
+                            <button id="create-action-item-submit-btn" class="btn btn-primary">Create Item</button>
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Exchange Tab -->
+            <main id="exchange" class="tab-content">
+                <!-- Exchange Sub-tabs -->
+                <div class="exchange-tabs">
+                    <button class="tab-btn active" data-exchange-tab="browse">Browse Listings</button>
+                    <button class="tab-btn" data-exchange-tab="my-listings">My Listings</button>
+                </div>
+
+                <!-- Browse Listings Sub-tab -->
+                <div id="exchange-browse" class="exchange-subtab">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2>Exchange</h2>
+                            <button id="create-listing-btn" class="btn btn-small btn-primary">+ Post Listing</button>
+                        </div>
+                        <p class="subtitle">Find what you need, share what you have</p>
+
+                        <!-- Listing Filters -->
+                        <div class="listing-filters">
+                            <button class="filter-btn active" data-listing-filter="all">All</button>
+                            <button class="filter-btn" data-listing-filter="offer">Offers</button>
+                            <button class="filter-btn" data-listing-filter="want">Wants</button>
+                        </div>
+
+                        <div class="category-filters">
+                            <select id="listing-category-filter">
+                                <option value="">All Categories</option>
+                                <option value="equipment">Equipment</option>
+                                <option value="services">Services</option>
+                                <option value="materials">Materials</option>
+                                <option value="space">Space</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+
+                        <div id="listings-grid" class="listings-grid">
+                            <p class="loading">Loading...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- My Listings Sub-tab -->
+                <div id="exchange-my-listings" class="exchange-subtab hidden">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2>My Listings</h2>
+                            <button id="create-listing-btn-2" class="btn btn-small btn-primary">+ Post Listing</button>
+                        </div>
+                        <p class="subtitle">Manage your offers and wants</p>
+
+                        <div id="my-listings-list" class="listings-grid">
+                            <p class="loading">Loading...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Create Listing Modal -->
+                <div id="create-listing-modal" class="modal hidden" role="dialog" aria-labelledby="create-listing-title" aria-modal="true">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h2 id="create-listing-title">Post a Listing</h2>
+                            <button id="close-create-listing" class="modal-close" aria-label="Close create listing dialog">&times;</button>
+                        </div>
+
+                        <div class="modal-body">
+                            <form id="create-listing-form">
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="listing-type">Type</label>
+                                        <select id="listing-type" required>
+                                            <option value="offer">Offer - I have something to share</option>
+                                            <option value="want">Want - I'm looking for something</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="listing-category">Category</label>
+                                        <select id="listing-category" required>
+                                            <option value="equipment">Equipment</option>
+                                            <option value="services">Services</option>
+                                            <option value="materials">Materials</option>
+                                            <option value="space">Space</option>
+                                            <option value="other">Other</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="listing-title">Title</label>
+                                    <input type="text" id="listing-title" placeholder="e.g., Commercial pizza oven available" required maxlength="100" />
+                                    <p class="help-text">A short, descriptive title</p>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="listing-description">Description</label>
+                                    <textarea id="listing-description" rows="4" placeholder="Describe what you're offering or looking for, including condition, specifications, etc." required></textarea>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="listing-seeking">What are you looking for in exchange?</label>
+                                    <input type="text" id="listing-seeking" placeholder="e.g., Credits, labor exchange, or make offer" required />
+                                    <p class="help-text">What would you accept in return?</p>
+                                </div>
+
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="listing-visibility">Visibility</label>
+                                        <select id="listing-visibility">
+                                            <option value="coop">My Coop Only</option>
+                                            <option value="federation" selected>Federation</option>
+                                            <option value="network">Entire Network</option>
+                                        </select>
+                                        <p class="help-text">Who can see this listing?</p>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="listing-expires">Expires (optional)</label>
+                                        <input type="date" id="listing-expires" />
+                                        <p class="help-text">Leave empty for no expiration</p>
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="listing-photos">Photo URLs (one per line, optional)</label>
+                                    <textarea id="listing-photos" rows="2" placeholder="https://example.com/photo1.jpg&#10;https://example.com/photo2.jpg"></textarea>
+                                    <p class="help-text">Direct links to images</p>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="listing-tags">Tags (comma-separated, optional)</label>
+                                    <input type="text" id="listing-tags" placeholder="e.g., kitchen, restaurant, commercial" />
+                                </div>
+                            </form>
+                        </div>
+
+                        <div class="modal-footer">
+                            <button id="create-listing-cancel-btn" class="btn btn-secondary">Cancel</button>
+                            <button id="create-listing-submit-btn" class="btn btn-primary">Post Listing</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Listing Detail Modal -->
+                <div id="listing-detail-modal" class="modal hidden" role="dialog" aria-labelledby="listing-detail-title" aria-modal="true">
+                    <div class="modal-content modal-large">
+                        <div class="modal-header">
+                            <h2 id="listing-detail-title">Listing Details</h2>
+                            <button id="close-listing-detail" class="modal-close" aria-label="Close listing detail">&times;</button>
+                        </div>
+
+                        <div class="modal-body">
+                            <div id="listing-detail-content">
+                                <div class="listing-detail-header">
+                                    <span id="listing-detail-type" class="listing-type-badge"></span>
+                                    <span id="listing-detail-category" class="listing-category-badge"></span>
+                                    <span id="listing-detail-status" class="listing-status-badge"></span>
+                                </div>
+
+                                <h3 id="listing-detail-title-text" class="listing-detail-title-text"></h3>
+
+                                <div class="listing-detail-meta">
+                                    <span id="listing-detail-coop"></span>
+                                    <span id="listing-detail-date"></span>
+                                </div>
+
+                                <div id="listing-detail-photos" class="listing-detail-photos"></div>
+
+                                <div class="listing-detail-section">
+                                    <h4>Description</h4>
+                                    <p id="listing-detail-description"></p>
+                                </div>
+
+                                <div class="listing-detail-section">
+                                    <h4>Looking For</h4>
+                                    <p id="listing-detail-seeking"></p>
+                                </div>
+
+                                <div id="listing-detail-tags" class="listing-detail-tags"></div>
+
+                                <div id="listing-detail-interests" class="listing-detail-section hidden">
+                                    <h4>Interest Expressed</h4>
+                                    <div id="listing-interests-list"></div>
+                                </div>
+                            </div>
+
+                            <div id="express-interest-section" class="express-interest-section hidden">
+                                <h4>Express Interest</h4>
+                                <form id="express-interest-form">
+                                    <div class="form-group">
+                                        <label for="interest-message">Message</label>
+                                        <textarea id="interest-message" rows="3" placeholder="Introduce yourself and explain your interest..." required></textarea>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="interest-offer">Your Offer (optional)</label>
+                                        <input type="text" id="interest-offer" placeholder="What can you offer in exchange?" />
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+
+                        <div class="modal-footer">
+                            <button id="listing-detail-close-btn" class="btn btn-secondary">Close</button>
+                            <button id="listing-detail-interest-btn" class="btn btn-primary hidden">Express Interest</button>
+                            <button id="submit-interest-btn" class="btn btn-primary hidden">Send Interest</button>
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Receipts Tab -->
+            <main id="receipts" class="tab-content" role="tabpanel" aria-labelledby="tab-receipts">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Economic Receipt Chain</h2>
+                    </div>
+                    <p class="subtitle">View the provenance chain: Decision → Allocation → Intent → Ledger</p>
+
+                    <div class="form-group">
+                        <label for="decision-hash-input">Decision Hash</label>
+                        <input 
+                            type="text" 
+                            id="decision-hash-input" 
+                            placeholder="Enter 64-character hex hash (e.g., 2a2a2a...)"
+                            pattern="[0-9a-fA-F]{64}"
+                            maxlength="64"
+                            aria-describedby="decision-hash-hint"
+                        />
+                        <small id="decision-hash-hint">64 hex characters representing the governance decision hash</small>
+                    </div>
+
+                    <button id="query-chain-btn" class="btn btn-primary">Query Chain</button>
+                </div>
+
+                <!-- Chain Results -->
+                <div id="receipt-chain-results" class="card hidden">
+                    <div class="card-header">
+                        <h3>Receipt Chain</h3>
+                        <div class="chain-actions">
+                            <span id="chain-status" class="status-badge"></span>
+                            <button id="copy-chain-btn" class="btn btn-small" title="Copy chain summary">Copy</button>
+                        </div>
+                    </div>
+
+                    <!-- Allocation Receipts -->
+                    <div id="allocations-section" class="receipt-section">
+                        <h4>Allocation Receipts</h4>
+                        <div id="allocations-list" class="receipt-list">
+                            <p class="empty-state">No allocations found</p>
+                        </div>
+                    </div>
+
+                    <!-- Settlement Intents -->
+                    <div id="intents-section" class="receipt-section">
+                        <h4>Settlement Intents</h4>
+                        <div id="intents-list" class="receipt-list">
+                            <p class="empty-state">No intents found</p>
+                        </div>
+                    </div>
+
+                    <!-- Ledger Entries -->
+                    <div id="ledger-section" class="receipt-section">
+                        <h4>Ledger Entries</h4>
+                        <div id="ledger-list" class="receipt-list">
+                            <p class="empty-state">No ledger entries found</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Error/Status Messages -->
+                <div id="receipt-error" class="card error-card hidden">
+                    <p id="receipt-error-message"></p>
+                </div>
+
+                <!-- Invariants Section -->
+                <div class="card">
+                    <h3>Receipt Chain Invariants</h3>
+                    <ul class="invariants-list">
+                        <li><strong>Cross-node determinism:</strong> Same inputs → same canonical hashes</li>
+                        <li><strong>Order-independence:</strong> Intent order does not affect allocation hash</li>
+                        <li><strong>Provenance chain:</strong> Every ledger entry links back to its decision</li>
+                    </ul>
+                </div>
+            </main>
+
+            <!-- Status Bar -->
+            <footer>
+                <span id="connection-status" class="status-indicator">
+                    <span class="status-dot"></span>
+                    Connected
+                </span>
+                <span id="last-update"></span>
+            </footer>
+        </div>
+    </div>
+
+    <script src="offline-storage.js"></script>
+    <script src="app.js?v=1771017695"></script>
+    <script src="receipts.js"></script>
+</body>
+</html>

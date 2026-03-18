@@ -1,0 +1,16 @@
+[package]
+name = "icn-wasm-example"
+version = "0.1.0"
+edition = "2021"
+description = "Example WASM modules for ICN distributed compute"
+
+[lib]
+crate-type = ["cdylib"]
+
+[profile.release]
+opt-level = "s"      # Optimize for size
+lto = true           # Link-time optimization
+codegen-units = 1    # Better optimization
+strip = true         # Strip symbols
+
+[dependencies]

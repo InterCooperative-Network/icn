@@ -1,0 +1,86 @@
+name: Weekly Security Audit
+
+on:
+  schedule:
+    # Run every Monday at 6:00 AM UTC
+    - cron: '0 6 * * 1'
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "icn -> target"
+
+      - name: Install security tools
+        run: |
+          cargo install cargo-audit --locked
+          cargo install cargo-deny --locked
+          cargo install cargo-outdated --locked
+
+      - name: Run cargo-audit
+        run: cargo audit
+        working-directory: ./icn
+
+      - name: Run cargo-deny full check
+        run: cargo deny check
+        working-directory: ./icn
+
+      - name: Check for outdated dependencies
+        run: cargo outdated --workspace --depth 1
+        working-directory: ./icn
+        continue-on-error: true  # Informational only
+
+      - name: Create issue on failure
+        if: failure()
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const title = 'Weekly Security Audit Failed';
+            const body = `The weekly security audit has detected issues that need attention.
+
+            **Workflow Run:** ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}
+
+            Please review the workflow logs and address any security advisories.
+
+            ---
+            _This issue was automatically created by the weekly security audit workflow._`;
+
+            // Check if an issue already exists
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'security-audit'
+            });
+
+            const existingIssue = issues.data.find(issue => issue.title === title);
+
+            if (existingIssue) {
+              // Add a comment to the existing issue
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existingIssue.number,
+                body: `Another security audit failure detected.\n\n**Workflow Run:** ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+              });
+            } else {
+              // Create a new issue
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: title,
+                body: body,
+                labels: ['priority:critical', 'type:impl']
+              });
+            }

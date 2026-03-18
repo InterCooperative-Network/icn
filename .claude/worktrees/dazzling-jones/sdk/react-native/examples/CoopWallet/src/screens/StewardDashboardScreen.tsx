@@ -1,0 +1,465 @@
+/**
+ * Steward Dashboard Screen
+ *
+ * Main dashboard for stewards to review and approve SDIS enrollments.
+ */
+
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  FlatList,
+  RefreshControl,
+  ActivityIndicator,
+} from 'react-native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { usePendingEnrollments, useStewardStats, Enrollment } from '@icn/react-native';
+import { client } from '../client';
+import { RootStackParamList } from '../../App';
+import { useTheme, Theme } from '../contexts/ThemeContext';
+
+type Props = {
+  navigation: NativeStackNavigationProp<RootStackParamList, 'StewardDashboard'>;
+};
+
+export function StewardDashboardScreen({ navigation }: Props) {
+  const { theme } = useTheme();
+  const styles = createStyles(theme);
+  const [activeTab, setActiveTab] = useState<'pending' | 'stats'>('pending');
+
+  const {
+    enrollments,
+    pendingCount,
+    isLoading: enrollmentsLoading,
+    error: enrollmentsError,
+    refresh: refreshEnrollments,
+  } = usePendingEnrollments(client!, { autoRefresh: true, refreshInterval: 30000 });
+
+  const {
+    stats,
+    isLoading: statsLoading,
+    error: statsError,
+    refresh: refreshStats,
+  } = useStewardStats(client!);
+
+  const handleRefresh = () => {
+    refreshEnrollments();
+    refreshStats();
+  };
+
+  const renderEnrollmentCard = ({ item }: { item: Enrollment }) => (
+    <TouchableOpacity
+      style={styles.enrollmentCard}
+      onPress={() => navigation.navigate('EnrollmentDetail', { enrollmentId: item.enrollment_id })}
+      accessibilityRole="button"
+      accessibilityLabel={`Review ${item.identity_name}'s enrollment, level ${item.level}, ${formatStatus(item.status)}`}
+    >
+      <View style={styles.cardHeader}>
+        <Text style={styles.identityName}>{item.identity_name}</Text>
+        <View style={[styles.levelBadge, getLevelStyle(item.level, theme)]}>
+          <Text style={styles.levelText}>Level {item.level}</Text>
+        </View>
+      </View>
+      <View style={styles.cardMeta}>
+        <Text style={styles.metaText}>Coop: {item.coop_id}</Text>
+        <Text style={styles.metaText}>
+          Expires: {new Date(item.expires_at).toLocaleDateString()}
+        </Text>
+      </View>
+      <View style={styles.statusRow}>
+        <Text style={styles.statusLabel}>Status: </Text>
+        <Text style={styles.statusValue}>{formatStatus(item.status)}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+
+  const renderStatsTab = () => (
+    <View style={styles.statsContainer}>
+      {statsLoading ? (
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+      ) : statsError ? (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText} accessibilityRole="alert">{statsError}</Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={refreshStats}
+            accessibilityRole="button"
+            accessibilityLabel="Retry loading statistics"
+          >
+            <Text style={styles.retryText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      ) : stats ? (
+        <>
+          <View style={styles.statsGrid}>
+            <View style={styles.statCard}>
+              <Text style={styles.statValue}>{stats.total_vouches}</Text>
+              <Text style={styles.statLabel}>Total Vouches</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={styles.statValue}>{stats.monthly_vouches}</Text>
+              <Text style={styles.statLabel}>This Month</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={styles.statValue}>{stats.total_rejections}</Text>
+              <Text style={styles.statLabel}>Rejections</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={styles.statValue}>{Math.round(stats.reputation_score * 100)}%</Text>
+              <Text style={styles.statLabel}>Reputation</Text>
+            </View>
+          </View>
+          <View style={styles.responseTimeCard}>
+            <Text style={styles.responseTimeLabel}>Average Response Time</Text>
+            <Text style={styles.responseTimeValue}>
+              {stats.avg_response_hours < 24
+                ? `${Math.round(stats.avg_response_hours)} hours`
+                : `${Math.round(stats.avg_response_hours / 24)} days`}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={styles.historyButton}
+            onPress={() => navigation.navigate('VouchHistory')}
+            accessibilityRole="button"
+            accessibilityLabel="View your vouch history"
+          >
+            <Text style={styles.historyButtonText}>View Vouch History</Text>
+          </TouchableOpacity>
+        </>
+      ) : (
+        <Text style={styles.emptyText}>No statistics available</Text>
+      )}
+    </View>
+  );
+
+  return (
+    <View style={styles.container}>
+      {/* Tab Bar */}
+      <View style={styles.tabBar} accessibilityRole="tablist">
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'pending' && styles.activeTab]}
+          onPress={() => setActiveTab('pending')}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeTab === 'pending' }}
+          accessibilityLabel={`Pending enrollments${pendingCount > 0 ? `, ${pendingCount} pending` : ''}`}
+        >
+          <Text style={[styles.tabText, activeTab === 'pending' && styles.activeTabText]}>
+            Pending
+          </Text>
+          {pendingCount > 0 && (
+            <View style={styles.badge} accessibilityLabel="">
+              <Text style={styles.badgeText}>{pendingCount}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'stats' && styles.activeTab]}
+          onPress={() => setActiveTab('stats')}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeTab === 'stats' }}
+          accessibilityLabel="Statistics"
+        >
+          <Text style={[styles.tabText, activeTab === 'stats' && styles.activeTabText]}>
+            Statistics
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Content */}
+      {activeTab === 'pending' ? (
+        <FlatList
+          data={enrollments}
+          renderItem={renderEnrollmentCard}
+          keyExtractor={(item) => item.enrollment_id}
+          refreshControl={
+            <RefreshControl refreshing={enrollmentsLoading} onRefresh={handleRefresh} />
+          }
+          contentContainerStyle={styles.listContent}
+          ListEmptyComponent={
+            enrollmentsLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={theme.colors.primary} />
+                <Text style={styles.loadingText}>Loading enrollments...</Text>
+              </View>
+            ) : enrollmentsError ? (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText} accessibilityRole="alert">{enrollmentsError}</Text>
+                <TouchableOpacity
+                  style={styles.retryButton}
+                  onPress={refreshEnrollments}
+                  accessibilityRole="button"
+                  accessibilityLabel="Retry loading enrollments"
+                >
+                  <Text style={styles.retryText}>Retry</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyIcon}>✓</Text>
+                <Text style={styles.emptyTitle}>All Caught Up!</Text>
+                <Text style={styles.emptyText}>No pending enrollments to review.</Text>
+              </View>
+            )
+          }
+        />
+      ) : (
+        renderStatsTab()
+      )}
+    </View>
+  );
+}
+
+function formatStatus(status: string): string {
+  const statusMap: Record<string, string> = {
+    pending_device_verification: 'Awaiting Device',
+    pending_steward_vouch: 'Awaiting Vouch',
+    ready_for_completion: 'Ready',
+    rejected: 'Rejected',
+  };
+  return statusMap[status] || status;
+}
+
+function getLevelStyle(level: number, theme: Theme) {
+  switch (level) {
+    case 0:
+      return { backgroundColor: theme.colors.errorBackground };
+    case 1:
+      return { backgroundColor: theme.colors.warningBackground };
+    case 2:
+      return { backgroundColor: theme.colors.successBackground };
+    default:
+      return { backgroundColor: theme.colors.border };
+  }
+}
+
+const createStyles = (theme: Theme) => StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  tabBar: {
+    flexDirection: 'row',
+    backgroundColor: theme.colors.card,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  tab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    gap: 8,
+  },
+  activeTab: {
+    borderBottomWidth: 2,
+    borderBottomColor: theme.colors.primary,
+  },
+  tabText: {
+    fontSize: 16,
+    color: theme.colors.textSecondary,
+  },
+  activeTabText: {
+    color: theme.colors.primary,
+    fontWeight: '600',
+  },
+  badge: {
+    backgroundColor: theme.colors.error,
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  badgeText: {
+    color: theme.colors.primaryText,
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  listContent: {
+    padding: 16,
+  },
+  enrollmentCard: {
+    backgroundColor: theme.colors.card,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  identityName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: theme.colors.text,
+    flex: 1,
+  },
+  levelBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  level0: {
+    backgroundColor: theme.colors.errorBackground,
+  },
+  level1: {
+    backgroundColor: theme.colors.warningBackground,
+  },
+  level2: {
+    backgroundColor: theme.colors.successBackground,
+  },
+  levelText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: theme.colors.text,
+  },
+  cardMeta: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 8,
+  },
+  metaText: {
+    fontSize: 13,
+    color: theme.colors.textSecondary,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statusLabel: {
+    fontSize: 13,
+    color: theme.colors.textSecondary,
+  },
+  statusValue: {
+    fontSize: 13,
+    color: theme.colors.primary,
+    fontWeight: '500',
+  },
+  loadingContainer: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: theme.colors.textSecondary,
+  },
+  errorContainer: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  errorText: {
+    fontSize: 14,
+    color: theme.colors.error,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  retryButton: {
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryText: {
+    color: theme.colors.primaryText,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  emptyContainer: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  emptyIcon: {
+    fontSize: 48,
+    color: theme.colors.success,
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: theme.colors.text,
+    marginBottom: 8,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+  },
+  statsContainer: {
+    flex: 1,
+    padding: 16,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 16,
+  },
+  statCard: {
+    backgroundColor: theme.colors.card,
+    borderRadius: 12,
+    padding: 20,
+    flex: 1,
+    minWidth: '45%',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  statValue: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: theme.colors.primary,
+  },
+  statLabel: {
+    fontSize: 13,
+    color: theme.colors.textSecondary,
+    marginTop: 4,
+  },
+  responseTimeCard: {
+    backgroundColor: theme.colors.card,
+    borderRadius: 12,
+    padding: 20,
+    alignItems: 'center',
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  responseTimeLabel: {
+    fontSize: 13,
+    color: theme.colors.textSecondary,
+    marginBottom: 8,
+  },
+  responseTimeValue: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: theme.colors.text,
+  },
+  historyButton: {
+    backgroundColor: theme.colors.primary,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+  },
+  historyButtonText: {
+    color: theme.colors.primaryText,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+});

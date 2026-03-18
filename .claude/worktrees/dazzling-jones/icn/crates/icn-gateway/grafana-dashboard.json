@@ -1,0 +1,124 @@
+{
+  "dashboard": {
+    "title": "ICN Gateway API Monitoring",
+    "tags": ["icn", "gateway", "api"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "title": "Request Rate (req/s)",
+        "targets": [
+          {
+            "expr": "sum(rate(icn_gateway_requests_total[5m])) by (endpoint)",
+            "legendFormat": "{{endpoint}}"
+          }
+        ],
+        "type": "graph"
+      },
+      {
+        "title": "Request Latency (p50, p95, p99)",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(icn_gateway_request_duration_seconds_bucket[5m])) by (le, endpoint))",
+            "legendFormat": "p50 - {{endpoint}}"
+          },
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(icn_gateway_request_duration_seconds_bucket[5m])) by (le, endpoint))",
+            "legendFormat": "p95 - {{endpoint}}"
+          },
+          {
+            "expr": "histogram_quantile(0.99, sum(rate(icn_gateway_request_duration_seconds_bucket[5m])) by (le, endpoint))",
+            "legendFormat": "p99 - {{endpoint}}"
+          }
+        ],
+        "type": "graph"
+      },
+      {
+        "title": "Error Rate (%)",
+        "targets": [
+          {
+            "expr": "100 * (sum(rate(icn_gateway_requests_total{status=~\"4..|5..\"}[5m])) by (endpoint) / sum(rate(icn_gateway_requests_total[5m])) by (endpoint))",
+            "legendFormat": "{{endpoint}}"
+          }
+        ],
+        "type": "graph"
+      },
+      {
+        "title": "Active WebSocket Connections",
+        "targets": [
+          {
+            "expr": "icn_gateway_websocket_connections_active"
+          }
+        ],
+        "type": "graph"
+      },
+      {
+        "title": "Authentication Success Rate",
+        "targets": [
+          {
+            "expr": "100 * (rate(icn_gateway_auth_successes_total[5m]) / rate(icn_gateway_auth_verifications_total[5m]))",
+            "legendFormat": "Success %"
+          }
+        ],
+        "type": "graph"
+      },
+      {
+        "title": "Authentication Failures by Reason",
+        "targets": [
+          {
+            "expr": "sum(rate(icn_gateway_auth_failures_total[5m])) by (reason)",
+            "legendFormat": "{{reason}}"
+          }
+        ],
+        "type": "graph"
+      },
+      {
+        "title": "Rate Limit Violations",
+        "targets": [
+          {
+            "expr": "topk(10, sum(rate(icn_gateway_rate_limit_exceeded_total[5m])) by (did))",
+            "legendFormat": "{{did}}"
+          }
+        ],
+        "type": "graph"
+      },
+      {
+        "title": "Authorization Failures by Scope",
+        "targets": [
+          {
+            "expr": "sum(rate(icn_gateway_authorization_failures_total[5m])) by (required_scope)",
+            "legendFormat": "{{required_scope}}"
+          }
+        ],
+        "type": "graph"
+      },
+      {
+        "title": "Payment Volume by Currency",
+        "targets": [
+          {
+            "expr": "sum(rate(icn_gateway_payments_created_total[1h])) by (currency)",
+            "legendFormat": "{{currency}}"
+          }
+        ],
+        "type": "graph"
+      },
+      {
+        "title": "Cooperative Activity",
+        "targets": [
+          {
+            "expr": "rate(icn_gateway_coops_created_total[1h])",
+            "legendFormat": "Created"
+          },
+          {
+            "expr": "rate(icn_gateway_members_added_total[1h])",
+            "legendFormat": "Members Added"
+          },
+          {
+            "expr": "rate(icn_gateway_members_removed_total[1h])",
+            "legendFormat": "Members Removed"
+          }
+        ],
+        "type": "graph"
+      }
+    ]
+  }
+}

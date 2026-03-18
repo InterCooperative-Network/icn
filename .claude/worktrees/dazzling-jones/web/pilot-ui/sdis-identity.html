@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SDIS Identity Viewer - ICN Pilot</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="sdis-identity.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔐 SDIS Identity</h1>
+            <button id="backBtn" class="secondary-btn">← Back to Dashboard</button>
+        </header>
+
+        <!-- Loading State -->
+        <div id="loadingState" class="card">
+            <div class="loading-spinner"></div>
+            <p>Loading identity information...</p>
+        </div>
+
+        <!-- Error State -->
+        <div id="errorState" class="card error-state" style="display: none;">
+            <h3>⚠️ Error Loading Identity</h3>
+            <p id="errorMessage"></p>
+            <button id="retryBtn" class="primary-btn">Retry</button>
+        </div>
+
+        <!-- Identity Overview -->
+        <div id="identityOverview" class="card" style="display: none;">
+            <h2>Identity Overview</h2>
+            
+            <div class="identity-status">
+                <div class="status-badge" id="statusBadge">
+                    <span id="statusIcon"></span>
+                    <span id="statusText"></span>
+                </div>
+                <div class="status-details">
+                    <p><strong>Enrollment Date:</strong> <span id="enrollmentDate"></span></p>
+                    <p><strong>Steward:</strong> <span id="stewardName"></span></p>
+                    <p><strong>Trust Score:</strong> <span id="trustScore"></span></p>
+                </div>
+            </div>
+
+            <div class="identity-grid">
+                <!-- DID Card -->
+                <div class="identity-card">
+                    <h3>🆔 Decentralized Identifier</h3>
+                    <div class="did-display">
+                        <code id="didValue"></code>
+                        <button class="copy-btn" data-copy="did" title="Copy DID">📋</button>
+                    </div>
+                    <button class="secondary-btn" id="showQrBtn">Show QR Code</button>
+                </div>
+
+                <!-- Keys Card -->
+                <div class="identity-card">
+                    <h3>🔑 Cryptographic Keys</h3>
+                    <div class="key-list">
+                        <div class="key-item">
+                            <span class="key-type">Ed25519 (Signing)</span>
+                            <span class="key-status">✓ Active</span>
+                        </div>
+                        <div class="key-item">
+                            <span class="key-type">ML-DSA (Post-Quantum)</span>
+                            <span class="key-status">✓ Active</span>
+                        </div>
+                        <div class="key-item">
+                            <span class="key-type">X25519 (Encryption)</span>
+                            <span class="key-status">✓ Active</span>
+                        </div>
+                    </div>
+                    <button class="secondary-btn" id="rotateKeysBtn">Rotate Keys</button>
+                </div>
+
+                <!-- Anchors Card -->
+                <div class="identity-card">
+                    <h3>⚓ Identity Anchors</h3>
+                    <div id="anchorsList"></div>
+                    <button class="secondary-btn" id="addAnchorBtn">+ Add Anchor</button>
+                </div>
+
+                <!-- Proofs Card -->
+                <div class="identity-card">
+                    <h3>📜 Verifiable Credentials</h3>
+                    <div id="credentialsList"></div>
+                    <button class="secondary-btn" id="requestProofBtn">Request Proof</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- DID QR Code Modal -->
+        <div id="qrModal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <span class="close-modal">&times;</span>
+                <h2>Share Your DID</h2>
+                <div id="qrCode"></div>
+                <p class="qr-instructions">
+                    Scan this QR code to share your identity with others
+                </p>
+                <div class="did-display">
+                    <code id="qrDidValue"></code>
+                    <button class="copy-btn" data-copy="qr-did">📋</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Anchor Modal -->
+        <div id="addAnchorModal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <span class="close-modal">&times;</span>
+                <h2>Add Identity Anchor</h2>
+                
+                <form id="addAnchorForm">
+                    <div class="form-group">
+                        <label>Anchor Type</label>
+                        <select id="anchorType" required>
+                            <option value="">Select anchor type...</option>
+                            <option value="email">Email Address</option>
+                            <option value="phone">Phone Number</option>
+                            <option value="domain">Domain Name</option>
+                            <option value="social">Social Media</option>
+                            <option value="pgp">PGP Key</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Anchor Value</label>
+                        <input type="text" id="anchorValue" required 
+                               placeholder="Enter the anchor value">
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="requireVerification">
+                            Require verification before activation
+                        </label>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="secondary-btn" id="cancelAnchorBtn">Cancel</button>
+                        <button type="submit" class="primary-btn">Add Anchor</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Recovery Section -->
+        <div id="recoverySection" class="card danger-zone" style="display: none;">
+            <h2>🆘 Recovery & Security</h2>
+            
+            <div class="recovery-options">
+                <button class="warning-btn" id="viewRecoveryBtn">
+                    View Recovery Codes
+                </button>
+                <button class="warning-btn" id="exportIdentityBtn">
+                    Export Identity Backup
+                </button>
+                <button class="danger-btn" id="revokeIdentityBtn">
+                    Revoke Identity
+                </button>
+            </div>
+
+            <div class="security-tips">
+                <h3>Security Best Practices</h3>
+                <ul>
+                    <li>Store recovery codes in a secure, offline location</li>
+                    <li>Never share your private keys with anyone</li>
+                    <li>Regularly review and update your identity anchors</li>
+                    <li>Enable multi-anchor authentication when possible</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Activity Log -->
+        <div id="activitySection" class="card" style="display: none;">
+            <h2>📊 Identity Activity</h2>
+            <div id="activityLog"></div>
+        </div>
+    </div>
+
+    <script src="sdis-identity.js"></script>
+</body>
+</html>

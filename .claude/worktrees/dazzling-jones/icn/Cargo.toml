@@ -1,0 +1,156 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/icn-kernel-api",
+    "crates/icn-core",
+    "crates/icn-identity",
+    "crates/icn-trust",
+    "crates/icn-protocol",
+    "crates/icn-services",
+    "crates/icn-crypto",
+    "crates/icn-net",
+    "crates/icn-gossip",
+    "crates/icn-ledger",
+    "crates/icn-ccl",
+    "crates/icn-store",
+    "crates/icn-rpc",
+    "crates/icn-obs",
+    "crates/icn-snapshot",
+    "crates/icn-testkit",
+    "bins/icnd",
+    "bins/icnctl",
+    "bins/icn-console",
+    "crates/icn-gateway",
+    "crates/icn-governance",
+    "crates/icn-compute",
+    "crates/icn-security",
+    "crates/icn-time",
+    "crates/icn-privacy",
+    "crates/icn-federation",
+    "crates/icn-crypto-pq",
+    "crates/icn-steward",
+    "crates/icn-zkp", "crates/icn-community", "crates/icn-coop",
+    "crates/icn-entity",
+    "crates/icn-encoding",
+    "crates/icn-api",
+    "crates/icn-naming",
+    "apps/governance",
+    "apps/membership",
+    "apps/ledger",
+    "crates/icn-http-kit",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/yourusername/icn"
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1.49", features = ["rt-multi-thread", "macros", "io-util", "fs", "signal", "sync", "time"] }
+tokio-util = { version = "0.7", features = ["codec"] }
+
+# Networking & Transport
+quinn = "0.11"
+rustls = "0.23"
+tokio-rustls = "0.26"
+hyper = { version = "1.5", features = ["full"] }
+
+# RPC
+tonic = "0.14"
+prost = "0.14"
+
+# Discovery
+mdns-sd = "0.17"
+
+# Identity & Crypto
+ed25519-dalek = { version = "2.1", features = ["rand_core", "batch"] }
+x25519-dalek = "2.0"
+chacha20poly1305 = "0.10"
+rand_core = { version = "0.6", features = ["getrandom"] }
+rand = "0.8"
+zeroize = { version = "1.7", features = ["serde"] }
+rcgen = "0.14"
+sha2 = "0.10"
+pem = "3.0"
+
+# Storage
+sled = "0.34"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+postcard = { version = "1.1", features = ["alloc"] }
+toml = "0.9"
+
+# Observability
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+metrics = "0.24"
+metrics-exporter-prometheus = "0.18"
+opentelemetry = { version = "0.31", features = ["trace"] }
+opentelemetry_sdk = { version = "0.31", features = ["rt-tokio"] }
+opentelemetry-otlp = { version = "0.31", features = ["grpc-tonic"] }
+tracing-opentelemetry = "0.32"
+
+# CLI
+clap = { version = "4.5", features = ["derive", "env"] }
+
+# Internationalization
+rust-i18n = "3"
+sys-locale = "0.3"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "2.0"
+
+# HTTP client
+reqwest = { version = "0.13", features = ["json", "form"] }
+
+# Utilities
+bytes = "1.11"
+futures = "0.3"
+lru = "0.16"
+portpicker = "0.1"
+
+# Internal workspace crates
+icn-kernel-api = { path = "crates/icn-kernel-api" }
+icn-core = { path = "crates/icn-core" }
+icn-identity = { path = "crates/icn-identity" }
+icn-trust = { path = "crates/icn-trust" }
+icn-protocol = { path = "crates/icn-protocol" }
+icn-services = { path = "crates/icn-services" }
+icn-crypto = { path = "crates/icn-crypto" }
+icn-net = { path = "crates/icn-net" }
+icn-gossip = { path = "crates/icn-gossip" }
+icn-ledger = { path = "crates/icn-ledger" }
+icn-ccl = { path = "crates/icn-ccl" }
+icn-store = { path = "crates/icn-store" }
+icn-rpc = { path = "crates/icn-rpc" }
+icn-obs = { path = "crates/icn-obs" }
+icn-snapshot = { path = "crates/icn-snapshot" }
+icn-testkit = { path = "crates/icn-testkit" }
+icn-gateway = { path = "crates/icn-gateway" }
+icn-governance = { path = "crates/icn-governance" }
+icn-compute = { path = "crates/icn-compute" }
+icn-security = { path = "crates/icn-security" }
+icn-time = { path = "crates/icn-time" }
+icn-privacy = { path = "crates/icn-privacy" }
+icn-federation = { path = "crates/icn-federation" }
+icn-crypto-pq = { path = "crates/icn-crypto-pq" }
+icn-steward = { path = "crates/icn-steward" }
+icn-zkp = { path = "crates/icn-zkp" }
+icn-encoding = { path = "crates/icn-encoding" }
+icn-coop = { path = "crates/icn-coop" }
+icn-api = { path = "crates/icn-api" }
+icn-naming = { path = "crates/icn-naming" }
+
+[workspace.lints.clippy]
+# Error handling - warn for now, will be upgraded to deny after cleanup
+unwrap_used = "warn"
+expect_used = "warn"
+# Allow in tests
+unwrap_in_result = "allow"
+# Allow non-inlined format args (many pre-existing instances across workspace)
+uninlined_format_args = "allow"

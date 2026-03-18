@@ -1,0 +1,56 @@
+{
+  "name": "Echo",
+  "participants": [],
+  "currency": null,
+  "state_vars": [],
+  "rules": [
+    {
+      "name": "echo",
+      "params": [
+        {
+          "name": "message"
+        }
+      ],
+      "requires": [],
+      "body": [
+        {
+          "Return": {
+            "value": {
+              "Var": "message"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "add",
+      "params": [
+        {
+          "name": "a"
+        },
+        {
+          "name": "b"
+        }
+      ],
+      "requires": [],
+      "body": [
+        {
+          "Return": {
+            "value": {
+              "BinOp": {
+                "op": "Add",
+                "left": {
+                  "Var": "a"
+                },
+                "right": {
+                  "Var": "b"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "triggers": []
+}

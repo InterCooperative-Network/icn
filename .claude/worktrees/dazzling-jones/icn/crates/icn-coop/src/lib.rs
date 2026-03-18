@@ -1,0 +1,81 @@
+//! ICN Coop - Cooperative management and lifecycle
+#![allow(missing_docs)]
+#![deny(clippy::unwrap_used, clippy::expect_used)]
+// Allow unwrap/expect in test code - panics are acceptable for tests
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
+
+/// Cooperative actor for handling coop operations
+pub mod actor;
+/// Handle for interacting with the coop actor
+pub mod handle;
+/// Lifecycle events and state transitions
+pub mod lifecycle;
+/// Membership management
+pub mod membership;
+/// Persistent storage for cooperatives
+pub mod store;
+/// Cooperative types and data structures
+pub mod types;
+
+pub use actor::{CoopActor, CoopMessage, GossipHandle, TreasuryManagerHandle, COOP_TOPIC};
+pub use handle::CoopHandle;
+pub use lifecycle::{
+    derive_treasury_anchor, derive_treasury_did, LifecycleEvent, LifecycleManager,
+};
+pub use membership::{MembershipChange, MembershipManager};
+pub use store::CoopStore;
+pub use types::{
+    AssetDistributionPlan, BalanceAction, CapitalReturnMethod, CoopStatus, CoopType, Cooperative,
+    CooperativeId, DebtAction, DissolutionRequest, FormationRequest, Member, MemberRole,
+    MemberStatus, MembershipApplication, MembershipTier, StoredFounderSignature,
+};
+
+// Re-export governance charter types for convenience
+pub use icn_governance::charter::{CharterId, FounderSignature};
+
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum CoopError {
+    #[error("Cooperative not found: {0}")]
+    NotFound(String),
+
+    #[error("Permission denied: {0}")]
+    PermissionDenied(String),
+
+    #[error("Invalid state transition: {0}")]
+    InvalidStateTransition(String),
+
+    #[error("Member not found: {0}")]
+    MemberNotFound(String),
+
+    #[error("Duplicate member: {0}")]
+    DuplicateMember(String),
+
+    #[error("Storage error: {0}")]
+    Storage(#[from] sled::Error),
+
+    #[error("Serialization error: {0}")]
+    Serialization(String),
+
+    #[error("Governance error: {0}")]
+    Governance(String),
+
+    #[error("Ledger error: {0}")]
+    Ledger(String),
+
+    #[error("Treasury nonce mismatch for coop {coop_id}: expected {expected}, stored {stored}")]
+    NonceMismatch {
+        coop_id: String,
+        expected: u64,
+        stored: u64,
+    },
+}
+
+pub type Result<T> = std::result::Result<T, CoopError>;
+
+impl From<icn_encoding::Error> for CoopError {
+    fn from(e: icn_encoding::Error) -> Self {
+        CoopError::Serialization(e.to_string())
+    }
+}

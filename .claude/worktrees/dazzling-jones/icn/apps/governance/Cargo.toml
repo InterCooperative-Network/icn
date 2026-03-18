@@ -1,0 +1,71 @@
+[package]
+name = "icn-governance-actor"
+version = "0.1.0"
+edition = "2021"
+description = "ICN Governance Actor — distributed decision-making for the cooperative network"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[dependencies]
+# Kernel API for EventEmitter trait and SystemEvent types
+icn-kernel-api = { path = "../../crates/icn-kernel-api" }
+
+# Governance domain types (proposals, votes, domains, etc.)
+icn-governance = { path = "../../crates/icn-governance" }
+
+# Identity types (Did)
+icn-identity = { path = "../../crates/icn-identity" }
+
+# Entity types (EntityId, EntityRegistry)
+icn-entity = { path = "../../crates/icn-entity" }
+
+# Storage trait
+icn-store = { path = "../../crates/icn-store" }
+
+# Gossip actor (for governance message broadcast)
+icn-gossip = { path = "../../crates/icn-gossip" }
+
+# Federation types (for federation governance topic constant)
+icn-federation = { path = "../../crates/icn-federation" }
+
+# Observability metrics
+icn-obs = { path = "../../crates/icn-obs" }
+
+# Time utilities
+icn-time = { path = "../../crates/icn-time" }
+
+# Encoding utilities (for Sled store serialization)
+icn-encoding = { path = "../../crates/icn-encoding" }
+
+# Shared HTTP scaffolding (auth, error, pagination, validation)
+icn-http-kit = { path = "../../crates/icn-http-kit" }
+
+# HTTP framework (for governance HTTP handlers)
+actix-web = "4"
+utoipa = { version = "5", features = ["actix_extras"] }
+
+# Persistent storage for action items
+sled = "0.34"
+
+# Cryptography (for GovernanceProof signing)
+ed25519-dalek.workspace = true
+hex = "0.4"
+blake3 = "1.5"
+
+# UUID generation (for suggestion proposal IDs)
+uuid = { version = "1", features = ["v4"] }
+
+# Error handling
+anyhow = "1.0"
+
+# Async
+async-trait = "0.1"
+tokio = { version = "1", features = ["sync", "time", "rt"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Logging
+tracing = "0.1"
+
+[lints]
+workspace = true

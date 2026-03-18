@@ -1,0 +1,599 @@
+# Deploy ICN Test Network
+
+**Status**: ✅ Production-ready configuration
+**Last Verified**: 2025-12-04
+
+---
+
+## Deployment Options
+
+| Option | Use Case | Location |
+|--------|----------|----------|
+| **K3s Homelab** | Production testing, multi-node validation | K3s cluster on Hyperion |
+| **Local Docker** | Development, quick testing | WSL2/local machine |
+
+---
+
+## Option 1: K3s Homelab Deployment (Recommended for Testing)
+
+### Infrastructure
+
+| Host | IP | Role |
+|------|-----|------|
+| k3s-control | 10.8.10.40 | K3s control plane |
+| k3s-worker-1 | 10.8.10.41 | K3s worker node |
+| k3s-worker-2 | 10.8.10.42 | K3s worker node |
+| Atlas | 10.8.10.25 | NFS storage (`atlas-nfs` StorageClass) |
+
+**Current ICN Identity**: `did:icn:z3TE1ei6B4L5j6Jp29RmJKt1FYonGaQAXQoYHJL3GULR3`
+
+### Quick Access
+
+```bash
+# SSH to K3s control plane
+ssh ubuntu@10.8.10.40
+
+# Check cluster status
+sudo kubectl get nodes
+sudo kubectl -n icn get pods
+
+# View ICN logs
+sudo kubectl -n icn logs -l app=icn -f
+
+# Check ICN identity
+sudo kubectl -n icn exec deploy/icn-daemon -- /usr/local/bin/icnctl id show
+
+# Access metrics (via port-forward)
+sudo kubectl -n icn port-forward svc/icn 9100:9100 &
+curl http://localhost:9100/metrics
+```
+
+### Monitoring
+
+| Service | Access |
+|---------|--------|
+| **Grafana** | http://10.8.10.40:30300 |
+| **ICN Metrics** | Port-forward to 9100 |
+| **Dashboard** | ICN Node Dashboard |
+
+Credentials: See K8s secret `prometheus-grafana` in monitoring namespace
+
+### K8s Resources
+
+```bash
+# View all ICN resources
+sudo kubectl -n icn get all
+
+# Check persistent storage
+sudo kubectl -n icn get pvc
+
+# View ServiceMonitor (Prometheus scraping)
+sudo kubectl -n icn get servicemonitor
+```
+
+### Related Documentation
+
+| Resource | Location |
+|----------|----------|
+| Homelab Inventory | `/home/matt/homelab-inventory` |
+| ICN Launchpad | `/home/matt/homelab-inventory/projects/icn/ICN_LAUNCHPAD.md` |
+| K3s Cluster Docs | `/home/matt/homelab-inventory/projects/icn/docs/K3S_CLUSTER.md` |
+| Deployment Plans | `/home/matt/homelab-inventory/projects/icn/docs/DEPLOYMENT_PLANS.md` |
+
+---
+
+## Option 2: Local Docker Deployment (Development)
+
+### Quick Start
+
+```bash
+# Navigate to ICN repository root
+cd /path/to/icn
+
+# Build and start (first time takes 5-10 min)
+docker compose -f docker-compose.test.yml up -d --build
+
+# Wait for containers to be healthy
+sleep 30
+
+# Initialize node identities (first time only)
+docker exec icn-node1 icnctl -d /data id init
+docker exec icn-node2 icnctl -d /data id init
+docker exec icn-node3 icnctl -d /data id init
+
+# Verify
+docker compose -f docker-compose.test.yml ps
+```
+
+---
+
+## Prerequisites Check
+
+On your **host system**, verify:
+
+```bash
+# Check Docker version
+docker --version
+# Required: Docker 24+
+
+# Check Docker Compose version
+docker compose version
+# Required: Docker Compose 2.20+
+
+# Check jq (used for parsing JSON in test commands)
+jq --version
+# Required: jq 1.6+
+# Install: apt install jq / brew install jq
+
+# Check available resources
+docker system info | grep -E "CPUs:|Total Memory"
+# Required: 4 GB RAM minimum (8 GB recommended)
+```
+
+### Optional: Validate Configuration
+
+Before deploying, you can run the validation script to check all configuration files:
+
+```bash
+./scripts/validate-test-config.sh
+```
+
+This script verifies:
+- All required files exist
+- Port configurations are correct (9100 for metrics, 9095 for Prometheus)
+- Config files use proper settings
+- Documentation is consistent
+- Prerequisites are installed
+
+---
+
+## Step 1: Build ICN Docker Image
+
+From your **host system**, navigate to the ICN repository and build:
+
+```bash
+# Navigate to repository root
+cd /path/to/icn
+
+# Build the image (5-10 minutes first time)
+docker build -t icn:latest -f Dockerfile icn/
+
+# Verify image was created
+docker images | grep icn
+# Expected output: icn    latest    <image-id>    <size>
+```
+
+**What's happening**: Multi-stage build compiles Rust binaries in a builder container, then creates a minimal runtime image with just the binaries and dependencies.
+
+---
+
+## Step 2: Start 3-Node Test Network
+
+```bash
+# Start node1, node2, node3, prometheus, grafana
+docker compose -f docker-compose.test.yml up -d
+
+# Wait ~30 seconds for network formation
+sleep 30
+
+# Check all containers are running
+docker compose -f docker-compose.test.yml ps
+```
+
+**Expected output**:
+```
+NAME                COMMAND                  SERVICE      STATUS       PORTS
+icn-grafana         "/run.sh"                grafana      Up           0.0.0.0:3000->3000/tcp
+icn-node1           "icnd --config /conf…"   node1        Up (healthy) 0.0.0.0:5001->5001/tcp, 0.0.0.0:8081->8080/tcp, 0.0.0.0:9091->9100/tcp
+icn-node2           "icnd --config /conf…"   node2        Up (healthy) 0.0.0.0:5002->5002/tcp, 0.0.0.0:8082->8080/tcp, 0.0.0.0:9092->9100/tcp
+icn-node3           "icnd --config /conf…"   node3        Up (healthy) 0.0.0.0:5003->5003/tcp, 0.0.0.0:8083->8080/tcp, 0.0.0.0:9093->9100/tcp
+icn-prometheus      "/bin/prometheus --c…"   prometheus   Up (healthy) 0.0.0.0:9095->9090/tcp
+```
+
+---
+
+## Step 3: Initialize Node Identities
+
+**Important**: Each node needs a cryptographic identity initialized before it can participate in the network.
+
+```bash
+# Initialize identities (first time only)
+docker exec icn-node1 icnctl -d /data id init
+docker exec icn-node2 icnctl -d /data id init
+docker exec icn-node3 icnctl -d /data id init
+
+# Verify identities were created
+docker exec icn-node1 icnctl -d /data id show
+```
+
+**Expected output**: Each node shows a DID like `did:icn:z26prYPzZVEr8UezRwz1QtN5H1DRZ47pnuaqyW8ErrsjY`
+
+---
+
+## Step 4: Verify Node Health
+
+### 4.1 Check Node Logs
+```bash
+# View node1 logs (look for "Actor system spawned" messages)
+docker compose -f docker-compose.test.yml logs node1 | tail -20
+
+# Check for successful startup
+docker compose -f docker-compose.test.yml logs | grep -i "spawned\|started"
+```
+
+**What to look for**:
+- ✅ "Actor system spawned"
+- ✅ "Metrics server listening on 0.0.0.0:9100"
+- ✅ Container health checks passing
+
+### 4.2 Check Metrics Endpoint
+```bash
+# Query node1 metrics
+curl -s http://localhost:9091/metrics | grep icn_system
+
+# Expected output:
+# icn_system_uptime_seconds <value>
+# icn_system_actors_active 7
+
+# Check all 3 nodes
+for port in 9091 9092 9093; do
+  echo "=== Node on port $port ==="
+  curl -s http://localhost:$port/metrics | grep -E "icn_system|icn_gossip"
+done
+```
+
+**Expected**: Each node shows 7 active actors and increasing uptime
+
+### 4.3 Interactive Node Access
+```bash
+# Enter node1 container
+docker exec -it icn-node1 bash
+
+# Inside container, check identity
+icnctl -d /data id show
+
+# Exit container
+exit
+```
+
+### Known Limitation: Peer Discovery
+
+**Note**: mDNS peer discovery does not work across Docker bridge network containers. Nodes run independently but won't auto-discover each other.
+
+**Solutions for peer connectivity:**
+
+1. **Configure bootstrap peers after initialization** (recommended for Docker testing):
+   ```bash
+   # 1. Initialize all nodes first
+   docker exec icn-node1 icnctl -d /data id init
+   docker exec icn-node2 icnctl -d /data id init
+   docker exec icn-node3 icnctl -d /data id init
+
+   # 2. Get each node's DID
+   DID1=$(docker exec icn-node1 icnctl -d /data id show | grep "did:icn" | awk '{print $2}')
+   DID2=$(docker exec icn-node2 icnctl -d /data id show | grep "did:icn" | awk '{print $2}')
+   DID3=$(docker exec icn-node3 icnctl -d /data id show | grep "did:icn" | awk '{print $2}')
+
+   # 3. Update config files with bootstrap peers (manual step)
+   # Edit config/node1.toml: bootstrap_peers = ["icn://$DID2@node2:5002", "icn://$DID3@node3:5003"]
+   # Edit config/node2.toml: bootstrap_peers = ["icn://$DID1@node1:5001", "icn://$DID3@node3:5003"]
+   # etc.
+
+   # 4. Restart containers to pick up new config
+   docker compose -f docker-compose.test.yml restart
+   ```
+
+2. **Use K3s deployment** (recommended for full testing):
+   - K3s provides proper DNS-based service discovery
+   - See Option 1 (K3s Homelab Deployment) above
+
+3. **Use host networking mode** (loses port isolation):
+   - Add `network_mode: host` to each service in docker-compose.test.yml
+
+---
+
+## Step 5: Access Monitoring Dashboards
+
+### Grafana
+- **URL**: http://localhost:3000
+- **Login**: Anonymous access enabled (no login required)
+- **Dashboard**: Navigate to "Dashboards" → "ICN Node Dashboard"
+- **Direct Link**: http://localhost:3000/d/icn-node-dashboard/icn-node-dashboard
+
+**Panels to check**:
+- Nodes Up (should show 3)
+- System Uptime (increasing)
+- Active Actors (7 per node, 21 total)
+- Gossip & Replication metrics
+- Trust Cache stats
+
+### Prometheus
+- **URL**: http://localhost:9095
+- **Query Examples**:
+  ```promql
+  # Node status
+  up{job="icn-nodes"}
+
+  # System metrics
+  icn_system_uptime_seconds
+  icn_system_actors_active
+
+  # Gossip metrics
+  icn_gossip_digests_sent_total
+  icn_gossip_entries_total
+
+  # Trust metrics
+  icn_trust_lookups_total
+  icn_trust_cache_hits_total
+  ```
+
+---
+
+## Step 6: Run Basic Tests
+
+### Test 1: Verify Prometheus Scraping
+```bash
+# Check all targets are being scraped
+curl -s http://localhost:9095/api/v1/targets | jq '.data.activeTargets[] | {instance: .labels.instance, health: .health}'
+
+# Expected: node1, node2, node3 all show "up"
+```
+
+### Test 2: Query Metrics
+```bash
+# Check node count
+curl -s 'http://localhost:9095/api/v1/query?query=count(up{job="icn-nodes"}==1)' | jq '.data.result[0].value[1]'
+# Expected: "3"
+
+# Check system actors
+curl -s 'http://localhost:9095/api/v1/query?query=sum(icn_system_actors_active)' | jq '.data.result[0].value[1]'
+# Expected: "21" (7 per node × 3 nodes)
+```
+
+### Test 3: Verify Node Identities
+```bash
+# Each node should have a unique DID
+docker exec icn-node1 icnctl -d /data id show
+docker exec icn-node2 icnctl -d /data id show
+docker exec icn-node3 icnctl -d /data id show
+```
+
+### Test 4: Network Connectivity (Requires Bootstrap Peers)
+```bash
+# Note: mDNS doesn't work in Docker bridge mode
+# Nodes run independently without peer connections by default
+# To enable connectivity, configure bootstrap_peers in node config files
+
+# With bootstrap peers configured:
+docker exec icn-node1 icnctl network peers | wc -l
+# Expected: 2 (connected to node2 and node3)
+
+# Verify from all nodes
+for node in node1 node2 node3; do
+  echo "=== $node ==="
+  docker exec icn-$node icnctl network peers
+done
+```
+
+---
+
+## Step 7: Start Byzantine Node (Optional)
+
+```bash
+# Start node4 with byzantine profile
+docker compose -f docker-compose.test.yml --profile byzantine up -d node4
+
+# Wait for it to join
+sleep 30
+
+# Verify node1 sees 3 peers now (including node4)
+docker exec icn-node1 icnctl network peers | wc -l
+# Expected: 3
+
+# Monitor for Byzantine violations
+watch -n 1 'curl -s http://localhost:9091/metrics | grep icn_misbehavior'
+```
+
+---
+
+## Troubleshooting
+
+### Issue: Containers Keep Restarting
+
+```bash
+# Check logs for crash reason
+docker compose -f docker-compose.test.yml logs --tail=100 node1
+
+# Common causes:
+# 1. Keystore unlock fails → Check ICN_PASSPHRASE is set
+# 2. Port conflicts → Check ports 5001-5004, 9090-9094, 8080-8084, 3000 are free
+# 3. Insufficient resources → Increase Docker RAM limit to 8 GB
+```
+
+### Issue: Nodes Not Discovering Each Other
+
+```bash
+# Check mDNS is working
+docker exec icn-node1 icnctl network discover
+
+# Check network connectivity
+docker network inspect docker-compose_icn_test
+
+# Restart network
+docker compose -f docker-compose.test.yml restart
+```
+
+### Issue: Metrics Not Available
+
+```bash
+# Check Prometheus targets
+curl http://localhost:9095/api/v1/targets | jq '.data.activeTargets[] | {instance: .labels.instance, health: .health}'
+
+# Should show all nodes as "up"
+
+# If down, check firewall rules and container networking
+docker compose -f docker-compose.test.yml logs prometheus
+```
+
+### Issue: Grafana Dashboard Not Loading
+
+```bash
+# Check Grafana logs
+docker compose -f docker-compose.test.yml logs grafana
+
+# Re-provision datasource
+docker compose -f docker-compose.test.yml restart grafana
+
+# Wait 30 seconds then reload http://localhost:3000
+```
+
+### Issue: High Memory Usage
+
+```bash
+# Check container stats
+docker stats icn-node1 icn-node2 icn-node3
+
+# If >2 GB per node, check for memory leaks
+docker exec icn-node1 ps aux
+docker exec icn-node1 top -bn1
+```
+
+---
+
+## Stop and Cleanup
+
+### Stop Network (Preserve Data)
+```bash
+docker compose -f docker-compose.test.yml down
+```
+
+**Data preserved** in Docker volumes:
+- `node1_data`, `node2_data`, `node3_data`, `node4_data`
+- `prometheus_data`, `grafana_data`
+
+### Stop and Remove All Data
+```bash
+# ⚠️ WARNING: This deletes all node data, metrics, and dashboards
+docker compose -f docker-compose.test.yml down -v
+```
+
+### Complete Cleanup
+```bash
+# Remove everything including images
+docker compose -f docker-compose.test.yml down -v
+docker rmi icn:latest
+docker system prune -a
+```
+
+---
+
+## Success Criteria
+
+After completing steps 1-6, you should have:
+
+- ✅ ICN Docker image built successfully
+- ✅ 3 nodes running and healthy (passing health checks)
+- ✅ Each node has a unique DID identity
+- ✅ Prometheus scraping metrics from all 3 nodes (`up{job="icn-nodes"} == 1`)
+- ✅ Grafana dashboard showing real-time data
+- ✅ 21 active actors total (7 per node)
+- ✅ No error messages in logs
+
+**Note**: Peer connectivity (nodes discovering each other) requires bootstrap peer configuration or K3s deployment. See "Known Limitation: Peer Discovery" section.
+
+---
+
+## Next Steps After Deployment
+
+Once the network is running successfully:
+
+1. **Baseline Testing** (Week 1)
+   - Run 10 baseline test scenarios from [INTERNAL_TESTING_PLAN.md](../development/testing/INTERNAL_TESTING_PLAN.md)
+   - Document results in test execution log
+
+2. **Byzantine Testing** (Week 2)
+   - Start node4 with `--profile byzantine`
+   - Run 10 Byzantine attack scenarios
+   - Verify detection and quarantine mechanisms
+
+3. **Governance Testing** (Week 2)
+   - Run 9 governance scenarios
+   - Test domain creation, proposals, voting
+   - Verify WebSocket event delivery
+
+4. **Performance Baseline** (Week 2)
+   - Establish throughput and latency targets
+   - Run 24-hour soak test
+   - Monitor resource usage
+
+5. **Go/No-Go Decision**
+   - All 38 test scenarios must pass
+   - No crashes or panics
+   - Byzantine detection < 1 min SLA
+   - Governance voting works correctly
+   - Network recovers from partitions < 2 min
+
+---
+
+## Configuration Files Reference
+
+### Docker Compose
+- **File**: `docker-compose.test.yml`
+- **Services**: node1, node2, node3, node4 (optional), prometheus, grafana
+- **Networks**: icn_test (172.20.0.0/16)
+- **Volumes**: 6 persistent volumes
+
+### Security Configuration
+- **Passphrase**: `test-passphrase-insecure-do-not-use-in-production`
+- **⚠️ CRITICAL**: ONLY for isolated internal testing
+- **Production**: Use secure secrets management (Docker secrets, Vault)
+
+### Port Mapping
+| Service    | P2P  | Metrics | Gateway | Dashboard |
+|------------|------|---------|---------|-----------|
+| node1      | 5001 | 9091    | 8081    | -         |
+| node2      | 5002 | 9092    | 8082    | -         |
+| node3      | 5003 | 9093    | 8083    | -         |
+| node4      | 5004 | 9094    | 8084    | -         |
+| prometheus | -    | 9095    | -       | -         |
+| grafana    | -    | -       | -       | 3000      |
+
+### Monitoring
+- **Prometheus**: http://localhost:9095
+- **Grafana**: http://localhost:3000
+- **Node Metrics**: http://localhost:9091-9094/metrics
+- **Alert Rules**: 25 rules in `monitoring/alert_rules.yml`
+
+---
+
+## Documentation
+
+- **[INTERNAL_TESTING_PLAN.md](../development/testing/INTERNAL_TESTING_PLAN.md)** - 38 test scenarios with success criteria
+- **[TESTING_QUICKSTART.md](../development/testing/TESTING_QUICKSTART.md)** - Quick reference guide for getting started
+- **[CLAUDE.md](../../CLAUDE.md)** - Project overview and architecture
+
+---
+
+## Support
+
+**Issue**: Check logs first
+```bash
+docker compose -f docker-compose.test.yml logs <service>
+```
+
+**Health**: Check container health
+```bash
+docker compose -f docker-compose.test.yml ps
+```
+
+**Metrics**: Verify Prometheus targets
+```bash
+curl http://localhost:9095/api/v1/targets
+```
+
+---
+
+**Deployment Status**: ✅ **READY**
+**Last Updated**: 2025-12-04
+
+🚀 **Run these commands on your host system to start testing!**

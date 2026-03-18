@@ -1,0 +1,99 @@
+# Rust
+target/
+**/*.rs.bk
+*.pdb
+
+# Cargo
+# Track workspace Cargo.lock for reproducible builds
+!icn/Cargo.lock
+# Ignore example and app Cargo.lock files
+examples/*/Cargo.lock
+icn/apps/*/Cargo.lock
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Claude Code
+.claude/settings.local.json
+.claude/.env
+
+# Local cargo config overrides (machine-specific, not for CI)
+icn/.cargo/config.user.toml
+
+# ICN data directories
+/data/
+.demo-data/
+*.db
+*.db-*
+
+# Secrets
+*.key
+*.pem
+/keys/
+demo-token.txt
+
+# Build artifacts
+*.o
+*.so
+*.dylib
+*.dll
+*.exe
+
+# Build/test logs
+build_errors*.log
+build.log
+test.log
+*.log
+!sims/mutual-credit/all_scenarios.log
+
+# Debug/error output files
+check_output.txt
+*_error.txt
+*_failure.txt
+*_fail.log
+
+# Testing
+/coverage/
+
+# Node.js
+node_modules/
+
+# Misc
+.env
+.env.local
+venv/
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Simulation results
+sims/mutual-credit/results/
+sims/mutual-credit/*.csv
+sims/mutual-credit/*.png
+
+# Kubernetes deployment - now tracked in git
+# deploy/k8s/ is tracked, but secret.yaml is ignored via deploy/k8s/.gitignore
+
+# Copilot session files
+copilot-session-*.md
+
+# Local artifacts (agent work products, not for repo)
+.local_artifacts/
+
+# Codex skills (local agent tooling)
+.codex/

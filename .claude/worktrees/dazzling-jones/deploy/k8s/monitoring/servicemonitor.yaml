@@ -1,0 +1,212 @@
+# ServiceMonitor for ICN daemon
+# Tells Prometheus to scrape metrics from the ICN service
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: icn-daemon
+  namespace: icn
+  labels:
+    app: icn
+    release: prometheus  # Must match Prometheus selector
+spec:
+  selector:
+    matchLabels:
+      app: icn
+  namespaceSelector:
+    matchNames:
+      - icn
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s
+---
+# PrometheusRule for ICN-specific alerts
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: icn-alerts
+  namespace: monitoring
+  labels:
+    release: prometheus  # Must match Prometheus selector
+spec:
+  groups:
+    # Byzantine Detection Alerts
+    - name: icn.byzantine_detection
+      interval: 10s
+      rules:
+        - alert: ICNByzantineNodeQuarantined
+          expr: icn_misbehavior_quarantined_peers > 0
+          for: 1m
+          labels:
+            severity: warning
+            component: security
+          annotations:
+            summary: "Byzantine node quarantined"
+            description: "{{ $value }} nodes quarantined on {{ $labels.instance }}"
+
+        - alert: ICNByzantineNodeAutoBanned
+          expr: increase(icn_misbehavior_auto_bans_total[5m]) > 0
+          labels:
+            severity: critical
+            component: security
+          annotations:
+            summary: "Critical violation auto-ban triggered"
+            description: "Node auto-banned for Byzantine violations on {{ $labels.instance }}"
+
+        - alert: ICNHighViolationRate
+          expr: rate(icn_misbehavior_violations_total[5m]) > 1
+          for: 5m
+          labels:
+            severity: warning
+            component: security
+          annotations:
+            summary: "High Byzantine violation rate"
+            description: "{{ $value }} violations/sec on {{ $labels.instance }}"
+
+    # Network Health Alerts
+    - name: icn.network_health
+      interval: 10s
+      rules:
+        - alert: ICNNetworkPartition
+          expr: icn_network_connections_active < 2
+          for: 2m
+          labels:
+            severity: warning
+            component: network
+          annotations:
+            summary: "Possible network partition"
+            description: "{{ $labels.instance }} has {{ $value }} connections"
+
+        - alert: ICNNodeIsolated
+          expr: icn_network_connections_active == 0
+          for: 1m
+          labels:
+            severity: critical
+            component: network
+          annotations:
+            summary: "ICN node is isolated"
+            description: "{{ $labels.instance }} has no network connections"
+
+        - alert: ICNHighMessageFailureRate
+          expr: rate(icn_network_messages_failed_total[5m]) > 0.1
+          for: 5m
+          labels:
+            severity: warning
+            component: network
+          annotations:
+            summary: "High message failure rate"
+            description: "{{ $value }} messages/sec failing on {{ $labels.instance }}"
+
+    # Ledger Consistency Alerts
+    - name: icn.ledger_consistency
+      interval: 30s
+      rules:
+        - alert: ICNLedgerEntriesQuarantined
+          expr: icn_ledger_entries_quarantined > 0
+          for: 1m
+          labels:
+            severity: critical
+            component: ledger
+          annotations:
+            summary: "Ledger entries quarantined"
+            description: "{{ $value }} entries in quarantine (possible fork attack)"
+
+        - alert: ICNLedgerBalanceInconsistency
+          expr: abs(icn_ledger_balances_total) > 0.01
+          labels:
+            severity: critical
+            component: ledger
+          annotations:
+            summary: "Ledger balance sum non-zero"
+            description: "Sum of balances = {{ $value }} (should be 0)"
+
+    # Compute Layer Alerts
+    - name: icn.compute_layer
+      interval: 15s
+      rules:
+        - alert: ICNComputeTaskTimeout
+          expr: rate(icn_compute_tasks_timeout_total[5m]) > 0.1
+          for: 5m
+          labels:
+            severity: warning
+            component: compute
+          annotations:
+            summary: "Compute tasks timing out"
+            description: "{{ $value }} tasks/sec timing out"
+
+        - alert: ICNComputeSignatureFailures
+          expr: rate(icn_compute_signatures_invalid_total[5m]) > 0
+          labels:
+            severity: critical
+            component: compute
+          annotations:
+            summary: "Invalid compute signatures detected"
+            description: "Possible Byzantine executor on {{ $labels.instance }}"
+
+    # Authentication & Authorization Alerts
+    - name: icn.auth_security
+      interval: 10s
+      rules:
+        - alert: ICNHighAuthFailureRate
+          expr: rate(icn_gateway_auth_failures_total[5m]) > 0.5
+          for: 2m
+          labels:
+            severity: warning
+            component: security
+          annotations:
+            summary: "High authentication failure rate"
+            description: "{{ $value }} auth failures/sec on {{ $labels.instance }}"
+
+        - alert: ICNAuthenticationAttack
+          expr: rate(icn_gateway_auth_failures_total[1m]) > 5
+          labels:
+            severity: critical
+            component: security
+          annotations:
+            summary: "Possible authentication attack detected"
+            description: "{{ $value }} auth failures/sec (threshold: 5/sec) on {{ $labels.instance }}"
+
+        - alert: ICNAuthorizationFailures
+          expr: rate(icn_gateway_authorization_failures_total[5m]) > 1
+          for: 2m
+          labels:
+            severity: warning
+            component: security
+          annotations:
+            summary: "High authorization failure rate"
+            description: "{{ $value }} authz failures/sec on {{ $labels.instance }} (scope: {{ $labels.required_scope }})"
+
+        - alert: ICNRateLimitAttack
+          expr: rate(icn_gateway_rate_limit_exceeded_total[1m]) > 10
+          for: 1m
+          labels:
+            severity: warning
+            component: security
+          annotations:
+            summary: "High rate limit violations"
+            description: "{{ $value }} rate limit hits/sec on {{ $labels.instance }}"
+
+    # System Resources
+    - name: icn.system_resources
+      interval: 30s
+      rules:
+        - alert: ICNHighMemoryUsage
+          expr: process_resident_memory_bytes{job="icn-daemon"} / (1024^3) > 2
+          for: 10m
+          labels:
+            severity: warning
+            component: system
+          annotations:
+            summary: "ICN daemon high memory"
+            description: "{{ $labels.instance }} using {{ $value }}GB RAM"
+
+        - alert: ICNMemoryLeak
+          expr: rate(process_resident_memory_bytes{job="icn-daemon"}[1h]) > 1024^2
+          for: 1h
+          labels:
+            severity: critical
+            component: system
+          annotations:
+            summary: "ICN daemon possible memory leak"
+            description: "Memory growing at {{ $value | humanize }}B/sec"

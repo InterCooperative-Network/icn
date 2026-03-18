@@ -1,0 +1,49 @@
+{
+  "name": "icn-timebank-pilot-ui",
+  "version": "1.0.0",
+  "description": "ICN Timebank Pilot UI - Progressive Web App for cooperative time banking",
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:debug": "playwright test --debug",
+    "test:a11y": "playwright test tests/e2e/accessibility.spec.js",
+    "test:a11y:headed": "playwright test tests/e2e/accessibility.spec.js --headed",
+    "test:all": "npm run test && npm run test:e2e"
+  },
+  "keywords": [
+    "timebank",
+    "cooperative",
+    "mutual-credit",
+    "pwa"
+  ],
+  "author": "ICN Project",
+  "license": "MIT",
+  "devDependencies": {
+    "@axe-core/playwright": "^4.11.1",
+    "@playwright/test": "^1.58.2",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.1.5",
+    "jest": "^30.2.0",
+    "jest-environment-jsdom": "^30.2.0"
+  },
+  "jest": {
+    "testEnvironment": "jsdom",
+    "setupFilesAfterEnv": ["<rootDir>/tests/setup.js"],
+    "testMatch": ["**/tests/**/*.test.js"],
+    "collectCoverageFrom": [
+      "app.js",
+      "!tests/**"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "branches": 70,
+        "functions": 70,
+        "lines": 70,
+        "statements": 70
+      }
+    }
+  }
+}

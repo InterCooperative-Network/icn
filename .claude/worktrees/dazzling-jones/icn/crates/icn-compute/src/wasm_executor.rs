@@ -1,0 +1,1337 @@
+//! WASM executor for compute tasks.
+//!
+//! This module provides WebAssembly execution capabilities using the Wasmtime runtime.
+//! Enable with the `wasm` feature flag.
+
+#[cfg(feature = "wasm")]
+use wasmtime::{Engine, Linker, Module, Store, StoreLimits, StoreLimitsBuilder};
+
+use crate::error::ComputeError;
+use crate::executor::{ExecutionContext, Executor};
+use crate::types::{ComputeTask, ExecutionOutcome, ExecutorCapability, TaskCode};
+use crate::wasm_registry::WasmRegistry;
+use std::sync::Arc;
+
+/// WASM execution state for memory limits
+#[cfg(feature = "wasm")]
+struct WasmState {
+    limits: StoreLimits,
+}
+
+#[cfg(feature = "wasm")]
+impl WasmState {
+    fn new(max_memory_bytes: usize) -> Self {
+        Self {
+            limits: StoreLimitsBuilder::new()
+                .memory_size(max_memory_bytes)
+                .table_elements(10_000)
+                .instances(10)
+                .tables(10)
+                .memories(10)
+                .build(),
+        }
+    }
+}
+
+/// Callback type for resolving contract references from the registry
+/// Takes a contract hash and returns the contract if found
+pub type ContractResolverCallback =
+    Arc<dyn Fn([u8; 32]) -> Option<icn_ccl::Contract> + Send + Sync>;
+
+/// WASM executor using Wasmtime
+pub struct WasmExecutor {
+    capabilities: Vec<ExecutorCapability>,
+    #[cfg(feature = "wasm")]
+    engine: Engine,
+    /// Maximum memory per WASM instance (bytes)
+    max_memory: usize,
+    /// Optional WASM registry for WasmRef resolution
+    registry: Option<Arc<WasmRegistry>>,
+    /// Optional contract resolver for CclRef resolution
+    contract_resolver: Option<ContractResolverCallback>,
+}
+
+impl WasmExecutor {
+    /// Create a new WASM executor
+    #[cfg(feature = "wasm")]
+    pub fn new() -> Result<Self, ComputeError> {
+        // Use default config - fuel metering can be enabled later
+        let engine = Engine::default();
+
+        Ok(Self {
+            capabilities: vec![ExecutorCapability::Wasm, ExecutorCapability::Ccl],
+            engine,
+            max_memory: 64 * 1024 * 1024, // 64MB default
+            registry: None,
+            contract_resolver: None,
+        })
+    }
+
+    /// Create a new WASM executor (stub when feature disabled)
+    #[cfg(not(feature = "wasm"))]
+    pub fn new() -> Result<Self, ComputeError> {
+        Ok(Self {
+            capabilities: vec![ExecutorCapability::Ccl],
+            max_memory: 64 * 1024 * 1024,
+            registry: None,
+            contract_resolver: None,
+        })
+    }
+
+    /// Set maximum memory per WASM instance
+    pub fn with_max_memory(mut self, bytes: usize) -> Self {
+        self.max_memory = bytes;
+        self
+    }
+
+    /// Set the WASM registry for WasmRef resolution
+    pub fn with_registry(mut self, registry: Arc<WasmRegistry>) -> Self {
+        self.registry = Some(registry);
+        self
+    }
+
+    /// Set the WASM registry (mutable reference version)
+    pub fn set_registry(&mut self, registry: Arc<WasmRegistry>) {
+        self.registry = Some(registry);
+    }
+
+    /// Get the WASM registry if set
+    pub fn registry(&self) -> Option<&Arc<WasmRegistry>> {
+        self.registry.as_ref()
+    }
+
+    /// Set the contract resolver callback for CclRef resolution (builder pattern)
+    pub fn with_contract_resolver(mut self, resolver: ContractResolverCallback) -> Self {
+        self.contract_resolver = Some(resolver);
+        self
+    }
+
+    /// Set the contract resolver callback for CclRef resolution (mutable reference version)
+    pub fn set_contract_resolver(&mut self, resolver: ContractResolverCallback) {
+        self.contract_resolver = Some(resolver);
+    }
+
+    /// Get the contract resolver if set
+    pub fn contract_resolver(&self) -> Option<&ContractResolverCallback> {
+        self.contract_resolver.as_ref()
+    }
+
+    /// Execute a WASM module
+    #[cfg(feature = "wasm")]
+    fn execute_wasm(
+        &self,
+        wasm_bytes: &[u8],
+        inputs: &[u8],
+        ctx: &mut ExecutionContext,
+    ) -> ExecutionOutcome {
+        // Create store with memory limits
+        let state = WasmState::new(self.max_memory);
+        let mut store = Store::new(&self.engine, state);
+        store.limiter(|s| &mut s.limits);
+
+        // Compile module
+        let module = match Module::new(&self.engine, wasm_bytes) {
+            Ok(m) => m,
+            Err(e) => return ExecutionOutcome::Failed(format!("WASM compilation failed: {e}")),
+        };
+
+        // Create linker and add WASI-like imports
+        let mut linker: Linker<WasmState> = Linker::new(&self.engine);
+
+        // Add ICN host functions
+        if let Err(e) = self.add_host_functions(&mut linker) {
+            return ExecutionOutcome::Failed(format!("Failed to add host functions: {e}"));
+        }
+
+        // Instantiate module
+        let instance = match linker.instantiate(&mut store, &module) {
+            Ok(i) => i,
+            Err(e) => return ExecutionOutcome::Failed(format!("WASM instantiation failed: {e}")),
+        };
+
+        // Get the main/run function
+        let run_fn = match instance.get_typed_func::<(i32, i32), i32>(&mut store, "run") {
+            Ok(f) => f,
+            Err(_) => {
+                // Try alternative signatures
+                match instance.get_typed_func::<(), i32>(&mut store, "run") {
+                    Ok(f) => {
+                        // No-arg version
+                        match f.call(&mut store, ()) {
+                            Ok(result) => {
+                                // Simple fuel estimation: 100 fuel per execution
+                                ctx.fuel_remaining = ctx.fuel_remaining.saturating_sub(100);
+                                return ExecutionOutcome::Success(result.to_le_bytes().to_vec());
+                            }
+                            Err(e) => {
+                                let err_str = e.to_string();
+                                if err_str.contains("fuel") || err_str.contains("out of fuel") {
+                                    return ExecutionOutcome::OutOfFuel;
+                                }
+                                return ExecutionOutcome::Failed(format!(
+                                    "Execution failed: {err_str}"
+                                ));
+                            }
+                        }
+                    }
+                    Err(_) => {
+                        return ExecutionOutcome::Failed(
+                            "No 'run' function found with supported signature".into(),
+                        )
+                    }
+                }
+            }
+        };
+
+        // Write inputs to WASM memory if provided
+        let (input_ptr, input_len) = if !inputs.is_empty() {
+            // Get memory export
+            let memory = match instance.get_memory(&mut store, "memory") {
+                Some(m) => m,
+                None => return ExecutionOutcome::Failed("No memory export found".into()),
+            };
+
+            // Allocate space for inputs (simplified - assumes module has an allocator)
+            // For now, write to a fixed offset
+            let offset = 1024u32; // Start at 1KB offset
+            let data = memory.data_mut(&mut store);
+            if offset as usize + inputs.len() > data.len() {
+                return ExecutionOutcome::Failed("Input too large for WASM memory".into());
+            }
+            data[offset as usize..offset as usize + inputs.len()].copy_from_slice(inputs);
+            (offset as i32, inputs.len() as i32)
+        } else {
+            (0, 0)
+        };
+
+        // Call the function
+        match run_fn.call(&mut store, (input_ptr, input_len)) {
+            Ok(result) => {
+                // Simple fuel estimation: 100 fuel per execution
+                ctx.fuel_remaining = ctx.fuel_remaining.saturating_sub(100);
+                // Return result as bytes
+                ExecutionOutcome::Success(result.to_le_bytes().to_vec())
+            }
+            Err(e) => {
+                let err_str = e.to_string();
+                if err_str.contains("fuel") || err_str.contains("out of fuel") {
+                    ExecutionOutcome::OutOfFuel
+                } else {
+                    ExecutionOutcome::Failed(format!("Execution failed: {err_str}"))
+                }
+            }
+        }
+    }
+
+    /// Add ICN host functions to the linker
+    #[cfg(feature = "wasm")]
+    fn add_host_functions(&self, linker: &mut Linker<WasmState>) -> Result<(), ComputeError> {
+        // Add logging function
+        linker
+            .func_wrap(
+                "icn",
+                "log",
+                |_caller: wasmtime::Caller<'_, WasmState>, ptr: i32, len: i32| {
+                    tracing::debug!(ptr, len, "WASM log call");
+                },
+            )
+            .map_err(|e| {
+                ComputeError::ExecutionFailed(format!("Failed to add log function: {e}"))
+            })?;
+
+        // Add timestamp function
+        linker
+            .func_wrap(
+                "icn",
+                "timestamp",
+                |_caller: wasmtime::Caller<'_, WasmState>| -> i64 {
+                    std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_else(|e| {
+                            tracing::warn!("System clock before UNIX epoch: {:?}", e);
+                            std::time::Duration::ZERO
+                        })
+                        .as_millis() as i64
+                },
+            )
+            .map_err(|e| {
+                ComputeError::ExecutionFailed(format!("Failed to add timestamp function: {e}"))
+            })?;
+
+        Ok(())
+    }
+
+    /// Execute WASM (stub when feature disabled)
+    #[cfg(not(feature = "wasm"))]
+    fn execute_wasm(
+        &self,
+        _wasm_bytes: &[u8],
+        _inputs: &[u8],
+        _ctx: &mut ExecutionContext,
+    ) -> ExecutionOutcome {
+        ExecutionOutcome::Failed("WASM support not enabled. Rebuild with --features wasm".into())
+    }
+}
+
+#[cfg(feature = "wasm")]
+impl Default for WasmExecutor {
+    fn default() -> Self {
+        // SAFETY: WasmExecutor::new() with wasm feature only fails if wasmtime
+        // engine initialization fails, which is a catastrophic configuration error.
+        #[allow(clippy::expect_used)]
+        Self::new().expect("Failed to create default WasmExecutor")
+    }
+}
+
+#[cfg(not(feature = "wasm"))]
+impl Default for WasmExecutor {
+    fn default() -> Self {
+        // SAFETY: WasmExecutor::new() only fails when wasm feature is enabled
+        // and engine initialization fails. Without wasm feature, it's infallible.
+        #[allow(clippy::expect_used)]
+        Self::new().expect("Failed to create default WasmExecutor")
+    }
+}
+
+impl Executor for WasmExecutor {
+    fn execute(&self, task: &ComputeTask, ctx: &mut ExecutionContext) -> ExecutionOutcome {
+        match &task.code {
+            TaskCode::Ccl(source) => {
+                // Delegate CCL execution to the CCL interpreter (same as LocalExecutor)
+                let contract: icn_ccl::Contract = match serde_json::from_str(source) {
+                    Ok(c) => c,
+                    Err(e) => return ExecutionOutcome::Failed(format!("Invalid CCL JSON: {e}")),
+                };
+
+                if let Err(e) = contract.validate() {
+                    return ExecutionOutcome::Failed(format!("Contract validation failed: {e}"));
+                }
+
+                let rule_name = contract
+                    .rules
+                    .first()
+                    .map(|r| r.name.clone())
+                    .unwrap_or_else(|| "main".to_string());
+
+                let caller_did: icn_identity::Did = match serde_json::from_value(
+                    serde_json::Value::String(ctx.executor_did.clone()),
+                ) {
+                    Ok(d) => d,
+                    Err(e) => return ExecutionOutcome::Failed(format!("Invalid caller DID: {e}")),
+                };
+
+                let timestamp = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_else(|e| {
+                        tracing::warn!("System clock before UNIX epoch: {:?}", e);
+                        std::time::Duration::ZERO
+                    })
+                    .as_secs();
+
+                // Use the task's determinism_class for CCL execution context.
+                // This propagates the E3 enforcement: Advisory tasks cannot mutate state.
+                let ccl_determinism = match task.determinism_class {
+                    crate::types::DeterminismClass::Canonical => {
+                        icn_kernel_api::compute::DeterminismClass::Canonical
+                    }
+                    crate::types::DeterminismClass::Advisory => {
+                        icn_kernel_api::compute::DeterminismClass::Advisory
+                    }
+                };
+
+                let ccl_context = icn_ccl::ExecutionContext {
+                    caller: caller_did.clone(),
+                    timestamp,
+                    fuel: ctx.fuel_remaining,
+                    fuel_limit: ctx.fuel_remaining,
+                    capabilities: vec![],
+                    participants: vec![caller_did],
+                    determinism_class: ccl_determinism,
+                };
+
+                let state = icn_ccl::ContractState::default();
+                let args: std::collections::HashMap<String, icn_ccl::Value> =
+                    if task.inputs.is_empty() {
+                        std::collections::HashMap::new()
+                    } else {
+                        serde_json::from_slice(&task.inputs).unwrap_or_default()
+                    };
+
+                let interpreter = icn_ccl::Interpreter::new(contract, state, ccl_context);
+                match interpreter.execute_rule(&rule_name, args) {
+                    Ok(result) => {
+                        ctx.fuel_remaining =
+                            ctx.fuel_remaining.saturating_sub(result.fuel_consumed);
+                        let output =
+                            serde_json::to_vec(&result.value).unwrap_or_else(|_| b"null".to_vec());
+                        ExecutionOutcome::Success(output)
+                    }
+                    Err(e) => {
+                        let err_str = e.to_string();
+                        if err_str.contains("fuel") || err_str.contains("Fuel") {
+                            ExecutionOutcome::OutOfFuel
+                        } else {
+                            ExecutionOutcome::Failed(err_str)
+                        }
+                    }
+                }
+            }
+            TaskCode::CclRef { hash, rule } => {
+                // CclRef requires a contract registry to be set up
+                let hash_hex = hex::encode(hash);
+
+                match &self.contract_resolver {
+                    Some(resolver) => {
+                        // Resolve the contract from the registry
+                        match resolver(*hash) {
+                            Some(contract) => {
+                                tracing::debug!(
+                                    hash = %hash_hex,
+                                    rule = %rule,
+                                    "Resolved CclRef, executing contract"
+                                );
+
+                                // Validate contract structure
+                                if let Err(e) = contract.validate() {
+                                    return ExecutionOutcome::Failed(format!(
+                                        "Contract validation failed: {e}"
+                                    ));
+                                }
+
+                                // Check that the rule exists
+                                if contract.get_rule(rule).is_none() {
+                                    return ExecutionOutcome::Failed(format!(
+                                        "Rule '{rule}' not found in contract"
+                                    ));
+                                }
+
+                                // Parse caller DID
+                                let caller_did: icn_identity::Did = match serde_json::from_value(
+                                    serde_json::Value::String(ctx.executor_did.clone()),
+                                ) {
+                                    Ok(d) => d,
+                                    Err(e) => {
+                                        return ExecutionOutcome::Failed(format!(
+                                            "Invalid caller DID: {e}"
+                                        ))
+                                    }
+                                };
+
+                                let timestamp = std::time::SystemTime::now()
+                                    .duration_since(std::time::UNIX_EPOCH)
+                                    .unwrap_or_else(|e| {
+                                        tracing::warn!("System clock before UNIX epoch: {:?}", e);
+                                        std::time::Duration::ZERO
+                                    })
+                                    .as_secs();
+
+                                // Propagate determinism class to CCL context (E3 enforcement)
+                                let ccl_determinism = match task.determinism_class {
+                                    crate::types::DeterminismClass::Canonical => {
+                                        icn_kernel_api::compute::DeterminismClass::Canonical
+                                    }
+                                    crate::types::DeterminismClass::Advisory => {
+                                        icn_kernel_api::compute::DeterminismClass::Advisory
+                                    }
+                                };
+
+                                let ccl_context = icn_ccl::ExecutionContext {
+                                    caller: caller_did.clone(),
+                                    timestamp,
+                                    fuel: ctx.fuel_remaining,
+                                    fuel_limit: ctx.fuel_remaining,
+                                    capabilities: vec![],
+                                    participants: vec![caller_did],
+                                    determinism_class: ccl_determinism,
+                                };
+
+                                let state = icn_ccl::ContractState::default();
+                                let args: std::collections::HashMap<String, icn_ccl::Value> =
+                                    if task.inputs.is_empty() {
+                                        std::collections::HashMap::new()
+                                    } else {
+                                        serde_json::from_slice(&task.inputs).unwrap_or_default()
+                                    };
+
+                                let interpreter =
+                                    icn_ccl::Interpreter::new(contract, state, ccl_context);
+                                match interpreter.execute_rule(rule, args) {
+                                    Ok(result) => {
+                                        ctx.fuel_remaining =
+                                            ctx.fuel_remaining.saturating_sub(result.fuel_consumed);
+                                        let output = serde_json::to_vec(&result.value)
+                                            .unwrap_or_else(|_| b"null".to_vec());
+                                        ExecutionOutcome::Success(output)
+                                    }
+                                    Err(e) => {
+                                        let err_str = e.to_string();
+                                        if err_str.contains("fuel") || err_str.contains("Fuel") {
+                                            ExecutionOutcome::OutOfFuel
+                                        } else {
+                                            ExecutionOutcome::Failed(err_str)
+                                        }
+                                    }
+                                }
+                            }
+                            None => {
+                                tracing::warn!(
+                                    hash = %hash_hex,
+                                    rule = %rule,
+                                    "Contract not found in registry"
+                                );
+                                ExecutionOutcome::Failed(format!(
+                                    "Contract {hash_hex} not found in registry"
+                                ))
+                            }
+                        }
+                    }
+                    None => {
+                        tracing::warn!(
+                            hash = %hash_hex,
+                            rule = %rule,
+                            "CclRef requires contract registry (not configured)"
+                        );
+                        ExecutionOutcome::Failed(format!(
+                            "Contract registry not configured. Cannot resolve {hash_hex}."
+                        ))
+                    }
+                }
+            }
+            TaskCode::WasmInline(bytes) => self.execute_wasm(bytes, &task.inputs, ctx),
+            TaskCode::WasmRef(hash) => {
+                // Fetch WASM from registry using hash
+                let hash_hex = hex::encode(hash);
+
+                let Some(registry) = &self.registry else {
+                    tracing::warn!(
+                        hash = %hash_hex,
+                        "WasmRef requires registry but none configured"
+                    );
+                    return ExecutionOutcome::Failed(
+                        "WASM registry not configured. Cannot resolve WasmRef.".into(),
+                    );
+                };
+
+                // Use the blocking version since Executor::execute is synchronous
+                // The get_blocking() method uses blocking_read/blocking_write on
+                // tokio RwLocks which is designed for this use case.
+                let wasm_bytes = registry.get_blocking(hash);
+
+                match wasm_bytes {
+                    Ok(Some(bytes)) => {
+                        tracing::debug!(
+                            hash = %hash_hex,
+                            size = bytes.len(),
+                            "Resolved WasmRef from registry"
+                        );
+                        self.execute_wasm(&bytes, &task.inputs, ctx)
+                    }
+                    Ok(None) => {
+                        tracing::warn!(
+                            hash = %hash_hex,
+                            "WASM module not found in registry"
+                        );
+                        ExecutionOutcome::Failed(format!("WASM module not found: {hash_hex}"))
+                    }
+                    Err(e) => {
+                        tracing::error!(
+                            hash = %hash_hex,
+                            error = %e,
+                            "Failed to fetch WASM from registry"
+                        );
+                        ExecutionOutcome::Failed(format!("Registry error: {e}"))
+                    }
+                }
+            }
+        }
+    }
+
+    fn capabilities(&self) -> Vec<ExecutorCapability> {
+        self.capabilities.clone()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::{DeterminismClass, FuelLimit, PrivacyClass};
+
+    /// Valid test DID (proper multibase-encoded Ed25519 public key)
+    /// Generated from deterministic seed [1u8; 32]
+    const TEST_ALICE_DID: &str = "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9";
+
+    #[test]
+    fn test_wasm_executor_creation() {
+        let executor = WasmExecutor::new().unwrap();
+        let caps = executor.capabilities();
+
+        #[cfg(feature = "wasm")]
+        assert!(caps.contains(&ExecutorCapability::Wasm));
+
+        assert!(caps.contains(&ExecutorCapability::Ccl));
+    }
+
+    #[test]
+    fn test_wasm_executor_ccl_fallback() {
+        let executor = WasmExecutor::new().unwrap();
+
+        let contract = format!(
+            r#"{{
+            "name": "SimpleReturn",
+            "participants": ["{TEST_ALICE_DID}"],
+            "currency": null,
+            "state_vars": [],
+            "rules": [{{
+                "name": "run",
+                "params": [],
+                "requires": [],
+                "body": [{{ "Return": {{ "value": {{ "Literal": {{ "Int": 42 }} }} }} }}]
+            }}],
+            "triggers": []
+        }}"#
+        );
+
+        let task = ComputeTask {
+            id: "test".into(),
+            submitter: TEST_ALICE_DID.into(),
+            coop_id: None,
+            code: TaskCode::Ccl(contract),
+            inputs: vec![],
+            fuel_limit: FuelLimit(10_000),
+            required_capabilities: vec![ExecutorCapability::Ccl],
+            priority: crate::types::TaskPriority::Normal,
+            created_at: 1000,
+            deadline: None,
+            payment_rate: None,
+            payment_currency: None,
+            resource_profile: None,
+            actor_mode: None,
+            placement_constraints: None,
+            federation_constraints: None,
+            estimated_value: None,
+            verification: None,
+            inputs_hash: None,
+            policy_hash: None,
+            determinism_class: DeterminismClass::default(),
+            privacy_class: PrivacyClass::default(),
+            // E4: Storage specification fields
+            storage_class: None,
+            data_locality: None,
+            scope: Default::default(),
+        };
+
+        let mut ctx = ExecutionContext {
+            executor_did: TEST_ALICE_DID.into(),
+            fuel_remaining: 10_000,
+        };
+
+        let result = executor.execute(&task, &mut ctx);
+        assert!(
+            matches!(result, ExecutionOutcome::Success(_)),
+            "Expected success, got: {result:?}"
+        );
+    }
+
+    #[cfg(feature = "wasm")]
+    #[test]
+    fn test_wasm_inline_execution() {
+        // Simple WASM module that returns 42
+        let wat_source = r#"
+            (module
+                (func $run (export "run") (result i32)
+                    i32.const 42
+                )
+            )
+        "#;
+        let wasm_bytes = wat::parse_str(wat_source).expect("Failed to parse WAT");
+
+        let executor = WasmExecutor::new().unwrap();
+        let task = ComputeTask {
+            id: "wasm-test".into(),
+            submitter: TEST_ALICE_DID.into(),
+            coop_id: None,
+            code: TaskCode::WasmInline(wasm_bytes),
+            inputs: vec![],
+            fuel_limit: FuelLimit(10_000),
+            required_capabilities: vec![ExecutorCapability::Wasm],
+            priority: crate::types::TaskPriority::Normal,
+            created_at: 1000,
+            deadline: None,
+            payment_rate: None,
+            payment_currency: None,
+            resource_profile: None,
+            actor_mode: None,
+            placement_constraints: None,
+            federation_constraints: None,
+            estimated_value: None,
+            verification: None,
+            inputs_hash: None,
+            policy_hash: None,
+            determinism_class: DeterminismClass::default(),
+            privacy_class: PrivacyClass::default(),
+            // E4: Storage specification fields
+            storage_class: None,
+            data_locality: None,
+            scope: Default::default(),
+        };
+
+        let mut ctx = ExecutionContext {
+            executor_did: "did:icn:executor".into(),
+            fuel_remaining: 10_000,
+        };
+
+        let result = executor.execute(&task, &mut ctx);
+        match result {
+            ExecutionOutcome::Success(output) => {
+                // Should return 42 as little-endian i32
+                assert_eq!(output, vec![42, 0, 0, 0]);
+            }
+            other => panic!("Expected success, got: {other:?}"),
+        }
+    }
+
+    #[cfg(feature = "wasm")]
+    #[test]
+    fn test_wasm_with_host_functions() {
+        // WASM module that calls host functions (log, timestamp)
+        let wat_source = r#"
+            (module
+                ;; Import ICN host functions
+                (import "icn" "log" (func $log (param i32 i32)))
+                (import "icn" "timestamp" (func $timestamp (result i64)))
+
+                ;; Memory for log message
+                (memory (export "memory") 1)
+
+                ;; Store "Hi" at offset 0
+                (data (i32.const 0) "Hi")
+
+                (func $run (export "run") (result i32)
+                    ;; Call log("Hi", 2)
+                    (call $log (i32.const 0) (i32.const 2))
+                    ;; Call timestamp (result ignored)
+                    (drop (call $timestamp))
+                    ;; Return 99
+                    (i32.const 99)
+                )
+            )
+        "#;
+        let wasm_bytes = wat::parse_str(wat_source).expect("Failed to parse WAT");
+
+        let executor = WasmExecutor::new().unwrap();
+        let task = ComputeTask {
+            id: "host-fn-test".into(),
+            submitter: TEST_ALICE_DID.into(),
+            coop_id: None,
+            code: TaskCode::WasmInline(wasm_bytes),
+            inputs: vec![],
+            fuel_limit: FuelLimit(10_000),
+            required_capabilities: vec![ExecutorCapability::Wasm],
+            priority: crate::types::TaskPriority::Normal,
+            created_at: 1000,
+            deadline: None,
+            payment_rate: None,
+            payment_currency: None,
+            resource_profile: None,
+            actor_mode: None,
+            placement_constraints: None,
+            federation_constraints: None,
+            estimated_value: None,
+            verification: None,
+            inputs_hash: None,
+            policy_hash: None,
+            determinism_class: DeterminismClass::default(),
+            privacy_class: PrivacyClass::default(),
+            // E4: Storage specification fields
+            storage_class: None,
+            data_locality: None,
+            scope: Default::default(),
+        };
+
+        let mut ctx = ExecutionContext {
+            executor_did: "did:icn:executor".into(),
+            fuel_remaining: 10_000,
+        };
+
+        let result = executor.execute(&task, &mut ctx);
+        match result {
+            ExecutionOutcome::Success(output) => {
+                assert_eq!(output, vec![99, 0, 0, 0]);
+            }
+            other => panic!("Expected success, got: {other:?}"),
+        }
+    }
+
+    #[cfg(feature = "wasm")]
+    #[test]
+    fn test_wasm_with_inputs() {
+        // WASM module that reads inputs and sums bytes
+        let wat_source = r#"
+            (module
+                (memory (export "memory") 1)
+
+                ;; run(ptr, len) -> i32: sum bytes from ptr..ptr+len
+                (func $run (export "run") (param $ptr i32) (param $len i32) (result i32)
+                    (local $sum i32)
+                    (local $end i32)
+                    (local.set $end (i32.add (local.get $ptr) (local.get $len)))
+                    (block $done
+                        (loop $loop
+                            (br_if $done (i32.ge_u (local.get $ptr) (local.get $end)))
+                            (local.set $sum
+                                (i32.add (local.get $sum)
+                                    (i32.load8_u (local.get $ptr))))
+                            (local.set $ptr (i32.add (local.get $ptr) (i32.const 1)))
+                            (br $loop)
+                        )
+                    )
+                    (local.get $sum)
+                )
+            )
+        "#;
+        let wasm_bytes = wat::parse_str(wat_source).expect("Failed to parse WAT");
+
+        let executor = WasmExecutor::new().unwrap();
+        let task = ComputeTask {
+            id: "input-test".into(),
+            submitter: TEST_ALICE_DID.into(),
+            coop_id: None,
+            code: TaskCode::WasmInline(wasm_bytes),
+            inputs: vec![1, 2, 3, 4, 5], // Sum = 15
+            fuel_limit: FuelLimit(10_000),
+            required_capabilities: vec![ExecutorCapability::Wasm],
+            priority: crate::types::TaskPriority::Normal,
+            created_at: 1000,
+            deadline: None,
+            payment_rate: None,
+            payment_currency: None,
+            resource_profile: None,
+            actor_mode: None,
+            placement_constraints: None,
+            federation_constraints: None,
+            estimated_value: None,
+            verification: None,
+            inputs_hash: None,
+            policy_hash: None,
+            determinism_class: DeterminismClass::default(),
+            privacy_class: PrivacyClass::default(),
+            // E4: Storage specification fields
+            storage_class: None,
+            data_locality: None,
+            scope: Default::default(),
+        };
+
+        let mut ctx = ExecutionContext {
+            executor_did: "did:icn:executor".into(),
+            fuel_remaining: 10_000,
+        };
+
+        let result = executor.execute(&task, &mut ctx);
+        match result {
+            ExecutionOutcome::Success(output) => {
+                // Sum of [1,2,3,4,5] = 15
+                assert_eq!(output, vec![15, 0, 0, 0]);
+            }
+            other => panic!("Expected success, got: {other:?}"),
+        }
+    }
+
+    #[cfg(not(feature = "wasm"))]
+    #[test]
+    fn test_wasm_disabled_message() {
+        let executor = WasmExecutor::new().unwrap();
+        let task = ComputeTask {
+            id: "wasm-test".into(),
+            submitter: TEST_ALICE_DID.into(),
+            coop_id: None,
+            code: TaskCode::WasmInline(vec![0x00, 0x61, 0x73, 0x6d]),
+            inputs: vec![],
+            fuel_limit: FuelLimit(10_000),
+            required_capabilities: vec![ExecutorCapability::Wasm],
+            priority: crate::types::TaskPriority::Normal,
+            created_at: 1000,
+            deadline: None,
+            payment_rate: None,
+            payment_currency: None,
+            resource_profile: None,
+            actor_mode: None,
+            placement_constraints: None,
+            federation_constraints: None,
+            estimated_value: None,
+            verification: None,
+            inputs_hash: None,
+            policy_hash: None,
+            determinism_class: DeterminismClass::default(),
+            privacy_class: PrivacyClass::default(),
+            // E4: Storage specification fields
+            storage_class: None,
+            data_locality: None,
+            scope: Default::default(),
+        };
+
+        let mut ctx = ExecutionContext {
+            executor_did: "did:icn:executor".into(),
+            fuel_remaining: 10_000,
+        };
+
+        let result = executor.execute(&task, &mut ctx);
+        match result {
+            ExecutionOutcome::Failed(msg) => {
+                assert!(msg.contains("WASM support not enabled"));
+            }
+            other => panic!("Expected failure message, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_wasm_ref_without_registry() {
+        let executor = WasmExecutor::new().unwrap();
+        let task = ComputeTask {
+            id: "wasm-ref-test".into(),
+            submitter: TEST_ALICE_DID.into(),
+            coop_id: None,
+            code: TaskCode::WasmRef([0xAA; 32]),
+            inputs: vec![],
+            fuel_limit: FuelLimit(10_000),
+            required_capabilities: vec![ExecutorCapability::Wasm],
+            priority: crate::types::TaskPriority::Normal,
+            created_at: 1000,
+            deadline: None,
+            payment_rate: None,
+            payment_currency: None,
+            resource_profile: None,
+            actor_mode: None,
+            placement_constraints: None,
+            federation_constraints: None,
+            estimated_value: None,
+            verification: None,
+            inputs_hash: None,
+            policy_hash: None,
+            determinism_class: DeterminismClass::default(),
+            privacy_class: PrivacyClass::default(),
+            // E4: Storage specification fields
+            storage_class: None,
+            data_locality: None,
+            scope: Default::default(),
+        };
+
+        let mut ctx = ExecutionContext {
+            executor_did: "did:icn:executor".into(),
+            fuel_remaining: 10_000,
+        };
+
+        let result = executor.execute(&task, &mut ctx);
+        match result {
+            ExecutionOutcome::Failed(msg) => {
+                assert!(msg.contains("registry not configured"));
+            }
+            other => panic!("Expected 'registry not configured' error, got: {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_wasm_ref_not_found_in_registry() {
+        let registry = Arc::new(WasmRegistry::new());
+        let executor = WasmExecutor::new().unwrap().with_registry(registry);
+
+        let fake_hash = [0xBB; 32];
+        let task = ComputeTask {
+            id: "wasm-ref-missing".into(),
+            submitter: TEST_ALICE_DID.into(),
+            coop_id: None,
+            code: TaskCode::WasmRef(fake_hash),
+            inputs: vec![],
+            fuel_limit: FuelLimit(10_000),
+            required_capabilities: vec![ExecutorCapability::Wasm],
+            priority: crate::types::TaskPriority::Normal,
+            created_at: 1000,
+            deadline: None,
+            payment_rate: None,
+            payment_currency: None,
+            resource_profile: None,
+            actor_mode: None,
+            placement_constraints: None,
+            federation_constraints: None,
+            estimated_value: None,
+            verification: None,
+            inputs_hash: None,
+            policy_hash: None,
+            determinism_class: DeterminismClass::default(),
+            privacy_class: PrivacyClass::default(),
+            // E4: Storage specification fields
+            storage_class: None,
+            data_locality: None,
+            scope: Default::default(),
+        };
+
+        let mut ctx = ExecutionContext {
+            executor_did: "did:icn:executor".into(),
+            fuel_remaining: 10_000,
+        };
+
+        let result = executor.execute(&task, &mut ctx);
+        match result {
+            ExecutionOutcome::Failed(msg) => {
+                assert!(
+                    msg.contains("not found"),
+                    "Expected 'not found', got: {msg}"
+                );
+            }
+            other => panic!("Expected 'not found' error, got: {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_wasm_ref_with_registry() {
+        // Minimal valid WASM module
+        let wasm_bytes = vec![
+            0x00, 0x61, 0x73, 0x6D, // magic: \0asm
+            0x01, 0x00, 0x00, 0x00, // version: 1
+        ];
+
+        let registry = Arc::new(WasmRegistry::new());
+
+        // Deploy the WASM module
+        let hash = registry
+            .deploy(wasm_bytes.clone(), "did:icn:deployer", |m| m)
+            .await
+            .unwrap();
+
+        let executor = WasmExecutor::new().unwrap().with_registry(registry);
+
+        let task = ComputeTask {
+            id: "wasm-ref-valid".into(),
+            submitter: TEST_ALICE_DID.into(),
+            coop_id: None,
+            code: TaskCode::WasmRef(hash),
+            inputs: vec![],
+            fuel_limit: FuelLimit(10_000),
+            required_capabilities: vec![ExecutorCapability::Wasm],
+            priority: crate::types::TaskPriority::Normal,
+            created_at: 1000,
+            deadline: None,
+            payment_rate: None,
+            payment_currency: None,
+            resource_profile: None,
+            actor_mode: None,
+            placement_constraints: None,
+            federation_constraints: None,
+            estimated_value: None,
+            verification: None,
+            inputs_hash: None,
+            policy_hash: None,
+            determinism_class: DeterminismClass::default(),
+            privacy_class: PrivacyClass::default(),
+            // E4: Storage specification fields
+            storage_class: None,
+            data_locality: None,
+            scope: Default::default(),
+        };
+
+        let mut ctx = ExecutionContext {
+            executor_did: "did:icn:executor".into(),
+            fuel_remaining: 10_000,
+        };
+
+        // This will attempt to execute the minimal WASM module
+        // It will fail because the module has no 'run' function, but it proves
+        // the registry lookup worked
+        let result = executor.execute(&task, &mut ctx);
+
+        // Without the wasm feature, we expect "WASM support not enabled"
+        // With the wasm feature, we expect "No 'run' function found" (because we're using a minimal module)
+        #[cfg(not(feature = "wasm"))]
+        match result {
+            ExecutionOutcome::Failed(msg) => {
+                assert!(msg.contains("WASM support not enabled"));
+            }
+            other => panic!("Expected WASM disabled message, got: {other:?}"),
+        }
+
+        #[cfg(feature = "wasm")]
+        match result {
+            ExecutionOutcome::Failed(msg) => {
+                // Module loaded but no 'run' function - proves registry lookup worked
+                assert!(
+                    msg.contains("run") || msg.contains("function"),
+                    "Expected function-related error, got: {msg}"
+                );
+            }
+            other => panic!("Expected function error, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_cclref_without_resolver() {
+        let executor = WasmExecutor::new().unwrap();
+        let task = ComputeTask {
+            id: "cclref-test".into(),
+            submitter: TEST_ALICE_DID.into(),
+            coop_id: None,
+            code: TaskCode::CclRef {
+                hash: [0xCC; 32],
+                rule: "run".into(),
+            },
+            inputs: vec![],
+            fuel_limit: FuelLimit(10_000),
+            required_capabilities: vec![ExecutorCapability::Ccl],
+            priority: crate::types::TaskPriority::Normal,
+            created_at: 1000,
+            deadline: None,
+            payment_rate: None,
+            payment_currency: None,
+            resource_profile: None,
+            actor_mode: None,
+            placement_constraints: None,
+            federation_constraints: None,
+            estimated_value: None,
+            verification: None,
+            inputs_hash: None,
+            policy_hash: None,
+            determinism_class: DeterminismClass::default(),
+            privacy_class: PrivacyClass::default(),
+            // E4: Storage specification fields
+            storage_class: None,
+            data_locality: None,
+            scope: Default::default(),
+        };
+
+        let mut ctx = ExecutionContext {
+            executor_did: TEST_ALICE_DID.into(),
+            fuel_remaining: 10_000,
+        };
+
+        let result = executor.execute(&task, &mut ctx);
+        match result {
+            ExecutionOutcome::Failed(msg) => {
+                assert!(
+                    msg.contains("registry not configured"),
+                    "Expected 'registry not configured', got: {msg}"
+                );
+            }
+            other => panic!("Expected 'registry not configured' error, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_cclref_not_found() {
+        // Create a resolver that always returns None
+        let resolver: ContractResolverCallback = Arc::new(|_hash| None);
+        let executor = WasmExecutor::new()
+            .unwrap()
+            .with_contract_resolver(resolver);
+
+        let task = ComputeTask {
+            id: "cclref-missing".into(),
+            submitter: TEST_ALICE_DID.into(),
+            coop_id: None,
+            code: TaskCode::CclRef {
+                hash: [0xDD; 32],
+                rule: "run".into(),
+            },
+            inputs: vec![],
+            fuel_limit: FuelLimit(10_000),
+            required_capabilities: vec![ExecutorCapability::Ccl],
+            priority: crate::types::TaskPriority::Normal,
+            created_at: 1000,
+            deadline: None,
+            payment_rate: None,
+            payment_currency: None,
+            resource_profile: None,
+            actor_mode: None,
+            placement_constraints: None,
+            federation_constraints: None,
+            estimated_value: None,
+            verification: None,
+            inputs_hash: None,
+            policy_hash: None,
+            determinism_class: DeterminismClass::default(),
+            privacy_class: PrivacyClass::default(),
+            // E4: Storage specification fields
+            storage_class: None,
+            data_locality: None,
+            scope: Default::default(),
+        };
+
+        let mut ctx = ExecutionContext {
+            executor_did: TEST_ALICE_DID.into(),
+            fuel_remaining: 10_000,
+        };
+
+        let result = executor.execute(&task, &mut ctx);
+        match result {
+            ExecutionOutcome::Failed(msg) => {
+                assert!(
+                    msg.contains("not found"),
+                    "Expected 'not found', got: {msg}"
+                );
+            }
+            other => panic!("Expected 'not found' error, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_cclref_with_resolver() {
+        // Create a test contract
+        let contract_json = format!(
+            r#"{{
+            "name": "TestContract",
+            "participants": ["{TEST_ALICE_DID}"],
+            "currency": null,
+            "state_vars": [],
+            "rules": [{{
+                "name": "compute",
+                "params": [],
+                "requires": [],
+                "body": [{{ "Return": {{ "value": {{ "Literal": {{ "Int": 100 }} }} }} }}]
+            }}],
+            "triggers": []
+        }}"#
+        );
+
+        let contract: icn_ccl::Contract =
+            serde_json::from_str(&contract_json).expect("parse contract");
+        let expected_hash = [0xEE; 32];
+
+        // Create a resolver that returns our contract for the expected hash
+        let resolver: ContractResolverCallback = Arc::new(move |hash| {
+            if hash == expected_hash {
+                Some(contract.clone())
+            } else {
+                None
+            }
+        });
+
+        let executor = WasmExecutor::new()
+            .unwrap()
+            .with_contract_resolver(resolver);
+
+        let task = ComputeTask {
+            id: "cclref-valid".into(),
+            submitter: TEST_ALICE_DID.into(),
+            coop_id: None,
+            code: TaskCode::CclRef {
+                hash: expected_hash,
+                rule: "compute".into(),
+            },
+            inputs: vec![],
+            fuel_limit: FuelLimit(10_000),
+            required_capabilities: vec![ExecutorCapability::Ccl],
+            priority: crate::types::TaskPriority::Normal,
+            created_at: 1000,
+            deadline: None,
+            payment_rate: None,
+            payment_currency: None,
+            resource_profile: None,
+            actor_mode: None,
+            placement_constraints: None,
+            federation_constraints: None,
+            estimated_value: None,
+            verification: None,
+            inputs_hash: None,
+            policy_hash: None,
+            determinism_class: DeterminismClass::default(),
+            privacy_class: PrivacyClass::default(),
+            // E4: Storage specification fields
+            storage_class: None,
+            data_locality: None,
+            scope: Default::default(),
+        };
+
+        let mut ctx = ExecutionContext {
+            executor_did: TEST_ALICE_DID.into(),
+            fuel_remaining: 10_000,
+        };
+
+        let result = executor.execute(&task, &mut ctx);
+        assert!(
+            matches!(result, ExecutionOutcome::Success(_)),
+            "Expected success, got: {result:?}"
+        );
+    }
+
+    #[test]
+    fn test_cclref_rule_not_found() {
+        // Create a test contract with a "run" rule
+        let contract_json = format!(
+            r#"{{
+            "name": "TestContract",
+            "participants": ["{TEST_ALICE_DID}"],
+            "currency": null,
+            "state_vars": [],
+            "rules": [{{
+                "name": "run",
+                "params": [],
+                "requires": [],
+                "body": [{{ "Return": {{ "value": {{ "Literal": {{ "Int": 1 }} }} }} }}]
+            }}],
+            "triggers": []
+        }}"#
+        );
+
+        let contract: icn_ccl::Contract =
+            serde_json::from_str(&contract_json).expect("parse contract");
+        let expected_hash = [0xFF; 32];
+
+        let resolver: ContractResolverCallback = Arc::new(move |hash| {
+            if hash == expected_hash {
+                Some(contract.clone())
+            } else {
+                None
+            }
+        });
+
+        let executor = WasmExecutor::new()
+            .unwrap()
+            .with_contract_resolver(resolver);
+
+        // Try to execute a rule that doesn't exist
+        let task = ComputeTask {
+            id: "cclref-bad-rule".into(),
+            submitter: TEST_ALICE_DID.into(),
+            coop_id: None,
+            code: TaskCode::CclRef {
+                hash: expected_hash,
+                rule: "nonexistent_rule".into(),
+            },
+            inputs: vec![],
+            fuel_limit: FuelLimit(10_000),
+            required_capabilities: vec![ExecutorCapability::Ccl],
+            priority: crate::types::TaskPriority::Normal,
+            created_at: 1000,
+            deadline: None,
+            payment_rate: None,
+            payment_currency: None,
+            resource_profile: None,
+            actor_mode: None,
+            placement_constraints: None,
+            federation_constraints: None,
+            estimated_value: None,
+            verification: None,
+            inputs_hash: None,
+            policy_hash: None,
+            determinism_class: DeterminismClass::default(),
+            privacy_class: PrivacyClass::default(),
+            // E4: Storage specification fields
+            storage_class: None,
+            data_locality: None,
+            scope: Default::default(),
+        };
+
+        let mut ctx = ExecutionContext {
+            executor_did: TEST_ALICE_DID.into(),
+            fuel_remaining: 10_000,
+        };
+
+        let result = executor.execute(&task, &mut ctx);
+        match result {
+            ExecutionOutcome::Failed(msg) => {
+                assert!(
+                    msg.contains("not found") && msg.contains("nonexistent_rule"),
+                    "Expected rule not found error, got: {msg}"
+                );
+            }
+            other => panic!("Expected rule not found error, got: {other:?}"),
+        }
+    }
+}

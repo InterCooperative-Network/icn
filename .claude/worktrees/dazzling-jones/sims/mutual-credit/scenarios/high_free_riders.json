@@ -1,0 +1,37 @@
+{
+  "name": "High Free-Rider Ratio",
+  "description": "Stress test with 20% free-riders to find system breaking point.",
+  "parameters": {
+    "n_agents": 100,
+    "simulation_months": 12,
+    "seed": 42,
+    "credit_policy": {
+      "initial_limit": -20,
+      "max_limit": -500,
+      "growth_rate": 0.1,
+      "trust_multiplier": 1.0,
+      "demurrage_rate": 0.0,
+      "demurrage_threshold": 50,
+      "default_threshold": 100,
+      "default_period_days": 90,
+      "write_off_threshold": 200,
+      "ramp_period_months": 3,
+      "contribution_requirement": 10
+    },
+    "agent_type_distribution": {
+      "reciprocator": 0.55,
+      "hoarder": 0.10,
+      "free_rider": 0.20,
+      "opportunist": 0.10,
+      "super_contributor": 0.05
+    },
+    "trust_network_density": 0.6
+  },
+  "hypothesis": "System can tolerate ~8% free-riders but breaks down beyond 15-20%",
+  "compare_to": "baseline",
+  "expected_outcomes": {
+    "default_rate": "much higher than baseline (>25%)",
+    "velocity": "lower (fear-driven reduction)",
+    "failure_mode": "default cascade and trust breakdown"
+  }
+}

@@ -1,0 +1,225 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (build but do not publish)'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  id-token: write  # Required for keyless signing with Sigstore
+  attestations: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            artifact_name: icn-linux-amd64
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            artifact_name: icn-linux-arm64
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            artifact_name: icn-macos-amd64
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            artifact_name: icn-macos-arm64
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Free disk space (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install cross-compilation tools (Linux ARM64)
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "icn -> target"
+          key: ${{ matrix.target }}
+
+      - name: Build release binaries
+        run: |
+          if [ "${{ matrix.target }}" = "aarch64-unknown-linux-gnu" ]; then
+            export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc
+          fi
+          cargo build --release --target ${{ matrix.target }}
+        working-directory: ./icn
+
+      - name: Package binaries
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          cp icn/target/${{ matrix.target }}/release/icnd dist/
+          cp icn/target/${{ matrix.target }}/release/icnctl dist/
+          # icn-console is optional; copy it if it was built
+          if [ -f "icn/target/${{ matrix.target }}/release/icn-console" ]; then
+            cp icn/target/${{ matrix.target }}/release/icn-console dist/
+          fi
+          tar -czvf ${{ matrix.artifact_name }}.tar.gz -C dist .
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_name }}.tar.gz
+
+  sign-and-release:
+    name: Sign and Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v7
+        with:
+          path: artifacts
+
+      - name: Flatten artifacts
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          find artifacts -name "*.tar.gz" -exec mv {} release/ \;
+          if ! ls release/*.tar.gz >/dev/null 2>&1; then
+            echo "Error: No .tar.gz artifacts found in release/ after flattening."
+            exit 1
+          fi
+          ls -la release/
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign artifacts with cosign (keyless)
+        run: |
+          set -euo pipefail
+          cd release
+          shopt -s nullglob
+          files=( *.tar.gz )
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "Error: No .tar.gz artifacts found to sign."
+            exit 1
+          fi
+          for file in "${files[@]}"; do
+            echo "Signing $file..."
+            cosign sign-blob --yes "$file" \
+              --output-signature "${file}.sig" \
+              --output-certificate "${file}.pem"
+          done
+          ls -la
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0.17
+        with:
+          path: ./icn
+          artifact-name: sbom.spdx.json
+          output-file: release/sbom.spdx.json
+
+      - name: Generate checksums
+        run: |
+          set -euo pipefail
+          cd release
+          shopt -s nullglob
+          files=( *.tar.gz )
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "Error: No .tar.gz artifacts found for checksum generation."
+            exit 1
+          fi
+          sha256sum "${files[@]}" > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Create attestation
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: 'release/*.tar.gz'
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/') && (github.event_name != 'workflow_dispatch' || github.event.inputs.dry_run != true)
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/*.tar.gz
+            release/*.sig
+            release/*.pem
+            release/SHA256SUMS.txt
+            release/sbom.spdx.json
+          generate_release_notes: true
+          body: |
+            ## Verification
+
+            All release artifacts are signed using [Sigstore](https://www.sigstore.dev/) keyless signing.
+
+            ### Verify signatures
+
+            ```bash
+            # Install cosign
+            # https://docs.sigstore.dev/cosign/system_config/installation/
+
+            # Verify a binary
+            cosign verify-blob icn-linux-amd64.tar.gz \
+              --signature icn-linux-amd64.tar.gz.sig \
+              --certificate icn-linux-amd64.tar.gz.pem \
+              --certificate-identity-regexp "https://github.com/InterCooperative-Network/icn" \
+              --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
+            ```
+
+            ### Verify checksums
+
+            ```bash
+            # Linux
+            sha256sum -c SHA256SUMS.txt
+
+            # macOS
+            shasum -a 256 -c SHA256SUMS.txt
+            ```
+
+            ### Software Bill of Materials
+
+            The `sbom.spdx.json` file contains a complete list of dependencies.
+
+      - name: Summary
+        run: |
+          echo "## Release Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| File | Size |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|------|" >> $GITHUB_STEP_SUMMARY
+          cd release
+          for file in *.tar.gz; do
+            size=$(ls -lh "$file" | awk '{print $5}')
+            echo "| $file | $size |" >> $GITHUB_STEP_SUMMARY
+          done
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Checksums" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          cat SHA256SUMS.txt >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

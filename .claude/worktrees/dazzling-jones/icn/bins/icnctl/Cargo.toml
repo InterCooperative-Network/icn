@@ -1,0 +1,66 @@
+[package]
+name = "icnctl"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[features]
+default = []
+post-quantum = ["icn-identity/post-quantum", "icn-crypto-pq"]
+
+[[bin]]
+name = "icnctl"
+path = "src/main.rs"
+
+[dependencies]
+tokio.workspace = true
+tracing.workspace = true
+anyhow.workspace = true
+clap.workspace = true
+clap_complete = "4.5"
+rust-i18n.workspace = true
+sys-locale.workspace = true
+serde.workspace = true
+toml.workspace = true
+zeroize.workspace = true
+serde_json = "1.0"
+rpassword = "7.3"
+dirs = "6.0"
+sha2 = "0.10"
+hex = "0.4"
+base64 = "0.22"
+rand.workspace = true
+x25519-dalek.workspace = true
+tar = "0.4"
+walkdir = "2.4"
+chrono = "0.4"
+tempfile = "3.24"
+reqwest = { workspace = true, features = ["blocking"] }
+uuid = { version = "1.20", features = ["v4"] }
+qrcode = "0.14"
+image = { version = "0.25", default-features = false, features = ["png"] }
+
+# ICN crates
+icn-core.workspace = true
+icn-identity.workspace = true
+icn-crypto-pq = { workspace = true, optional = true }
+icn-store.workspace = true
+icn-trust.workspace = true
+icn-obs.workspace = true
+icn-rpc.workspace = true
+icn-ccl.workspace = true
+icn-ledger.workspace = true
+icn-snapshot.workspace = true
+icn-governance.workspace = true
+icn-federation.workspace = true
+icn-steward.workspace = true
+icn-gateway.workspace = true
+
+# OpenAPI
+utoipa = { version = "5.4.0", features = ["yaml"] }
+
+[dev-dependencies]
+tempfile = "3.24"
+
+[lints]
+workspace = true

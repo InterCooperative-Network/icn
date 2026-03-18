@@ -1,0 +1,473 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://icn.coop/schemas/config/v1.json",
+  "title": "ICN Node Configuration",
+  "description": "JSON Schema for ICN (Intercooperative Network) node configuration",
+  "type": "object",
+  "properties": {
+    "data_dir": {
+      "type": "string",
+      "description": "Data directory for node state, keystore, and databases",
+      "default": "~/.icn",
+      "examples": [
+        "/home/user/.icn",
+        "/var/lib/icn"
+      ]
+    },
+    "network": {
+      "type": "object",
+      "description": "Network configuration for P2P connectivity",
+      "properties": {
+        "listen_addr": {
+          "type": "string",
+          "description": "QUIC listener address for peer-to-peer connections (UDP)",
+          "default": "0.0.0.0:7777",
+          "pattern": "^(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}|0\\.0\\.0\\.0):\\d{1,5}$",
+          "examples": [
+            "0.0.0.0:7777",
+            "192.168.1.100:7777"
+          ]
+        },
+        "rpc_port": {
+          "type": "integer",
+          "description": "RPC (JSON-RPC over HTTP) listen port",
+          "default": 5601,
+          "minimum": 1024,
+          "maximum": 65535
+        },
+        "mdns_enabled": {
+          "type": "boolean",
+          "description": "Enable mDNS for automatic local network peer discovery",
+          "default": true
+        },
+        "bootstrap_peers": {
+          "type": "array",
+          "description": "Bootstrap peers for initial network connectivity",
+          "default": [],
+          "items": {
+            "type": "string",
+            "pattern": "^icn://did:icn:[a-zA-Z0-9]+@[\\d\\.]+:\\d{1,5}$",
+            "examples": [
+              "icn://did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK@203.0.113.50:7777"
+            ]
+          }
+        },
+        "min_trust_threshold": {
+          "type": "number",
+          "description": "Minimum trust score required for TLS connection acceptance (0.0 to 1.0)",
+          "default": 0.1,
+          "minimum": 0.0,
+          "maximum": 1.0
+        }
+      },
+      "additionalProperties": false
+    },
+    "observability": {
+      "type": "object",
+      "description": "Observability configuration for metrics and logging",
+      "properties": {
+        "metrics_port": {
+          "type": "integer",
+          "description": "Prometheus metrics exporter port (HTTP)",
+          "default": 9100,
+          "minimum": 1024,
+          "maximum": 65535
+        },
+        "health_port": {
+          "type": "integer",
+          "description": "Health check endpoint port (HTTP)",
+          "default": 8080,
+          "minimum": 1024,
+          "maximum": 65535
+        },
+        "log_level": {
+          "type": "string",
+          "description": "Log level for structured logging",
+          "default": "info",
+          "enum": ["trace", "debug", "info", "warn", "error"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "rate_limiting": {
+      "type": "object",
+      "description": "Trust-gated rate limiting configuration",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable trust-gated rate limiting",
+          "default": true
+        },
+        "refill_interval_ms": {
+          "type": "integer",
+          "description": "Token bucket refill interval (milliseconds)",
+          "default": 100,
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "isolated": {
+          "$ref": "#/$defs/rateLimitClass",
+          "description": "Rate limits for Isolated peers (trust 0.0-0.1)"
+        },
+        "known": {
+          "$ref": "#/$defs/rateLimitClass",
+          "description": "Rate limits for Known peers (trust 0.1-0.4)"
+        },
+        "partner": {
+          "$ref": "#/$defs/rateLimitClass",
+          "description": "Rate limits for Partner peers (trust 0.4-0.7)"
+        },
+        "federated": {
+          "$ref": "#/$defs/rateLimitClass",
+          "description": "Rate limits for Federated peers (trust 0.7-1.0)"
+        },
+        "fallback": {
+          "$ref": "#/$defs/rateLimitClass",
+          "description": "Fallback rate limits when trust is unavailable"
+        }
+      },
+      "additionalProperties": false
+    },
+    "topology": {
+      "type": "object",
+      "description": "Topology-aware networking configuration",
+      "properties": {
+        "region": {
+          "type": "string",
+          "description": "Geographic region identifier",
+          "default": "",
+          "examples": ["us-west", "eu-central", "ap-southeast"]
+        },
+        "cluster_id": {
+          "type": "string",
+          "description": "Cluster identifier within the region",
+          "default": "",
+          "examples": ["sfo-1", "lax-2", "pdx-1"]
+        },
+        "role": {
+          "type": "string",
+          "description": "Node role in the network topology",
+          "default": "edge",
+          "enum": ["edge", "rendezvous", "archive"]
+        },
+        "neighbor_limits": {
+          "type": "object",
+          "description": "Neighbor set size limits per category",
+          "properties": {
+            "max_local_cluster": {
+              "type": "integer",
+              "description": "Maximum local cluster neighbors",
+              "default": 50,
+              "minimum": 1
+            },
+            "max_regional": {
+              "type": "integer",
+              "description": "Maximum regional neighbors",
+              "default": 30,
+              "minimum": 1
+            },
+            "max_backbone": {
+              "type": "integer",
+              "description": "Maximum backbone neighbors",
+              "default": 20,
+              "minimum": 1
+            },
+            "max_trusted": {
+              "type": "integer",
+              "description": "Maximum trusted neighbors",
+              "default": 100,
+              "minimum": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "fanout": {
+          "type": "object",
+          "description": "Gossip fanout configuration per scope",
+          "properties": {
+            "local_cluster": {
+              "type": "integer",
+              "description": "Local cluster fanout",
+              "default": 8,
+              "minimum": 1,
+              "maximum": 20
+            },
+            "regional": {
+              "type": "integer",
+              "description": "Regional fanout",
+              "default": 6,
+              "minimum": 1,
+              "maximum": 20
+            },
+            "global": {
+              "type": "integer",
+              "description": "Global fanout",
+              "default": 4,
+              "minimum": 1,
+              "maximum": 20
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "federation": {
+      "type": "object",
+      "description": "Federation configuration for cross-network connectivity",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable federation features",
+          "default": false
+        },
+        "network_name": {
+          "type": "string",
+          "description": "Network name for identification",
+          "default": "icn-mainnet",
+          "examples": ["icn-mainnet", "my-private-coop"]
+        },
+        "bootstrap_peer_trust": {
+          "type": "number",
+          "description": "Initial trust score assigned to bootstrap peers",
+          "default": 0.3,
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "auto_accept_invites": {
+          "type": "boolean",
+          "description": "Automatically accept federation invites from trusted peers",
+          "default": false
+        },
+        "min_invite_trust": {
+          "type": "number",
+          "description": "Minimum trust score required to accept automatic invites",
+          "default": 0.5,
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "max_federations": {
+          "type": "integer",
+          "description": "Maximum number of federated networks to join",
+          "default": 10,
+          "minimum": 1,
+          "maximum": 100
+        },
+        "announce_public_addr": {
+          "type": "boolean",
+          "description": "Announce this node's public address to federation peers",
+          "default": true
+        },
+        "retry": {
+          "type": "object",
+          "description": "Connection retry settings for federation peers",
+          "properties": {
+            "max_retries": {
+              "type": "integer",
+              "description": "Maximum number of connection retry attempts",
+              "default": 5,
+              "minimum": 1,
+              "maximum": 20
+            },
+            "initial_delay_secs": {
+              "type": "integer",
+              "description": "Initial retry delay in seconds (exponential backoff)",
+              "default": 1,
+              "minimum": 1,
+              "maximum": 60
+            },
+            "max_delay_secs": {
+              "type": "integer",
+              "description": "Maximum retry delay in seconds",
+              "default": 60,
+              "minimum": 1,
+              "maximum": 3600
+            },
+            "reconnect_interval_secs": {
+              "type": "integer",
+              "description": "Reconnect interval for established peers that disconnect",
+              "default": 30,
+              "minimum": 1,
+              "maximum": 600
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "gateway": {
+      "type": "object",
+      "description": "Gateway API configuration (REST + WebSocket)",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable the gateway API server",
+          "default": false
+        },
+        "bind_addr": {
+          "type": "string",
+          "description": "HTTP bind address for the gateway",
+          "default": "127.0.0.1:8080",
+          "pattern": "^(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}|0\\.0\\.0\\.0|127\\.0\\.0\\.1):\\d{1,5}$"
+        },
+        "token_expiry_hours": {
+          "type": "integer",
+          "description": "JWT token expiration time in hours",
+          "default": 24,
+          "minimum": 1,
+          "maximum": 720
+        },
+        "challenge_ttl_minutes": {
+          "type": "integer",
+          "description": "Authentication challenge TTL in minutes",
+          "default": 5,
+          "minimum": 1,
+          "maximum": 60
+        },
+        "jwt_secret": {
+          "type": "string",
+          "description": "JWT secret key for token signing (use environment variable in production)",
+          "default": "",
+          "minLength": 16
+        },
+        "rate_limiting": {
+          "type": "object",
+          "description": "Gateway rate limiting configuration",
+          "properties": {
+            "capacity": {
+              "type": "integer",
+              "description": "Maximum tokens in bucket (burst capacity)",
+              "default": 100,
+              "minimum": 1,
+              "maximum": 10000
+            },
+            "refill_rate": {
+              "type": "integer",
+              "description": "Tokens refilled per second (sustained rate)",
+              "default": 10,
+              "minimum": 1,
+              "maximum": 1000
+            },
+            "cost_per_request": {
+              "type": "integer",
+              "description": "Tokens consumed per request",
+              "default": 1,
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "privacy": {
+      "type": "object",
+      "description": "Privacy configuration for metadata protection",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable privacy features",
+          "default": false
+        },
+        "onion_routing_enabled": {
+          "type": "boolean",
+          "description": "Enable onion routing for anonymous message delivery",
+          "default": false
+        },
+        "onion_hops": {
+          "type": "integer",
+          "description": "Number of relay hops for onion routing",
+          "default": 2,
+          "minimum": 1,
+          "maximum": 10
+        },
+        "min_relay_trust": {
+          "type": "number",
+          "description": "Minimum trust score for relay node selection",
+          "default": 0.3,
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "topic_encryption_enabled": {
+          "type": "boolean",
+          "description": "Enable topic name encryption",
+          "default": false
+        },
+        "traffic_obfuscation_enabled": {
+          "type": "boolean",
+          "description": "Enable traffic obfuscation (padding, delays, cover traffic)",
+          "default": false
+        },
+        "padding_target": {
+          "type": "integer",
+          "description": "Message padding target size (bytes)",
+          "default": 0,
+          "minimum": 0,
+          "maximum": 65536
+        },
+        "max_delay_ms": {
+          "type": "integer",
+          "description": "Maximum random delay for messages (milliseconds)",
+          "default": 0,
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "cover_traffic_rate": {
+          "type": "integer",
+          "description": "Cover traffic rate (messages per minute)",
+          "default": 0,
+          "minimum": 0,
+          "maximum": 1000
+        }
+      },
+      "additionalProperties": false
+    },
+    "cooperative": {
+      "type": "object",
+      "description": "Cooperative-specific settings for identity and financial operations",
+      "properties": {
+        "treasury_did": {
+          "type": "string",
+          "description": "Treasury DID for the cooperative",
+          "pattern": "^did:icn:[a-zA-Z0-9]+$",
+          "examples": ["did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK"]
+        },
+        "name": {
+          "type": "string",
+          "description": "Cooperative display name (human-readable)",
+          "maxLength": 100
+        },
+        "description": {
+          "type": "string",
+          "description": "Cooperative description",
+          "maxLength": 500
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "$defs": {
+    "rateLimitClass": {
+      "type": "object",
+      "properties": {
+        "max_messages_per_second": {
+          "type": "integer",
+          "description": "Maximum messages per second",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "burst_capacity": {
+          "type": "integer",
+          "description": "Burst capacity (tokens in bucket)",
+          "minimum": 1,
+          "maximum": 1000
+        }
+      },
+      "required": ["max_messages_per_second", "burst_capacity"],
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

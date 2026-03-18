@@ -1,0 +1,22 @@
+# Directories to exclude
+target/
+node_modules/
+.git/
+.github/
+sdk/
+sims/
+web/
+examples/
+docs/
+deploy/k8s/
+monitoring/
+*.md
+.claude/
+
+# Keep only what's needed for build
+!icn/
+!Cargo.toml
+!Cargo.lock
+!config/
+!contracts/
+!scripts/

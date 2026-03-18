@@ -1,0 +1,866 @@
+# ICN Kernel Surface Inventory
+#
+# This file lists every public API exposed by kernel crates and tracks
+# their "infection" status - whether they contain domain-specific logic
+# that should be extracted to apps.
+#
+# Status values:
+#   clean          - Pure infrastructure, no domain coupling
+#   infected       - Contains domain logic that should be extracted
+#   needs-review   - Unclear, requires analysis
+#
+# Update this file when kernel APIs change.
+# Every PR touching kernel code must check this inventory.
+
+[metadata]
+version = "0.2.0"
+last_updated = "2026-02-20"
+total_crates = 29
+clean_crates = 9
+infected_crates = 11
+needs_review_crates = 9
+
+# Extraction Progress (updated 2026-02-10):
+# - icn-governance-actor: NEW - Governance actor extracted to apps/governance
+# - icn-core governance handlers remain for proposal dispatch (federation, protocol, treasury)
+# - icn-kernel-api provides GovernanceExecutor trait for kernel/app boundary
+
+# =============================================================================
+# CORE INFRASTRUCTURE CRATES
+# =============================================================================
+
+[crates.icn-core]
+description = "Actor runtime and supervisor"
+status = "infected"
+infection_severity = "medium"
+infection_notes = """
+Governance actor extracted to apps/governance (icn-governance-actor).
+icn-core now uses GovernanceExecutor adapter pattern from icn-kernel-api.
+
+Remaining infections (2026-02-10):
+- governance_handlers/: 55 icn_governance:: refs (proposal dispatch, treasury, protocol, federation)
+- icn_ledger:: refs: 31 (treasury integration, dispute manager)
+- icn_ccl:: refs: 32 (contract execution, dispute actor)
+
+These are being incrementally extracted to apps layer.
+"""
+
+# Governance extraction pinned refs (from meaning_firewall.rs ratchet tests):
+governance_refs = 43
+ledger_refs = 31
+ccl_refs = 32
+
+[[crates.icn-core.exports]]
+name = "Runtime"
+kind = "struct"
+public_methods = ["new", "start", "stop", "shutdown"]
+notes = "Core runtime - should stay kernel"
+
+[[crates.icn-core.exports]]
+name = "Supervisor"
+kind = "struct"
+public_methods = ["new", "spawn", "stop", "send"]
+notes = "Actor supervision - should stay kernel"
+
+[[crates.icn-core.exports]]
+name = "EventBus"
+kind = "struct"
+public_methods = ["subscribe", "publish", "unsubscribe"]
+notes = "Event routing - should stay kernel"
+
+[[crates.icn-core.exports]]
+name = "GovernanceActor"
+kind = "struct"
+public_methods = ["spawn", "handle"]
+notes = "EXTRACTED: Core actor now in apps/governance (icn-governance-actor). icn-core uses GovernanceExecutor adapter."
+
+[[crates.icn-core.exports]]
+name = "ResourceAccessEnforcerActor"
+kind = "struct"
+public_methods = ["spawn", "handle"]
+notes = "INFECTED: Resource access policy should be app"
+
+[[crates.icn-core.exports]]
+name = "UpgradeActor"
+kind = "struct"
+public_methods = ["spawn", "handle"]
+notes = "INFECTED: Upgrade coordination tied to governance"
+
+# -----------------------------------------------------------------------------
+
+[crates.icn-identity]
+description = "DID generation and key management"
+status = "clean"
+infection_notes = "Pure identity primitive. No cross-references to trust, ledger, governance."
+
+[[crates.icn-identity.exports]]
+name = "Did"
+kind = "struct"
+public_methods = ["new", "from_str", "to_string"]
+notes = "Decentralized identifier - kernel primitive"
+
+[[crates.icn-identity.exports]]
+name = "KeyPair"
+kind = "struct"
+public_methods = ["generate", "sign", "verify", "public_key"]
+notes = "Cryptographic key pair - kernel primitive"
+
+[[crates.icn-identity.exports]]
+name = "KeyStore"
+kind = "trait"
+methods = ["sign", "public_key", "list_keys"]
+notes = "Key storage interface - kernel primitive"
+
+[[crates.icn-identity.exports]]
+name = "AgeKeyStore"
+kind = "struct"
+public_methods = ["new", "open", "sign", "public_key"]
+notes = "Age-encrypted keystore implementation"
+
+[[crates.icn-identity.exports]]
+name = "Anchor"
+kind = "struct"
+public_methods = ["new", "id", "verify"]
+notes = "Permanent identity anchor - kernel primitive"
+
+[[crates.icn-identity.exports]]
+name = "RevocationRegistry"
+kind = "struct"
+public_methods = ["revoke", "is_revoked", "check"]
+notes = "Key revocation tracking - kernel primitive"
+
+[[crates.icn-identity.exports]]
+name = "PersonhoodAnchor"
+kind = "struct"
+notes = "NEEDS REVIEW: May be steward-related (app concern)"
+
+[[crates.icn-identity.exports]]
+name = "EnrollmentPathway"
+kind = "enum"
+notes = "NEEDS REVIEW: Enrollment may be app concern"
+
+# -----------------------------------------------------------------------------
+
+[crates.icn-net]
+description = "QUIC/TLS networking"
+status = "infected"
+infection_severity = "medium"
+infection_notes = """
+Network layer imports TrustClass and TrustGraph directly for rate limiting
+and TLS peer validation. This is architecturally necessary but should use
+callback/trait interfaces instead of direct type imports.
+"""
+
+[[crates.icn-net.exports]]
+name = "NetworkActor"
+kind = "struct"
+public_methods = ["spawn", "send", "receive"]
+notes = "Core networking - should stay kernel"
+
+[[crates.icn-net.exports]]
+name = "NetworkHandle"
+kind = "struct"
+public_methods = ["send_message", "connected_peers"]
+notes = "Actor handle - should stay kernel"
+
+[[crates.icn-net.exports]]
+name = "SignedEnvelope"
+kind = "struct"
+public_methods = ["new", "sign", "verify", "open"]
+notes = "Signed message wrapper - should stay kernel"
+
+[[crates.icn-net.exports]]
+name = "EncryptedEnvelope"
+kind = "struct"
+public_methods = ["encrypt", "decrypt"]
+notes = "Encrypted message wrapper - should stay kernel"
+
+[[crates.icn-net.exports]]
+name = "TrustGatedRateLimitConfig"
+kind = "struct"
+notes = "INFECTED: Exposes trust types in public API"
+
+[[crates.icn-net.internal]]
+name = "rate_limit module"
+kind = "module"
+notes = "INFECTED: Directly uses icn_trust::TrustClass"
+
+[[crates.icn-net.internal]]
+name = "tls module"
+kind = "module"
+notes = "INFECTED: Directly uses icn_trust::TrustGraph"
+
+# -----------------------------------------------------------------------------
+
+[crates.icn-gossip]
+description = "Topic-based gossip protocol"
+status = "infected"
+infection_severity = "medium"
+infection_notes = """
+Gossip imports TrustClass for access control on topics. Trust-gating is
+architecturally necessary but should use PolicyOracle callback instead of
+direct trust type imports.
+"""
+
+[[crates.icn-gossip.exports]]
+name = "GossipActor"
+kind = "struct"
+public_methods = ["spawn", "subscribe", "publish"]
+notes = "Core gossip - should stay kernel"
+
+[[crates.icn-gossip.exports]]
+name = "GossipHandle"
+kind = "struct"
+public_methods = ["subscribe", "publish", "unsubscribe"]
+notes = "Actor handle - should stay kernel"
+
+[[crates.icn-gossip.exports]]
+name = "Topic"
+kind = "struct"
+public_methods = ["new", "name", "namespace"]
+notes = "Topic identifier - should stay kernel"
+
+[[crates.icn-gossip.exports]]
+name = "AccessControl"
+kind = "struct"
+notes = "INFECTED: Contains TrustClass in public API"
+
+[[crates.icn-gossip.exports]]
+name = "TrustResourceLimits"
+kind = "struct"
+notes = "INFECTED: Trust-specific resource limits"
+
+[[crates.icn-gossip.exports]]
+name = "VectorClock"
+kind = "struct"
+public_methods = ["new", "increment", "merge", "compare"]
+notes = "Causal ordering - should stay kernel"
+
+[[crates.icn-gossip.exports]]
+name = "BloomFilter"
+kind = "struct"
+public_methods = ["new", "insert", "contains"]
+notes = "Probabilistic set - should stay kernel"
+
+# -----------------------------------------------------------------------------
+
+[crates.icn-store]
+description = "Persistent storage via Sled"
+status = "clean"
+infection_notes = "Pure storage abstraction. No dependencies on trust, ledger, governance."
+
+[[crates.icn-store.exports]]
+name = "Store"
+kind = "trait"
+methods = ["get", "put", "delete", "list", "transaction"]
+notes = "Generic KV abstraction - kernel primitive"
+
+[[crates.icn-store.exports]]
+name = "SledStore"
+kind = "struct"
+public_methods = ["open", "get", "put", "delete"]
+notes = "Sled implementation - kernel primitive"
+
+[[crates.icn-store.exports]]
+name = "TransactionalStore"
+kind = "trait"
+methods = ["begin", "commit", "rollback"]
+notes = "Transaction support - kernel primitive"
+
+[[crates.icn-store.exports]]
+name = "StorageQuota"
+kind = "struct"
+notes = "Resource limits - kernel primitive"
+
+# -----------------------------------------------------------------------------
+
+[crates.icn-naming]
+description = "KV-backed hierarchical naming service"
+status = "clean"
+infection_notes = """
+Implements NamingService trait from icn-kernel-api. Provides generic
+hierarchical name resolution backed by icn-store (SledStore).
+
+No imports of icn-trust, icn-governance, icn-ledger, icn-ccl, icn-entity,
+icn-community, icn-federation, or icn-steward. Signature verification uses
+icn-identity primitives only.
+
+Added to icn-gateway in PR #1250 (Sprint 7 names API wiring).
+"""
+
+[[crates.icn-naming.exports]]
+name = "SledNamingService"
+kind = "struct"
+public_methods = ["new", "register", "resolve", "resolve_with_options", "update", "delete"]
+notes = "Concrete NamingService implementation - wraps SledStore"
+
+# -----------------------------------------------------------------------------
+
+[crates.icn-time]
+description = "Clock synchronization and scheduling"
+status = "clean"
+infection_notes = "Pure time primitive. Provides logical clocks and scheduling."
+
+[[crates.icn-time.exports]]
+name = "LogicalClock"
+kind = "struct"
+public_methods = ["now", "tick", "update"]
+notes = "Lamport clock - kernel primitive"
+
+[[crates.icn-time.exports]]
+name = "VectorClock"
+kind = "struct"
+notes = "Vector clock for distributed ordering"
+
+[[crates.icn-time.exports]]
+name = "Scheduler"
+kind = "trait"
+methods = ["schedule_at", "schedule_after", "cancel"]
+notes = "Scheduling interface - kernel primitive"
+
+# -----------------------------------------------------------------------------
+
+[crates.icn-snapshot]
+description = "State snapshots for graceful restarts"
+status = "clean"
+infection_notes = "Pure infrastructure for state persistence."
+
+[[crates.icn-snapshot.exports]]
+name = "SnapshotManager"
+kind = "struct"
+public_methods = ["create", "restore", "list", "delete"]
+notes = "Snapshot management - kernel primitive"
+
+# =============================================================================
+# DOMAIN CRATES (Should become apps)
+# =============================================================================
+
+[crates.icn-trust]
+description = "Trust graph computation"
+status = "infected"
+infection_severity = "high"
+infection_notes = """
+Trust computation should be an app implementing PolicyOracle, not a kernel
+crate. Currently, trust types are imported directly by icn-gossip, icn-net,
+icn-ledger, and icn-governance.
+
+The internal implementation is relatively clean (uses Store trait), but
+its position as a kernel crate causes cascading infections.
+"""
+
+[[crates.icn-trust.exports]]
+name = "TrustGraph"
+kind = "struct"
+public_methods = ["new", "get_score", "add_attestation", "compute"]
+notes = "INFECTED: Should become trust app"
+
+[[crates.icn-trust.exports]]
+name = "TrustScore"
+kind = "struct"
+public_methods = ["new", "value", "class"]
+notes = "INFECTED: Domain type, should be app"
+
+[[crates.icn-trust.exports]]
+name = "TrustClass"
+kind = "enum"
+variants = ["Isolated", "Known", "Partner", "Federated"]
+notes = "INFECTED: Domain type, should be app"
+
+[[crates.icn-trust.exports]]
+name = "TrustAttestation"
+kind = "struct"
+notes = "INFECTED: Domain type, should be app"
+
+[[crates.icn-trust.exports]]
+name = "SybilResistance"
+kind = "struct"
+notes = "INFECTED: Domain logic, should be app"
+
+# -----------------------------------------------------------------------------
+
+[crates.icn-ledger]
+description = "Mutual credit accounting"
+status = "infected"
+infection_severity = "high"
+infection_notes = """
+Most heavily infected crate. Has dependencies on:
+- icn-gossip (for ledger sync)
+- icn-trust (for credit policies)
+- icn-governance (for treasury)
+
+Should become ledger app using generic state primitives.
+"""
+
+[[crates.icn-ledger.exports]]
+name = "Ledger"
+kind = "struct"
+public_methods = ["new", "transfer", "balance", "history"]
+notes = "INFECTED: Domain type, should be ledger app"
+
+[[crates.icn-ledger.exports]]
+name = "JournalEntry"
+kind = "struct"
+notes = "INFECTED: Domain type, should be app event schema"
+
+[[crates.icn-ledger.exports]]
+name = "CreditLimit"
+kind = "struct"
+notes = "INFECTED: Domain type (trust-based)"
+
+[[crates.icn-ledger.exports]]
+name = "CreditPolicy"
+kind = "struct"
+notes = "INFECTED: Trust-based policy, should be app"
+
+[[crates.icn-ledger.exports]]
+name = "DisputeManager"
+kind = "struct"
+notes = "INFECTED: Governance concern, should be app"
+
+[[crates.icn-ledger.exports]]
+name = "Treasury"
+kind = "struct"
+notes = "INFECTED: Governance concern, should be app"
+
+[[crates.icn-ledger.exports]]
+name = "WitnessedEntry"
+kind = "struct"
+notes = "INFECTED: Multi-witness entries, domain logic"
+
+# -----------------------------------------------------------------------------
+
+[crates.icn-governance]
+description = "Governance primitives"
+status = "infected"
+infection_severity = "medium"
+infection_notes = """
+Governance legitimately depends on trust and ledger as business logic.
+However, governance should be at application level, not kernel.
+
+Dependencies on trust (voting weights) and ledger (treasury) are policy
+concerns that belong in an app.
+"""
+
+[[crates.icn-governance.exports]]
+name = "Proposal"
+kind = "struct"
+public_methods = ["new", "vote", "status", "enact"]
+notes = "INFECTED: Should be governance app"
+
+[[crates.icn-governance.exports]]
+name = "Vote"
+kind = "struct"
+notes = "INFECTED: Should be governance app"
+
+[[crates.icn-governance.exports]]
+name = "GovernanceDomain"
+kind = "enum"
+variants = ["Operations", "Policy", "Constitutional", "Economic", "Disputes", "Treasury"]
+notes = "INFECTED: Should be governance app"
+
+[[crates.icn-governance.exports]]
+name = "Charter"
+kind = "struct"
+notes = "INFECTED: Should be membership/governance app"
+
+[[crates.icn-governance.exports]]
+name = "Delegation"
+kind = "struct"
+notes = "INFECTED: Should be governance app"
+
+[[crates.icn-governance.exports]]
+name = "TreasuryManager"
+kind = "struct"
+notes = "INFECTED: Ties governance to ledger"
+
+# -----------------------------------------------------------------------------
+
+[crates.icn-coop]
+description = "Cooperative management"
+status = "infected"
+infection_severity = "medium"
+infection_notes = "Should merge with icn-entity into single membership app."
+
+[[crates.icn-coop.exports]]
+name = "Cooperative"
+kind = "struct"
+notes = "INFECTED: Should be membership app"
+
+# -----------------------------------------------------------------------------
+
+[crates.icn-community]
+description = "Community structures"
+status = "infected"
+infection_severity = "medium"
+infection_notes = "Should merge with icn-entity into single membership app."
+
+[[crates.icn-community.exports]]
+name = "Community"
+kind = "struct"
+notes = "INFECTED: Should be membership app"
+
+# -----------------------------------------------------------------------------
+
+[crates.icn-entity]
+description = "Unified entity model"
+status = "infected"
+infection_severity = "medium"
+infection_notes = """
+Attempts to unify Individual, Cooperative, Community, Federation.
+Overlaps with icn-coop and icn-community. Should become single membership app.
+"""
+
+[[crates.icn-entity.exports]]
+name = "Entity"
+kind = "enum"
+variants = ["Individual", "Cooperative", "Community", "Federation"]
+notes = "INFECTED: Should be membership app"
+
+# -----------------------------------------------------------------------------
+
+[crates.icn-federation]
+description = "Inter-coop coordination"
+status = "infected"
+infection_severity = "medium"
+infection_notes = """
+Federation depends on many infected crates (trust, ledger, governance).
+Should become federation app using generic primitives.
+"""
+
+[[crates.icn-federation.exports]]
+name = "FederationAgreement"
+kind = "struct"
+notes = "INFECTED: Should be federation app"
+
+[[crates.icn-federation.exports]]
+name = "PeerCoop"
+kind = "struct"
+notes = "INFECTED: Should be federation app"
+
+# -----------------------------------------------------------------------------
+
+[crates.icn-steward]
+description = "SDIS steward network"
+status = "infected"
+infection_severity = "low"
+infection_notes = """
+Steward ceremonies and VUI issuance are identity verification methods,
+not kernel infrastructure. Should become steward app.
+"""
+
+[[crates.icn-steward.exports]]
+name = "StewardCeremony"
+kind = "struct"
+notes = "INFECTED: Should be steward app"
+
+[[crates.icn-steward.exports]]
+name = "VUI"
+kind = "struct"
+notes = "INFECTED: Verifiable Unique Identifier, should be app"
+
+# -----------------------------------------------------------------------------
+
+[crates.icn-zkp]
+description = "Zero-knowledge proofs"
+status = "infected"
+infection_severity = "low"
+infection_notes = """
+ZK proofs are verification methods, not kernel primitives.
+Should become zkp app for privacy-preserving verifications.
+"""
+
+[[crates.icn-zkp.exports]]
+name = "MembershipProof"
+kind = "struct"
+notes = "INFECTED: Should be zkp app"
+
+[[crates.icn-zkp.exports]]
+name = "AgeProof"
+kind = "struct"
+notes = "INFECTED: Should be zkp app"
+
+# =============================================================================
+# COMPUTE CRATES
+# =============================================================================
+
+[crates.icn-compute]
+description = "Distributed compute layer"
+status = "needs-review"
+infection_notes = """
+Compute layer is relatively clean but needs ABI formalization.
+Should become icn-runtime with versioned ABIs.
+"""
+
+[[crates.icn-compute.exports]]
+name = "ComputeEngine"
+kind = "struct"
+notes = "Needs ABI formalization"
+
+[[crates.icn-compute.exports]]
+name = "TaskScheduler"
+kind = "struct"
+notes = "Scheduling - likely kernel"
+
+[[crates.icn-compute.exports]]
+name = "ResourceAllocator"
+kind = "struct"
+notes = "Resource management - likely kernel"
+
+# -----------------------------------------------------------------------------
+
+[crates.icn-ccl]
+description = "Cooperative Contract Language"
+status = "clean"
+infection_notes = """
+Deterministic WASM execution. Could become the compute primitive
+with formalized ABIs.
+"""
+
+[[crates.icn-ccl.exports]]
+name = "Contract"
+kind = "struct"
+public_methods = ["new", "execute", "validate"]
+notes = "Contract execution - kernel primitive"
+
+[[crates.icn-ccl.exports]]
+name = "Interpreter"
+kind = "struct"
+notes = "WASM interpreter - kernel primitive"
+
+# =============================================================================
+# API CRATES
+# =============================================================================
+
+[crates.icn-rpc]
+description = "JSON-RPC API server"
+status = "infected"
+infection_severity = "low"
+infection_notes = "Exposes domain types from ledger/governance. API layer concern."
+
+[[crates.icn-rpc.exports]]
+name = "RpcServer"
+kind = "struct"
+notes = "Server infrastructure - kernel"
+
+# -----------------------------------------------------------------------------
+
+[crates.icn-gateway]
+description = "REST + WebSocket API"
+status = "infected"
+infection_severity = "medium"
+infection_notes = """
+Trust-gated rate limiting is implemented here. Uses TrustClass directly.
+Should use PolicyOracle pattern.
+"""
+
+[[crates.icn-gateway.exports]]
+name = "Gateway"
+kind = "struct"
+notes = "API gateway - kernel infrastructure"
+
+[[crates.icn-gateway.exports]]
+name = "TrustGatedRateLimiter"
+kind = "struct"
+notes = "INFECTED: Uses TrustClass directly"
+
+# -----------------------------------------------------------------------------
+
+[crates.icn-api]
+description = "Shared API types"
+status = "clean"
+infection_notes = "Type definitions shared between RPC and Gateway."
+
+[[crates.icn-api.exports]]
+name = "ApiError"
+kind = "enum"
+notes = "Error types - clean utility"
+
+# =============================================================================
+# SECURITY & OBSERVABILITY
+# =============================================================================
+
+[crates.icn-security]
+description = "Byzantine fault detection"
+status = "clean"
+infection_notes = "Clean infrastructure for detecting Byzantine behavior."
+
+[[crates.icn-security.exports]]
+name = "FaultDetector"
+kind = "struct"
+notes = "Byzantine detection - kernel"
+
+[[crates.icn-security.exports]]
+name = "Quarantine"
+kind = "struct"
+notes = "Quarantine management - kernel"
+
+# -----------------------------------------------------------------------------
+
+[crates.icn-privacy]
+description = "Privacy primitives"
+status = "clean"
+infection_notes = "Clean encryption and privacy utilities."
+
+[[crates.icn-privacy.exports]]
+name = "Encrypt"
+kind = "trait"
+notes = "Encryption interface - kernel"
+
+# -----------------------------------------------------------------------------
+
+[crates.icn-obs]
+description = "Metrics and observability"
+status = "clean"
+infection_notes = "Clean observability infrastructure."
+
+[[crates.icn-obs.exports]]
+name = "MetricsRegistry"
+kind = "struct"
+notes = "Prometheus metrics - kernel"
+
+[[crates.icn-obs.exports]]
+name = "TracingConfig"
+kind = "struct"
+notes = "Tracing setup - kernel"
+
+# -----------------------------------------------------------------------------
+
+[crates.icn-crypto-pq]
+description = "Post-quantum cryptography"
+status = "clean"
+infection_notes = "Future-proofing crypto primitives. Could stay in kernel."
+
+[[crates.icn-crypto-pq.exports]]
+name = "HybridSignature"
+kind = "struct"
+notes = "Classical + PQ signatures - kernel"
+
+# =============================================================================
+# UTILITIES
+# =============================================================================
+
+[crates.icn-encoding]
+description = "Serialization utilities"
+status = "clean"
+infection_notes = "Clean postcard-based encoding."
+
+[[crates.icn-encoding.exports]]
+name = "encode"
+kind = "function"
+notes = "Serialization - kernel utility"
+
+[[crates.icn-encoding.exports]]
+name = "decode"
+kind = "function"
+notes = "Deserialization - kernel utility"
+
+# -----------------------------------------------------------------------------
+
+[crates.icn-testkit]
+description = "Testing utilities"
+status = "clean"
+infection_notes = "Test helpers and mocks."
+
+[[crates.icn-testkit.exports]]
+name = "TestNode"
+kind = "struct"
+notes = "Test infrastructure"
+
+[[crates.icn-testkit.exports]]
+name = "MockStore"
+kind = "struct"
+notes = "Mock implementations"
+
+# =============================================================================
+# EXTRACTED APPS (governance extraction in progress)
+# =============================================================================
+
+[apps.icn-governance-actor]
+description = "Governance actor - extracted from icn-core"
+location = "apps/governance"
+status = "extracted"
+extraction_date = "2026-02-10"
+notes = """
+Core governance actor logic extracted from icn-core to apps/governance.
+Uses GovernanceExecutor trait from icn-kernel-api for kernel/app boundary.
+Handlers: domain_based, execution, federation, treasury, protocol, sdis.
+"""
+
+[[apps.icn-governance-actor.exports]]
+name = "GovernanceActor"
+kind = "struct"
+public_methods = ["spawn", "handle", "domain_router"]
+notes = "Main governance actor with domain-based proposal routing"
+
+[[apps.icn-governance-actor.exports]]
+name = "handlers module"
+kind = "module"
+notes = "Proposal execution handlers (execution, federation, treasury, protocol, sdis)"
+
+# =============================================================================
+# REFACTORING PRIORITY
+# =============================================================================
+
+[refactoring_priority]
+description = "Order of extraction work"
+
+[[refactoring_priority.phases]]
+phase = 1
+name = "Extract Trust"
+crates = ["icn-trust"]
+notes = """
+Move trust computation to icn-app-trust.
+Add PolicyOracle to icn-kernel-api.
+Update icn-gossip and icn-net to use PolicyOracle.
+"""
+
+[[refactoring_priority.phases]]
+phase = 2
+name = "Extract Ledger"
+crates = ["icn-ledger"]
+notes = """
+Move ledger to icn-app-ledger.
+Generalize icn-store for namespaced storage.
+Balances become projections.
+"""
+
+[[refactoring_priority.phases]]
+phase = 3
+name = "Extract Governance"
+crates = ["icn-governance"]
+status = "in_progress"
+notes = """
+Move governance to icn-app-governance.
+Remove governance actors from icn-core.
+
+Progress (2026-02-10):
+- DONE: GovernanceActor extracted to apps/governance/icn-governance-actor
+- DONE: GovernanceExecutor trait in icn-kernel-api for kernel/app boundary
+- PENDING: Extract governance_handlers (federation, protocol, treasury) to apps/
+- PENDING: Remove remaining icn_governance:: refs from icn-core (43 refs)
+"""
+
+[[refactoring_priority.phases]]
+phase = 4
+name = "Merge Membership"
+crates = ["icn-coop", "icn-community", "icn-entity"]
+notes = """
+Merge into single icn-app-membership.
+"""
+
+[[refactoring_priority.phases]]
+phase = 5
+name = "Extract Verification Apps"
+crates = ["icn-steward", "icn-zkp"]
+notes = """
+Move to icn-app-steward and icn-app-zkp.
+"""
+
+[[refactoring_priority.phases]]
+phase = 6
+name = "Crate Consolidation"
+crates = ["icn-net", "icn-gossip", "icn-store", "icn-snapshot"]
+notes = """
+Merge into icn-network and icn-storage.
+Target: 27 crates → ~12 crates.
+"""

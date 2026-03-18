@@ -1,0 +1,20 @@
+# Enforce LF line endings for all text source files
+* text=auto eol=lf
+
+# Explicit overrides for common types
+*.rs text eol=lf
+*.md text eol=lf
+*.toml text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.js text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.sh text eol=lf
+*.py text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+
+# Windows batch files need CRLF
+*.bat text eol=crlf

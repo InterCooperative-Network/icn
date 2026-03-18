@@ -1,0 +1,37 @@
+{
+  "name": "High Demurrage",
+  "description": "Tests 2% monthly demurrage to prevent hoarding and increase velocity.",
+  "parameters": {
+    "n_agents": 100,
+    "simulation_months": 12,
+    "seed": 42,
+    "credit_policy": {
+      "initial_limit": -20,
+      "max_limit": -500,
+      "growth_rate": 0.1,
+      "trust_multiplier": 1.0,
+      "demurrage_rate": -0.02,
+      "demurrage_threshold": 50,
+      "default_threshold": 100,
+      "default_period_days": 90,
+      "write_off_threshold": 200,
+      "ramp_period_months": 3,
+      "contribution_requirement": 10
+    },
+    "agent_type_distribution": {
+      "reciprocator": 0.65,
+      "hoarder": 0.15,
+      "free_rider": 0.08,
+      "opportunist": 0.07,
+      "super_contributor": 0.05
+    },
+    "trust_network_density": 0.6
+  },
+  "hypothesis": "Demurrage reduces hoarding and increases velocity without frustrating users",
+  "compare_to": "baseline",
+  "expected_outcomes": {
+    "velocity": "higher than baseline",
+    "hoarding_index": "lower than baseline",
+    "user_satisfaction": "unknown (need real pilot data)"
+  }
+}

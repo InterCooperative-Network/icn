@@ -1,0 +1,16 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'icn-docker'
+
+scrape_configs:
+  - job_name: 'icn-node'
+    static_configs:
+      - targets: ['icnd:9100']
+        labels:
+          service: 'icn-node'
+  
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

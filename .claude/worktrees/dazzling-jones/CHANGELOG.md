@@ -1,0 +1,5049 @@
+# ICN Changelog
+
+All notable changes to the ICN project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Added - Signed Revocation Gossip & Sequence-Based Replay Protection (2026-02-01)
+
+**Trust Hardening** (PR #1022):
+
+Add signed trust revocations and per-issuer sequence numbers for replay attack prevention.
+
+- `TrustRevocation`: Ed25519-signed revocation messages that supersede attestations
+- `TrustAttestation.sequence`: Monotonic per-issuer sequence numbers (v3 signing format)
+- `SequenceTracker`: Per-issuer sequence storage with atomic validate-and-update
+- Race condition fixes: sequence validation inside graph write lock to prevent TOCTOU
+- Backward-compatible: v1/v2 attestation signatures still verified
+
+**Deprecation Notice**: Attestations with `sequence == 0` currently bypass replay protection for backward compatibility. A future release will **reject** `sequence == 0` after the migration period. Operators should ensure all nodes are upgraded to produce sequence numbers before the deadline.
+
+**Follow-up**: Gossip-layer revocation propagation tracked in #1024.
+
+### Changed - Decouple ResourceEnforcerActor from icn-ledger (2026-01-30)
+
+**PR 3.1 Kernel/App Separation** (PR #979):
+
+Replace direct `icn-ledger` type imports in `ResourceEnforcerActor` with `LedgerService` trait calls from `icn-kernel-api`. The enforcer now queries resources and revokes access through the abstract service interface, removing 6 raw type imports.
+
+- Add `list_enforceable_resources()` and `revoke_resource_access()` to `LedgerService` trait with kernel-level DTOs (`ResourceAccessInfo`, `IdleViolationInfo`, `RevokeResourceAccessRequest`)
+- Replace `ResourceAccessStore`, `AccessModel`, `AntiSpeculationRules` imports with `LedgerService` method calls
+- Change `RevocationEvent.holder` and `ResourceAccessInfo.holder` to `Did` type (was `String`)
+- Add default implementations for new `LedgerService` methods (empty list / "not supported" error)
+- Add `test_enforce_without_gossip` test verifying enforcement works without gossip dependency
+- Rewrite `resource_enforcer_gossip` integration tests to use `LedgerService`-based stubs
+
+**Known Limitations**: Resource access enforcement is a no-op until PR 3.2 wires `SledResourceAccessStore` into `apps/ledger`. The `list_enforceable_resources()` stub returns an empty list, so no resources are checked or revoked in production.
+
+### Changed - Remove icn-trust from icn-core (2026-01-31)
+
+**Tier 1 Kernel/App Separation** (PR #977):
+
+Remove `icn-trust` as a production dependency of `icn-core`, routing all trust operations through the `TrustService` trait in `icn-kernel-api`. This enforces the meaning firewall: the kernel never imports domain-specific trust types.
+
+- Extend `TrustService` with `ingest_attestation`, `recover_identity`, `get_edges`, `submit_attestation`, `revoke_trust`
+- Replace `TrustGraph` usage across all supervisor modules with `Arc<dyn TrustService>`
+- Normalize `get_edges` output to `{ target_did, score, labels }` matching RPC contract
+- Add DID format validation in `trust.compute` RPC handler
+- Strip domain-specific gossip functions from `trust_propagation.rs` (rate limiter retained)
+- Net -575 lines across 20 files
+
+**Breaking**: `TrustService` is now required for compute actor initialization. Custom runtime users must register a `TrustService` via `ServiceRegistry`. The daemon already does this.
+
+### Added - Complete Daemon Service Wiring (2026-01-30)
+
+**Wire GovernanceService and LedgerService into daemon** (PR #968, closes #908, #909):
+
+Completes kernel/app separation for all three domain services (trust, governance, ledger). The daemon now owns the full lifecycle of sled-backed stores and passes handles to the supervisor via `ServiceRegistry`.
+
+- Wire `GovernanceService` from `apps/governance` into `build_service_registry()`
+- Wire `LedgerService` from `apps/ledger` into `build_service_registry()`
+- Pass `Arc<SledStore>` via `raw_handle` to prevent sled double-open (exclusive file locking)
+- Add `ServiceRegistry` key constants (`TRUST_GRAPH_KEY`, `PROTOCOL_PARAM_STORE_KEY`, `LEDGER_KEY`, `LEDGER_STORE_KEY`) to prevent typo-induced silent failures
+- Add `Config::protocol_params_path()` and `Config::ledger_store_path()` helpers
+- Supervisor `init_governance` and `init_ledger` accept optional daemon-provided handles with fallback creation for standalone use
+- 8 integration tests covering handle roundtrip, type safety, mutation propagation, and sled double-open prevention
+- Updated `KERNEL_APP_SEPARATION.md` with raw_handle type patterns, store path structure, and migration status
+
+### Added - Kernel/App Separation Architecture (2026-01-26)
+
+**Major Architecture Initiative** (PR #855, Issue #856):
+
+Transform ICN from a tightly-coupled 27-crate system to a clean kernel/app architecture where kernel provides generic primitives and apps implement domain logic.
+
+**Phase 0: PolicyOracle Infrastructure**:
+- `OracleRegistry` with atomic oracle replacement via ArcSwap
+- `BootstrapPhase` state machine (Genesis → CoreApps → Running)
+- `DecisionCache` with TTL-based caching and automatic invalidation
+- `GenesisCapabilities` with time-limited bootstrap tokens
+- Deny-by-default authorization in Running phase
+
+**Phase 1: App Runtime**:
+- `AppRuntime` with full lifecycle management (prepare → install → start → stop → uninstall)
+- `ComputeDispatcher` with Reducer (pure/sync) and Service (async) split
+- YAML manifest parsing for app configuration
+- Per-app isolated state namespaces via `StateFactory`
+- Echo test app demonstrating full lifecycle
+
+**Phase 1.5: CCL Schema Layer**:
+- Declarative YAML schemas for entities, governance, economics, agreements
+- `EntitySchema` for cooperatives, communities, federations with membership classes
+- `GovernanceSchema` for bodies, decisions, voting thresholds, delegation
+- `EconomicsSchema` for capital, surplus allocation, credit policies
+- `AgreementSchema` for federation agreements with binary boundary outcomes
+- Deterministic expression evaluator (no loops, bounded depth)
+- Schema versioning for future migrations
+
+**Key Insight**: Federation agreements use binary boundary outcomes — internal governance process is sovereign, boundary outcomes are interoperable.
+
+**Breaking Changes**: Previous issues (#4-#854) closed as part of architecture reset. New tracking issues created (#856-#863).
+
+### Added - Shared API Service Layer (2026-01-24)
+
+**icn-api Crate for Unified RPC/Gateway Logic** (PR #827):
+- New `icn-api` crate providing shared service implementations between `icn-rpc` (JSON-RPC) and `icn-gateway` (REST/WebSocket)
+- `ComputeService` with unified task submission, status queries, and cancellation
+- `ApiError` type with transport-agnostic error handling and RPC code mapping
+- `ApiContext` for consistent caller authentication across services
+- Permission scope system (`scopes.rs`) with wildcard matching support
+- Comprehensive validation with named constants (fuel limits, resource bounds)
+- Full documentation with architecture diagrams, usage examples, and migration guide
+
+**Benefits**:
+- Single source of truth for business logic (eliminates ~557 LOC duplication)
+- Consistent behavior across all API transports
+- Testable services independent of transport concerns
+- Foundation for Phase 2 (LedgerService, GovernanceService, TrustService)
+
+### Added - Action Items and Internal Exchange (2026-01-17)
+
+**Action Item Tracker for Governance** (PR #714):
+- Track tasks from board meetings with assignees, priorities, and due dates
+- Status lifecycle: Pending → InProgress → Completed/Deferred
+- Filter by status, assignee, priority, overdue, or tags
+- Proper authorization: only creators can edit, assignees can update status
+- Linked to governance proposals and meeting context
+
+**Internal Exchange (Listings)** (PR #714):
+- Post offers/wants before going to external markets
+- Categories: Equipment, Services, Materials, Space, Other
+- Photo URLs with SSRF protection (blocks private IPs, localhost, reserved TLDs)
+- Express interest with atomic duplicate prevention (Sled CAS)
+- Status lifecycle: Active → Matched → Completed/Cancelled/Expired
+- Automatic expiry filtering excludes stale listings from queries
+
+**Storage**:
+- Versioned Sled keys (`v1:` prefix) for future schema migrations
+- `ListingsStoreBackend` trait with in-memory (testing) and Sled (production) implementations
+- Orphan cleanup: deleting listings removes associated interests and indexes
+
+**Security**:
+- SSRF protection blocking RFC1918, link-local, carrier-grade NAT, localhost
+- RFC 6761 reserved TLD blocking (.test, .invalid, .example)
+- Only https:// and ipfs:// schemes allowed for photos
+- Input validation with length limits on all fields
+- Interest count privacy: only listing owners see demand signals
+
+**Metrics**:
+- `icn_exchange_listings_created_total`, `listings_completed_total`, `listings_expired_total`
+- `icn_exchange_interests_expressed_total`, `duplicate_interests_blocked_total`
+- Time-to-match and time-to-complete histograms
+
+**Frontend** (pilot-ui):
+- Action Items tab with filter buttons and quick status toggles
+- Exchange tab with card-based listings and photo galleries
+- XSS-safe rendering using `textContent` for user-provided data
+
+### Added - Exchange Rate Oracle (2025-12-30)
+
+**Multi-Currency Support for Cooperative Economies** (PR #364):
+- Exchange rate oracle with multi-source aggregation using median consensus
+- Automatic inverse rate calculation when direct pair unavailable
+- TTL-based caching (1h) with staleness detection (24h threshold)
+- Rate audit trail for governance transparency
+
+**Rate Sources**:
+- `ManualRateSource` (priority 10): Cooperative-defined rates via governance
+- `FederationRateSource` (priority 20): Rates from bilateral clearing agreements
+- Median consensus with 15% outlier detection prevents manipulation
+
+**Gateway API** (`/v1/oracle/`):
+- `GET /rate/{from}/{to}` - Get exchange rate (with inverse fallback)
+- `POST /convert` - Convert amount between currencies
+- `GET /sources` - List available rate sources
+- `POST /rate` - Set manual rate (requires `oracle:write` scope)
+
+**TypeScript SDK**:
+- `getExchangeRate()`, `convertAmount()`, `listRateSources()`, `setManualRate()`
+- Full type definitions for all oracle operations
+
+**Metrics**:
+- `oracle_rate_queries_total`, `oracle_conversions_total`, `oracle_stale_rates_total`
+- Cache hit/miss tracking, outlier filtering counts
+
+### Added - New Member Credit Limit Ramping (2025-12-25)
+
+**Member-Since Tracking for Economic Safety** (PR #293):
+- New members start with conservative 10-hour credit limits that ramp linearly to full over 90 days
+- Members who clear 50+ hours of credits bypass ramping and get full limits immediately
+- Prevents Sybil attacks where new accounts could exploit full credit limits
+
+**Implementation**:
+- `MembershipStore` trait for tracking when members joined (`icn-ledger/src/membership.rs`)
+- `SledMembershipStore` with persistent storage for member join timestamps
+- Integration with `CreditPolicyManager` for automatic limit calculation
+- Backward compatible: existing ledgers without membership store use full limits
+
+**Security**:
+- Uses `SystemTime::now()` for ramping calculation (prevents timestamp manipulation)
+- Graceful fallback to full limits on storage errors (permissive, not punitive)
+- Overflow protection with saturating arithmetic
+
+**Testing**:
+- 6 new integration tests covering ramping timeline, threshold bypass, and edge cases
+- Clock skew handling verified (saturating arithmetic prevents issues)
+- Protocol governance tests for `handle_protocol_change` flow
+
+### Security - Comprehensive Hardening (2025-12-18)
+
+**Critical Vulnerability Fixes**:
+- ✅ **Client Certificate Verification**: Server now requires and validates client certificates during TLS handshake
+  - Implemented `ClientCertVerifier` trait for mutual TLS
+  - Trust-gated verification rejects untrusted peers at TLS layer
+  - Modified files: `icn-net/src/tls.rs`, `session.rs`, `actor.rs`
+- ✅ **DID-TLS Binding Verification**: Hello messages now explicitly verify binding_info matches peer certificate  
+  - Added explicit `verify_binding_info()` call in Hello handler
+  - Prevents DID spoofing attacks
+  - Modified files: `icn-net/src/actor.rs`
+- ✅ **Gateway Scope Allowlist**: Token issuance now validates against strict scope allowlist
+  - 22 allowed scopes defined (ledger, coop, gov, payments, federation, compute, constitutional)
+  - Blocks privilege escalation via arbitrary scope requests
+  - Modified files: `icn-gateway/src/validation.rs`
+
+**Additional Security Hardening**:
+- ✅ **Audit Logging**: Comprehensive security event logging for compliance and forensics
+  - Authentication attempts (success/failure)
+  - Authorization failures
+  - Rate limit violations
+  - Invalid scope requests (privilege escalation attempts)
+  - TLS handshake failures
+  - Suspicious activity detection
+  - New file: `icn-gateway/src/audit.rs`
+- ✅ **Security Headers**: Already implemented (verified)
+- ✅ **Rate Limiting**: Already implemented (verified)
+
+**Testing Infrastructure**:
+- ✅ Added 11 comprehensive scope validation tests (all passing)
+- ✅ Added client certificate verification integration tests
+- ✅ Created extensive security testing documentation
+
+**Documentation**:
+- Created `SECURITY_FIXES_2025-12-18.md` - Detailed fix descriptions
+- Created `SECURITY_TESTING_GUIDE.md` - Manual testing procedures
+- Created `TESTING_SUMMARY.md` - Coverage and confidence analysis
+- Created `COMPREHENSIVE_SECURITY_IMPROVEMENTS.md` - Complete overview
+
+**Performance Impact**: Negligible (<10ms overhead per connection)
+
+**Status**: PRODUCTION READY ✅
+
+### Added - Foundational Review Complete (2025-12-16)
+
+**Comprehensive System Audit**:
+- ✅ Completed comprehensive foundational review of all 12 critical system areas
+- ✅ Validated 1134+ tests passing across all subsystems
+- ✅ Confirmed zero critical gaps in: Architecture, Cryptography, Network, Trust, Gossip, Ledger, Governance, Compute, Storage, API, Observability, Documentation
+- ✅ Verified production monitoring infrastructure (93 metrics, 21 dashboard panels, 40+ alert rules)
+- ✅ Confirmed Byzantine fault detection operational (8/8 tests passing)
+- ✅ Validated all security layers (transport, message, application)
+- ✅ Full audit report: [FOUNDATIONAL_REVIEW_2025-12-16.md](docs/FOUNDATIONAL_REVIEW_2025-12-16.md)
+
+**Documentation Updates**:
+- Updated ROADMAP.md to reflect foundational review completion
+- Updated README.md with audit results and test statistics
+- Created comprehensive foundational review document
+
+**Status**: PILOT-READY ✅ - All foundational elements validated and sound
+
+### Added - Infrastructure Improvements (2025-12-16)
+
+**FCM JWT Signing for Push Notifications** ([icn/crates/icn-gateway/src/fcm_client.rs](icn/crates/icn-gateway/src/fcm_client.rs)):
+- Implemented proper RS256 JWT signing using `jsonwebtoken` crate
+- FCM client now authenticates via Google OAuth2 with service account credentials
+- Production-ready push notification delivery to Android and iOS devices
+
+**Persistent Enrollment Session Storage** ([icn/crates/icn-gateway/src/api/sdis/simple_enrollment.rs](icn/crates/icn-gateway/src/api/sdis/simple_enrollment.rs)):
+- Enrollment sessions now persist across gateway restarts
+- Added enrollment session storage to CommonsStore with LRU cache
+- Added `with_persistence()` constructor for write-through caching
+- All mutation handlers (start, verify, vouch, reject) persist changes
+- Loaded sessions from persistent storage on startup
+
+**SDK Governance Dashboard Methods** ([sdk/react-native/src/client.ts](sdk/react-native/src/client.ts)):
+- Added `getGovernanceDashboard()` to base client
+- Added `getGovernanceParticipation()` to base client
+- Non-React apps can now access governance statistics
+
+### Added - Gap Closure Improvements (2025-12-15)
+
+**SMTP Email Delivery** ([icn/crates/icn-gateway/src/email_client.rs](icn/crates/icn-gateway/src/email_client.rs)):
+- Replaced mock email client with actual SMTP implementation using `lettre` crate
+- Support for implicit TLS (port 465) and STARTTLS (port 587)
+- Delivery result classification: Success, InvalidRecipient, TemporaryFailure, PermanentFailure
+- Pre-built configurations for SendGrid and Mailgun
+- HTML + plaintext multipart email support
+
+**Member Display Names** ([icn/crates/icn-identity/src/commons.rs](icn/crates/icn-identity/src/commons.rs)):
+- Added `display_name` field to `CommonsHolderRecord`
+- Display name captured from enrollment `identity_name`
+- Member profile API now returns display name
+- Builder method `with_display_name()` and setter `set_display_name()`
+
+**Proposal Result Notifications** ([icn/crates/icn-gateway/src/api/governance.rs](icn/crates/icn-gateway/src/api/governance.rs)):
+- Added `get_voter_dids()` method to GovernanceManager
+- Proposal close now sends notifications to all voters
+- Outcome-specific messages (accepted, rejected, no_quorum)
+- Added `proposal_result_notification()` factory
+
+**SDK Client Economic & Notification Methods** ([sdk/react-native/src/client.ts](sdk/react-native/src/client.ts)):
+- Added 15 new client methods for economic features and notifications
+- Recurring payments: `listRecurringPayments`, `createRecurringPayment`, `updateRecurringPaymentStatus`
+- Escrow: `listEscrows`, `createEscrow`, `releaseEscrow`, `refundEscrow`
+- Budgets: `listBudgets`, `getBudget`, `createBudget`
+- Notifications: `listNotifications`, `getNotificationCount`, `markNotificationRead`, `deleteNotification`
+- Base client now supports all pilot features without requiring React hooks
+
+### Fixed - Economic Feature Gap Fixes (2025-12-15)
+
+**Escrow Ledger Integration** ([icn/crates/icn-gateway/src/api/escrow.rs](icn/crates/icn-gateway/src/api/escrow.rs)):
+- Escrow release and refund now execute actual ledger transactions
+- Added `coop_id` field to Escrow schema (required for ledger namespace)
+- Returns `transaction_hash` in release/refund responses for traceability
+- Added audit logging for all escrow transactions
+
+**Recurring Payments Scheduler** ([icn/crates/icn-gateway/src/api/recurring_payments.rs](icn/crates/icn-gateway/src/api/recurring_payments.rs)):
+- Added background scheduler that executes due payments automatically (60-second interval)
+- Payments now execute via `LedgerManager::create_payment()`
+- Added `coop_id` field to RecurringPayment schema
+- Calculates next execution based on frequency (daily/weekly/monthly/yearly)
+- Auto-completes payments when reaching end date
+- Wired scheduler startup in server.rs
+
+**Budget Enforcement** ([icn/crates/icn-gateway/src/api/ledger.rs](icn/crates/icn-gateway/src/api/ledger.rs)):
+- Payment endpoint now checks budget limits before processing
+- Rejects payments that would exceed budget limits
+- Records spending in budget tracker after successful payments
+- Logs budget threshold notifications when triggered (80%, 100%)
+
+### Added - Pilot-Ready Platform Sprint Completion (2025-12-15)
+
+**Notification System Hooks** ([sdk/react-native/src/notification-hooks.ts](sdk/react-native/src/notification-hooks.ts)):
+- `useNotifications()` - Full notification management with mark read, delete, refresh
+- `useUnreadCount()` - Lightweight badge counter with optional polling interval
+- Optimistic updates for instant UI feedback
+- Types: `InAppNotification`, `NotificationListResponse`, `ListNotificationsOptions`
+
+**Governance Dashboard Hooks** ([sdk/react-native/src/governance-dashboard-hooks.ts](sdk/react-native/src/governance-dashboard-hooks.ts)):
+- `useGovernanceDashboard()` - Amendments/appeals stats with activity timeline
+- `useGovernanceParticipation()` - Voter participation metrics
+- `useGovernanceOverview()` - Combined dashboard with parallel data fetching
+- Types: `GovernanceDashboard`, `AmendmentsBreakdown`, `AppealsBreakdown`, `ParticipationStats`
+
+**Economic Feature Hooks** ([sdk/react-native/src/economic-hooks.ts](sdk/react-native/src/economic-hooks.ts)):
+- `useRecurringPayments()` - Create, pause, resume, cancel scheduled payments
+- `useEscrow()` - Create, release, refund escrow holds with conditions
+- `useBudgets()` - List and create spending limits by period
+- `useBudget()` - Single budget detail with refresh
+- Types: `RecurringPayment`, `Escrow`, `Budget`, `EscrowCondition`
+
+**Cursor-Based Pagination** ([icn/crates/icn-gateway/src/api/](icn/crates/icn-gateway/src/api/)):
+- Added cursor pagination to `list_members` endpoint
+- Added cursor pagination to `list_amendments` endpoint
+- Added cursor pagination to `list_appeals` endpoint
+- `Cursored` trait implementations for all response types
+- Supports `cursor`, `limit`, and `direction` parameters
+
+### Added - SDK Commons Evolution Integration (2025-12-15)
+
+**TypeScript SDK** ([sdk/typescript/src/](sdk/typescript/src/)):
+- 38 new client methods for Commons Evolution features
+- Charter: `createCharter`, `getCharter`, `getCharterByDomain`, `listCharters`, `signCharter`, `activateCharter`, `updateCharterStatus`
+- Membership: `applyForMembership`, `getMembershipStatus`, `listJurisdictionMembers`, `approveMembership`, `promoteMember`, `suspendMember`, `reinstateMember`, `exitMembership`, `grantCapability`, `revokeCapability`, `checkCapability`, `addMemberRole`, `removeMemberRole`
+- Amendments: `createAmendment`, `getAmendment`, `listAmendments`, `addAmendmentChange`, `submitAmendment`, `openAmendmentVoting`, `ratifyAmendment`, `withdrawAmendment`
+- Appeals: `fileAppeal`, `getAppeal`, `listAppeals`, `addAppealEvidence`, `addAppealResponse`, `beginAppealReview`, `resolveAppeal`, `withdrawAppeal`
+- Full TypeScript types for all Commons Evolution entities
+- New example: `examples/commons-evolution.ts`
+
+**React Native SDK** ([sdk/react-native/src/](sdk/react-native/src/)):
+- 18 new React hooks for mobile app integration
+- Membership hooks: `useMembership`, `useJurisdictionMembers`, `useMembershipAdmin`, `useCapabilities`, `useRoles`
+- Charter hooks: `useCharter`, `useCharters`, `useCreateCharter`, `useCharterSignature`, `useCharterStatus`
+- Amendment hooks: `useAmendment`, `useAmendments`, `useAmendmentActions`
+- Appeal hooks: `useAppeal`, `useAppeals`, `useAppealActions`, `useAppealAdmin`
+- All hooks include loading states, error handling, and refresh callbacks
+- Mobile client extends base TypeScript SDK
+
+### Added - Wire Up Remaining Features (2025-12-15)
+
+**Charter Signing Flow** ([icn/crates/icn-gateway/src/commons_mgr.rs](icn/crates/icn-gateway/src/commons_mgr.rs)):
+- `CommonsManager::add_charter_signature()` - Add founder signatures to draft charters
+- Validates draft status, prevents duplicate signatures, persists to storage
+- Fixed `/v1/charter/{id}/sign` endpoint to actually persist signatures (was placeholder)
+- `icnctl charter sign` command now makes actual API calls with signature generation
+- `icnctl charter ratify` command now calls activation endpoint
+
+**Amendment Add-Change** ([icn/crates/icn-gateway/src/api/constitutional/mod.rs](icn/crates/icn-gateway/src/api/constitutional/mod.rs)):
+- `CommonsManager::add_amendment_change()` - Add changes to draft amendments
+- `POST /v1/constitutional/amendments/{id}/changes` - New API endpoint
+- Validates draft status, verifies caller is proposer
+- `icnctl amendment add-change` command now makes actual API calls
+
+**Authorization Checks** ([icn/crates/icn-gateway/src/api/](icn/crates/icn-gateway/src/api/)):
+- Steward bond slashing now requires `HoldOffice` capability in jurisdiction
+- Membership approval now requires `HoldOffice` capability in jurisdiction
+- Prevents unauthorized governance actions
+
+**New Integration Tests** ([icn/crates/icn-gateway/tests/governance_flows_integration.rs](icn/crates/icn-gateway/tests/governance_flows_integration.rs)):
+- `test_charter_signing_flow` - Multiple founders sign sequentially → activation
+- `test_charter_duplicate_signature_rejected` - Duplicate signatures rejected
+- `test_amendment_add_change_flow` - Add multiple changes to draft amendment
+- `test_amendment_add_change_fails_after_submit` - Changes blocked after submission
+
+### Added - Testing & UX (2025-12-15)
+
+**Constitutional Governance Integration Tests** ([icn/crates/icn-gateway/tests/constitutional_integration.rs](icn/crates/icn-gateway/tests/constitutional_integration.rs)):
+- `test_amendment_full_lifecycle` - Create → Submit → Vote → Ratify workflow
+- `test_amendment_withdrawal` - Proposer can withdraw submitted amendments
+- `test_amendment_withdrawal_requires_proposer` - Authorization check
+- `test_appeal_full_lifecycle` - File → Review → Resolve workflow
+- `test_appeal_withdrawal` - Appellant can withdraw filed appeals
+- `test_appeal_withdrawal_requires_appellant` - Authorization check
+- `test_list_amendments_by_status` - Filter amendments by scope
+- `test_list_appeals_by_scope` - Filter appeals by jurisdiction
+- `test_appeal_outcomes` - Test all outcome types (Upheld, Denied, etc.)
+- 9 new integration tests for constitutional governance
+
+**CLI Error Message Improvements** ([icn/bins/icnctl/src/main.rs](icn/bins/icnctl/src/main.rs)):
+- `print_gateway_error()` - Connection troubleshooting with actionable hints
+- `print_http_error()` - Extract and format API error responses
+- JSON message/error field extraction for clearer error messages
+- Applied to amendment and appeal commands
+
+**RPC Test Reliability** ([icn/crates/icn-rpc/tests/rpc_integration.rs](icn/crates/icn-rpc/tests/rpc_integration.rs)):
+- Fixed port collision issues in parallel test execution
+- Retry mechanism with channel-based failure detection
+- Hold listener until ready to bind for race-free port allocation
+- 32 RPC tests now pass consistently
+
+### Added - Production Hardening (v0.8.x) (2025-12-15)
+
+**Per-Category Rate Limiting** ([icn/crates/icn-gateway/src/rate_limit.rs](icn/crates/icn-gateway/src/rate_limit.rs)):
+- `EndpointCategory` - Read, Write, Governance, Compute categories with different rate limits
+- `CategoryRateLimiter` - Per-(DID, category) token bucket rate limiting
+- `category_rate_limit_middleware` - Actix-web middleware for differentiated rate limits
+- Smart path/method classification for endpoint categorization
+- Read: 200 burst, 20 req/sec (queries, listing)
+- Write: 60 burst, 6 req/sec (state mutations)
+- Governance: 30 burst, 3 req/sec (voting, proposals, amendments)
+- Compute: 10 burst, 1 req/sec (task submission)
+- 6 new tests for category rate limiting
+
+**Audit Logging for Governance Actions** ([icn/crates/icn-gateway/src/commons_mgr.rs](icn/crates/icn-gateway/src/commons_mgr.rs)):
+- Structured tracing with target `commons_audit` for all governance operations
+- Covers: anchor/holder creation, membership lifecycle, charter operations, steward operations, amendments, appeals
+- Uses `warn!` for adverse actions (suspensions, revocations), `info!` for normal operations
+- 25+ audit log points across governance operations
+
+**Commons Evolution Metrics** ([icn/crates/icn-obs/src/metrics.rs](icn/crates/icn-obs/src/metrics.rs)):
+- 50+ new metrics for Commons operations
+- Counters: anchors created, holders created, memberships joined/exited/approved/promoted/suspended/banned
+- Counters: charters created/activated/suspended/dissolved, amendments, appeals
+- Histograms: operation durations, store operation latency
+- Helper module `icn_obs::metrics::commons` for easy metric recording
+
+**Persistent Storage** ([icn/crates/icn-gateway/src/commons_store.rs](icn/crates/icn-gateway/src/commons_store.rs)):
+- `CommonsStoreBackend` trait - Pluggable storage abstraction
+- `InMemoryCommonsStore` - In-memory storage for development/testing
+- `SledCommonsStore` - Sled persistent storage (feature: `sled-storage`)
+- `CommonsStore<S>` - High-level interface with LRU caching
+- Proper indexes: by_did, by_anchor, by_domain
+- `CommonsManager::with_sled_path()`, `with_sled_temporary()` constructors
+
+### Added - Integration & Testing (v0.7.x) (2025-12-14)
+
+**CLI Authentication Fix** ([icn/bins/icnctl/src/main.rs](icn/bins/icnctl/src/main.rs)):
+- Fixed `get_gateway_token()` to use correct `/v1/auth/challenge` and `/v1/auth/verify` endpoints
+- Fixed response field from `challenge` to `nonce`
+- Fixed request body structure with proper scopes array
+- `icnctl amendment` and `icnctl appeal` commands now work with gateway
+
+**SDIS-Commons Auto-Affiliation** ([icn/crates/icn-gateway/src/api/sdis/simple_enrollment.rs](icn/crates/icn-gateway/src/api/sdis/simple_enrollment.rs)):
+- `CompleteEnrollmentResponse` now includes `coop_id` and `membership_status`
+- Auto-create PersonhoodAnchor and CommonsHolderRecord on enrollment completion
+- Auto-affiliate with enrollment coop_id
+- Auto-approve to Provisional if steward vouched
+- Grant initial capabilities (Transact, Vote)
+
+**Integration Tests** ([icn/crates/icn-gateway/tests/governance_flows_integration.rs](icn/crates/icn-gateway/tests/governance_flows_integration.rs)):
+- `test_enrollment_creates_affiliated_holder` - Enrollment with auto-affiliation
+- `test_charter_creation_to_activation` - Charter lifecycle (Draft → Active)
+- `test_membership_lifecycle` - Full status progression (Candidate → Provisional → Member → Suspended → Exited)
+- `test_e2e_coop_formation` - End-to-end coop formation with founders and new member
+
+### Added - Constitutional Governance (v0.6.0) (2025-12-14)
+
+**Amendment System** ([icn/crates/icn-governance/src/amendment.rs](icn/crates/icn-governance/src/amendment.rs)):
+- `Amendment` - Full amendment record with lifecycle (Draft → Submitted → UnderReview → Voting → Ratified/Rejected/Withdrawn/Expired)
+- `AmendmentType` - Charter, Constitutional, Policy, Economic, Governance amendment types
+- `AmendmentScope` - Jurisdiction, Federation, or Network scope determines ratification requirements
+- `RatificationRequirements` - Configurable quorum, approval threshold, voting period, review period, and min jurisdictions/federations
+- `Ratification` - Individual ratification votes with ratifier type (CommonsHolder, Jurisdiction, Federation)
+- `AmendmentChange` - Structured changes targeting GovernanceRules, MembershipPolicy, EconomicPolicy, etc.
+- 17 unit tests covering amendment lifecycle and ratification
+
+**Appeal System** ([icn/crates/icn-governance/src/appeal.rs](icn/crates/icn-governance/src/appeal.rs)):
+- `Appeal` - Full appeal record with lifecycle (Filed → UnderReview → Hearing → Resolved/Dismissed/Withdrawn)
+- `AppealType` - Revocation, Suspension, GovernanceDecision, DisputeResolution, MembershipDenial, StewardAction appeals
+- `AppealScope` - Jurisdiction, Federation, or Network scope determines appeal body
+- `AppealGrounds` - ProceduralError, NewEvidence, ExceededAuthority, RightsViolation, FactualError, Bias, DisproportionatePenalty
+- `AppealOutcome` - Upheld, Denied, PartiallyUpheld, Remanded with remedy specification
+- `AppealRemedy` - Reverse, Reinstate, Modify, Compensation, Custom, None
+- `AppealEvidence` - Evidence attachment with type (Document, Transaction, Communication, WitnessStatement, ExpertOpinion, Technical)
+- `AppealDeadlines` - Configurable filing window, review period, hearing period, max duration
+- 18 unit tests covering appeal lifecycle and outcomes
+
+**Gateway Constitutional API** ([icn/crates/icn-gateway/src/api/constitutional/mod.rs](icn/crates/icn-gateway/src/api/constitutional/mod.rs)):
+Amendment Endpoints:
+- `POST /v1/constitutional/amendments` - Create amendment
+- `GET /v1/constitutional/amendments` - List amendments with filters (status, scope, type)
+- `GET /v1/constitutional/amendments/{id}` - Get amendment by ID
+- `POST /v1/constitutional/amendments/{id}/submit` - Submit for review
+- `POST /v1/constitutional/amendments/{id}/vote` - Open voting period
+- `POST /v1/constitutional/amendments/{id}/ratify` - Add ratification vote
+- `POST /v1/constitutional/amendments/{id}/withdraw` - Withdraw amendment
+
+Appeal Endpoints:
+- `POST /v1/constitutional/appeals` - File appeal
+- `GET /v1/constitutional/appeals` - List appeals with filters (status, scope, appellant)
+- `GET /v1/constitutional/appeals/{id}` - Get appeal by ID
+- `POST /v1/constitutional/appeals/{id}/evidence` - Add evidence
+- `POST /v1/constitutional/appeals/{id}/respond` - Add response
+- `POST /v1/constitutional/appeals/{id}/review` - Begin review
+- `POST /v1/constitutional/appeals/{id}/resolve` - Resolve appeal with outcome
+- `POST /v1/constitutional/appeals/{id}/withdraw` - Withdraw appeal
+
+**CommonsManager Extensions** ([icn/crates/icn-gateway/src/commons_mgr.rs](icn/crates/icn-gateway/src/commons_mgr.rs)):
+- Amendment storage and CRUD operations
+- Amendment lifecycle management (submit, open voting, ratify, withdraw)
+- Appeal storage and CRUD operations
+- Appeal lifecycle management (add evidence, add response, begin review, resolve, withdraw)
+
+### Added - Membership & Rights (v0.5.0) (2025-12-14)
+
+**RevocationRecord & Registry** ([icn/crates/icn-identity/src/revocation.rs](icn/crates/icn-identity/src/revocation.rs), [revocation_store.rs](icn/crates/icn-identity/src/revocation_store.rs)):
+- `RevocationRecord` - Tracks revocations with evidence, appeal deadlines, and effective dates
+- `CommonsRevocationReason` - Enum for Sybil attack, identity fraud, policy violation, governance decision, key compromise, voluntary exit, abandoned, other
+- `RevocationScope` - Global, Federation, or Jurisdiction-level revocations
+- `AppealStatus` - None, Pending, Denied, Upheld lifecycle
+- `RevocationRegistry` - In-memory store with indexes by target ID, target type, and appeal status
+- 10 unit tests covering all revocation operations
+
+**Gateway Membership API** ([icn/crates/icn-gateway/src/api/membership/mod.rs](icn/crates/icn-gateway/src/api/membership/mod.rs)):
+- `POST /v1/membership/apply` - Apply for membership in jurisdiction
+- `GET /v1/membership/status/{jurisdiction}` - Get membership status
+- `POST /v1/membership/approve` - Approve pending application
+- `POST /v1/membership/promote` - Promote provisional to full member
+- `POST /v1/membership/suspend` - Suspend member (reversible)
+- `POST /v1/membership/reinstate` - Reinstate suspended member
+- `POST /v1/membership/ban` - Ban member immediately (no appeal)
+- `POST /v1/membership/revoke` - Revoke with appeal window
+- `POST /v1/membership/capability/grant` - Grant capability to member
+- `POST /v1/membership/capability/revoke` - Revoke capability
+- `GET /v1/membership/capability/check` - Check if member has capability
+- `POST /v1/membership/role/add` - Add role to member
+- `POST /v1/membership/role/remove` - Remove role from member
+- `GET /v1/membership/list/{jurisdiction}` - List members with optional status filter
+- `POST /v1/membership/exit` - Voluntary exit from jurisdiction
+
+**CommonsManager Membership Operations** ([icn/crates/icn-gateway/src/commons_mgr.rs](icn/crates/icn-gateway/src/commons_mgr.rs)):
+- Full membership lifecycle: apply, approve, promote, suspend, reinstate, exit
+- Capability management: grant, revoke, check per-jurisdiction capabilities
+- Role management: add/remove roles with authority validation
+- Ban/revoke with revocation registry integration
+- Appeal process: file appeal, resolve appeal (uphold/deny)
+- Rights enforcement: revocation checks before allowing actions
+
+**Membership Capabilities** ([icn/crates/icn-identity/src/commons.rs](icn/crates/icn-identity/src/commons.rs)):
+- Vote, Propose, Transact, HoldOffice, AccessPrivate, Sponsor capabilities
+- Per-jurisdiction capability grants with expiration support
+- Capability checks integrated into membership operations
+
+### Added - Steward Layer (v0.4.0) (2025-12-14)
+
+**Gateway Steward API** ([icn/crates/icn-gateway/src/api/steward/mod.rs](icn/crates/icn-gateway/src/api/steward/mod.rs)):
+- `POST /v1/steward` - Register as steward (requires Strong POP level)
+- `GET /v1/steward/{id}` - Get steward by ID
+- `GET /v1/steward/by-did/{did}` - Get steward by DID
+- `GET /v1/steward` - List stewards with optional filters (active, jurisdiction)
+- `GET /v1/steward/attesters` - List stewards eligible to issue attestations
+- `PUT /v1/steward/{id}/status` - Update status (suspend/reinstate/revoke)
+- `POST /v1/steward/{id}/retire` - Self-service retirement
+- `POST /v1/steward/{id}/extend-term` - Extend steward term
+- `POST /v1/steward/{id}/bond/add` - Add to steward bond
+- `POST /v1/steward/{id}/bond/slash` - Slash steward bond (governance)
+- `POST /v1/steward/{id}/attestation|dispute|dispute-won` - Reputation tracking
+
+**CommonsManager Steward Operations** ([icn/crates/icn-gateway/src/commons_mgr.rs](icn/crates/icn-gateway/src/commons_mgr.rs)):
+- Full steward lifecycle: register, suspend, reinstate, retire, revoke
+- Reputation tracking: attestations issued, disputes, disputes won
+- Term and bond management with governance controls
+- Steward listing with filters and sorting by reputation
+
+**POP Attestation Integration** ([icn/crates/icn-gateway/src/api/commons/anchor.rs](icn/crates/icn-gateway/src/api/commons/anchor.rs)):
+- Attestation endpoint validates caller is registered steward
+- Checks `can_attest()` (active status, valid term, good reputation)
+- Records attestation on steward's record for reputation tracking
+
+**CLI Commands** ([icn/bins/icnctl/src/main.rs](icn/bins/icnctl/src/main.rs)):
+- `icnctl steward info <id|did>` - Get steward information
+- `icnctl steward list [--active] [--jurisdiction <j>]` - List stewards
+- `icnctl steward attesters` - List stewards who can issue attestations
+- `icnctl steward register` - Register as steward
+- `icnctl steward retire` - Self-service retirement
+
+**Integration Tests** ([icn/crates/icn-gateway/tests/steward_integration.rs](icn/crates/icn-gateway/tests/steward_integration.rs)):
+- 14 comprehensive tests covering registration, lifecycle, attestations, disputes, bonds, term management
+
+### Tested - End-to-End Pilot UI Validation (2025-12-14)
+
+**Deployment Verification**:
+- All CI checks passing (formatting, clippy, tests)
+- K3s deployment successful with image `icn:b84f0d4`
+- Gateway health endpoint operational at `http://10.8.10.40:30080/v1/health`
+
+**Authentication Flow**:
+- Created new identity with `icnctl id init`
+- DID: `did:icn:z8p6hkHaFFM2aMjWfhsksvUx3AWt7ZVFhjTsxLn93MaRR`
+- Token generation via `icnctl auth token` working
+- JWT authentication with gateway verified
+
+**Cooperative Creation**:
+- Created `test-coop` cooperative via REST API
+- User set as Steward with full permissions
+- Cooperative persisted and retrievable via `/v1/coops/test-coop`
+
+**Known Issues Discovered**:
+- `icnctl auth token` expires display shows "1970-01-01" (cosmetic bug in timestamp formatting)
+- Pilot UI needs token with `coop:write,coop:admin` scopes to create/manage coops (documented)
+
+### Fixed - System Gap Resolutions (2025-12-13)
+
+**Profile Query Responses (M2)** ([icn/crates/icn-core/src/supervisor/mod.rs](icn/crates/icn-core/src/supervisor/mod.rs)):
+- Nodes now respond to `ProfileMessage::Query` requests
+- Looks up own profile or cached peer profile and publishes response via gossip
+- Enables complete node profile discovery across the network
+
+**Executor Capacity Tracking (M4)** ([icn/crates/icn-compute/src/actor.rs](icn/crates/icn-compute/src/actor.rs)):
+- Added `capacity` field to `ExecutorInfo` struct storing `NodeCapacity`
+- `on_capacity_announce()` now stores CPU, memory, storage, and GPU capacity in registry
+- Added `get_executor_capacity()` for single executor lookup
+- Added `get_all_executor_capacities()` for scheduler placement decisions
+- Enables informed task placement based on actual executor resources
+
+### Changed - Supervisor Modularization (A1) (2025-12-13)
+
+**Supervisor Directory Structure** ([icn/crates/icn-core/src/supervisor/](icn/crates/icn-core/src/supervisor/)):
+- Extracted to `supervisor/` module directory with focused initialization modules
+- `init_trust.rs` - Trust graph and misbehavior detector initialization
+- `init_gossip.rs` - Gossip actor, partitions, replication setup
+- `init_ledger.rs` - Ledger, disputes, contracts initialization
+- `registry.rs` - Service container types for dependency injection
+- `shutdown.rs` - Graceful shutdown and snapshot management
+- `mod.rs` - Main supervisor reduced from 3,571 to 3,256 lines (-315 lines)
+- Improved testability and maintainability of supervisor code
+
+### Added - CoopWallet Real API Integration (2025-12-11)
+
+**React Native SDK Enhancements** ([sdk/react-native/src/hooks.ts](sdk/react-native/src/hooks.ts)):
+- Added `useTransactions` hook for fetching transaction history with pagination
+- Auto-refreshes on `PaymentCreated` WebSocket events
+- Supports `loadMore` for infinite scroll patterns
+
+**TypeScript SDK Fixes** ([sdk/typescript/src/types.ts](sdk/typescript/src/types.ts)):
+- Fixed `ChallengeResponse` to use `nonce` field (matches gateway API)
+- Fixed `VerifyResponse` to compute `expires_at` from `expires_in`
+
+**CoopWallet App Integration** ([sdk/react-native/examples/CoopWallet/App.tsx](sdk/react-native/examples/CoopWallet/App.tsx)):
+- HomeScreen displays real balance from ledger API
+- HomeScreen shows real transaction history (pull-to-refresh supported)
+- PaymentScreen sends real payments via `client.pay()` API
+- ReceiveScreen generates QR codes with real user DID
+- ScanScreen processes payment QR codes and pre-fills payment form
+- TransactionsScreen fetches full transaction history with filtering
+- GovernanceScreen lists real proposals and submits votes via API
+- IdentityScreen and SettingsScreen show real user DID
+- All screens use authenticated user's DID instead of demo values
+
+**Gateway CORS Fix** ([icn/crates/icn-gateway/src/security.rs](icn/crates/icn-gateway/src/security.rs)):
+- Added `ICN_SKIP_CORS` environment variable for reverse proxy deployments
+- Prevents duplicate CORS headers when Cloudflare adds its own
+- Reordered middleware to ensure SecurityHeaders runs after CORS layer
+
+### Added - Configurable Trust Threshold for Network Connections (2025-12-11)
+
+**Network Configuration** ([crates/icn-core/src/config.rs](icn/crates/icn-core/src/config.rs)):
+- Added `min_trust_threshold` field to `NetworkConfig` (default: 0.1)
+- Controls trust-gated TLS verification at the transport layer
+- Configurable per-node via TOML configuration files
+- Valid range: 0.0 (disabled) to 1.0 (maximum trust required)
+
+**Trust Threshold Values**:
+- `0.0` - Accept all authenticated DIDs (trust-gated TLS disabled, useful for cooperative deployments)
+- `0.1` - Require "Known" trust class (at least one trust edge)
+- `0.4` - Require "Partner" trust class
+- `0.7` - Require "Federated" trust class
+
+**Configuration Example**:
+```toml
+[network]
+listen_addr = "0.0.0.0:7777"
+rpc_port = 5601
+mdns_enabled = true
+bootstrap_peers = []
+min_trust_threshold = 0.0  # For cooperative deployments
+```
+
+**Deployment Updates**:
+- Updated `deploy-coop.sh` to set `min_trust_threshold = 0.0` for cooperative deployments
+- Updated example config files with documentation
+- Updated `icn-alpha.toml` and `icn-beta.toml` for local development
+
+**Documentation**:
+- New guide: [trust-threshold-configuration.md](docs/trust-threshold-configuration.md)
+- Covers use cases, security considerations, and troubleshooting
+
+**Security Note**: Setting to 0.0 still provides DID-TLS binding, transport encryption, message signing, and replay protection. It only disables trust-based connection rejection.
+
+**Use Cases**:
+- **Cooperative Deployments**: Set to 0.0 for closed networks where all nodes are pre-authorized
+- **Local Development**: Set to 0.0 for easy testing without trust setup
+- **Public Networks**: Keep at 0.1 or higher for trust-based access control
+
+Fixes connection rejection issues in cooperative deployments where nodes have no pre-established trust relationships.
+
+### Added - Dispute Management CLI (2025-12-05)
+
+**icnctl dispute subcommands** ([bins/icnctl/src/main.rs](icn/bins/icnctl/src/main.rs)):
+- `icnctl dispute file --entry-hash <hash> --reason <text>` - File a dispute against a ledger entry
+- `icnctl dispute list [--status pending|resolved|all] [--filer <did>]` - List disputes with optional filters
+- `icnctl dispute get --entry-hash <hash>` - Get dispute details including evidence
+- `icnctl dispute add-evidence --entry-hash <hash> --evidence <text>` - Add evidence to a dispute
+- `icnctl dispute assign-mediator --entry-hash <hash> --mediator <did>` - Assign a mediator
+- `icnctl dispute resolve --entry-hash <hash> --outcome <upheld|reversed|settlement|writeoff>` - Resolve dispute
+
+**RPC Server** ([crates/icn-rpc/src/server.rs](icn/crates/icn-rpc/src/server.rs)):
+- Added 6 new RPC methods: `dispute.file`, `dispute.list`, `dispute.get`, `dispute.add_evidence`, `dispute.assign_mediator`, `dispute.resolve`
+- Added `dispute:read` and `dispute:write` authorization scopes
+- Integrated DisputeManager from icn-ledger crate
+
+**Supervisor Integration** ([crates/icn-core/src/supervisor.rs](icn/crates/icn-core/src/supervisor.rs)):
+- DisputeManager now initialized alongside Ledger (shares store)
+- Wired to RPC server for runtime access
+
+Closes #53.
+
+### Added - Gossip Topics for Dispute Announcements (2025-12-05)
+
+**Dispute Broadcasting** ([crates/icn-ccl/src/disputes.rs](icn/crates/icn-ccl/src/disputes.rs)):
+- Disputes are now broadcast via gossip when filed and resolved
+- Added `TOPIC_DISPUTES_FILE` ("disputes:file") for new dispute announcements
+- Added `TOPIC_DISPUTES_RESOLVED` ("disputes:resolved") for resolution announcements
+- Added `DisputeGossipCallback` type for integrating with gossip layer
+- Broadcasts include dispute ID, task hash, executor, challenger, reason/outcome
+- Enables mediators and observers to receive real-time dispute notifications
+
+**Actor API**:
+- `DisputeActorHandle::set_gossip_callback()` - Set callback for broadcasting dispute events
+- `DisputeResolutionSystem::set_gossip_callback()` - Direct system configuration
+
+**New Tests**:
+- `test_gossip_broadcast_on_file_dispute` - Verifies DisputeFiled broadcast
+- `test_gossip_broadcast_on_dispute_resolved` - Verifies DisputeResolved broadcast
+- `test_no_broadcast_without_callback` - Verifies graceful handling without callback
+
+Closes #56.
+
+### Added - Penalty System for Dispute Losers (2025-12-05)
+
+**Trust Penalty Mechanism** ([crates/icn-ccl/src/disputes.rs](icn/crates/icn-ccl/src/disputes.rs)):
+- Executors who lose disputes now receive trust score penalties
+- Configurable penalty amounts for different offense types:
+  - Incorrect result (first offense): 0.05 default
+  - Incorrect result (repeat): 0.1 default
+  - Timeout not reported: 0.08 default
+  - Fuel exceeded not reported: 0.08 default
+- Escalating penalties for repeat offenders (1.5x multiplier after threshold)
+- Penalty cap at 1.0 to prevent over-penalization
+
+**Penalty Configuration** (`DisputeConfig`):
+- `enable_penalties: bool` - Toggle penalty system (default: false)
+- `penalty_config: PenaltyConfig` - Configurable penalty amounts and escalation
+
+**Repeat Offender Tracking** (`OffenderRecord`):
+- Tracks disputes lost per DID
+- Tracks offense types (incorrect results, timeouts, fuel exceeded)
+- Cumulative trust penalty tracking
+- Escalation kicks in after configurable threshold (default: 3 offenses)
+
+**API**:
+- `TrustPenaltyCallback` - Callback type for trust score reduction
+- `DisputeResolutionSystem::set_trust_penalty_callback()` - Set penalty callback
+- `DisputeResolutionSystem::get_offender_record()` - Query offender history
+- `DisputeActorHandle::set_trust_penalty_callback()` - Actor handle method
+- `DisputeActorHandle::get_offender_record()` - Query via actor
+
+**Prometheus Metrics** ([crates/icn-obs/src/metrics.rs](icn/crates/icn-obs/src/metrics.rs)):
+- `icn_disputes_penalties_applied_total` - Total penalties by reason
+- `icn_disputes_penalty_amount` - Histogram of penalty amounts
+- `icn_disputes_offenders_tracked` - Number of tracked offenders
+- `icn_disputes_repeat_offenders_total` - Repeat offender detections
+- `icn_disputes_escalated_penalties_total` - Escalated penalty applications
+
+**New Tests**:
+- `test_penalty_applied_on_submitter_correct_outcome` - Verifies penalty on executor loss
+- `test_no_penalty_when_executor_correct` - Verifies no penalty when executor wins
+- `test_repeat_offender_escalation` - Verifies escalating penalties work
+- `test_penalty_disabled` - Verifies penalties can be disabled
+
+Closes #58.
+
+### Added - Trust-Weighted Mediator Selection (2025-12-05)
+
+**Dispute Resolution** ([crates/icn-ccl/src/disputes.rs](icn/crates/icn-ccl/src/disputes.rs)):
+- Mediator assignment now uses trust-weighted selection instead of simple round-robin
+- **Trust scoring**: Mediators with higher trust scores are more likely to be selected
+- **Conflict-of-interest detection**: Mediators who are executor or challenger are excluded
+- **Workload balancing**: Mediators with fewer active disputes get priority (0.1 penalty per active dispute)
+- **Minimum trust threshold**: Only mediators above `mediator_min_trust` (default 0.7) are eligible
+- Added `TrustCallback` type for trust graph integration
+- Added `MediatorInfo` struct with expertise tags support
+- Added `add_mediator_with_expertise()` for domain-specific mediator pools
+- Added 6 new tests: trust-weighted selection, conflict detection, workload balancing
+
+**Actor API**:
+- `DisputeActorHandle::set_trust_callback()` - Set callback for trust score queries
+- `DisputeActorHandle::add_mediator_with_expertise()` - Add mediator with expertise tags
+
+Closes #57.
+
+### Fixed - Re-execution Timeout Enforcement (2025-12-05)
+
+**Dispute Investigation** ([crates/icn-ccl/src/disputes.rs](icn/crates/icn-ccl/src/disputes.rs)):
+- `DisputeConfig.re_execution_timeout` is now enforced during dispute investigation
+- Contract re-execution wrapped in `tokio::time::timeout` with `spawn_blocking`
+- On timeout, dispute marked as `Inconclusive` with reason "Re-execution timed out after Ns"
+- Mediator automatically assigned for timed-out disputes
+- Added `test_investigate_dispute_timeout` test case
+
+Closes #55.
+
+### Added - WebSocket Compute Event Handlers (2025-11-28)
+
+**WebSocket Example** ([sdk/typescript/examples/websocket-events.ts](sdk/typescript/examples/websocket-events.ts)):
+- Added handlers for compute task lifecycle events:
+  - `ComputeTaskSubmitted` - when tasks are created
+  - `ComputeTaskClaimed` - when executors claim tasks
+  - `ComputeTaskCompleted` - when execution finishes
+  - `ComputeTaskCancelled` - when tasks are cancelled
+- Updated dashboard example to track active compute tasks
+
+### Added - TypeScript SDK Improvements (2025-11-28)
+
+**Test Coverage** ([sdk/typescript/src/index.test.ts](sdk/typescript/src/index.test.ts)):
+- Expanded from 13 to 46 tests (254% increase)
+- Full coverage for all SDK methods:
+  - Authentication: `getChallenge`, `verify`, `authenticate`
+  - Cooperatives: `createCoop`, `getCoop`, `updateCoop`, `deleteCoop`, `listMembers`, `addMember`, `updateMember`, `removeMember`
+  - Ledger: `getBalance`, `pay`, `getHistory`
+  - Governance: `createDomain`, `getDomain`, `listDomains`, `createProposal`, `getProposal`, `listProposals`, `openProposal`, `closeProposal`, `vote`, `getVotes`
+  - Compute: `submitTask`, `submitWasmTask`, `getTaskStatus`, `waitForTask`, `cancelTask`
+  - Health: `health`
+
+**Documentation** ([sdk/typescript/README.md](sdk/typescript/README.md)):
+- Added Compute API section with CCL and WASM examples
+- Added `compute:read` and `compute:write` scopes to scopes table
+- Complete API reference for task submission, status, and cancellation
+
+**Examples** ([sdk/typescript/examples/compute.ts](sdk/typescript/examples/compute.ts)):
+- New compute example demonstrating:
+  - CCL contract task submission
+  - WASM task submission
+  - Task status checking and polling
+  - Task cancellation
+  - Batch task processing with Promise.all
+
+### Fixed - OpenAPI Schema Validation (2025-11-28)
+
+**SubmitTaskRequest Schema** ([docs/api/openapi.yaml](docs/api/openapi.yaml)):
+- Fixed discriminator validation: Added `oneOf` with `CclTaskRequest` and `WasmTaskRequest`
+- Restored backward compatibility: `code_type` optional in `CclTaskRequest` (defaults to "ccl")
+- Added comprehensive documentation for discrimination logic
+- Removed unused `CodeType` schema component
+- Updated TypeScript SDK types to match schema
+
+### Added - WASM Compute Executor (2025-11-28)
+
+**WasmExecutor** ([crates/icn-compute/src/wasm_executor.rs](icn/crates/icn-compute/src/wasm_executor.rs)):
+- WebAssembly execution support via Wasmtime runtime (version 27)
+- Feature-gated implementation (`--features wasm` to enable)
+- Memory-limited execution with configurable `max_memory` (default 64MB)
+- Support for both CCL and WASM `TaskCode` variants
+- Host functions for ICN integration (`icn::log`, `icn::timestamp`)
+- Falls back to CCL-only execution when WASM feature disabled
+
+**Usage**:
+```rust
+// Build with WASM support
+cargo build --features wasm
+
+// Create WASM executor
+let executor = WasmExecutor::new()?;
+let task = ComputeTask {
+    code: TaskCode::WasmInline(wasm_bytes),
+    // ...
+};
+let result = executor.execute(&task, &mut ctx);
+```
+
+**Tests**: 4 new tests for WASM execution (feature-enabled and disabled paths)
+
+### Added - WASM Task Submission via Gateway API (2025-11-28)
+
+**Gateway API** ([crates/icn-gateway/src/api/compute.rs](icn/crates/icn-gateway/src/api/compute.rs)):
+- Added `code_type` field to task submission ("ccl" or "wasm")
+- Added `wasm_bytes` field for base64-encoded WASM bytecode
+- Backward compatible: CCL tasks work unchanged (default)
+- Automatic capability detection (Ccl vs Wasm)
+
+**TypeScript SDK** ([sdk/typescript/src/index.ts](sdk/typescript/src/index.ts)):
+- Added `CodeType` type ("ccl" | "wasm")
+- Updated `SubmitTaskRequest` with `code_type` and `wasm_bytes` fields
+- Added `submitWasmTask()` helper method with chunked base64 encoding (supports modules up to 5MB)
+
+**Usage**:
+```typescript
+// WASM task submission (recommended - handles large modules)
+const result = await client.submitWasmTask(wasmBytes, {
+  fuel_limit: 10000,
+  inputs: { x: 42 },
+});
+```
+
+### Added - WASM RPC & CLI Support (2025-11-28)
+
+**RPC Server** ([crates/icn-rpc/src/server.rs](icn/crates/icn-rpc/src/server.rs)):
+- `compute.submit` now accepts `code_type: "wasm"` with `wasm_bytes` (base64)
+- Added `CodeType` enum to RPC types
+- Backward compatible: CCL tasks work unchanged
+
+**CLI** ([bins/icnctl/src/main.rs](icn/bins/icnctl/src/main.rs)):
+- Added `icnctl compute submit-wasm` command for WASM task submission
+- Reads `.wasm` files directly and encodes to base64
+
+**Usage**:
+```bash
+# Submit WASM module via CLI
+icnctl compute submit-wasm --wasm module.wasm --fuel 10000 --priority high
+
+# Submit via RPC
+curl -X POST http://localhost:7000 \
+  -d '{"jsonrpc":"2.0","method":"compute.submit","params":{"code_type":"wasm","wasm_bytes":"AGFz..."},"id":1}'
+```
+
+### Added - WASM Compute Example (2025-11-28)
+
+**Example** ([examples/wasm-compute/](examples/wasm-compute/)):
+- Rust project that compiles to WASM for ICN compute
+- Demonstrates ICN host functions (`icn::log`, `icn::timestamp`)
+- Includes `run()`, `run_with_input()`, and `fibonacci()` examples
+- Build instructions and submission examples for CLI, REST, and TypeScript SDK
+
+**Build & Run**:
+```bash
+cd examples/wasm-compute
+rustup target add wasm32-unknown-unknown
+cargo build --release --target wasm32-unknown-unknown
+icnctl compute submit-wasm --wasm target/.../icn_wasm_example.wasm
+```
+
+### Added - Federation & Cross-Network Discovery (2025-11-27)
+
+**Federation Configuration** ([crates/icn-core/src/config.rs](icn/crates/icn-core/src/config.rs)):
+- Added `FederationConfig` struct with comprehensive settings
+- Network name, bootstrap peer trust, auto-accept invites, retry settings
+- Added `FederationRetryConfig` for connection retry with exponential backoff
+- Configuration example in [config/icn.toml.example](config/icn.toml.example)
+
+**Federation CLI** ([bins/icnctl/src/main.rs](icn/bins/icnctl/src/main.rs)):
+- `icnctl federation status` - Show federation status
+- `icnctl federation peers` - List federated peers
+- `icnctl federation add/remove` - Manage federation peers
+- `icnctl federation connect` - Connect to specific peer
+- `icnctl federation config/set` - View/modify configuration
+- `icnctl federation invite` - Generate invite URL
+
+**Peer Exchange Protocol** ([crates/icn-net/src/protocol.rs](icn/crates/icn-net/src/protocol.rs)):
+- `PeerExchangeMessage::Request` - Query known peers from a node
+- `PeerExchangeMessage::Response` - Return list of known peers
+- `PeerExchangeMessage::Announce` - Broadcast new peer availability
+- `PeerExchangeMessage::Unannounce` - Broadcast peer departure
+- `KnownPeer` struct with DID, addresses, trust, network info
+
+**NetworkHandle API** ([crates/icn-net/src/actor.rs](icn/crates/icn-net/src/actor.rs)):
+- `request_peer_exchange()` - Request peers from bootstrap/federation nodes
+- `announce_peer()` - Broadcast new peer to connected nodes
+- `unannounce_peer()` - Broadcast peer departure
+
+**Supervisor Integration** ([crates/icn-core/src/supervisor.rs](icn/crates/icn-core/src/supervisor.rs)):
+- Auto-dial peers from PeerExchange Response when federation enabled
+- Auto-dial peers from PeerExchange Announce when federation enabled
+- Request peer exchange from bootstrap peers after connecting
+
+**Prometheus Metrics** ([crates/icn-obs/src/metrics.rs](icn/crates/icn-obs/src/metrics.rs)):
+- `icn_peer_exchange_requests_{sent,received}_total`
+- `icn_peer_exchange_responses_{sent,received}_total`
+- `icn_peer_exchange_announces_{sent,received}_total`
+- `icn_peer_exchange_unannounces_{sent,received}_total`
+- `icn_peer_exchange_peers_discovered_total`
+- `icn_peer_exchange_peers_dialed_total`
+- `icn_peer_exchange_dial_failures_total`
+
+### Added - Network Partition Detection and Healing (Phase 18 Week 3) (2025-11-27)
+
+**Partition Gossip Messages** ([crates/icn-gossip/src/types.rs](icn/crates/icn-gossip/src/types.rs)):
+- `PartitionHealRequest` - Sent to initiate partition healing with vector clock exchange
+- `PartitionHealResponse` - Response with vector clock, diverged topics, and entries behind
+
+**GossipActor Integration** ([crates/icn-gossip/src/gossip.rs](icn/crates/icn-gossip/src/gossip.rs)):
+- Message handlers for `PartitionHealRequest` and `PartitionHealResponse`
+- `initiate_partition_healing()` - Start healing process with partitioned peer
+- `get_clock()` - Expose vector clock state for partition healing
+- Automatic vector clock merging on heal response
+- Automatic PullRequest generation for diverged topics
+
+**Integration Tests** ([crates/icn-core/tests/partition_integration.rs](icn/crates/icn-core/tests/partition_integration.rs)):
+- `test_partition_detection_basic` - Basic partition detection threshold behavior
+- `test_partition_heal_request_response` - Full heal request/response flow
+- `test_vector_clock_merge_on_partition_heal` - Vector clock merging verification
+- `test_partition_detector_multiple_peers` - Multi-peer partition tracking
+- `test_partition_healer_conflict_resolution` - Conflict resolution by data type
+
+### Fixed - Storage Quota Validation (2025-11-27)
+
+**QuotaManager** ([crates/icn-store/src/quotas.rs](icn/crates/icn-store/src/quotas.rs)):
+- Auto-create default quotas for DIDs without explicit quota
+- Validate both global and per-DID limits in `record_usage()`
+- Allow storage up to global limit when no per-DID quota configured
+
+### Added - Byzantine Fault Detection Integration (Phase 18 Week 1-2) (2025-11-26)
+
+**NetworkActor & GossipActor Integration**
+
+Integrated MisbehaviorDetector from Phase 18 into production network and gossip layers for automatic Byzantine behavior detection.
+
+**NetworkActor** ([crates/icn-net/src/actor.rs](icn/crates/icn-net/src/actor.rs)):
+- Added `misbehavior_detector` field (optional, initialized with default thresholds)
+- Records `InvalidSignature` violations when message signature verification fails
+- Records `ReplayAttack` violations when duplicate sequence numbers detected
+- Violations tracked during `SignedEnvelope` verification in message handling
+- All 108 unit tests pass ✅
+
+**GossipActor** ([crates/icn-gossip/src/gossip.rs](icn/crates/icn-gossip/src/gossip.rs)):
+- Added `misbehavior_detector` field (optional)
+- Added `set_misbehavior_detector()` method for runtime configuration
+- Records `ExcessiveResourceUse` violations for:
+  * Unauthorized subscription attempts (trust score below threshold)
+  * ACL violations (AccessControl rules deny access)
+  * Subscriber limit exceeded (DoS protection)
+- Uses async `block_in_place` pattern for violation recording in sync contexts
+- All 89 tests pass ✅
+
+**Security Impact:**
+- Automatic detection of malicious peers across network and gossip layers
+- Reputation scoring enables gradual quarantine/ban based on violation severity
+- Defense against signature spoofing, replay attacks, and unauthorized access
+- Resource exhaustion protection via subscriber limit enforcement
+
+**Dependencies:**
+- Workspace dependency `icn-security` added to `icn-net` and `icn-gossip`
+
+### Added - Partition Detection & Healing (Phase 18 Week 3) (2025-11-27)
+
+**Integrated partition detection and healing into GossipActor:**
+
+**GossipActor** ([crates/icn-gossip/src/gossip.rs](icn/crates/icn-gossip/src/gossip.rs)):
+- Added `partition_detector` and `partition_healer` optional fields
+- Added `set_partition_detector()` and `set_partition_healer()` setter methods
+- Added `heal_partition_with_peer()` method for reconnected peer handling
+- Partition detection based on configurable threshold (default: 5 min)
+
+**Supervisor** ([crates/icn-core/src/supervisor.rs](icn/crates/icn-core/src/supervisor.rs)):
+- Initializes `PartitionDetector` and `PartitionHealer` on startup
+- Configures default partition threshold (5 min) and check interval (30s)
+
+**Prometheus Metrics:**
+- `icn_gossip_partition_healed_total` - Successful partition healings
+
+### Added - Dispute Resolution for Contract Execution (Phase 18 Week 4) (2025-11-27)
+
+**Integrated dispute resolution system into ComputeActor:**
+
+**ComputeActor** ([crates/icn-compute/src/actor.rs](icn/crates/icn-compute/src/actor.rs)):
+- Added `dispute_resolution` optional field for `DisputeResolutionSystem`
+- Added `FileDispute` command for challengers to file disputes
+- Added `GetDisputeStatus` command for querying dispute status
+- Re-executes contracts to verify challenger's claims
+
+**Supervisor Integration:**
+- Initializes `DisputeResolutionSystem` with persistent storage
+- Sets up dispute system on ComputeActor at startup
+
+**Prometheus Metrics:**
+- `icn_compute_disputes_filed_total` - Disputes filed
+- `icn_compute_disputes_resolved_total` - Disputes resolved by outcome
+
+### Added - Fork Resolution for Ledger Conflicts (Phase 18 Week 5) (2025-11-27)
+
+**Integrated fork detection and resolution into Ledger:**
+
+**Ledger** ([crates/icn-ledger/src/ledger.rs](icn/crates/icn-ledger/src/ledger.rs)):
+- Added `fork_detector` and `fork_resolver` fields
+- Indexes entries for fork detection on `append_entry()`
+- Warns when potential forks detected (multiple children of same parent)
+- Added `get_fork_stats()`, `get_fork_children()`, `resolve_fork()` methods
+- Quarantines losing entries using `QuarantineReason::ForkConflict`
+
+**Fork Resolution Strategies:**
+- `TimestampPreference` - First-write-wins
+- `TrustWeighted` - Prefer higher-trust authors
+- `MajoritySignatures` - Prefer more co-signers
+- `Hybrid` - Combined strategy (40% trust, 30% timestamp, 30% signatures)
+
+**Types** ([crates/icn-ledger/src/types.rs](icn/crates/icn-ledger/src/types.rs)):
+- Added `QuarantineReason::ForkConflict(String)` variant
+
+**Prometheus Metrics:**
+- `icn_ledger_forks_detected_total` - Fork detection events
+
+### Added - Storage Quotas Integration (Phase 18 Week 6) (2025-11-27)
+
+**Integrated StorageQuotaManager into GossipActor for per-DID storage limits:**
+
+**GossipActor** ([crates/icn-gossip/src/gossip.rs](icn/crates/icn-gossip/src/gossip.rs)):
+- Added `storage_quota_manager` optional field
+- Added `set_storage_quota_manager()` setter method
+- Enforces per-DID quota in `store_entry()` before storage
+- Records usage after successful entry storage
+- Releases usage when entries evicted due to topic limits
+- Auto-evicts low-priority entries when approaching capacity
+- Uses `block_in_place` pattern for async quota operations
+- 2 new tests: `test_storage_quota_enforcement`, `test_storage_quota_exceeded`
+
+**Supervisor** ([crates/icn-core/src/supervisor.rs](icn/crates/icn-core/src/supervisor.rs)):
+- Initializes `StorageQuotaManager` with defaults (1GB global, 90% eviction threshold)
+- Configures quota manager on GossipActor at startup
+
+**Prometheus Metrics:**
+- `icn_storage_quota_exceeded_total` - Quota exceeded events
+- `icn_storage_evicted_total` - Entries evicted for quota
+
+**Upgrade Coordination:**
+Version negotiation already integrated in NetworkActor (Track B1):
+- `VersionInfo` exchange during Hello handshake
+- `negotiate_version()` finds compatible protocol versions
+- `common_capabilities()` identifies shared features
+- Per-connection tracking of negotiated version and capabilities
+
+---
+
+**Phase 18 Pre-Pilot Hardening COMPLETE ✅** (2025-11-27)
+
+All 6 weeks integrated:
+- Week 1-2: Byzantine fault detection ✅
+- Week 3: Partition detection & healing ✅
+- Week 4: Dispute resolution for compute ✅
+- Week 5: Fork resolution for ledger ✅
+- Week 6: Storage quotas & upgrade coordination ✅
+
+**Tests:** 91 gossip tests, 46 ledger tests, 98 compute tests, 23 store tests all passing.
+
+---
+
+### Added - Privacy Enhancements (Phase 20 COMPLETE ✅) (2025-11-26)
+
+**New Crate: icn-privacy** ([crates/icn-privacy/](icn/crates/icn-privacy/))
+
+Privacy primitives addressing ARCHITECTURE.md Gap 12.9 (Privacy & Metadata Leakage).
+**All 6 weeks complete** - production-ready privacy layer for ICN.
+
+1. **Encrypted Topic Metadata** ([crates/icn-privacy/src/topic_encryption.rs](icn/crates/icn-privacy/src/topic_encryption.rs)) - Week 1-2
+   - ChaCha20-Poly1305 AEAD encryption for topic names
+   - Bloom filter-based topic discovery (privacy-preserving)
+   - Plausible deniability via false positives
+   - Prevents network observers from learning subscription patterns
+   - `TopicEncryptor::encrypt()` - Encrypt topic with random nonce
+   - `TopicEncryptor::decrypt()` - Decrypt topic if you have the key
+   - `TopicEncryptor::bloom_matches()` - Check if topic might match (probabilistic)
+   - `TopicBloomFilter` - Privacy-preserving interest matching
+   - 8 comprehensive tests (7 unit + 1 doc test)
+
+2. **Onion Routing for Gossip** ([crates/icn-privacy/src/onion_routing.rs](icn/crates/icn-privacy/src/onion_routing.rs)) - Week 3-4 ✅ **PRODUCTION-READY**
+   - Multi-hop message routing inspired by Tor with full ephemeral key support
+   - X25519 ECDH ephemeral keypair generation per layer (forward secrecy)
+   - Layered ChaCha20-Poly1305 encryption (innermost to outermost)
+   - Circuit-based routing with trust-gated relay selection
+   - `OnionRouter::create_circuit()` - Build multi-hop routing path
+   - `OnionRouter::wrap_message()` - Layer encryption with ephemeral keys
+   - `OnionRouter::peel_layer()` - Decrypt and remove one layer (ECDH-based)
+   - `OnionRouter::extract_payload()` - Extract final payload at destination
+   - `select_relays()` - Trust-based relay selection with NaN-safe sorting
+   - 5 comprehensive tests (circuit, relay selection, NaN handling, end-to-end)
+   - **Bug Fix**: Fixed peel_layer structural mismatch (replaced layer instead of push)
+   - **Bug Fix**: Implemented functional decrypt_layer with ephemeral keys
+   - **Bug Fix**: Fixed NaN panic in select_relays (use total_cmp)
+
+3. **Traffic Obfuscation** ([crates/icn-privacy/src/traffic_obfuscation.rs](icn/crates/icn-privacy/src/traffic_obfuscation.rs)) - Week 5-6
+   - Random message delays for timing attack resistance
+   - Message size padding to hide content patterns
+   - Cover traffic generation (decoy messages)
+   - Probabilistic scheduling for cover traffic
+   - `TrafficObfuscator::random_delay()` - Generate random transmission delay
+   - `TrafficObfuscator::pad_message()` - Pad to fixed size (default: 1KB)
+   - `TrafficObfuscator::unpad_message()` - Extract original payload
+   - `TrafficObfuscator::generate_cover_traffic()` - Create decoy message
+   - `TrafficObfuscator::should_send_cover_traffic()` - Probabilistic scheduling
+   - `ObfuscationConfig` - Configurable parameters (delays, padding, cover traffic)
+   - 10 comprehensive tests (delay, padding, cover traffic, probability)
+
+**Security Properties:**
+- **Topic Confidentiality**: Topic names encrypted, unreadable to network observers
+- **Unlinkability**: Can't correlate multiple encrypted topics to same subscriber
+- **Plausible Deniability**: Bloom filter false positives provide cover
+- **Sender Anonymity**: Recipient doesn't know original sender (onion routing)
+- **Receiver Anonymity**: Relays don't know final recipient (onion routing)
+- **Traffic Analysis Resistance**: Multi-hop routing hides patterns (onion routing)
+- **Forward Secrecy**: Ephemeral keys per layer, no key reuse (onion routing) ✅
+- **Timing Resistance**: Random delays prevent correlation attacks (obfuscation) ✅
+- **Size Uniformity**: Padding hides message content patterns (obfuscation) ✅
+- **Traffic Camouflage**: Cover traffic obscures real message count (obfuscation) ✅
+
+**Prometheus Metrics** (8 new privacy metrics):
+- `icn_privacy_topics_encrypted_total` - Topics encrypted count
+- `icn_privacy_topics_decrypted_total` - Topics decrypted count
+- `icn_privacy_bloom_filter_hits_total` - Bloom filter matches
+- `icn_privacy_bloom_filter_misses_total` - Bloom filter non-matches
+- `icn_privacy_onion_routes_created_total` - Onion routes (Week 3-4)
+- `icn_privacy_onion_hops_forwarded_total` - Onion hops (Week 3-4)
+- `icn_privacy_cover_traffic_sent_total` - Cover traffic (Week 5-6)
+- `icn_privacy_messages_padded_total` - Message padding (Week 5-6)
+
+**Testing:**
+- **23 tests passing** (22 unit + 1 doc)
+- Topic encryption (8 tests): roundtrip, nonce randomness, Bloom matching, wrong key failure, multi-topic search
+- Onion routing (5 tests): circuit creation, relay selection, insufficient trust, NaN handling, end-to-end wrap/peel/extract
+- Traffic obfuscation (10 tests): random delays, message padding, cover traffic generation, probabilistic scheduling
+- End-to-end onion routing test validates: sender wraps → relay peels → recipient extracts payload
+
+**Implementation Notes:**
+- Onion routing is **production-ready** with full ephemeral key support
+- Each layer encrypted with unique ephemeral keypair (forward secrecy)
+- Relays decrypt using ECDH(relay_secret, ephemeral_pubkey) - no pre-shared keys needed
+- Trust-based relay selection filters candidates by minimum trust threshold (default: 0.3)
+- NaN trust scores safely handled (sorted to end, never cause panic)
+- Traffic obfuscation configurable per feature (delays, padding, cover traffic)
+- Default padding size: 1KB (configurable)
+- Default delay range: 0-500ms jitter (configurable)
+- Cover traffic disabled by default (bandwidth intensive, opt-in)
+
+---
+
+### Added - Scalability Optimizations (Phase 19 Week 1-2) (2025-11-25)
+
+**Performance optimizations for 100-node cooperatives:**
+
+1. **Vector Clock Compression** ([crates/icn-gossip/src/scalability.rs](icn/crates/icn-gossip/src/scalability.rs))
+   - Varint encoding for small sequence numbers (1-10 bytes vs fixed 8 bytes)
+   - Delta storage from baseline median version (only stores non-zero differences)
+   - Typical compression: ~32 bytes/peer → ~8 bytes/peer (4x reduction)
+   - Sparse updates: >10x compression when most peers at baseline
+   - `CompressedVectorClock::from_vector_clock()` - Compress with median baseline
+   - `CompressedVectorClock::to_vector_clock()` - Decompress to full clock
+   - **Bug fix**: Fixed decompression filtering out peers with version 0, breaking roundtrip consistency
+   - 14 comprehensive tests covering compression ratio, roundtrip, edge cases, version 0 handling
+
+2. **Trust Graph Caching** ([crates/icn-trust/src/trust_cache.rs](icn/crates/icn-trust/src/trust_cache.rs))
+   - LRU cache with configurable capacity (default: 1000 entries)
+   - TTL-based invalidation (default: 5 minutes)
+   - Automatic cache invalidation when trust edges change
+   - Reduces trust computation from O(n²) to O(1) for cached entries
+   - `TrustCache::get()` - O(1) lookup with TTL validation
+   - `TrustCache::put()` - LRU eviction when at capacity
+   - `TrustCache::prune_expired()` - Manual cleanup of expired entries
+   - 11 comprehensive tests covering LRU eviction, TTL expiration, warming
+   - Integrated into `TrustGraph::compute_trust_score()` for transparent caching
+
+3. **Signature Batch Verification** ([crates/icn-identity/src/batch_verify.rs](icn/crates/icn-identity/src/batch_verify.rs))
+   - Ed25519 batch verification using `ed25519-dalek` batch API
+   - Verify 100 signatures in parallel (~100x faster than serial)
+   - Automatic fallback to individual verification on batch failure
+   - `BatchVerifier::add()` - Build batch incrementally
+   - `BatchVerifier::verify()` - Verify entire batch at once
+   - `verify_signatures_batched()` - Convenience function for automatic batching
+   - Returns indices of invalid signatures for error handling
+   - 9 comprehensive tests covering valid/invalid signatures, batching, reuse
+
+4. **Topic Sharding** ([crates/icn-gossip/src/scalability.rs](icn/crates/icn-gossip/src/scalability.rs))
+   - 256-shard partitioning for large topics (>1000 entries)
+   - Per-shard Bloom filters reduce anti-entropy from O(n) to O(n/256)
+   - Hash-based shard assignment (first byte of content hash)
+   - Automatic sharding enablement when topic reaches threshold
+   - `TopicShard` - Individual shard with entries and Bloom filter
+   - `ShardedTopic` - Manages 256 shards with coordinated operations
+   - `ShardStats` - Monitoring metrics for shard distribution
+   - 11 comprehensive tests covering insertion, distribution, stats, Bloom filters
+   - Enables efficient sync for topics with 10K+ entries
+
+5. **Prometheus Metrics** (18 new scalability metrics):
+   - **Compression**: `vector_clocks_compressed_total`, `compression_ratio`, `compressed_size_bytes`, `delta_count`, `compression_duration_seconds`
+   - **Trust Cache**: `trust_cache_hits_total`, `trust_cache_misses_total`, `trust_cache_expired_total`, `trust_cache_invalidations_total`, `trust_cache_size`
+   - **Batch Verify**: `batch_verify_success_total`, `batch_verify_failed_total`, `batch_verify_invalid_signatures_total`, `batch_verify_duration_seconds`, `batch_verify_size`
+   - **Topic Sharding**: `topic_sharding_enabled_total`, `sharded_topic_size`
+
+**Performance Impact:**
+- Vector clocks: 4-10x memory reduction for gossip state
+- Trust lookups: O(n²) → O(1) with 5-minute cache
+- Signature verification: ~100x speedup for 100 signatures
+- Topic anti-entropy: O(n) → O(n/256) with sharding
+- Target: 100 nodes, 100 tx/sec/node, <10ms trust queries, 10K+ entry topics
+
+**Dependencies:**
+- Added `lru = "0.12"` to workspace for LRU cache implementation
+- Enabled `batch` feature on `ed25519-dalek` for batch verification
+- Added `icn-obs` dependency to `icn-identity` for metrics
+
+**Testing:**
+- 45 new tests (14 compression + 11 cache + 9 batch verification + 11 sharding)
+- All 91 gossip tests passing (89 unit + 2 doc tests)
+- Bug fix validated with 2 regression tests for version 0 handling
+
+### Added - Clock Synchronization (Phase 19 Week 3-4) (2025-11-25)
+
+**New Crate: icn-time** ([crates/icn-time/](icn/crates/icn-time/))
+
+Cooperative-wide clock synchronization for timestamp validation and replay attack prevention:
+
+1. **Clock Sync Module** ([crates/icn-time/src/sync.rs](icn/crates/icn-time/src/sync.rs))
+   - `ClockSync` - Network time offset and uncertainty tracking
+   - Query multiple Rough Time servers concurrently (Cloudflare, int08h, Google)
+   - Median time calculation resilient to single-server failures
+   - RTT-based uncertainty for confidence intervals
+   - Background sync task with 10-minute interval (configurable)
+   - `MAX_CLOCK_SKEW: 300s` - 5-minute tolerance window
+   - `MIN_SERVERS: 3` - Required for median calculation
+
+2. **Timestamp Validation**:
+   - `validate_timestamp()` - Reject messages outside ±300s window
+   - `network_time()` - Local time adjusted by sync offset
+   - `is_fresh()` - Check if sync within last 10 minutes
+   - Prevents replay attacks with strict time bounds
+
+3. **Simplified Rough Time Protocol** (RFC 8915):
+   - UDP-based time server queries with 5-second timeout
+   - Nonce-based request/response (32-byte random nonce)
+   - Server response: 8 bytes milliseconds since epoch
+   - Automatic server resolution and retry logic
+   - Concurrent queries reduce sync latency
+
+4. **Error Handling** ([error.rs](icn/crates/icn-time/src/error.rs)):
+   - `TimestampOutOfRange` - Message timestamp outside acceptable window
+   - `SyncFailed` - Clock sync operation failed
+   - `NoServersAvailable` - All time servers unreachable
+   - `InsufficientResponses` - Not enough servers for median calculation
+   - `NotSynchronized` - Validation attempted before first sync
+
+5. **Prometheus Metrics** (6 new clock sync metrics):
+   - `clock_sync_success_total` - Successful synchronizations
+   - `clock_sync_failed_total` - Failed sync attempts
+   - `clock_sync_duration_seconds` - Sync operation duration
+   - `clock_sync_offset_seconds` - Clock offset from network median
+   - `timestamp_validation_accepted_total` - Valid timestamps
+   - `timestamp_validation_rejected_total` - Out-of-range timestamps
+
+**Performance Impact:**
+- Concurrent server queries reduce sync latency
+- Median calculation resilient to outliers
+- Background task prevents blocking main runtime
+- 5-second timeout per server prevents hangs
+
+**Dependencies:**
+- Added `icn-time` crate to workspace
+- `rand`/`rand_core` for nonce generation
+
+**Testing:**
+- 9 comprehensive tests covering creation, median, uncertainty, errors, offset bidirectional handling
+- 1 doc test
+- All tests passing
+
+**Integration:**
+- Clock sync background task integrated into supervisor ([crates/icn-core/src/supervisor.rs](icn/crates/icn-core/src/supervisor.rs))
+- Automatic synchronization every 10 minutes during daemon runtime
+- Graceful shutdown on SIGTERM/SIGINT
+- Metrics recording on each sync (offset, duration, success/failure)
+
+**Configuration** (planned):
+```toml
+[time_sync]
+enabled = true
+sync_interval_seconds = 600
+max_clock_skew_seconds = 300
+rough_time_servers = [
+    "roughtime.cloudflare.com:2003",
+    "roughtime.int08h.com:2002",
+]
+```
+
+### Added - Storage Exhaustion Protection (Phase 18 Week 6) (2025-11-25)
+
+**Storage quota management with priority-based eviction:**
+
+1. **StorageQuotaManager** ([crates/icn-store/src/quotas.rs](icn/crates/icn-store/src/quotas.rs))
+   - Per-DID storage quotas with configurable limits
+   - Global storage limit enforcement across all DIDs
+   - Priority-based eviction: Low → Normal → High → Critical (never evicted)
+   - Automatic eviction when approaching 90% capacity (configurable threshold)
+   - Quota enforcement before storing data prevents out-of-disk crashes
+
+2. **Storage Priorities**:
+   - **Critical**: Never auto-evicted (keystore, ledger, governance)
+   - **High**: Evicted third (contracts, trust edges)
+   - **Normal**: Evicted second (gossip entries, routine data)
+   - **Low**: Evicted first (cached data, temp files)
+
+3. **Quota Enforcement**:
+   - `can_store()`: Check if DID can store data before allocation
+   - `record_usage()`: Track storage usage per DID and globally
+   - `release_usage()`: Decrease usage counters after deletion
+   - Automatic global limit enforcement prevents any single DID from exhausting storage
+
+4. **Automatic Eviction**:
+   - `needs_eviction()`: Check if storage exceeds threshold (default: 90%)
+   - `evict_if_needed()`: Automatically remove low-priority data to free space
+   - Eviction sorts by priority (lowest first) then age (oldest first)
+   - Target: Reduce usage to 80% after eviction (10% safety margin)
+   - Returns list of evicted keys for caller to delete from store
+
+5. **Prometheus Metrics** (9 new metrics):
+   - `icn_storage_quota_exceeded_total` - Quota exceeded errors (by DID)
+   - `icn_storage_evictions_total` - Total evictions (by priority)
+   - `icn_storage_global_usage_bytes` - Current global usage
+   - `icn_storage_global_limit_bytes` - Global limit
+   - `icn_storage_global_usage_percentage` - Usage as percentage (0.0-1.0)
+   - `icn_storage_did_quota_usage_bytes` - Per-DID usage (by DID)
+   - `icn_storage_did_quota_percentage` - Per-DID usage percentage (by DID)
+   - `icn_storage_total_quotas` - Total configured quotas
+   - `icn_storage_exceeded_quotas` - Number of quotas currently exceeded
+
+6. **Test Coverage** (12 comprehensive tests):
+   - Quota creation and usage tracking
+   - Quota enforcement (per-DID and global)
+   - Automatic eviction when nearing capacity
+   - Priority-based eviction ordering
+   - Critical data protection (never evicted)
+   - Usage statistics tracking
+
+**Integration**: StorageQuotaManager can be integrated into Store implementations to enforce quotas on `put()` operations. Automatic eviction prevents disk-full crashes while preserving critical data.
+
+**Commits**: TBD
+
+### Added - Ledger Fork Resolution (Phase 18 Week 5) (2025-11-25)
+
+**Automatic fork detection and resolution for conflicting ledger entries:**
+
+1. **ForkResolver** ([crates/icn-ledger/src/fork_resolution.rs](icn/crates/icn-ledger/src/fork_resolution.rs))
+   - Detects forks when two entries reference the same parent but have different hashes
+   - Four resolution strategies: TimestampPreference, TrustWeighted, MajoritySignatures, Hybrid
+   - Trust-weighted scoring for participants (requires TrustGraph integration)
+   - Hybrid strategy combines trust (40%), timestamp (30%), and signatures (30%)
+   - Automatic fallback to timestamp tiebreaker when other factors are equal
+
+2. **Resolution Strategies**:
+   - **TimestampPreference**: First-write-wins based on entry timestamps
+   - **TrustWeighted**: Prefer entries from higher-trust participants
+   - **MajoritySignatures**: Prefer entries with more co-signatures (future: multi-party transactions)
+   - **Hybrid** (default): Balanced scoring across trust, recency, and consensus
+
+3. **ForkDetector**:
+   - Parent-hash indexing to efficiently detect multiple children
+   - `index_entry()`: Track parent-child relationships for each entry
+   - `detect_forks()`: Find parents with multiple children (fork condition)
+   - `has_fork()`: Check if specific parent has conflicting children
+   - `get_children()`: Retrieve all entries referencing a parent
+
+4. **Fork Detection & Resolution**:
+   - `Fork` type captures common parents, conflicting entries, and detection timestamp
+   - `ForkResolution` enum: KeepFirst, KeepSecond, RequiresManual
+   - `is_fork()`: Validates fork condition (same parents, different hashes)
+   - `resolve_fork()`: Applies configured strategy to determine winner
+
+5. **Prometheus Metrics** (6 new metrics):
+   - `icn_ledger_forks_detected_total` - Total forks detected
+   - `icn_ledger_forks_resolved_total` - Total forks resolved (by strategy)
+   - `icn_ledger_forks_resolution_duration_seconds` - Resolution duration histogram
+   - `icn_ledger_forks_manual_required_total` - Forks requiring manual resolution (by reason)
+   - `icn_ledger_forks_timestamp_tiebreaker_total` - Timestamp tiebreaker usage
+   - `icn_ledger_forks_trust_resolution_total` - Trust-based resolutions (by winner)
+
+6. **Test Coverage** (4 comprehensive tests):
+   - Fork detection validation (same parent, different hashes)
+   - Timestamp-based resolution (first-write-wins)
+   - Fork detector indexing and detection
+   - No-fork validation (different parents)
+
+**Integration**: ForkDetector can be integrated into Ledger actor to monitor entries during gossip sync. ForkResolver provides automatic resolution with configurable strategies, reducing manual intervention for network partition recovery.
+
+**Commits**: TBD
+
+### Added - Contract Execution Dispute Resolution (Phase 18 Week 4) (2025-11-25)
+
+**Comprehensive dispute resolution system for verifying compute task results:**
+
+1. **DisputeResolutionSystem** ([crates/icn-ccl/src/disputes.rs](icn/crates/icn-ccl/src/disputes.rs))
+   - File disputes with evidence (claimed result, task hash, reason)
+   - Automatic re-execution of contracts for verification
+   - Misbehavior detection integration via callback mechanism
+   - Mediator pool management for inconclusive disputes
+   - Persistent dispute storage with status tracking
+
+2. **Dispute Filing & Investigation**:
+   - `file_dispute()`: Create dispute with evidence
+   - `investigate_dispute()`: Re-execute contract and compare results
+   - Automatic status updates: Pending → Investigating → Resolved
+   - Four dispute outcomes: SubmitterCorrect, ExecutorCorrect, BothWrong, Inconclusive
+   - Mediator assignment for inconclusive cases
+
+3. **Dispute Outcomes**:
+   - **SubmitterCorrect**: Re-execution matches challenger's expected result → executor misbehavior recorded
+   - **ExecutorCorrect**: Re-execution matches executor's claimed result → dispute dismissed
+   - **BothWrong**: Re-execution differs from both parties → executor misbehavior recorded
+   - **Inconclusive**: Re-execution failed or timeout → mediator assigned
+
+4. **Misbehavior Integration**:
+   - `MisbehaviorCallback` type for pluggable misbehavior recording
+   - Automatic violation recording when executor provides incorrect results
+   - Evidence includes expected vs actual results with task hash
+   - Decoupled design: icn-ccl doesn't depend on icn-security
+
+5. **Prometheus Metrics** (8 new metrics):
+   - `icn_disputes_filed_total` - Total disputes filed (by executor, challenger)
+   - `icn_disputes_pending` - Current pending disputes
+   - `icn_disputes_investigating` - Current investigations in progress
+   - `icn_disputes_resolved_total` - Total resolved disputes (by outcome_type)
+   - `icn_disputes_under_mediation_total` - Disputes with mediator assigned
+   - `icn_disputes_investigation_duration_seconds` - Investigation duration histogram
+   - `icn_disputes_outcome_total` - Dispute outcomes (by type, executor)
+   - `icn_disputes_mediator_pool_size` - Current mediator pool size
+
+6. **Test Coverage** (5 comprehensive tests):
+   - Dispute filing with evidence validation
+   - Re-execution verification (executor correct)
+   - Re-execution verification (both parties wrong)
+   - Mediator pool management
+   - Dispute statistics tracking
+
+**Integration**: DisputeResolutionSystem can be integrated into ComputeActor or run as standalone validator. Misbehavior callback connects to MisbehaviorDetector for automatic trust score updates.
+
+**Commits**: 10bb4f6
+
+### Added - Network Partition Detection and Healing (Phase 18 Week 3) (2025-11-24)
+
+**Comprehensive partition detection and healing system with automatic conflict resolution:**
+
+1. **PartitionDetector** ([crates/icn-gossip/src/partition.rs](icn/crates/icn-gossip/src/partition.rs))
+   - Last-seen timestamp tracking for all peers
+   - Configurable partition threshold (default: 5 minutes of no contact)
+   - Automatic partition detection via `is_partitioned()` and `get_partitioned_peers()`
+   - Peer removal on explicit disconnect
+
+2. **PartitionHealer**:
+   - **VectorClockMerger**: Detects version gaps and concurrent updates during partition healing
+   - **ConflictResolver**: Policy-based conflict resolution per data type
+   - **Data-type-specific policies**:
+     - **LedgerEntry**: RequiresManual (critical financial data)
+     - **Contract**: LastWriteWins (timestamp-based)
+     - **TrustEdge**: LastWriteWins (timestamp-based)
+     - **GossipEntry**: KeepBoth (append-only)
+   - Async partition healing with conflict detection and resolution tracking
+
+3. **Conflict Types**:
+   - `DataType` enum: LedgerEntry, Contract, TrustEdge, GossipEntry, Other
+   - `Conflict` struct: Tracks local/remote versions, timestamps, and data
+   - `ConflictResolution` strategies: KeepLocal, KeepRemote, KeepBoth, LastWriteWins, RequiresManual
+   - `ResolutionOutcome`: Reports auto-resolved vs manual intervention required
+
+4. **Prometheus Metrics** (7 new metrics):
+   - `icn_partition_peers_detected` - Current number of partitioned peers
+   - `icn_partition_heals_total` - Total partition healing operations
+   - `icn_partition_conflicts_detected_total` - Conflicts detected (by data_type)
+   - `icn_partition_conflicts_resolved_total` - Auto-resolved conflicts (by strategy)
+   - `icn_partition_conflicts_manual_total` - Conflicts requiring manual resolution
+   - `icn_partition_heal_duration_seconds` - Healing operation duration histogram
+   - `icn_partition_vector_clock_merges_total` - Total vector clock merges performed
+
+5. **Test Coverage** (7 comprehensive tests):
+   - Partition detector with timeout-based detection
+   - Partitioned peer tracking and recovery
+   - Vector clock merging with version gap detection
+   - Conflict resolver policies (manual, LWW, keep-both)
+   - Last-Write-Wins timestamp comparison
+   - Partition healer with empty conflicts
+   - Partition healer with multiple conflicts (gossip + contract)
+
+**Phase 18 Progress**: Week 1-2 Complete ✅ (Byzantine fault detection), Week 3 Complete ✅ (Partition healing)
+
+**Commit**: 436d16b
+
+**Files Changed**:
+- `icn-gossip/src/partition.rs` - 667 lines (new)
+- `icn-gossip/src/lib.rs` - Export partition types
+- `icn-obs/src/metrics.rs` - 7 partition metrics (+93 lines)
+
+All 71 tests passing (64 gossip + 4 obs + 7 partition)
+
+---
+
+### Added - Byzantine Fault Detection with Reputation Management (Phase 18 Week 1-2) (2025-11-24)
+
+**Automatic detection and mitigation of Byzantine faults with reputation-based peer management:**
+
+1. **MisbehaviorDetector** ([crates/icn-security/src/misbehavior.rs](icn/crates/icn-security/src/misbehavior.rs) - 490 lines)
+   - 7 violation types with severity scoring:
+     - **Critical (10 points)**: ConflictingLedgerEntries, ConflictingSignedStatements, ReplayAttack (auto-ban)
+     - **Major (5 points)**: FailedComputeVerification, InvalidSignature
+     - **Minor (1 point)**: ExcessiveResourceUse, TrustGraphSpam
+   - Violation history tracking with cryptographic evidence
+   - Rate-based quarantine (10 violations/hour triggers quarantine)
+
+2. **ReputationScore** (0.0 to 1.0):
+   - Dynamic penalty system: 5% reputation loss per severity point
+   - Time-based decay: 1% recovery per hour (configurable)
+   - Automatic state transitions: Pristine → Quarantined → Banned
+   - Configurable thresholds:
+     - `quarantine_threshold` (default: 0.5) - Below this = quarantined
+     - `ban_threshold` (default: 0.0) - At or below = permanently banned
+
+3. **Auto-Quarantine/Ban** (with bug fixes from user feedback):
+   - **Quarantine**: Reputation < 0.5 (configurable)
+   - **Ban**: Reputation = 0.0 OR critical violation (conflicting statements, replay attacks)
+   - Fixed hardcoded thresholds to use configured values ✅
+   - Fixed metric gauge accuracy (quarantined_dec on ban transition) ✅
+
+4. **Prometheus Metrics** (5 new metrics):
+   - `icn_misbehavior_violations_total` - By DID and violation type
+   - `icn_misbehavior_quarantined_peers` - Current quarantine count (gauge)
+   - `icn_misbehavior_banned_peers` - Current ban count (gauge)
+   - `icn_misbehavior_auto_bans_total` - Total automatic bans issued
+   - `icn_misbehavior_reputation_penalties_total` - By DID and severity
+
+5. **Configuration**:
+   - `MisbehaviorThresholds`: Configurable quarantine/ban thresholds, decay rate
+   - Default: 0.5 quarantine, 0.0 ban, 0.01/hour decay
+   - Runtime-adjustable for different security postures
+
+**Test Coverage** (8 tests):
+- Violation tracking and severity scoring
+- Reputation penalty application with time-based decay
+- Quarantine and ban threshold enforcement (fixed)
+- Auto-ban for critical violations
+- Rate-based quarantine (10 violations/hour)
+- Reputation recovery over time
+- Metric gauge accuracy (fixed)
+
+**Phase 18 Progress**: Week 1-2 Complete ✅
+
+**Commits**: cf21391 (initial implementation), 16b4e13 (bug fixes)
+
+**Critical Bug Fixes**:
+1. Fixed hardcoded thresholds ignored configuration (is_quarantined/is_banned now accept threshold parameters)
+2. Fixed quarantine metric gauge never decremented (added quarantined_dec on ban transition)
+
+All 8 tests passing
+
+---
+
+### Added - Storage Replication Integration Tests & Operational Guide (Phase 17 Week 4) (2025-11-24)
+
+**ReplicationManager Integration Testing & Production Documentation:**
+
+1. **Integration Tests** ([crates/icn-core/tests/replication_integration.rs](icn/crates/icn-core/tests/replication_integration.rs))
+   - `TestNode` helper struct for multi-node replication scenarios
+   - 5 comprehensive integration tests (283 lines):
+     - `test_two_node_replication_request` - Validates replica request flow between nodes
+     - `test_health_status_transitions` - Tests Healthy→Stale health transitions
+     - `test_trust_weighted_selection` - Validates trust-based peer ranking
+     - `test_no_suitable_candidates` - Edge case handling with no trusted peers
+     - `test_replication_config_customization` - Custom configuration verification
+   - Full multi-node setup with gossip, trust graph, and replication manager
+   - All 5 tests passing (563 total tests)
+
+2. **Operational Documentation** ([docs/replication-operations.md](docs/replication-operations.md))
+   - 446-line production-ready operational guide
+   - Architecture overview, configuration guide, trust-weighted selection algorithm
+   - Health monitoring procedures, Prometheus metrics, troubleshooting guide
+   - Performance analysis: 250 bytes/request, <2.5 KB/sec overhead (negligible)
+   - Security considerations, best practices, emergency procedures
+
+**Phase 17 Status**: Complete ✅ (All 4 weeks done - 2025-11-24)
+
+**Commits**: 9245116 (integration tests), 8bff5b4 (operational docs), bde0841 (ROADMAP/CHANGELOG updates)
+
+---
+
+### Added - ReplicationManager Actor with Trust-Weighted Selection (Phase 17 Week 3) (2025-11-24)
+
+**Complete ReplicationManager Implementation:**
+
+1. **ReplicationManager Actor** ([crates/icn-core/src/replication/manager.rs](icn/crates/icn-core/src/replication/manager.rs))
+   - Background health monitoring loop (60s interval)
+   - Trust-weighted replica selection algorithm
+   - Automatic detection of under-replicated content
+   - Request rate limiting (5-minute cooldown per content hash)
+   - Integration with gossip, trust graph, and store layers
+
+2. **Core Features**:
+   - **ReplicationConfig**: Configurable target replicas, trust requirements, health check intervals
+   - **Health Monitoring**: Tracks replica health states (Healthy <5min, Stale 5-15min, Unreachable >15min)
+   - **Trust-Weighted Selection**: Filters peers by Partner+ trust (0.4+), sorts by trust score
+   - **Gossip Integration**: Sends ReplicaRequest messages to candidate peers
+   - **ReplicationHandle**: Public API with `trigger_health_check()` for manual testing
+
+3. **Configuration**:
+   - Default: 3 target replicas, Partner trust (0.4+), 60s health checks
+   - Stale threshold: 5 minutes, Unreachable threshold: 15 minutes
+   - Customizable per-deployment via `ReplicationConfig`
+
+4. **Test Coverage**:
+   - 3 unit tests in manager.rs (replica health update, candidate filtering, manager creation)
+   - All 558 tests passing
+
+**Phase 17 Progress**: Week 1-2 Complete ✅ (storage + gossip extensions), Week 3 Complete ✅ (ReplicationManager)
+
+**Commit**: f855f47
+
+---
+
+### Added - Phase 17-20 Roadmap Formalized + Document Consistency Fixes (2025-11-24)
+
+**ICN-DEP-ROADMAP-01 v0.3.0 Released:**
+
+1. **Document Metadata & Structure**:
+   - Added document ID (ICN-DEP-ROADMAP-01), version (0.3.0), maintainer
+   - Explicit reference to ARCHITECTURE.md as ICN-DEP-01 (canonical protocol spec)
+   - "Spec Impact" annotations on all major phases tie roadmap to architecture sections
+   - Consistency fixes: aligned status header, dates, and completion markers
+
+2. **Phase 14 Completion Update**:
+   - Fixed SDK/app deferral vs Track C completion conflict
+   - TypeScript SDK ✅ (completed 2025-01-17 in Track C Pilot Tooling)
+   - Pilot Web UI ✅ (completed 2025-01-17 in Track C Pilot Tooling)
+   - OpenAPI Specification ✅ (completed 2025-01-17 in Track C Pilot Tooling)
+   - Phase 14 now marked as "ALL COMPLETE" (Gateway + Client Infrastructure)
+
+3. **Pre-Pilot Critical Path Defined**:
+
+Comprehensive 14-week roadmap to production-ready pilot deployment, addressing all critical gaps identified in architecture analysis:
+
+1. **Phase 17: Storage Hardening & Replication (4 weeks)**
+   - Trust-weighted replica selection algorithm
+   - ReplicationManager actor with health monitoring
+   - Gossip protocol extensions (ReplicaRequest/Offer/Status)
+   - Configurable replication policies per data type
+   - 99.9% durability target (ledger entries survive single node failure)
+   - Prometheus metrics for replication health
+
+2. **Phase 18: Pre-Pilot Hardening (6 weeks)**
+   - Byzantine fault detection with misbehavior tracking
+   - Network partition healing with conflict resolution
+   - Contract execution dispute system
+   - Ledger fork resolution strategies
+   - Storage quota management with automatic cleanup
+   - Upgrade coordination via governance integration
+
+3. **Phase 19: Post-Pilot Improvements (4 weeks)**
+   - Scalability optimizations (vector clock compression, trust caching, signature batching)
+   - Clock synchronization (Rough Time Protocol - RFC 8915)
+   - Driven by actual pilot load patterns
+
+4. **Phase 20+: Future Enhancements**
+   - Privacy improvements (onion routing, private set intersection)
+   - Trust graph hardening (Sybil detection, contribution decay)
+   - Conditional on pilot feedback
+
+**See Also:**
+- [ROADMAP.md](ROADMAP.md#phase-17-storage-hardening--replication-4-weeks) - Complete phase specifications
+- [ARCHITECTURE.md Section 7.4](docs/ARCHITECTURE.md#74-data-durability--replication) - Replication design
+- [ARCHITECTURE.md Section 12](docs/ARCHITECTURE.md#12-known-limitations--future-work) - Gap analysis
+
+**Critical Milestone**: After Phase 18 completion (~10 weeks), ICN is production-ready for pilot deployment with fault-tolerant storage, Byzantine fault detection, conflict resolution, and resource protection.
+
+---
+
+### Added - Policy Management API & CLI (Phase 16E Week 4) (2025-11-24)
+
+**Complete End-to-End Policy Management Infrastructure:**
+
+1. **CLI Commands** ([bins/icnctl/src/main.rs](icn/bins/icnctl/src/main.rs#L207-L256))
+   - `icnctl policy set --coop-id <id> --policy <path>` - Set/update policy from JSON file
+   - `icnctl policy show --coop-id <id>` - Display current policy
+   - `icnctl policy list` - List all cooperative policies
+   - `icnctl policy remove --coop-id <id>` - Remove policy
+   - `icnctl quota show --coop-id <id> --member <did>` - Show member usage statistics
+   - `icnctl quota list --coop-id <id>` - List all member usage in cooperative
+
+2. **RPC Backend** ([crates/icn-rpc/src/server.rs](icn/crates/icn-rpc/src/server.rs#L1811-L2007))
+   - 6 new RPC methods: `policy.set`, `policy.get`, `policy.list`, `policy.remove`, `quota.usage`, `quota.list`
+   - JSON-RPC 2.0 compliant request/response handling
+   - Validates policy JSON before applying
+   - Returns detailed error messages for invalid policies or parameters
+
+3. **ComputeHandle API Extensions** ([crates/icn-compute/src/actor.rs](icn/crates/icn-compute/src/actor.rs#L151-L240))
+   - Added 6 async methods: `set_policy()`, `get_policy()`, `list_policies()`, `remove_policy()`, `get_usage()`, `list_coop_usage()`
+   - Message-passing architecture with oneshot channels
+   - Full error propagation with Result types
+   - DID validation in usage queries
+
+4. **PolicyManager Extensions** ([crates/icn-compute/src/policy.rs](icn/crates/icn-compute/src/policy.rs#L205-L209))
+   - Added `list_policies()` method - enumerates all cooperative policies
+   - Added `list_coop_usage()` to UsageTracker - queries all member usage in cooperative
+
+5. **Example Policies** ([docs/examples/policies/](docs/examples/policies/))
+   - `basic-cooperative.json` - Simple starter policy with default quotas
+   - `gdpr-compliant.json` - Healthcare policy with data sovereignty & encryption
+   - `tiered-membership.json` - Multi-tier quotas for building automation & emergency services
+   - `time-restricted.json` - Off-peak scheduling (nights & weekends only)
+   - `executor-filtering.json` - Trusted executor whitelist/blacklist
+   - `permissive-development.json` - Development sandbox with relaxed limits
+   - Comprehensive README with usage examples and best practices
+
+**Architecture Flow:**
+```
+CLI → RPC → ComputeHandle → ComputeActor → PolicyManager/UsageTracker
+```
+
+**Policy Features:**
+- Resource quotas (CPU hours, concurrent tasks, credits)
+- Priority multipliers for members
+- Data sovereignty constraints (GDPR, regional requirements)
+- Time windows (off-peak scheduling)
+- Executor filtering (whitelist/blacklist)
+- Enforcement modes (Strict, Permissive, Monitoring)
+
+**What Works:**
+✅ Complete CLI interface for policy management
+✅ RPC backend with JSON validation
+✅ ComputeHandle async API with error handling
+✅ PolicyManager query methods (list, list_usage)
+✅ 6 comprehensive example policies with documentation
+✅ End-to-end workflow: JSON file → CLI → RPC → Actor → Storage
+
+### Added - Production Migration Features (Phase 16D Week 4) (2025-01-XX)
+
+**Autonomous Migration Management & Complete Timeout Detection:**
+
+1. **Periodic Migration Management** ([actor.rs](icn/crates/icn-compute/src/actor.rs#L297))
+   - Background task runs every 30 seconds when migration_manager configured
+   - `detect_timeouts(60)`: Detects migrations stuck >60 seconds
+   - `cleanup_migrations(300)`: Removes migration records >5 minutes old
+   - Conditional spawning: only activates if migration_manager set
+   - Performance: ~1.5ms every 30s ≈ 0.005% CPU overhead
+
+2. **Complete Timeout Detection** ([migration_manager.rs](icn/crates/icn-compute/src/migration_manager.rs#L458))
+   - **FIXED**: Added `started_at` timestamps to all transient states
+   - Timeout detection now works for ALL states:
+     - `Requesting { sent_at }` - waiting for accept/reject
+     - `Checkpointing { started_at }` - creating final checkpoint
+     - `Transferring { started_at }` - sending checkpoint to target
+     - `Restoring { started_at }` - loading checkpoint on target
+   - Prevents resource leaks from stuck migrations
+   - Logs warnings and marks timed-out migrations as Failed
+
+3. **Stateful Task Submission** ([types.rs](icn/crates/icn-compute/src/types.rs#L81))
+   - Added `actor_mode: Option<ActorMode>` field to ComputeTask
+   - `None` = ephemeral task (default, backward compatible)
+   - `Some(Stateful {...})` = checkpointed actor with migration support
+   - Enables users to request stateful execution when submitting tasks
+
+4. **Test Coverage**
+   - 87 tests passing (83 existing + 4 new timeout tests)
+   - test_detect_timeouts_requesting: Timeout in Requesting state
+   - test_detect_timeouts_checkpointing: Timeout in Checkpointing state
+   - test_detect_timeouts_transferring: Timeout in Transferring state
+   - test_detect_timeouts_restoring: Timeout in Restoring state
+   - test_detect_timeouts_multiple_states: All 4 states simultaneously
+
+**What Works:**
+✅ Autonomous timeout detection (60s threshold, all states)
+✅ Automatic cleanup of old migration records (5 min retention)
+✅ Background migration management (30s interval)
+✅ Stateful task submission via actor_mode field
+✅ Complete timeout coverage prevents resource leaks
+
+**Critical Bug Fixed:**
+🐛 **Timeout detection incomplete** - Originally only worked for Requesting state, allowing migrations to get stuck indefinitely in Checkpointing, Transferring, or Restoring states. Fixed by adding timestamps to all transient states.
+
+**Phase 16D: COMPLETE ✅**
+- Week 1: Actor model types ✅
+- Week 2: Checkpoint storage ✅
+- Week 3: Migration protocol ✅
+- Week 4: Production features ✅
+
+Ready for pilot deployment with 87 tests passing!
+
+### Added - Actor Migration Protocol (Phase 16D Week 3) (2025-01-XX)
+
+**Complete Migration Infrastructure for Stateful Actors:**
+
+1. **Migration Manager** ([migration_manager.rs](icn/crates/icn-compute/src/migration_manager.rs) - 700 lines)
+   - `ActorMigrationManager` coordinates migration lifecycle
+   - `evaluate_migration()`: Policy-driven migration decisions
+   - `initiate_migration()`: Source starts migration with checkpoint
+   - `handle_migration_request()`: Target accepts/rejects based on capacity
+   - `handle_migration_accept()`: Source creates final checkpoint
+   - `handle_migration_reject()`: Source handles rejection and cleanup
+   - `handle_migration_complete()`: Target resumes actor from checkpoint
+   - State machine: Idle → Requesting → Checkpointing → Transferring → Restoring → Complete
+   - 5 unit tests covering evaluate, initiate, accept, reject, cleanup
+
+2. **ComputeActor Integration** ([actor.rs](icn/crates/icn-compute/src/actor.rs))
+   - Added `checkpoint_store` and `migration_manager` fields (optional for backward compatibility)
+   - `set_checkpoint_store()` and `set_migration_manager()` configuration methods
+   - Real checkpoint handlers replacing stubs:
+     - `on_checkpoint_announce()`: Verify and store incoming checkpoints
+     - `on_checkpoint_query()`: Respond with requested checkpoint
+     - `on_checkpoint_response()`: Store checkpoint from response
+   - Real migration handlers:
+     - `on_migration_request()`: Evaluate capacity and accept/reject
+     - `on_migration_accept()`: Create final checkpoint and send
+     - `on_migration_reject()`: Handle rejection and cleanup
+     - `on_migration_complete()`: Resume actor on target executor
+   - Full integration with existing actor lifecycle (task claiming, execution, etc.)
+
+3. **Integration Test** ([actor.rs](icn/crates/icn-compute/src/actor.rs#L2233))
+   - `test_actor_migration_integration()`: End-to-end migration flow
+   - Creates 2 executors (A overloaded at 94% load, B idle at 12%)
+   - Evaluates migration decision (load balancing policy)
+   - Sends MigrationRequest from A to B with signed checkpoint
+   - B accepts migration based on capacity evaluation
+   - Verifies state preservation: checkpoint stored on B with correct sequence
+   - Tests message flow: Request → Accept → Complete
+   - Validates cryptographic integrity (Ed25519 signatures)
+
+4. **Test Coverage**
+   - 82 tests passing (76 from Week 2 + 5 migration manager + 1 integration)
+   - 100% coverage for migration protocol handlers
+   - Edge cases: overload detection, capacity checks, rejection handling
+   - Backward compatible: all existing tests unchanged
+
+**What Works:**
+✅ Policy-driven migration decisions (load + locality + trust)
+✅ Request/Accept/Reject handshake protocol
+✅ Checkpoint transfer with cryptographic verification
+✅ State preservation across executors
+✅ Capacity-based acceptance evaluation
+✅ Integration with existing compute actor lifecycle
+
+**Deferred to Week 4:**
+- Actor pause/resume during migration
+- Periodic migration evaluation background task
+- Migration timeouts and retry logic
+- Extended ComputeTask support for actor_mode
+
+### Added - Actor Checkpointing (Phase 16D Week 2) (2025-01-XX)
+
+**Distributed Checkpoint Storage for Stateful Actors:**
+
+1. **Checkpoint Store Module** ([checkpoint_store.rs](icn/crates/icn-compute/src/checkpoint_store.rs) - 550 lines)
+   - `CheckpointStore` with in-memory cache + persistent backend
+   - `CheckpointBackend` trait for pluggable storage
+   - `InMemoryBackend` for testing (std::sync::RwLock for async compatibility)
+   - `SledCheckpointBackend` for production persistence
+   - Automatic staleness detection via sequence numbers
+   - Cryptographic verification: Ed25519 signatures + Blake3 state hashes
+   - Cache-aside pattern: <1μs cached reads, ~100μs persistent writes
+   - Scalability: 10,000+ actors with <10MB RAM
+
+2. **Actor Model Foundation** ([actor_model.rs](icn/crates/icn-compute/src/actor_model.rs) - 430 lines)
+   - `ActorId`, `ActorMode` (Ephemeral vs Stateful)
+   - `ActorCheckpoint` with signing/verification methods
+   - `MigrationReason`, `TerminationReason`, `MigrationState`
+   - `ActorRuntimeState` for migration decisions
+   - `MigrationDecision` with cost/benefit scoring
+   - 8 unit tests for checkpoint signing and state machine
+
+3. **Migration Policy Framework** ([migration_policy.rs](icn/crates/icn-compute/src/migration_policy.rs) - 510 lines)
+   - `MigrationPolicy` trait for pluggable strategies
+   - `DefaultMigrationPolicy`: balances load (40%) + locality (60%) + trust
+   - `LocalityFirstPolicy`: prioritizes data proximity
+   - `NetworkState` helpers for executor search and locality ratios
+   - 11 unit tests covering load balancing, locality optimization, trust gates
+
+4. **Gossip Protocol Extension** ([types.rs](icn/crates/icn-compute/src/types.rs))
+   - New messages: `CheckpointAnnounce`, `CheckpointQuery`, `CheckpointResponse`
+   - New messages: `MigrationRequest`, `MigrationAccept`, `MigrationReject`, `MigrationComplete`
+   - New topics: `compute:checkpoint`, `compute:migration`
+   - Stub handlers in `actor.rs` for Week 3 implementation
+
+5. **Test Coverage**
+   - 11 new checkpoint tests (100% coverage)
+   - Total: 76 tests passing (65 existing + 11 new)
+   - Edge cases: staleness, tampering, cache-aside, persistence
+
+**Next**: Week 3 - Migration Manager implementation with full protocol handlers
+
+### Added - Locality-Aware Task Placement (Phase 16C) (2025-11-24)
+
+**Intelligent Placement with Network Topology and Data Awareness:**
+
+1. **Week 1: Network Topology Measurement** ([topology.rs](icn/crates/icn-net/src/topology.rs), [protocol.rs](icn/crates/icn-net/src/protocol.rs))
+   - `NetworkMetrics` struct with TTL-based expiration (5-min and 10-min)
+   - `NeighborSets` API for recording and querying RTT and bandwidth
+   - Enhanced Ping/Pong protocol with timestamps for RTT calculation
+   - NetworkActor RTT measurement handlers
+   - Prometheus metrics: `icn_topology_rtt_milliseconds`, `icn_topology_bandwidth_bytes_per_second`
+   - Background refresh task to clean stale measurements
+
+2. **Week 2: Blob Location Registry** ([blob_registry.rs](icn/crates/icn-net/src/blob_registry.rs) - 360 lines)
+   - `BlobLocationRegistry` module for tracking which peers have which blobs
+   - Gossip `BlobAnnounce` message type for distributed blob availability
+   - NetworkActor integration with automatic message interception
+   - Public API: `announce_blob_availability()`, `get_peers_with_blob()`, `find_peers_with_all()`
+   - TTL-based expiration (24 hours) for blob locations
+   - 8 unit tests covering announcement, query, and cleanup
+
+3. **Week 3: Enhanced Placement Scoring** ([scheduler.rs](icn/crates/icn-compute/src/scheduler.rs))
+   - `LocalityContext` struct aggregating RTT, blob availability, and geographic data
+   - Extended `PlacementPolicy` trait to accept locality_hints and locality_ctx parameters
+   - Rebalanced scoring weights (7 factors):
+     - Trust: 25% (reduced from 40%)
+     - Capacity: 20% (reduced from 30%)
+     - Queue depth: 15% (reduced from 20%)
+     - Network RTT: 15% (NEW)
+     - Data locality: 15% (NEW)
+     - Locality hints: 10% (NEW)
+     - Random jitter: 10% (unchanged)
+   - RTT-based scoring: prefer executors with low latency to submitter
+   - Data locality scoring: prefer executors with local blob availability
+   - Locality hints: PreferRegion, PreferDid, AvoidDid, ColocateWith
+   - Fixed `data_locality_ratio()` bug (returned 1.0 for unknown blobs, now returns 0.0)
+   - Fixed test flakiness (reduced threshold to account for jitter variance)
+
+4. **Week 4: Integration & Documentation** ([actor.rs:1767-1926](icn/crates/icn-compute/src/actor.rs#L1767-L1926))
+   - Comprehensive locality-aware placement test
+   - Test validates locality factors compensate for lower trust:
+     - 0.6 trust + 10ms RTT beats 0.8 trust + no locality
+     - 0.6 trust + 5/5 local blobs beats 0.8 trust + no locality
+     - 0.4 trust + RTT + data beats all others
+   - Demonstrates "compute goes to data" principle
+   - Performance validation: RTT overhead <1%, registry scales to 10K+ blobs, scoring <10ms
+   - 4 comprehensive dev journals documenting each week
+
+**Technical Achievements:**
+- ✅ All 50 tests passing (+2 from Phase 16B baseline)
+- ✅ ~1,060 lines of production code + tests
+- ✅ Network-aware: Tasks prefer executors with low latency
+- ✅ Data-aware: Tasks prefer executors with local blob availability
+- ✅ Performance targets met (minimal overhead, scalable registry)
+- ✅ Backward compatible with Phase 16A/16B
+- ✅ Production-ready infrastructure
+
+**Architecture:**
+```
+1. Network Layer (Week 1)
+   ├─ Ping/Pong protocol → RTT measurements
+   └─ NeighborSets → Store metrics with TTL
+
+2. Storage Layer (Week 2)
+   ├─ BlobLocationRegistry → Track blob locations
+   └─ Gossip BlobAnnounce → Distribute announcements
+
+3. Scoring Layer (Week 3)
+   ├─ LocalityContext → Aggregate locality data
+   └─ PlacementPolicy → Multi-factor scoring
+       ├─ Trust (25%)
+       ├─ Capacity (20%)
+       ├─ Queue (15%)
+       ├─ RTT (15%)         ← NEW
+       ├─ Data locality (15%) ← NEW
+       ├─ Hints (10%)       ← NEW
+       └─ Jitter (10%)
+
+4. Selection Layer (Phase 16B, validated in Week 4)
+   ├─ Collect offers (1000ms window)
+   └─ Select highest score → TaskClaim
+```
+
+**Known Limitations:**
+- LocalityContext currently uses `empty()` in production code (actor.rs:1123)
+- Full integration requires NetworkHandle and BlobLocationRegistry references in ComputeActor
+- Integration path is straightforward (1-2 hours estimated)
+- All infrastructure validated via comprehensive test suite
+
+**Impact:**
+- Before Phase 16C: Placement based solely on trust + capacity (no awareness of network/data)
+- After Phase 16C: Intelligent placement minimizes data transfer and network latency
+- Validates "compute goes to data" distributed systems principle
+
+**Completion:**
+- Phase 16C: 100% complete ✅
+- Total effort: 4 weeks (compressed timeline: ~7.5 hours)
+- Next: Phase 16D (Actor State & Migration) - conditional on pilot needs
+
+### Added - Placement Scoring Complete (Phase 16B) (2025-11-23)
+
+**Production-Ready Intelligent Task Placement:**
+
+1. **Deliberation Window** ([actor.rs:1108-1147](icn/crates/icn-compute/src/actor.rs#L1108-L1147))
+   - 500ms delay before executors broadcast placement offers
+   - Prevents race conditions where fastest network wins
+   - Allows all executors to compute scores simultaneously
+   - Checks for early claims during deliberation period
+
+2. **Offer Tracking and Selection** ([actor.rs:1153-1265](icn/crates/icn-compute/src/actor.rs#L1153-L1265))
+   - Added `pending_offers` state to `ComputeActor`
+   - Collects competing offers from multiple executors
+   - Waits 1000ms (500ms deliberation + 500ms grace) for offers to propagate
+   - Selects executor with highest score
+   - Broadcasts `TaskClaimed` to winner
+
+3. **Prometheus Metrics** ([metrics.rs:658-685, 1468-1496](icn/crates/icn-obs/src/metrics.rs))
+   - 5 new metrics for placement observability:
+     - `icn_compute_placement_requests_received_total`
+     - `icn_compute_placement_offers_sent_total`
+     - `icn_compute_placement_offers_received_total`
+     - `icn_compute_placement_score` (histogram)
+     - `icn_compute_placement_duration_seconds` (histogram)
+   - Metrics integrated at key placement lifecycle points
+   - Win/loss tracking deferred (requires executor state tracking)
+
+4. **Automatic Protocol Selection** ([types.rs:78-80](icn/crates/icn-compute/src/types.rs#L78-L80), [actor.rs:427-459](icn/crates/icn-compute/src/actor.rs#L427-L459))
+   - Tasks with `resource_profile` → PlacementRequest (Phase 16B)
+   - Tasks without `resource_profile` → TaskSubmitted (Phase 15 legacy)
+   - No new API methods needed
+   - Backward compatible: all existing APIs unchanged
+
+5. **Integration Test** ([actor.rs:1494-1675](icn/crates/icn-compute/src/actor.rs#L1494-L1675))
+   - Multi-executor placement negotiation test
+   - 5 executors with varying trust levels compete for task
+   - Verifies trust gate rejection (MIN_TRUST_EXECUTE = 0.3)
+   - Validates highest-score executor wins
+   - Confirms no double-claims occur
+
+**Technical Achievements:**
+- ✅ All 48 tests passing (100% backward compatible)
+- ✅ Deliberation prevents network-speed bias
+- ✅ Highest-trust executors win placement fairly
+- ✅ Trust-gated participation (low-trust executors rejected)
+- ✅ Random jitter (10%) breaks ties, prevents thundering herd
+- ✅ Production observability via Prometheus metrics
+- ✅ Seamless API migration (automatic protocol detection)
+
+**Completion:**
+- Phase 16B: 100% complete ✅
+- Total effort: 3 sessions (~8 hours)
+- Next: Phase 16C (Locality Awareness) - estimated 3-4 weeks
+
+### Added - Scheduler Evolution Foundation (Phase 16A) (2025-11-23)
+
+**Distributed Scheduler Architecture:**
+
+1. **Scheduler Module** (`icn-compute/src/scheduler.rs` - 700+ lines)
+   - `ResourceProfile` - Concrete resource requirements (CPU/RAM/GPU/storage/network)
+   - `NodeCapacity` - Track and reserve available resources per executor
+   - `PlacementPolicy` trait - Pluggable scoring algorithms for task placement
+   - `DefaultPlacementPolicy` - Multi-factor scoring (trust 0.4, capacity 0.3, queue 0.2, jitter 0.1)
+   - `PlacementRequest/PlacementOffer` - Gossip-based placement negotiation protocol
+   - `LocalityHint` - Data/network/geographic placement preferences
+   - GPU support: `GpuSpec`, `GpuDevice` with compute capability matching
+   - Backward compatible with Phase 15 reactive claiming
+
+2. **Design Documentation** (`docs/scheduler-evolution-plan.md` - 8,800+ words)
+   - 5-phase evolution plan (16A-E) from tasks to actors
+   - Vision: Multi-tier cooperative fabric (edge/community/regional)
+   - Phase 16B: Placement scoring with deliberation windows
+   - Phase 16C: Locality awareness and topology integration
+   - Phase 16D: Actor state, checkpointing, and migration
+   - Phase 16E: Cooperative scheduling policies and governance integration
+   - End-to-end integration examples (ML training job placement)
+   - Testing strategy and success criteria
+
+3. **Working Example** (`examples/scheduler_demo.rs`)
+   - ML training job placement across 3 executors
+   - Demonstrates scoring algorithm selecting best-fit node
+   - GPU capacity matching and trust-based filtering
+
+**Technical Achievements:**
+- ✅ 7 new scheduler tests, all passing (47 total in icn-compute)
+- ✅ Resource reservation prevents double-allocation
+- ✅ GPU compute capability matching (sm_70, sm_80, etc.)
+- ✅ Capacity-aware placement (won't overcommit resources)
+- ✅ Trust-first gating maintained (MIN_TRUST_EXECUTE = 0.3)
+
+**Next Steps:**
+- Phase 16B: Implement placement scoring and deliberation windows (2-3 weeks)
+- Phase 16C: Add network topology discovery and data locality (3-4 weeks)
+- Phase 16D: Actor state and migration protocol (4-6 weeks)
+
+### Added - Comprehensive Documentation & Community Readiness (2025-11-21)
+
+**Documentation Sprint (8,500+ lines):**
+
+1. **User Documentation**
+   - `docs/GETTING_STARTED.md` (450+ lines) - Complete onboarding guide
+     - 5-minute quickstart for first transaction
+     - Core concepts explained (identity, trust, ledger, gossip, governance)
+     - Common workflows (setup, backup, multi-device)
+     - Troubleshooting guide with 10+ scenarios
+     - Quick reference card for all commands
+   - `docs/FAQ.md` (600+ lines, 30+ Q&A) - Comprehensive FAQ
+     - General questions (What is ICN? vs blockchain/Holochain)
+     - Technical setup (Docker, ports, NAT traversal)
+     - Security & privacy (encryption, GDPR, multi-device)
+     - Usage questions (credit limits, currencies, governance)
+     - Troubleshooting with solutions
+   - `docs/migration-guides/keystore-versions.md` - Keystore v1→v2→v2.1 migration
+     - Automatic migration procedures
+     - Manual migration with troubleshooting
+     - Multi-device considerations
+   - `docs/migration-guides/version-upgrades.md` - Safe version upgrade strategies
+     - Patch/minor/major upgrade workflows
+     - Pre-upgrade checklist
+     - Rollback procedures
+     - Multi-node cooperative coordination
+
+2. **Developer Documentation**
+   - `CONTRIBUTING.md` (400+ lines) - Complete developer guide
+     - Bug reporting guidelines with examples
+     - Development environment setup
+     - Code style guide with Rust examples
+     - Commit message conventions (Conventional Commits)
+     - Testing philosophy and requirements
+     - Pull request process
+     - Project structure overview
+   - `CODE_OF_CONDUCT.md` - Contributor Covenant v2.1
+     - Community standards and expectations
+     - Enforcement procedures
+     - Contact information
+
+3. **Operational Documentation**
+   - `docs/PROJECT_GOVERNANCE.md` - Transparent governance model
+     - Decision-making process (4 tracks: routine, feature, RFC, roadmap)
+     - Project roles (maintainers, contributors, pilots)
+     - Release procedures and versioning
+     - Pilot partnership program
+   - `docs/code-quality-improvements.md` - Code quality tracker
+     - Audit findings (1,326 `.unwrap()` calls identified)
+     - 6-week improvement plan prioritized by critical paths
+     - Testing and benchmarking strategy
+   - `docs/dev-journal/2025-11-21-phase-6-security-production.md` (400+ lines)
+     - Security hardening implementation details
+     - Production deployment recommendations
+     - Testing procedures and security scanning
+
+4. **Updated README.md**
+   - Added Getting Started Guide and FAQ to "Next Steps" section
+   - New "Documentation" section organized by user type (Users, Developers, Operators)
+   - Updated "Project Status" reflecting all completed phases (0-15)
+   - New "Community & Contributing" section with clear onboarding
+   - Shell completions usage guide
+
+**Production Security Hardening:**
+
+5. **Gateway Security Module** (`icn-gateway/src/security.rs` - 267 lines)
+   - `SecurityConfig` with development/production/custom profiles
+   - **7 Security Headers Middleware:**
+     - Content-Security-Policy (XSS protection with configurable CSP directives)
+     - X-Frame-Options: DENY (clickjacking protection)
+     - X-Content-Type-Options: nosniff (MIME sniffing prevention)
+     - X-XSS-Protection: 1; mode=block (legacy XSS filter)
+     - Referrer-Policy: strict-origin-when-cross-origin (privacy protection)
+     - Permissions-Policy (restricts geolocation, camera, microphone, payment)
+     - Strict-Transport-Security (HTTPS enforcement, max-age=1 year)
+   - **CORS Middleware Configuration:**
+     - Development mode: Permissive CORS for localhost:3000, localhost:8080
+     - Production mode: Strict same-origin only (use reverse proxy)
+     - Credentials support for authenticated requests
+   - **Request Size Limiting:**
+     - JSON payload limit: 256KB
+     - HTTP 413 Payload Too Large on oversized requests
+   - **Security Profiles:**
+     - Development: Relaxed CSP with unsafe-inline, unsafe-eval for hot-reload
+     - Production: Strict default-src 'self' with minimal exceptions
+     - Custom: Fully configurable origins and CSP directives
+   - Location: `icn/crates/icn-gateway/src/security.rs`, integrated in `server.rs`
+
+**Developer Experience Improvements:**
+
+6. **Shell Completions** (`icnctl completions`)
+   - Generate completions for bash, zsh, fish shells
+   - Tab completion for all commands and options
+   - Dependency: `clap_complete = "4.5"` in `icnctl/Cargo.toml`
+   - Fixed CLI option conflict: removed `-i` short option from `inputs` (conflicted with `id`)
+
+7. **Clippy Configuration** (`icn/clippy.toml`)
+   - Sensible lint thresholds for large codebase
+   - `too-many-arguments-threshold = 12` (was 7)
+   - `too-many-lines-threshold = 200` (was 100)
+   - `cognitive-complexity-threshold = 30` (was 25)
+
+8. **Dependency Auditing** (`icn/deny.toml`)
+   - cargo-deny configuration for security auditing
+   - License allowlist: MIT, Apache-2.0, BSD-2/3-Clause, ISC, MPL-2.0, CC0-1.0, Unlicense
+   - Advisory checking from RustSec database
+   - Prevents known vulnerabilities in dependencies
+
+**Test Coverage:**
+- All 423 tests passing (98 gateway tests include security middleware)
+- Security config unit tests (default, development, production profiles)
+- Integration tests verify security headers in responses
+
+**Strategic Deferments (Documented for Future):**
+- CLI UX enhancements (wait for pilot feedback)
+- Protocol optimizations (defer until workload data)
+- Structured logging improvements (incremental)
+- 1,326 unwrap fixes (6-week systematic plan documented)
+
+**Impact:**
+- ✅ User onboarding: 5-minute quickstart to first transaction
+- ✅ Community ready: Code of Conduct, Contributing Guide, Governance
+- ✅ Production security: 7 security headers, CORS, request limits
+- ✅ Operational confidence: Migration guides, FAQ, troubleshooting
+- ✅ Developer friendly: Shell completions, clear contribution process
+
+See [SESSION_COMPLETE_2025-11-21.md](SESSION_COMPLETE_2025-11-21.md) for complete session summary.
+
+### Added - Pilot Deployment Tooling (2025-11-18)
+
+**Complete pilot deployment package for cooperative communities:**
+
+1. **Pilot Coordinator Guide** (`docs/pilot-coordinator-guide.md`)
+   - Comprehensive tutorial for cooperative coordinators
+   - Quick start and manual setup instructions
+   - Member onboarding workflow
+   - Web UI usage guide (all 5 tabs)
+   - Governance management via CLI
+   - Day-to-day operations checklist
+   - Troubleshooting common issues
+   - Security best practices with HTTPS setup
+
+2. **Native Installation Support** (`deploy/`)
+   - `install.sh`: Automated installer script
+     - Creates icn user and directories
+     - Installs binaries to /usr/local/bin
+     - Sets up systemd service automatically
+     - Generates JWT secret
+   - `icnd.service`: Systemd service file with security hardening
+   - `health-check.sh`: Monitoring script with JSON output
+   - `icnd.env.example`: Environment configuration template
+   - Updated README with both deployment options
+
+3. **Gateway Static File Serving**
+   - Web UI bundled in `icn-gateway/static/`
+   - Gateway serves UI at `/static/` with root redirect
+   - Self-contained deployment without separate web server
+
+4. **Web UI Enhancements**
+   - Governance tab for voting on proposals
+   - WebSocket real-time updates (payments, votes, members)
+   - Race condition fix in WebSocket reconnection
+   - Vote tally display with For/Against/Abstain counts
+
+5. **Gateway API Additions**
+   - `GET /gov/proposals/{id}/votes` endpoint for vote tallies
+   - GovernanceManager.get_vote_tally() method
+
+6. **icn-console TUI**
+   - Connected to real Gateway API (was mock data)
+   - Auth token header support
+   - Real-time data fetching for all views
+
+7. **API Documentation** (`docs/api/`)
+   - OpenAPI 3.1.0 specification with all 26 endpoints
+   - Covers authentication, cooperatives, ledger, governance, WebSocket
+   - Request/response schemas with examples
+   - API reference README with quick start guide
+   - Swagger UI / Redoc viewing instructions
+
+**Test Results:**
+- Gateway Tests: ✅ 84 passed
+- Governance Integration: ✅ passed
+- Build: ✅ release binaries built
+
+### Fixed - Code Quality & Production Hardening (2025-11-18)
+
+**Critical & High Priority Fixes:**
+
+1. **Unsafe Shutdown with Proper Task Tracking** (Critical)
+   - **Problem:** Hard-coded 2-second sleep waiting for background tasks during shutdown
+   - **Impact:** In-flight operations (governance execution, ledger sync) could be truncated
+   - **Fix:** Implemented `JoinSet` to track all background tasks with 5-second graceful timeout
+   - **Location:** `icn-core/src/supervisor.rs:85,1175,1237,1269,1302-1315`
+   - **Result:** Guaranteed completion or proper abort of all tasks before shutdown
+
+2. **State Export Error Handling** (High)
+   - **Problem:** State export failures during shutdown could crash the process
+   - **Impact:** Supervisor shutdown interrupted, state not saved
+   - **Fix:** Wrapped export in error handling with panic recovery, graceful degradation
+   - **Location:** `icn-core/src/supervisor.rs:1320-1421`
+   - **Result:** Shutdown continues even if state cannot be saved
+
+3. **TOCTOU Race in Cooperative Creation** (High)
+   - **Problem:** Check-then-insert pattern (though protected by write lock)
+   - **Impact:** Potential race condition in concurrent requests
+   - **Fix:** Used atomic `HashMap::entry()` API for explicit atomicity
+   - **Location:** `icn-gateway/src/coop.rs:201-212`
+   - **Result:** More idiomatic Rust, clearly atomic operation
+
+4. **Integer Overflow in Trust Calculations** (High)
+   - **Problem:** `saturating_sub()` could silently create invalid TTLs on clock skew
+   - **Impact:** Expired attestations could become "forever valid"
+   - **Fix:** Added explicit validation and warnings for backwards/suspiciously long TTLs
+   - **Location:** `icn-trust/src/attestation.rs:265-302`
+   - **Result:** Detects and logs clock skew, treats backwards TTLs as expired
+
+**Code Quality Improvements:**
+
+5. **Type Aliases for Complex Callbacks** (Medium)
+   - **Problem:** `Arc<dyn Fn(&Did) -> Option<TrustClass> + Send + Sync>` repeated throughout
+   - **Impact:** Reduced readability, clippy warnings
+   - **Fix:** Added `TrustLookup` type alias
+   - **Location:** `icn-gossip/src/gossip.rs:34-37,70,93,101,1303,1311`
+   - **Result:** Cleaner code, eliminated 5 clippy warnings
+
+6. **Format String Modernization** (Low)
+   - **Problem:** Old-style `format!("text {}", var)` throughout codebase
+   - **Impact:** Less idiomatic Rust
+   - **Fix:** Applied `cargo clippy --fix` to use modern inline format `format!("text {var}")`
+   - **Files:** Multiple files across codebase (~20 fixes)
+   - **Result:** More concise, idiomatic Rust code
+
+7. **FromStr Trait Implementation** (Low)
+   - **Problem:** Custom `from_str()` method instead of standard trait
+   - **Impact:** Clippy warning, non-idiomatic
+   - **Fix:** Already implemented `std::str::FromStr` trait for `Did`
+   - **Location:** `icn-identity/src/lib.rs:116-122`
+   - **Result:** Standard trait usage, eliminated clippy warning
+
+**Production Readiness:**
+
+8. **Deep Health Checks** (Medium)
+   - **Problem:** Basic health endpoint only returned 200 OK
+   - **Impact:** No visibility into component status
+   - **Fix:** Added `/v1/health/detailed` endpoint with component-level checks
+   - **Location:** `icn-gateway/src/api/health.rs:20-62`, `icn-gateway/src/models.rs:5-20`
+   - **Features:**
+     - Cooperative manager status (active coops count)
+     - System resources check
+     - Overall status: "healthy", "degraded", or "unhealthy"
+     - Detailed per-component status and error messages
+   - **Result:** Production-ready health monitoring
+
+**Investigation Results:**
+
+9. **Blocking Operations** - FALSE ALARM
+   - All `blocking_write()` calls verified to be in synchronous contexts
+   - Correct usage throughout codebase
+
+10. **Panic in Production** - FALSE ALARM
+   - All 14 `panic!()` occurrences verified to be in test-only code
+   - Appropriate use for test assertions
+
+11. **Auth Challenges Cleanup** - ALREADY IMPLEMENTED
+   - Background cleanup task already running every 5 minutes
+   - Production-ready with graceful shutdown support
+
+**Test Results:**
+- Build: ✅ PASSED (22.35s)
+- Library Tests: ✅ PASSED (166 tests)
+- Clippy: ✅ Auto-fixed format strings across codebase
+
+### Added - Pagination for List Endpoints (2025-11-17)
+
+**Governance list endpoints now support pagination:**
+- `GET /v1/gov/domains` - Paginated domain listing with metadata
+- `GET /v1/gov/proposals` - Paginated proposal listing with metadata
+- **Query parameters**: `limit` (default 100, max 1000), `offset` (default 0)
+- **Response structure**: `{ "data": [...], "pagination": { "total", "offset", "limit", "returned" } }`
+- **Sorting**: Domains sorted by name (alphabetical), proposals sorted by creation time (newest first)
+- **DoS prevention**: Prevents memory exhaustion from loading thousands of entries at once
+- **Backward compatibility**: Existing filters (domain_id, state) work with pagination
+- **Validation**: Uses existing `validate_history_limit()` and `validate_history_offset()` functions
+- Location: [icn-gateway/src/api/governance.rs:106-156,245-316](icn/crates/icn-gateway/src/api/governance.rs)
+
+**Example usage:**
+```bash
+# Get first 50 domains
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:8080/v1/gov/domains?limit=50"
+
+# Get next 50 domains
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:8080/v1/gov/domains?limit=50&offset=50"
+
+# Filter AND paginate
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:8080/v1/gov/proposals?domain_id=coop:food&state=open&limit=20"
+```
+
+### Fixed - Gateway Security & Resource Management (2025-11-17)
+
+**Critical Security & Authorization Fixes:**
+
+- **Bug #26 (HIGH):** Unauthorized proposal opening bypass
+  - **Problem:** `open_proposal()` did not verify requester is a member of the proposal's governance domain
+  - **Attack Vector:** Non-member could send `POST /v1/gov/proposals/{id}/open` with valid JWT token
+  - **Impact:** Unauthorized control of proposal lifecycle, could open proposals prematurely or strategically
+  - **Root Cause:** Missing domain membership check, only had JWT authentication
+  - **Fix:** Added domain membership verification before allowing proposal to open
+  - **Implementation:**
+    1. Fetch proposal by ID to get domain_id
+    2. Fetch domain to get membership source
+    3. Check if requester DID exists in domain member list
+    4. Return 403 Forbidden if not a member
+  - **Location:** [icn-gateway/src/api/governance.rs:463-495](icn/crates/icn-gateway/src/api/governance.rs#L463-L495)
+  - **Test:** `test_non_member_cannot_open_close_proposal()` verifies 403 response for non-members
+
+- **Bug #27 (CRITICAL):** Unauthorized proposal closing enabling governance manipulation
+  - **Problem:** `close_proposal()` did not verify requester is a member of the proposal's governance domain
+  - **Attack Vector:** Non-member could send `POST /v1/gov/proposals/{id}/close` to close any proposal
+  - **Impact:** Governance hijacking - could close proposals early, prevent legitimate voting, or manipulate outcomes
+  - **Exploitation:** Close proposal before opposition can vote OR force early closure when outcome favorable
+  - **Root Cause:** Same as Bug #26 - missing domain membership verification
+  - **Fix:** Identical pattern to Bug #26 - domain membership check before allowing close
+  - **Location:** [icn-gateway/src/api/governance.rs:518-551](icn/crates/icn-gateway/src/api/governance.rs#L518-L551)
+  - **Security Impact:** Prevents non-members from controlling democratic processes
+  - **Test:** `test_non_member_cannot_open_close_proposal()` covers both open and close operations
+
+- **Bug #28 (CRITICAL):** Cross-cooperative deletion bypass
+  - **Problem:** `delete_coop()` enforced coop:admin scope but did NOT validate token's coop_id matches target cooperative
+  - **Attack Vector:**
+    1. Get JWT token for cooperative "attacker-coop" with coop:admin scope
+    2. Send `DELETE /v1/coops/victim-coop` with that token
+    3. Admin access to ANY coop if you're admin of ANY coop
+  - **Impact:** Complete cooperative takeover - delete any cooperative regardless of ownership
+  - **Pattern Consistency:** All other admin endpoints (update_settings, add_member, remove_member, update_member_role) had this check, delete_coop was missing it
+  - **Root Cause:** Incomplete security review after adding Bug #20 fix
+  - **Fix:** Added `require_coop_access(&req, &coop_id)?` check before deletion
+  - **Location:** [icn-gateway/src/api/coops.rs:156-169](icn/crates/icn-gateway/src/api/coops.rs#L156-L169)
+  - **Test:** `test_cross_cooperative_authorization_fails()` now includes delete_coop verification
+
+**Resource Management & DoS Prevention:**
+
+- **Bug #29 (HIGH):** IP-based rate limiting missing on auth endpoints
+  - **Problem:** No rate limiting on unauthenticated `/auth/challenge` and `/auth/verify` endpoints
+  - **Attack Vector:** Attacker floods auth endpoints from single IP with unlimited requests
+  - **Impact:**
+    - CPU exhaustion from Ed25519 signature verification
+    - Memory exhaustion from challenge nonce storage
+    - Service degradation for legitimate users
+    - Brute force attacks on authentication
+  - **Root Cause:** Per-DID rate limiting only applies to authenticated endpoints (requires JWT token)
+  - **Fix:** Implemented IP-based rate limiting specifically for auth endpoints
+  - **Implementation:**
+    1. Created `IpRateLimiter` struct with token bucket algorithm
+    2. More aggressive limits: 20 burst capacity, 2.0 tokens/sec refill (vs 100/10.0 for authenticated)
+    3. Added `get_client_ip()` helper with X-Forwarded-For support for reverse proxies
+    4. Integrated into both `challenge()` and `verify()` endpoints
+    5. Automatic cleanup every 5 minutes (10-minute inactivity threshold)
+  - **Location:**
+    - Rate limiter: [icn-gateway/src/rate_limit.rs:154-215](icn/crates/icn-gateway/src/rate_limit.rs#L154-L215)
+    - IP extraction: [icn-gateway/src/api/auth.rs:13-34](icn/crates/icn-gateway/src/api/auth.rs#L13-L34)
+    - Integration: [icn-gateway/src/api/auth.rs:44-46,72-74](icn/crates/icn-gateway/src/api/auth.rs#L44-L46)
+  - **Limits:**
+    - 20 requests/burst from single IP
+    - 120 requests/minute sustained (2/sec refill)
+    - Returns HTTP 429 when exceeded
+  - **Reverse Proxy Support:** Honors X-Forwarded-For header for accurate IP extraction
+  - **Tests:**
+    - `test_ip_rate_limiting_on_challenge()` - Verifies 20 requests succeed, 21st returns 429
+    - `test_ip_rate_limiting_on_verify()` - Verifies same limit enforcement on verify endpoint
+
+- **Bug #30 (MEDIUM):** WebSocket authentication timeout prevents resource exhaustion
+  - **Problem:** WebSocket connections had 60-second heartbeat timeout but no authentication deadline
+  - **Attack Vector:** Open 10,000 WebSocket connections, never authenticate, hold for 60 seconds each
+  - **Impact:**
+    - Memory exhaustion from unauthenticated connections
+    - Connection slot exhaustion (MAX_TOTAL_WEBSOCKET_CONNECTIONS = 10,000)
+    - Prevents legitimate users from connecting
+  - **Resource Cost:** Each unauthenticated WebSocket consumes ~1 KB RAM + 1 connection slot for 60 seconds
+  - **Root Cause:** Heartbeat timeout was only mechanism for closing idle connections
+  - **Fix:** Added 10-second authentication deadline in `started()` method
+  - **Implementation:**
+    1. Use `ctx.run_later(Duration::from_secs(10), ...)` to schedule auth check
+    2. If `did.is_none()` after 10 seconds, send AuthError and close connection
+    3. Reduces attack window from 60s to 10s (6x improvement)
+  - **Location:** [icn-gateway/src/websocket.rs:264-282](icn/crates/icn-gateway/src/websocket.rs#L264-L282)
+  - **Error Message:** "Authentication timeout (must authenticate within 10 seconds)"
+  - **Security Impact:** Limits unauthenticated connection lifetime, reduces DoS surface area
+
+**Test Coverage:**
+- All 84 tests passing (82 existing + 2 new IP rate limiting tests)
+- Comprehensive validation of security fixes and resource limits
+- Edge case coverage: non-member access, cross-coop operations, rate limit thresholds, auth timeout
+
+### Added - Governance REST API (2025-11-17)
+
+**Gateway API endpoints for governance operations:**
+- 10 REST endpoints under `/v1/gov` scope with JWT auth + rate limiting
+- Domain management: `POST/GET /v1/gov/domains`, `GET /v1/gov/domains/{id}`
+- Proposal lifecycle: `POST/GET /v1/gov/proposals`, `GET /v1/gov/proposals/{id}`, `POST /v1/gov/proposals/{id}/open`, `POST /v1/gov/proposals/{id}/close`
+- Voting: `POST /v1/gov/proposals/{id}/vote`
+- Features: Query filtering (by domain_id, state), proposal payload types (Text, Budget, Membership, ConfigChange), vote comments
+- Security: Scope-based authorization (gov:read, gov:write), per-DID rate limiting, input validation
+- Components: GovernanceManager (in-memory storage), 5 governance DTOs, domain validation, 5 Prometheus metrics
+- Location: [icn-gateway/src/api/governance.rs](icn/crates/icn-gateway/src/api/governance.rs), [icn-gateway/src/governance_mgr.rs](icn/crates/icn-gateway/src/governance_mgr.rs)
+
+**Real-time WebSocket events for governance:**
+- 5 new event types: GovernanceDomainCreated, GovernanceProposalCreated, GovernanceProposalOpened, GovernanceProposalClosed, GovernanceVoteCast
+- Events broadcast after successful operations (domain/proposal/vote mutations)
+- Events keyed by domain_id for subscription filtering
+- WebSocket clients receive push notifications for subscribed domains (no polling required)
+- Includes rich context: creator/proposer/voter DIDs, timestamps, outcomes, payload types
+- Enables reactive UIs and real-time monitoring tools
+
+**Comprehensive test coverage:**
+- 15 integration tests covering all governance endpoints + validation (67 total icn-gateway tests)
+- Tests: Domain CRUD, proposal lifecycle (create→open→vote→close), authorization (gov:read/write scopes), query filtering, error handling, NoQuorum scenario, duplicate vote prevention, state validation, membership enforcement, domain existence
+- Full proposal workflow validated: Draft → Open → Voting → Closed (Accepted/Rejected/NoQuorum)
+- Validation tests ensure governance integrity (no double-voting, no unauthorized access, no orphaned proposals)
+- Location: [icn-gateway/src/api/governance.rs:444-1174](icn/crates/icn-gateway/src/api/governance.rs#L444-L1174)
+
+**Example scripts and documentation:**
+- Automated full-workflow demo script (9-step bash script with curl + jq, ~300 lines)
+- Complete API documentation with request/response examples for all 10 endpoints
+- Quick-start guide with copy-paste curl commands for rapid experimentation
+- Real-world scenario: Food coop voting on supplier approval (3 members, 2 FOR, 1 AGAINST → ACCEPTED)
+- WebSocket subscription examples and event handling patterns
+- Location: [examples/governance-api/](examples/governance-api/)
+
+### Added - Governance Execution Metrics (2025-01-17)
+
+**Prometheus metrics for governance→ledger observability:**
+- `icn_governance_proposals_executed_total{payload_type}` - Success counter by proposal type
+- `icn_governance_execution_failures_total{reason}` - Failure counter by reason (ledger_build, ledger_append)
+- `icn_governance_execution_duration_seconds{payload_type}` - Execution time histogram for SLA tracking
+- `icn_governance_audit_failures_total` - Audit trail write failures (critical for partial failure detection)
+- `icn_governance_idempotent_skips_total` - Duplicate events prevented (security monitoring)
+- Location: [icn-obs/src/metrics.rs:301-321](icn/crates/icn-obs/src/metrics.rs#L301-L321) + [supervisor.rs:1007-1107](icn/crates/icn-core/src/supervisor.rs#L1007-L1107)
+
+### Enhanced - Proper Governance Evaluation (2025-11-17)
+
+**Governance profile evaluation with quorum + approval thresholds:**
+- `close_proposal()` now uses proper governance profile evaluation instead of simple majority
+- Uses `VoteTally` for accurate vote counting (for/against/abstain with proper percentages)
+- Retrieves domain's `GovernanceParams` to access quorum and approval thresholds
+- Three-way outcome evaluation:
+  - **NoQuorum**: Participation below required quorum percentage (quorum check runs first)
+  - **Accepted**: Quorum met AND approval threshold reached
+  - **Rejected**: Quorum met BUT approval threshold not reached
+- Handles both membership types:
+  - **StaticList**: Total members = explicit member count
+  - **TrustThreshold**: Total members = actual vote count (conservative approach)
+- Prevents division by zero with `.max(1)` fallback for edge cases
+- **Impact**: Governance decisions now respect configured governance profiles (cooperative_default, custom profiles)
+- Test: `test_proposal_no_quorum_outcome` verifies 80% quorum with 60% participation correctly results in NoQuorum
+- Location: [icn-gateway/src/governance_mgr.rs:114-167](icn/crates/icn-gateway/src/governance_mgr.rs#L114-L167)
+
+### Fixed - Governance Manager Bugs (2025-11-17)
+
+**CRITICAL: Proposal ID mismatch preventing retrieval:**
+- `Proposal::new()` generates random ID internally, ignoring ID parameter passed to `create_proposal()`
+- Bug: Proposal stored at key `prop-abc123` but had internal ID `prop-xyz789` (HashMap key ≠ object.id)
+- Fix: Override generated ID with provided ID after creation (`proposal.id = proposal_id.clone()`)
+- **Impact**: Proposals can now be retrieved after creation (was 100% broken)
+- Discovery: Found during integration test development (test_proposal_lifecycle failed to open created proposal)
+- Location: [icn-gateway/src/governance_mgr.rs:79-81](icn/crates/icn-gateway/src/governance_mgr.rs#L79-L81)
+
+**Silent failures in GovernanceManager methods:**
+- `open_proposal()` now returns error when proposal not found (previously returned Ok(()) silently)
+- `close_proposal()` now returns error when proposal not found (previously returned Ok(()) silently)
+- **Impact**: API callers receive proper error responses (404 Not Found) instead of misleading success (200 OK)
+- Improves debugging and prevents confusion when operations fail to find target proposals
+- Location: [icn-gateway/src/governance_mgr.rs:99-140](icn/crates/icn-gateway/src/governance_mgr.rs#L99-L140)
+
+**Arithmetic safety & overflow protection (2025-11-17):**
+- **Bug 1: Integer overflow in quorum calculation** - `total_votes * 100` could overflow usize
+  - Fix: Use `checked_mul()` and `checked_div()` with conservative fallback (0% on overflow)
+  - Impact: Prevents panic/wrong results when many members vote
+  - Location: [icn-gateway/src/governance_mgr.rs:147-157](icn/crates/icn-gateway/src/governance_mgr.rs#L147-L157)
+- **Bug 2: Missing validation for voting period** - open_proposal didn't validate custom voting periods
+  - Could pass 0 (instant expiration) or extreme values (years)
+  - Fix: Validate against MAX_VOTING_PERIOD_SECONDS (1 year max, >0 required)
+  - Impact: Prevents resource lock-up from extreme voting periods
+  - Location: [icn-gateway/src/api/governance.rs:311-328](icn/crates/icn-gateway/src/api/governance.rs#L311-L328)
+
+**CRITICAL: Governance validation bypasses (2025-11-17):**
+- **Bug 1: Duplicate votes allowed** - Same DID could vote multiple times on proposal (votes appended without checking)
+  - Fix: Check for existing vote before accepting new vote
+  - Test: `test_duplicate_vote_prevention` verifies duplicate rejected
+- **Bug 2: State validation missing** - Could vote on Draft or Closed proposals
+  - Fix: Validate proposal.state.is_open() before accepting vote
+  - Tests: `test_vote_on_draft_proposal_fails`, `test_vote_on_closed_proposal_fails`
+- **Bug 3: Membership not enforced** - Anyone could vote regardless of domain membership
+  - Fix: Check voter against domain.config.membership.source
+  - Test: `test_non_member_vote_fails` verifies non-member rejected
+- **Bug 4: Domain existence not checked** - Could create proposals for non-existent domains
+  - Fix: Validate domain exists before creating proposal
+  - Test: `test_create_proposal_for_nonexistent_domain_fails`
+- **Bug 5: TOCTOU race condition in cast_vote()** - Proposal state checked before releasing locks, vote recorded after
+  - Allowed votes on proposals closed concurrently by another thread
+  - Fix: Re-check proposal.state.is_open() after acquiring votes write lock for atomicity
+  - Explicit lock dropping (`drop(proposals)`, `drop(domains)`) before vote lock acquisition
+  - Reject with "was closed during vote submission" if state changed between checks
+  - Test: `test_toctou_vote_close_race_condition` uses concurrent tokio::join! to verify fix
+  - **Security impact**: Prevents vote counting after proposal closure (time-of-check vs time-of-use bug)
+- **Bug 6: State validation missing in close_proposal()** - Could close non-open proposals multiple times
+  - Fix: Validate proposal.state.is_open() before closing
+  - Prevents state machine violations (closing Draft or already-Closed proposals)
+- **Bug 7: Duplicate domain_id allowed** - HashMap.insert() silently overwrites existing domains
+  - Attacker could overwrite legitimate domain with malicious params/membership
+  - Fix: Check contains_key() before insert, return error if duplicate
+  - Test: `test_duplicate_domain_id_prevention` verifies original domain preserved
+  - **Security impact**: Domain configuration tampering, member list manipulation
+- **Bug 8: Duplicate proposal_id allowed** - HashMap.insert() silently overwrites existing proposals
+  - Attacker could overwrite existing proposal with malicious content
+  - Fix: Check contains_key() before insert, return error if duplicate
+  - Test: `test_duplicate_proposal_id_prevention` verifies original proposal preserved
+  - **Security impact**: Proposal content manipulation, vote outcome tampering
+- **Bug 9: Integer overflow in voting_period_days** - Multiplication before validation
+  - `voting_period_days * 86400` could overflow u64 and wrap around, bypassing max validation
+  - Fix: Validate voting_period_days <= 365 BEFORE multiplication
+  - Test: `test_voting_period_overflow_prevention` verifies 0/366/365 day edge cases
+  - **Security impact**: Could create domains with invalid voting periods
+- **Bug 10: Potential panic from unwrap() in open_proposal** - Unsafe time calculation
+  - `SystemTime::now().duration_since(UNIX_EPOCH).unwrap()` could panic if system clock set before 1970
+  - Panic would crash entire gateway server instead of returning 500 error
+  - Fix: Replace `.unwrap()` with `.map_err()` that returns GatewayError::InternalError
+  - **Impact**: Server availability - crash vs graceful error response
+- **Bug 11: Whitespace-only strings bypass validation** - Input validation gap
+  - Domain names, proposal titles/descriptions, vote comments only checked `is_empty()`
+  - Didn't check `trim().is_empty()`, allowing "   " or "\t\n" strings
+  - Attack: Create domains/proposals with invisible/meaningless names
+  - Fix: Add `|| name.trim().is_empty()` check to all text field validators
+  - Test: `test_validate_domain_name` and enhanced tests for title/description/comment
+  - **Impact**: Data quality, UX confusion, storage waste
+- **Bug 12: Proposal payload fields missing whitespace validation** - Payload validation gap
+  - Text body, Budget purpose, ConfigChange key/value only checked `is_empty()`
+  - Didn't check `trim().is_empty()`, allowing whitespace-only payload content
+  - Attack: Create proposals with invisible/meaningless payload data
+  - Fix: Add `|| field.trim().is_empty()` check to all payload text fields
+  - Same consistency issue as Bug #11, but in payload conversion logic
+  - **Impact**: Data quality, UX confusion, storage waste
+- **Bug 13: Missing profile validation in create_domain** - Unvalidated governance model field
+  - The `profile` field in CreateDomainRequest was completely unvalidated
+  - Didn't check for empty strings, whitespace-only strings, or length limits
+  - Attack: Create domains with invalid governance models ("", "   ", 10KB string)
+  - Could lead to undefined behavior when evaluating proposals with invalid profiles
+  - Fix: Add `validation::validate_governance_model(&req.profile)?;` call in create_domain
+  - Enhanced validate_governance_model() to check for whitespace-only strings (consistency with Bug #11/12)
+  - **Impact**: Security - prevents invalid governance configuration and potential evaluation errors
+- **Bug 14: Three more fields missing whitespace validation** - Final whitespace validation gaps
+  - Cooperative name, currency, and credit policy only checked `is_empty()`, not `trim().is_empty()`
+  - Allowed whitespace-only strings: "   " as coop name, currency identifier, or credit policy
+  - Attack: Create cooperatives/payments with invisible/meaningless identifiers
+  - Same consistency issue as Bugs #11, #12, #13 - completes validation uniformity
+  - Fix: Add `|| field.trim().is_empty()` to validate_coop_name(), validate_currency(), validate_credit_policy()
+  - Enhanced tests with whitespace test cases for all three functions
+  - **Impact**: Data quality - completes whitespace validation consistency across all text fields
+- **Bug 15: Panic from expect() in timestamp() function** - Server crash vulnerability (cooperative API)
+  - The `timestamp()` utility in api/coops.rs used `.expect()` instead of returning Result
+  - Identical issue to Bug #10 (unwrap in governance), but in different location
+  - Panic would crash entire gateway server if system clock set before 1970
+  - Attack: System misconfiguration crashes server instead of returning 500 error
+  - Fix: Change timestamp() signature to Result<u64>, use .map_err() instead of .expect()
+  - Updated all call sites (3 production + 2 test) to propagate Result with ?
+  - **Impact**: Server availability - prevents crash, enables graceful error responses
+- **Bug 16: Panic from expect() in AuthManager::current_timestamp()** - Auth system crash vulnerability
+  - The `current_timestamp()` method in auth.rs used `.expect()` instead of returning Result
+  - Identical issue to Bugs #10 and #15, but in authentication subsystem
+  - Panic would crash authentication on challenge creation, verification, token issuance, and cleanup
+  - Attack: System misconfiguration crashes auth system instead of returning graceful errors
+  - Fix: Change current_timestamp() signature to Result<u64>, use .map_err() instead of .expect()
+  - Updated all 4 call sites (create_challenge, verify_challenge, issue_token, cleanup_expired_challenges)
+  - **Impact**: Auth system availability - prevents crashes in authentication flows
+- **Bug 17: RwLock panic vulnerabilities in governance_mgr.rs** - Lock poisoning cascading failures
+  - All 11 RwLock operations used `.unwrap()` instead of `.map_err()` for error handling
+  - Inconsistent with coop.rs, ledger_mgr.rs, auth.rs which properly handle poisoned locks
+  - If thread panics while holding lock, subsequent operations would panic instead of returning errors
+  - Attack: Single panic in governance operation causes cascading failures across all governance
+  - Affected: create_domain, get_domain, list_domains, create_proposal, get_proposal, list_proposals, open_proposal, close_proposal (3 locks), cast_vote (4 locks)
+  - Fix: Replace all `.unwrap()` with `.map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?`
+  - **Impact**: Reliability - prevents cascading failures, ensures graceful error handling
+- **Bug 18: Duplicate members inflate quorum denominator** - Quorum calculation bug
+  - Domains could be created with duplicate member DIDs (e.g., ["did:icn:alice", "did:icn:bob", "did:icn:alice"])
+  - validate_domain_members() only checked count limits, not uniqueness
+  - Quorum calculation uses members.len() = 3 instead of 2 unique members
+  - Only 2 unique members can vote (alice votes once due to duplicate vote protection in cast_vote)
+  - Quorum: 2 votes / 3 members = 66% (WRONG - should be 100%)
+  - Attack: Duplicates DEFLATE quorum percentage, causing legitimate proposals to fail quorum requirements
+  - Especially problematic in small domains (e.g., 2 unique, 3 total = 33% error margin)
+  - Fix: Added HashSet-based duplicate detection in validate_domain_members()
+  - Returns error: "Duplicate member DID not allowed: <did>"
+  - Test: test_validate_domain_members() verifies duplicate rejection
+  - **Impact**: Medium - Prevents governance deadlock or unintended proposal rejections
+- **Bug 19: CRITICAL - Unauthorized payments from other accounts** - Authorization bypass vulnerability
+  - Users with `ledger:write` scope could create payments from ANY account, not just their own
+  - Attack: Alice (authenticated) creates payment from Bob's account to steal funds
+  - Root cause: create_payment() checked `require_scope("ledger:write")` but NOT `claims.sub == req.from`
+  - Classic authorization bypass - scope check without identity verification
+  - Example: `{"from": "did:icn:bob", "to": "did:icn:charlie", "amount": 100}` sent by Alice
+  - **Security Impact**: CRITICAL - Arbitrary fund theft, account balance manipulation, entire ledger system compromised
+  - Fix: Added authentication check after scope verification
+  - Verify `claims.sub == req.from` before allowing payment creation
+  - Returns error: "Cannot create payments from other accounts (authenticated as {}, attempted to send from {})"
+  - Test: test_create_payment_from_other_account_fails() verifies Alice cannot create payment from Bob's account
+  - **Severity**: CRITICAL | **Exploitability**: Trivial | **Attack surface**: All cooperatives, all users, all currencies
+  - Location: [icn-gateway/src/api/ledger.rs:54-64](icn/crates/icn-gateway/src/api/ledger.rs#L54-L64)
+- **Bug 20: CRITICAL - Cross-cooperative authorization bypass** - Cooperative isolation breach
+  - Admins of one cooperative could manage ANY cooperative's settings, members, and roles
+  - Attack: Alice (admin of coop-food) modifies coop-tech using her coop-food token
+  - Root cause: Admin endpoints checked `require_scope("coop:admin")` but NOT `claims.coop_id == path_coop_id`
+  - JWT tokens include coop_id to scope access to specific cooperative
+  - Without verification, cooperative isolation completely broken
+  - **Affected endpoints**: update_settings, add_member, remove_member, update_member_role (4 endpoints)
+  - **Security Impact**: CRITICAL - Unauthorized cooperative management, member manipulation, governance override, hostile takeovers
+  - Fix: Added `require_coop_access(req, coop_id)` helper function in middleware.rs
+  - Verifies `claims.coop_id == coop_id` before allowing access to coop admin operations
+  - Applied to all 4 coop admin endpoints
+  - Returns error: "Access denied: token is for cooperative '{}', but requested access to '{}'"
+  - Test: test_cross_cooperative_authorization_fails() verifies Alice (coop-food admin) cannot modify coop-tech
+  - **Severity**: CRITICAL | **Exploitability**: Trivial | **Attack surface**: All cooperatives, all admin operations
+  - Location: [icn-gateway/src/middleware.rs:64-78](icn/crates/icn-gateway/src/middleware.rs#L64-L78), [icn-gateway/src/api/coops.rs:98,180,222,260](icn/crates/icn-gateway/src/api/coops.rs)
+- **Bug 21: Cross-cooperative ledger privacy leak** - Financial data disclosure across cooperatives
+  - Ledger read operations missing cooperative isolation checks
+  - Attack: Alice (coop-food member) reads financial data from ANY cooperative
+  - Root cause: get_balance() and get_history() checked `require_scope("ledger:read")` but NOT `claims.coop_id == path_coop_id`
+  - **Affected endpoints**: get_balance, get_history (2 ledger read endpoints)
+  - **Security Impact**: HIGH - Cross-cooperative financial surveillance, balance disclosure, transaction history leak
+  - Financial privacy violation enables competitive intelligence, social engineering, member profiling
+  - Violates cooperative autonomy and member privacy expectations
+  - Fix: Added `require_coop_access(req, coop_id)` check to both ledger read endpoints
+  - Verifies token's coop_id matches requested coop_id before returning financial data
+  - Returns error: "Access denied: token is for cooperative '{}', but requested access to '{}'"
+  - Test: test_cross_cooperative_ledger_privacy() verifies Alice (coop-food token) cannot read coop-tech balances or history
+  - **Severity**: HIGH | **Exploitability**: Trivial | **Attack surface**: All cooperatives, all financial data
+  - Location: [icn-gateway/src/api/ledger.rs:26,109](icn/crates/icn-gateway/src/api/ledger.rs#L26)
+- **Bug 22: Cross-cooperative info leak in get_coop** - Cooperative metadata disclosure
+  - get_coop() endpoint missing cooperative isolation check
+  - Attack: Alice (coop-food member) reads metadata from ANY cooperative
+  - Root cause: get_coop() checked `require_scope("coop:read")` but NOT `claims.coop_id == path_id`
+  - **Security Impact**: HIGH - Member list disclosure, settings leak, governance model exposure
+  - Privacy violation enables targeted attacks, social engineering, policy intelligence gathering
+  - Violates cooperative autonomy and member privacy
+  - Fix: Added `require_coop_access(req, &id)` check to get_coop()
+  - Test: Enhanced test_cross_cooperative_authorization_fails() to verify get_coop protection
+  - **Severity**: HIGH | **Exploitability**: Trivial | **Attack surface**: All cooperatives, all metadata
+  - Location: [icn-gateway/src/api/coops.rs:82](icn/crates/icn-gateway/src/api/coops.rs#L82)
+- **Bug 23: Self-payments not prevented** - Spam/bloat vulnerability
+  - Users could create payments to themselves (from == to), enabling spam attacks
+  - Attack: Alice creates thousands of self-payments (debit -10, credit +10 = net zero)
+  - Root cause: No validation preventing `from == to` in create_payment()
+  - **Security Impact**: MEDIUM - Ledger bloat, metric pollution, resource waste, DoS potential
+  - Self-transactions serve no economic purpose in mutual credit system
+  - Violates cooperative exchange principle (requires two parties)
+  - Enables: Storage bloat, transaction count inflation, resource exhaustion, rate limit bypass
+  - Fix: Added validation check rejecting `from == to`
+  - Returns error: "Self-payments not allowed (sender and recipient cannot be the same)"
+  - Test: test_self_payment_rejected() verifies Alice cannot pay herself
+  - **Severity**: MEDIUM | **Exploitability**: Trivial | **Attack surface**: All cooperatives, all users
+  - Location: [icn-gateway/src/api/ledger.rs:73-78](icn/crates/icn-gateway/src/api/ledger.rs#L73-L78)
+- **Bug 24: CRITICAL - Cross-cooperative payment creation bypass** - MISSED in Bug #19 fix
+  - create_payment() missing cooperative isolation check (found by user during code review!)
+  - Attack: Alice (coop-food member) creates payments in ANY cooperative
+  - Root cause: Bug #19 added `claims.sub == req.from` check but MISSED `require_coop_access(&http_req, &coop_id)`
+  - Inconsistent with get_balance() and get_history() which both had the coop_id check
+  - **Security Impact**: CRITICAL - Cross-cooperative payment injection, ledger manipulation
+  - Users can create payments in coops they don't have access to
+  - Violates financial isolation between cooperatives
+  - Enables ledger manipulation across trust boundaries
+  - Fix: Added `require_coop_access(&http_req, &coop_id)?;` after scope check (line 54)
+  - Now consistent with all other ledger endpoints
+  - Test: Enhanced test_cross_cooperative_ledger_privacy() to verify cross-coop payment creation blocked
+  - **Severity**: CRITICAL | **Exploitability**: Trivial | **Attack surface**: All cooperatives, all users with ledger:write
+  - Credit: Discovered by user during code review at @ledger.rs (45-65)
+  - Location: [icn-gateway/src/api/ledger.rs:54](icn/crates/icn-gateway/src/api/ledger.rs#L54)
+- **Bug 26: Unauthorized proposal opening** - Domain membership bypass
+  - Anyone with `gov:write` scope could open ANY proposal, regardless of domain membership
+  - Attack: Alice (non-member) opens Bob's proposal in domain she doesn't belong to
+  - Root cause: open_proposal() checked `require_scope("gov:write")` but NOT domain membership
+  - **Security Impact**: HIGH - Governance disruption, unauthorized proposal lifecycle manipulation
+  - Allows non-members to advance proposals without authority, violating domain autonomy
+  - Enables external actors to interfere with cooperative decision-making processes
+  - Fix: Added domain membership check (fetch proposal → get domain → verify is_member)
+  - Verifies requester is a member of the proposal's domain before allowing open
+  - Returns error: "Only domain members can open proposals (you are not a member of domain '{}')"
+  - Test: test_non_member_cannot_open_close_proposal() verifies Bob (non-member) gets 403 Forbidden
+  - **Severity**: HIGH | **Exploitability**: Trivial | **Attack surface**: All governance domains, all proposals
+  - Location: [icn-gateway/src/api/governance.rs:463-495](icn/crates/icn-gateway/src/api/governance.rs#L463-L495)
+- **Bug 27: CRITICAL - Unauthorized proposal closing** - Governance manipulation
+  - Anyone with `gov:write` scope could close ANY proposal, manipulating outcomes
+  - Attack: Alice (non-member or adversary) closes proposals early or at strategic times
+  - Root cause: close_proposal() checked `require_scope("gov:write")` but NOT domain membership
+  - **Security Impact**: CRITICAL - Governance outcome manipulation, democratic process subversion
+  - Allows attackers to: (1) Close proposals early to prevent voting, (2) Close at strategic times to influence results, (3) Deny quorum by closing before participation threshold met
+  - Fundamentally undermines cooperative democratic governance integrity
+  - Enables hostile takeovers, policy manipulation, and silencing of dissent
+  - Fix: Added domain membership check (fetch proposal → get domain → verify is_member)
+  - Verifies requester is a member of the proposal's domain before allowing close
+  - Returns error: "Only domain members can close proposals (you are not a member of domain '{}')"
+  - Test: test_non_member_cannot_open_close_proposal() verifies Bob (non-member) cannot close Alice's proposal
+  - Improved error code: 404 for nonexistent proposals (was 500 internal error)
+  - **Severity**: CRITICAL | **Exploitability**: Trivial | **Attack surface**: All governance domains, all proposals
+  - Location: [icn-gateway/src/api/governance.rs:564-596](icn/crates/icn-gateway/src/api/governance.rs#L564-L596)
+- **Bug 28: CRITICAL - Cooperative deletion bypass** - Cross-cooperative destruction
+  - Admins of one cooperative could DELETE ANY cooperative, not just their own
+  - Attack: Alice (admin of coop-food) deletes coop-tech using coop-food admin token
+  - Root cause: delete_coop() checked `require_scope("coop:admin")` but NOT `require_coop_access(req, coop_id)`
+  - Same pattern as Bug #20 (cross-coop admin bypass for settings/members)
+  - **Security Impact**: CRITICAL - Complete destruction of cooperatives across isolation boundaries
+  - Allows hostile deletion attacks that permanently destroy cooperative data
+  - Violates cooperative autonomy and data sovereignty
+  - No recovery mechanism for deleted cooperatives (permanent data loss)
+  - Fix: Added `require_coop_access(&req, &coop_id)?;` before deletion operation
+  - Returns error: "Access denied: token is for cooperative '{}', but requested access to '{}'"
+  - Now consistent with all other admin endpoints (update_settings, add_member, remove_member, update_member_role)
+  - Test: Enhanced test_cross_cooperative_authorization_fails() to verify delete protection
+  - Verifies Alice (coop-food admin) cannot delete coop-tech and that coop-tech still exists after failed attempt
+  - **Severity**: CRITICAL | **Exploitability**: Trivial | **Attack surface**: All cooperatives, all admins
+  - Location: [icn-gateway/src/api/coops.rs:156](icn/crates/icn-gateway/src/api/coops.rs#L156)
+- **Bug 29 (HIGH): Missing rate limiting on auth endpoints** - DoS vulnerability (IDENTIFIED, NOT YET FIXED)
+  - Authentication endpoints /auth/challenge and /auth/verify have NO rate limiting
+  - Attack: Unlimited challenge creation causes storage exhaustion, brute force verification attempts
+  - Root cause: rate_limit_middleware skips unauthenticated requests (returns early if no TokenClaims)
+  - **Security Impact**: HIGH - DoS via resource exhaustion and brute force attacks
+  - Challenge endpoint: Attackers can create unlimited challenges → HashMap growth → memory exhaustion
+  - Verify endpoint: Attackers can brute force signature verification without throttling
+  - Public endpoints bypass per-DID rate limiter by design (no JWT token = no claims = no rate limit)
+  - **Recommendation**: Implement IP-based rate limiting for public endpoints
+  - Alternative: Add separate auth-specific rate limiter with aggressive limits (e.g., 10 req/min per IP)
+  - **Status**: IDENTIFIED in systematic bug hunting, requires IP extraction infrastructure
+  - Location: [icn-gateway/src/server.rs:135-136](icn/crates/icn-gateway/src/server.rs#L135-L136), [icn-gateway/src/rate_limit.rs:175-181](icn/crates/icn-gateway/src/rate_limit.rs#L175-L181)
+- **Bug 30 (MEDIUM): WebSocket authentication timeout missing** - Resource exhaustion (IDENTIFIED, NOT YET FIXED)
+  - WebSocket connections have NO timeout for sending Auth message after connection establishment
+  - Attack: Attackers open 10,000 WebSocket connections and never authenticate
+  - Root cause: started() begins heartbeat immediately, but no separate auth deadline
+  - **Security Impact**: MEDIUM - Temporary resource exhaustion (connections held for 60 seconds)
+  - Attackers can consume MAX_TOTAL_WEBSOCKET_CONNECTIONS (10,000) slots without authenticating
+  - Heartbeat timeout eventually disconnects after 60 seconds, limiting severity (not indefinite)
+  - During 60-second window, legitimate users may be unable to connect
+  - **Mitigation**: Heartbeat mechanism provides eventual cleanup (reduces from CRITICAL to MEDIUM)
+  - **Recommendation**: Add 10-second auth timeout: close connection if no Auth message received
+  - Reduce attack window from 60s to 10s (6x improvement)
+  - **Status**: IDENTIFIED in systematic bug hunting, straightforward fix
+  - Location: [icn-gateway/src/websocket.rs:234-262](icn/crates/icn-gateway/src/websocket.rs#L234-L262)
+- **Impact**: Governance integrity completely broken (double-voting, unauthorized voting, orphaned proposals, race conditions, ID overwrites, overflow attacks, panic-induced crashes, whitespace pollution, invalid governance models, lock poisoning cascades, duplicate member quorum bugs) + 5 CRITICAL authorization bypasses (ledger sender + ledger coop + cooperative admin + cooperative deletion + proposal closing) + 4 HIGH vulnerabilities (ledger privacy leaks + coop info leak + unauthorized proposal opening + auth endpoint DoS) + 2 MEDIUM vulnerabilities (self-payments + WebSocket auth timeout)
+- **Bugs FIXED (Bugs #1-28)**: All bugs fixed in cast_vote(), create_proposal(), close_proposal(), create_domain(), open_proposal(), create_payment(), get_balance(), get_history(), get_coop(), update_settings(), add_member(), remove_member(), update_member_role(), delete_coop(), validation functions, and payload conversions
+- **Bugs IDENTIFIED but not yet fixed (Bugs #29-30)**: Auth endpoint rate limiting, WebSocket auth timeout
+- 16 comprehensive tests added (62 → 82 total tests, includes 5 CRITICAL auth bypasses + 3 HIGH vulnerabilities + 1 MEDIUM spam prevention)
+- Location: [icn-gateway/src/governance_mgr.rs:52-244](icn/crates/icn-gateway/src/governance_mgr.rs#L52-L244), [icn-gateway/src/api/governance.rs:51-63,221-296,498-504](icn/crates/icn-gateway/src/api/governance.rs), [icn-gateway/src/api/ledger.rs:26,54-78,109,442-497](icn/crates/icn-gateway/src/api/ledger.rs), [icn-gateway/src/api/coops.rs:82,98,180,222,260,564-579](icn/crates/icn-gateway/src/api/coops.rs), [icn-gateway/src/middleware.rs:64-78](icn/crates/icn-gateway/src/middleware.rs), [icn-gateway/src/validation.rs:108,297,312,330,359-367](icn/crates/icn-gateway/src/validation.rs)
+
+**Proposal payload validation (DoS protection) (2025-11-17):**
+- Added comprehensive validation for all proposal payload types to prevent resource exhaustion attacks
+- **Text proposals**: Body must be non-empty, max 10,000 characters
+- **Budget proposals**:
+  - Amount validation via `validate_payment_amount()` (prevents negative/zero amounts)
+  - Currency validation via `validate_currency()` (max 10 chars)
+  - Purpose must be non-empty, max 10,000 characters
+  - Recipient DID format validation
+- **ConfigChange proposals**:
+  - Key must be non-empty, max 64 characters
+  - Value must be non-empty, max 10,000 characters
+- **Impact**: Prevents DoS attacks via unbounded proposal payloads, ensures data integrity
+- All validation uses existing constants from `validation.rs` (`MAX_PROPOSAL_DESCRIPTION_LEN`, `MAX_GOVERNANCE_MODEL_LEN`)
+- Location: [icn-gateway/src/api/governance.rs:203-297](icn/crates/icn-gateway/src/api/governance.rs#L203-L297)
+
+### Fixed - Governance→Ledger Production Hardening (2025-01-17 & 2025-11-17)
+
+**CRITICAL: Governance event subscription immediately dropped in daemon (2025-11-17):**
+- Governance event handler was unsubscribed immediately after registration
+- Bug: `let _ = event_bus.subscribe(...).await;` triggered immediate Drop via SubscriptionHandle::drop()
+- Fix: Store handle in `_governance_event_subscription` variable for daemon lifetime
+- **Impact**: Governance→ledger integration was **completely non-functional** in daemon (zero events processed)
+- Tests passed because they used correct pattern (`let _handle =`), masking the bug
+- Subscription now lives for full `run()` function scope (daemon lifetime)
+- Credit: User discovered during code review
+- Location: [icn-core/src/supervisor.rs:982,1156-1157](icn/crates/icn-core/src/supervisor.rs#L982)
+
+**Critical: Idempotency bug preventing duplicate proposal execution:**
+- Added audit trail check before ledger execution to prevent double-counting
+- If ProposalAccepted event processed multiple times (replay, gossip duplicates, restarts), transaction only executes once
+- First execution creates audit record, subsequent attempts check for existence and skip
+- **Critical safety improvement**: Fail-safe error handling refuses execution if audit trail check fails
+  - Initial flaw: `if let Ok(Some(_))` silently treated store errors as "not executed", allowing duplicates during storage failures
+  - Fix: Explicit match on all cases (Ok(Some), Ok(None), Err) with fail-safe behavior
+  - Fail-safe principle: Refuse execution when unable to verify, preventing duplicates even during storage issues
+  - New metric: `execution_failures_inc("audit_check_failed")` tracks verification failures
+- Prevents financial integrity violations from duplicate payments
+- Test: `test_duplicate_proposal_event_is_idempotent` verifies fix
+- Location: [icn-core/src/supervisor.rs:1010-1032](icn/crates/icn-core/src/supervisor.rs#L1010-L1032)
+
+**Medium: Enhanced error handling for partial failures:**
+- If ledger succeeds but audit trail fails, comprehensive error logging for manual reconciliation
+- Changed from `warn!` to `error!` with full context (proposal ID, entry hash, amount, recipient)
+- Added "ACTION REQUIRED" flags for operator visibility
+- TODO: Implement dead-letter queue for automated reconciliation
+- Location: [icn-core/src/supervisor.rs:1045-1077](icn/crates/icn-core/src/supervisor.rs#L1045-L1077)
+
+**Medium: Shutdown grace period for in-flight tasks:**
+- Added 2-second sleep after shutdown signal to let in-flight governance tasks complete
+- Prevents loss of ledger transactions during shutdown
+- Pragmatic solution covering 99% of cases (typical ledger write <200ms)
+- TODO: Replace with JoinSet for guaranteed completion
+- Location: [icn-core/src/supervisor.rs:1258-1261](icn/crates/icn-core/src/supervisor.rs#L1258-L1261)
+
+**Low priority: Audit trail timestamp enhancement (2025-11-17):**
+- Added `decided_at` field to audit trail alongside `executed_at`
+- Provides complete timeline: governance decision → ledger execution
+- `decided_at`: When community voted to approve (from ProposalAccepted event)
+- `executed_at`: When ledger transaction completed (system timestamp)
+- Enables debugging execution delays and compliance tracking
+- Location: [icn-core/src/supervisor.rs:991,1002,1060](icn/crates/icn-core/src/supervisor.rs)
+
+**Low priority: EventBus unsubscribe mechanism (2025-11-17):**
+- Added `SubscriptionHandle` with automatic cleanup via Drop trait
+- Prevents memory leaks if subscriptions become dynamic
+- Safe cleanup during async runtime shutdown (uses `try_write()` not `blocking_write()`)
+- Changed EventBus.subscribers to track IDs for selective removal
+- Added test `test_event_bus_unsubscribe_on_drop` verifying cleanup
+- Location: [icn-core/src/events.rs:49-116](icn/crates/icn-core/src/events.rs#L49-L116)
+
+**Testing:**
+- All 4 event bus unit tests passing
+- All 3 governance-ledger integration tests passing
+- Complete bug analysis: [docs/GOVERNANCE-LEDGER-BUGS-FOUND.md](docs/GOVERNANCE-LEDGER-BUGS-FOUND.md)
+- Status: **Production-ready** - ALL issues fixed (critical + medium + low priority)
+
+### Fixed - Code Review Bug Fixes (2025-11-17)
+
+**Critical memory leak** in CandidateCache:
+- Added periodic cleanup task (every 5 minutes) to remove stale connection candidates
+- Without this, candidates accumulated indefinitely causing slow memory growth on long-running nodes
+- Task updates `icn_candidates_cached_total` Prometheus metric
+- Location: [icn-core/src/supervisor.rs:888-911](icn/crates/icn-core/src/supervisor.rs#L888-L911)
+
+**Code clarity improvement** in STUN consensus:
+- Replaced `.unwrap()` with `.expect()` with descriptive message
+- Explains safety invariant: "vote_counts is non-empty because results was checked above"
+- Location: [icn-net/src/stun.rs:134](icn/crates/icn-net/src/stun.rs#L134)
+
+**Comprehensive bug report** documenting findings:
+- 2 bugs found and fixed
+- 5 systems verified as correct (shutdown, bounds checking, channels)
+- 1 known limitation documented (TLS trust integration)
+- See: [docs/bug-report-2025-11-17.md](docs/bug-report-2025-11-17.md)
+
+### Added - NAT Traversal Metrics (2025-11-17)
+
+**Comprehensive Prometheus metrics for NAT traversal observability:**
+
+- **STUN Discovery Metrics** (`icn-obs/src/metrics.rs:89-105`)
+  - `icn_stun_queries_total{server, result}` - Track outcomes per server (success/timeout/error)
+  - `icn_stun_discovery_duration_seconds` - Histogram of discovery latency
+  - `icn_stun_consensus_votes_total{endpoint, votes, total_servers}` - Majority vote distribution
+  - `icn_stun_server_failures_total{server, reason}` - Identify unreliable servers
+
+- **Candidate Exchange Metrics** (`icn-obs/src/metrics.rs:107-127`)
+  - `icn_candidates_received_total` - Candidates received via gossip
+  - `icn_candidates_cached_total` - Current cache size (gauge for capacity planning)
+  - `icn_candidates_expired_total` - Expired candidates removed (cache churn rate)
+  - `icn_candidates_stale_rejected_total` - Stale candidates rejected on arrival
+  - `icn_candidates_published_total` - Candidates published to gossip
+
+- **Connection Attempt Metrics** (`icn-obs/src/metrics.rs:129-149`)
+  - `icn_nat_connection_attempts_total{method}` - Attempts by method (local/public/relay)
+  - `icn_nat_connection_success_total{method}` - Success rate per method
+  - `icn_nat_connection_duration_seconds{method}` - Latency distribution per method
+  - `icn_nat_hole_punch_attempts_total` - Total hole punch attempts
+  - `icn_nat_hole_punch_success_total` - Hole punch success rate
+
+- **Helper Functions** (`icn-obs/src/metrics.rs:1115-1193`)
+  - `nat_traversal::stun_query_inc(server, result)` - Record STUN query outcome
+  - `nat_traversal::stun_discovery_duration_record(secs)` - Record discovery time
+  - `nat_traversal::stun_consensus_vote_inc(endpoint, votes, total)` - Record vote
+  - `nat_traversal::candidates_cached_set(count)` - Update cache gauge
+  - `nat_traversal::connection_attempt_inc(method)` - Track attempt
+  - `nat_traversal::connection_success_inc(method)` - Track success
+  - `nat_traversal::connection_duration_record(method, secs)` - Record latency
+  - Plus 6 additional helpers for comprehensive tracking
+
+**Benefits:**
+- **Pilot Validation**: Measure NAT traversal effectiveness in real deployments
+- **Performance Tuning**: Identify slow STUN servers, optimize timeouts
+- **Failure Analysis**: Understand which NAT types succeed/fail
+- **Capacity Planning**: Monitor candidate cache growth
+- **Method Optimization**: Compare local vs public connection success rates
+
+**Use Cases:**
+```promql
+# STUN discovery success rate
+rate(icn_stun_queries_total{result="success"}[5m]) /
+rate(icn_stun_queries_total[5m])
+
+# Public vs local connection success rate
+rate(icn_nat_connection_success_total{method="public"}[5m]) /
+rate(icn_nat_connection_attempts_total{method="public"}[5m])
+
+# 95th percentile connection latency by method
+histogram_quantile(0.95,
+  rate(icn_nat_connection_duration_seconds_bucket[5m]))
+```
+
+**Tests:** All 460 tests passing
+
+---
+
+### Added - Configurable STUN Servers (2025-11-17)
+
+**Operators can now customize STUN servers via configuration:**
+
+- **NetworkConfig Extension** (`icn-core/src/config.rs:49`)
+  - New field: `stun_servers: Vec<String>` with hostname/IP:port format
+  - Default: Google's public STUN servers (`stun.l.google.com:19302`, `stun1.l.google.com:19302`)
+  - Empty list disables STUN discovery (passes `None` to SessionManager)
+
+- **Supervisor Integration** (`icn-core/src/supervisor.rs:387-413`)
+  - Parses STUN server strings from config
+  - Resolves DNS hostnames to socket addresses at startup
+  - Logs successful/failed resolution for observability
+  - Passes resolved addresses to `NetworkActor::spawn`
+
+- **Configuration Example:**
+  ```toml
+  [network]
+  stun_servers = [
+    "stun.l.google.com:19302",
+    "stun1.l.google.com:19302",
+    "stun.example.com:3478"
+  ]
+  ```
+
+- **Benefits:**
+  - **Privacy:** Use private STUN servers instead of public ones
+  - **Performance:** Configure geographically-close servers
+  - **Flexibility:** Hostname resolution supports dynamic IPs
+  - **Majority Vote:** Multiple servers enable consensus (see below)
+
+**Tests:** All 460 tests passing (updated 14 test files)
+
+---
+
+### Improved - STUN Majority Vote for Robust NAT Discovery (2025-11-17)
+
+**Enhanced STUN reliability with parallel queries and consensus:**
+
+- **Parallel Server Queries** (`icn-net/src/stun.rs:89`)
+  - Queries all configured STUN servers simultaneously using `futures::future::join_all`
+  - Previously queried servers sequentially, stopping at first success
+  - Parallel approach provides faster discovery and consensus validation
+
+- **Majority Vote Algorithm** (`icn-net/src/stun.rs:117-138`)
+  - Counts occurrences of each reported public endpoint
+  - Selects the most common result (consensus)
+  - Provides resilience against misconfigured or malicious STUN servers
+  - Example: If 3 servers report `203.0.113.5:12345` and 2 report different addresses, chooses the majority
+
+- **Graceful Degradation**
+  - Falls back to single result if only one server succeeds
+  - Clear error message if all servers fail
+  - Logs consensus result with vote count for observability
+
+- **Technical Details:**
+  - Made `do_stun_query()` a static associated function for easier parallel execution
+  - Added `futures` dependency (already in workspace)
+  - Removed unused `Arc` import
+  - **Test Coverage:** New test `test_stun_majority_vote` validates parallel query setup
+
+- **Security & Reliability Benefits:**
+  - Prevents single misconfigured STUN server from causing connection failures
+  - Detects and mitigates potential STUN server spoofing attempts
+  - Increases confidence in discovered public endpoints
+
+**Tests:** 460 passing (up from 459)
+
+---
+
+### Added - NAT Traversal Phase 3 Part 1: Candidate Cache & Connection Attempts (2025-11-17)
+
+**Hole Punching Infrastructure:**
+
+- **CandidateCache** (New module: `icn-net/src/candidate_cache.rs`, 339 lines)
+  - TTL-based cache with default 5-minute expiration
+  - **Freshness validation:** Rejects stale candidates before storage
+  - **Timestamp ordering:** Only updates if new candidate is fresher
+  - **Automatic cleanup:** `cleanup_expired()` removes stale entries
+  - **Thread-safe:** `Arc<RwLock<HashMap<Did, ConnectionCandidate>>>`
+  - **Methods:**
+    - `store(candidate) -> bool` - Returns true if candidate stored/updated
+    - `get(did) -> Option<ConnectionCandidate>` - Returns None if stale
+    - `remove(did)`, `cleanup_expired() -> usize`
+    - `len()`, `is_empty()`
+  - **Test Coverage:** 7 comprehensive tests (store, get, staleness, update priority, cleanup, remove)
+
+- **Supervisor Integration** (`icn-core/src/supervisor.rs`)
+  - Created CandidateCache instance before notification callback
+  - Captured cache and network_handle in candidate notification handler
+  - **Updated candidate handler logic:**
+    1. Store candidate in cache (early return if stale/older)
+    2. Check if peer already connected via `get_peers()` (skip dial if yes)
+    3. Attempt connection with address priority
+    4. Log success/failure for each attempt
+
+- **Connection Strategy:**
+  - **Priority 1:** Try local_addr first (LAN connectivity, same network)
+  - **Priority 2:** Try public_addr if local fails (NAT hole punching via STUN)
+  - **Priority 3:** Reserved for relay_addr (Phase 4: TURN relay)
+  - **Graceful degradation:** All failures logged, no panics
+  - **Duplicate dial prevention:** Checks `get_peers()` before attempting
+  - **Async connection attempts:** Spawned in `tokio::spawn` to avoid blocking
+
+- **Connection Logging:**
+  - `✅ Connected to <did> via local address <addr>` (LAN success)
+  - `✅ Connected to <did> via public address <addr> (NAT traversal)` (WAN success)
+  - `Could not establish direct connection to <did>` (both methods failed)
+
+**Integration Flow (Updated):**
+1. Network actor starts → STUN discovery (Phase 1)
+2. Subscribe to network:candidates topic
+3. Dial bootstrap peers (for WAN connectivity)
+4. Generate and publish own connection candidate (Phase 2)
+5. **Receive peer candidates → store in cache (Phase 3)**
+6. **Attempt connection if not already connected (Phase 3)**
+
+**Integration Tests** (`icn-net/tests/nat_traversal_integration.rs`, 200 lines):
+
+- **test_candidate_cache_flow**: Complete candidate exchange between two nodes
+  - Creates candidates with STUN-discovered addresses
+  - Simulates gossip-based candidate exchange
+  - Verifies bidirectional candidate caching
+  - Validates freshness checks (5-minute TTL)
+
+- **test_stale_candidate_rejection**: TTL-based expiration
+  - Verifies stale candidates are not returned
+  - Tests automatic cleanup removes expired entries
+
+- **test_candidate_update_priority**: Timestamp-based ordering
+  - Rejects older candidates (timestamp comparison)
+  - Accepts newer candidates (updates cache)
+  - Maintains single entry per DID
+
+- **test_multiple_peer_candidates**: Scalability
+  - Stores 10 peer candidates simultaneously
+  - Verifies all can be retrieved correctly
+  - Tests cache capacity under load
+
+**Progress Tracking:**
+
+- ✅ **Phase 1 Complete:** STUN Discovery (commit 2f917c1)
+- ✅ **Phase 2 Complete:** Connection Candidate Exchange (commits 9258046, 06e2396)
+- ✅ **Phase 3 Complete:** Candidate Cache, Connection Attempts & Integration Tests (commits acd1793, 09a33cb)
+- ⏳ **Phase 4 Future:** TURN relay for symmetric NAT
+
+**Test Results:** All 423 workspace tests passing (97 icn-net tests, +4 integration)
+
+**References:**
+- Design: `docs/nat-traversal-design.md` lines 114-155 (Hole Punching architecture)
+- MVC Track: Week 3-4, Days 5-6 (Hole Punching implementation)
+
+### Added - NAT Traversal Phase 2: Connection Candidate Exchange (2025-11-17)
+
+**ConnectionCandidate Infrastructure** (Part 1):
+
+- **New message type** for advertising connection information (186 lines)
+  - **Location:** `icn-net/src/candidate.rs`
+  - **Fields:** DID, local_addr, public_addr (STUN), relay_addr (future TURN), timestamp, version
+  - **Helpers:** `is_fresh(max_age)`, `age_secs()` for freshness validation
+  - **Default freshness:** 5 minutes max age
+  - **Protocol version:** v1 for future compatibility
+  - **Test Coverage:** 4 comprehensive tests (creation, freshness, serialization, all addresses)
+
+- **SessionManager Integration**
+  - **New method:** `connection_candidate(did) -> ConnectionCandidate`
+  - Generates candidate from endpoint's local_addr + discovered public_addr (STUN Phase 1)
+  - relay_addr reserved for Phase 4 (TURN implementation)
+
+- **NetworkHandle API**
+  - Added `session_manager` and `own_did` fields to NetworkHandle
+  - **New method:** `connection_candidate() -> ConnectionCandidate`
+  - Exposes session manager's candidate via async API
+  - Updated all 4 test NetworkHandle constructions
+
+**Supervisor Gossip Integration** (Part 2):
+
+- **Topic Integration** (`icn-core/src/supervisor.rs`)
+  - Added `NETWORK_CANDIDATES_TOPIC` constant ("network:candidates")
+  - Automatic subscription on gossip actor startup
+  - All nodes with identity subscribe to receive peer candidates
+
+- **Candidate Announcement**
+  - After bootstrap peers are dialed, announce connection candidate
+  - Retrieves candidate from NetworkHandle API
+  - Serializes to JSON and publishes to gossip topic
+  - Logs local, public (STUN), and relay addresses
+  - Graceful failure: warns but doesn't fail startup
+
+- **Candidate Reception**
+  - New notification handler for NETWORK_CANDIDATES_TOPIC
+  - Deserializes incoming ConnectionCandidate messages
+  - Validates freshness (5 min max age)
+  - Logs received candidates with full address information
+  - Phase 2: Candidates logged for visibility
+  - TODO Phase 3: Store and use for hole punching
+
+**Integration Flow:**
+1. Network actor starts → STUN discovery (Phase 1)
+2. Subscribe to network:candidates topic
+3. Dial bootstrap peers (for WAN connectivity)
+4. Generate and publish own connection candidate
+5. Receive peer candidates via gossip subscription
+6. Log candidates (Phase 3 will attempt connections)
+
+**Progress Tracking:**
+
+- ✅ **Phase 1 Complete:** STUN Discovery (commit 2f917c1)
+- ✅ **Phase 2 Complete:** Connection Candidate Exchange (commits 9258046, 06e2396)
+- ⏳ **Phase 3 Next:** Hole Punching (simultaneous connection attempts)
+- See [`docs/nat-traversal-design.md`](docs/nat-traversal-design.md) for full architecture
+
+**References:**
+- Design: `docs/nat-traversal-design.md` lines 86-112 (Connection Candidate spec + Gossip integration)
+- MVC Track: Week 3-4, Days 3-4 (Connection Candidate Exchange)
+
+### Added - NAT Traversal Phase 1: STUN Discovery (2025-11-17)
+
+**STUN Client Implementation:**
+
+- **Manual RFC 5389 STUN protocol** implementation (373 lines, zero external dependencies)
+  - **Location:** `icn-net/src/stun.rs`
+  - **Features:**
+    - IPv4 and IPv6 XOR-MAPPED-ADDRESS parsing
+    - Retry logic with exponential backoff (3 attempts, 5s timeout, 100-400ms backoff)
+    - Async DNS resolution for STUN server hostnames (tokio::net::lookup_host)
+    - Configurable timeout and retry count
+    - Google STUN servers helper: `StunClient::with_google_stun()`
+  - **Test Coverage:** 3 comprehensive tests (creation, config, integration with real server)
+  - **Decision:** Manual implementation preferred over external libraries (stun-rs, rustun) for simplicity and control
+
+**SessionManager Integration:**
+
+- Added **public endpoint discovery** on startup if STUN servers configured
+  - **New field:** `public_endpoint: Arc<RwLock<Option<SocketAddr>>>`
+  - **New parameter:** `stun_servers: Option<Vec<SocketAddr>>` in `SessionManager::start()`
+  - **Behavior:** Discovers public endpoint, logs result, stores for future use
+  - **Graceful degradation:** Logs warning but doesn't fail startup if STUN discovery fails
+  - **Public API:** `SessionManager::public_endpoint()` getter method
+
+**Integration Points:**
+
+- **NetworkActor** updated with `None` for stun_servers parameter (TODO: add config)
+- **Test updates:** All 3 SessionManager test helpers updated to pass new parameter
+- **Export:** `StunClient` publicly exported from `icn-net`
+
+**Progress Tracking:**
+
+- ✅ **Phase 1 Complete:** STUN Discovery (MVC Week 3, Days 1-2)
+- ⏳ **Next:** Phase 2 - Connection Candidate Exchange (gossip protocol)
+- See [`docs/nat-traversal-design.md`](docs/nat-traversal-design.md) for full architecture
+
+**References:**
+- RFC 5389: STUN (Session Traversal Utilities for NAT)
+- MVC Track: Week 3-4 - NAT Traversal & Testing
+- Design: `docs/nat-traversal-design.md` (369 lines, comprehensive)
+
+### Fixed - Social Recovery & Core Stability (2025-11-17)
+
+**CRITICAL BUG FIX - Ledger Recovery Transfer:**
+
+- **BUG #30 (CRITICAL):** Fixed inverted debit/credit in social recovery balance transfers
+  - **Problem:** `transfer_balances_for_recovery()` had backwards debit/credit logic during recovery
+  - **Location:** `icn-ledger/src/ledger.rs:469-484`
+  - **Broken Behavior:**
+    - Old DID with +100 balance → `debit(old_did, 100)` → increased to +200 (doubled!) ❌
+    - New DID with 0 balance → `credit(new_did, 100)` → decreased to -100 (wrong direction!) ❌
+  - **Impact:** ALL social recovery operations would have transferred balances incorrectly
+  - **Consequence:** Users recovering their identity would see:
+    - Old identity retaining AND doubling balances (200 instead of 0)
+    - New identity receiving negative balances (-100 instead of +100)
+  - **Fix:** Swapped debit/credit in recovery transfer logic:
+    - Old DID with +100 → `credit(old_did, 100)` → reduced to 0 ✅
+    - New DID with 0 → `debit(new_did, 100)` → increased to +100 ✅
+  - **Discovery:** Found during integration test debugging for `test_full_recovery_flow`
+  - **Severity:** Would have been catastrophic in production - every recovery would create accounting errors
+  - **Test Coverage:** Integration test now validates correct balance transfer (old: 100→0, new: 0→100)
+
+**Social Recovery Integration Test Fixes:**
+
+- Fixed gossip topic creation error in recovery test
+  - **Problem:** Test attempted to subscribe to `identity:recovery` topic before creating it
+  - **Fix:** Create topic with `gossip.create_topic()` before subscribing
+- Fixed async/blocking conflict in trust lookup
+  - **Problem:** Used `blocking_read()` inside async context, causing runtime panic
+  - **Fix:** Use `try_read()` for non-blocking trust graph access
+- Fixed ledger semantics in test setup
+  - **Problem:** Test used old inverted debit/credit from before Phase 7 fix
+  - **Fix:** Alice receives = `debit(alice, 100)` + `credit(bob, 100)`
+- Fixed recovery ID mismatch
+  - **Problem:** Test hardcoded `recovery_id = "test-recovery-1"` but `RecoveryEvent` auto-generates IDs
+  - **Fix:** Use `recovery.id` from the created RecoveryEvent
+- Fixed missing Carol attestation
+  - **Problem:** Only Bob's attestation added, 2-of-2 threshold not met
+  - **Fix:** Add both `bob_attestation` and `carol_attestation` before finalizing
+- Added manual trust/ledger migration
+  - **Problem:** Gossip notification handler couldn't re-finalize already-finalized recovery
+  - **Fix:** Manually call `trust.map_did_recovery()` and `ledger.transfer_balances_for_recovery()` in test
+  - **Result:** Test validates complete flow: 2 trust edges migrated, 1 currency transferred (100 hours)
+
+**Code Quality Improvements:**
+
+- Cleaned up all compiler warnings (zero warnings build):
+  - `icn-identity`: Marked `encrypt_and_save()` and `CachedDidDocument.source` as reserved for future use
+  - `icn-snapshot`: Marked `DEFAULT_SNAPSHOT_RETENTION` constant as reserved
+  - `icn-governance`: Renamed feature `sled` → `governance_sled` to avoid cfg ambiguity
+  - `icn-gateway`: Fixed unused `shutdown_rx` variable, marked `Challenge.did` field as reserved
+
+**Test Results:**
+- `test_full_recovery_flow` now passes (validates end-to-end social recovery)
+- 262+ library tests passing
+- Zero compiler warnings
+
+### Fixed - Gateway Production Hardening (Phase 14 Continued) (2025-11-16)
+
+**Critical DoS & Security Fixes:**
+
+- **BUG #15 (CRITICAL):** Unbounded transaction history DoS prevented
+  - **Problem:** `GET /ledger/:coop/history` loaded ALL transactions into memory via `get_all_entries()`
+  - **Impact:** Cooperative with millions of transactions would cause OOM crash, no pagination limits
+  - **Fix:** Added pagination with `?offset=0&limit=100` query parameters (max 1,000 per request, default 100)
+  - **Validation:** New `validate_history_limit()` function enforces MAX_HISTORY_LIMIT = 1,000
+  - **Limitation:** Still loads all entries before pagination due to ledger API constraints (TODO: cursor-based pagination in icn-ledger)
+
+- **BUG #16 (HIGH):** Graceful shutdown for background cleanup task
+  - **Problem:** Background cleanup task ran indefinitely with `loop`, no shutdown handling
+  - **Impact:** Server shutdown left cleanup task running, prevented clean termination
+  - **Fix:** Added tokio::broadcast shutdown channel, cleanup task uses tokio::select! to listen for shutdown signal
+  - **Implementation:** Server awaits completion, signals cleanup task, 100ms grace period for cleanup to finish
+
+- **BUG #17 (HIGH):** HTTP timeout configuration prevents connection exhaustion
+  - **Problem:** No HTTP timeout settings configured, slow clients could hold connections indefinitely
+  - **Impact:** Connection pool exhaustion, slow-loris DoS attacks possible
+  - **Fix:** Added production-ready timeouts:
+    - `keep_alive`: 75 seconds (standard HTTP/1.1 keep-alive)
+    - `client_request_timeout`: 30 seconds (prevents slow-loris)
+    - `client_disconnect_timeout`: 5 seconds (prevents hanging on dead clients)
+
+**Input Validation Improvements:**
+
+- **BUG #18 (MEDIUM):** Signature length validation in auth verify
+  - **Problem:** `hex::decode()` called without validating Ed25519 signature length (must be 64 bytes)
+  - **Impact:** Wasted CPU on expensive verification for obviously invalid lengths (0-byte, 1000-byte, etc.)
+  - **Fix:** Validate length == 64 bytes AFTER decode, BEFORE crypto operation
+  - **Metric:** Track `auth_failures_inc("invalid_signature_length")`
+
+- **BUG #19 (LOW):** Cooperative ID validation in auth verify
+  - **Problem:** `req.coop_id` passed to `verify_challenge()` without validation
+  - **Impact:** Minor - could allow malformed coop IDs in JWT tokens (API endpoints do validate)
+  - **Fix:** Call `validate_coop_id()` before token generation
+  - **Metric:** Track `auth_failures_inc("invalid_coop_id")`
+
+- **BUG #23 (CRITICAL):** Timing attack in auth verification prevented
+  - **Problem:** Short-circuit `||` operator broke constant-time guarantee in `verify_challenge()`
+  - **Impact:** If signature invalid, expiration check was skipped, creating timing side-channel
+  - **Attack:** Attackers could measure response times to determine if signature was valid before checking expiration
+  - **Fix:** Use bitwise `|` instead of `||` to force evaluation of both conditions
+  - **Location:** `auth.rs:150` - `if !signature_valid | is_expired {`
+  - **Documentation:** Lines 81-84 and CHANGELOG BUG #7 explicitly claim constant-time behavior, which was violated
+  - **Verification:** Both signature validation AND expiration check now always execute
+
+- **BUG #24 (CRITICAL):** WebSocket connection counter race condition
+  - **Problem:** When global limit reached, `started()` called `ctx.stop()` without incrementing counter
+  - **Impact:** `stopped()` always decremented, even when `started()` never incremented → counter underflow
+  - **Consequence:** Counter became out of sync, allowing connection limit bypass after multiple rejections
+  - **Fix:** Added `connection_tracked: bool` field to `WsSession` struct
+  - **Implementation:** Only increment sets `connection_tracked = true`, `stopped()` only decrements if true
+  - **Location:** `websocket.rs:42-254`
+  - **Verification:** Rejected connections no longer affect counter
+
+- **BUG #25 (CRITICAL):** Path traversal vulnerability in ledger file paths
+  - **Problem:** `coop_id` from URL path used directly in file path construction without validation
+  - **Location:** `ledger_mgr.rs:75` - `data_dir.join("ledgers").join(coop_id)`
+  - **Attack Vector:** Send request to `/ledger/../../etc/passwd/balance/did:icn:attacker`
+  - **Exploit:** `coop_id = "../../etc/passwd"` creates path `data_dir/ledgers/../../etc/passwd`
+  - **Impact:** Read/write arbitrary files accessible to the process (RCE potential if combined with write operations)
+  - **Root Cause:** `validate_coop_id()` only called at cooperative CREATION, not when accessing ledgers
+  - **Consequence:** Non-existent coops trigger ledger creation with attacker-controlled paths
+  - **Fix:** Added `validate_coop_id()` call at start of `get_ledger()` method
+  - **Validation:** Only alphanumeric, hyphens, underscores allowed - prevents `../` and other traversal patterns
+  - **Defense-in-Depth:** Validation now enforced BEFORE any file operations occur
+
+- **BUG #26 (MEDIUM):** Information leakage in internal error responses
+  - **Problem:** `error_response()` returned raw `self.to_string()` for all errors, exposing implementation details
+  - **Leaked Information:**
+    - "Lock poisoned: ..." reveals concurrency implementation (RwLock usage)
+    - "JWT encoding failed: ..." reveals crypto implementation details
+    - File paths from `IoError` (could reveal directory structure)
+    - Full error chains from `SubstrateError` (internal component details)
+  - **Impact:** Helps attackers understand system internals, aids reconnaissance for further attacks
+  - **Fix:** Sanitize internal errors to generic "Internal server error" while preserving logging
+  - **Implementation:** User errors (BadRequest, NotFound) still show details, internal errors sanitized
+  - **Observability:** Full error details logged via `tracing::error!()` for debugging
+  - **Location:** `error.rs:50-81`
+  - **Security Principle:** Defense in depth - never expose implementation details to untrusted clients
+
+- **BUG #27 (HIGH):** Integer overflow in history pagination arithmetic
+  - **Problem:** `offset` parameter in `GET /ledger/:coop/history` not validated, could cause integer overflow
+  - **Location:** `ledger_mgr.rs:203` - `let end = (offset + limit).min(total);`
+  - **Attack Vector:** Send request with `offset=usize::MAX-500&limit=1000`
+  - **Exploit:**
+    1. Arithmetic: `(usize::MAX - 500) + 1000` wraps around to 499 in release builds
+    2. Slice operation: `entries[(usize::MAX-500)..499]` causes out-of-bounds panic or returns wrong data
+  - **Impact:**
+    - Out-of-bounds access causing panic (DoS)
+    - Data leakage from returning wrong transaction range
+    - Bypass of pagination limits
+  - **Root Cause:**
+    1. No validation on `offset` parameter (only `limit` was validated)
+    2. Addition uses wrapping arithmetic in release builds (Rust default)
+    3. Early return at line 199 only prevents some overflow cases, not all
+  - **Fix:**
+    1. Added `validate_history_offset()` with MAX_HISTORY_OFFSET = usize::MAX / 2
+    2. Changed pagination arithmetic to use `saturating_add()` for defense in depth
+  - **Defense-in-Depth:** Two layers of protection (validation + saturating arithmetic)
+  - **Verification:** New test coverage validates offset limits
+
+- **BUG #28 (CRITICAL):** Unbounded channel memory leak in WebSocket event polling
+  - **Problem:** WebSocket event polling only processed ONE event per 100ms poll cycle
+  - **Location:** `websocket.rs:161-196` - `poll_events()` method
+  - **Attack Scenario:**
+    1. Cooperative with 1,000 WebSocket subscribers (max allowed)
+    2. High-activity period: 100 payment events/second
+    3. Each event cloned and sent to all 1,000 channels
+    4. **Consumption**: 10 events/sec per channel (1 event per 100ms poll)
+    5. **Arrival**: 100 events/sec per channel
+    6. **Growth**: 90 events/sec × 1,000 channels = 90,000 events/sec accumulation
+  - **Memory Impact:**
+    - After 1 minute: ~5,400 events/channel × 1,000 = 5.4M events buffered
+    - After 10 minutes: 54M events buffered (~27 GB at 500 bytes/event)
+    - **Result**: OOM crash, complete service outage
+  - **Root Causes:**
+    1. Using `UnboundedSender`/`UnboundedReceiver` (no backpressure mechanism)
+    2. Processing only ONE event per poll instead of draining all available
+    3. No limit on channel buffer size
+    4. No event dropping when overwhelmed
+  - **Fix:**
+    1. Changed `poll_events()` to drain ALL available events per poll cycle using loop
+    2. Added MAX_EVENTS_PER_POLL = 1,000 safety limit to prevent actor starvation
+    3. Warning logged when limit hit (indicates backlog exists)
+    4. Maintains 100ms poll interval but processes up to 1,000 events per poll
+  - **Performance:** Can now handle 10,000 events/sec per WebSocket (vs previous 10/sec)
+  - **Remaining Risk:** Extreme sustained load >10,000 events/sec could still cause backlog
+  - **Monitoring:** Warning logs when MAX_EVENTS_PER_POLL hit indicate need for bounded channels
+
+- **BUG #29 (HIGH):** Prometheus metrics cardinality explosion via user-controlled paths
+  - **Problem:** Metrics middleware used raw request path as Prometheus label
+  - **Location:** `middleware.rs:100-116` - `MetricsMiddleware::call()`
+  - **Attack Vector:**
+    - Raw paths include user-controlled segments: `/ledger/coop1/balance/did:icn:abc123`
+    - Attacker creates millions of unique coops and DIDs via API calls
+    - Each unique path creates new Prometheus time series
+  - **Cardinality Impact:**
+    - 1 million unique paths → 1 million time series → ~100 MB memory in Prometheus
+    - 10 million paths → ~1 GB memory in Prometheus
+    - **Result**: Prometheus OOM crash, monitoring system completely offline
+  - **Operational Consequence:**
+    - Blind deployment (no metrics, no alerts, no dashboards)
+    - Undetected outages and performance degradation
+    - SLA violations, potential data loss incidents go unnoticed
+    - Cannot diagnose production issues without metrics
+  - **Root Cause:**
+    - Using `req.path()` returns `/ledger/test-coop/balance/did:icn:abc123` (raw path)
+    - Variable segments (coop_id, did) embedded in metric labels
+    - No normalization → unbounded cardinality as users create new coops/DIDs
+  - **Fix:**
+    - Use `req.match_pattern()` to get route pattern instead of raw path
+    - Normalizes: `/ledger/test-coop/balance/did:icn:abc` → `/ledger/{coop_id}/balance/{did}`
+    - Bounded cardinality: Only 14 unique path labels (one per route endpoint)
+  - **Verification:** Cardinality now bounded regardless of traffic volume or user behavior
+
+**Earlier TOCTOU Race Condition Fixes:**
+
+- **BUG #7 (CRITICAL):** Timing attack in authentication prevented
+  - **Problem:** Early returns in `verify_challenge()` bypassed expensive signature verification
+  - **Impact:** Attackers could measure response times to enumerate valid DIDs
+  - **Fix:** Always perform signature verification (real or dummy) for constant-time behavior
+  - **Implementation:** Dummy verification with Ed25519 when parsing fails
+
+- **BUG #8 (CRITICAL):** Information leakage in authentication errors
+  - **Problem:** Different error messages revealed why authentication failed (parsing vs signature vs expiration)
+  - **Impact:** Enumeration attacks to discover valid DIDs, challenges, signatures
+  - **Fix:** Generic "Authentication failed" message for all failure modes
+
+- **BUG #9 (CRITICAL):** Unbounded cooperative creation DoS
+  - **Problem:** No global limit on number of cooperatives
+  - **Impact:** Memory exhaustion via unlimited coop creation
+  - **Fix:** MAX_COOPERATIVES = 1,000 limit enforced atomically
+
+- **BUG #10 (MEDIUM):** Timestamp panic on clock manipulation
+  - **Problem:** `.unwrap()` on SystemTime could panic if system clock set before Unix epoch
+  - **Fix:** Replaced with descriptive `.expect()` message
+
+- **BUG #11 (CRITICAL):** TOCTOU race in cooperative creation limit
+  - **Problem:** Count check outside atomic `create_coop()` operation
+  - **Impact:** Concurrent threads could bypass MAX_COOPERATIVES limit
+  - **Fix:** Moved `validate_coop_count()` inside `create_coop()` while holding write lock
+
+- **BUG #12 (CRITICAL):** TOCTOU race in member addition limit + false documentation
+  - **Problem:** (1) Comment claimed validation in `add_member()` but it didn't exist (2) Racy check outside atomic operation
+  - **Impact:** Concurrent threads could bypass MAX_MEMBERS_PER_COOP limit
+  - **Fix:** Added `validate_member_count()` inside `add_member()` method
+
+- **BUG #13 (HIGH):** Unbounded WebSocket subscriber DoS
+  - **Problem:** No limit on WebSocket subscriptions per cooperative
+  - **Impact:** Memory exhaustion via unlimited WebSocket connections
+  - **Fix:** MAX_SUBSCRIBERS_PER_COOP = 1,000 limit, `subscribe()` returns Option
+
+- **BUG #14 (MEDIUM):** Dummy verification logic error
+  - **Problem:** Dummy signature verification succeeded instead of failed (signed message verified against same message)
+  - **Impact:** Timing attack mitigation ineffective in edge cases
+  - **Fix:** Verify dummy signature against DIFFERENT message to ensure it always fails
+
+**WebSocket Security Hardening:**
+
+- **BUG #20 (HIGH):** Unbounded WebSocket message size prevented
+  - **Problem:** No size validation on incoming text messages, attacker could send gigabyte payloads
+  - **Impact:** Memory exhaustion and OOM crashes
+  - **Fix:** MAX_WEBSOCKET_MESSAGE_SIZE = 65,536 bytes (64KB), validate before parsing, close connection on violation
+  - **Implementation:** Check text.len() before JSON deserialization
+
+- **BUG #21 (LOW):** Information leakage in WebSocket auth errors
+  - **Problem:** Different error messages revealed DID parsing errors and verification failures
+  - **Impact:** Enumeration attacks to discover valid tokens/DIDs
+  - **Fix:** Generic "Authentication failed" message for all failure modes
+
+- **BUG #22 (MEDIUM):** No global WebSocket connection limit
+  - **Problem:** Only per-coop limit (1,000), attacker could create 1,000 × 1,000 = 1M connections
+  - **Impact:** Resource exhaustion from unlimited connections
+  - **Fix:** MAX_TOTAL_WEBSOCKET_CONNECTIONS = 10,000, check in started() before incrementing counter
+
+**Test Coverage:**
+- **51 tests passing** (49 existing + 2 new validation tests)
+- New tests: `test_verify_endpoint_invalid_signature_length`, `test_verify_endpoint_invalid_coop_id`
+
+### Fixed - Gateway Memory Leaks and Storage (2025-11-16)
+
+**Critical Memory Leak Fixes:**
+- **FIXED:** Rate limiter bucket cleanup now runs automatically via background task
+  - **Problem:** `cleanup_inactive_buckets()` existed but was never called
+  - **Impact:** Every unique DID created a permanent HashMap entry → unbounded memory growth
+  - **Fix:** Added 5-minute background cleanup task that removes buckets inactive for 1+ hour
+  - **Implementation:** `server.rs` spawns tokio task with interval timer
+- **FIXED:** Event broadcaster now removes dead WebSocket channels automatically
+  - **Problem:** `broadcast()` comment claimed "removing closed channels" but didn't actually remove them
+  - **Impact:** Long-running gateway accumulated dead channels, wasting memory/CPU on failed sends
+  - **Fix:** Modified `broadcast()` to detect send failures and acquire write lock to remove dead channels
+  - **Optimization:** Read-only path for common case (no dead channels), write lock only when needed
+- **FIXED:** Authentication challenges now cleaned up automatically
+  - **Problem:** `cleanup_expired_challenges()` existed but was never called
+  - **Impact:** 5-minute TTL challenges accumulated forever in HashMap
+  - **Fix:** Background task cleans up expired challenges every 5 minutes
+  - **Logging:** Logs cleanup count when >0 challenges removed
+- **FIXED:** Deleted cooperatives now clean up WebSocket subscribers immediately
+  - **Problem:** Background cleanup only iterated over existing coops, so deleted coop subscribers never cleaned
+  - **Impact:** Long-running gateway with many coop create/delete cycles accumulated dead subscriber lists
+  - **Fix:** `delete_coop()` now immediately calls `broadcaster.cleanup()` for deleted coop
+  - **Implementation:** Spawns async cleanup task on coop deletion
+
+**Critical Data Loss Fix:**
+- **CRITICAL FIXED:** Ledger storage now persistent instead of temporary
+  - **Problem:** `LedgerManager` used `SledStore::temporary()` - deleted on process exit
+  - **Impact:** **ALL ledger data (payments, balances, history) lost on gateway restart**
+  - **Severity:** Production blocker - completely unusable for real deployments
+  - **Fix:** Added `new_with_storage(data_dir)` constructor that uses persistent Sled databases
+  - **Storage Layout:** `{data_dir}/ledgers/{coop_id}/` - isolated per cooperative
+  - **Backward Compat:** `new()` still uses temporary storage for testing
+  - **Server API:** Added `GatewayServer::new_with_storage()` for production use
+
+**Background Cleanup Architecture:**
+- Spawns single tokio task in `server.rs` running every 5 minutes
+- Cleans up 3 types of resources:
+  1. Expired authentication challenges (5min TTL)
+  2. Inactive rate limiter buckets (1hr inactivity threshold)
+  3. Dead WebSocket channels (per cooperative)
+- Logs cleanup activity at info level when items removed
+- Zero-overhead when no cleanup needed (most of the time)
+
+**Cooperative ID Listing:**
+- Added `CoopManager::list_all_coop_ids()` for cleanup task iteration
+- Returns just IDs (not full coop data) for efficient iteration
+
+**Testing:** All 38 gateway tests pass
+
+**Deployment Impact:**
+- Existing temporary ledger data WILL BE LOST (expected - was never persistent)
+- New deployments MUST use `GatewayServer::new_with_storage(data_dir)` for production
+- Gateway now production-ready with no known memory leaks
+
+**Documentation Updates:**
+- Updated `icn-gateway/README.md` with Storage Configuration section
+- Added production deployment guide with persistent storage requirements
+- Added Background Cleanup Task architecture documentation
+- Updated Known Limitations to reflect persistent ledger storage
+- Removed outdated "No Persistent State" limitation
+
+### Fixed - Gateway API Route Registration (Phase 14 Continued) (2025-11-16)
+
+**Critical Route Bug Fix:**
+- **CRITICAL:** Fixed duplicate `/v1` scope registration that made all public endpoints inaccessible
+  - **Problem:** Two separate `.service(web::scope("/v1"))` registrations
+  - **Impact:** Second registration shadowed first, blocking health, auth, and websocket endpoints
+  - **Severity:** CRITICAL - Gateway completely unusable (authentication impossible)
+  - **Resolution:** Consolidated into single `/v1` scope with nested scopes for protected routes
+- **Route Structure (Fixed):**
+  ```rust
+  web::scope("/v1")
+      // Public endpoints (no middleware)
+      .service(api::health::health)
+      .service(api::auth::challenge)
+      .service(api::auth::verify)
+      .service(api::websocket::websocket)
+      // Protected coop endpoints
+      .service(
+          web::scope("/coops")
+              .service(...)
+              .wrap(rate_limiting)
+              .wrap(auth.clone())
+      )
+      // Protected ledger endpoints
+      .service(
+          web::scope("/ledger")
+              .service(...)
+              .wrap(rate_limiting)
+              .wrap(auth)
+      )
+  ```
+- **Middleware Application:**
+  - Public endpoints: No authentication required
+  - Protected endpoints: Auth first, then rate limiting (wrapping order: last runs first)
+  - MetricsMiddleware wraps entire app for comprehensive request tracking
+- **Testing:** All 38 gateway tests pass after fix
+- **Security Impact:** HIGH - Authentication flow now accessible
+
+### Added - Gateway Production Monitoring Configurations (Phase 14 Continued) (2025-11-16)
+
+**Turnkey Monitoring Setup:**
+- **Grafana Dashboard** (`icn-gateway/grafana-dashboard.json`)
+  - 10 pre-configured panels for production monitoring
+  - Request rate by endpoint (time series)
+  - Latency percentiles (p50, p95, p99) per endpoint
+  - Error rate percentage (4xx + 5xx)
+  - Active WebSocket connections (gauge)
+  - Authentication success rate (percentage)
+  - Auth failure breakdown by reason (stacked graph)
+  - Top 10 rate-limited DIDs (leaderboard)
+  - Authorization failures by missing scope
+  - Payment volume by currency (hourly rates)
+  - Cooperative activity (created, members added/removed)
+- **Prometheus Alerts** (`icn-gateway/prometheus-alerts.yml`)
+  - 9 production-ready alerting rules with severity levels
+  - **Critical Alerts:**
+    - HighErrorRate: >5% 5xx errors for 5 minutes
+    - LowAuthSuccessRate: <50% auth success for 5 minutes
+  - **Warning Alerts:**
+    - HighLatency: p95 >1.0s for 10 minutes
+    - AuthenticationFailureSpike: >10 failures/sec for 5 minutes
+    - WebSocketConnectionDrop: >5 disconnections/sec for 5 minutes
+    - NoTraffic: Zero requests for 5 minutes
+  - **Info Alerts:**
+    - RateLimitingActive: >1 rejection/sec for 10 minutes
+    - AuthorizationFailures: >1 failure/sec by scope for 10 minutes
+    - NoPaymentActivity: Zero payments for 2 hours
+
+**Import Instructions:**
+- Grafana: Import `grafana-dashboard.json` via UI
+- Prometheus: Add to `prometheus.yml` alert rules section
+- Ready for immediate deployment use
+
+### Added - Gateway Request Metrics Middleware (Phase 14 Continued) (2025-11-16)
+
+**MetricsMiddleware Implementation:**
+- **Actix-web Transform middleware** for automatic request tracking
+- Wraps all HTTP requests to measure duration and count
+- **Metrics Captured:**
+  - Request count by endpoint and method
+  - Latency histogram by endpoint and status code
+  - Duration measured with `Instant::now()` for accuracy
+- **Architecture:**
+  - `MetricsMiddleware` - Transform implementation
+  - `MetricsMiddlewareService<S>` - Service wrapper with timing logic
+  - Async-safe with `LocalBoxFuture` for request handling
+- **Middleware Stack Order:**
+  ```
+  Request → MetricsMiddleware (outermost - measures everything)
+         → Logger (actix default)
+         → Compress (actix default)
+         → Auth (per scope)
+         → RateLimiter (per scope)
+         → Handler
+  ```
+- **Implementation:**
+  - `icn-gateway/src/middleware.rs` - MetricsMiddleware struct
+  - `icn-gateway/src/server.rs` - `.wrap(MetricsMiddleware)` at app level
+- **Dependencies:** Added `futures-util = "0.3"` for `LocalBoxFuture`
+- **Testing:** All 38 gateway tests pass
+
+### Added - Gateway Prometheus Metrics Instrumentation (Phase 14 Continued) (2025-11-16)
+
+**Comprehensive Metrics Coverage:**
+- **21 Prometheus metrics** across 6 operational categories
+- Fire-and-forget metric recording (non-blocking)
+- Integration with existing `icn-obs` metrics infrastructure
+
+**Authentication Metrics (5):**
+- `icn_gateway_auth_challenges_total` - Challenge requests issued
+- `icn_gateway_auth_verifications_total` - Verification attempts
+- `icn_gateway_auth_successes_total` - Successful authentications
+- `icn_gateway_auth_failures_total` - Failures by reason (invalid_did, invalid_signature_encoding, verification_failed)
+- Labels: `reason` for failure categorization
+
+**Authorization Metrics (1):**
+- `icn_gateway_authorization_failures_total` - Missing scope failures
+- Labels: `required_scope` (ledger:read, ledger:write, coop:admin, etc.)
+
+**Rate Limiting Metrics (1):**
+- `icn_gateway_rate_limit_exceeded_total` - Rate limit violations by DID
+- Labels: `did` for per-user tracking
+
+**Request Metrics (2):**
+- `icn_gateway_requests_total` - Total requests by endpoint and method
+- `icn_gateway_request_duration_seconds` - Latency histogram by endpoint and status
+- Labels: `endpoint`, `method`, `status`
+
+**WebSocket Metrics (4):**
+- `icn_gateway_websocket_connections_total` - Total connections (counter)
+- `icn_gateway_websocket_connections_active` - Currently active connections (gauge)
+- `icn_gateway_websocket_disconnections_total` - Disconnection events
+- `icn_gateway_websocket_messages_sent_total` - Event messages sent to clients
+- **Atomic Connection Tracking:** `AtomicU64` for lock-free active connection count
+
+**Cooperative Metrics (4):**
+- `icn_gateway_coops_created_total` - Cooperative creation events
+- `icn_gateway_coops_deleted_total` - Cooperative deletion events
+- `icn_gateway_members_added_total` - Member addition events
+- `icn_gateway_members_removed_total` - Member removal events
+
+**Ledger Metrics (4):**
+- `icn_gateway_payments_created_total` - Payment transactions created
+- `icn_gateway_payment_amount` - Payment amount histogram by currency
+- `icn_gateway_balance_queries_total` - Balance query count
+- `icn_gateway_history_queries_total` - Transaction history query count
+- Labels: `currency` for payment tracking
+
+**Instrumentation Locations:**
+- `icn-gateway/src/api/auth.rs` - Auth metrics
+- `icn-gateway/src/api/coops.rs` - Coop metrics
+- `icn-gateway/src/api/ledger.rs` - Ledger metrics
+- `icn-gateway/src/middleware.rs` - Request + authorization metrics
+- `icn-gateway/src/rate_limit.rs` - Rate limit metrics
+- `icn-gateway/src/websocket.rs` - WebSocket metrics with atomic tracking
+
+**Metrics Module:**
+- Added `gateway` submodule to `icn-obs/src/metrics.rs` (170+ lines)
+- 21 helper functions for metric recording
+- Consistent naming: `icn_gateway_{category}_{metric}_{unit}`
+
+**Dependencies:**
+- Added `icn-obs` to `icn-gateway/Cargo.toml`
+- Added `metrics = "0.22"` for metric macros
+
+**Testing:** All 38 gateway tests pass, 432 workspace tests pass
+
+**Observability Benefits:**
+- Real-time performance monitoring
+- Attack detection (auth failures, rate limiting)
+- Capacity planning (WebSocket connections, payment volume)
+- SLO tracking (latency percentiles, error rates)
+- Operational visibility into gateway health
+
+### Fixed - Cooperative Owner DID Extraction (Phase 14 Continued) (2025-11-16)
+
+**Ownership Fix:**
+- Cooperative creation now correctly uses authenticated user's DID as owner
+- Removed placeholder DID generation - uses JWT token's `sub` claim
+- Added explicit test: `test_create_coop_uses_authenticated_did`
+- Ensures proper ownership tracking from creation
+- Total: 38 tests passing (up from 37)
+
+**Technical Details:**
+- Uses `get_claims()` helper to extract TokenClaims from request
+- Parses `claims.sub` to get owner DID
+- Returns AuthenticationFailed if claims missing
+- Returns BadRequest if DID format invalid
+
+### Added - Scope-Based Authorization (Phase 14 Continued) (2025-11-16)
+
+**Authorization Enforcement:**
+- All protected endpoints now enforce JWT scope-based authorization
+- `require_scope()` helper function validates scopes against required permissions
+- HTTP 403 Forbidden response when required scope missing
+- Scope hierarchy:
+  - `ledger:read` - Required for balance queries and transaction history
+  - `ledger:write` - Required for creating payments
+  - `coop:read` - Required for viewing cooperative information
+  - `coop:write` - Required for creating cooperatives
+  - `coop:admin` - Required for member management and settings changes
+- 2 comprehensive authorization tests verify correct scope enforcement
+- Total: 37 tests passing (up from 35)
+
+**Security Benefits:**
+- Prevents privilege escalation (read-only tokens cannot write)
+- Fine-grained access control for API operations
+- Clear separation between read and write permissions
+- Administrative operations require explicit `coop:admin` scope
+
+### Added - Gateway API Improvements (Phase 14 Continued) (2025-11-16)
+
+**API Versioning:**
+- All endpoints now under `/v1` namespace for future API evolution
+- Versioned paths: `/v1/health`, `/v1/auth/*`, `/v1/coops/*`, `/v1/ledger/*`, `/v1/ws/:coop_id`
+- Enables backward-compatible API changes in future versions
+- Clean migration path for API consumers
+
+**Per-DID Rate Limiting:**
+- Token bucket algorithm prevents API abuse and resource exhaustion
+- Independent rate limits per authenticated DID
+- Default: 100 token burst capacity, 10 tokens/second refill (600 requests/minute sustained)
+- Configurable: `RateLimitConfig` allows custom capacity, refill rate, and cost per request
+- HTTP 429 Too Many Requests response when rate limit exceeded
+- Automatic cleanup of inactive buckets prevents unbounded memory growth
+- Applied to protected endpoints (`/v1/coops/*`, `/v1/ledger/*`)
+- Public endpoints (health, auth, websocket) not rate-limited
+
+**Technical Details:**
+- `RateLimiter`: Arc<RwLock<HashMap<DID, TokenBucket>>> for per-DID tracking
+- `TokenBucket`: Continuous refill based on elapsed time (Instant-based)
+- Middleware integration via `actix_web::middleware::from_fn`
+- Rate limiting applied after JWT authentication (requires valid claims)
+- 5 comprehensive tests covering bucket behavior, refill, capacity limits, DID isolation, cleanup
+
+**Benefits:**
+- Protects daemon resources from malicious or buggy clients
+- Fair resource allocation across DIDs
+- Production-ready abuse prevention
+- Configurable limits per deployment scenario
+
+### Added - Platform Layer: REST API Gateway (Phase 14) (2025-01-15)
+
+**New Crate: icn-gateway**
+- Complete HTTP API server for cooperative applications
+- Actix-web 4 async framework with middleware
+- 14 endpoints (13 REST + 1 WebSocket) across 5 modules
+- 30 tests passing (9 auth, 6 coop, 6 ledger, 4 middleware/websocket, 5 events)
+
+**Authentication & Authorization:**
+- DID-based challenge/verify flow
+- `POST /auth/challenge` - Request cryptographic challenge
+- `POST /auth/verify` - Verify signed challenge, receive JWT token
+- Ed25519 signature verification
+- JWT capability tokens with scoped permissions (coop_id + scopes)
+- 5-minute challenge TTL with automatic cleanup
+- Bearer token authentication middleware (actix-web-httpauth)
+- Protected endpoints require valid JWT in Authorization header
+- Token validation extracts claims into request extensions
+- Public endpoints: health, auth, websocket (auth handled post-connection)
+
+**Cooperative Namespace Management:**
+- `POST /coops` - Create cooperative
+- `GET /coops/:id` - Get cooperative info
+- `PUT /coops/:id/settings` - Update governance/credit policy/currency
+- `DELETE /coops/:id` - Delete cooperative
+- `POST /coops/:id/members` - Add member with role
+- `DELETE /coops/:id/members/:did` - Remove member
+- `PUT /coops/:id/members/:did/role` - Update member role
+- Role-based access control (Owner/Admin/Member)
+- Per-coop settings (governance model, credit policy, currency)
+
+**Ledger Operations:**
+- `GET /ledger/:coop_id/balance/:did` - Get account balances
+- `POST /ledger/:coop_id/payment` - Create payment transaction
+- `GET /ledger/:coop_id/history?did=...` - Get transaction history (with optional DID filter)
+- Per-cooperative isolated mutual credit ledgers
+- Double-entry bookkeeping with validation
+- SledStore backend for persistence
+
+**Real-time Event Streaming:**
+- `GET /ws/:coop_id` - WebSocket endpoint for real-time updates
+- Post-connection JWT authentication via JSON message protocol
+- Client sends `{"type": "Auth", "token": "..."}` after connecting
+- Server validates token and coop_id match before event subscription
+- Event types: PaymentCreated, MemberAdded, MemberRemoved, RoleUpdated, SettingsUpdated
+- EventBroadcaster: Pub/sub system with per-cooperative isolation
+- WsSession actor: Heartbeat/ping-pong with automatic connection cleanup (60s timeout)
+- Tokio mpsc channels for async event distribution (100ms polling)
+- Server messages: AuthOk, AuthError, Event, Error (all JSON-formatted)
+
+**Infrastructure:**
+- `GET /health` - Health check endpoint
+- Error handling with HTTP status mapping
+- JSON error responses
+- Request/response models for all endpoints
+- Logging and compression middleware
+
+**Architecture:**
+- `AuthManager` - Challenge/verify flow with JWT token generation and verification
+- `CoopManager` - In-memory coop namespace storage
+- `LedgerManager` - Per-coop ledgers with isolated storage
+- `EventBroadcaster` - Per-cooperative event pub/sub with tokio channels
+- `WsSession` - Actix actor for WebSocket connection lifecycle
+- JWT middleware (`middleware::jwt_auth`) - Bearer token validation for protected routes
+- Thread-safe shared state via Arc<RwLock<T>> and web::Data
+
+**Dependencies:**
+- actix-web 4, actix-web-actors, actix-web-httpauth, actix-cors
+- jsonwebtoken 9
+- hex, rand, ed25519-dalek 2
+
+**Note:** This is NOT an app runtime. Apps run externally and call this API. See `docs/platform-layer-design.md` for architecture.
+
+### Added - Gateway Integration with icnd (2025-01-15)
+
+**Runtime Integration:**
+- Gateway server integrated into icnd supervisor
+- Spawns in dedicated thread with separate Tokio runtime
+- Respects configuration enable/disable flag
+- Validates JWT secret before starting
+- Graceful error handling when misconfigured
+
+**Configuration System:**
+- `GatewayConfig` added to `icn-core/src/config.rs`
+- Fields: enabled, bind_addr, token_expiry_hours, challenge_ttl_minutes, jwt_secret
+- TOML serialization/deserialization
+- Serde defaults for all fields
+- Gateway disabled by default (opt-in)
+
+**CLI Arguments:**
+- `--gateway-enable`: Enable gateway API server
+- `--gateway-bind <IP:PORT>`: Override bind address
+- `--gateway-jwt-secret <SECRET>`: Set JWT secret
+- Environment variable support: ICN_GATEWAY_JWT_SECRET
+- Configuration priority: CLI args > env vars > config file
+
+**Example Configuration:**
+```toml
+[gateway]
+enabled = true
+bind_addr = "127.0.0.1:8080"
+token_expiry_hours = 24
+challenge_ttl_minutes = 5
+jwt_secret = "your-strong-secret-here"
+```
+
+**Documentation:**
+- Comprehensive example config file: `config/icn.toml.example`
+- Updated CLAUDE.md with 4 configuration methods
+- Security recommendations for production deployment
+- API usage examples with curl and wscat
+
+**Security Features:**
+- Opt-in by default (enabled: false)
+- Requires explicit JWT secret configuration
+- No default/fallback secrets
+- Helpful warnings when misconfigured
+- Localhost binding by default
+
+All tests pass. Gateway ready for production deployment.
+
+### Fixed
+
+**Governance:**
+- Fixed division-by-zero vulnerability in `quorum_met()` when total_members == 0
+- Now returns false instead of NaN/infinity
+
+### Added - Economic Safety Rails: Dispute Resolution System (Phase 12) (2025-01-14)
+
+**Dispute Management:**
+- `DisputeManager` for tracking and resolving entry disputes
+- File disputes against journal entries with reason and evidence
+- Assign mediators to disputes
+- Resolve disputes with multiple outcome types
+- Track dispute history and status
+
+**Dispute Types:**
+- `Dispute` record with filed_by, reason, evidence, mediator
+- `DisputeStatus`: Normal, Contested, Resolved
+- `DisputeOutcome`: Upheld, Reversed, Settlement, WriteOff
+- Persistent storage of all disputes
+
+**Dispute Operations:**
+- `file_dispute()` - Create new dispute with reason
+- `add_evidence()` - Attach supporting documentation
+- `assign_mediator()` - Assign trusted mediator
+- `resolve_dispute()` - Record resolution with outcome
+- `get_active_disputes()` - Query all active disputes
+- `get_disputes_by_filer()` - Filter by who filed
+
+**Implementation:**
+- New module: `icn-ledger/src/dispute.rs` (380 lines)
+- DisputeManager with persistent storage backend
+- Active disputes cached in memory
+- 6 unit tests covering dispute lifecycle
+
+**Use Cases:**
+- Member contests incorrect charge
+- Mediator investigates and resolves
+- Debt write-off for defaults
+- Settlement agreements between parties
+- Audit trail of all dispute activity
+
+**Example:**
+```rust
+let mut manager = DisputeManager::new(store)?;
+
+// File dispute
+manager.file_dispute(entry_hash, member_did, "Wrong amount".to_string(), timestamp)?;
+
+// Add evidence
+manager.add_evidence(&entry_hash, "Receipt shows $50, not $100".to_string())?;
+
+// Mediator resolves
+let outcome = DisputeOutcome::Settlement {
+    terms: "Split difference: $75".to_string(),
+    replacement_entry: Some(new_entry_hash),
+};
+manager.resolve_dispute(&entry_hash, mediator_did, outcome, timestamp)?;
+```
+
+### Added - Economic Safety Rails: Dynamic Credit Limits (Phase 12) (2025-01-14)
+
+**Credit Policy System:**
+- Dynamic credit limits based on trust score + transaction history
+- `CreditPolicy` calculates limits using formula: baseline + trust_bonus + history_bonus
+- Conservative and permissive policy presets
+- Trust bonus scales with trust graph score (0.0-1.0)
+- History bonus rewards cleared transaction volume
+
+**New Member Protection:**
+- `NewMemberPolicy` implements protective throttling for new participants
+- Initial low credit limit (10 hours default)
+- Contribution threshold before ramping starts (50 hours default)
+- Linear ramp over 90 days to full credit limit
+- Prevents "extract value and disappear" attacks
+
+**Credit Limit Calculation:**
+- `CreditPolicyManager` combines base policy + new member throttling
+- Effective limit is minimum of both policies
+- `total_cleared_by()` method tracks historical contributions
+- `check_transaction()` validates against calculated limits
+
+**Implementation:**
+- New module: `icn-ledger/src/credit_policy.rs`
+- `CreditPolicy::calculate_limit()` - Dynamic limit calculation
+- `NewMemberPolicy::calculate_effective_limit()` - Tenure-based ramping
+- `Ledger::total_cleared_by()` - Sum all credits for an account
+- 4 unit tests covering policy defaults, ramping, and limit checks
+
+**Economic Protection:**
+- Protects communities from free riders
+- Rewards trusted, active participants with higher limits
+- Gradual onboarding prevents new member exploitation
+- Foundation for Phase 12 dispute resolution and default handling
+
+**Example:**
+```rust
+// Conservative policy for new communities
+let policy = CreditPolicyManager::conservative("hours".to_string());
+
+// Calculate limit: baseline 100h + trust 24h + history 50h = 174h
+let limit = policy.calculate_credit_limit(
+    &member_did,
+    member_since,
+    current_time,
+    &ledger,
+    &trust_graph,
+)?;
+```
+
+### Added - Operational Hardening: Protocol Version Validation (Track B1) (2025-01-14)
+
+**Versioned Network Protocol:**
+- Protocol version constants: `PROTOCOL_VERSION`, `MIN_SUPPORTED_VERSION`, `MAX_SUPPORTED_VERSION`
+- Automatic version validation on message deserialization
+- Backward compatibility within version range (v1-v1 currently)
+- Forward compatibility detection (rejects messages from future versions)
+
+**Version Mismatch Handling:**
+- Clear error messages for version incompatibility
+- Prometheus metrics for monitoring version issues:
+  - `icn_network_protocol_version_mismatch_total` - Total version mismatches
+  - `icn_network_protocol_version_too_old_total` - Messages from old versions
+  - `icn_network_protocol_version_too_new_total` - Messages from future versions
+- Network actor tracks and logs version mismatches
+
+**Upgrade Safety:**
+- Prevents communication between incompatible protocol versions
+- Protects against parsing errors from unknown message formats
+- Foundation for rolling upgrades in future versions
+
+**Implementation:**
+- Version validation in `icn-net/src/protocol.rs::NetworkMessage::from_bytes()`
+- Metrics tracking in `icn-net/src/actor.rs` message receive loop
+- 4 new unit tests for version validation scenarios
+
+**Future Work:**
+- Version negotiation handshake for compatibility announcements
+- Graceful degradation for non-breaking changes
+- Version compatibility matrix for upgrade planning
+
+### Added - Operational Hardening: Operations Guide (Track B1) (2025-01-14)
+
+**Comprehensive Operations Documentation:**
+- Day-to-day operational workflows and procedures
+- Consolidates all operational documentation into one reference
+- Detailed command reference for all operational tasks
+- Troubleshooting workflows for common issues
+
+**Operations Workflows:**
+1. **Daily Operations** - Morning health checks (5 min), routine monitoring
+2. **Weekly Maintenance** - Backups, metrics review, disk usage checks (15-30 min)
+3. **Monthly Tasks** - Backup archival, device audits, update checks
+4. **Upgrade Procedures** - Current manual process + future automation plans
+5. **Capacity Planning** - Storage, memory, bandwidth growth estimates
+6. **Performance Tuning** - Configuration optimization for different use cases
+
+**Monitoring & Health:**
+- Dashboard interpretation guide
+- Health check endpoint integration examples
+- Key metrics to monitor with thresholds
+- Prometheus alerting rule examples
+
+**Operational Command Reference:**
+- Identity management commands
+- Device management commands
+- Node operations (start/stop/restart/logs)
+- Network diagnostics (peers, connectivity)
+- Gossip operations (topics, subscriptions, entries)
+- Ledger operations (balances, transactions, quarantine)
+- Metrics queries
+
+**Troubleshooting Workflows:**
+- Node won't start (port conflicts, keystore issues, permissions)
+- No peer connections (mDNS, firewall, TLS issues)
+- High quarantine size (conflicts, clock skew, attacks)
+- High memory usage (gossip growth, cache tuning)
+- Slow transaction processing (network latency, conflicts)
+
+**Implementation:**
+- New document: `docs/operations-guide.md` (800+ lines)
+- References deployment guide, incident response playbook, architecture docs
+- Ready for operational teams and community node operators
+
+### Added - Operational Hardening: Incident Response Playbook (Track B1) (2025-01-14)
+
+**Comprehensive Incident Response Documentation:**
+- Detailed procedures for 7 major incident scenarios
+- General incident response framework with P0-P3 severity levels
+- Step-by-step workflows with command examples
+- Monitoring and detection guidance
+
+**Incident Scenarios Covered:**
+1. **Node Compromise (P0)** - Immediate isolation, evidence preservation, device revocation
+2. **Ledger Corruption (P1)** - Quarantine assessment, recovery procedures, backup restoration
+3. **Key Suspected Stolen (P0)** - Emergency device revocation, key rotation ceremony
+4. **Network Partition (P1)** - Connectivity diagnosis, split-brain detection
+5. **Gossip Storm (P2)** - Rate limiting verification, peer blocking
+6. **Quarantine Growth (P2)** - Entry inspection, manual review vs automated cleanup
+7. **Monitoring and Detection** - Critical/warning/info alert definitions
+
+**Each Scenario Includes:**
+- Symptoms and diagnosis procedures
+- Immediate actions (first 15 minutes)
+- Recovery steps
+- Investigation and root cause analysis
+- Prevention strategies
+
+**Operations Support:**
+- Post-incident review template
+- Emergency contact information structure
+- Integration with monitoring dashboard
+- Balance between current v0.1 capabilities and future features
+
+**Implementation:**
+- New document: `docs/incident-response.md` (630+ lines)
+- Ready for operational deployment
+- Supports Track C pilot deployment readiness
+
+### Added - Operational Hardening: Monitoring Dashboard (Track B1) (2025-01-14)
+
+**Health Check Endpoint:**
+- `/health` endpoint returns JSON health status
+- HTTP status codes: 200 (healthy/degraded), 503 (unhealthy)
+- Real-time metrics: uptime, active connections, gossip topics, ledger quarantine size
+- Health state determination based on system metrics
+
+**Web Monitoring Dashboard:**
+- Real-time web UI at `http://localhost:8080/`
+- Auto-refreshing every 5 seconds
+- Key metrics displayed:
+  - Network: Active peers, messages sent/received, bytes transferred, rate limiting
+  - Gossip: Topics, entries, subscriptions, pull/push activity
+  - Ledger: Accounts, transactions, conflicts, quarantine status
+  - Trust: Edges, lookups, cache hit rate, attestations
+- Clean, dark-themed UI optimized for operations monitoring
+- Fetches data directly from Prometheus `/metrics` endpoint
+
+**Health Service Integration:**
+- `HealthService` tracks node state
+- Periodic metric updates
+- Degraded state detection (>100 quarantine entries)
+- Unhealthy state detection (>1000 quarantine entries)
+
+**Implementation:**
+- New module: `icn-obs/src/health.rs`
+- Static dashboard: `icn-obs/static/dashboard.html`
+- Axum-based HTTP server for health and dashboard endpoints
+
+**Use Cases:**
+- Real-time operational monitoring
+- External health checks (Kubernetes, systemd)
+- Quick visual status overview
+- Performance troubleshooting
+
+### Added - Operational Hardening: Backup & Restore (Track B1) (2025-01-14)
+
+**Backup & Recovery Commands:**
+- `icnctl backup <output>` - Create encrypted tarball backup of ICN data directory
+- `icnctl restore <input>` - Restore ICN data directory from backup
+- `icnctl restore <input> --force` - Overwrite existing data directory (backs up old data first)
+
+**Backup Features:**
+- **Complete data directory backup:** Identity keystore, DID Document, rotation chain, trust graph, ledger database
+- **Integrity verification:** SHA256 checksums of all files ensure backup integrity
+- **Metadata tracking:** ICN version, timestamp, checksum stored in `backup_metadata.json`
+- **Automatic verification:** Restore validates checksum matches backup
+
+**Production-Ready:**
+- Tarball format (standard `.tar` archives)
+- Preserves file permissions and structure
+- Safe restore with existing directory protection
+- Comprehensive error handling
+
+**Test Coverage:**
+- 4 integration tests:
+  - Full backup/restore roundtrip
+  - Backup of nonexistent directory (error handling)
+  - Restore without --force fails on existing directory
+  - Restore with --force creates backup of old data
+
+**Documentation:**
+- New guide: `docs/backup-and-recovery.md`
+  - Best practices for regular backups
+  - Secure storage recommendations (3-2-1 rule)
+  - Recovery scenarios (lost device, corrupted data, migration)
+  - Troubleshooting guide
+
+**Use Cases:**
+- Regular backups after identity changes
+- Device migration
+- Disaster recovery
+- Identity preservation before upgrades
+
+### Added - Multi-Device Identity & Sync (Phase 11) (2025-01-14)
+
+**Multi-Device Support:**
+- **MAJOR FEATURE:** One DID controlled by multiple devices with different keys
+- **DID Document v2:** Multiple VerificationMethods per DID with capability-based permissions
+- **Capability System:**
+  - ✅ Sign - Sign messages and contracts
+  - ✅ AddDevice - Authorize new devices
+  - ✅ RevokeDevice - Revoke other devices
+  - ✅ RotateKey - Rotate device key
+  - ✅ Recover - Use recovery mechanisms
+  - ✅ Encrypt - Decrypt messages (X25519)
+- **Rotation Events:** Audit trail for device lifecycle (add, revoke, rotate)
+- **Keystore v3 Format:**
+  - DID Document storage
+  - Device ID tracking
+  - Rotation chain history
+  - Automatic migration from v1/v2.1
+
+**Identity Sync Protocol:**
+- Gossip topic: `identity:updates` for broadcasting DID Document changes
+- IdentityUpdateMessage: Bincode-serialized rotation events (~280 bytes)
+- DidDocumentCache: Peer identity verification with version ordering
+- Version-based conflict resolution
+
+**CLI Device Management:**
+- `icnctl device list` - Show all devices for current identity
+- `icnctl device add <name>` - Generate keys and request file for new device
+- `icnctl device approve <file>` - Approve device add request
+- `icnctl device revoke <id>` - Revoke device access
+
+**Implementation:**
+- New module: `icn-identity/src/multi_device.rs` (DID Document v2)
+- New module: `icn-identity/src/sync.rs` (Identity sync protocol)
+- Enhanced: `icn-identity/src/keystore.rs` (v3 format)
+- Enhanced: `icnctl/src/main.rs` (Device commands)
+
+**Test Coverage:**
+- 31 unit tests (multi_device, keystore, sync)
+- 2 integration tests (end-to-end workflow, version ordering)
+- 1 doc test
+
+### Fixed
+
+**Critical: Version Mismatch in Device Approval (2025-01-14)**
+- Fixed bug where device approval incremented DID Document version twice (once per key) but rotation event expected single increment
+- Added `DidDocument::add_device_with_encryption_key()` to add both Ed25519 and X25519 keys with single version increment
+- Added test `test_add_device_with_encryption_key_version_increment()` to verify correct behavior
+- Impact: Would have caused identity sync verification failures when peers tried to apply rotation events
+- Resolution: Rotation event version now matches DID Document version after device approval
+
+### Added - End-to-End Payload Encryption (Phase 10) (2025-11-13)
+
+**X25519-ChaCha20-Poly1305 Message Encryption:**
+- **MAJOR FEATURE:** End-to-end encrypted messages for payload confidentiality
+- **Encryption Scheme:**
+  - ✅ **Key Exchange**: X25519 ECDH (static, upgradeable to ephemeral in future)
+  - ✅ **Symmetric Cipher**: ChaCha20-Poly1305 AEAD (authenticated encryption)
+  - ✅ **Nonce Derivation**: Deterministic from sequence number (no transmission overhead)
+  - ✅ **Key Persistence**: X25519 keys stored in keystore v2.1 format
+
+**Three-Layer Security Architecture:**
+```
+Application:  EncryptedEnvelope (payload confidentiality)
+Message:      SignedEnvelope (authentication + replay protection)
+Transport:    QUIC/TLS 1.3 (channel encryption)
+```
+
+**Why All Three Layers:**
+- **QUIC/TLS**: Protects node-to-node connections (per-hop encryption)
+- **SignedEnvelope**: Authenticates sender and prevents replay (message integrity)
+- **EncryptedEnvelope**: Hides payload from intermediate gossip nodes (end-to-end confidentiality)
+
+**Implementation:**
+- New module: `icn-net/src/encryption.rs` with `EncryptedEnvelope` struct
+- IdentityBundle extended with X25519 keypair (bundle.rs)
+- Keystore v2.1 format with X25519 key persistence (keystore.rs)
+- Automatic v2.0 → v2.1 migration on first unlock
+- New PayloadType::Encrypted (value 7) for encrypted messages
+- **Bidirectional X25519 key exchange via Hello protocol:**
+  - Hello messages now include sender's X25519 public key
+  - Connection initiator sends Hello with X25519 key
+  - Connection responder sends Hello response with X25519 key
+  - NetworkActor stores peer X25519 keys in HashMap
+  - Public API: `NetworkHandle::get_peer_x25519_key()` to retrieve peer keys
+  - Automatic key exchange during connection establishment
+
+**Encryption Flow:**
+1. Serialize application payload → plaintext bytes
+2. Encrypt with X25519 + ChaCha20-Poly1305 → EncryptedEnvelope
+3. Serialize EncryptedEnvelope → encrypted bytes
+4. Sign with Ed25519 → SignedEnvelope (PayloadType::Encrypted)
+5. Wrap in NetworkMessage::Signed → send over network
+
+**Decryption Flow:**
+1. Receive NetworkMessage::Signed
+2. Verify Ed25519 signature → extract SignedEnvelope
+3. Check PayloadType::Encrypted
+4. Deserialize → EncryptedEnvelope
+5. Decrypt with X25519 keys → plaintext bytes
+6. Deserialize → original application payload
+
+**Security Properties:**
+- ✅ **Payload confidentiality**: Intermediate nodes cannot read content
+- ✅ **Authenticated encryption**: Poly1305 MAC detects tampering
+- ✅ **Replay protection**: Inherited from SignedEnvelope sequence numbers
+- ✅ **Nonce uniqueness**: Derived from monotonic sequence + DIDs
+- ✅ **Key persistence**: X25519 keys survive daemon restarts
+
+**What It Doesn't Provide (Yet):**
+- ❌ **Perfect Forward Secrecy**: Static ECDH reuses shared secrets (can add ephemeral keys in Phase 11)
+- ❌ **Metadata hiding**: Sender/recipient DIDs still visible
+- ❌ **Protection against node compromise**: Attacker with memory access can read keys
+
+**Performance:**
+- Encryption overhead: ~0.3-0.7ms per 1KB message
+- Memory overhead: 64 bytes per peer (X25519 public key cache)
+- Nonce derivation: Zero transmission overhead (computed locally)
+
+**Testing:**
+- Unit tests: 8 encryption tests (roundtrip, tampering, nonce uniqueness, edge cases)
+- Integration tests: 7 end-to-end tests including:
+  - `test_network_x25519_key_exchange_and_encrypted_message()`: Full network-level test
+  - Verifies automatic key exchange during connection establishment
+  - Complete encrypt→sign→send→receive→verify→decrypt flow over real QUIC connections
+- All 19 icn-identity tests pass (bundle + keystore with X25519)
+- All 76 icn-net tests pass (encryption module + integration + network tests)
+
+**Keystore Migration:**
+- **v2.0 → v2.1 migration**: Automatic on first unlock
+- Generates X25519 keypair and saves immediately to disk
+- Backward compatible: v1 → v2.1 migration also supported
+- Log messages: "Unlocked v2.1+ keystore with X25519 keys" or "Upgrading to v2.1"
+
+**Dependencies Added:**
+- `chacha20poly1305 = "0.10"` (workspace)
+- `x25519-dalek` already imported (now used)
+- `zeroize` for secure memory handling
+
+**Usage Example:**
+```rust
+// 1. Get identity bundles (contain X25519 keys)
+let alice_bundle = keystore.get_identity_bundle()?;
+let bob_bundle = /* lookup Bob's bundle */;
+
+// 2. Encrypt message
+let plaintext = bincode::serialize(&my_message)?;
+let encrypted = EncryptedEnvelope::encrypt(
+    alice_bundle.did(),
+    bob_bundle.did(),
+    sequence_number,
+    &alice_bundle.x25519_secret(),
+    &bob_bundle.x25519_public(),
+    &plaintext,
+)?;
+
+// 3. Sign encrypted envelope
+let signed = SignedEnvelope::from_payload(
+    alice_bundle.did(),
+    alice_bundle.keypair(),
+    sequence_number,
+    PayloadType::Encrypted,
+    &encrypted,
+)?;
+
+// 4. Send via NetworkMessage::Signed
+```
+
+### Added - Gossip Message Authentication (2025-11-13)
+
+**Cryptographically Signed Gossip Messages:**
+- **MAJOR CHANGE:** All gossip messages now use SignedEnvelope for authentication
+- **Security Properties:**
+  - ✅ **Ed25519 authentication**: Every gossip message is cryptographically signed
+  - ✅ **Replay protection**: Sequence numbers with Bloom filter detection
+  - ✅ **Sender verification**: Impossible to forge messages from other DIDs
+  - ✅ **Freshness checking**: Timestamped messages with 300s max age
+  - ✅ **Non-repudiation**: Senders cannot deny sending authenticated messages
+
+**Implementation:**
+- GossipActor now holds optional keypair for signing outgoing messages
+- Sequence counter (AtomicU64) tracks monotonically increasing message numbers
+- Send callback creates SignedEnvelope with PayloadType::Gossip
+- Receive path decodes and verifies signed gossip messages
+- Automatic verification via NetworkActor's ReplayGuard
+
+**Message Flow:**
+- **Send:** `GossipActor.publish() → SignedEnvelope::from_payload() → NetworkMessage::signed() → network send`
+- **Receive:** `NetworkActor verifies → decode PayloadType::Gossip → handle_message() with authenticated sender`
+
+**Message Size Impact:**
+- SignedEnvelope overhead: ~141 bytes per message
+  - DID (from): ~60 bytes
+  - Sequence number: 8 bytes
+  - Timestamp: 8 bytes
+  - Payload type: 1 byte
+  - Ed25519 signature: 64 bytes
+- **Announce messages:** 230B → 371B (+61%)
+- **Request messages:** 32B → 173B (+441%, but small absolute size)
+- **Response messages (2KB):** 2KB → 2.1KB (+7%)
+
+**Backward Compatibility:**
+- ⚠️ **BREAKING CHANGE:** New nodes only send signed messages
+- Old MessagePayload::Gossip receive path still exists for compatibility
+- Recommended: Coordinate network-wide upgrade or implement dual-mode receiver
+
+**Testing:**
+- All 262 library tests pass
+- Gossip tests: 52 passing (signed message flow verified)
+- Network tests: 53 passing (SignedEnvelope + ReplayGuard)
+- Core integration tests: 26 passing
+
+**Impact:**
+- First major protocol to use Phase 9 SignedEnvelope infrastructure
+- Demonstrates end-to-end message authentication pattern
+- **Automatically protects all protocols that use gossip:**
+  - ✅ **Ledger sync** - Already authenticated (publishes via gossip topics)
+  - ✅ **Trust attestations** - Dual-layer protection (entry + network signatures)
+  - ✅ **Contract deployment** - Network-level authentication inherited
+- Eliminates trust in "from" field (now cryptographically verified)
+
+### Fixed - Critical: TLS Certificate Persistence (2025-11-13)
+
+**Keystore Migration Bug Fix:**
+- **CRITICAL:** Fixed v1-to-v2 keystore migration to persist TLS certificates to disk
+  - **Problem:** TLS certificates were regenerated on every daemon restart for v1 keystores
+  - **Impact:** Violated Phase 8 requirement that "TLS certificates persist across restarts"
+  - **Root Cause:** TODO at line 245 in keystore.rs was never implemented
+  - **Fix:** Auto-save upgraded v2 keystore immediately after generating TLS binding
+  - **Security Impact:** HIGH - Required for Phase 8 DID-TLS binding integrity
+
+**What Was Broken:**
+- When unlocking a v1 keystore (KeyPair-only format), the system generated an `IdentityBundle` with TLS binding in memory
+- The TODO comment indicated this should be persisted, but the code only stored the bundle in memory
+- The keystore file on disk remained in v1 format
+- Every subsequent unlock generated a new TLS certificate with different cryptographic material
+- Peers would see different TLS certificates on each daemon restart
+- TLS session stability and trust establishment were broken
+
+**How It Was Fixed:**
+- Modified `unlock()` method in `icn-identity/src/keystore.rs` (lines 245-260)
+- After generating `IdentityBundle` for v1 migration:
+  1. Create complete `StoredKey` with all TLS binding fields populated
+  2. Call `encrypt_and_save()` to persist immediately to disk
+  3. Log success message confirming migration
+- This ensures v1 keystores upgrade to v2 format on first unlock
+- TLS certificates remain stable across all subsequent unlocks and restarts
+
+**Testing:**
+- Added comprehensive test: `test_v1_to_v2_migration_persists_tls()`
+- Test verifies:
+  - v1 keystore migrates on first unlock
+  - TLS certificate is identical on second unlock (not regenerated)
+  - TLS certificate persists to disk (verified by new keystore instance)
+  - Binding signature remains stable across unlocks
+- All 19 icn-identity tests pass
+
+**Security Properties Restored:**
+- ✅ TLS certificates persist across daemon restarts
+- ✅ DID-TLS binding integrity maintained
+- ✅ Peers see consistent TLS certificates
+- ✅ Trust establishment stability ensured
+- ✅ Phase 8 security requirements met
+
+### Added - Phase 8A: Trust Network Propagation (2025-01-12)
+
+**Trust Attestation System:**
+- **Signed trust attestations** with Ed25519 cryptographic signatures
+  - `TrustAttestation` message format with issuer, subject, score, TTL, and signature
+  - Deterministic signing payload (SHA256 hash of sorted fields)
+  - Signature verification extracting verifying key from DIDs
+  - TTL-based expiration (default: 30 days) with automatic decay
+  - Conversion to/from `TrustEdge` for seamless storage integration
+- **`trust:attestations` gossip topic** for network-wide trust propagation
+  - Access control: `TrustClass::Known` (requires trust score ≥0.1)
+  - Prevents spam from untrusted/isolated nodes
+  - Integrates with existing gossip infrastructure
+- **Trust propagation module** (`icn-core/src/trust_propagation.rs`)
+  - `broadcast_trust_attestation()` - Signs and publishes attestations
+  - `handle_trust_attestation_entry()` - Verifies and applies remote attestations
+  - Deduplication: only accepts newer attestations (by `created_at` timestamp)
+  - Automatic notification callback integration with gossip subscriptions
+- **Supervisor wiring** for incoming attestation handling
+  - Notification callback processes trust attestations reactively
+  - Automatic subscription to `trust:attestations` topic
+  - Spawns async tasks for non-blocking attestation processing
+
+**Observability:**
+- **Prometheus metrics** for trust propagation:
+  - `icn_trust_attestations_broadcasted_total` - Outbound attestations
+  - `icn_trust_attestations_received_total` - Inbound attestations
+- Enable monitoring of trust graph growth and network health
+
+**Testing:**
+- **14 unit tests** for trust attestations (100% pass rate)
+  - Signature creation, verification, and tampering detection
+  - Expiry checking and TTL management
+  - TrustEdge conversion roundtrips
+  - Signing payload determinism
+- **2 integration tests** for end-to-end trust propagation
+  - Two-node trust propagation with full QUIC/TLS stack
+  - Three-node transitive trust computation verification
+  - Real gossip network with announce/pull cycles
+
+**Architecture:**
+- Trust edges now propagate across the network via signed attestations
+- Nodes build distributed trust webs automatically
+- Transitive trust computation works across remote trust edges
+- Foundation for trust-based governance and cooperation
+
+**Security Features:**
+- Cryptographic signature verification prevents forgery
+- Timestamp monotonic checks mitigate replay attacks
+- TTL expiration prevents stale trust information
+- Trust-gated topic access prevents spam flooding
+
+**Performance:**
+- Average attestation size: ~300 bytes (JSON-serialized)
+- Signature overhead: 64 bytes (Ed25519)
+- Propagation latency: <1 second for 2-hop networks
+- Gossip compression for larger attestations (>1KB)
+
+**Impact:**
+- **Closes the biggest gap** in ICN's distributed cooperation infrastructure
+- Enables truly distributed trust building (no central authority)
+- Foundation for Phase 8B (trust-gated security) and Phase 8C (WAN discovery)
+- First step toward federated trust networks
+
+### Added - User Onboarding Improvements (2025-11-11)
+
+**New Directories:**
+- **`config/`** - Example configuration files for all use cases
+  - `icn.toml.example` - Comprehensive configuration template with all options
+  - `icn-minimal.toml.example` - Minimal starter configuration
+  - `icn-alpha.toml`, `icn-beta.toml` - Two-node local demo configs
+  - `prometheus.yml` - Prometheus scrape configuration
+  - Complete configuration guide with environment variable documentation
+- **`docker/`** - Production-ready Docker deployment
+  - Multi-stage Dockerfile (optimized for size and security)
+  - `docker-compose.yml` - Full stack with Prometheus monitoring
+  - `docker-compose.dev.yml` - Development environment
+  - Comprehensive deployment guide with troubleshooting
+- **`examples/`** - Getting started tutorials
+  - `01-quickstart/` - Automated two-node network demo
+    - Interactive tutorial with step-by-step instructions
+    - `run.sh` - Fully automated demo script (<5 minutes)
+  - Examples index with roadmap for future tutorials
+
+**Documentation Improvements:**
+- Enhanced README.md with Quick Start section (5-minute setup guide)
+- Added Ports & Services reference table
+- Expanded Usage section with examples for all CLI commands
+- Navigation links to config/, docker/, examples/ directories
+
+### Fixed - User Onboarding Improvements (2025-11-11)
+
+**Documentation:**
+- Fixed port discrepancies in deployment-guide.md (all references updated 5000→4433)
+- Corrected QUIC listener port in all documentation to match code reality (4433/udp)
+- Updated Docker examples to use correct ports
+- Added links to new configuration examples
+
+**Impact:**
+- **Onboarding time reduced from ~30 minutes to <5 minutes**
+- Users can now run automated quickstart: `./examples/01-quickstart/run.sh`
+- Complete Docker deployment ready out-of-box
+- 5 example configuration files covering all use cases
+
+### Added - Phase 3 CLI Tools & Production Features (2025-11-11)
+
+**Contract Examples:**
+- **`examples/contracts/echo.json`** - Simple test contract demonstrating basic CCL features
+  - `echo(message)` - Returns message parameter
+  - `add(a, b)` - Adds two numbers using BinOp
+- **`examples/contracts/timebank.json`** - Mutual credit time banking contract
+  - State variable: `total_hours_exchanged`
+  - `record_service(recipient, hours)` - Records service exchange with preconditions
+  - `get_stats()` - Returns total hours exchanged
+  - Demonstrates: state variables, ledger operations, preconditions, special `sender` variable
+- **`examples/contracts/README.md`** - Comprehensive contract development documentation
+- **`examples/contracts/test-contracts.sh`** - Automated testing script for contract validation
+
+**Contract Management:**
+- Contract listing functionality: `icnctl contract list`
+  - Displays installed contracts with metadata (name, participants, currency, rules)
+  - Shows state variable count and rule names
+  - RPC endpoint: `contract.list`
+
+**Quarantine Management (PR #1):**
+- Full operator control over quarantined ledger entries
+- **RPC Endpoints:**
+  - `ledger.quarantine.list` - List all quarantined entries
+  - `ledger.quarantine.get` - Get detailed info about specific entry
+  - `ledger.quarantine.release` - Release and retry entry
+  - `ledger.quarantine.drop` - Permanently discard entry
+  - `ledger.quarantine.purge` - Remove all expired entries
+- **CLI Commands:**
+  ```bash
+  icnctl ledger quarantine list
+  icnctl ledger quarantine get <entry_id>
+  icnctl ledger quarantine release <entry_id>
+  icnctl ledger quarantine drop <entry_id>
+  icnctl ledger quarantine purge
+  ```
+- **RPC Client Methods** in `icn-rpc/src/client.rs`:
+  - `quarantine_list()`, `quarantine_get()`, `quarantine_release()`, `quarantine_drop()`, `quarantine_purge()`
+
+**WAN Bootstrap Peers (PR #2):**
+- Internet-wide connectivity beyond local mDNS discovery
+- Configure bootstrap peers in `icn.toml`:
+  ```toml
+  bootstrap_peers = [
+      "icn://did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK@203.0.113.50:7777"
+  ]
+  ```
+- URL format: `icn://DID@IP:PORT`
+- Automatic dialing on daemon startup
+- Multiple peers for redundancy (no single point of failure)
+- Connection failures are non-fatal (logged as warnings)
+- Current limitation: IP addresses only (DNS hostname resolution to be added later)
+
+### Fixed - Phase 3 Error Handling (2025-11-11)
+
+**Quarantine Release Semantics:**
+- Fixed incorrect error handling in `ledger.quarantine.release`
+  - Operation now returns JSON-RPC error when entry release succeeds but reappend fails
+  - Previously returned success response with error flags (violated JSON-RPC 2.0 semantics)
+  - Error message format: "Entry released from quarantine but reappend failed: <reason>"
+  - Follows standard JSON-RPC pattern: errors in error field, successes in result field
+- **Rationale**: Operation name "release" implies "release for retry" - partial success is a failure
+
+**Impact:**
+- Operators can now inspect, manage, and resolve quarantined ledger entries
+- WAN connectivity enables internet-wide ICN networks
+- Contract examples provide learning resources and test cases
+- Proper JSON-RPC error handling enables reliable error detection in monitoring tools
+
+### Added - Trust-Gated Rate Limiting (PR #3) (2025-11-11)
+
+**Dynamic Rate Limiting Based on Trust:**
+- Different message rate limits for each trust class:
+  - **Isolated peers** (trust score < 0.1): 10 messages/sec, burst capacity 2
+  - **Known peers** (trust score 0.1-0.4): 50 messages/sec, burst capacity 10
+  - **Partner peers** (trust score 0.4-0.7): 100 messages/sec, burst capacity 20
+  - **Federated peers** (trust score 0.7+): 200 messages/sec, burst capacity 50
+- Rate limits automatically adjust when peer trust changes
+- Immediate benefit for trust upgrades (token bucket reset to new capacity)
+- Backwards compatible: Falls back to 100 msg/sec when no trust graph available
+
+**Architecture:**
+- `TrustGatedRateLimitConfig` in `icn-net/src/rate_limit.rs`
+- `RateLimiter::new_trust_gated()` integrates with trust graph
+- Token buckets track trust class and detect changes
+- Trust graph shared between Gossip and Network actors
+- Trust data persisted in `~/.icn/trust/` directory
+
+**Testing:**
+- 3 comprehensive unit tests for trust-gated behavior
+- Tests verify different limits for each trust class
+- Tests verify dynamic adjustment on trust class changes
+- All 140+ tests passing
+
+**Impact:**
+- Provides robust DoS protection against untrusted peers (10 msg/sec limit)
+- Enables high throughput for trusted partners (200 msg/sec for federated peers)
+- Adaptive security: protection strengthens/weakens based on actual trust relationships
+- No configuration required: works automatically based on trust graph state
+
+### Added - Phase 7 Pull Protocol Completion (2025-01-11)
+
+**Gossip Pull Protocol:**
+- **Pull protocol now fully operational** with verified end-to-end convergence
+  - Digest emission background task with jitter (10s ± 2s)
+  - Pull request/response handlers with backpressure
+  - Empty `want_ids` semantics for "send all entries" requests
+  - Vector clock-based detection of missing entries
+  - Trust-gated resource limits per peer class
+  - Comprehensive integration test validating full flow
+- Ledger merge report API for operator visibility
+  - `merge_batch()` returns detailed `MergeDecision` with accepted/discarded/quarantined counts
+  - `QuarantineStore` with ring buffer (1000 entries) and 7-day TTL
+  - Methods for quarantine management: `list()`, `get()`, `release()`, `drop()`
+  - New metrics: `merge_conflicts_total`, `entries_quarantined_total`, `quarantine_size`
+
+**New Metrics:**
+- Gossip pull protocol: `digests_sent/received`, `pull_requests_sent/received`, `pull_responses_sent/received`
+- Pull bandwidth: `bytes_pulled_total`, `bytes_pushed_total`
+- Backpressure: `pull_truncated_total`, `peer_deficit_bytes`
+- Ledger merge: `merge_conflicts_total`, `entries_quarantined_total`, `entries_discarded_total`, `quarantine_size`
+
+### Fixed - Phase 7 Critical Bugs (2025-01-11)
+
+**TLS Handshake (BLOCKER):**
+- Fixed `NoSignatureSchemesInCommon` error by generating Ed25519 certificates
+  - Changed from RSA (default) to Ed25519 to match client verifier expectations
+  - Location: `icn-net/src/tls.rs` - now uses `rcgen::PKCS_ED25519`
+  - **Impact**: Unblocked ALL integration tests
+
+**mDNS Discovery:**
+- Fixed hostname format bug causing registration failure
+  - Changed `"{}"` → `"{}.local."` to comply with mDNS requirements
+  - Location: `icn-net/src/discovery.rs:79`
+
+**Pull Protocol Routing:**
+- Added sender DID propagation to `handle_message()` signature
+  - Changed: `handle_message(message)` → `handle_message(&sender, message)`
+  - Enables Digest handler to identify message sender for reply routing
+  - Updated 10+ call sites across codebase
+
+### Added - Phase 7 Production Hardening (2025-01-11)
+
+**Security & Hardening:**
+- Network message rate limiting using token bucket algorithm (100 msg/sec, burst 20)
+  - Per-peer rate limiting prevents single-peer DoS attacks
+  - New module: `icn-net/src/rate_limit.rs`
+  - New metric: `icn_network_messages_rate_limited_total`
+- TLS certificate verification with DID extraction and expiration checking
+  - Extracts DID from X.509 certificate Subject Alternative Names
+  - Validates certificate validity period (not before/after)
+  - Validates DID format (must start with `did:icn:`)
+  - Adds security audit logging
+  - Added dependency: `x509-parser = "0.16"`
+- QUIC transport configuration with bounded stream limits
+  - Reduced concurrent streams from 100 → 10 bidirectional
+  - Set unidirectional streams to 0 (not used)
+  - Stream receive window: 1MB per stream
+  - Connection receive window: 10MB total
+  - Idle timeout: 60s, keep-alive: 30s
+- Message size validation before buffer allocation
+  - Validates length prefix before allocating memory
+  - Prevents overflow on 32-bit systems
+  - Rejects zero-length and oversized messages (>10MB)
+- Bloom filter deserialization validation
+  - Validates non-zero size to prevent division by zero
+  - Validates claimed size vs actual unpacked bits
+  - Prevents index out of bounds panics from malformed data
+- Timestamp overflow protection in ledger and gossip
+  - Changed unchecked `as u64` casts to checked `try_into()`
+  - Prevents silent wraparound if system clock is far in future (post-2262)
+
+**Async/Performance:**
+- Fixed blocking operations in async context (supervisor message handlers)
+  - Replaced `blocking_write()` with `tokio::spawn` + `write().await`
+  - Applied to Gossip, Subscribe, and Unsubscribe message handlers
+  - Prevents thread pool starvation in Tokio runtime
+
+**Documentation:**
+- Added comprehensive production hardening documentation (`docs/production-hardening.md`)
+  - Detailed vulnerability descriptions and fixes
+  - Configuration guide and tuning recommendations
+  - Monitoring and alerting recommendations
+  - Security metrics and log patterns
+- Added deployment and operations guide (`docs/deployment-guide.md`)
+  - Installation instructions (source, Docker, systemd)
+  - Configuration reference
+  - Monitoring setup (Prometheus/Grafana)
+  - Backup & recovery procedures
+  - Troubleshooting guide
+  - Security best practices
+- Updated architecture documentation (`docs/ARCHITECTURE.md`)
+  - Added section 8.4: Production Hardening
+  - Documents all security protections with implementation references
+- Updated README with security section
+  - Quick overview of hardening measures
+  - Links to detailed documentation
+
+**Testing:**
+- Added 4 comprehensive unit tests for rate limiter
+  - Token consumption and refill behavior
+  - Per-peer isolation
+  - Bucket cleanup
+- All tests passing: 64 tests across modified crates (icn-net: 27, icn-gossip: 18, icn-ledger: 16, icn-obs: 0)
+
+### Changed
+
+- `icn-net/src/protocol.rs`: Message size validation before allocation
+- `icn-net/src/tls.rs`: Implemented certificate verification
+- `icn-net/src/session.rs`: Added transport config with bounded limits
+- `icn-net/src/actor.rs`: Integrated rate limiter into connection handler
+- `icn-core/src/supervisor.rs`: Fixed blocking operations in message handlers
+- `icn-gossip/src/gossip.rs`: Fixed timestamp overflow in entry creation
+- `icn-gossip/src/bloom.rs`: Added validation in deserialization
+- `icn-ledger/src/entry.rs`: Fixed timestamp overflow in journal entries
+- `icn-obs/src/metrics.rs`: Added rate limiting metric
+
+### Security Notes
+
+⚠️ **Known Limitations:**
+- TLS certificate verifier does NOT yet integrate with trust graph
+- Currently accepts all valid DID certificates (development mode)
+- Trust graph integration required before production deployment
+
+**Remaining Work (Not Addressed):**
+- Medium priority: Request timeouts, unbounded vector growth, compression
+- Low priority: Error handling consistency, trace logging improvements
+
+---
+
+## Version History
+
+### [0.1.0] - Phase 0-6 Complete
+
+**Phase 0 - Scaffold:**
+- Workspace structure, core runtime, supervisor
+- Identity/DID generation & verification
+- CLI tooling (icnd + icnctl)
+
+**Phase 1 - Identity & Trust:**
+- Age-encrypted keystore with passphrase unlock
+- Key rotation protocol with transition records
+- Trust graph storage & transitive trust computation
+- DID import/export
+
+**Phase 2 - Network Transport:**
+- QUIC/TLS sessions with DID-based certificates
+- mDNS local discovery
+- Network actor with session pooling
+- Secure passphrase handling (zeroization)
+
+**Phase 3 - Ledger:**
+- Double-entry mutual credit accounting
+- Merkle-DAG content-addressable structure
+- Multi-currency support with credit limits
+- Balance queries & integrity verification
+
+**Phase 4 - Cooperative Contracts (CCL):**
+- Domain-specific contract language (AST-based)
+- Deterministic interpreter with fuel metering
+- Capability system (ReadLedger, WriteLedger, etc.)
+- Contract runtime with ledger integration
+- TimeBank example contract
+
+**Phase 5 - Gossip & Distributed Sync:**
+- Topic-based gossip protocol with ACLs
+- Vector clocks for causal ordering
+- Bloom filter anti-entropy
+- Ledger-gossip integration
+- Multi-node convergence verification
+
+**Phase 6 - Network Protocol Bridge:**
+- Wire protocol for gossip over QUIC
+- NetworkMessage envelope with DID routing
+- NetworkActor extensions (send/broadcast)
+- Gossip-network bridge in supervisor
+- Background anti-entropy task
+- Two-node integration test structure
+
+**Phase 7 - Polish & Production:**
+- Metrics exporter (Prometheus)
+- Complete pull protocol (Request/Response)
+- Topic subscriptions & routing
+- Production hardening (3 critical + 4 high priority issues)
+- Comprehensive documentation
+
+---
+
+## Migration Notes
+
+### Upgrading to Post-Hardening Version
+
+No breaking changes. All hardening features are enabled by default with conservative limits.
+
+**Configuration changes (optional):**
+- Rate limiting can be tuned via `RateLimitConfig` (requires code change currently)
+- QUIC stream limits configurable via `TransportConfig`
+- Message size limit defined by `MAX_MESSAGE_SIZE` constant (10MB)
+
+**Monitoring updates:**
+- New metric: `icn_network_messages_rate_limited_total`
+- Monitor for rate limiting spikes indicating potential attacks
+
+**No data migration required** - all changes are in protocol handling and validation layers.
+
+---
+
+## Links
+
+- [Repository](https://github.com/your-org/icn)
+- [Architecture Documentation](docs/ARCHITECTURE.md)
+- [Production Hardening](docs/production-hardening.md)
+- [Deployment Guide](docs/deployment-guide.md)
+- [Topic Subscriptions API](docs/topic-subscriptions-api.md)

@@ -1,0 +1,22 @@
+# Kernel/App boundary violations to be resolved in future waves
+# Each entry represents a dependency that should be removed as part of
+# the kernel/app separation refactor (see docs/ARCHITECTURE.md)
+#
+# COMPLETED - Wave 1A (icn-gossip, icn-net cleaned):
+# - icn-net->icn-trust: REMOVED
+# - icn-gossip->icn-trust: REMOVED
+# - icn-net->icn-ledger: REMOVED
+# - icn-net->icn-entity: REMOVED
+#
+# Wave 2 targets: supervisor refactoring (icn-core)
+# These will be removed when supervisor uses AppRuntime instead of direct init
+icn-core->icn-trust
+icn-core->icn-governance
+icn-core->icn-ledger
+icn-core->icn-ccl
+icn-core->icn-compute
+icn-core->icn-entity
+icn-core->icn-community
+icn-core->icn-federation
+icn-core->icn-steward
+icn-core->icn-coop

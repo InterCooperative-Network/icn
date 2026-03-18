@@ -1,0 +1,56 @@
+[package]
+name = "icn-trust-app"
+version = "0.1.0"
+edition = "2021"
+description = "Trust app - provides trust-based policy decisions for the ICN kernel"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[dependencies]
+# Kernel API for PolicyOracle trait and types
+icn-kernel-api = { path = "../../icn/crates/icn-kernel-api" }
+
+# Internal trust graph implementation (not exposed to kernel)
+icn-trust = { path = "../../icn/crates/icn-trust" }
+
+# Identity types (for Did conversion)
+icn-identity = { path = "../../icn/crates/icn-identity" }
+
+# Storage for stores and init
+icn-store = { path = "../../icn/crates/icn-store" }
+
+# Security primitives (MisbehaviorDetector for init)
+icn-security = { path = "../../icn/crates/icn-security" }
+
+# Metrics (for observability)
+icn-obs = { path = "../../icn/crates/icn-obs" }
+
+# Sync primitives (for PolicyOracle sync requirement)
+parking_lot = "0.12"
+
+# Tokio for async lock support (used by icn-core)
+tokio = { version = "1", features = ["sync", "rt"] }
+
+# Serialization (for TrustService edge queries)
+serde_json = "1.0"
+
+# Hashing for reducer provenance
+sha2 = "0.10"
+
+# Error handling
+anyhow = "1.0"
+
+# Logging
+tracing = "0.1"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+icn-time = { path = "../../icn/crates/icn-time" }
+tempfile = "3"
+ed25519-dalek = { version = "2.1", features = ["rand_core"] }
+rand = "0.8"
+criterion = "0.5"
+
+[[bench]]
+name = "trust_service_bench"
+harness = false

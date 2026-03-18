@@ -1,0 +1,20 @@
+{
+  "coop_id": "dev-sandbox",
+  "governance_domain": null,
+  "rules": [
+    {
+      "MemberPriority": {
+        "member": "did:icn:test-user",
+        "multiplier": 1.0
+      }
+    }
+  ],
+  "member_quotas": {},
+  "default_quota": {
+    "cpu_hours_per_month": 1000.0,
+    "max_concurrent_tasks": 100,
+    "max_priority": "Critical",
+    "credits_per_month": 10000
+  },
+  "enforcement_mode": "Permissive"
+}

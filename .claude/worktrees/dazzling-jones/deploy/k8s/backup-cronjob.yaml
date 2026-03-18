@@ -1,0 +1,77 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: icn-backup
+  namespace: icn
+  labels:
+    app: icn
+    component: backup
+spec:
+  schedule: "0 2 * * *"  # Daily at 2am
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 600  # 10 minute timeout
+      template:
+        metadata:
+          labels:
+            app: icn
+            component: backup-job
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: backup
+            image: busybox:1.36
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              BACKUP_DATE=$(date +%Y%m%d-%H%M%S)
+              BACKUP_FILE="/backups/icn-backup-${BACKUP_DATE}.tar.gz"
+
+              echo "Starting ICN backup at $(date)"
+              echo "Creating backup: ${BACKUP_FILE}"
+
+              # Create compressed backup of data directory
+              tar -czf "${BACKUP_FILE}" -C /data .
+
+              # Verify archive integrity
+              echo "Verifying backup integrity..."
+              tar -tzf "${BACKUP_FILE}" > /dev/null
+
+              BACKUP_SIZE=$(ls -lh "${BACKUP_FILE}" | awk '{print $5}')
+              echo "Backup created successfully: ${BACKUP_FILE} (${BACKUP_SIZE})"
+
+              # Delete backups older than 7 days
+              echo "Cleaning up old backups..."
+              find /backups -name "icn-backup-*.tar.gz" -mtime +7 -delete
+
+              # List remaining backups
+              echo "Current backups:"
+              ls -lh /backups/icn-backup-*.tar.gz 2>/dev/null || echo "No backups found"
+
+              echo "Backup completed at $(date)"
+            volumeMounts:
+            - name: data
+              mountPath: /data
+              readOnly: true
+            - name: backups
+              mountPath: /backups
+            resources:
+              requests:
+                cpu: 100m
+                memory: 128Mi
+              limits:
+                cpu: 500m
+                memory: 512Mi
+          volumes:
+          - name: data
+            persistentVolumeClaim:
+              claimName: icn-data
+          - name: backups
+            persistentVolumeClaim:
+              claimName: icn-backups

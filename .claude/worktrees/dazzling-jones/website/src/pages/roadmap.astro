@@ -1,0 +1,127 @@
+---
+// src/pages/roadmap.astro — Project Roadmap
+import Layout from '../layouts/Layout.astro';
+import fs from 'node:fs';
+import { renderMarkdown } from '../lib/markdown';
+import { resolveRepoDoc } from '../lib/paths';
+
+// Phase history from repo root docs/
+const phaseHistoryPath = resolveRepoDoc('PHASE_HISTORY.md');
+let phaseHtml = '';
+if (fs.existsSync(phaseHistoryPath)) {
+  phaseHtml = renderMarkdown(fs.readFileSync(phaseHistoryPath, 'utf-8'));
+}
+---
+
+<Layout title="Roadmap" activeNav="roadmap">
+  <section class="section" style="padding-top: calc(64px + var(--space-3xl));">
+    <div class="container">
+      <div class="section-header" style="text-align: left; max-width: none;">
+        <span class="badge badge-amber">Project Roadmap</span>
+        <h1>Development Roadmap</h1>
+        <p>ICN is developed in phases, each building on the last. The project has gone through 18+ development phases covering identity, networking, governance, ledger, federation, and more.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Vision roadmap stages -->
+  <section class="section-alt">
+    <div class="container">
+      <h2 style="margin-bottom: var(--space-xl);">Product Vision Stages</h2>
+      <div class="roadmap-timeline">
+        <div class="timeline-item">
+          <div class="timeline-marker" style="background: var(--accent-teal);"></div>
+          <div class="timeline-content">
+            <span class="badge badge-teal">Stage A — Now</span>
+            <h3>Institution-in-a-Box</h3>
+            <p>One-click cooperative creation, default charter templates, membership onboarding, treasury ledger, and proposal-to-vote loop. The minimum viable institution.</p>
+          </div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-marker" style="background: var(--accent-blue);"></div>
+          <div class="timeline-content">
+            <span class="badge badge-blue">Stage B</span>
+            <h3>Federation Layer</h3>
+            <p>Inter-cooperative agreements with treaty-based governance, cross-group trust propagation, and federation clearing for mutual credit networks.</p>
+          </div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-marker" style="background: var(--accent-purple);"></div>
+          <div class="timeline-content">
+            <span class="badge badge-purple">Stage C</span>
+            <h3>Compute Commons</h3>
+            <p>Shared compute resources contributed to a commons and allocated via mana. Members contribute hardware; the network rewards them with cooperative capacity.</p>
+          </div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-marker" style="background: var(--accent-amber);"></div>
+          <div class="timeline-content">
+            <span class="badge" style="background: rgba(251, 191, 36, 0.12); color: var(--accent-amber); border: 1px solid rgba(251, 191, 36, 0.25);">Stage D</span>
+            <h3>Civilization Tools</h3>
+            <p>Municipal governance platforms, participatory budgeting at city scale, public infrastructure coordination, and democratic technology governance.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Phase history from repo -->
+  {phaseHtml && (
+    <section class="section">
+      <div class="container-narrow">
+        <span class="badge badge-teal mb-lg">From PHASE_HISTORY.md</span>
+        <article class="prose" set:html={phaseHtml} />
+      </div>
+    </section>
+  )}
+</Layout>
+
+<style>
+  .roadmap-timeline {
+    position: relative;
+    padding-left: var(--space-2xl);
+  }
+
+  .roadmap-timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: linear-gradient(to bottom, var(--accent-teal), var(--accent-blue), var(--accent-purple), var(--accent-amber));
+    border-radius: 1px;
+  }
+
+  .timeline-item {
+    position: relative;
+    padding-bottom: var(--space-2xl);
+  }
+
+  .timeline-item:last-child { padding-bottom: 0; }
+
+  .timeline-marker {
+    position: absolute;
+    left: calc(var(--space-2xl) * -1);
+    top: 8px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 3px solid var(--bg-primary);
+  }
+
+  .timeline-content {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-xl);
+    padding: var(--space-xl);
+  }
+
+  .timeline-content h3 {
+    margin: var(--space-sm) 0 var(--space-sm);
+  }
+
+  .timeline-content p {
+    margin: 0;
+  }
+</style>

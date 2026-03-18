@@ -1,0 +1,75 @@
+# Docker Compose for ICN Development
+#
+# This is a simplified setup for local development with:
+# - Local volume mounts for faster iteration
+# - Debug logging enabled
+# - No monitoring stack (lighter)
+#
+# Usage:
+#   docker-compose -f docker/docker-compose.dev.yml up --build
+#
+# Access:
+#   - Alpha RPC: http://localhost:5050
+#   - Beta RPC: http://localhost:5051
+
+version: '3.9'
+
+services:
+  # ============================================================================
+  # ICN Alpha Node (Development)
+  # ============================================================================
+  icn-alpha:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: icn-alpha-dev
+    hostname: icn-alpha-dev
+    networks:
+      - icn-dev-network
+    ports:
+      - "4433:4433/udp"
+      - "5050:5050"
+      - "9100:9100"
+      - "8080:8080"
+    volumes:
+      - ./volumes/alpha:/data
+    environment:
+      - ICN_DATA_DIR=/data
+      - ICN_OBSERVABILITY_METRICS_PORT=9100
+      - ICN_OBSERVABILITY_LOG_LEVEL=debug
+      - ICN_NETWORK_MDNS_ENABLED=false
+    restart: "no"  # Don't auto-restart in dev mode
+
+  # ============================================================================
+  # ICN Beta Node (Development)
+  # ============================================================================
+  icn-beta:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: icn-beta-dev
+    hostname: icn-beta-dev
+    networks:
+      - icn-dev-network
+    ports:
+      - "4434:4433/udp"
+      - "5051:5050"
+      - "9101:9100"
+      - "8081:8080"
+    volumes:
+      - ./volumes/beta:/data
+    environment:
+      - ICN_DATA_DIR=/data
+      - ICN_OBSERVABILITY_METRICS_PORT=9100
+      - ICN_OBSERVABILITY_LOG_LEVEL=debug
+      - ICN_NETWORK_MDNS_ENABLED=false
+    restart: "no"
+    depends_on:
+      - icn-alpha
+
+# ============================================================================
+# Networks
+# ============================================================================
+networks:
+  icn-dev-network:
+    driver: bridge

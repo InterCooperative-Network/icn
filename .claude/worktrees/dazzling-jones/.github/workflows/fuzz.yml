@@ -1,0 +1,102 @@
+name: Fuzz Testing
+
+on:
+  # Run nightly at 2am UTC
+  schedule:
+    - cron: '0 2 * * *'
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      duration:
+        description: 'Fuzz duration per target (seconds)'
+        required: false
+        default: '300'
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  # Use environment variable for duration to avoid injection risk
+  FUZZ_DURATION: ${{ github.event.inputs.duration || '300' }}
+
+jobs:
+  fuzz:
+    name: CCL Fuzz Testing
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Validate duration input
+        run: |
+          # Ensure duration is a positive integer to prevent injection
+          if ! echo "$FUZZ_DURATION" | grep -qE '^[0-9]+$'; then
+            echo "::error::Invalid duration: must be a positive integer"
+            exit 1
+          fi
+
+      - name: Free disk space
+        uses: ./.github/actions/free-disk-space
+
+      - name: Install nightly toolchain
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Install cargo-fuzz
+        run: cargo install cargo-fuzz
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "icn -> target"
+
+      - name: Run fuzz_contract_json
+        working-directory: ./icn/crates/icn-ccl
+        run: |
+          cargo +nightly fuzz run fuzz_contract_json -- \
+            -max_total_time="$FUZZ_DURATION" \
+            -print_final_stats=1
+        continue-on-error: true
+
+      - name: Run fuzz_contract_validate
+        working-directory: ./icn/crates/icn-ccl
+        run: |
+          cargo +nightly fuzz run fuzz_contract_validate -- \
+            -max_total_time="$FUZZ_DURATION" \
+            -print_final_stats=1
+        continue-on-error: true
+
+      - name: Run fuzz_interpreter
+        working-directory: ./icn/crates/icn-ccl
+        run: |
+          cargo +nightly fuzz run fuzz_interpreter -- \
+            -max_total_time="$FUZZ_DURATION" \
+            -print_final_stats=1
+        continue-on-error: true
+
+      - name: Upload crash artifacts
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: fuzz-artifacts
+          path: |
+            icn/crates/icn-ccl/fuzz/artifacts/
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Upload corpus
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: fuzz-corpus
+          path: |
+            icn/crates/icn-ccl/fuzz/corpus/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Check for crashes
+        working-directory: ./icn/crates/icn-ccl
+        run: |
+          if [ -d "fuzz/artifacts" ] && [ "$(find fuzz/artifacts \( -name 'crash-*' -o -name 'timeout-*' \) 2>/dev/null | wc -l)" -gt 0 ]; then
+            echo "::error::Fuzz testing found crashes!"
+            find fuzz/artifacts -type f \( -name 'crash-*' -o -name 'timeout-*' \) | head -20
+            exit 1
+          fi
+          echo "No crashes found during fuzzing"

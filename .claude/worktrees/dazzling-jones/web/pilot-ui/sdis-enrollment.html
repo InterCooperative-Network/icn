@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SDIS Enrollment - ICN</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="sdis-enrollment.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Toast Notifications -->
+        <div id="toast-container" role="status" aria-live="polite" aria-atomic="true"></div>
+
+        <!-- Enrollment Wizard -->
+        <div id="sdis-enrollment-wizard" class="wizard-container">
+            <!-- Header -->
+            <header class="wizard-header">
+                <h1>Create Your Identity</h1>
+                <p class="subtitle">Secure Digital Identity System (SDIS)</p>
+            </header>
+
+            <!-- Progress Bar -->
+            <div id="enrollment-progress" class="progress-container">
+                <div class="progress-bar-bg">
+                    <div id="progress-bar" class="progress-bar-fill"></div>
+                </div>
+                <div class="progress-info">
+                    <span id="step-number">Step 1 of 5</span>
+                    <span id="step-title">Choose Pathway</span>
+                </div>
+            </div>
+
+            <!-- Step 1: Choose Pathway -->
+            <div id="step-pathway" class="wizard-step">
+                <h2>Choose Your Enrollment Pathway</h2>
+                <p class="step-description">Select how you'd like to verify your identity.</p>
+
+                <div class="pathway-grid">
+                    <div class="pathway-card" data-pathway="government_id" role="button" tabindex="0">
+                        <div class="pathway-icon">🆔</div>
+                        <h3>Government ID</h3>
+                        <p>Verify with a government-issued ID (passport, driver's license, etc.)</p>
+                    </div>
+
+                    <div class="pathway-card" data-pathway="org_sponsorship" role="button" tabindex="0">
+                        <div class="pathway-icon">🏢</div>
+                        <h3>Organization Sponsor</h3>
+                        <p>Your organization will sponsor and verify your identity</p>
+                    </div>
+
+                    <div class="pathway-card" data-pathway="web_of_trust" role="button" tabindex="0">
+                        <div class="pathway-icon">🤝</div>
+                        <h3>Web of Trust</h3>
+                        <p>Get vouched for by 3 or more trusted members</p>
+                    </div>
+
+                    <div class="pathway-card" data-pathway="biometric" role="button" tabindex="0">
+                        <div class="pathway-icon">👆</div>
+                        <h3>Biometric</h3>
+                        <p>Use fingerprint or facial recognition</p>
+                    </div>
+
+                    <div class="pathway-card" data-pathway="genesis" role="button" tabindex="0">
+                        <div class="pathway-icon">🌱</div>
+                        <h3>Genesis</h3>
+                        <p>Bootstrap a new network (restricted)</p>
+                    </div>
+                </div>
+
+                <div id="pathway-instructions" class="alert alert-info hidden"></div>
+            </div>
+
+            <!-- Step 2: Upload Documents -->
+            <div id="step-documents" class="wizard-step hidden">
+                <h2>Upload Verification Documents</h2>
+                <p class="step-description">Please provide the required documents for verification.</p>
+
+                <div class="upload-area">
+                    <label for="document-upload" class="upload-label">
+                        <div class="upload-icon">📄</div>
+                        <p>Click to upload or drag and drop</p>
+                        <small>Supported: JPG, PNG (max 5MB)</small>
+                    </label>
+                    <input type="file" id="document-upload" accept="image/*" class="hidden" />
+                </div>
+
+                <div id="document-preview" class="document-preview hidden"></div>
+
+                <div class="alert alert-info mt-4">
+                    <strong>ℹ️ Privacy Notice:</strong> Your documents are encrypted and only shared with 
+                    verification stewards. They are never stored permanently.
+                </div>
+            </div>
+
+            <!-- Step 3: Generate Keys -->
+            <div id="step-keys" class="wizard-step hidden">
+                <h2>Generate Cryptographic Keys</h2>
+                <p class="step-description">Your identity will be secured with hybrid post-quantum cryptography.</p>
+
+                <div class="key-generation-info">
+                    <div class="info-card">
+                        <h4>🔐 What are we generating?</h4>
+                        <ul>
+                            <li><strong>Ed25519:</strong> Fast, secure signing key</li>
+                            <li><strong>ML-DSA:</strong> Post-quantum secure signature</li>
+                            <li><strong>X25519:</strong> Encryption key for private messages</li>
+                        </ul>
+                    </div>
+
+                    <div class="info-card">
+                        <h4>🛡️ Security</h4>
+                        <p>Keys are generated in your browser and never leave your device. 
+                           Only public keys are shared with the network.</p>
+                    </div>
+                </div>
+
+                <button id="generate-keys-btn" class="btn btn-primary btn-large">
+                    🔑 Generate Keys
+                </button>
+
+                <div id="generated-keys" class="keys-display hidden"></div>
+            </div>
+
+            <!-- Step 4: Submit and Wait -->
+            <div id="step-submit" class="wizard-step hidden">
+                <h2>Submit for Verification</h2>
+                <p class="step-description">Your enrollment will be reviewed by steward nodes.</p>
+
+                <div class="ceremony-info">
+                    <div class="info-item">
+                        <strong>Pathway:</strong>
+                        <span id="selected-pathway-display"></span>
+                    </div>
+                    <div class="info-item">
+                        <strong>Required Approvals:</strong>
+                        <span>3 of N stewards</span>
+                    </div>
+                    <div class="info-item">
+                        <strong>Estimated Time:</strong>
+                        <span>5-10 minutes</span>
+                    </div>
+                </div>
+
+                <button id="submit-enrollment-btn" class="btn btn-primary btn-large">
+                    🚀 Submit Enrollment
+                </button>
+
+                <div id="ceremony-status" class="ceremony-status hidden">
+                    <h3>⏳ Waiting for Steward Approval...</h3>
+                    <div id="approval-progress"></div>
+                    <p class="text-center text-gray-600 mt-4">
+                        This may take a few minutes. Please don't close this window.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Step 5: Complete -->
+            <div id="step-complete" class="wizard-step hidden">
+                <div class="success-animation">
+                    <div class="success-icon">✅</div>
+                    <h2>Enrollment Complete!</h2>
+                    <p class="success-message">Your permanent identity anchor has been created.</p>
+                </div>
+
+                <div id="anchor-display"></div>
+
+                <div id="recovery-codes-display" class="mt-6"></div>
+
+                <div class="action-buttons">
+                    <button id="download-recovery-btn" class="btn btn-secondary">
+                        📥 Download Recovery Codes
+                    </button>
+                    <button class="btn btn-primary" onclick="window.location.href='index.html'">
+                        🎉 Go to Dashboard
+                    </button>
+                </div>
+
+                <div class="alert alert-warning mt-6">
+                    <strong>⚠️ Important Next Steps:</strong>
+                    <ul class="mt-2">
+                        <li>Save your recovery codes in a secure location</li>
+                        <li>Consider printing them and storing offline</li>
+                        <li>Never share your private keys with anyone</li>
+                        <li>Set up multiple trusted devices</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Navigation -->
+            <div class="wizard-navigation">
+                <button id="prev-step-btn" class="btn btn-secondary">
+                    ← Previous
+                </button>
+                <button id="next-step-btn" class="btn btn-primary" disabled>
+                    Next →
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="app.js"></script>
+    <script src="sdis-enrollment.js"></script>
+</body>
+</html>

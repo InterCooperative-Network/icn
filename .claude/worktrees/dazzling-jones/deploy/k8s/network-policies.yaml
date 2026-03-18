@@ -1,0 +1,107 @@
+# Network policies for ICN namespace
+# These policies secure the ICN deployment while allowing necessary traffic
+
+---
+# Default deny all ingress traffic to pods in the namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: icn
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+
+---
+# Allow DNS egress for all pods
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+  namespace: icn
+spec:
+  podSelector: {}
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+    ports:
+    - port: 53
+      protocol: UDP
+    - port: 53
+      protocol: TCP
+
+---
+# Allow ICN daemon mesh traffic (P2P, RPC, Gateway, Metrics)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-icn-mesh
+  namespace: icn
+spec:
+  podSelector:
+    matchLabels:
+      app: icn
+      component: daemon
+  policyTypes:
+  - Ingress
+  ingress:
+  # Allow traffic from other ICN namespaces (coop mesh)
+  - from:
+    - namespaceSelector:
+        matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: In
+          values:
+          - icn
+          - icn-coop-alpha
+          - icn-coop-beta
+          - icn-coop-gamma
+          - icn-coop-delta
+    ports:
+    - port: 7777
+      protocol: UDP
+    - port: 5601
+      protocol: TCP
+    - port: 8080
+      protocol: TCP
+  # Allow monitoring from prometheus
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: monitoring
+    ports:
+    - port: 9100
+      protocol: TCP
+  # Allow external NodePort traffic (for P2P, RPC, Gateway)
+  - ports:
+    - port: 7777
+      protocol: UDP
+    - port: 5601
+      protocol: TCP
+    - port: 8080
+      protocol: TCP
+
+---
+# Allow Pilot UI web traffic on port 3000
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-pilot-ui
+  namespace: icn
+spec:
+  podSelector:
+    matchLabels:
+      app: icn
+      component: pilot-ui
+  policyTypes:
+  - Ingress
+  ingress:
+  # Allow all traffic to port 3000 (nginx serving static files)
+  - ports:
+    - port: 3000
+      protocol: TCP

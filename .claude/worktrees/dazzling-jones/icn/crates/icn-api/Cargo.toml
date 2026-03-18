@@ -1,0 +1,42 @@
+[package]
+name = "icn-api"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Shared API service layer for ICN"
+
+[dependencies]
+# ICN crates
+icn-compute = { path = "../icn-compute" }
+icn-identity = { path = "../icn-identity" }
+icn-time = { path = "../icn-time" }
+icn-governance = { path = "../icn-governance" }
+icn-ledger = { path = "../icn-ledger" }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+thiserror = "2.0"
+anyhow = "1.0"
+
+# Async
+tokio = { version = "1.49", features = ["sync"] }
+
+# Logging
+tracing = "0.1"
+
+# Hashing
+blake3 = "1.5"
+
+# Utilities
+hex = "0.4"
+base64 = "0.22"
+
+[dev-dependencies]
+tokio = { version = "1.49", features = ["rt-multi-thread", "macros"] }
+
+[lints]
+workspace = true

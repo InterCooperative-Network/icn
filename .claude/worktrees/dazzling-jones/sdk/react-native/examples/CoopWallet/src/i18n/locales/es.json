@@ -1,0 +1,248 @@
+{
+  "common": {
+    "loading": "Cargando...",
+    "error": "Ocurrio un error",
+    "retry": "Reintentar",
+    "cancel": "Cancelar",
+    "confirm": "Confirmar",
+    "save": "Guardar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "done": "Hecho",
+    "next": "Siguiente",
+    "back": "Atras",
+    "close": "Cerrar",
+    "logout": "Cerrar sesion",
+    "search": "Buscar",
+    "noData": "No hay datos disponibles"
+  },
+
+  "nav": {
+    "home": "Inicio",
+    "payments": "Pagos",
+    "contacts": "Contactos",
+    "governance": "Gobernanza",
+    "settings": "Configuracion",
+    "identity": "Identidad",
+    "steward": "Administrador"
+  },
+
+  "home": {
+    "title": "Inicio",
+    "welcome": "Bienvenido de nuevo",
+    "balance": {
+      "label": "Saldo Disponible",
+      "currency": "horas"
+    },
+    "status": {
+      "connected": "Conectado",
+      "offline": "Sin conexion",
+      "syncing": "Sincronizando..."
+    },
+    "actions": {
+      "send": "Enviar",
+      "receive": "Recibir",
+      "scan": "Escanear",
+      "vote": "Votar",
+      "trust": "Confianza"
+    },
+    "transactions": {
+      "title": "Transacciones Recientes",
+      "seeAll": "Ver Todas",
+      "empty": "Aun no hay transacciones",
+      "to": "A: {{did}}",
+      "from": "De: {{did}}"
+    }
+  },
+
+  "login": {
+    "title": "Unirse a la Cooperativa",
+    "scanQr": "Escanear Codigo QR",
+    "pasteCode": "Pegar Codigo de Inscripcion",
+    "enrollmentCode": "Codigo de Inscripcion",
+    "placeholder": "Introduce los datos de inscripcion...",
+    "submit": "Unirse",
+    "generating": "Generando prueba de dispositivo...",
+    "verifying": "Verificando con la cooperativa...",
+    "success": "Inscripcion verificada!",
+    "successTitle": "Inscripcion Exitosa"
+  },
+
+  "payments": {
+    "title": "Enviar Pago",
+    "recipient": "Destinatario",
+    "recipientPlaceholder": "Introduce DID o selecciona contacto",
+    "amount": "Cantidad",
+    "amountPlaceholder": "0.00",
+    "currency": "Moneda",
+    "memo": "Memo (opcional)",
+    "memoPlaceholder": "Para que es esto?",
+    "send": "Enviar Pago",
+    "confirm": {
+      "title": "Confirmar Pago",
+      "message": "Enviar {{amount}} {{currency}} a {{recipient}}?"
+    },
+    "success": "Pago enviado exitosamente!",
+    "history": {
+      "title": "Historial de Transacciones",
+      "empty": "No se encontraron transacciones"
+    }
+  },
+
+  "receive": {
+    "title": "Recibir Pago",
+    "yourDid": "Tu DID",
+    "qrCode": "Codigo QR",
+    "copyDid": "Copiar DID",
+    "copied": "DID copiado al portapapeles",
+    "share": "Compartir"
+  },
+
+  "contacts": {
+    "title": "Contactos",
+    "search": "Buscar contactos...",
+    "add": "Agregar Contacto",
+    "empty": "Aun no hay contactos",
+    "form": {
+      "did": "DID",
+      "didPlaceholder": "did:icn:...",
+      "name": "Nombre (opcional)",
+      "namePlaceholder": "Nombre del contacto"
+    },
+    "delete": {
+      "title": "Eliminar Contacto",
+      "message": "Estas seguro de que deseas eliminar este contacto?"
+    },
+    "errors": {
+      "invalidDid": "Formato de DID invalido. Debe comenzar con did:icn:",
+      "alreadyExists": "El contacto ya existe",
+      "saveFailed": "Error al guardar contacto",
+      "loadFailed": "Error al cargar contactos"
+    }
+  },
+
+  "governance": {
+    "title": "Gobernanza",
+    "proposals": {
+      "title": "Propuestas Activas",
+      "empty": "No hay propuestas activas",
+      "vote": "Votar",
+      "voted": "Votado",
+      "approved": "Aprobado",
+      "rejected": "Rechazado",
+      "pending": "Pendiente"
+    },
+    "voting": {
+      "title": "Emitir Tu Voto",
+      "approve": "Aprobar",
+      "reject": "Rechazar",
+      "abstain": "Abstenerse",
+      "confirm": "Estas seguro de que deseas votar {{vote}} en esta propuesta?"
+    }
+  },
+
+  "trust": {
+    "title": "Red de Confianza",
+    "attestation": {
+      "title": "Atestacion de Confianza",
+      "for": "Atestando confianza para",
+      "score": "Puntuacion de Confianza",
+      "context": "Contexto",
+      "reason": "Razon (opcional)",
+      "submit": "Enviar Atestacion"
+    },
+    "vouch": {
+      "title": "Avalar a un Miembro",
+      "confirm": "Confirmar Aval",
+      "success": "Aval enviado exitosamente"
+    },
+    "history": {
+      "title": "Historial de Avales",
+      "empty": "Sin historial de avales"
+    }
+  },
+
+  "identity": {
+    "title": "Mi Identidad",
+    "did": "Tu DID",
+    "memberSince": "Miembro desde",
+    "trustScore": "Puntuacion de Confianza",
+    "cooperative": "Cooperativa",
+    "devices": {
+      "title": "Dispositivos Vinculados",
+      "this": "Este Dispositivo",
+      "add": "Vincular Nuevo Dispositivo"
+    }
+  },
+
+  "steward": {
+    "dashboard": {
+      "title": "Panel de Administrador",
+      "pendingEnrollments": "Inscripciones Pendientes",
+      "approvedToday": "Aprobadas Hoy",
+      "pendingVouches": "Avales Pendientes"
+    },
+    "enrollment": {
+      "title": "Solicitud de Inscripcion",
+      "approve": "Aprobar",
+      "reject": "Rechazar",
+      "rejectReason": "Razon del rechazo...",
+      "rejectReasonRequired": "Por favor proporciona una razon para el rechazo.",
+      "rejected": "Inscripcion rechazada"
+    },
+    "verification": {
+      "title": "Historial de Verificaciones",
+      "empty": "Aun no hay verificaciones"
+    }
+  },
+
+  "settings": {
+    "title": "Configuracion",
+    "account": {
+      "title": "Cuenta",
+      "profile": "Perfil",
+      "security": "Seguridad"
+    },
+    "app": {
+      "title": "Configuracion de la App",
+      "language": "Idioma",
+      "theme": "Tema",
+      "notifications": "Notificaciones"
+    },
+    "about": {
+      "title": "Acerca de",
+      "version": "Version",
+      "terms": "Terminos de Servicio",
+      "privacy": "Politica de Privacidad"
+    },
+    "logout": {
+      "title": "Cerrar Sesion",
+      "confirm": "Estas seguro de que deseas cerrar sesion?"
+    }
+  },
+
+  "scan": {
+    "title": "Escanear Codigo QR",
+    "instructions": "Apunta la camara al codigo QR",
+    "permissionDenied": "Permiso de camara denegado",
+    "requestPermission": "Conceder Acceso a la Camara"
+  },
+
+  "errors": {
+    "network": "Error de red. Por favor verifica tu conexion.",
+    "auth": "Autenticacion fallida. Por favor inicia sesion de nuevo.",
+    "notFound": "Recurso no encontrado",
+    "forbidden": "No tienes permiso para esta accion",
+    "serverError": "Error del servidor. Por favor intenta mas tarde.",
+    "validation": "Por favor verifica tu entrada",
+    "unknown": "Ocurrio un error inesperado"
+  },
+
+  "accessibility": {
+    "badge": "{{count}} notificaciones",
+    "selected": "Seleccionado",
+    "notSelected": "No seleccionado",
+    "loading": "Cargando contenido",
+    "error": "Mensaje de error"
+  }
+}

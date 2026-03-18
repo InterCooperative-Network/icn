@@ -1,0 +1,109 @@
+# Dependabot Configuration
+# https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+updates:
+  # Rust workspace dependencies
+  - package-ecosystem: "cargo"
+    directory: "/icn"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/New_York"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "rust"
+    reviewers:
+      - "InterCooperative-Network/core-team"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+    # Group minor and patch updates
+    groups:
+      tokio:
+        patterns:
+          - "tokio*"
+      rustls:
+        patterns:
+          - "rustls*"
+          - "quinn*"
+      crypto:
+        patterns:
+          - "*dalek"
+          - "chacha*"
+          - "pqcrypto*"
+      dev-dependencies:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # TypeScript SDK
+  - package-ecosystem: "npm"
+    directory: "/sdk/typescript"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "typescript"
+      - "sdk"
+    commit-message:
+      prefix: "deps(ts-sdk)"
+    groups:
+      dev-dependencies:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # React Native SDK
+  - package-ecosystem: "npm"
+    directory: "/sdk/react-native"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "react-native"
+      - "sdk"
+    commit-message:
+      prefix: "deps(rn-sdk)"
+    groups:
+      react-native:
+        patterns:
+          - "react-native*"
+          - "@react-native*"
+      dev-dependencies:
+        dependency-type: "development"
+
+  # Pilot UI
+  - package-ecosystem: "npm"
+    directory: "/web/pilot-ui"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "web-ui"
+    commit-message:
+      prefix: "deps(pilot-ui)"
+    groups:
+      dev-dependencies:
+        dependency-type: "development"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    labels:
+      - "dependencies"
+      - "ci"
+    commit-message:
+      prefix: "ci"

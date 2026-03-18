@@ -1,0 +1,21 @@
+# nextest configuration for the ICN workspace.
+# See: https://nexte.st/docs/configuration/
+
+[profile.default]
+# Kill tests that take longer than 120s (2 min)
+slow-timeout = { period = "60s", terminate-after = 2 }
+
+# Fail-fast: stop on first failure in CI-like contexts
+fail-fast = false
+
+# ─── Test groups ─────────────────────────────────────────────────────
+#
+# Scrypt-based keystore tests use ~256MB each. Running many in parallel
+# causes OOM or flaky decryption failures. Cap concurrency for these.
+
+[test-groups.crypto-heavy]
+max-threads = 2
+
+[[profile.default.overrides]]
+filter = "test(keystore::) | test(sdis_) | test(migration)"
+test-group = "crypto-heavy"

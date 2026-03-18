@@ -1,0 +1,76 @@
+{
+  "repos": {
+    "icn": {
+      "local": ".",
+      "remote": "git@github.com:InterCooperative-Network/icn.git",
+      "cargo_workspace": "icn",
+      "primary_branch": "main",
+      "purpose": "ICN monorepo: daemon, substrate libraries, website, ops, SDK, web apps",
+      "claude_config": ".claude",
+      "monorepo": true,
+      "subdirectories": {
+        "rust": "icn/",
+        "website": "website/",
+        "ops": "ops/",
+        "sdk": "sdk/",
+        "web": "web/",
+        "docs": "docs/",
+        "deploy": "deploy/"
+      }
+    },
+    "homelab-inventory": {
+      "local": "../homelab-inventory",
+      "remote": "git@github.com:fahertym/homelab-inventory.git",
+      "primary_branch": "main",
+      "purpose": "Infrastructure inventory and automation for the homelab (Python 3.12+)",
+      "access_mode": "read-only-from-icn-ops",
+      "notes": "Manages the infrastructure ICN runs on. icn-ops observes but never mutates homelab state."
+    }
+  },
+  "worktrees": {
+    "root": "../icn-wt",
+    "managed_by": "scripts/worktrees.sh",
+    "base_branch": "origin/main",
+    "active": [
+      "main",
+      "1084-names-gateway-a",
+      "1120-auth-semantics-b"
+    ]
+  },
+  "relationships": [
+    {
+      "from": "docs/",
+      "to": "website/src/pages/docs/",
+      "type": "content-read",
+      "direction": "direct",
+      "mechanism": "website reads ../docs via path.resolve at build time (no sync script)"
+    },
+    {
+      "from": "deploy/k8s/",
+      "to": "k3s-cluster",
+      "type": "deployment",
+      "direction": "push",
+      "cluster_control": "10.8.10.40",
+      "workers": ["10.8.10.41", "10.8.10.42"]
+    },
+    {
+      "from": "homelab-inventory",
+      "to": "ops/",
+      "type": "infra-observation",
+      "direction": "read-only",
+      "notes": "homelab-inventory data/llm-context/ bundles are authoritative infra state"
+    }
+  ],
+  "infrastructure": {
+    "k3s": {
+      "control": "10.8.10.40",
+      "workers": ["10.8.10.41", "10.8.10.42"],
+      "icn_dev": "10.8.10.45",
+      "services": {
+        "gateway": "10.8.10.40:30080",
+        "pilot_ui": "10.8.10.40:30030",
+        "metrics": "10.8.10.40:30091"
+      }
+    }
+  }
+}

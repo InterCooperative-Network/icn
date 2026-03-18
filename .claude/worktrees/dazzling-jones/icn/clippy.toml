@@ -1,0 +1,16 @@
+# Clippy configuration for ICN workspace
+#
+# We allow certain lints that are stylistic or would require significant
+# refactoring without clear benefit to code quality.
+
+# Allow functions with more than 7 arguments
+# Many actor/supervisor methods naturally have many parameters
+too-many-arguments-threshold = 12
+
+# Allow longer function lines - our functions are reasonably sized
+# and line count alone isn't a good quality metric
+too-many-lines-threshold = 200
+
+# Cognitive complexity - allow moderately complex functions
+# State machines and protocol handlers are inherently complex
+cognitive-complexity-threshold = 30

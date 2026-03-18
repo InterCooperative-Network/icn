@@ -1,0 +1,45 @@
+{
+  "coop_id": "housing-coop",
+  "governance_domain": "governance:housing",
+  "rules": [
+    {
+      "MemberPriority": {
+        "member": "did:icn:building-automation-system",
+        "multiplier": 2.0
+      }
+    },
+    {
+      "MemberPriority": {
+        "member": "did:icn:emergency-services",
+        "multiplier": 3.0
+      }
+    }
+  ],
+  "member_quotas": {
+    "did:icn:building-automation-system": {
+      "cpu_hours_per_month": 200.0,
+      "max_concurrent_tasks": 20,
+      "max_priority": "Critical",
+      "credits_per_month": 2000
+    },
+    "did:icn:emergency-services": {
+      "cpu_hours_per_month": 500.0,
+      "max_concurrent_tasks": 50,
+      "max_priority": "Critical",
+      "credits_per_month": null
+    },
+    "did:icn:guest-member": {
+      "cpu_hours_per_month": 10.0,
+      "max_concurrent_tasks": 2,
+      "max_priority": "Low",
+      "credits_per_month": 100
+    }
+  },
+  "default_quota": {
+    "cpu_hours_per_month": 50.0,
+    "max_concurrent_tasks": 5,
+    "max_priority": "Normal",
+    "credits_per_month": 500
+  },
+  "enforcement_mode": "Strict"
+}

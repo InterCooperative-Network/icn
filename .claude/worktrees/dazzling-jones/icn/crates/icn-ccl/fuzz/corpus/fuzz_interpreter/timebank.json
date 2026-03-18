@@ -1,0 +1,30 @@
+{
+  "name": "TimeBank",
+  "participants": [
+    "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9",
+    "did:icn:zGyGKxMyg1p9SsHfm15MkNUu1u9TN2JtTspcdmrtGUdse"
+  ],
+  "currency": "hours",
+  "state_vars": [],
+  "rules": [
+    {
+      "name": "record_service",
+      "params": [
+        { "name": "recipient" },
+        { "name": "hours" }
+      ],
+      "requires": [],
+      "body": [
+        {
+          "LedgerTransfer": {
+            "from": { "Var": "sender" },
+            "to": { "Var": "recipient" },
+            "amount": { "Var": "hours" },
+            "currency": { "Literal": { "String": "hours" } }
+          }
+        }
+      ]
+    }
+  ],
+  "triggers": []
+}

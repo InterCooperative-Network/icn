@@ -1,0 +1,12 @@
+# Secrets - NEVER commit these!
+secret.yaml
+
+# Temporary files
+*.tmp
+*.tar
+*.bak
+
+# Deployment logs and backups
+deploy.log
+backups/
+

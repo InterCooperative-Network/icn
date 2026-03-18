@@ -1,0 +1,63 @@
+# ICN Gateway API Translations - Spanish (Espanol)
+# Format: {category}.{error_type}.{variant}
+# Variables: {var_name} for interpolation
+#
+# Note: Some keys (auth_required, token_expired, etc.) are defined for future
+# use when more specific error variants are added. Currently, the *_prefix keys
+# are used with dynamic content appended via Rust's format!() macro.
+
+gateway:
+  errors:
+    # Authentication errors
+    auth_failed_prefix: "Autenticacion fallida"
+    auth_required: "Se requiere autenticacion"
+    token_expired: "El token de autenticacion ha expirado"
+    invalid_token: "Token de autenticacion invalido"
+
+    # Authorization errors
+    authz_failed_prefix: "Autorizacion fallida"
+    forbidden_prefix: "Acceso prohibido"
+    insufficient_permissions: "Permisos insuficientes para esta operacion"
+
+    # Resource errors
+    not_found_prefix: "Recurso no encontrado"
+    already_exists: "El recurso ya existe: {resource}"
+
+    # Request errors
+    bad_request_prefix: "Solicitud invalida"
+    validation_failed: "Validacion fallida: {reason}"
+
+    # Rate limiting
+    rate_limit_exceeded: "Limite de tasa excedido"
+    rate_limit_exceeded_prefix: "Limite de tasa excedido para DID"
+    budget_exceeded_prefix: "Presupuesto excedido"
+
+    # Conflict errors
+    conflict_prefix: "Conflicto"
+
+    # Server errors
+    internal: "Error interno del servidor"
+    service_unavailable: "Servicio temporalmente no disponible"
+
+  # Health check messages
+  health:
+    status_ok: "El servicio esta saludable"
+    status_degraded: "El servicio esta degradado"
+    status_unavailable: "El servicio no esta disponible"
+    component_available: "Disponible"
+    component_unavailable: "No disponible"
+
+  # API responses
+  responses:
+    success: "Operacion completada exitosamente"
+    created: "Recurso creado exitosamente"
+    updated: "Recurso actualizado exitosamente"
+    deleted: "Recurso eliminado exitosamente"
+
+  # Validation messages
+  validation:
+    required_field: "{field} es requerido"
+    invalid_format: "Formato invalido para {field}"
+    invalid_did: "Formato de DID invalido"
+    invalid_amount: "Cantidad invalida: debe ser positiva"
+    amount_too_large: "La cantidad excede el maximo permitido"

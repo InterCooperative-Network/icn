@@ -1,0 +1,116 @@
+---
+// src/pages/community.astro — Community page
+import Layout from '../layouts/Layout.astro';
+import stats from '../data/stats.json';
+---
+
+<Layout title="Community" activeNav="community">
+  <section class="section" style="padding-top: calc(64px + var(--space-3xl));">
+    <div class="container">
+      <div class="section-header" style="text-align: left; max-width: none;">
+        <span class="badge badge-purple">Community</span>
+        <h1>Join the Cooperative Movement</h1>
+        <p>ICN is built by and for cooperatives. Contribute code, documentation, use cases, or ideas. Every contribution strengthens the cooperative internet.</p>
+      </div>
+
+      <div class="grid grid-3">
+        <a href="https://github.com/InterCooperative-Network/icn" target="_blank" class="community-card">
+          <div class="card-icon">⭐</div>
+          <h3>Star on GitHub</h3>
+          <p>Show your support and stay updated. {stats.activeBranches} branches, {stats.mergedPRs} merged PRs.</p>
+        </a>
+
+        <a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" class="community-card">
+          <div class="card-icon">🐛</div>
+          <h3>Report Issues</h3>
+          <p>Found a bug or have a feature idea? Open an issue and help us improve.</p>
+        </a>
+
+        <a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" class="community-card">
+          <div class="card-icon">💬</div>
+          <h3>Discussions</h3>
+          <p>Join conversations about cooperative technology, governance patterns, and ICN development.</p>
+        </a>
+
+        <a href="/docs/CONTRIBUTING" class="community-card">
+          <div class="card-icon">🤝</div>
+          <h3>Contributing Guide</h3>
+          <p>Read the guidelines for contributing code, documentation, and architectural proposals.</p>
+        </a>
+
+        <a href="/docs/GETTING_STARTED" class="community-card">
+          <div class="card-icon">🚀</div>
+          <h3>Getting Started</h3>
+          <p>Set up your development environment and run ICN locally in minutes.</p>
+        </a>
+
+        <a href="/docs" class="community-card">
+          <div class="card-icon">📚</div>
+          <h3>Documentation</h3>
+          <p>{stats.docFiles}+ documents covering architecture, APIs, guides, economics, and governance.</p>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Contributing principles -->
+  <section class="section-alt">
+    <div class="container">
+      <h2 class="text-center" style="margin-bottom: var(--space-xl);">Contributing Principles</h2>
+      <div class="grid grid-2">
+        <div class="card">
+          <h3>🏗️ Interfaces First</h3>
+          <p>Design the interface before the implementation. Every public API should be driven by use cases from cooperative governance, economics, or federation scenarios.</p>
+        </div>
+        <div class="card">
+          <h3>🧱 No Drive-By Refactors</h3>
+          <p>Each PR touches one concern. If you notice something that needs refactoring while working on a feature, open a separate issue.</p>
+        </div>
+        <div class="card">
+          <h3>🔥 The Meaning Firewall</h3>
+          <p>The kernel must never understand the semantic meaning of what it processes. If domain logic leaks into kernel crates, the architecture is broken.</p>
+        </div>
+        <div class="card">
+          <h3>📐 Architectural Guardrails</h3>
+          <p>All changes must respect crate boundaries, the app/kernel separation, and the constraint engine model. See CONTRIBUTING.md for details.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</Layout>
+
+<style>
+  .community-card {
+    display: block;
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-xl);
+    padding: var(--space-xl);
+    transition: all var(--duration-normal) var(--ease-out);
+    text-decoration: none;
+  }
+
+  .community-card:hover {
+    background: var(--bg-card-hover);
+    border-color: var(--border-accent);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-glow-teal);
+  }
+
+  .community-card .card-icon {
+    font-size: 2rem;
+    margin-bottom: var(--space-md);
+  }
+
+  .community-card h3 {
+    color: var(--text-heading);
+    margin-bottom: var(--space-sm);
+    font-size: 1.125rem;
+  }
+
+  .community-card p {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    margin: 0;
+  }
+</style>

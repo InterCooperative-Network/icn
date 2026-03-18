@@ -1,0 +1,40 @@
+sequenceDiagram
+    participant Caller
+    participant Oracle as TrustPolicyOracle
+    participant Handle as TrustGraph Handle
+    participant Graph as TrustGraph (Actor)
+    participant Metrics
+
+    Caller->>Oracle: evaluate(PolicyRequest)
+    activate Oracle
+    
+    Note over Oracle: 1. Check Domain
+    alt domain != "trust"
+        Oracle-->>Caller: Allow (Abstain)
+    else domain == "trust"
+        Note over Oracle: 2. Compute Trust Score
+        
+        alt Actor-Backed Mode
+            Oracle->>Handle: try_read()
+            alt Lock Acquired
+                Handle->>Graph: compute_trust_score(target_did)
+                Graph-->>Oracle: score result
+            else Lock Contention
+                Oracle->>Metrics: increment("trust_oracle_block_in_place_total")
+                Oracle->>Handle: blocking_read() (via block_in_place)
+                Handle->>Graph: compute_trust_score(target_did)
+                Graph-->>Oracle: score result
+            end
+        else Standalone Mode
+            Oracle->>Oracle: compute_local(target_string)
+        end
+        
+        Note over Oracle: 3. Construct Constraints
+        Oracle->>Oracle: Map score to RateLimit (Isolated/Known/Partner/Federated)
+        
+        Note over Oracle: 4. Record Metrics
+        Oracle->>Metrics: record_histogram("trust_oracle_evaluation_duration_seconds")
+        
+        Oracle-->>Caller: Allow(constraints: {trust_score, rate_limit})
+    end
+    deactivate Oracle

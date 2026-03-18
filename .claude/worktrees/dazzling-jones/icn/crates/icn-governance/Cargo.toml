@@ -1,0 +1,38 @@
+[package]
+name = "icn-governance"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+sled.workspace = true
+anyhow.workspace = true
+async-trait = "0.1"
+serde = { workspace = true, features = ["derive"] }
+serde_json = "1.0"
+icn-encoding = { path = "../icn-encoding" }
+icn-kernel-api = { path = "../icn-kernel-api" }
+icn-entity = { path = "../icn-entity" }
+icn-federation = { path = "../icn-federation" }
+icn-identity = { path = "../icn-identity" }
+icn-ledger = { path = "../icn-ledger" }
+icn-obs = { path = "../icn-obs" }
+icn-trust = { path = "../icn-trust" }
+icn-time.workspace = true
+thiserror.workspace = true
+tokio = { workspace = true }
+uuid = { version = "1.20", features = ["v4", "serde"] }
+sha2.workspace = true
+hex = "0.4"
+blake3 = "1.8"
+ed25519-dalek.workspace = true
+lru = "0.16"
+tracing.workspace = true
+
+[dev-dependencies]
+icn-store = { path = "../icn-store" }
+tempfile = "3"
+
+[lints]
+workspace = true
