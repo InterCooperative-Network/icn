@@ -44,6 +44,8 @@ pub struct GatewayHandles {
         Option<Arc<icn_gateway::service_discovery_mgr::ServiceDiscoveryManager>>,
     /// Naming service for Flow B name resolution endpoints
     pub naming_service: Option<Arc<dyn icn_kernel_api::naming::NamingService>>,
+    /// Hook invoked when a Charter proposal is accepted.
+    pub charter_accepted_hook: Option<Arc<dyn Fn(String, String) + Send + Sync>>,
 }
 
 /// Spawn the Gateway API server if enabled
@@ -106,6 +108,7 @@ pub fn spawn_gateway(config: &GatewayConfig, data_dir: PathBuf, handles: Gateway
     let agreement_manager_handle = handles.agreement_manager;
     let service_discovery_manager = handles.service_discovery_manager;
     let naming_service = handles.naming_service;
+    let charter_accepted_hook = handles.charter_accepted_hook;
     let default_trust_score = config.default_trust_score;
 
     // Spawn gateway in a dedicated thread (actix-web has its own runtime)
@@ -180,6 +183,10 @@ pub fn spawn_gateway(config: &GatewayConfig, data_dir: PathBuf, handles: Gateway
 
             if let Some(score) = default_trust_score {
                 gateway_server = gateway_server.with_default_trust_score(score);
+            }
+
+            if let Some(hook) = charter_accepted_hook {
+                gateway_server = gateway_server.with_charter_accepted_hook(hook);
             }
 
             if let Err(e) = gateway_server.run().await {

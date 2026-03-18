@@ -20,6 +20,15 @@ use crate::manager::GovernanceManager;
 
 use super::handlers;
 
+/// Callback invoked when a `Charter` proposal is accepted.
+///
+/// Arguments: `(charter_id, charter_yaml)`.
+///
+/// The gateway wires this to `CharterPolicyOracle::deploy_charter()`.
+/// Errors are non-fatal to the proposal-close operation — implementations
+/// should log warnings internally rather than panicking.
+pub type CharterAcceptedHook = Arc<dyn Fn(String, String) + Send + Sync>;
+
 /// Shared application context for governance HTTP handlers.
 ///
 /// Stored as `web::Data<GovernanceContext<E>>`. Using a single struct keeps
@@ -28,6 +37,8 @@ use super::handlers;
 pub struct GovernanceContext<E> {
     pub manager: Arc<GovernanceManager>,
     pub emitter: E,
+    /// Optional hook called when a `Charter` proposal is accepted.
+    pub on_charter_accepted: Option<CharterAcceptedHook>,
 }
 
 /// Register all governance routes on `cfg`.

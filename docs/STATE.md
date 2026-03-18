@@ -38,6 +38,14 @@
 - **Verified:** 547 tests passing, cold-start demo 18/18, tally correct (2/2 votes)
 - **API routes:** Governance at `/v1/gov/*` (previously 404 due to scope shadowing)
 
+## Current status (2026-03-18 evening snapshot)
+- **Phase 1 (Charter Engine) complete** — PRs #1336 + #1337 merged
+- Charter bridge (`charter_to_constraints()`), `CharterPolicyOracle`, 5 CCL templates, `icnctl charter` CLI, and governance ratification flow all landed
+- `ProposalPayload::Charter` wired end-to-end: vote passes → `close_proposal` fires type-erased hook → oracle deploys charter → constraints active for subsequent requests
+- Demo governance script (Phase 2) now submits real CCL charter YAML for member ratification instead of a plain text proposal
+- Meaning Firewall preserved: kernel crates (`icn-core`, `icn-gateway`) hold only `Arc<dyn Fn(String, String) + Send + Sync>` — no `icn-charter-app` import
+- Phase 2 (Pilot Launch) is next — requires cooperative partners identified and committed
+
 ## Current status (2026-02-18 snapshot)
 - **Sprint 8-10 Economics Consolidation complete** - Full deterministic economic receipt chain implemented:
   - CanonicalReceipt trait with Blake3-based deterministic hashing

@@ -2,6 +2,7 @@
 //!
 //! Exercises the full `charter_to_constraints()` bridge with a realistic
 //! worker cooperative charter that uses all three schema sections.
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use icn_ccl::schema::bridge::{charter_to_constraints, CharterContext};
 use icn_ccl::schema::CclDocument;

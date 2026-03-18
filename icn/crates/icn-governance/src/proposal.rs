@@ -656,6 +656,18 @@ pub enum ProposalPayload {
         /// Reason for grant/revocation
         reason: String,
     },
+
+    /// Charter ratification — members vote to adopt a CCL charter document.
+    ///
+    /// On acceptance the charter YAML is deployed to the `CharterPolicyOracle`,
+    /// making it immediately enforceable by the kernel.
+    Charter {
+        /// Stable identifier that the oracle will use to key this charter.
+        /// Typically the cooperative's DID or a human-readable name.
+        charter_id: String,
+        /// Complete YAML charter document (CCL format, schema_version: v0).
+        charter_yaml: String,
+    },
 }
 
 impl ProposalPayload {
@@ -682,6 +694,7 @@ impl ProposalPayload {
             ProposalPayload::BondIssuance { .. } => "bond_issuance",
             ProposalPayload::Federation(_) => "federation",
             ProposalPayload::ResourceAccess { .. } => "resource_access",
+            ProposalPayload::Charter { .. } => "charter",
         }
     }
 

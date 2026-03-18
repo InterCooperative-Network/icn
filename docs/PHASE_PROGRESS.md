@@ -40,9 +40,9 @@
 ---
 
 ### Phase 1: The Charter Engine
-**Status:** 🚧 In Progress
+**Status:** ✅ Complete
 **Started:** 2026-03-18
-**Completed:** —
+**Completed:** 2026-03-18
 **Sprint(s):** S17–S18
 
 **Objective:** YAML charter documents produce kernel-enforced constraints. Cooperatives define their own rules.
@@ -58,9 +58,9 @@
 - [x] Housing cooperative charter template — `contracts/templates/housing-coop.yaml`
 - [x] Community organization charter template — `contracts/templates/community-org.yaml`
 - [x] Regional federation charter template — `contracts/templates/federation.yaml`
-- [ ] Charter ratification flow (governance vote triggers charter deployment)
+- [x] Charter ratification flow (governance vote triggers charter deployment) — PRs #1336 + #1337
 - [x] `icnctl charter validate/inspect/deploy` subcommands
-- [ ] Demo Flow 1 updated to use real charter document
+- [x] Demo Flow 1 updated to use real charter document — demo-governance.py Phase 2 now submits Charter payload with CCL YAML
 
 **Blockers:**
 - (none blocking — ratification flow and demo update are additive)
@@ -71,11 +71,12 @@
 - (2026-03-18) Start with governance thresholds + credit limits mapping. Expand incrementally.
 - (2026-03-18) `community-org` template uses `entity.type: cooperative / subtype: purpose` — `community` is an entity type (for `icn-community`), not a valid cooperative subtype.
 - (2026-03-18) Charter ratification flow is a separate PR: governance has no effect execution hook today. `GovernanceProposalClosed` event is logged only — no `deploy_charter()` call exists anywhere. Wiring requires: (a) add `Charter` variant to `ProposalPayload`, (b) listen for `Accepted` outcome in gateway, (c) call `charter_oracle.deploy_charter()` from gateway handler.
+- (2026-03-18) Charter ratification uses type-erased hook (`Arc<dyn Fn(String, String) + Send + Sync>`) threaded through `BootstrapHandles → GatewayActorHandles → GatewayHandles → GatewayServer`. Kernel (`icn-core`, `icn-gateway`) never imports `icn-charter-app`. The daemon (`icnd`) builds the concrete closure from `Arc<CharterPolicyOracle>` and injects it at the boundary.
 
 **Metrics:**
-- Tests added: 32 (12 bridge unit, 9 oracle unit, 11 oracle unit, 1 template integration ratchet — but icn-charter-app lib tests = 11 total; icn-ccl integration = 20 total)
-- Lines changed: ~900 (bridge 350, oracle 200, daemon wiring 50, templates 350, CLI 90)
-- Kernel infection delta: 0 (charter oracle is an app — kernel sees only ConstraintSet)
+- Tests added: 32+ (12 bridge unit, 9 oracle unit, 11 oracle unit, 1 template integration ratchet; icn-charter-app lib = 11 total; icn-ccl integration = 20 total)
+- Lines changed: ~1,068 (bridge 350, oracle 200, daemon wiring 50, templates 350, CLI 90, ratification flow 168, demo 30)
+- Kernel infection delta: 0 (charter oracle is an app — kernel sees only ConstraintSet; hook is type-erased at boundary)
 
 ### Schema → Constraint Mapping Status
 

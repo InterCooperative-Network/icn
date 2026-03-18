@@ -119,6 +119,8 @@ pub struct GatewayServer {
     audit_prune_config: Option<AuditPruneConfig>,
     /// Default trust score for unknown peers (overrides DEFAULT_TRUST_SCORE)
     default_trust_score: Option<f64>,
+    /// Hook called when a Charter proposal is accepted: deploys the document to the oracle.
+    charter_accepted_hook: Option<icn_governance_actor::http::configure::CharterAcceptedHook>,
 }
 
 impl GatewayServer {
@@ -149,6 +151,7 @@ impl GatewayServer {
             wasm_registry_handle: None,
             audit_prune_config: None,
             default_trust_score: None,
+            charter_accepted_hook: None,
         }
     }
 
@@ -191,6 +194,7 @@ impl GatewayServer {
             wasm_registry_handle: None,
             audit_prune_config: None,
             default_trust_score: None,
+            charter_accepted_hook: None,
         }
     }
 
@@ -234,6 +238,7 @@ impl GatewayServer {
             wasm_registry_handle: None,
             audit_prune_config: None,
             default_trust_score: None,
+            charter_accepted_hook: None,
         }
     }
 
@@ -246,6 +251,19 @@ impl GatewayServer {
     /// Set default trust score
     pub fn with_default_trust_score(mut self, score: f64) -> Self {
         self.default_trust_score = Some(score);
+        self
+    }
+
+    /// Attach a charter-accepted hook so that ratified `Charter` proposals are
+    /// deployed automatically when the governance vote closes with `Accepted`.
+    ///
+    /// The hook receives `(charter_id, charter_yaml)` and is responsible for
+    /// parsing the YAML and calling `CharterPolicyOracle::deploy_charter()`.
+    pub fn with_charter_accepted_hook(
+        mut self,
+        hook: icn_governance_actor::http::configure::CharterAcceptedHook,
+    ) -> Self {
+        self.charter_accepted_hook = Some(hook);
         self
     }
 
@@ -796,9 +814,13 @@ impl GatewayServer {
 
         // Create governance context for apps/governance HTTP handlers.
         // GatewayEventAdapter wires the domain emitter to the WebSocket broadcaster.
+        //
+        // If a charter_accepted_hook is provided (wired from icnd via init_gateway),
+        // it is called when a Charter proposal closes with Accepted.
         let gov_ctx = GovernanceContext {
             manager: governance_manager.clone(),
             emitter: GatewayEventAdapter::new(event_broadcaster.clone()),
+            on_charter_accepted: self.charter_accepted_hook,
         };
 
         // Create rate limiter with configured or default config

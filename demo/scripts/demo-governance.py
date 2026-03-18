@@ -323,6 +323,41 @@ def main():
     phase_header(2, "Charter Ratification",
                  "Members vote to adopt the cooperative's founding charter")
 
+    CHARTER_YAML = """\
+schema_version: v0
+entity:
+  name: "Finger Lakes Food Co-op"
+  type: cooperative
+  subtype: consumer
+governance:
+  bodies:
+    - name: general_assembly
+    - name: stewardship_circle
+      seats: 3
+      term:
+        years: 2
+  decisions:
+    - name: ordinary
+      threshold: simple_majority
+      quorum: "0.20 * members"
+    - name: constitutional
+      threshold: two_thirds
+      quorum: "0.50 * members"
+  delegation:
+    allowed: true
+    transitive: false
+economics:
+  credit:
+    limit: "200"
+    terms: net30
+  surplus:
+    distribution:
+      - pool: reserve
+        percentage: 20
+      - pool: patronage
+        percentage: 80
+"""
+
     step(7, "Alice submits the founding charter for ratification")
     status, resp = api("POST", "/gov/proposals", {
         "domain_id": DOMAIN_ID,
@@ -332,19 +367,9 @@ def main():
             "governance structure, and operating principles."
         ),
         "payload": {
-            "type": "text",
-            "body": (
-                "COOPERATIVE CHARTER — Finger Lakes Food Co-op\n\n"
-                "1. MEMBERSHIP: Any person who supports our mission may join. "
-                "All members have equal voting rights.\n"
-                "2. GOVERNANCE: Decisions are made democratically. "
-                "No member has more authority than any other.\n"
-                "3. PURPOSE: To provide affordable, healthy food to our community "
-                "and build economic resilience through cooperation.\n"
-                "4. COORDINATION: Coordinators are elected for specific purposes "
-                "and terms. All coordination roles rotate.\n"
-                "5. AMENDMENT: This charter may be amended by a two-thirds vote of members."
-            ),
+            "type": "charter",
+            "charter_id": "finger-lakes-food-coop",
+            "charter_yaml": CHARTER_YAML,
         },
     }, alice.token)
     if status in (200, 201):

@@ -85,6 +85,13 @@ pub enum ProposalPayloadRequest {
         key: String,
         value: String,
     },
+    /// Charter ratification — members vote to adopt a CCL charter document.
+    Charter {
+        /// Stable charter identifier (cooperative DID or human-readable name).
+        charter_id: String,
+        /// Complete YAML charter document (CCL schema_version: v0).
+        charter_yaml: String,
+    },
 }
 
 /// Open a proposal for voting
