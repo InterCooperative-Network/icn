@@ -127,6 +127,13 @@ Navigate using `docs/INDEX.md` (complete index) or `docs/README.md` (overview).
 - `TODO.md` - Active work items
 - `glossary.md` - Terminology definitions
 
+**Current Planning & Strategy (read these for project direction):**
+- `planning/` - Forward plan, crate reference, ecosystem map, vertical slice assessment
+- `strategy/` - Gap analysis, active sprint, roadmaps, whitepaper, pitch docs (March 2026)
+- `mobile/icn-mobile-ux-spec-v1.md` - Mobile member UX spec (build-facing, anchored to gateway API)
+- `status/icn-status-march-2026.md` - Current status report
+- `GOLDEN_PROMPT.md` - Master agent context (27KB, complete project state)
+
 **Main Categories:**
 - `architecture/` - Architecture documentation, design decisions, audits
 - `design/` - Feature designs, proposals, evolution plans
@@ -141,6 +148,9 @@ Navigate using `docs/INDEX.md` (complete index) or `docs/README.md` (overview).
   - `guides/developer/` - Development guides
   - `guides/operations/` - Deployment and operations
   - `guides/user/` - End-user documentation
+- `planning/` - Project planning docs (crate reference, ecosystem map, demo docs)
+- `strategy/` - Strategic direction (gap analysis, sprint plans, roadmaps)
+- `mobile/` - Mobile UX spec (v1 supersedes Dec 2024 docs in archive/)
 - `development/` - Development resources (sprints, testing)
 - `security/` - Security documentation and threat models
 - `sdis/` - SDIS implementation documentation
