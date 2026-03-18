@@ -1,0 +1,11 @@
+FROM debian:trixie-slim
+RUN apt-get update && apt-get install -y ca-certificates curl && rm -rf /var/lib/apt/lists/*
+RUN useradd -m -u 1000 -s /bin/bash icn
+RUN mkdir -p /data && chown icn:icn /data
+COPY icn/target/release/icnd /usr/local/bin/icnd
+COPY icn/target/release/icnctl /usr/local/bin/icnctl
+RUN chmod +x /usr/local/bin/icnd /usr/local/bin/icnctl
+USER icn
+WORKDIR /data
+EXPOSE 5000-5010 9100 8080
+ENTRYPOINT ["icnd"]
