@@ -448,5 +448,18 @@ const commitUrl = 'https://github.com/InterCooperative-Network/icn/commits/main'
 @media (max-width: 768px) {
   .demo-callout { grid-template-columns: 1fr; }
   .stages-grid { grid-template-columns: 1fr; }
+  .stage-card { flex-direction: row; gap: var(--space-sm); }
+  .stage-num { width: 36px; height: 36px; font-size: 1rem; }
+  .stage-body p { font-size: .8125rem; line-height: 1.5; }
+  .hero-content h1 { font-size: clamp(2rem, 8vw, 3rem); }
+  .hero-content > p { font-size: 1rem; }
+  .crate-table { gap: var(--space-lg); }
+  .crate-row { flex-direction: column; gap: 2px; }
+  .crate-row code { font-size: .75rem; }
+  .crate-row span { font-size: .8125rem; }
+  .fw-grid { grid-template-columns: 1fr !important; }
+}
+@media (max-width: 480px) {
+  .badge { font-size: .625rem; padding: .2rem .5rem; }
 }
 </style>
