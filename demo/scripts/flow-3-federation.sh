@@ -21,8 +21,9 @@
 #   Finger Lakes CDN         → facilitates, tracks, reports — does NOT control
 #   Term: 90 days, renewable by mutual consent
 #
-# Known cluster constraints (as of 2026-03-07):
-#   - treasury:read/write and federation:write scopes may be limited
+# Known cluster constraints (as of 2026-03-18):
+#   - treasury:read/write scopes are in ALLOWED_SCOPES and DEMO_DEFAULT_SCOPES — resolved
+#   - federation:write scope included in DEMO_DEFAULT_SCOPES
 #   - gossip sync between nodes is eventual — don't expect instant propagation
 #
 # Usage:    ./demo/scripts/flow-3-federation.sh

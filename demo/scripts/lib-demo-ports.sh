@@ -71,7 +71,7 @@ export HARBOR_GRPC="10.8.30.40:30649"
 export FINGERLAKES_GRPC="10.8.30.40:30655"
 
 # Default scopes to request for demo tokens
-export DEMO_DEFAULT_SCOPES="ledger:read,ledger:write,coop:read,coop:write,governance:read,governance:write,payments:read,payments:write,federation:read,federation:write"
+export DEMO_DEFAULT_SCOPES="ledger:read,ledger:write,coop:read,coop:write,governance:read,governance:write,settlements:read,settlements:write,treasury:read,treasury:write,federation:read,federation:write"
 
 # HTTP status code from the last demo_curl call
 export DEMO_LAST_HTTP_CODE=""

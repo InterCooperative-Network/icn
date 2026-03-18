@@ -11,7 +11,7 @@
 #   - Ledger action authorized by the approved decision
 #   - Provenance: proposal -> decision -> authorized action visible together
 #
-# What this does NOT yet claim (Flow 1B — pending PR #1327 ExecutionReceiptGate):
+# What this does NOT yet claim (Flow 1B — ExecutionReceiptGate merged PR #1327, signing key pending):
 #   - Machine-verifiable cryptographic binding of execution to approved governance
 #   - Receipt-gated enforcement (unauthorized actions blocked at the kernel level)
 #   - Signed GovernanceReceipt (proof endpoint requires signing key — not yet
@@ -20,10 +20,10 @@
 # Core cooperator question: "Did the thing we voted on actually happen,
 #                            and can we prove it?"
 #
-# Known cluster constraints (as of 2026-03-07):
-#   - treasury:read/write scopes not in ALLOWED_SCOPES — treasury API unreachable
-#   - Proof endpoint returns 404: signing key not configured in pod
-#   - These are deployment gaps, not design gaps. Flow 1B addresses both.
+# Known cluster constraints (as of 2026-03-18):
+#   - treasury:read/write scopes are in ALLOWED_SCOPES and DEMO_DEFAULT_SCOPES — resolved
+#   - Proof endpoint returns 404: signing key not configured in pod (deployment gap)
+#   - PR #1327 ExecutionReceiptGate is merged; signing key deployment is the remaining gap.
 #
 # Usage:    ./demo/scripts/flow-1-governance.sh
 # Duration: ~5 minutes live

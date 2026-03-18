@@ -12,9 +12,9 @@
 #
 # Core cooperator question: "Why did this member get this distribution?"
 #
-# Known cluster constraints (as of 2026-03-07):
-#   - treasury:read/write scopes not in ALLOWED_SCOPES — treasury API unreachable
-#   - Ledger settlement may require treasury:write or ledger:write scope
+# Known cluster constraints (as of 2026-03-18):
+#   - treasury:read/write scopes are in ALLOWED_SCOPES and DEMO_DEFAULT_SCOPES — resolved
+#   - Ledger settlement uses ledger:write scope (included in DEMO_DEFAULT_SCOPES)
 #   - The demo narrates all 5 member allocations from seed data; the live
 #     settlement API call uses the single seeded node DID
 #

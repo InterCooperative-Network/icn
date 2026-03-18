@@ -8,7 +8,7 @@
 #   - Governance and expenditure evidence for grant/compliance reporting
 #   - Federation-level reporting without centralized control
 #   - Audit without bureaucracy: query records, don't own them
-#   - Strengthens significantly when Flow 1B (PR #1327) is complete
+#   - Strengthens significantly now that PR #1327 ExecutionReceiptGate is merged (2026-03-18)
 #
 # Core institutional question:
 #   "Can this produce trustworthy reporting without adding massive admin overhead?"
@@ -20,9 +20,9 @@
 #   Amara Diallo (Executive Director) needs this without calling each coop
 #   and asking them to send spreadsheets.
 #
-# Known cluster constraints (as of 2026-03-07):
-#   - treasury:read scope not in ALLOWED_SCOPES — treasury endpoints limited
-#   - Some receipt/execution endpoints may require elevated scopes
+# Known cluster constraints (as of 2026-03-18):
+#   - treasury:read/write scopes are in ALLOWED_SCOPES and DEMO_DEFAULT_SCOPES — resolved
+#   - Some receipt/execution endpoints may require elevated scopes (signing key gap)
 #   - Flow 4 gracefully handles unavailable endpoints with presenter narration
 #
 # Usage:    ./demo/scripts/flow-4-reporting.sh
