@@ -2849,6 +2849,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "icn-charter-app"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "icn-ccl",
+ "icn-kernel-api",
+ "parking_lot 0.12.5",
+ "tracing",
+]
+
+[[package]]
 name = "icn-community"
 version = "0.1.0"
 dependencies = [
@@ -3846,6 +3857,7 @@ dependencies = [
  "anyhow",
  "clap",
  "icn-ccl",
+ "icn-charter-app",
  "icn-core",
  "icn-gossip",
  "icn-governance",
