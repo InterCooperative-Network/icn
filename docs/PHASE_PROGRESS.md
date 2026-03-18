@@ -18,8 +18,8 @@
 - [x] Deploy proof signing key to K3s pods — init container keystore fix deployed 2026-03-18
 - [x] Verify K3s cluster + CI runner operational — VMs restarted, all nodes Ready, cluster healthy
 - [x] All 4 demo flows pass — governance 19/19 (demo-governance.py), flows 1-4 all green 2026-03-18
-- [ ] Recorded demo for async audiences — content asset
-- [ ] Layer 3 handoff: someone other than Matt can run the demo — documentation
+- [ ] Recorded demo for async audiences — content asset (Matt records, not engineering)
+- [x] Layer 3 handoff: someone other than Matt can run the demo — demo/RUNBOOK.md K3s section added 2026-03-18
 
 **Blockers:**
 - (none — all ops blockers resolved)

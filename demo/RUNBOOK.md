@@ -161,3 +161,80 @@ rm -rf /tmp/icn-demo /tmp/icn-demo-*
 | `demo/scripts/record-demo.sh` | Record terminal demo with asciinema |
 | `icn/crates/icn-gateway/static/demo.html` | Browser-based demo UI |
 | `demo/RUNBOOK.md` | This file |
+
+---
+
+## K3s Cluster Demo (4-Flow Federation)
+
+For the full 4-coop federation demo running on the homelab K3s cluster.
+
+**Prerequisites:** `kubectl` configured (`~/.kube/config`, server `10.8.30.40`), Python 3 + `cryptography`, ports 18081–18084 free.
+
+### Port Mapping
+
+| Namespace | Coop | Port |
+|-----------|------|------|
+| icn-coop-alpha | BrightWorks Cooperative | 18081 |
+| icn-coop-beta  | River City Tool Library | 18082 |
+| icn-coop-gamma | Harbor Homes Cooperative | 18083 |
+| icn-coop-delta | Finger Lakes CDN | 18084 |
+
+### Quick Start
+
+```bash
+cd /home/ubuntu/projects/icn
+
+# Reseed canonical state (manages port-forwards automatically)
+bash demo/scripts/reseed-federation-demo.sh
+
+# Full 19-step governance demo (proof included)
+python3 demo/scripts/demo-governance.py http://localhost:18081 --presenter
+
+# Four federation flows
+bash demo/scripts/flow-1-governance.sh --present    # Harbor Homes capital vote
+bash demo/scripts/flow-2-patronage.sh --present     # BrightWorks patronage distribution
+bash demo/scripts/flow-3-federation.sh --present    # Cross-coop federation agreement
+bash demo/scripts/flow-4-reporting.sh --present     # Funder-facing audit trail
+```
+
+Reseed before each flow run — flows consume state that was seeded.
+
+### If Pods Have Restarted
+
+The `copy-keystore` init container runs automatically on every pod start. No manual keystore copy needed. Just reseed to restore in-memory state:
+
+```bash
+bash demo/scripts/reseed-federation-demo.sh
+```
+
+### If the Binary Is Stale
+
+Build from pre-compiled binaries (`icn/target/release/icnd` must exist):
+
+```bash
+# Build and push (from repo root)
+TAG=$(date +%Y%m%d)
+docker build -f Dockerfile.fast -t 10.8.30.40:30500/icn:$TAG .
+docker push 10.8.30.40:30500/icn:$TAG
+
+# Roll out (imagePullPolicy: IfNotPresent — new tag required, not :latest)
+for ns_deploy in "icn-coop-alpha icn-alpha" "icn-coop-beta icn-beta" "icn-coop-gamma icn-gamma" "icn-coop-delta icn-delta"; do
+  ns=$(echo $ns_deploy | cut -d" " -f1); deploy=$(echo $ns_deploy | cut -d" " -f2)
+  kubectl set image deployment/$deploy icnd=10.8.30.40:30500/icn:$TAG -n $ns
+done
+for ns in icn-coop-alpha icn-coop-beta icn-coop-gamma icn-coop-delta; do
+  kubectl rollout status deployment -n $ns --timeout=120s
+done
+```
+
+### Known Issues (non-blocking)
+
+- **#1334** — Flow 2 Step 11: `/v1/receipts/allocations` returns 400 (`missing decision_hash`). Settlement succeeds; only receipt chain query fails.
+- **#1335** — Flow 3: clearing agreement ID shown as `(failed)`. Both coops ratify; Flow 4 runs without the ID.
+
+### Verify Cluster Health
+
+```bash
+kubectl get pods -A | grep icn-coop          # all 4 should be Running
+curl -s http://localhost:18081/v1/health      # requires port-forward active
+```
