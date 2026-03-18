@@ -636,6 +636,13 @@ impl PolicyOracle for CharterPolicyOracle {
 | Demo scripts | `demo/scripts/` |
 | Demo design doc | `docs/plans/2026-03-07-demo-system-design.md` |
 | Sprint planning | `docs/plans/2026-03-05-sprint-14-closeout-sprint-15-scope-design.md` |
+| Active sprint (Mar 17-30) | `docs/strategy/ICN-Sprint-March17.md` |
+| Gap analysis (Mar 2026) | `docs/strategy/ICN-Gap-Analysis-March-2026.md` |
+| 90-day roadmap | `docs/strategy/ICN-Roadmap-Live.md` |
+| Crate reference (38 crates) | `docs/planning/icn-crate-reference.md` |
+| Ecosystem map | `docs/planning/icn-ecosystem-map.md` |
+| Vertical slice assessment | `docs/planning/icn-vertical-slice-assessment.md` |
+| Mobile UX spec v1 | `docs/mobile/icn-mobile-ux-spec-v1.md` |
 | Charter templates (to be created) | `contracts/templates/` |
 | Pilot UI | `web/pilot-ui/` |
 | Gateway scopes | `icn/crates/icn-gateway/src/validation.rs` (ALLOWED_SCOPES) |

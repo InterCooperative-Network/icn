@@ -91,6 +91,17 @@
 - docs/operations/deployment/HOMELAB_DEPLOYMENT.md
 - deploy/README.md
 
+### Planning & Strategy (March 2026)
+- docs/planning/icn-crate-reference.md ? 38-crate inventory
+- docs/planning/icn-ecosystem-map.md ? surfaces, funnels, entity hierarchy
+- docs/planning/icn-vertical-slice-assessment.md ? gateway endpoint inventory
+- docs/planning/FORWARD_PLAN_2026-03.md ? Phase 2-4 roadmap
+- docs/strategy/ICN-Gap-Analysis-March-2026.md ? subsystem reality check
+- docs/strategy/ICN-Sprint-March17.md ? active sprint plan
+- docs/strategy/ICN-Roadmap-Live.md ? grounded 90-day roadmap
+- docs/mobile/icn-mobile-ux-spec-v1.md ? mobile member UX spec
+- docs/status/icn-status-march-2026.md ? March 2026 status report
+
 ## Current status (2026-03-18 snapshot)
 - **Phase 0 (Close the Demo) nearly complete** — all 4 flows passing on K3s cluster
 - New binary deployed: icn:20260318 (includes all S14 PRs through #1327, settlements:* and treasury:* scopes)

@@ -2,7 +2,7 @@
 
 Welcome to the ICN (Intercooperative Network) documentation! This index provides clear navigation to all documentation.
 
-**Last Updated**: 2026-02-18  
+**Last Updated**: 2026-03-18  
 **Version**: 2.0 (Post-Phase 2C Reorganization)
 
 ---
@@ -312,10 +312,37 @@ Active project status and gap analyses:
 - [vision-implementation-gap.md](internal/status/vision-implementation-gap.md) - Vision gaps
 - [multi-device-status.md](internal/status/multi-device-status.md) - Multi-device status
 
+### Planning Documents (`planning/`)
+
+Current project planning and analysis:
+
+- [FORWARD_PLAN_2026-03.md](planning/FORWARD_PLAN_2026-03.md) - Phase 2-4 roadmap and timeline
+- [icn-crate-reference.md](planning/icn-crate-reference.md) - 38-crate inventory with roles and modules
+- [icn-ecosystem-map.md](planning/icn-ecosystem-map.md) - Entity hierarchy, surfaces, funnels, flywheel
+- [icn-vertical-slice-assessment.md](planning/icn-vertical-slice-assessment.md) - Gateway endpoint inventory and gap analysis
+- [icn-demo-one-pager.md](planning/icn-demo-one-pager.md) - Demo summary for summit
+- [icn-demo-presentation-prompt.md](planning/icn-demo-presentation-prompt.md) - Presentation generation prompt
+
+### Strategy Documents (`strategy/`)
+
+Strategic direction and gap analysis (March 2026):
+
+- [ICN-Gap-Analysis-March-2026.md](strategy/ICN-Gap-Analysis-March-2026.md) - Subsystem-by-subsystem reality check
+- [ICN-Sprint-March17.md](strategy/ICN-Sprint-March17.md) - Active 2-week sprint plan
+- [ICN-Roadmap-Live.md](strategy/ICN-Roadmap-Live.md) - Grounded 90-day roadmap
+- [ICN-Roadmap-Strategy.md](strategy/ICN-Roadmap-Strategy.md) - 18-month strategy
+- [ADR-001-What-ICN-Is.md](strategy/ADR-001-What-ICN-Is.md) - Meaning Firewall formal definition
+- [ICN-Definition.md](strategy/ICN-Definition.md) - What ICN is (multiple audiences)
+- [ICN-Technical-Whitepaper.md](strategy/ICN-Technical-Whitepaper.md) - Architecture whitepaper
+- [ICN-Pitch.md](strategy/ICN-Pitch.md) - Cooperative organizer pitch
+- [ICN-Scenarios.md](strategy/ICN-Scenarios.md) - Six working scenarios with API calls
+- [ICN-Evolution-Arc.md](strategy/ICN-Evolution-Arc.md) - Two-year project history
+
 ### Current Status Reports (`status/`)
 
 Live status reports and deployment verification:
 
+- [icn-status-march-2026.md](status/icn-status-march-2026.md) - March 2026 status report
 - [PROJECT_STATE_2026-02-09.md](status/PROJECT_STATE_2026-02-09.md) - Current project state ⭐
 - [CURRENT_SYSTEM_STATUS.md](status/CURRENT_SYSTEM_STATUS.md) - System status
 - [DEPLOYMENT_VERIFICATION.md](status/DEPLOYMENT_VERIFICATION.md) - Deployment verification
