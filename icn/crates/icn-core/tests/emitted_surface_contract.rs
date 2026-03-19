@@ -34,6 +34,7 @@ fn approved_emitted_effects() -> BTreeSet<&'static str> {
         // Treasury effects
         "Treasury::Spend",
         "Treasury::CreateBudget",
+        "Treasury::Allocate",
         "Treasury::DistributeSurplus",
         // Membership effects
         "Membership::AddMember",
