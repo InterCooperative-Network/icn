@@ -1,65 +1,98 @@
 {
-  "sprint": 8,
-  "name": "Sprint 8 — Flow Demos as Product Truth",
-  "started": "2026-02-20",
+  "sprint": 15,
+  "name": "Sprint 15 — Receipt Chain & Demo Truth",
+  "started": "2026-03-20",
   "goals": [
-    "Ship Flow B end-to-end demo script (service discovery)",
-    "Implement Flow A WASM compute path in gateway + SDK (#1076, #1077)",
-    "Ship Flow A demo script (WASM distribution)",
-    "Merge CI disk cleanup fix (#1251) and prevent future runner exhaustion"
+    "Audit all 4 demo flows on K3s — classify PROVEN/FRAGILE/BROKEN with evidence",
+    "Complete 6-link receipt chain: AllocationProposal → Execution gate wiring → vertical slice test",
+    "Close epic #1302 (regulatory-safe architecture): CCL formula extraction + CI linter",
+    "Support March 31 grant applications with credible demo proof"
   ],
   "tasks": [
     {
-      "id": "1250",
-      "title": "feat(gateway): names API wiring + SDK surface",
-      "status": "in-review",
-      "pr": 1250,
-      "assignee": null,
-      "epic": "1099"
-    },
-    {
-      "id": "1251",
-      "title": "fix(ci): clean stale Cargo test binaries on self-hosted runners",
-      "status": "in-review",
-      "pr": 1251,
-      "assignee": null,
-      "epic": null
-    },
-    {
-      "id": "1076",
-      "title": "feat(gateway): compute submit accepts wasm_hash",
-      "status": "in-review",
-      "pr": 1253,
-      "assignee": null,
-      "epic": "1099"
-    },
-    {
-      "id": "1077",
-      "title": "feat(sdk): TypeScript WASM client + typed errors",
-      "status": "in-review",
-      "pr": 1254,
-      "assignee": null,
-      "epic": "1099"
-    },
-    {
-      "id": "1085",
-      "title": "demo(flow-b): service discovery end-to-end script",
-      "status": "in-progress",
+      "id": "s15-t1",
+      "title": "K3s demo audit: run all 4 flows, classify with evidence, write report",
+      "status": "pending",
       "pr": null,
-      "assignee": "main-session",
+      "assignee": null,
       "epic": "1099"
     },
     {
-      "id": "1078",
-      "title": "demo(flow-a): WASM distribution end-to-end script",
-      "status": "in-progress",
+      "id": "s15-t2",
+      "title": "fix(gateway): make decision_hash optional in /v1/receipts/allocations (#1334)",
+      "status": "pending",
       "pr": null,
-      "assignee": "main-session",
+      "assignee": null,
+      "epic": "1302"
+    },
+    {
+      "id": "s15-t3",
+      "title": "fix(demo): Flow 3 clearing agreement ID extraction (#1335)",
+      "status": "pending",
+      "pr": null,
+      "assignee": null,
       "epic": "1099"
+    },
+    {
+      "id": "s15-t4",
+      "title": "feat(governance): AllocationProposal for participatory budgeting (#1311)",
+      "status": "pending",
+      "pr": null,
+      "assignee": null,
+      "epic": "1302"
+    },
+    {
+      "id": "s15-t5",
+      "title": "feat(governance): wire AllocationProposal acceptance to ExecutionReceiptGate",
+      "status": "pending",
+      "pr": null,
+      "assignee": null,
+      "epic": "1147"
+    },
+    {
+      "id": "s15-t6",
+      "title": "test(core): vertical slice integration test — full receipt chain in CI (#1147)",
+      "status": "pending",
+      "pr": null,
+      "assignee": null,
+      "epic": "1147"
+    },
+    {
+      "id": "s15-t7",
+      "title": "refactor(economics): extract commons credit formula to CCL PolicyOracle (#1308)",
+      "status": "pending",
+      "pr": null,
+      "assignee": null,
+      "epic": "1302"
+    },
+    {
+      "id": "s15-t8",
+      "title": "chore(ci): regulatory compliance linter (#1312)",
+      "status": "pending",
+      "pr": null,
+      "assignee": null,
+      "epic": "1302"
+    },
+    {
+      "id": "s15-t9",
+      "title": "Close epic #1302 with verified evidence for all 10 sub-items",
+      "status": "pending",
+      "pr": null,
+      "assignee": null,
+      "epic": "1302"
+    },
+    {
+      "id": "s15-t10",
+      "title": "feat(cli): icnctl audit verify — receipt chain verification command (Tier 2)",
+      "status": "pending",
+      "pr": null,
+      "assignee": null,
+      "epic": "1147"
     }
   ],
   "epics": {
     "1099": "[EPIC] Pilot Completion (P0) — Flows A/B/C",
-    "1147": "[EPIC] Vertical Slice (P0) — Identity→Governance→Compute→Receipts→Audit"
+    "1147": "[EPIC] Vertical Slice (P0) — Identity→Governance→Compute→Receipts→Audit",
+    "1302": "[EPIC] Regulatory-safe verifiable state architecture"
   }
 }
