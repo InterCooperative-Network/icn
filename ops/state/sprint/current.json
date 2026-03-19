@@ -93,10 +93,11 @@
     {
       "id": "s15-t10",
       "title": "feat(cli): icnctl audit verify — receipt chain verification command (Tier 2)",
-      "status": "pending",
-      "pr": null,
-      "assignee": null,
-      "epic": "1147"
+      "status": "done",
+      "pr": 1354,
+      "assignee": "claude",
+      "epic": "1147",
+      "evidence": "PR #1354. icnctl audit verify command with 7 integrity checks, --json output, non-zero exit on failure. All workspace tests pass."
     }
   ],
   "epics": {

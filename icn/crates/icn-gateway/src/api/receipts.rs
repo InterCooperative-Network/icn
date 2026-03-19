@@ -22,7 +22,7 @@ pub struct ByDecisionQuery {
 }
 
 /// Response for allocation receipt
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AllocationReceiptResponse {
     /// Hex-encoded canonical hash
@@ -53,7 +53,7 @@ impl From<&AllocationReceipt> for AllocationReceiptResponse {
 }
 
 /// Response for settlement intent
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SettlementIntentResponse {
     /// Hex-encoded canonical hash
@@ -99,7 +99,7 @@ impl From<&SettlementIntent> for SettlementIntentResponse {
 }
 
 /// Response for economic chain query
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EconomicChainResponse {
     /// Hex-encoded decision hash
@@ -111,7 +111,7 @@ pub struct EconomicChainResponse {
 }
 
 /// Response for governance decision receipt
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GovernanceReceiptResponse {
     /// Hex-encoded decision hash (canonical)
@@ -129,7 +129,7 @@ pub struct GovernanceReceiptResponse {
 }
 
 /// Serializable vote tally summary
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GovernanceVoteTallyResponse {
     /// Number of votes in favor
@@ -160,7 +160,7 @@ impl From<&GovernanceDecisionReceipt> for GovernanceReceiptResponse {
 /// Response for the full receipt chain (governance + economic artifacts).
 ///
 /// Returned by `GET /v1/receipts/chain/{decision_hash}`.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReceiptChainResponse {
     /// Hex-encoded decision hash
