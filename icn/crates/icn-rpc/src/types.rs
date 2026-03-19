@@ -184,6 +184,15 @@ pub struct CreateProposalRequest {
     pub payload: ProposalPayloadInfo,
 }
 
+/// A single option within a participatory budget allocation (RPC variant).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AllocationOptionInfo {
+    pub label: String,
+    pub description: String,
+    pub recipient: String,
+    pub requested_amount: i64,
+}
+
 /// Proposal payload for RPC
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
@@ -195,6 +204,13 @@ pub enum ProposalPayloadInfo {
         amount: i64,
         currency: String,
         recipient: String,
+        purpose: String,
+    },
+    #[serde(rename = "allocation")]
+    Allocation {
+        pool_amount: i64,
+        unit: String,
+        options: Vec<AllocationOptionInfo>,
         purpose: String,
     },
     #[serde(rename = "config_change")]

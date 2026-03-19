@@ -128,6 +128,7 @@ impl GovernanceConfig {
             // Normal proposals - use default thresholds
             ProposalPayload::Text { .. }
             | ProposalPayload::Budget { .. }
+            | ProposalPayload::Allocation { .. }
             | ProposalPayload::Membership { .. }
             | ProposalPayload::ConfigChange { .. }
             | ProposalPayload::SchedulingPolicy { .. }
