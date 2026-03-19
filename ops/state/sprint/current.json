@@ -25,7 +25,7 @@
       "pr": 1343,
       "assignee": "claude",
       "epic": "1302",
-      "evidence": "Merged 2026-03-19. 449 tests pass. Awaiting K3s deploy to verify flows 2/4."
+      "evidence": "Merged 2026-03-19. Deployed 2026-03-19 (kubectl set image SHA 41ceac95). Flow 2 step 11 GET /v1/receipts/allocations → HTTP 200 confirmed. Flow 4 governance steps proven. docs/status/demo-audit-2026-03-19-post-fix-verification.md"
     },
     {
       "id": "s15-t3",
@@ -39,26 +39,29 @@
     {
       "id": "s15-t4",
       "title": "feat(governance): AllocationProposal for participatory budgeting (#1311)",
-      "status": "pending",
-      "pr": null,
-      "assignee": null,
-      "epic": "1302"
+      "status": "done",
+      "pr": 1345,
+      "assignee": "claude",
+      "epic": "1302",
+      "evidence": "PR #1345 open. AllocationEntry + AllocationProposal variant added to ProposalPayload. cargo test passes."
     },
     {
       "id": "s15-t5",
       "title": "feat(governance): wire AllocationProposal acceptance to ExecutionReceiptGate",
-      "status": "pending",
-      "pr": null,
-      "assignee": null,
-      "epic": "1147"
+      "status": "done",
+      "pr": 1346,
+      "assignee": "claude",
+      "epic": "1147",
+      "evidence": "PR #1346 open. AllocationAcceptedHook in configure.rs, handler wiring in handlers.rs, production hook in server.rs. Cargo check clean."
     },
     {
       "id": "s15-t6",
       "title": "test(core): vertical slice integration test — full receipt chain in CI (#1147)",
-      "status": "pending",
-      "pr": null,
-      "assignee": null,
-      "epic": "1147"
+      "status": "done",
+      "pr": 1347,
+      "assignee": "claude",
+      "epic": "1147",
+      "evidence": "PR #1347 open. 2 tests pass: receipt chain produces AllocationReceipt + SettlementIntents, rejected proposal writes nothing."
     },
     {
       "id": "s15-t7",
