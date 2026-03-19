@@ -310,6 +310,32 @@ impl ReceiptStore {
         Ok(intents)
     }
 
+    /// List all allocation receipts, regardless of decision hash.
+    pub fn list_all_allocations(&self) -> Result<Vec<AllocationReceipt>, String> {
+        let mut receipts = Vec::new();
+        for entry in self.db.scan_prefix(ALLOCATION_PREFIX) {
+            let (_, bytes) = entry.map_err(|e| format!("Failed to scan: {}", e))?;
+            match serde_json::from_slice::<AllocationReceipt>(&bytes) {
+                Ok(receipt) => receipts.push(receipt),
+                Err(e) => return Err(format!("Failed to deserialize allocation receipt: {}", e)),
+            }
+        }
+        Ok(receipts)
+    }
+
+    /// List all settlement intents, regardless of decision hash.
+    pub fn list_all_intents(&self) -> Result<Vec<SettlementIntent>, String> {
+        let mut intents = Vec::new();
+        for entry in self.db.scan_prefix(INTENT_PREFIX) {
+            let (_, bytes) = entry.map_err(|e| format!("Failed to scan: {}", e))?;
+            match serde_json::from_slice::<SettlementIntent>(&bytes) {
+                Ok(intent) => intents.push(intent),
+                Err(e) => return Err(format!("Failed to deserialize settlement intent: {}", e)),
+            }
+        }
+        Ok(intents)
+    }
+
     // ========================================================================
     // Convenience methods
     // ========================================================================
