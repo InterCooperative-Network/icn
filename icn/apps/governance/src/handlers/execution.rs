@@ -230,17 +230,26 @@ pub fn translate_payload_to_effects(
             }
         },
 
-        // Participatory budgeting: create an envelope budget, then allocate per option
+        // Participatory budgeting: create an envelope budget, then allocate per option.
+        //
+        // CreateBudget defines the governance-authorized spending envelope (not a debit).
+        // Each Allocate reserves a portion of the envelope for a specific option.
+        // The budget_id includes the decision_receipt_id to prevent collision across
+        // allocation rounds with the same purpose string.
+        //
+        // NOTE: treasury_did is String::new() — filled by caller context, same pattern
+        // as Budget and other treasury translations. recipient attribution (from
+        // AllocationOption::recipient) is not yet expressible in TreasuryEffect::Allocate;
+        // it will be carried once the kernel type is extended.
         ProposalPayload::Allocation {
             pool_amount,
             unit,
             options,
             purpose,
         } => {
-            let budget_id = format!("alloc-{purpose}");
-            // First effect: governance-backed spending envelope for the pool
+            let budget_id = format!("alloc-{purpose}-{decision_receipt_id}");
             let mut effects = vec![KernelEffect::Treasury(TreasuryEffect::CreateBudget {
-                treasury_did: String::new(), // Filled by caller context
+                treasury_did: String::new(),
                 budget_id: budget_id.clone(),
                 total_amount: *pool_amount,
                 currency: unit.clone(),
@@ -250,7 +259,6 @@ pub fn translate_payload_to_effects(
                 decision_receipt_id: decision_receipt_id.to_string(),
                 decision_hash: decision_hash.to_string(),
             })];
-            // One Allocate per option — distributes from the pool budget
             for opt in options {
                 effects.push(KernelEffect::Treasury(TreasuryEffect::Allocate {
                     treasury_did: String::new(),
@@ -599,7 +607,7 @@ mod tests {
                 decision_hash,
                 ..
             }) => {
-                assert_eq!(budget_id, "alloc-q1-budget");
+                assert_eq!(budget_id, "alloc-q1-budget-receipt-alloc-1");
                 assert_eq!(*total_amount, 10_000);
                 assert_eq!(currency, "compute-hours");
                 assert_eq!(name, "q1-budget");
@@ -617,7 +625,7 @@ mod tests {
                 currency,
                 ..
             }) => {
-                assert_eq!(budget_id, "alloc-q1-budget");
+                assert_eq!(budget_id, "alloc-q1-budget-receipt-alloc-1");
                 assert_eq!(*amount, 6_000);
                 assert_eq!(currency, "compute-hours");
             }
@@ -632,7 +640,7 @@ mod tests {
                 currency,
                 ..
             }) => {
-                assert_eq!(budget_id, "alloc-q1-budget");
+                assert_eq!(budget_id, "alloc-q1-budget-receipt-alloc-1");
                 assert_eq!(*amount, 4_000);
                 assert_eq!(currency, "compute-hours");
             }
