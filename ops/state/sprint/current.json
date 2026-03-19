@@ -71,10 +71,11 @@
     {
       "id": "s15-t8",
       "title": "chore(ci): regulatory compliance linter (#1312)",
-      "status": "pending",
-      "pr": null,
-      "assignee": null,
-      "epic": "1302"
+      "status": "done",
+      "pr": 1349,
+      "assignee": "claude",
+      "epic": "1302",
+      "evidence": "PR #1349. Python linter + CI job at warning phase. 33 pre-existing violations cataloged. Ratchet to blocking after cleanup."
     },
     {
       "id": "s15-t9",
