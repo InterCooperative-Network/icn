@@ -181,6 +181,10 @@ enum Commands {
     #[command(subcommand)]
     Receipts(ReceiptCommands),
 
+    /// Audit and verify receipt chain integrity
+    #[command(subcommand)]
+    Audit(AuditCommands),
+
     /// Pre-deployment health checks
     Preflight {
         /// Gateway endpoint to check (if running)
@@ -252,6 +256,23 @@ enum ReceiptCommands {
     Intent {
         /// Canonical hash (64 hex characters)
         hash: String,
+
+        /// Gateway API URL
+        #[arg(short, long, default_value = "http://localhost:8080")]
+        gateway: String,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum AuditCommands {
+    /// Verify receipt chain integrity for a governance decision
+    Verify {
+        /// Decision hash (64 hex characters)
+        decision_hash: String,
 
         /// Gateway API URL
         #[arg(short, long, default_value = "http://localhost:8080")]
@@ -2137,6 +2158,10 @@ async fn main() -> Result<()> {
 
         Commands::Receipts(receipt_cmd) => {
             handle_receipt_command(receipt_cmd).await?;
+        }
+
+        Commands::Audit(audit_cmd) => {
+            handle_audit_command(audit_cmd).await?;
         }
 
         Commands::Preflight {
@@ -10140,6 +10165,235 @@ async fn handle_receipt_command(cmd: ReceiptCommands) -> Result<()> {
             } else {
                 println!("Settlement Intent: {}...", &hash[..16]);
                 println!("{}", serde_json::to_string_pretty(&data)?);
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Audit check result used by `icnctl audit verify`.
+struct AuditCheck {
+    name: String,
+    passed: bool,
+    detail: String,
+}
+
+/// Verify receipt chain integrity. Returns a list of checks with pass/fail.
+///
+/// Extracted from the handler so it can be unit-tested without a live gateway.
+fn verify_receipt_chain(
+    chain: &icn_gateway::api::receipts::ReceiptChainResponse,
+    decision_hash: &str,
+) -> Vec<AuditCheck> {
+    use std::collections::HashSet;
+
+    let mut checks: Vec<AuditCheck> = Vec::new();
+
+    // Check 1: Governance receipt present
+    let has_governance = chain.governance.is_some();
+    checks.push(AuditCheck {
+        name: "Governance receipt present".to_string(),
+        passed: has_governance,
+        detail: if let Some(ref gov) = chain.governance {
+            format!("Proposal: {}", gov.proposal_id)
+        } else {
+            "No governance decision receipt found".to_string()
+        },
+    });
+
+    // Check 2: Decision hash consistency
+    let hash_consistent = chain.decision_hash == decision_hash;
+    checks.push(AuditCheck {
+        name: "Decision hash consistent".to_string(),
+        passed: hash_consistent,
+        detail: if hash_consistent {
+            format!("Hash: {}...", &decision_hash[..16])
+        } else {
+            format!(
+                "Mismatch: requested {}... got {}...",
+                &decision_hash[..16],
+                &chain.decision_hash[..chain.decision_hash.len().min(16)]
+            )
+        },
+    });
+
+    // Check 3: Allocation receipts present
+    let has_allocations = !chain.allocations.is_empty();
+    checks.push(AuditCheck {
+        name: "Allocation receipts present".to_string(),
+        passed: has_allocations,
+        detail: format!("{} allocation receipt(s)", chain.allocations.len()),
+    });
+
+    // Check 4: All allocations reference correct decision hash
+    let all_alloc_linked = chain
+        .allocations
+        .iter()
+        .all(|a| a.decision_hash == decision_hash);
+    checks.push(AuditCheck {
+        name: "Allocation provenance linked".to_string(),
+        passed: !has_allocations || all_alloc_linked,
+        detail: if !has_allocations {
+            "No allocations to verify".to_string()
+        } else if all_alloc_linked {
+            "All allocations reference correct decision".to_string()
+        } else {
+            "Some allocations reference wrong decision hash".to_string()
+        },
+    });
+
+    // Check 5: Settlement intents present
+    let has_intents = !chain.intents.is_empty();
+    checks.push(AuditCheck {
+        name: "Settlement intents present".to_string(),
+        passed: has_intents,
+        detail: format!("{} settlement intent(s)", chain.intents.len()),
+    });
+
+    // Check 6: Intents reference correct decision hash
+    let all_intents_linked = chain
+        .intents
+        .iter()
+        .all(|i| i.decision_hash == decision_hash);
+    checks.push(AuditCheck {
+        name: "Intent provenance linked".to_string(),
+        passed: !has_intents || all_intents_linked,
+        detail: if !has_intents {
+            "No intents to verify".to_string()
+        } else if all_intents_linked {
+            "All intents reference correct decision".to_string()
+        } else {
+            "Some intents reference wrong decision hash".to_string()
+        },
+    });
+
+    // Check 7: Every intent hash is claimed by at least one allocation
+    // (no orphaned intents — each intent should appear in an allocation's
+    // intent_hashes list)
+    let claimed_hashes: HashSet<&str> = chain
+        .allocations
+        .iter()
+        .flat_map(|a| a.intent_hashes.iter().map(String::as_str))
+        .collect();
+    let orphaned: Vec<&str> = chain
+        .intents
+        .iter()
+        .filter(|i| !claimed_hashes.contains(i.canonical_hash.as_str()))
+        .map(|i| i.canonical_hash.as_str())
+        .collect();
+    let no_orphans = orphaned.is_empty();
+    checks.push(AuditCheck {
+        name: "No orphaned intents".to_string(),
+        passed: !has_intents || no_orphans,
+        detail: if !has_intents {
+            "No intents to verify".to_string()
+        } else if no_orphans {
+            "All intents linked to an allocation".to_string()
+        } else {
+            format!(
+                "{} orphaned intent(s) not claimed by any allocation",
+                orphaned.len()
+            )
+        },
+    });
+
+    // Check 8: Chain completeness (server-computed)
+    checks.push(AuditCheck {
+        name: "Chain complete".to_string(),
+        passed: chain.chain_complete,
+        detail: if chain.chain_complete {
+            "All chain links present".to_string()
+        } else {
+            "Chain has missing links".to_string()
+        },
+    });
+
+    checks
+}
+
+/// Handle audit commands — verify receipt chain integrity.
+///
+/// Fetches the full receipt chain from the gateway and runs typed verification
+/// checks against the deserialized `ReceiptChainResponse`.
+async fn handle_audit_command(cmd: AuditCommands) -> Result<()> {
+    use icn_gateway::api::receipts::ReceiptChainResponse;
+
+    match cmd {
+        AuditCommands::Verify {
+            decision_hash,
+            gateway,
+            json,
+        } => {
+            if decision_hash.len() != 64 || !decision_hash.chars().all(|c| c.is_ascii_hexdigit()) {
+                bail!("Invalid decision hash: expected 64 hex characters");
+            }
+
+            let client = reqwest::Client::new();
+            let url = format!("{}/v1/receipts/chain/{}", gateway, decision_hash);
+            let resp = client
+                .get(&url)
+                .send()
+                .await
+                .context("Failed to connect to gateway")?;
+
+            if !resp.status().is_success() {
+                if resp.status().as_u16() == 404 {
+                    bail!(
+                        "No receipt chain found for decision hash: {}",
+                        &decision_hash[..16]
+                    );
+                }
+                bail!("Gateway returned error: {}", resp.status());
+            }
+
+            let chain: ReceiptChainResponse = resp
+                .json()
+                .await
+                .context("Failed to parse receipt chain response (schema mismatch?)")?;
+
+            let checks = verify_receipt_chain(&chain, &decision_hash);
+            let passed = checks.iter().filter(|c| c.passed).count();
+            let total = checks.len();
+            let all_passed = passed == total;
+
+            if json {
+                let result = serde_json::json!({
+                    "decisionHash": decision_hash,
+                    "checks": checks.iter().map(|c| serde_json::json!({
+                        "name": c.name,
+                        "passed": c.passed,
+                        "detail": c.detail,
+                    })).collect::<Vec<_>>(),
+                    "summary": {
+                        "passed": passed,
+                        "total": total,
+                        "verified": all_passed,
+                    }
+                });
+                println!("{}", serde_json::to_string_pretty(&result)?);
+            } else {
+                println!("Receipt Chain Audit: {}...", &decision_hash[..16]);
+                println!("{}", "━".repeat(64));
+                println!();
+
+                for check in &checks {
+                    let icon = if check.passed { "PASS" } else { "FAIL" };
+                    println!("  [{icon}] {}", check.name);
+                    println!("         {}", check.detail);
+                }
+
+                println!();
+                println!("{}", "━".repeat(64));
+                if all_passed {
+                    println!("Result: VERIFIED ({passed}/{total} checks passed)");
+                } else {
+                    println!("Result: FAILED ({passed}/{total} checks passed)");
+                }
+            }
+
+            if !all_passed {
+                bail!("Receipt chain verification failed");
             }
         }
     }

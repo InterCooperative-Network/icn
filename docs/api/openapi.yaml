@@ -1,1522 +1,1740 @@
 openapi: 3.1.0
 info:
   title: ICN Gateway API
-  description: |
-    REST and WebSocket API for the Intercooperative Network (ICN) Gateway.
+  description: |-
+    REST and WebSocket API for the Intercooperative Network
+
+    ## Overview
+
+    The ICN Gateway provides a RESTful API for cooperative applications to interact with the Intercooperative Network. Features include:
+
+    - **Identity**: DID-based identity management with multi-device support
+    - **Cooperatives**: Create and manage cooperatives with member management
+    - **Ledger**: Mutual credit accounting with double-entry bookkeeping
+    - **Trust**: Social trust graph with transitive trust computation
+    - **Governance**: Democratic proposals and voting
+    - **Compute**: Distributed task execution with trust-gated access
+    - **Federation**: Cross-federation message routing
+    - **Notifications**: Real-time push notifications
 
     ## Authentication
 
-    The Gateway uses DID-based challenge-response authentication with JWT tokens:
+    Most endpoints require JWT authentication. Obtain a token via `/v1/auth/challenge` and `/v1/auth/verify` endpoints. Include the token in the `Authorization: Bearer <token>` header.
 
-    1. Request a challenge for your DID via `POST /v1/auth/challenge`
-    2. Sign the challenge with your Ed25519 private key
-    3. Submit signature via `POST /v1/auth/verify` to receive a JWT token
-    4. Include the token in subsequent requests: `Authorization: Bearer <token>`
+    ## WebSocket
 
-    ## Rate Limiting
-
-    All authenticated endpoints are rate-limited per DID using a token bucket algorithm:
-    - Burst capacity: 100 requests
-    - Refill rate: 10 tokens/second
-
-    When rate limited, the API returns HTTP 429 Too Many Requests.
-
-    ## Authorization Scopes
-
-    JWT tokens include scopes that control access to endpoints:
-    - `ledger:read` - View positions and transaction history
-    - `ledger:write` - Create settlements
-    - `coop:read` - View cooperative information
-    - `coop:write` - Update cooperative settings
-    - `coop:admin` - Manage members and roles
-    - `gov:read` - View governance domains, proposals, votes
-    - `gov:write` - Create proposals, cast votes
-    - `compute:read` - View compute task status
-    - `compute:write` - Submit compute tasks
-
-  version: 1.0.0
-  license:
-    name: MIT OR Apache-2.0
-    url: https://github.com/InterCooperative-Network/icn
+    Real-time events are available via WebSocket at `/v1/websocket`. After connecting, send authentication message with your JWT token.
   contact:
     name: ICN Project
     url: https://github.com/InterCooperative-Network/icn
-
-servers:
-  - url: http://localhost:8080
-    description: Local development server
-  - url: https://api.example.com
-    description: Production server (replace with your domain)
-
-tags:
-  - name: Health
-    description: Service health checks
-  - name: Authentication
-    description: DID-based authentication and JWT token management
-  - name: Cooperatives
-    description: Cooperative namespace management
-  - name: Ledger
-    description: Mutual credit ledger operations
-  - name: Governance
-    description: Democratic governance for cooperatives
-  - name: Compute
-    description: Distributed compute task submission and monitoring
-  - name: WebSocket
-    description: Real-time event streaming
-
-paths:
-  /v1/health:
-    get:
-      tags: [Health]
-      summary: Health check
-      description: Returns the current health status of the Gateway API.
-      operationId: getHealth
-      security: []  # Public endpoint
-      responses:
-        '200':
-          description: Service is healthy
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HealthResponse'
-              example:
-                status: healthy
-                version: "1.0.0"
-        '503':
-          description: Service unavailable
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
-  /v1/auth/challenge:
-    post:
-      tags: [Authentication]
-      summary: Request authentication challenge
-      description: |
-        Request a challenge nonce for DID-based authentication.
-        The challenge must be signed with the DID's private key and
-        submitted to `/v1/auth/verify` within 5 minutes.
-      operationId: requestChallenge
-      security: []  # Public endpoint
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ChallengeRequest'
-            example:
-              did: "did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK"
-      responses:
-        '200':
-          description: Challenge created successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ChallengeResponse'
-              example:
-                challenge: "a1b2c3d4e5f6..."
-                expires_at: "2025-01-15T12:05:00Z"
-        '400':
-          $ref: '#/components/responses/BadRequest'
-
-  /v1/auth/verify:
-    post:
-      tags: [Authentication]
-      summary: Verify signature and get JWT token
-      description: |
-        Submit the signed challenge to receive a JWT token.
-        The signature must be created using the Ed25519 private key
-        corresponding to the DID's public key.
-      operationId: verifyChallenge
-      security: []  # Public endpoint
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/VerifyRequest'
-            example:
-              did: "did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK"
-              signature: "base64-encoded-signature..."
-              coop_id: "my-coop"
-              scopes:
-                - "ledger:read"
-                - "ledger:write"
-                - "gov:read"
-                - "gov:write"
-      responses:
-        '200':
-          description: Authentication successful
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TokenResponse'
-              example:
-                token: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
-                expires_at: "2025-01-16T12:00:00Z"
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-
-  /v1/coops:
-    get:
-      tags: [Cooperatives]
-      summary: List cooperatives
-      operationId: listCoops
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: List of cooperatives
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Cooperative'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '429':
-          $ref: '#/components/responses/RateLimited'
-
-    post:
-      tags: [Cooperatives]
-      summary: Create a cooperative
-      operationId: createCoop
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateCoopRequest'
-      responses:
-        '201':
-          description: Cooperative created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Cooperative'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '409':
-          description: Cooperative ID already exists
-        '429':
-          $ref: '#/components/responses/RateLimited'
-
-  /v1/coops/{coop_id}:
-    get:
-      tags: [Cooperatives]
-      summary: Get cooperative details
-      operationId: getCoop
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/CoopId'
-      responses:
-        '200':
-          description: Cooperative details
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Cooperative'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '429':
-          $ref: '#/components/responses/RateLimited'
-
-    put:
-      tags: [Cooperatives]
-      summary: Update cooperative
-      operationId: updateCoop
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/CoopId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateCoopRequest'
-      responses:
-        '200':
-          description: Cooperative updated
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '429':
-          $ref: '#/components/responses/RateLimited'
-
-    delete:
-      tags: [Cooperatives]
-      summary: Delete cooperative
-      operationId: deleteCoop
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/CoopId'
-      responses:
-        '204':
-          description: Cooperative deleted
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '429':
-          $ref: '#/components/responses/RateLimited'
-
-  /v1/coops/{coop_id}/members:
-    get:
-      tags: [Cooperatives]
-      summary: List members
-      operationId: listMembers
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/CoopId'
-      responses:
-        '200':
-          description: List of members
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Member'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '429':
-          $ref: '#/components/responses/RateLimited'
-
-    post:
-      tags: [Cooperatives]
-      summary: Add member
-      operationId: addMember
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/CoopId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AddMemberRequest'
-      responses:
-        '201':
-          description: Member added
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Member'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '409':
-          description: Member already exists
-        '429':
-          $ref: '#/components/responses/RateLimited'
-
-  /v1/coops/{coop_id}/members/{did}:
-    put:
-      tags: [Cooperatives]
-      summary: Update member role
-      operationId: updateMember
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/CoopId'
-        - $ref: '#/components/parameters/Did'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateMemberRequest'
-      responses:
-        '200':
-          description: Member updated
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '429':
-          $ref: '#/components/responses/RateLimited'
-
-    delete:
-      tags: [Cooperatives]
-      summary: Remove member
-      operationId: removeMember
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/CoopId'
-        - $ref: '#/components/parameters/Did'
-      responses:
-        '204':
-          description: Member removed
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '429':
-          $ref: '#/components/responses/RateLimited'
-
-  /v1/ledger/{coop_id}/position/{did}:
-    get:
-      tags: [Ledger]
-      summary: Get position
-      operationId: getPosition
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/CoopId'
-        - $ref: '#/components/parameters/Did'
-      responses:
-        '200':
-          description: Position retrieved
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Position'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '429':
-          $ref: '#/components/responses/RateLimited'
-
-  /v1/ledger/{coop_id}/settle:
-    post:
-      tags: [Ledger]
-      summary: Create settlement
-      description: Create a mutual credit settlement from the authenticated user to another member.
-      operationId: createSettlement
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/CoopId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SettlementRequest'
-      responses:
-        '201':
-          description: Settlement created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Settlement'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '422':
-          description: Insufficient position or credit limit exceeded
-        '429':
-          $ref: '#/components/responses/RateLimited'
-
-  /v1/ledger/{coop_id}/history:
-    get:
-      tags: [Ledger]
-      summary: Get transaction history
-      operationId: getHistory
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/CoopId'
-        - name: limit
-          in: query
-          schema:
-            type: integer
-            default: 50
-        - name: offset
-          in: query
-          schema:
-            type: integer
-            default: 0
-      responses:
-        '200':
-          description: Transaction history
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Transaction'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '429':
-          $ref: '#/components/responses/RateLimited'
-
-  /v1/gov/domains:
-    get:
-      tags: [Governance]
-      summary: List governance domains
-      operationId: listDomains
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: List of domains
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/GovernanceDomain'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '429':
-          $ref: '#/components/responses/RateLimited'
-
-    post:
-      tags: [Governance]
-      summary: Create governance domain
-      operationId: createDomain
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateDomainRequest'
-      responses:
-        '201':
-          description: Domain created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GovernanceDomain'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '409':
-          description: Domain ID already exists
-        '429':
-          $ref: '#/components/responses/RateLimited'
-
-  /v1/gov/domains/{domain_id}:
-    get:
-      tags: [Governance]
-      summary: Get governance domain
-      operationId: getDomain
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/DomainId'
-      responses:
-        '200':
-          description: Domain details
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GovernanceDomain'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '429':
-          $ref: '#/components/responses/RateLimited'
-
-  /v1/gov/proposals:
-    get:
-      tags: [Governance]
-      summary: List proposals
-      operationId: listProposals
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: domain_id
-          in: query
-          schema:
-            type: string
-          description: Filter by domain ID
-        - name: state
-          in: query
-          schema:
-            type: string
-            enum: [draft, open, closed]
-        - name: limit
-          in: query
-          schema:
-            type: integer
-            default: 50
-        - name: offset
-          in: query
-          schema:
-            type: integer
-            default: 0
-      responses:
-        '200':
-          description: List of proposals with pagination
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Proposal'
-                  pagination:
-                    type: object
-                    properties:
-                      total:
-                        type: integer
-                      offset:
-                        type: integer
-                      limit:
-                        type: integer
-                      returned:
-                        type: integer
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '429':
-          $ref: '#/components/responses/RateLimited'
-
-    post:
-      tags: [Governance]
-      summary: Create proposal
-      operationId: createProposal
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateProposalRequest'
-      responses:
-        '201':
-          description: Proposal created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Proposal'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          description: Domain not found
-        '429':
-          $ref: '#/components/responses/RateLimited'
-
-  /v1/gov/proposals/{proposal_id}:
-    get:
-      tags: [Governance]
-      summary: Get proposal
-      operationId: getProposal
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/ProposalId'
-      responses:
-        '200':
-          description: Proposal details
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Proposal'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '429':
-          $ref: '#/components/responses/RateLimited'
-
-  /v1/gov/proposals/{proposal_id}/open:
-    post:
-      tags: [Governance]
-      summary: Open proposal for voting
-      operationId: openProposal
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/ProposalId'
-      responses:
-        '200':
-          description: Proposal opened
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Proposal'
-        '400':
-          description: Proposal is not in Draft state
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '429':
-          $ref: '#/components/responses/RateLimited'
-
-  /v1/gov/proposals/{proposal_id}/close:
-    post:
-      tags: [Governance]
-      summary: Close proposal and calculate outcome
-      operationId: closeProposal
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/ProposalId'
-      responses:
-        '200':
-          description: Proposal closed with outcome
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Proposal'
-        '400':
-          description: Proposal is not in Open state
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '429':
-          $ref: '#/components/responses/RateLimited'
-
-  /v1/gov/proposals/{proposal_id}/vote:
-    post:
-      tags: [Governance]
-      summary: Cast vote
-      operationId: castVote
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/ProposalId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CastVoteRequest'
-      responses:
-        '200':
-          description: Vote cast
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Vote'
-        '400':
-          description: Proposal is not open for voting
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '429':
-          $ref: '#/components/responses/RateLimited'
-
-  /v1/gov/proposals/{proposal_id}/votes:
-    get:
-      tags: [Governance]
-      summary: Get vote tally
-      operationId: getVoteTally
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/ProposalId'
-      responses:
-        '200':
-          description: Vote tally
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/VoteTally'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '429':
-          $ref: '#/components/responses/RateLimited'
-
-  # ============================================
-  # Compute Endpoints
-  # ============================================
-
-  /v1/compute/submit:
-    post:
-      tags: [Compute]
-      summary: Submit a compute task
-      description: |
-        Submit a compute task for distributed execution. Supports two code types:
-
-        - **CCL** (default): Submit a CCL (Cooperative Contract Language) contract as JSON
-        - **WASM**: Submit a WebAssembly module as base64-encoded bytes
-
-        The task is broadcast to the network where trusted executors can claim and run it.
-        Settlement is automatically recorded based on fuel consumed.
-
-        **Priority levels**: low, normal (default), high, critical
-      operationId: submitComputeTask
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SubmitTaskRequest'
-            examples:
-              ccl:
-                summary: CCL contract submission
-                value:
-                  code_type: ccl
-                  code: '{"name":"SimpleReturn","participants":["did:icn:alice"],"rules":[{"name":"run","body":[{"Return":{"value":{"Literal":{"Int":42}}}}]}]}'
-                  fuel_limit: 10000
-                  priority: normal
-              wasm:
-                summary: WASM module submission
-                value:
-                  code_type: wasm
-                  wasm_bytes: AGFzbQEAAAABBAFgAAF/AwIBAAcHAQNydW4AAAoGAQQAQSoL
-                  fuel_limit: 10000
-                  priority: high
-      responses:
-        '200':
-          description: Task submitted successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SubmitTaskResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '429':
-          $ref: '#/components/responses/RateLimited'
-
-  /v1/compute/status/{task_hash}:
-    get:
-      tags: [Compute]
-      summary: Get task status
-      description: |
-        Retrieve the current status of a compute task by its hash.
-
-        Status values: pending, claimed, completed, failed
-      operationId: getComputeTaskStatus
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: task_hash
-          in: path
-          required: true
-          schema:
-            type: string
-            pattern: '^[a-f0-9]{64}$'
-          description: Task hash (64 hex characters)
-      responses:
-        '200':
-          description: Task status
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ComputeTaskStatus'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '429':
-          $ref: '#/components/responses/RateLimited'
-
-  /v1/compute/cancel/{task_hash}:
-    post:
-      tags: [Compute]
-      summary: Cancel a compute task
-      description: |
-        Cancel a pending or claimed compute task. Only the original submitter
-        can cancel their own tasks.
-
-        Tasks can only be cancelled if they are in `pending` or `claimed` status.
-        Completed or failed tasks cannot be cancelled.
-      operationId: cancelComputeTask
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: task_hash
-          in: path
-          required: true
-          schema:
-            type: string
-            pattern: '^[a-f0-9]{64}$'
-          description: Task hash (64 hex characters)
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CancelTaskRequest'
-            example:
-              reason: "No longer needed"
-      responses:
-        '200':
-          description: Task cancelled successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CancelTaskResponse'
-        '400':
-          description: Task cannot be cancelled (already completed or failed)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          description: Not authorized to cancel this task (not the submitter)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '429':
-          $ref: '#/components/responses/RateLimited'
-
-  # ============================================
-  # WebSocket Endpoint
-  # ============================================
-
-  /v1/ws/{coop_id}:
-    get:
-      tags: [WebSocket]
-      summary: WebSocket event stream
-      description: |
-        Connect for real-time event streaming.
-
-        After connecting, send: `{"type": "Auth", "token": "..."}`
-
-        The server responds with: `{"type": "AuthOk", "did": "...", "current_seq": N}`
-
-        To request missed events after reconnection: `{"type": "Backfill", "after_seq": N}`
-
-        Events include: SettlementCreated, MemberAdded, MemberRemoved,
-        RoleUpdated, SettingsUpdated, GovernanceDomainCreated,
-        GovernanceProposalCreated, GovernanceProposalOpened,
-        GovernanceProposalClosed, GovernanceVoteCast,
-        ComputeTaskSubmitted, ComputeTaskClaimed, ComputeTaskCompleted
-      operationId: websocketConnect
-      security: []  # Auth handled via WebSocket message
-      parameters:
-        - $ref: '#/components/parameters/CoopId'
-      responses:
-        '101':
-          description: Switching to WebSocket protocol
-        '400':
-          $ref: '#/components/responses/BadRequest'
-
+  license:
+    name: MIT OR Apache-2.0
+    url: https://opensource.org/licenses/MIT
+  version: 0.1.0
+paths: {}
 components:
-  securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-
-  parameters:
-    CoopId:
-      name: coop_id
-      in: path
-      required: true
-      schema:
-        type: string
-        pattern: '^[a-z0-9][a-z0-9-]*[a-z0-9]$'
-
-    Did:
-      name: did
-      in: path
-      required: true
-      schema:
-        type: string
-        pattern: '^did:icn:[a-zA-Z0-9]+$'
-
-    DomainId:
-      name: domain_id
-      in: path
-      required: true
-      schema:
-        type: string
-
-    ProposalId:
-      name: proposal_id
-      in: path
-      required: true
-      schema:
-        type: string
-        format: uuid
-
-  responses:
-    BadRequest:
-      description: Invalid request parameters
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-
-    Unauthorized:
-      description: Missing or invalid authentication
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-
-    Forbidden:
-      description: Insufficient permissions
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-
-    NotFound:
-      description: Resource not found
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-
-    RateLimited:
-      description: Rate limit exceeded
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-
   schemas:
-    Error:
+    AccountDeltaResponse:
       type: object
-      required: [error, message]
+      description: Account delta for transaction history
+      required:
+      - account_id
+      - unit
       properties:
-        error:
+        account_id:
           type: string
-        message:
+        credit:
+          type:
+          - integer
+          - 'null'
+          format: int64
+        debit:
+          type:
+          - integer
+          - 'null'
+          format: int64
+        unit:
           type: string
-
-    HealthResponse:
+    AccountStateResponse:
       type: object
+      description: Account state response (net positions derived from signed receipt graph)
+      required:
+      - did
+      - positions
       properties:
-        status:
+        credit_limits:
+          type:
+          - object
+          - 'null'
+          description: |-
+            Obligation ceilings per unit (max negative position allowed)
+            Absence of a key means no ceiling for that unit
+          additionalProperties:
+            type: integer
+            format: int64
+          propertyNames:
+            type: string
+        did:
           type: string
-          enum: [healthy, degraded, unhealthy]
-        version:
-          type: string
-
-    ChallengeRequest:
+        positions:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int64
+          propertyNames:
+            type: string
+    AddMemberRequest:
       type: object
-      required: [did]
+      description: Add a member to a cooperative
+      required:
+      - did
+      - role
       properties:
         did:
           type: string
-          pattern: '^did:icn:[a-zA-Z0-9]+$'
-
-    ChallengeResponse:
+        display_name:
+          type:
+          - string
+          - 'null'
+          description: Optional display name to set when adding the member
+        role:
+          type: string
+          description: |-
+            Role for the new member: "steward", "facilitator", or "participant"
+            Legacy names "owner", "admin", "member" are also accepted for backwards compatibility
+    AllocationOptionRequest:
       type: object
+      description: A single option within a participatory budget allocation (gateway request variant).
+      required:
+      - label
+      - description
+      - recipient
+      - requested_amount
       properties:
-        challenge:
+        description:
           type: string
-        expires_at:
+        label:
           type: string
-          format: date-time
-
-    VerifyRequest:
+        recipient:
+          type: string
+        requested_amount:
+          type: integer
+          format: int64
+    AmendmentsBreakdown:
       type: object
-      required: [did, signature, coop_id, scopes]
+      description: Amendments breakdown by status
+      required:
+      - draft
+      - submitted
+      - voting
+      - ratified
+      - rejected
+      - withdrawn
       properties:
-        did:
+        draft:
+          type: integer
+          minimum: 0
+        ratified:
+          type: integer
+          minimum: 0
+        rejected:
+          type: integer
+          minimum: 0
+        submitted:
+          type: integer
+          minimum: 0
+        voting:
+          type: integer
+          minimum: 0
+        withdrawn:
+          type: integer
+          minimum: 0
+    ApiListDevicesResponse:
+      type: object
+      description: Response for device list
+      required:
+      - devices
+      - total
+      properties:
+        devices:
+          type: array
+          items:
+            $ref: '#/components/schemas/DeviceInfo'
+        total:
+          type: integer
+          minimum: 0
+    ApiRegisterDeviceRequest:
+      type: object
+      description: Request to register a new device
+      required:
+      - device_id
+      - label
+      - public_key
+      - capabilities
+      - signing_device_id
+      - signature
+      properties:
+        capabilities:
+          type: array
+          items:
+            type: string
+          description: 'Capabilities to grant: "sign", "add_device", "revoke_device", "rotate_key", "encrypt"'
+        device_id:
           type: string
+          description: Unique device identifier (e.g., "phone-1", "laptop-work")
+        encryption_public_key:
+          type:
+          - string
+          - 'null'
+          description: Optional X25519 encryption public key (hex-encoded)
+        label:
+          type: string
+          description: Human-readable label
+        public_key:
+          type: string
+          description: Ed25519 public key (hex-encoded)
         signature:
           type: string
+          description: Hex-encoded signature of the registration request
+        signing_device_id:
+          type: string
+          description: Device ID of the device signing this request (must have AddDevice capability)
+    ApiRegisterDeviceResponse:
+      type: object
+      description: Response for device registration
+      required:
+      - device
+      - message
+      properties:
+        device:
+          $ref: '#/components/schemas/DeviceInfo'
+        message:
+          type: string
+    ApiRevokeDeviceRequest:
+      type: object
+      description: Request to revoke a device
+      required:
+      - signing_device_id
+      - signature
+      properties:
+        signature:
+          type: string
+          description: Hex-encoded signature
+        signing_device_id:
+          type: string
+          description: Device ID of the device signing this request (must have RevokeDevice capability)
+    AppealsBreakdown:
+      type: object
+      description: Appeals breakdown by status
+      required:
+      - filed
+      - under_review
+      - hearing
+      - resolved
+      - dismissed
+      - withdrawn
+      properties:
+        dismissed:
+          type: integer
+          minimum: 0
+        filed:
+          type: integer
+          minimum: 0
+        hearing:
+          type: integer
+          minimum: 0
+        resolved:
+          type: integer
+          minimum: 0
+        under_review:
+          type: integer
+          minimum: 0
+        withdrawn:
+          type: integer
+          minimum: 0
+    ApplyMembershipRequest:
+      type: object
+      description: Apply for membership request
+      required:
+      - jurisdiction_id
+      properties:
+        capabilities_requested:
+          type: array
+          items:
+            type: string
+        jurisdiction_id:
+          type: string
+    BanMemberRequest:
+      type: object
+      description: Ban member request
+      required:
+      - holder_id
+      - jurisdiction_id
+      - reason
+      properties:
+        evidence_summary:
+          type:
+          - string
+          - 'null'
+        holder_id:
+          type: string
+        jurisdiction_id:
+          type: string
+        reason:
+          type: string
+    BondOperationRequest:
+      type: object
+      description: Bond operation request
+      required:
+      - amount
+      properties:
+        amount:
+          type: integer
+          format: int64
+          minimum: 0
+    CapabilityRequest:
+      type: object
+      description: Grant/revoke capability request
+      required:
+      - holder_id
+      - jurisdiction_id
+      - capability
+      properties:
+        capability:
+          type: string
+        holder_id:
+          type: string
+        jurisdiction_id:
+          type: string
+    CastVoteRequest:
+      type: object
+      description: Cast a vote on a proposal
+      required:
+      - choice
+      properties:
+        choice:
+          type: string
+        comment:
+          type:
+          - string
+          - 'null'
+    ChallengeRequest:
+      type: object
+      description: Request a challenge for DID-based authentication
+      required:
+      - did
+      properties:
+        did:
+          type: string
+    ChallengeResponse:
+      type: object
+      description: Challenge response containing nonce to sign
+      required:
+      - nonce
+      - expires_in
+      properties:
+        expires_in:
+          type: integer
+          format: int64
+          minimum: 0
+        nonce:
+          type: string
+    CharterDetailResponse:
+      type: object
+      description: Charter detail response
+      required:
+      - charter_id
+      - domain_id
+      - name
+      - org_type
+      - status
+      - founders
+      - created_at
+      - bootstrap_endpoints
+      properties:
+        bootstrap_endpoints:
+          type: array
+          items:
+            type: string
+        charter_id:
+          type: string
+        created_at:
+          type: integer
+          format: int64
+          minimum: 0
+        description:
+          type:
+          - string
+          - 'null'
+        domain_id:
+          type: string
+        founders:
+          type: array
+          items:
+            $ref: '#/components/schemas/FounderResponse'
+        name:
+          type: string
+        org_type:
+          type: string
+        status:
+          type: string
+    CharterSummaryResponse:
+      type: object
+      description: Charter summary response (for list endpoints)
+      required:
+      - charter_id
+      - domain_id
+      - name
+      - org_type
+      - status
+      - founder_count
+      - created_at
+      properties:
+        charter_id:
+          type: string
+        created_at:
+          type: integer
+          format: int64
+          minimum: 0
+        domain_id:
+          type: string
+        founder_count:
+          type: integer
+          minimum: 0
+        name:
+          type: string
+        org_type:
+          type: string
+        status:
+          type: string
+    ComponentHealth:
+      type: object
+      description: Health status of an individual component
+      required:
+      - status
+      properties:
+        details:
+          type:
+          - string
+          - 'null'
+        status:
+          type: string
+    CreateCharterRequest:
+      type: object
+      description: Create charter request
+      required:
+      - domain_id
+      - name
+      - org_type
+      properties:
+        bootstrap_endpoints:
+          type: array
+          items:
+            type: string
+        description:
+          type:
+          - string
+          - 'null'
+        domain_id:
+          type: string
+        name:
+          type: string
+        org_type:
+          type: string
+    CreateCoopRequest:
+      type: object
+      description: Create a new cooperative
+      required:
+      - id
+      - name
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+    CreateDomainRequest:
+      type: object
+      description: Create a new governance domain
+      required:
+      - id
+      - name
+      - profile
+      - quorum_percent
+      - approval_percent
+      - voting_period_days
+      - members
+      properties:
+        approval_percent:
+          type: integer
+          format: int32
+          minimum: 0
+        id:
+          type: string
+        members:
+          type: array
+          items:
+            type: string
+        name:
+          type: string
+        profile:
+          type: string
+        quorum_percent:
+          type: integer
+          format: int32
+          minimum: 0
+        voting_period_days:
+          type: integer
+          format: int64
+          minimum: 0
+    CreateInviteRequest:
+      type: object
+      description: Create an invite for someone to join the coop
+      required:
+      - coop_id
+      - role
+      properties:
         coop_id:
+          type: string
+        expires_in_seconds:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 0
+        role:
+          type: string
+          description: 'Role for the invitee: "member", "admin", "participant", "facilitator"'
+    CreateProposalRequest:
+      type: object
+      description: Create a new proposal
+      required:
+      - domain_id
+      - title
+      - description
+      - payload
+      properties:
+        description:
+          type: string
+        domain_id:
+          type: string
+        payload:
+          $ref: '#/components/schemas/ProposalPayloadRequest'
+        scope:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/ProposalScopeRequest'
+            description: Proposal scope — defaults to Local if omitted
+        title:
+          type: string
+    CreateSessionRequest:
+      type: object
+      description: Create a new login session for QR-based authentication
+      required:
+      - coop_id
+      properties:
+        coop_id:
+          type: string
+    CreateSessionResponse:
+      type: object
+      description: Session creation response
+      required:
+      - session_id
+      - expires_at
+      - qr_data
+      properties:
+        expires_at:
+          type: integer
+          format: int64
+          minimum: 0
+        qr_data:
+          $ref: '#/components/schemas/SessionQrData'
+        session_id:
+          type: string
+    DetailedComponentHealth:
+      type: object
+      description: Detailed component health with latency information
+      required:
+      - status
+      properties:
+        latency_ms:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 0
+        message:
+          type:
+          - string
+          - 'null'
+        status:
+          $ref: '#/components/schemas/HealthStatus'
+    DetailedHealthResponse:
+      type: object
+      description: Detailed health response with component-level status
+      required:
+      - status
+      - version
+      - uptime_seconds
+      - components
+      properties:
+        components:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/DetailedComponentHealth'
+          propertyNames:
+            type: string
+        status:
+          $ref: '#/components/schemas/HealthStatus'
+        uptime_seconds:
+          type: integer
+          format: int64
+          minimum: 0
+        version:
+          type: string
+    DeviceInfo:
+      type: object
+      description: Device information in responses
+      required:
+      - id
+      - label
+      - key_type
+      - capabilities
+      - added_at
+      - revoked
+      properties:
+        added_at:
+          type: integer
+          format: int64
+          minimum: 0
+        capabilities:
+          type: array
+          items:
+            type: string
+        id:
+          type: string
+        key_type:
+          type: string
+        label:
+          type: string
+        revoked:
+          type: boolean
+    ExtendTermRequest:
+      type: object
+      description: Extend term request
+      required:
+      - additional_days
+      properties:
+        additional_days:
+          type: integer
+          format: int64
+          description: Additional days to extend
+          minimum: 0
+    FounderDetailResponse:
+      type: object
+      description: Detailed founder response
+      required:
+      - did
+      - timestamp
+      - signed_at
+      - display_name
+      - has_signature
+      properties:
+        did:
+          type: string
+        display_name:
+          type: string
+          description: Truncated DID for display
+        has_signature:
+          type: boolean
+          description: Has valid signature
+        role:
+          type:
+          - string
+          - 'null'
+        signed_at:
+          type: string
+          description: Human-readable timestamp
+        timestamp:
+          type: integer
+          format: int64
+          minimum: 0
+    FounderResponse:
+      type: object
+      description: Founder signature response
+      required:
+      - did
+      - timestamp
+      properties:
+        did:
+          type: string
+        role:
+          type:
+          - string
+          - 'null'
+        timestamp:
+          type: integer
+          format: int64
+          minimum: 0
+    FoundersResponse:
+      type: object
+      description: Founders list response
+      required:
+      - charter_id
+      - total_founders
+      - minimum_required
+      - ready_for_activation
+      - founders_needed
+      - founders
+      properties:
+        charter_id:
+          type: string
+        founders:
+          type: array
+          items:
+            $ref: '#/components/schemas/FounderDetailResponse'
+        founders_needed:
+          type: integer
+          minimum: 0
+        minimum_required:
+          type: integer
+          minimum: 0
+        ready_for_activation:
+          type: boolean
+        total_founders:
+          type: integer
+          minimum: 0
+    GovernanceActivityEvent:
+      type: object
+      description: Recent governance activity event
+      required:
+      - event_type
+      - description
+      - timestamp
+      - resource_id
+      - resource_type
+      properties:
+        description:
+          type: string
+          description: Event description
+        event_type:
+          type: string
+          description: Event type
+        resource_id:
+          type: string
+          description: Resource ID (proposal/amendment/appeal)
+        resource_type:
+          type: string
+          description: Resource type
+        timestamp:
+          type: integer
+          format: int64
+          description: Timestamp
+          minimum: 0
+    GovernanceDashboard:
+      type: object
+      description: Governance dashboard data
+      required:
+      - pending_amendments
+      - open_appeals
+      - recent_activity
+      - amendments_breakdown
+      - appeals_breakdown
+      properties:
+        amendments_breakdown:
+          $ref: '#/components/schemas/AmendmentsBreakdown'
+          description: Amendments breakdown
+        appeals_breakdown:
+          $ref: '#/components/schemas/AppealsBreakdown'
+          description: Appeals breakdown
+        charter_id:
+          type:
+          - string
+          - 'null'
+          description: Charter ID (hex)
+        open_appeals:
+          type: integer
+          description: Open appeals count
+          minimum: 0
+        pending_amendments:
+          type: integer
+          description: Pending amendments count
+          minimum: 0
+        recent_activity:
+          type: array
+          items:
+            $ref: '#/components/schemas/GovernanceActivityEvent'
+          description: Recent activity events
+    HealthResponse:
+      type: object
+      description: Health check response
+      required:
+      - status
+      - version
+      properties:
+        build_time:
+          type:
+          - string
+          - 'null'
+        checks:
+          type:
+          - object
+          - 'null'
+          additionalProperties:
+            $ref: '#/components/schemas/ComponentHealth'
+          propertyNames:
+            type: string
+        git_sha:
+          type:
+          - string
+          - 'null'
+        status:
+          type: string
+        version:
+          type: string
+    HealthStatus:
+      type: string
+      description: Structured health status enum for typed responses
+      enum:
+      - ok
+      - degraded
+      - unhealthy
+    InAppNotification:
+      type: object
+      description: In-app notification
+      required:
+      - id
+      - recipient
+      - coop_id
+      - title
+      - body
+      - notification_type
+      - created_at
+      - read
+      properties:
+        body:
+          type: string
+          description: Body
+        coop_id:
+          type: string
+          description: Cooperative ID
+        created_at:
+          type: integer
+          format: int64
+          description: Created timestamp
+          minimum: 0
+        data:
+          description: Custom data
+        id:
+          type: string
+          description: Notification ID
+        notification_type:
+          type: string
+          description: Notification type
+        read:
+          type: boolean
+          description: Whether the notification has been read
+        read_at:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Read timestamp
+          minimum: 0
+        recipient:
+          type: string
+          description: Recipient DID
+        title:
+          type: string
+          description: Title
+    InviteInfo:
+      type: object
+      description: Individual invite info (for listing)
+      required:
+      - code
+      - role
+      - created_by
+      - created_at
+      - expires_at
+      - used
+      properties:
+        code:
+          type: string
+        created_at:
+          type: integer
+          format: int64
+          minimum: 0
+        created_by:
+          type: string
+        expires_at:
+          type: integer
+          format: int64
+          minimum: 0
+        role:
+          type: string
+        used:
+          type: boolean
+    InviteListResponse:
+      type: object
+      description: List of invites
+      required:
+      - invites
+      properties:
+        invites:
+          type: array
+          items:
+            $ref: '#/components/schemas/InviteInfo'
+    InviteResponse:
+      type: object
+      description: Invite response with generated code
+      required:
+      - code
+      - coop_id
+      - coop_name
+      - role
+      - expires_at
+      - invite_url
+      properties:
+        code:
+          type: string
+        coop_id:
+          type: string
+        coop_name:
+          type: string
+        expires_at:
+          type: integer
+          format: int64
+          minimum: 0
+        invite_url:
+          type: string
+        role:
+          type: string
+    JoinRequest:
+      type: object
+      description: Join via invite code - request
+      required:
+      - invite_code
+      - did
+      properties:
+        did:
+          type: string
+        invite_code:
+          type: string
+    JoinResponse:
+      type: object
+      description: Join via invite - creates identity and returns credentials
+      required:
+      - did
+      - token
+      - token_expires_in
+      - coop_id
+      - role
+      - private_key
+      properties:
+        coop_id:
+          type: string
+        did:
+          type: string
+        private_key:
+          type: string
+        role:
+          type: string
+        token:
+          type: string
+        token_expires_in:
+          type: integer
+          format: int64
+          minimum: 0
+    ListNotificationsResponse:
+      type: object
+      description: Response for listing notifications
+      required:
+      - notifications
+      - total
+      - unread_count
+      properties:
+        notifications:
+          type: array
+          items:
+            $ref: '#/components/schemas/InAppNotification'
+          description: List of notifications
+        total:
+          type: integer
+          description: Total count (before pagination)
+          minimum: 0
+        unread_count:
+          type: integer
+          description: Unread count
+          minimum: 0
+    MarkReadResponse:
+      type: object
+      description: Response for marking notification as read
+      required:
+      - success
+      - message
+      properties:
+        message:
+          type: string
+        success:
+          type: boolean
+    MemberResponse:
+      type: object
+      description: Member response
+      required:
+      - holder_id
+      - holder_did
+      - jurisdiction_id
+      - status
+      - capabilities
+      - roles
+      - joined_at
+      properties:
+        capabilities:
+          type: array
+          items:
+            type: string
+        expires_at:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 0
+        holder_did:
+          type: string
+        holder_id:
+          type: string
+        joined_at:
+          type: integer
+          format: int64
+          minimum: 0
+        jurisdiction_id:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+    MembershipActionRequest:
+      type: object
+      description: Membership action request (approve, promote, suspend, etc.)
+      required:
+      - holder_id
+      - jurisdiction_id
+      properties:
+        holder_id:
+          type: string
+        jurisdiction_id:
+          type: string
+    NotificationCountResponse:
+      type: object
+      description: Response for notification count
+      required:
+      - total
+      - unread
+      properties:
+        total:
+          type: integer
+          description: Total notification count
+          minimum: 0
+        unread:
+          type: integer
+          description: Unread notification count
+          minimum: 0
+    OpenProposalRequest:
+      type: object
+      description: Open a proposal for voting
+      properties:
+        voting_period_seconds:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 0
+    PaginationInfo:
+      type: object
+      description: Generic pagination metadata for list responses
+      required:
+      - count
+      - has_more
+      - limit
+      properties:
+        count:
+          type: integer
+          description: Number of items in current page
+          minimum: 0
+        has_more:
+          type: boolean
+          description: Whether there are more items after this page
+        limit:
+          type: integer
+          description: Limit used for this query
+          minimum: 0
+        next_cursor:
+          type:
+          - string
+          - 'null'
+          description: Cursor for the next page (None if no more items)
+        offset:
+          type:
+          - integer
+          - 'null'
+          description: Current offset (for backward compatibility)
+          minimum: 0
+        prev_cursor:
+          type:
+          - string
+          - 'null'
+          description: Cursor for the previous page (None if at beginning)
+        total:
+          type:
+          - integer
+          - 'null'
+          description: Total number of items (if known/available)
+          minimum: 0
+    Platform:
+      type: string
+      description: Device platform type
+      enum:
+      - ios
+      - android
+      - web
+    ProposalPayloadRequest:
+      oneOf:
+      - type: object
+        required:
+        - body
+        - type
+        properties:
+          body:
+            type: string
+          type:
+            type: string
+            enum:
+            - text
+      - type: object
+        required:
+        - amount
+        - recipient
+        - currency
+        - purpose
+        - type
+        properties:
+          amount:
+            type: integer
+            format: int64
+          currency:
+            type: string
+          purpose:
+            type: string
+          recipient:
+            type: string
+          type:
+            type: string
+            enum:
+            - budget
+      - type: object
+        required:
+        - pool_amount
+        - unit
+        - options
+        - purpose
+        - type
+        properties:
+          options:
+            type: array
+            items:
+              $ref: '#/components/schemas/AllocationOptionRequest'
+          pool_amount:
+            type: integer
+            format: int64
+          purpose:
+            type: string
+          type:
+            type: string
+            enum:
+            - allocation
+          unit:
+            type: string
+      - type: object
+        required:
+        - action
+        - did
+        - type
+        properties:
+          action:
+            type: string
+          did:
+            type: string
+          type:
+            type: string
+            enum:
+            - membership
+      - type: object
+        required:
+        - key
+        - value
+        - type
+        properties:
+          key:
+            type: string
+          type:
+            type: string
+            enum:
+            - config_change
+          value:
+            type: string
+      description: Proposal payload types (gateway-local variant of the governance proposal payload)
+    ProposalScopeRequest:
+      oneOf:
+      - type: object
+        description: Local to this node's governance domain (default)
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            enum:
+            - local
+      - type: object
+        description: Visible across a federation — propagates via gossip
+        required:
+        - federation_id
+        - type
+        properties:
+          federation_id:
+            type: string
+            description: Federation identifier
+          type:
+            type: string
+            enum:
+            - federation
+      description: Scope for a proposal (local or federation-wide)
+    RecordTransferRequest:
+      type: object
+      description: Record a transfer between participants (user-signed obligation exchange)
+      required:
+      - from
+      - to
+      - amount
+      - unit
+      properties:
+        amount:
+          type: integer
+          format: int64
+        from:
+          type: string
+        memo:
+          type:
+          - string
+          - 'null'
+        to:
+          type: string
+        unit:
+          type: string
+    RegisterDeviceRequest:
+      type: object
+      description: Register device request
+      required:
+      - device_token
+      - platform
+      properties:
+        device_token:
+          type: string
+          description: Device FCM token
+        platform:
+          $ref: '#/components/schemas/Platform'
+          description: Platform type
+    RegisterDeviceResponse:
+      type: object
+      description: Register device response
+      required:
+      - success
+      - message
+      properties:
+        message:
+          type: string
+        success:
+          type: boolean
+    RegisterStewardRequest:
+      type: object
+      description: Register steward request
+      required:
+      - term_duration_days
+      - bond_amount
+      - governance_approval
+      properties:
+        bond_amount:
+          type: integer
+          format: int64
+          description: Bond amount in network credits
+          minimum: 0
+        governance_approval:
+          type: string
+          description: Governance proposal ID that approved this steward
+        jurisdiction:
+          type:
+          - string
+          - 'null'
+          description: Optional jurisdiction scope
+        specializations:
+          type: array
+          items:
+            type: string
+          description: Optional specializations (e.g., "identity", "mediation")
+        steward_did:
+          type:
+          - string
+          - 'null'
+          description: Operational DID for the steward (can be same as holder DID)
+        term_duration_days:
+          type: integer
+          format: int64
+          description: Term duration in days (e.g., 365 for 1 year)
+          minimum: 0
+    RevokeMembershipRequest:
+      type: object
+      description: Revoke membership request (with appeal window)
+      required:
+      - holder_id
+      - jurisdiction_id
+      - reason
+      properties:
+        appeal_window_days:
+          type: integer
+          format: int64
+          minimum: 0
+        holder_id:
+          type: string
+        jurisdiction_id:
+          type: string
+        policy_ref:
+          type:
+          - string
+          - 'null'
+        reason:
+          type: string
+    RoleRequest:
+      type: object
+      description: Role request
+      required:
+      - holder_id
+      - jurisdiction_id
+      - role
+      properties:
+        holder_id:
+          type: string
+        jurisdiction_id:
+          type: string
+        role:
+          type: string
+    SessionQrData:
+      type: object
+      description: Data to encode in the QR code (shown to mobile wallet)
+      required:
+      - session_id
+      - gateway_url
+      - coop_id
+      - expires_at
+      properties:
+        coop_id:
+          type: string
+        expires_at:
+          type: integer
+          format: int64
+          minimum: 0
+        gateway_url:
+          type: string
+        session_id:
+          type: string
+    SessionStatusResponse:
+      type: object
+      description: Session status check response (polling endpoint)
+      required:
+      - session_id
+      - status
+      - expires_at
+      properties:
+        did:
+          type:
+          - string
+          - 'null'
+          description: DID that approved the session (only present when status is "approved")
+        expires_at:
+          type: integer
+          format: int64
+          minimum: 0
+        scopes:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: Scopes granted (only present when status is "approved")
+        session_id:
+          type: string
+        status:
+          type: string
+        token:
+          type:
+          - string
+          - 'null'
+          description: Token for the web session (only present when status is "approved")
+        token_expires_in:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Token expiry in seconds (only present when status is "approved")
+          minimum: 0
+    SignCharterRequest:
+      type: object
+      description: Sign charter request
+      required:
+      - signature
+      properties:
+        role:
+          type:
+          - string
+          - 'null'
+        signature:
+          type: string
+    StewardDetailResponse:
+      type: object
+      description: Steward detail response
+      required:
+      - steward_id
+      - steward_did
+      - holder_did
+      - status
+      - term_start
+      - term_end
+      - bond_amount
+      - reputation_score
+      - effectiveness_score
+      - attestations_issued
+      - attestations_disputed
+      - disputes_against
+      - disputes_won
+      - specializations
+      - can_attest
+      - is_term_expired
+      - created_at
+      - updated_at
+      properties:
+        attestations_disputed:
+          type: integer
+          format: int64
+          minimum: 0
+        attestations_issued:
+          type: integer
+          format: int64
+          minimum: 0
+        bond_amount:
+          type: integer
+          format: int64
+          minimum: 0
+        can_attest:
+          type: boolean
+        created_at:
+          type: integer
+          format: int64
+          minimum: 0
+        disputes_against:
+          type: integer
+          format: int64
+          minimum: 0
+        disputes_won:
+          type: integer
+          format: int64
+          minimum: 0
+        effectiveness_score:
+          type: number
+          format: double
+        holder_did:
+          type: string
+        is_term_expired:
+          type: boolean
+        jurisdiction:
+          type:
+          - string
+          - 'null'
+        reputation_score:
+          type: number
+          format: double
+        specializations:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+        steward_did:
+          type: string
+        steward_id:
+          type: string
+        term_end:
+          type: integer
+          format: int64
+          minimum: 0
+        term_start:
+          type: integer
+          format: int64
+          minimum: 0
+        updated_at:
+          type: integer
+          format: int64
+          minimum: 0
+    StewardSummaryResponse:
+      type: object
+      description: Steward summary response (for list endpoints)
+      required:
+      - steward_id
+      - steward_did
+      - holder_did
+      - status
+      - reputation_score
+      - attestations_issued
+      - can_attest
+      - term_end
+      properties:
+        attestations_issued:
+          type: integer
+          format: int64
+          minimum: 0
+        can_attest:
+          type: boolean
+        holder_did:
+          type: string
+        jurisdiction:
+          type:
+          - string
+          - 'null'
+        reputation_score:
+          type: number
+          format: double
+        status:
+          type: string
+        steward_did:
+          type: string
+        steward_id:
+          type: string
+        term_end:
+          type: integer
+          format: int64
+          minimum: 0
+    TimelineEvent:
+      type: object
+      description: Timeline event
+      required:
+      - event_type
+      - description
+      - timestamp
+      - date_time
+      properties:
+        actor:
+          type:
+          - string
+          - 'null'
+          description: Related actor (DID)
+        date_time:
+          type: string
+          description: Human-readable timestamp
+        description:
+          type: string
+          description: Human-readable description
+        event_type:
+          type: string
+          description: Event type
+        metadata:
+          description: Additional metadata
+        timestamp:
+          type: integer
+          format: int64
+          description: Timestamp (Unix)
+          minimum: 0
+    TimelineResponse:
+      type: object
+      description: Timeline response
+      required:
+      - charter_id
+      - charter_name
+      - events
+      properties:
+        charter_id:
+          type: string
+        charter_name:
+          type: string
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimelineEvent'
+    TokenResponse:
+      type: object
+      description: Token response with JWT capability token
+      required:
+      - token
+      - expires_in
+      properties:
+        expires_in:
+          type: integer
+          format: int64
+          minimum: 0
+        token:
+          type: string
+    TransactionHistoryEntry:
+      type: object
+      description: Transaction history entry
+      required:
+      - id
+      - timestamp
+      - author
+      - accounts
+      properties:
+        accounts:
+          type: array
+          items:
+            $ref: '#/components/schemas/AccountDeltaResponse'
+        author:
+          type: string
+        decision_hash:
+          type:
+          - string
+          - 'null'
+          description: Decision canonical hash (cross-node anchor)
+        decision_receipt_id:
+          type:
+          - string
+          - 'null'
+          description: Decision receipt ID (node-local, links to governance decision)
+        id:
+          type: string
+        timestamp:
+          type: integer
+          format: int64
+          minimum: 0
+    TransactionHistoryResponse:
+      type: object
+      description: Paginated transaction history response
+      required:
+      - transactions
+      - pagination
+      properties:
+        pagination:
+          $ref: '#/components/schemas/PaginationInfo'
+          description: Pagination metadata
+        transactions:
+          type: array
+          items:
+            $ref: '#/components/schemas/TransactionHistoryEntry'
+          description: The transactions on this page
+    UpdateCharterStatusRequest:
+      type: object
+      description: Update status request
+      required:
+      - status
+      properties:
+        reason:
+          type:
+          - string
+          - 'null'
+        status:
+          type: string
+    UpdateRoleRequest:
+      type: object
+      description: Update member role
+      required:
+      - role
+      properties:
+        role:
+          type: string
+          description: |-
+            New role: "steward", "facilitator", or "participant"
+            Legacy names "owner", "admin", "member" are also accepted
+    UpdateSettingsRequest:
+      type: object
+      description: Update cooperative settings
+      properties:
+        credit_policy:
+          type:
+          - string
+          - 'null'
+        currency:
+          type:
+          - string
+          - 'null'
+        governance_model:
+          type:
+          - string
+          - 'null'
+    UpdateStatusRequest:
+      type: object
+      description: Update steward status request
+      required:
+      - status
+      properties:
+        evidence:
+          type: array
+          items:
+            type: string
+        reason:
+          type:
+          - string
+          - 'null'
+        status:
+          type: string
+    VerifyRequest:
+      type: object
+      description: Verify signed challenge and get capability token
+      required:
+      - did
+      - signature
+      - coop_id
+      - scopes
+      properties:
+        coop_id:
+          type: string
+        did:
           type: string
         scopes:
           type: array
           items:
             type: string
-
-    TokenResponse:
-      type: object
-      properties:
-        token:
-          type: string
-        expires_at:
-          type: string
-          format: date-time
-
-    Cooperative:
-      type: object
-      properties:
-        id:
-          type: string
-        name:
-          type: string
-        description:
-          type: string
-        owner:
-          type: string
-        created_at:
-          type: string
-          format: date-time
-
-    CreateCoopRequest:
-      type: object
-      required: [id, name]
-      properties:
-        id:
-          type: string
-        name:
-          type: string
-        description:
-          type: string
-
-    UpdateCoopRequest:
-      type: object
-      properties:
-        name:
-          type: string
-        description:
-          type: string
-
-    Member:
-      type: object
-      properties:
-        did:
-          type: string
-        role:
-          type: string
-          enum: [owner, admin, member]
-        joined_at:
-          type: string
-          format: date-time
-
-    AddMemberRequest:
-      type: object
-      required: [did, role]
-      properties:
-        did:
-          type: string
-        role:
-          type: string
-          enum: [admin, member]
-
-    UpdateMemberRequest:
-      type: object
-      required: [role]
-      properties:
-        role:
-          type: string
-
-    Position:
-      type: object
-      properties:
-        did:
-          type: string
-        position:
-          type: integer
-        unit:
-          type: string
-
-    SettlementRequest:
-      type: object
-      required: [to, amount, unit]
-      properties:
-        to:
-          type: string
-        amount:
-          type: integer
-          minimum: 1
-        unit:
-          type: string
-        memo:
-          type: string
-
-    Settlement:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        from:
-          type: string
-        to:
-          type: string
-        amount:
-          type: integer
-        unit:
-          type: string
-        memo:
-          type: string
-        created_at:
-          type: string
-          format: date-time
-
-    Transaction:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        type:
-          type: string
-          enum: [sent, received]
-        amount:
-          type: integer
-        unit:
-          type: string
-        counterparty:
-          type: string
-        memo:
-          type: string
-        created_at:
-          type: string
-          format: date-time
-
-    GovernanceDomain:
-      type: object
-      properties:
-        domain_id:
-          type: string
-        name:
-          type: string
-        description:
-          type: string
-        members:
-          type: array
-          items:
-            type: string
-        created_at:
-          type: string
-          format: date-time
-
-    CreateDomainRequest:
-      type: object
-      required: [domain_id, name, members]
-      properties:
-        domain_id:
-          type: string
-        name:
-          type: string
-        description:
-          type: string
-        members:
-          type: array
-          items:
-            type: string
-
-    Proposal:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        domain_id:
-          type: string
-        title:
-          type: string
-        description:
-          type: string
-        kind:
-          type: string
-          enum: [text, budget, membership, config_change]
-        state:
-          type: string
-          enum: [draft, open, closed]
-        author:
-          type: string
-        outcome:
-          type: string
-          enum: [accepted, rejected, no_quorum]
-        created_at:
-          type: string
-          format: date-time
-
-    CreateProposalRequest:
-      type: object
-      required: [domain_id, title, description, payload]
-      properties:
-        domain_id:
-          type: string
-          description: The governance domain this proposal belongs to
-        title:
-          type: string
-        description:
-          type: string
-        payload:
-          $ref: '#/components/schemas/ProposalPayload'
-
-    ProposalPayload:
-      oneOf:
-        - $ref: '#/components/schemas/TextPayload'
-        - $ref: '#/components/schemas/BudgetPayload'
-        - $ref: '#/components/schemas/MembershipPayload'
-        - $ref: '#/components/schemas/ConfigChangePayload'
-      discriminator:
-        propertyName: type
-        mapping:
-          text: '#/components/schemas/TextPayload'
-          budget: '#/components/schemas/BudgetPayload'
-          membership: '#/components/schemas/MembershipPayload'
-          config_change: '#/components/schemas/ConfigChangePayload'
-
-    TextPayload:
-      type: object
-      required: [type, body]
-      properties:
-        type:
-          type: string
-          enum: [text]
-        body:
-          type: string
-
-    BudgetPayload:
-      type: object
-      required: [type, amount, recipient, unit, purpose]
-      properties:
-        type:
-          type: string
-          enum: [budget]
-        amount:
-          type: integer
-        recipient:
-          type: string
-          description: DID of the recipient
-        unit:
-          type: string
-        purpose:
-          type: string
-
-    MembershipPayload:
-      type: object
-      required: [type, action, did]
-      properties:
-        type:
-          type: string
-          enum: [membership]
-        action:
-          type: string
-          enum: [add, remove]
-        did:
-          type: string
-
-    ConfigChangePayload:
-      type: object
-      required: [type, key, value]
-      properties:
-        type:
-          type: string
-          enum: [config_change]
-        key:
-          type: string
-        value:
-          type: string
-
-    CastVoteRequest:
-      type: object
-      required: [choice]
-      properties:
-        choice:
-          type: string
-          enum: [for, against, abstain]
-
-    Vote:
-      type: object
-      properties:
-        proposal_id:
-          type: string
-          format: uuid
-        voter:
-          type: string
-        choice:
-          type: string
-          enum: [for, against, abstain]
-        cast_at:
-          type: string
-          format: date-time
-
-    VoteTally:
-      type: object
-      properties:
-        proposal_id:
-          type: string
-          format: uuid
-        votes_for:
-          type: integer
-        votes_against:
-          type: integer
-        votes_abstain:
-          type: integer
-        total_votes:
-          type: integer
-        quorum_reached:
-          type: boolean
-
-    # ============================================
-    # Compute Schemas
-    # ============================================
-
-    # Base properties shared by all task submissions
-    SubmitTaskRequestBase:
-      type: object
-      properties:
-        task_id:
-          type: string
-          description: Optional task ID (auto-generated if not provided)
-        inputs:
-          type: object
-          description: Input arguments (JSON)
-        fuel_limit:
-          type: integer
-          description: Maximum fuel for execution (default 10000)
-          default: 10000
-        priority:
-          type: string
-          enum: [low, normal, high, critical]
-          description: Task priority (default normal)
-          default: normal
-        deadline_ms:
-          type: integer
-          description: Deadline in milliseconds from now (optional)
-        settlement_rate:
-          type: integer
-          description: Settlement rate per 1000 fuel (optional)
-        settlement_unit:
-          type: string
-          description: Settlement unit (default credits)
-
-    # CCL task submission (code_type: ccl or omitted)
-    # Note: Server accepts requests without code_type, defaulting to "ccl"
-    CclTaskRequest:
-      allOf:
-        - $ref: '#/components/schemas/SubmitTaskRequestBase'
-        - type: object
-          required: [code]
-          properties:
-            code_type:
-              type: string
-              enum: [ccl]
-              default: ccl
-              description: Code type (optional, defaults to "ccl" if omitted)
-            code:
-              type: string
-              description: CCL contract JSON
-
-    # WASM task submission (code_type: wasm)
-    WasmTaskRequest:
-      allOf:
-        - $ref: '#/components/schemas/SubmitTaskRequestBase'
-        - type: object
-          required: [code_type, wasm_bytes]
-          properties:
-            code_type:
-              type: string
-              enum: [wasm]
-            wasm_bytes:
-              type: string
-              format: byte
-              description: Base64-encoded WASM bytecode
-
-    # Union type: either CCL or WASM task
-    # Discrimination logic:
-    # - If code_type is "wasm" → WasmTaskRequest (wasm_bytes required)
-    # - If code_type is "ccl" or omitted → CclTaskRequest (code required)
-    SubmitTaskRequest:
-      description: |
-        Submit a compute task. Two types are supported:
-        - CCL (default): Provide `code` field with CCL contract JSON
-        - WASM: Set `code_type: wasm` and provide `wasm_bytes` with base64-encoded WASM
-
-        For backward compatibility, requests without `code_type` are treated as CCL.
-      oneOf:
-        - $ref: '#/components/schemas/CclTaskRequest'
-        - $ref: '#/components/schemas/WasmTaskRequest'
-      discriminator:
-        propertyName: code_type
-        mapping:
-          ccl: '#/components/schemas/CclTaskRequest'
-          wasm: '#/components/schemas/WasmTaskRequest'
-
-    SubmitTaskResponse:
-      type: object
-      properties:
-        task_id:
-          type: string
-        task_hash:
-          type: string
-          description: 64-character hex hash
-
-    ComputeTaskStatus:
-      type: object
-      properties:
-        task_hash:
-          type: string
-        status:
-          type: string
-          enum: [pending, claimed, completed, failed, cancelled]
-        executor:
-          type: string
-          description: DID of the executor (if claimed)
-        result:
-          $ref: '#/components/schemas/ComputeResult'
-        cancelled_reason:
-          type: string
-          description: Cancellation reason (if cancelled)
-
-    CancelTaskRequest:
-      type: object
-      properties:
-        reason:
-          type: string
-          description: Optional reason for cancellation
-          maxLength: 500
-
-    CancelTaskResponse:
-      type: object
-      properties:
-        task_hash:
-          type: string
-          description: Hash of the cancelled task
-        status:
-          type: string
-          enum: [cancelled]
-        message:
-          type: string
-          example: "Task cancelled successfully"
-
-    ComputeResult:
-      type: object
-      properties:
-        outcome:
-          type: string
-          enum: [success, failed, out_of_fuel, timeout]
-        output:
-          type: object
-          description: Execution output (JSON)
-        error:
-          type: string
-          description: Error message (if failed)
-        fuel_used:
-          type: integer
-        duration_ms:
-          type: integer
+        signature:
+          type: string
+    VoteChoiceResponse:
+      type: string
+      description: Vote choice response (simpler for API consumers)
+      enum:
+      - for
+      - against
+      - abstain
+tags:
+- name: health
+  description: Health check and readiness endpoints
+- name: auth
+  description: Authentication and authorization
+- name: identity
+  description: DID-based identity management
+- name: cooperatives
+  description: Cooperative creation and membership
+- name: ledger
+  description: Mutual credit ledger operations
+- name: trust
+  description: Trust graph management
+- name: governance
+  description: Democratic governance and voting
+- name: compute
+  description: Distributed compute task execution
+- name: federation
+  description: Cross-federation routing
+- name: notifications
+  description: Push notifications and alerts
+- name: websocket
+  description: Real-time event streaming
+- name: membership
+  description: Commons membership management
+- name: charter
+  description: Charter creation and management
+- name: steward
+  description: Steward management and attestations
+- name: devices
+  description: Multi-device management

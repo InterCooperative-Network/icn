@@ -41,6 +41,14 @@ export interface components {
              */
             role: string;
         };
+        /** @description A single option within a participatory budget allocation (gateway request variant). */
+        AllocationOptionRequest: {
+            description: string;
+            label: string;
+            recipient: string;
+            /** Format: int64 */
+            requested_amount: number;
+        };
         /** @description Amendments breakdown by status */
         AmendmentsBreakdown: {
             draft: number;
@@ -471,6 +479,14 @@ export interface components {
             recipient: string;
             /** @enum {string} */
             type: "budget";
+        } | {
+            options: components["schemas"]["AllocationOptionRequest"][];
+            /** Format: int64 */
+            pool_amount: number;
+            purpose: string;
+            /** @enum {string} */
+            type: "allocation";
+            unit: string;
         } | {
             action: string;
             did: string;
