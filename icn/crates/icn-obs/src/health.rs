@@ -177,7 +177,7 @@ pub fn monitoring_router(health: HealthService) -> Router {
 pub async fn start_monitoring_server(port: u16, health: HealthService) -> anyhow::Result<()> {
     let app = monitoring_router(health);
 
-    let addr = format!("0.0.0.0:{port}");
+    let addr = format!("[::]:{port}");
     let listener = tokio::net::TcpListener::bind(&addr).await?;
 
     tracing::info!("Monitoring server listening on http://{}", addr);

@@ -38,7 +38,7 @@ pub struct GatewayConfig {
 }
 
 fn default_gateway_bind_addr() -> String {
-    "127.0.0.1:8080".to_string()
+    "[::1]:8080".to_string()
 }
 
 fn default_token_expiry_hours() -> u64 {

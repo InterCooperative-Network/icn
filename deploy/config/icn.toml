@@ -8,7 +8,7 @@ data_dir = "/root/.icn"
 mdns_enabled = true
 
 # Listen on all interfaces
-listen_addr = "0.0.0.0:7777"
+listen_addr = "[::]:7777"
 
 # gRPC API port
 rpc_port = 5601
@@ -36,7 +36,7 @@ log_level = "info"
 enabled = true
 
 # Bind to all interfaces (nginx will proxy)
-bind_addr = "0.0.0.0:8080"
+bind_addr = "[::]:8080"
 
 # JWT secret from environment variable
 # jwt_secret is set via ICN_GATEWAY_JWT_SECRET env var
