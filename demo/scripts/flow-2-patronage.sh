@@ -403,19 +403,17 @@ echo "  The approved governance decision authorizes the ledger settlement."
 echo "  Each allocation is posted as a ledger entry. The memo records provenance."
 echo "  (Programmatic decision-linkage via decision_id is a future capability.)"
 echo ""
-aside "Attempting settlement via POST /v1/ledger/${BRIGHTWORKS_COOP_ID}/payment"
+aside "Attempting settlement via POST /v1/ledger/${BRIGHTWORKS_COOP_ID}/settle"
 echo ""
 
 # Settlement payload: from cooperative fund to member DID
-# Deployed binary (2bc85f83, 2026-02-23) uses /payment route and currency field.
-# Route renamed to /settle + field renamed to unit in source commit 439a8a2c (2026-03-01).
 # Demo: settlement from BrightWorks node DID to Harbor Homes node DID as member proxy.
 # (One DID per coop in demo — self-payments rejected, Harbor DID is a real cluster identity.)
 # NOTE: decision_id intentionally omitted — not in RecordTransferRequest schema.
 # The memo field carries human-readable provenance. The receipt chain (step 11) is the
 # future enforcement path; narrating decision_id as enforced here would be dishonest.
-_do_curl "${BRIGHTWORKS_URL}/v1/ledger/${BRIGHTWORKS_COOP_ID}/payment" POST \
-  "{\"from\":\"${BRIGHTWORKS_NODE_DID}\",\"to\":\"${HARBOR_NODE_DID}\",\"amount\":880,\"currency\":\"patronage_credits\",\"memo\":\"Q1 2026 patronage — Yusuf Okafor (120 labor hours, (120/524)*3840=880) — decision:${PROPOSAL_ID}\"}" \
+_do_curl "${BRIGHTWORKS_URL}/v1/ledger/${BRIGHTWORKS_COOP_ID}/settle" POST \
+  "{\"from\":\"${BRIGHTWORKS_NODE_DID}\",\"to\":\"${HARBOR_NODE_DID}\",\"amount\":880,\"unit\":\"patronage_credits\",\"memo\":\"Q1 2026 patronage — Yusuf Okafor (120 labor hours, (120/524)*3840=880) — decision:${PROPOSAL_ID}\"}" \
   "$BRIGHTWORKS_TOKEN"
 
 if [[ "$DEMO_LAST_HTTP_CODE" =~ ^2 ]]; then
@@ -442,30 +440,29 @@ fi
 echo ""
 
 # ---------------------------------------------------------------------------
-# STEP 9: Ledger position — member balance visible
+# STEP 9: Ledger position — member position visible
 # ---------------------------------------------------------------------------
-narrate "Step 9: Ledger balance — cooperative account shows allocation"
-_beat "The balance is live. Any member can query their own balance at any time — the coop doesn't have to send a statement."
+narrate "Step 9: Ledger position — cooperative account shows allocation"
+_beat "The position is live. Any member can query their own position at any time — the coop doesn't have to send a statement."
 echo ""
-aside "GET /v1/ledger/${BRIGHTWORKS_COOP_ID}/balance/${BRIGHTWORKS_NODE_DID}"
+aside "GET /v1/ledger/${BRIGHTWORKS_COOP_ID}/position/${BRIGHTWORKS_NODE_DID}"
 echo ""
-# Route was /balance/{did} in deployed binary (2bc85f83). Renamed to /position/{did} in 439a8a2c.
 
-_do_curl "${BRIGHTWORKS_URL}/v1/ledger/${BRIGHTWORKS_COOP_ID}/balance/${BRIGHTWORKS_NODE_DID}" \
+_do_curl "${BRIGHTWORKS_URL}/v1/ledger/${BRIGHTWORKS_COOP_ID}/position/${BRIGHTWORKS_NODE_DID}" \
   GET "" "$BRIGHTWORKS_TOKEN"
 
 if [[ "$DEMO_LAST_HTTP_CODE" =~ ^2 ]]; then
-  result "Ledger balance (HTTP ${DEMO_LAST_HTTP_CODE}):"
+  result "Ledger position (HTTP ${DEMO_LAST_HTTP_CODE}):"
   _pretty
-  aside "Cooperative account shows outgoing allocation (debit side of the double-entry record)"
+  aside "Cooperative account position shows outgoing allocation (debit side of the double-entry record)"
 elif [ "$DEMO_LAST_HTTP_CODE" = "403" ] || [ "$DEMO_LAST_HTTP_CODE" = "401" ]; then
-  warn "Balance query returned HTTP ${DEMO_LAST_HTTP_CODE} — ledger:read scope constraint"
+  warn "Position query returned HTTP ${DEMO_LAST_HTTP_CODE} — ledger:read scope constraint"
   echo ""
-  echo "  What the cooperative account balance would show:"
+  echo "  What the cooperative account position would show:"
   echo "    did:      ${BRIGHTWORKS_NODE_DID:0:45}..."
-  echo "    balances: {\"patronage_credits\": -880}"
+  echo "    positions: {\"patronage_credits\": -880}"
   echo ""
-  aside "In a production deployment, each member would see their personal balance here."
+  aside "In a production deployment, each member would see their personal position here."
 else
   warn "Unexpected response (HTTP ${DEMO_LAST_HTTP_CODE}):"
   _pretty
@@ -551,15 +548,15 @@ else
   warn "They show what would happen if the vote had met quorum and been accepted."
   echo ""
   echo "  STEP 8 (settlement) — what authorized settlement looks like:"
-  echo "    POST /v1/ledger/${BRIGHTWORKS_COOP_ID}/payment"
+  echo "    POST /v1/ledger/${BRIGHTWORKS_COOP_ID}/settle"
   echo "    { from: <coop-did>, to: <member-did>, amount: 880,"
-  echo "      currency: patronage_credits,"
+  echo "      unit: patronage_credits,"
   echo "      memo: 'Q1 2026 patronage — Yusuf Okafor — decision:<id>' }"
   echo "    (decision_id is in memo, not a schema field — enforced via receipt chain later)"
   echo ""
-  echo "  STEP 9 (balance) — what a member's balance would show:"
-  echo "    GET /v1/ledger/${BRIGHTWORKS_COOP_ID}/balance/<member-did>"
-  echo "    { did: <member-did>, balances: { patronage_credits: 880 } }"
+  echo "  STEP 9 (position) — what a member's position would show:"
+  echo "    GET /v1/ledger/${BRIGHTWORKS_COOP_ID}/position/<member-did>"
+  echo "    { did: <member-did>, positions: { patronage_credits: 880 } }"
   echo ""
   echo "  STEP 10 (history) — what the allocation trail looks like:"
   echo "    GET /v1/ledger/${BRIGHTWORKS_COOP_ID}/history"
@@ -589,13 +586,13 @@ echo "   - Allocation table: each member's share derived transparently"
 echo "   - Governance: allocation ratified by member vote, not just declared"
 echo "   - Record: governance decision persisted on the cooperative's node"
 echo "   - Ledger: settlement posts credits with provenance (decision_id)"
-echo "   - Audit: any member can query balance and trace back to the vote"
+echo "   - Audit: any member can query position and trace back to the vote"
 echo ""
 echo " The cooperator question answered:"
 echo "   'Why did this member get this distribution?'"
 echo "   Because: (their hours / total hours) × Q1 surplus"
 echo "   Verified: the formula is in the proposal, the vote is on-chain"
-echo "   Traceable: balance → settlement entry → approved decision → vote"
+echo "   Traceable: position → settlement entry → approved decision → vote"
 echo ""
 if [ "$FINAL_STATE" = "Accepted" ]; then
   echo " Governance outcome: ACCEPTED — distribution officially ratified"
