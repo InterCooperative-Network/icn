@@ -12,11 +12,13 @@ use icn_governance::GovernanceDecisionReceipt;
 use icn_kernel_api::economics::SettlementIntent;
 use icn_kernel_api::receipts::{AllocationReceipt, CanonicalReceipt, Hash};
 
-/// Query parameters for listing by decision hash
+/// Query parameters for listing by decision hash.
+///
+/// `decision_hash` is optional — when absent, all receipts of that type are returned.
 #[derive(Debug, Deserialize)]
 pub struct ByDecisionQuery {
-    /// Hex-encoded decision hash
-    pub decision_hash: String,
+    /// Hex-encoded decision hash (optional — omit to list all)
+    pub decision_hash: Option<String>,
 }
 
 /// Response for allocation receipt
@@ -239,13 +241,25 @@ pub async fn get_intent(
     }
 }
 
-/// GET /v1/receipts/chain?decision_hash=...
+/// GET /v1/receipts/chain?decision_hash=<hex>
+///
+/// `decision_hash` is required for this endpoint — it returns the economic
+/// chain (allocations + intents) for a specific governance decision.
 #[get("/chain")]
 pub async fn get_chain(
     receipt_store: web::Data<Arc<ReceiptStore>>,
     query: web::Query<ByDecisionQuery>,
 ) -> HttpResponse {
-    let hash = match parse_hash(&query.decision_hash) {
+    let hex = match &query.decision_hash {
+        Some(h) => h,
+        None => {
+            return HttpResponse::BadRequest().json(serde_json::json!({
+                "error": "decision_hash is required for /receipts/chain"
+            }))
+        }
+    };
+
+    let hash = match parse_hash(hex) {
         Ok(h) => h,
         Err(resp) => return resp,
     };
@@ -253,7 +267,7 @@ pub async fn get_chain(
     match receipt_store.get_chain_by_decision(&hash) {
         Ok((allocations, intents)) => {
             let response = EconomicChainResponse {
-                decision_hash: query.decision_hash.clone(),
+                decision_hash: hex.clone(),
                 allocations: allocations
                     .iter()
                     .map(AllocationReceiptResponse::from)
@@ -262,9 +276,7 @@ pub async fn get_chain(
             };
             HttpResponse::Ok().json(response)
         }
-        Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({
-            "error": e
-        })),
+        Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({ "error": e })),
     }
 }
 
@@ -320,18 +332,24 @@ pub async fn get_full_chain(
     HttpResponse::Ok().json(response)
 }
 
-/// GET /v1/receipts/allocations?decision_hash=...
+/// GET /v1/receipts/allocations[?decision_hash=<hex>]
+///
+/// Without `decision_hash`: returns all allocation receipts.
+/// With `decision_hash`: returns only receipts linked to that decision.
 #[get("/allocations")]
 pub async fn list_allocations(
     receipt_store: web::Data<Arc<ReceiptStore>>,
     query: web::Query<ByDecisionQuery>,
 ) -> HttpResponse {
-    let hash = match parse_hash(&query.decision_hash) {
-        Ok(h) => h,
-        Err(resp) => return resp,
+    let result = match &query.decision_hash {
+        None => receipt_store.list_all_allocations(),
+        Some(hex) => match parse_hash(hex) {
+            Ok(hash) => receipt_store.list_allocations_by_decision(&hash),
+            Err(resp) => return resp,
+        },
     };
 
-    match receipt_store.list_allocations_by_decision(&hash) {
+    match result {
         Ok(allocations) => {
             let responses: Vec<_> = allocations
                 .iter()
@@ -339,31 +357,33 @@ pub async fn list_allocations(
                 .collect();
             HttpResponse::Ok().json(responses)
         }
-        Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({
-            "error": e
-        })),
+        Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({ "error": e })),
     }
 }
 
-/// GET /v1/receipts/intents?decision_hash=...
+/// GET /v1/receipts/intents[?decision_hash=<hex>]
+///
+/// Without `decision_hash`: returns all settlement intents.
+/// With `decision_hash`: returns only intents linked to that decision.
 #[get("/intents")]
 pub async fn list_intents(
     receipt_store: web::Data<Arc<ReceiptStore>>,
     query: web::Query<ByDecisionQuery>,
 ) -> HttpResponse {
-    let hash = match parse_hash(&query.decision_hash) {
-        Ok(h) => h,
-        Err(resp) => return resp,
+    let result = match &query.decision_hash {
+        None => receipt_store.list_all_intents(),
+        Some(hex) => match parse_hash(hex) {
+            Ok(hash) => receipt_store.list_intents_by_decision(&hash),
+            Err(resp) => return resp,
+        },
     };
 
-    match receipt_store.list_intents_by_decision(&hash) {
+    match result {
         Ok(intents) => {
             let responses: Vec<_> = intents.iter().map(SettlementIntentResponse::from).collect();
             HttpResponse::Ok().json(responses)
         }
-        Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({
-            "error": e
-        })),
+        Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({ "error": e })),
     }
 }
 
