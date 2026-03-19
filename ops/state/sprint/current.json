@@ -12,26 +12,29 @@
     {
       "id": "s15-t1",
       "title": "K3s demo audit: run all 4 flows, classify with evidence, write report",
-      "status": "pending",
+      "status": "done",
       "pr": null,
-      "assignee": null,
-      "epic": "1099"
+      "assignee": "claude",
+      "epic": "1099",
+      "evidence": "docs/status/demo-audit-2026-03-19.md — F1 PROVEN, F2 FRAGILE, F3 PROVEN (post-fix), F4 FRAGILE"
     },
     {
       "id": "s15-t2",
       "title": "fix(gateway): make decision_hash optional in /v1/receipts/allocations (#1334)",
-      "status": "pending",
-      "pr": null,
-      "assignee": null,
-      "epic": "1302"
+      "status": "done",
+      "pr": 1343,
+      "assignee": "claude",
+      "epic": "1302",
+      "evidence": "Merged 2026-03-19. 449 tests pass. Awaiting K3s deploy to verify flows 2/4."
     },
     {
       "id": "s15-t3",
       "title": "fix(demo): Flow 3 clearing agreement ID extraction (#1335)",
-      "status": "pending",
-      "pr": null,
-      "assignee": null,
-      "epic": "1099"
+      "status": "done",
+      "pr": 1344,
+      "assignee": "claude",
+      "epic": "1099",
+      "evidence": "Merged 2026-03-19. Steps 5/6/7 verified 2xx on live K3s. docs/status/demo-audit-2026-03-19-flow3-verified.md"
     },
     {
       "id": "s15-t4",
