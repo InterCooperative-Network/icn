@@ -35,6 +35,7 @@ async fn make_actor() -> Result<(
     Arc<EventBus>,
     SubscriptionHandle,
     Arc<Mutex<Vec<SystemEvent>>>,
+    icn_identity::Did,
 )> {
     let alice = KeyPair::generate()?;
     let alice_did = alice.did().clone();
@@ -84,12 +85,12 @@ async fn make_actor() -> Result<(
             config: GovernanceConfigLite {
                 profile: "cooperative".to_string(),
                 params: GovernanceParams::new(1, 1, 604800), // 1% quorum, 1% approval
-                membership: MembershipConfig::static_list(vec![alice_did]),
+                membership: MembershipConfig::static_list(vec![alice_did.clone()]),
             },
         })
         .await?;
 
-    Ok((actor, event_bus, sub_handle, captured))
+    Ok((actor, event_bus, sub_handle, captured, alice_did))
 }
 
 /// Helper: create, open, (optionally vote), and close a proposal.
@@ -97,6 +98,7 @@ async fn run_proposal(
     actor: &icn_governance_actor::GovernanceHandle,
     domain_id: &GovernanceDomainId,
     cast_vote: bool,
+    voter_did: &icn_identity::Did,
 ) -> Result<()> {
     let proposal_id = ProposalId::generate();
 
@@ -125,7 +127,7 @@ async fn run_proposal(
             .submit(GovernanceCommand::CastVote {
                 proposal_id: proposal_id.clone(),
                 choice: VoteChoice::For,
-                voter: alice_did.clone(),
+                voter: voter_did.clone(),
                 comment: None,
             })
             .await?;
@@ -145,10 +147,10 @@ async fn run_proposal(
 /// This proves `check_execution_gate` is called and allows valid receipts through.
 #[tokio::test]
 async fn test_gate_passes_for_accepted_proposal() -> Result<()> {
-    let (actor, _bus, _sub, captured) = make_actor().await?;
+    let (actor, _bus, _sub, captured, alice_did) = make_actor().await?;
     let domain_id = GovernanceDomainId::new("gate-test-domain");
 
-    run_proposal(&actor, &domain_id, true /* cast For vote */).await?;
+    run_proposal(&actor, &domain_id, true, &alice_did).await?;
 
     let events = captured.lock().expect("lock");
     let accepted: Vec<_> = events
@@ -171,10 +173,10 @@ async fn test_gate_passes_for_accepted_proposal() -> Result<()> {
 /// The gate is skipped for Rejected/NoQuorum outcomes — they produce no effects.
 #[tokio::test]
 async fn test_no_proposal_accepted_event_when_no_quorum() -> Result<()> {
-    let (actor, _bus, _sub, captured) = make_actor().await?;
+    let (actor, _bus, _sub, captured, alice_did) = make_actor().await?;
     let domain_id = GovernanceDomainId::new("gate-test-domain");
 
-    run_proposal(&actor, &domain_id, false /* no votes → NoQuorum */).await?;
+    run_proposal(&actor, &domain_id, false, &alice_did /* no votes → NoQuorum */).await?;
 
     let events = captured.lock().expect("lock");
     let accepted: Vec<_> = events
