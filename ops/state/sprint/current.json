@@ -57,10 +57,11 @@
     {
       "id": "s15-t6",
       "title": "test(core): vertical slice integration test — full receipt chain in CI (#1147)",
-      "status": "pending",
-      "pr": null,
-      "assignee": null,
-      "epic": "1147"
+      "status": "done",
+      "pr": 1351,
+      "assignee": "claude",
+      "epic": "1147",
+      "evidence": "PR #1351. End-to-end test: Allocation proposal → vote → gate → effect translation → treasury effects → audit provenance. All 6 links proven."
     },
     {
       "id": "s15-t7",
