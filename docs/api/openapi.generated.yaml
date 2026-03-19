@@ -102,6 +102,24 @@ components:
           description: |-
             Role for the new member: "steward", "facilitator", or "participant"
             Legacy names "owner", "admin", "member" are also accepted for backwards compatibility
+    AllocationOptionRequest:
+      type: object
+      description: A single option within a participatory budget allocation (gateway request variant).
+      required:
+      - label
+      - description
+      - recipient
+      - requested_amount
+      properties:
+        description:
+          type: string
+        label:
+          type: string
+        recipient:
+          type: string
+        requested_amount:
+          type: integer
+          format: int64
     AmendmentsBreakdown:
       type: object
       description: Amendments breakdown by status
@@ -1114,6 +1132,29 @@ components:
             type: string
             enum:
             - budget
+      - type: object
+        required:
+        - pool_amount
+        - unit
+        - options
+        - purpose
+        - type
+        properties:
+          options:
+            type: array
+            items:
+              $ref: '#/components/schemas/AllocationOptionRequest'
+          pool_amount:
+            type: integer
+            format: int64
+          purpose:
+            type: string
+          type:
+            type: string
+            enum:
+            - allocation
+          unit:
+            type: string
       - type: object
         required:
         - action
