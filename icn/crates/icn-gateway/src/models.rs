@@ -316,6 +316,15 @@ pub struct CreateProposalRequest {
     pub scope: Option<ProposalScopeRequest>,
 }
 
+/// A single option within a participatory budget allocation (gateway request variant).
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct AllocationOptionRequest {
+    pub label: String,
+    pub description: String,
+    pub recipient: String, // DID
+    pub requested_amount: i64,
+}
+
 /// Proposal payload types (gateway-local variant of the governance proposal payload)
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -327,6 +336,12 @@ pub enum ProposalPayloadRequest {
         amount: i64,
         recipient: String, // DID
         currency: String,
+        purpose: String,
+    },
+    Allocation {
+        pool_amount: i64,
+        unit: String,
+        options: Vec<AllocationOptionRequest>,
         purpose: String,
     },
     Membership {

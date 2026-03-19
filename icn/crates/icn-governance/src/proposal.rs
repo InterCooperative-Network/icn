@@ -391,6 +391,23 @@ impl ProposalState {
     }
 }
 
+/// A single option within a participatory budget allocation.
+///
+/// Each option represents a competing use for the resource pool. Members
+/// vote to distribute the pool across these options.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AllocationOption {
+    /// Short label for this option (e.g., "Infrastructure", "Education").
+    pub label: String,
+    /// Longer description of what the allocation would fund.
+    pub description: String,
+    /// Recipient DID (the entity that would receive this allocation).
+    pub recipient: Did,
+    /// Requested amount from the pool. The sum of all requested amounts
+    /// may exceed the pool (competing claims).
+    pub requested_amount: i64,
+}
+
 /// Payload of a proposal (what is being decided)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ProposalPayload {
@@ -409,6 +426,27 @@ pub enum ProposalPayload {
         /// Recipient DID
         recipient: Did,
         /// Purpose
+        purpose: String,
+    },
+
+    /// Participatory budget allocation — distribute a pool among competing options.
+    ///
+    /// Unlike `Budget` (single-recipient), `Allocation` presents a pool of
+    /// resources and a set of `AllocationOption`s. Members vote to distribute
+    /// the pool across options. This is the participatory budgeting primitive:
+    /// "resource scheduling" semantics, not payment semantics.
+    ///
+    /// The tally engine counts votes per option; the accepted allocation is
+    /// recorded as a governance decision with a `decision_hash` that downstream
+    /// actors (e.g., `ExecutionReceiptGate`) can reference.
+    Allocation {
+        /// Total pool to distribute (in the specified unit).
+        pool_amount: i64,
+        /// Unit of account for the pool (e.g., "compute-hours", "participation-units").
+        unit: String,
+        /// Competing allocation options. Must contain at least 2 options.
+        options: Vec<AllocationOption>,
+        /// Purpose or context for this allocation round.
         purpose: String,
     },
 
@@ -676,6 +714,7 @@ impl ProposalPayload {
         match self {
             ProposalPayload::Text { .. } => "text",
             ProposalPayload::Budget { .. } => "budget",
+            ProposalPayload::Allocation { .. } => "allocation",
             ProposalPayload::Membership { .. } => "membership",
             ProposalPayload::ConfigChange { .. } => "config_change",
             ProposalPayload::SchedulingPolicy { .. } => "scheduling_policy",
@@ -2598,5 +2637,103 @@ mod tests {
             proposal.scope,
             ProposalScope::Federation("my-fed".to_string())
         );
+    }
+
+    // --- AllocationProposal tests ---
+
+    fn test_did() -> Did {
+        let kp = KeyPair::generate().unwrap();
+        kp.did().clone()
+    }
+
+    #[test]
+    fn test_allocation_proposal_creation() {
+        let proposer = test_did();
+        let domain_id = GovernanceDomainId::new("test-domain");
+
+        let proposal = Proposal::new(
+            domain_id,
+            proposer,
+            "Q2 Compute Budget".to_string(),
+            "Distribute 10,000 compute-hours across projects".to_string(),
+            ProposalPayload::Allocation {
+                pool_amount: 10_000,
+                unit: "compute-hours".to_string(),
+                options: vec![
+                    AllocationOption {
+                        label: "Infrastructure".to_string(),
+                        description: "Cluster maintenance and upgrades".to_string(),
+                        recipient: test_did(),
+                        requested_amount: 6_000,
+                    },
+                    AllocationOption {
+                        label: "Education".to_string(),
+                        description: "Training programs".to_string(),
+                        recipient: test_did(),
+                        requested_amount: 4_000,
+                    },
+                ],
+                purpose: "Q2 participatory budgeting".to_string(),
+            },
+        );
+
+        assert_eq!(proposal.payload.type_name(), "allocation");
+        assert!(!proposal.payload.is_emergency());
+    }
+
+    #[test]
+    fn test_allocation_option_serde_roundtrip() {
+        let opt = AllocationOption {
+            label: "Research".to_string(),
+            description: "Fund cooperative research".to_string(),
+            recipient: test_did(),
+            requested_amount: 5_000,
+        };
+
+        let json = serde_json::to_string(&opt).unwrap();
+        let deserialized: AllocationOption = serde_json::from_str(&json).unwrap();
+        assert_eq!(opt, deserialized);
+    }
+
+    #[test]
+    fn test_allocation_payload_serde_roundtrip() {
+        let payload = ProposalPayload::Allocation {
+            pool_amount: 10_000,
+            unit: "participation-units".to_string(),
+            options: vec![
+                AllocationOption {
+                    label: "Option A".to_string(),
+                    description: "First option".to_string(),
+                    recipient: test_did(),
+                    requested_amount: 7_000,
+                },
+                AllocationOption {
+                    label: "Option B".to_string(),
+                    description: "Second option".to_string(),
+                    recipient: test_did(),
+                    requested_amount: 5_000,
+                },
+            ],
+            purpose: "Test allocation".to_string(),
+        };
+
+        let json = serde_json::to_string(&payload).unwrap();
+        let deserialized: ProposalPayload = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(deserialized.type_name(), "allocation");
+        if let ProposalPayload::Allocation {
+            pool_amount,
+            unit,
+            options,
+            purpose,
+        } = &deserialized
+        {
+            assert_eq!(*pool_amount, 10_000);
+            assert_eq!(unit, "participation-units");
+            assert_eq!(options.len(), 2);
+            assert_eq!(purpose, "Test allocation");
+        } else {
+            panic!("Expected Allocation variant after deserialization");
+        }
     }
 }

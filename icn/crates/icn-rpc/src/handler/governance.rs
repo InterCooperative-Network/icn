@@ -505,6 +505,38 @@ pub async fn handle_governance_proposal_create(
                 member: member_did,
             }
         }
+        ProposalPayloadInfo::Allocation {
+            pool_amount,
+            unit,
+            options,
+            purpose,
+        } => {
+            let mut parsed_options = Vec::with_capacity(options.len());
+            for opt in options {
+                let recipient_did = match icn_identity::Did::from_str(&opt.recipient) {
+                    Ok(d) => d,
+                    Err(e) => {
+                        return RpcResponse::error(
+                            id,
+                            -32602,
+                            format!("Invalid option recipient DID: {e}"),
+                        );
+                    }
+                };
+                parsed_options.push(icn_governance::AllocationOption {
+                    label: opt.label.clone(),
+                    description: opt.description.clone(),
+                    recipient: recipient_did,
+                    requested_amount: opt.requested_amount,
+                });
+            }
+            ProposalPayload::Allocation {
+                pool_amount: *pool_amount,
+                unit: unit.clone(),
+                options: parsed_options,
+                purpose: purpose.clone(),
+            }
+        }
     };
 
     match governance_handle
