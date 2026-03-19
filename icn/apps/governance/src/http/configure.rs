@@ -29,6 +29,26 @@ use super::handlers;
 /// should log warnings internally rather than panicking.
 pub type CharterAcceptedHook = Arc<dyn Fn(String, String) + Send + Sync>;
 
+/// Callback invoked when an `AllocationProposal` is accepted.
+///
+/// Arguments: `(decision_receipt, recipients, unit, total_amount, domain_id)`.
+///
+/// The gateway wires this to build an `AllocationReceipt` (with one
+/// `SettlementIntent` per recipient), run it through `check_execution_gate`,
+/// and persist it to the `ReceiptStore`.
+///
+/// Errors are non-fatal — implementations should log warnings.
+pub type AllocationAcceptedHook = Arc<
+    dyn Fn(
+            icn_governance::GovernanceDecisionReceipt,
+            Vec<icn_governance::AllocationEntry>,
+            String,
+            u64,
+            String,
+        ) + Send
+        + Sync,
+>;
+
 /// Shared application context for governance HTTP handlers.
 ///
 /// Stored as `web::Data<GovernanceContext<E>>`. Using a single struct keeps
@@ -39,6 +59,8 @@ pub struct GovernanceContext<E> {
     pub emitter: E,
     /// Optional hook called when a `Charter` proposal is accepted.
     pub on_charter_accepted: Option<CharterAcceptedHook>,
+    /// Optional hook called when an `AllocationProposal` is accepted.
+    pub on_allocation_accepted: Option<AllocationAcceptedHook>,
 }
 
 /// Register all governance routes on `cfg`.

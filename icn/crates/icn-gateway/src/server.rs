@@ -812,6 +812,79 @@ impl GatewayServer {
             Arc::new(EventBroadcaster::new())
         });
 
+        // Build AllocationProposal acceptance hook.
+        //
+        // When an AllocationProposal is accepted, this closure:
+        //   1. Runs the GovernanceDecisionReceipt through check_execution_gate
+        //   2. Builds one SettlementIntent per recipient
+        //   3. Writes an AllocationReceipt to the ReceiptStore
+        //
+        // This closes the provenance chain:
+        //   GovernanceDecisionReceipt → AllocationReceipt → SettlementIntent(s)
+        let receipt_store_hook = receipt_store.clone();
+        let on_allocation_accepted = {
+            use icn_governance::{check_execution_gate, GovernanceDecisionReceipt};
+            use icn_kernel_api::{
+                economics::SettlementIntent, receipts::AllocationReceipt, ScopeLevel,
+            };
+            std::sync::Arc::new(
+                move |receipt: GovernanceDecisionReceipt,
+                      recipients: Vec<icn_governance::AllocationEntry>,
+                      unit: String,
+                      _total_amount: u64,
+                      domain_id: String| {
+                    if let Err(e) = check_execution_gate(&receipt) {
+                        tracing::warn!(
+                            decision_hash = ?receipt.decision_hash,
+                            error = %e,
+                            "ExecutionReceiptGate rejected AllocationProposal — receipt not written"
+                        );
+                        return;
+                    }
+
+                    let now = icn_time::current_timestamp_secs();
+                    let decision_hash = receipt.decision_hash;
+
+                    let intents: Vec<SettlementIntent> = recipients
+                        .iter()
+                        .map(|entry| {
+                            SettlementIntent::new(
+                                entry.recipient.to_string(),
+                                decision_hash,
+                                domain_id.clone(),
+                                entry.recipient.as_str(),
+                                entry.amount,
+                                unit.clone(),
+                            )
+                            .with_timestamp(now)
+                        })
+                        .collect();
+
+                    let allocation_receipt = AllocationReceipt::new(decision_hash, ScopeLevel::Org)
+                        .with_intents(intents)
+                        .with_timestamp(now)
+                        .with_receipt_id(uuid::Uuid::new_v4().to_string());
+
+                    match receipt_store_hook.put_allocation(&allocation_receipt) {
+                        Ok(hash) => {
+                            tracing::info!(
+                                decision_hash = ?decision_hash,
+                                receipt_hash = ?hash,
+                                "AllocationReceipt stored (receipt chain complete)"
+                            );
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                decision_hash = ?decision_hash,
+                                error = %e,
+                                "Failed to store AllocationReceipt (non-fatal)"
+                            );
+                        }
+                    }
+                },
+            )
+        };
+
         // Create governance context for apps/governance HTTP handlers.
         // GatewayEventAdapter wires the domain emitter to the WebSocket broadcaster.
         //
@@ -821,6 +894,7 @@ impl GatewayServer {
             manager: governance_manager.clone(),
             emitter: GatewayEventAdapter::new(event_broadcaster.clone()),
             on_charter_accepted: self.charter_accepted_hook,
+            on_allocation_accepted: Some(on_allocation_accepted),
         };
 
         // Create rate limiter with configured or default config

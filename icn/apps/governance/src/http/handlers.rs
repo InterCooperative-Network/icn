@@ -1025,6 +1025,44 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
                 hook(charter_id.clone(), charter_yaml.clone());
             }
         }
+
+        // On allocation acceptance: produce AllocationReceipt via ExecutionReceiptGate.
+        if let icn_governance::ProposalPayload::AllocationProposal {
+            ref recipients,
+            ref unit,
+            total_amount,
+            ..
+        } = proposal.payload
+        {
+            if let Some(hook) = &ctx.on_allocation_accepted {
+                match ctx.manager.get_proof(&proposal_id).await {
+                    Ok(Some(proof)) => {
+                        hook(
+                            proof.receipt,
+                            recipients.clone(),
+                            unit.clone(),
+                            total_amount,
+                            proposal.domain_id.0.clone(),
+                        );
+                    }
+                    Ok(None) => {
+                        tracing::warn!(
+                            proposal_id = %proposal_id.0,
+                            "AllocationProposal accepted but no GovernanceDecisionReceipt found \
+                             — AllocationReceipt not written"
+                        );
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            proposal_id = %proposal_id.0,
+                            error = %e,
+                            "Failed to retrieve proof for AllocationProposal — AllocationReceipt \
+                             not written"
+                        );
+                    }
+                }
+            }
+        }
     }
 
     ctx.emitter
