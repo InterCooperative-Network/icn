@@ -20,6 +20,7 @@ env:
   GATE_RATCHET_PHASE_COVERAGE: observational
   GATE_RATCHET_PHASE_SDK_TESTS: warning
   GATE_RATCHET_PHASE_A11Y: warning
+  GATE_RATCHET_PHASE_COMPLIANCE: warning
   # Scope controls for staged boundary enforcement
   GATE_RATCHET_KERNEL_DEPS_SCOPE: core-only
 
@@ -244,6 +245,36 @@ jobs:
           if [ "$PHASE" = "blocking" ]; then
             echo "::error title=Firewall contract (blocking)::Failing CI because phase=blocking and firewall contract violations were detected."
             echo "BLOCKING: failing CI due to firewall contract violations"
+            exit 1
+          fi
+
+          echo "Non-blocking phase ($PHASE): allowing CI to continue"
+          exit 0
+
+  compliance-linter:
+    name: Regulatory Compliance Linter
+    needs: [changes]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Run compliance linter
+        run: |
+          set -euo pipefail
+          if python3 .github/scripts/compliance_linter.py; then
+            echo "Compliance linter passed"
+            exit 0
+          fi
+
+          PHASE="${GATE_RATCHET_PHASE_COMPLIANCE}"
+          echo "Ratchet phase: $PHASE"
+          if [ "$PHASE" != "observational" ]; then
+            echo "::warning title=Compliance violations detected::Forbidden terminology in public API surfaces. Phase=$PHASE. See docs/dev/language-guide.md"
+          fi
+          echo "WARNING: Compliance violations detected. See docs/dev/language-guide.md"
+          if [ "$PHASE" = "blocking" ]; then
+            echo "::error title=Compliance linter (blocking)::Failing CI because phase=blocking and compliance violations were detected."
+            echo "BLOCKING: failing CI due to compliance violations"
             exit 1
           fi
 
