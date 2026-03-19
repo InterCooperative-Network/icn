@@ -48,15 +48,19 @@ fn make_allocation_hook(
         let intents: Vec<SettlementIntent> = recipients
             .iter()
             .map(|entry| {
-                SettlementIntent::new(
-                    entry.recipient.to_string(),
+                let intent = SettlementIntent::new(
+                    receipt.proposal_id.clone(),
                     decision_hash,
                     domain_id.clone(),
                     entry.recipient.as_str(),
                     entry.amount,
                     unit.clone(),
                 )
-                .with_timestamp(now)
+                .with_timestamp(now);
+                match &entry.memo {
+                    Some(m) => intent.with_memo(m.clone()),
+                    None => intent,
+                }
             })
             .collect();
 
@@ -66,7 +70,7 @@ fn make_allocation_hook(
             .with_receipt_id(uuid::Uuid::new_v4().to_string());
 
         store
-            .put_allocation(&allocation_receipt)
+            .put_allocation_with_intents(&allocation_receipt)
             .expect("failed to store AllocationReceipt");
     }
 }
@@ -161,11 +165,20 @@ fn test_allocation_proposal_produces_receipt_chain() {
         "expected 1 SettlementIntent per AllocationEntry recipient"
     );
 
-    // Each intent carries the same decision_hash (provenance anchor)
+    // Each intent carries the same decision_hash (provenance anchor) and
+    // decision_receipt_id that points back to the governance proposal (not the recipient DID).
     for intent in &receipt.intents {
         assert_eq!(
             intent.decision_hash, decision_hash,
             "SettlementIntent.decision_hash must chain back to governance decision"
+        );
+        assert_eq!(
+            intent.decision_receipt_id, "proposal-q1-patronage-2026",
+            "SettlementIntent.decision_receipt_id must be the governance proposal ID"
+        );
+        assert!(
+            intent.memo.is_some(),
+            "SettlementIntent.memo must be propagated from AllocationEntry"
         );
     }
 
@@ -184,6 +197,20 @@ fn test_allocation_proposal_produces_receipt_chain() {
         by_decision[0].canonical_hash(),
         receipt.canonical_hash(),
         "canonical hash must be stable across lookup paths"
+    );
+
+    // ── Verify: intents are indexed by decision_hash ──────────────────────────
+    // put_allocation_with_intents must write intents to the intent index so that
+    // /v1/receipts/intents and get_chain_by_decision return populated results.
+
+    let intents_by_decision = receipt_store
+        .list_intents_by_decision(&decision_hash)
+        .expect("failed to query intents by decision hash");
+
+    assert_eq!(
+        intents_by_decision.len(),
+        2,
+        "intent index must return 1 SettlementIntent per AllocationEntry"
     );
 }
 
