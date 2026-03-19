@@ -333,7 +333,7 @@ echo ""
 # Register River City in federation (from Finger Lakes CDN's view)
 echo "  Registering River City Tool Library..."
 _do_curl "${FINGERLAKES_URL}/v1/federation/coops" POST \
-  "{\"coop_id\":\"${RIVERCITY_COOP_ID}\",\"name\":\"River City Tool Library\",\"public_did\":\"${RIVERCITY_NODE_DID}\"}" \
+  "{\"coop_id\":\"${RIVERCITY_COOP_ID}\",\"name\":\"River City Tool Library\",\"public_did\":\"${RIVERCITY_NODE_DID}\",\"gateway_endpoints\":[]}" \
   "$FINGERLAKES_TOKEN"
 
 if [[ "$DEMO_LAST_HTTP_CODE" =~ ^2 ]]; then
@@ -347,7 +347,7 @@ fi
 # Register BrightWorks in federation
 echo "  Registering BrightWorks Cooperative..."
 _do_curl "${FINGERLAKES_URL}/v1/federation/coops" POST \
-  "{\"coop_id\":\"${BRIGHTWORKS_COOP_ID}\",\"name\":\"BrightWorks Cooperative\",\"public_did\":\"${BRIGHTWORKS_NODE_DID}\"}" \
+  "{\"coop_id\":\"${BRIGHTWORKS_COOP_ID}\",\"name\":\"BrightWorks Cooperative\",\"public_did\":\"${BRIGHTWORKS_NODE_DID}\",\"gateway_endpoints\":[]}" \
   "$FINGERLAKES_TOKEN"
 
 if [[ "$DEMO_LAST_HTTP_CODE" =~ ^2 ]]; then

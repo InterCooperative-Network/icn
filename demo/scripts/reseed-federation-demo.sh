@@ -130,6 +130,41 @@ _get_token() {
 # Helpers
 # ---------------------------------------------------------------------------
 
+# _ensure_federation_init <url> <coop_id> <name> <token>
+# Initializes the federation module if not already initialized.
+# Requires federation:admin scope in token.
+_ensure_federation_init() {
+  local url="$1" coop_id="$2" name="$3" token="$4"
+  local status
+  status=$(curl -s -w "\n%{http_code}" -o /dev/null \
+    -H "Authorization: Bearer $token" \
+    "${url}/v1/federation/status" 2>/dev/null | tail -1 || echo "000")
+  if [ "$status" = "200" ]; then
+    local initialized
+    initialized=$(curl -s -H "Authorization: Bearer $token" \
+      "${url}/v1/federation/status" 2>/dev/null | \
+      python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('initialized','false'))" 2>/dev/null || echo "false")
+    if [ "$initialized" = "True" ] || [ "$initialized" = "true" ]; then
+      aside "  Federation already initialized on ${coop_id} — skipping"
+      _count_skipped
+      return 0
+    fi
+  fi
+  local resp code
+  resp=$(curl -s -w "\n%{http_code}" \
+    -X POST "${url}/v1/federation/init" \
+    -H "Authorization: Bearer $token" \
+    -H "Content-Type: application/json" \
+    -d "{\"coop_id\":\"${coop_id}\",\"name\":\"${name}\"}" 2>/dev/null)
+  code=$(echo "$resp" | tail -1)
+  if [[ "$code" =~ ^2 ]]; then
+    result "  Federation initialized: ${coop_id} (HTTP ${code})"
+    _count_seeded
+  else
+    warn "  Federation init: HTTP ${code} — ${coop_id}"
+  fi
+}
+
 # _coop_exists <url> <coop_id> <token> → 0 if exists, 1 if not
 _coop_exists() {
   local url="$1" coop_id="$2" token="$3"
@@ -415,6 +450,7 @@ seed_brightworks() {
   local token
   token=$(_get_token alpha) || { fail "  Could not get alpha token"; _count_failed; return 1; }
 
+  _ensure_federation_init "$BRIGHTWORKS_URL" "$BRIGHTWORKS_COOP_ID" "BrightWorks Cooperative" "$token"
   _ensure_coop "$BRIGHTWORKS_URL" "$BRIGHTWORKS_COOP_ID" "BrightWorks Cooperative" "$token"
   _update_display_name "$BRIGHTWORKS_URL" "$BRIGHTWORKS_COOP_ID" "$ALPHA_DID" "BrightWorks Cooperative" "$token"
   _ensure_domain "$BRIGHTWORKS_URL" "brightworks-governance" "BrightWorks Governance" "$ALPHA_DID" "$token"
@@ -443,6 +479,7 @@ seed_rivercity() {
   local token
   token=$(_get_token beta) || { fail "  Could not get beta token"; _count_failed; return 1; }
 
+  _ensure_federation_init "$RIVERCITY_URL" "$RIVERCITY_COOP_ID" "River City Tool Library" "$token"
   _ensure_coop "$RIVERCITY_URL" "$RIVERCITY_COOP_ID" "River City Tool Library" "$token"
   _update_display_name "$RIVERCITY_URL" "$RIVERCITY_COOP_ID" "$BETA_DID" "River City Tool Library" "$token"
   _ensure_domain "$RIVERCITY_URL" "rivercity-governance" "River City Governance" "$BETA_DID" "$token"
@@ -461,6 +498,7 @@ seed_harborhomes() {
   local token
   token=$(_get_token gamma) || { fail "  Could not get gamma token"; _count_failed; return 1; }
 
+  _ensure_federation_init "$HARBOR_URL" "$HARBOR_COOP_ID" "Harbor Homes Cooperative" "$token"
   _ensure_coop "$HARBOR_URL" "$HARBOR_COOP_ID" "Harbor Homes Cooperative" "$token"
   _update_display_name "$HARBOR_URL" "$HARBOR_COOP_ID" "$GAMMA_DID" "Harbor Homes Cooperative" "$token"
   _ensure_domain "$HARBOR_URL" "harborhomes-governance" "Harbor Homes Governance" "$GAMMA_DID" "$token"
@@ -479,6 +517,7 @@ seed_fingerlakes() {
   local token
   token=$(_get_token delta) || { fail "  Could not get delta token"; _count_failed; return 1; }
 
+  _ensure_federation_init "$FINGERLAKES_URL" "$FINGERLAKES_COOP_ID" "Finger Lakes Cooperative Development Network" "$token"
   _ensure_coop "$FINGERLAKES_URL" "$FINGERLAKES_COOP_ID" "Finger Lakes Cooperative Development Network" "$token"
   _update_display_name "$FINGERLAKES_URL" "$FINGERLAKES_COOP_ID" "$DELTA_DID" "Finger Lakes CDN" "$token"
   _ensure_domain "$FINGERLAKES_URL" "fingerlakes-governance" "Finger Lakes Governance" "$DELTA_DID" "$token"
