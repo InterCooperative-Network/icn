@@ -668,6 +668,31 @@ pub enum ProposalPayload {
         /// Complete YAML charter document (CCL format, schema_version: v0).
         charter_yaml: String,
     },
+
+    // === Participatory Budgeting (Receipt Chain) ===
+    /// Multi-recipient allocation proposal for participatory budgeting.
+    ///
+    /// When accepted, produces an `AllocationReceipt` containing one
+    /// `SettlementIntent` per recipient. The receipt is anchored to the
+    /// governance `decision_hash`, closing the provenance chain:
+    ///
+    /// `AllocationProposal` → vote → `GovernanceDecisionReceipt`
+    ///   → `AllocationReceipt` → `SettlementIntent`(s) → ledger entry
+    ///
+    /// This is the structurally-typed alternative to `ProposalPayload::Text`
+    /// for budget distributions. Unlike `SurplusAllocation` (which is coupled
+    /// to `icn_ledger::SurplusAllocation`), this payload is self-contained and
+    /// can be produced by any governance domain.
+    AllocationProposal {
+        /// Total amount being distributed (must equal sum of recipient amounts)
+        total_amount: u64,
+        /// Currency or unit symbol (e.g. "credits", "ICN", "USD")
+        unit: String,
+        /// Human-readable formula or basis for this allocation (included in audit trail)
+        formula: String,
+        /// Recipient allocations (one SettlementIntent per entry on acceptance)
+        recipients: Vec<AllocationEntry>,
+    },
 }
 
 impl ProposalPayload {
@@ -695,6 +720,7 @@ impl ProposalPayload {
             ProposalPayload::Federation(_) => "federation",
             ProposalPayload::ResourceAccess { .. } => "resource_access",
             ProposalPayload::Charter { .. } => "charter",
+            ProposalPayload::AllocationProposal { .. } => "allocation_proposal",
         }
     }
 
@@ -718,6 +744,21 @@ impl ProposalPayload {
     pub fn is_emergency(&self) -> bool {
         self.emergency_type().is_some()
     }
+}
+
+/// A single recipient entry in an `AllocationProposal`.
+///
+/// Each entry produces one `SettlementIntent` when the proposal is accepted.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AllocationEntry {
+    /// Recipient DID
+    pub recipient: Did,
+    /// Amount to allocate in the proposal's unit
+    pub amount: u64,
+    /// Optional labor hours or participation basis for audit provenance
+    pub basis_hours: Option<u64>,
+    /// Optional human-readable memo (included in receipt provenance)
+    pub memo: Option<String>,
 }
 
 /// Treasury operations that require governance approval
@@ -2598,5 +2639,62 @@ mod tests {
             proposal.scope,
             ProposalScope::Federation("my-fed".to_string())
         );
+    }
+
+    #[test]
+    fn test_allocation_proposal() {
+        let kp = KeyPair::generate().unwrap();
+        let did = kp.did().clone();
+        let domain_id = GovernanceDomainId::new("brightworks-governance");
+
+        let recipient_a = KeyPair::generate().unwrap();
+        let recipient_b = KeyPair::generate().unwrap();
+
+        let payload = ProposalPayload::AllocationProposal {
+            total_amount: 3_840,
+            unit: "credits".to_string(),
+            formula: "(member_hours / 524) * 3840".to_string(),
+            recipients: vec![
+                AllocationEntry {
+                    recipient: recipient_a.did().clone(),
+                    amount: 2_000,
+                    basis_hours: Some(274),
+                    memo: Some("Q1 labor contribution".to_string()),
+                },
+                AllocationEntry {
+                    recipient: recipient_b.did().clone(),
+                    amount: 1_840,
+                    basis_hours: Some(250),
+                    memo: None,
+                },
+            ],
+        };
+
+        let proposal = Proposal::new(
+            domain_id,
+            did,
+            "Q1 2026 Patronage Distribution".to_string(),
+            "Distribute Q1 surplus proportionally to labor hours".to_string(),
+            payload,
+        );
+
+        assert_eq!(proposal.payload.type_name(), "allocation_proposal");
+        assert!(!proposal.payload.is_emergency());
+
+        let ProposalPayload::AllocationProposal {
+            total_amount,
+            unit,
+            recipients,
+            ..
+        } = &proposal.payload
+        else {
+            panic!("expected AllocationProposal");
+        };
+        assert_eq!(*total_amount, 3_840);
+        assert_eq!(unit, "credits");
+        assert_eq!(recipients.len(), 2);
+        assert_eq!(recipients[0].amount + recipients[1].amount, 3_840);
+        assert_eq!(recipients[0].basis_hours, Some(274));
+        assert!(recipients[1].memo.is_none());
     }
 }

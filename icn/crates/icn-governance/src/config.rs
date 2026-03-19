@@ -140,7 +140,8 @@ impl GovernanceConfig {
             | ProposalPayload::BondIssuance { .. }
             | ProposalPayload::Federation(_)
             | ProposalPayload::ResourceAccess { .. }
-            | ProposalPayload::Charter { .. } => ProposalThresholds::new(
+            | ProposalPayload::Charter { .. }
+            | ProposalPayload::AllocationProposal { .. } => ProposalThresholds::new(
                 self.params.quorum_percentage,
                 self.params.approval_threshold_percentage,
             ),

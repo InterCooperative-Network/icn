@@ -126,9 +126,9 @@ pub use proof::{
     ProofOutcome,
 };
 pub use proposal::{
-    DataSharingLevel, DisputeResolutionMethod, DisputeResolutionOutcome, FederationProposal,
-    FederationTerms, ForcedOutcome, MembershipAction, Proposal, ProposalId, ProposalPayload,
-    ProposalScope, ProposalState, ResourceAccessAction, TreasuryApprovalType,
+    AllocationEntry, DataSharingLevel, DisputeResolutionMethod, DisputeResolutionOutcome,
+    FederationProposal, FederationTerms, ForcedOutcome, MembershipAction, Proposal, ProposalId,
+    ProposalPayload, ProposalScope, ProposalState, ResourceAccessAction, TreasuryApprovalType,
     TreasuryProposalOperation, Version,
 };
 pub use resolver::{MembershipResolver, StaticMembershipResolver};
