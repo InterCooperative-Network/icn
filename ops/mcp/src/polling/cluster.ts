@@ -22,9 +22,11 @@ function writeCache(db: Database.Database, key: string, value: unknown): void {
 }
 
 const SERVICE_ENDPOINTS = [
-  { name: "ICN Gateway", url: "http://10.8.10.40:30080/health" },
-  { name: "Pilot UI", url: "http://10.8.10.40:30030" },
-  { name: "Prometheus", url: "http://10.8.10.40:30091/-/healthy" },
+  { name: "ICN Gateway", url: "http://10.8.30.40:30080/v1/health" },
+  { name: "Pilot UI", url: "http://10.8.30.40:30030" },
+  { name: "Prometheus", url: "http://10.8.30.40:30090/-/healthy" },
+  { name: "Grafana", url: "http://10.8.30.40:30300/" },
+  { name: "Registry", url: "http://10.8.30.40:30500/v2/_catalog" },
 ];
 
 function pollOnce(db: Database.Database): void {

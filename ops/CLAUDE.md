@@ -69,4 +69,4 @@ See `state/config/repo-map.json` for the authoritative map. Key relationships:
 - `website/` reads docs directly via path.resolve (no sync script)
 - `icn/` is the Cargo workspace root (not repo root)
 - Worktrees live in `../icn-wt/` on the dev VM
-- K3s cluster: control at `10.8.10.40`, workers at `.41`/`.42`
+- K3s cluster: control at `10.8.30.40`, workers at `.41`/`.42` (VLAN 30, post Feb 2026 migration)
