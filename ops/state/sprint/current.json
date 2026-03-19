@@ -39,10 +39,11 @@
     {
       "id": "s15-t4",
       "title": "feat(governance): AllocationProposal for participatory budgeting (#1311)",
-      "status": "pending",
-      "pr": null,
-      "assignee": null,
-      "epic": "1302"
+      "status": "done",
+      "pr": 1345,
+      "assignee": "claude",
+      "epic": "1302",
+      "evidence": "PR #1345. AllocationOption struct + Allocation variant in ProposalPayload, gateway, RPC. 3 new tests, 468 total pass. Clippy clean."
     },
     {
       "id": "s15-t5",
