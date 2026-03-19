@@ -176,7 +176,10 @@ async fn test_no_proposal_accepted_event_when_no_quorum() -> Result<()> {
     let (actor, _bus, _sub, captured, alice_did) = make_actor().await?;
     let domain_id = GovernanceDomainId::new("gate-test-domain");
 
-    run_proposal(&actor, &domain_id, false, &alice_did /* no votes → NoQuorum */).await?;
+    run_proposal(
+        &actor, &domain_id, false, &alice_did, /* no votes → NoQuorum */
+    )
+    .await?;
 
     let events = captured.lock().expect("lock");
     let accepted: Vec<_> = events
