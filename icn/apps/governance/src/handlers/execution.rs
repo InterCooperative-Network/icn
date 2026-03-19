@@ -230,6 +230,38 @@ pub fn translate_payload_to_effects(
             }
         },
 
+        // Participatory budgeting: create an envelope budget, then allocate per option
+        ProposalPayload::Allocation {
+            pool_amount,
+            unit,
+            options,
+            purpose,
+        } => {
+            let budget_id = format!("alloc-{purpose}");
+            // First effect: governance-backed spending envelope for the pool
+            let mut effects = vec![KernelEffect::Treasury(TreasuryEffect::CreateBudget {
+                treasury_did: String::new(), // Filled by caller context
+                budget_id: budget_id.clone(),
+                total_amount: *pool_amount,
+                currency: unit.clone(),
+                name: purpose.clone(),
+                validity_start: 0,
+                validity_end: u64::MAX,
+                decision_receipt_id: decision_receipt_id.to_string(),
+                decision_hash: decision_hash.to_string(),
+            })];
+            // One Allocate per option — distributes from the pool budget
+            for opt in options {
+                effects.push(KernelEffect::Treasury(TreasuryEffect::Allocate {
+                    treasury_did: String::new(),
+                    budget_id: budget_id.clone(),
+                    amount: opt.requested_amount,
+                    currency: unit.clone(),
+                }));
+            }
+            effects
+        }
+
         // Fallback for unhandled types
         _ => vec![KernelEffect::NoOp {
             reason: format!(
@@ -519,5 +551,100 @@ mod tests {
         }
 
         std::env::remove_var("ICN_USE_EFFECT_PATH");
+    }
+
+    #[test]
+    fn test_translate_allocation_produces_budget_and_allocate_effects() {
+        let recipient_a: Did = "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9"
+            .parse()
+            .expect("valid did");
+        let recipient_b: Did = "did:icn:z8eQZfY3RY75YwQ6MrFCHt9phbi3HGx1caFXE3291ow8t"
+            .parse()
+            .expect("valid did");
+
+        let payload = ProposalPayload::Allocation {
+            pool_amount: 10_000,
+            unit: "compute-hours".to_string(),
+            options: vec![
+                icn_governance::AllocationOption {
+                    label: "Infrastructure".to_string(),
+                    description: "Cluster ops".to_string(),
+                    recipient: recipient_a,
+                    requested_amount: 6_000,
+                },
+                icn_governance::AllocationOption {
+                    label: "Education".to_string(),
+                    description: "Training".to_string(),
+                    recipient: recipient_b,
+                    requested_amount: 4_000,
+                },
+            ],
+            purpose: "q1-budget".to_string(),
+        };
+
+        let effects =
+            translate_payload_to_effects(&payload, "receipt-alloc-1", "decision-hash-alloc-1");
+
+        // 1 CreateBudget + 2 Allocate = 3 effects total
+        assert_eq!(effects.len(), 3, "expected 3 effects, got {effects:?}");
+
+        // First effect: CreateBudget with decision provenance
+        match &effects[0] {
+            KernelEffect::Treasury(TreasuryEffect::CreateBudget {
+                budget_id,
+                total_amount,
+                currency,
+                name,
+                decision_receipt_id,
+                decision_hash,
+                ..
+            }) => {
+                assert_eq!(budget_id, "alloc-q1-budget");
+                assert_eq!(*total_amount, 10_000);
+                assert_eq!(currency, "compute-hours");
+                assert_eq!(name, "q1-budget");
+                assert_eq!(decision_receipt_id, "receipt-alloc-1");
+                assert_eq!(decision_hash, "decision-hash-alloc-1");
+            }
+            other => panic!("expected CreateBudget, got {other:?}"),
+        }
+
+        // Second effect: Allocate for first option
+        match &effects[1] {
+            KernelEffect::Treasury(TreasuryEffect::Allocate {
+                budget_id,
+                amount,
+                currency,
+                ..
+            }) => {
+                assert_eq!(budget_id, "alloc-q1-budget");
+                assert_eq!(*amount, 6_000);
+                assert_eq!(currency, "compute-hours");
+            }
+            other => panic!("expected Allocate for Infrastructure, got {other:?}"),
+        }
+
+        // Third effect: Allocate for second option
+        match &effects[2] {
+            KernelEffect::Treasury(TreasuryEffect::Allocate {
+                budget_id,
+                amount,
+                currency,
+                ..
+            }) => {
+                assert_eq!(budget_id, "alloc-q1-budget");
+                assert_eq!(*amount, 4_000);
+                assert_eq!(currency, "compute-hours");
+            }
+            other => panic!("expected Allocate for Education, got {other:?}"),
+        }
+
+        // No NoOp effects
+        assert!(
+            !effects
+                .iter()
+                .any(|e| matches!(e, KernelEffect::NoOp { .. })),
+            "Allocation must not produce NoOp effects"
+        );
     }
 }
