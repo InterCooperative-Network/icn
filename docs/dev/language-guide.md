@@ -182,9 +182,10 @@ These terms are architecturally accurate and should be used freely:
 
 ## Enforcement
 
-1. **PR checklist** — the CONTRIBUTING.md regulatory invariants checklist includes a language check.
-2. **Code review** — reviewers should flag forbidden terms in any changed API, SDK, or UI file.
-3. **Future CI gate** — a compliance linter (`s14-t19`) will automate detection of forbidden terms
-   in public API surface files.
+1. **CI gate** — the `compliance-linter` job (`.github/scripts/compliance_linter.py`) scans
+   gateway, SDK, and UI files for forbidden terms on every PR. Currently `warning` phase
+   (non-blocking); will ratchet to `blocking` once pre-existing violations are resolved.
+2. **PR checklist** — the CONTRIBUTING.md regulatory invariants checklist includes a language check.
+3. **Code review** — reviewers should flag forbidden terms in any changed API, SDK, or UI file.
 
 **See also**: [Regulatory-Safe Verifiable State Architecture](../design/regulatory-safe-verifiable-state.md)
