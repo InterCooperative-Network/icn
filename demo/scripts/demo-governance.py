@@ -338,9 +338,11 @@ governance:
         years: 2
   decisions:
     - name: ordinary
+      authority: general_assembly
       threshold: simple_majority
       quorum: "0.20 * members"
     - name: constitutional
+      authority: general_assembly
       threshold: two_thirds
       quorum: "0.50 * members"
   delegation:
