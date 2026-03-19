@@ -49,6 +49,7 @@ pub fn create_oracle_with_charter(
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
     use icn_ccl::schema::CclDocument;
