@@ -848,15 +848,19 @@ impl GatewayServer {
                     let intents: Vec<SettlementIntent> = recipients
                         .iter()
                         .map(|entry| {
-                            SettlementIntent::new(
-                                entry.recipient.to_string(),
+                            let intent = SettlementIntent::new(
+                                receipt.proposal_id.clone(),
                                 decision_hash,
                                 domain_id.clone(),
                                 entry.recipient.as_str(),
                                 entry.amount,
                                 unit.clone(),
                             )
-                            .with_timestamp(now)
+                            .with_timestamp(now);
+                            match &entry.memo {
+                                Some(m) => intent.with_memo(m.clone()),
+                                None => intent,
+                            }
                         })
                         .collect();
 
@@ -865,7 +869,7 @@ impl GatewayServer {
                         .with_timestamp(now)
                         .with_receipt_id(uuid::Uuid::new_v4().to_string());
 
-                    match receipt_store_hook.put_allocation(&allocation_receipt) {
+                    match receipt_store_hook.put_allocation_with_intents(&allocation_receipt) {
                         Ok(hash) => {
                             tracing::info!(
                                 decision_hash = ?decision_hash,
