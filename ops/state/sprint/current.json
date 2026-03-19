@@ -48,10 +48,11 @@
     {
       "id": "s15-t5",
       "title": "feat(governance): wire AllocationProposal acceptance to ExecutionReceiptGate",
-      "status": "pending",
-      "pr": null,
-      "assignee": null,
-      "epic": "1147"
+      "status": "done",
+      "pr": 1350,
+      "assignee": "claude",
+      "epic": "1147",
+      "evidence": "PR #1350. Allocation match arm in translate_payload_to_effects() produces CreateBudget + Allocate effects. 1 new test, clippy clean."
     },
     {
       "id": "s15-t6",
