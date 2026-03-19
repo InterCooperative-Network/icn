@@ -355,6 +355,7 @@ async fn test_tool_library_cooperative_vertical_slice() -> Result<()> {
         .submit(GovernanceCommand::CastVote {
             proposal_id: membership_proposal_id.clone(),
             choice: VoteChoice::For,
+            voter: alice.did(),
             comment: Some("Welcome Dave!".to_string()),
         })
         .await?;
@@ -436,6 +437,7 @@ async fn test_tool_library_cooperative_vertical_slice() -> Result<()> {
         .submit(GovernanceCommand::CastVote {
             proposal_id: budget_proposal_id.clone(),
             choice: VoteChoice::For,
+            voter: alice.did(),
             comment: Some("We need this tool".to_string()),
         })
         .await?;

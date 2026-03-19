@@ -125,6 +125,7 @@ async fn run_proposal(
             .submit(GovernanceCommand::CastVote {
                 proposal_id: proposal_id.clone(),
                 choice: VoteChoice::For,
+                voter: alice_did.clone(),
                 comment: None,
             })
             .await?;
