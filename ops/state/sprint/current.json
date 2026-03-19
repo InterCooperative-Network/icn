@@ -84,10 +84,11 @@
     {
       "id": "s15-t9",
       "title": "Close epic #1302 with verified evidence for all 10 sub-items",
-      "status": "pending",
+      "status": "done",
       "pr": null,
-      "assignee": null,
-      "epic": "1302"
+      "assignee": "claude",
+      "epic": "1302",
+      "evidence": "All 10 sub-issues checked off. 8 success criteria verified: no payment terms in API, ProvenanceRef required, ExecutionReceipt proven (vertical slice test PR #1351), PatronageTracker (PR #1325), CommonsResourcePolicy extracted (PR #1348), DelegationManager persisted (PR #1326), 7 invariants in CONTRIBUTING.md, meaning firewall CI passing, compliance linter CI (PR #1349)."
     },
     {
       "id": "s15-t10",
