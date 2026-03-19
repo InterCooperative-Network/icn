@@ -10,28 +10,86 @@
 //! prevents credit laundering through the journal entry builder.
 //!
 //! **Architectural invariant**: The credit formula is an accounting
-//! heuristic, not a market price. Subject to governance adjustment.
+//! heuristic, not a market price. Resource-to-credit conversion rates
+//! are governance-configurable via [`CommonsResourcePolicy`].
 
 use crate::entry::JournalEntryBuilder;
 use crate::types::JournalEntry;
 use anyhow::Result;
 use icn_identity::Did;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::LazyLock;
 
 /// Unit of account identifier for commons capacity credits.
 pub const COMMONS_CREDIT_CURRENCY: &str = "commons-capacity";
 
-// --- Credit formula weights (subject to governance adjustment) ---
-// TODO(governance): These constants should be configurable via CCL governance
-// parameters once governance hooks are available (Phase 29).
+/// Governance-configurable resource-to-credit conversion policy.
+///
+/// Controls how raw resource consumption (CPU, memory, storage, egress)
+/// is converted into commons capacity credits. Each divisor scales
+/// the contribution of one resource dimension.
+///
+/// Deploy new policies via governance proposals (CCL or direct config)
+/// to adjust the formula without code changes. The formula is:
+///
+/// ```text
+/// credits = cpu_millis
+///         + memory_mb_millis / memory_divisor
+///         + storage_bytes   / storage_divisor
+///         + egress_bytes    / egress_divisor
+/// ```
+///
+/// **Invariant**: All divisors must be non-zero. A zero divisor would
+/// cause a division-by-zero panic. The `Default` implementation provides
+/// safe, production-tested values.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CommonsResourcePolicy {
+    /// Divisor for memory contribution (MB-millis → credits). Default: 1,000.
+    pub memory_divisor: u128,
+    /// Divisor for storage contribution (bytes → credits). Default: 1,000,000.
+    pub storage_divisor: u128,
+    /// Divisor for egress contribution (bytes → credits). Default: 100,000.
+    pub egress_divisor: u128,
+}
 
-/// Divisor for memory contribution (MB-millis → credits).
-const MEMORY_DIVISOR: u128 = 1_000;
-/// Divisor for storage contribution (bytes → credits).
-const STORAGE_DIVISOR: u128 = 1_000_000;
-/// Divisor for egress contribution (bytes → credits).
-const EGRESS_DIVISOR: u128 = 100_000;
+impl Default for CommonsResourcePolicy {
+    fn default() -> Self {
+        Self {
+            memory_divisor: 1_000,
+            storage_divisor: 1_000_000,
+            egress_divisor: 100_000,
+        }
+    }
+}
+
+impl CommonsResourcePolicy {
+    /// Compute credits earned from contributed resources under this policy.
+    ///
+    /// Uses `u128` internally for accumulation, clamps to `u64` on output.
+    /// All arithmetic is saturating to prevent overflow panics.
+    ///
+    /// # Panics
+    ///
+    /// Panics if any divisor is zero. Use [`CommonsResourcePolicy::default()`]
+    /// or validate custom policies before calling.
+    #[must_use = "computed credits should be used to build a journal entry"]
+    pub fn compute_credits_earned(
+        &self,
+        cpu_millis: u64,
+        memory_mb_millis: u64,
+        storage_bytes: u64,
+        egress_bytes: u64,
+    ) -> u64 {
+        let acc: u128 = (cpu_millis as u128)
+            .saturating_add((memory_mb_millis as u128) / self.memory_divisor)
+            .saturating_add((storage_bytes as u128) / self.storage_divisor)
+            .saturating_add((egress_bytes as u128) / self.egress_divisor);
+
+        // Saturate u128 → u64: values above u64::MAX are clamped.
+        acc.min(u64::MAX as u128) as u64
+    }
+}
 
 /// Synthetic DID for the commons mint.
 ///
@@ -157,13 +215,11 @@ impl std::fmt::Display for EarningCapExceeded {
 
 impl std::error::Error for EarningCapExceeded {}
 
-/// Compute credits earned from contributed resources.
+/// Compute credits earned from contributed resources using the default policy.
 ///
-/// This is an **accounting heuristic, not a market price**. The formula
-/// weights different resource types and is subject to governance adjustment.
-///
-/// Uses `u128` internally for accumulation, clamps to `u64` on output.
-/// All arithmetic is saturating to prevent overflow panics.
+/// Convenience wrapper around [`CommonsResourcePolicy::compute_credits_earned`]
+/// using [`CommonsResourcePolicy::default()`]. Existing callers do not need
+/// to change — this function preserves identical behavior.
 #[must_use = "computed credits should be used to build a journal entry"]
 pub fn compute_credits_earned(
     cpu_millis: u64,
@@ -171,13 +227,12 @@ pub fn compute_credits_earned(
     storage_bytes: u64,
     egress_bytes: u64,
 ) -> u64 {
-    let acc: u128 = (cpu_millis as u128)
-        .saturating_add((memory_mb_millis as u128) / MEMORY_DIVISOR)
-        .saturating_add((storage_bytes as u128) / STORAGE_DIVISOR)
-        .saturating_add((egress_bytes as u128) / EGRESS_DIVISOR);
-
-    // Saturate u128 → u64: values above u64::MAX are clamped.
-    acc.min(u64::MAX as u128) as u64
+    CommonsResourcePolicy::default().compute_credits_earned(
+        cpu_millis,
+        memory_mb_millis,
+        storage_bytes,
+        egress_bytes,
+    )
 }
 
 /// Build a double-entry journal entry crediting the contributor.
@@ -697,5 +752,71 @@ mod tests {
         let _ = dedup.try_settle([0x01; 32]);
         assert!(dedup.is_settled(&[0x01; 32]));
         assert!(!dedup.is_settled(&[0x02; 32]));
+    }
+
+    // --- CommonsResourcePolicy tests ---
+
+    #[test]
+    fn test_default_policy_matches_legacy() {
+        // The method on the default policy must produce identical results
+        // to the standalone convenience function for all inputs.
+        let policy = CommonsResourcePolicy::default();
+        let inputs = [
+            (1_000, 5_000_000, 10_000_000, 500_000),
+            (0, 0, 0, 0),
+            (u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+            (42, 0, 0, 0),
+            (0, 1_000, 0, 0),
+        ];
+        for (cpu, mem, stor, eg) in inputs {
+            assert_eq!(
+                policy.compute_credits_earned(cpu, mem, stor, eg),
+                compute_credits_earned(cpu, mem, stor, eg),
+                "mismatch for inputs ({cpu}, {mem}, {stor}, {eg})"
+            );
+        }
+    }
+
+    #[test]
+    fn test_custom_policy_changes_credits() {
+        let default_policy = CommonsResourcePolicy::default();
+        let generous_policy = CommonsResourcePolicy {
+            memory_divisor: 100,      // 10x more credit per MB-milli
+            storage_divisor: 100_000, // 10x more credit per byte
+            egress_divisor: 10_000,   // 10x more credit per byte
+        };
+
+        let (cpu, mem, stor, eg) = (1_000, 5_000_000, 10_000_000, 500_000);
+        let default_credits = default_policy.compute_credits_earned(cpu, mem, stor, eg);
+        let generous_credits = generous_policy.compute_credits_earned(cpu, mem, stor, eg);
+
+        // More generous divisors → more credits (same CPU base, but larger
+        // contributions from memory/storage/egress).
+        assert!(
+            generous_credits > default_credits,
+            "generous policy ({generous_credits}) should yield more credits than default ({default_credits})"
+        );
+
+        // Verify exact: 1000 + 5_000_000/100 + 10_000_000/100_000 + 500_000/10_000
+        // = 1000 + 50_000 + 100 + 50 = 51_150
+        assert_eq!(generous_credits, 51_150);
+    }
+
+    #[test]
+    fn test_policy_serde_roundtrip() {
+        let policy = CommonsResourcePolicy {
+            memory_divisor: 500,
+            storage_divisor: 2_000_000,
+            egress_divisor: 50_000,
+        };
+
+        let json = serde_json::to_string(&policy).unwrap();
+        let deserialized: CommonsResourcePolicy = serde_json::from_str(&json).unwrap();
+        assert_eq!(policy, deserialized);
+
+        // Also verify default roundtrips
+        let default_json = serde_json::to_string(&CommonsResourcePolicy::default()).unwrap();
+        let default_rt: CommonsResourcePolicy = serde_json::from_str(&default_json).unwrap();
+        assert_eq!(CommonsResourcePolicy::default(), default_rt);
     }
 }

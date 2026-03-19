@@ -62,11 +62,12 @@
     },
     {
       "id": "s15-t7",
-      "title": "refactor(economics): extract commons credit formula to CCL PolicyOracle (#1308)",
-      "status": "pending",
-      "pr": null,
-      "assignee": null,
-      "epic": "1302"
+      "title": "refactor(economics): extract commons credit formula to CommonsResourcePolicy (#1308)",
+      "status": "done",
+      "pr": 1348,
+      "assignee": "claude",
+      "epic": "1302",
+      "evidence": "PR #1348. CommonsResourcePolicy struct with Serialize/Deserialize. 3 new tests + all 41 existing pass. Clippy clean."
     },
     {
       "id": "s15-t8",

@@ -144,7 +144,8 @@ pub use events::{
 // Commons credit accounting
 pub use commons_credits::{
     build_earn_entry, build_spend_entry, check_sufficient_balance, compute_credits_earned,
-    EarningCapExceeded, EarningTracker, InsufficientCredits, COMMONS_CREDIT_CURRENCY,
+    CommonsResourcePolicy, EarningCapExceeded, EarningTracker, InsufficientCredits,
+    COMMONS_CREDIT_CURRENCY,
 };
 
 // Exchange rate oracle
