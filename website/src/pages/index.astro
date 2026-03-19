@@ -28,7 +28,7 @@ const commitUrl = 'https://github.com/InterCooperative-Network/icn/commits/main'
 
         <p>
           ICN is democratic infrastructure for cooperatives, communities, and federations.
-          Charter your org, run democratic votes, manage your treasury, and federate with peers —
+          Charter your org, run democratic votes, coordinate your finances, and federate with peers —
           on infrastructure no one owns but everyone runs.
         </p>
 
@@ -66,17 +66,17 @@ const commitUrl = 'https://github.com/InterCooperative-Network/icn/commits/main'
         <div class="use-case-card card card-accent-teal animate-in">
           <div class="card-icon">🏛️</div>
           <h3>Form a Cooperative</h3>
-          <p>Three members, one vote, five minutes. Generate self-sovereign DIDs, submit a founding charter, and open a treasury. Your governance data lives on infrastructure you run.</p>
+          <p>Three people. One charter. Five minutes. Each member gets a cryptographic identity they control. Submit your founding rules, open your treasury, and start governing. No platform account required. No landlord.</p>
           <div class="card-footer">
-            <span class="tech-pill">DID · Ed25519</span>
-            <span class="tech-pill">Charter · CCL</span>
+            <span class="tech-pill">Identity · Crypto</span>
+            <span class="tech-pill">Charter · Bylaws</span>
           </div>
         </div>
 
         <div class="use-case-card card card-accent-amber animate-in animate-delay-1">
           <div class="card-icon">🗳️</div>
           <h3>Run Democratic Votes</h3>
-          <p>Any member can propose. Any member can close. Every decision produces a cryptographic receipt with a vote hash you can verify forever — not a spreadsheet in someone's inbox.</p>
+          <p>Any member proposes. Any member votes. Every decision produces a verifiable receipt — not a spreadsheet in someone's inbox. Six months later, you can prove exactly what was decided and who voted.</p>
           <div class="card-footer">
             <span class="tech-pill">Proposals · Tally</span>
             <span class="tech-pill">Receipts · Proofs</span>
@@ -154,10 +154,10 @@ const commitUrl = 'https://github.com/InterCooperative-Network/icn/commits/main'
     <div class="container">
       <div class="section-header">
         <span class="badge badge-teal">The Architecture</span>
-        <h2>Not a blockchain. Not a server.<br/>A <span class="shimmer-text">coordination substrate.</span></h2>
+        <h2>Not a blockchain. Not a server.<br/><span class="shimmer-text">A coordination engine.</span></h2>
         <p>
-          ICN is a P2P daemon. Cooperative apps translate governance into generic constraints.
-          The kernel enforces them without understanding their meaning.
+          ICN runs as a peer-to-peer service. Your co-op's rules get translated into enforceable constraints.
+          The engine enforces them mechanically — it doesn't interpret what they mean, it just makes sure they're followed.
           This is the <strong style="color: var(--text-heading)">Meaning Firewall</strong>.
         </p>
       </div>
@@ -204,9 +204,9 @@ const commitUrl = 'https://github.com/InterCooperative-Network/icn/commits/main'
       <div class="dev-grid">
         <div class="dev-text">
           <span class="badge badge-teal">For Developers</span>
-          <h2>34 crates.<br/>Zero central servers.</h2>
+          <h2>Pure Rust.<br/>Zero central servers.</h2>
           <p>
-            ICN is built in Rust — 34 crates, zero central servers.
+            ICN is built entirely in Rust. No central servers, no runtime dependencies on anyone else's infrastructure.
             Three binaries: <code>icnd</code> (daemon), <code>icn-cli</code> (tooling), and a gateway.
             Core subsystems organized around the Meaning Firewall.
           </p>
@@ -244,9 +244,9 @@ const commitUrl = 'https://github.com/InterCooperative-Network/icn/commits/main'
     <div class="container">
       <div class="section-header">
         <span class="badge badge-purple">Digital Public Infrastructure</span>
-        <h2>Not a startup. Not a protocol.<br/><span class="gradient-text-warm">A cooperative operating system.</span></h2>
+        <h2>Not a startup. Not a protocol.<br/><span class="gradient-text-warm">Infrastructure for the cooperative economy.</span></h2>
         <p>
-          ICN is designed to replace extractive platforms with cooperative ownership at every layer —
+          ICN replaces extractive platforms with cooperative ownership at every layer —
           from the individual co-op to municipal governance. Four stages, built in sequence.
         </p>
       </div>
@@ -283,7 +283,7 @@ const commitUrl = 'https://github.com/InterCooperative-Network/icn/commits/main'
           <div class="stage-num stage-d">D</div>
           <div class="stage-body">
             <h3>Civilization Tools</h3>
-            <p>Municipal governance platforms, participatory budgeting at city scale, public infrastructure coordination, and democratic technology governance.</p>
+            <p>Participatory budgeting at city scale. Municipal governance platforms. Public infrastructure coordination. The long-term vision: democratic technology governance beyond the co-op.</p>
           </div>
         </div>
       </div>
@@ -301,7 +301,7 @@ const commitUrl = 'https://github.com/InterCooperative-Network/icn/commits/main'
         <h2>Build the cooperative internet.</h2>
         <p>
           Contribute to infrastructure that replaces extractive systems with cooperative ownership.
-          Program your governance. Democratize your economics. Own the systems that shape your world.
+          Your governance. Your economics. Your infrastructure. No permission required.
         </p>
         <div class="hero-actions" style="justify-content: center;">
           <a href="/docs/GETTING_STARTED" class="btn btn-primary">Get Started →</a>
