@@ -51,11 +51,11 @@ pub struct RpcConfig {
 impl RpcConfig {
     /// Create RPC config from daemon config
     pub fn from_daemon_config(config: &crate::config::Config) -> Self {
-        // SAFETY: 127.0.0.1 is always valid, and rpc_port is u16, so this format always parses
+        // SAFETY: [::1] is always valid, and rpc_port is u16, so this format always parses
         #[allow(clippy::expect_used)]
-        let rpc_addr: SocketAddr = format!("127.0.0.1:{}", config.network.rpc_port)
+        let rpc_addr: SocketAddr = format!("[::1]:{}", config.network.rpc_port)
             .parse()
-            .expect("127.0.0.1:port is always a valid socket address");
+            .expect("[::1]:port is always a valid socket address");
 
         let jwt_secret = if config.gateway.enabled && !config.gateway.jwt_secret.is_empty() {
             Some(config.gateway.jwt_secret.as_bytes().to_vec())

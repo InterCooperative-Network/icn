@@ -93,6 +93,9 @@ impl SecurityConfig {
             "http://127.0.0.1:3000".to_string(),
             "http://127.0.0.1:8080".to_string(),
             "http://127.0.0.1:5173".to_string(), // Vite on 127.0.0.1
+            "http://[::1]:3000".to_string(),
+            "http://[::1]:8080".to_string(),
+            "http://[::1]:5173".to_string(), // Vite on ::1
         ];
 
         // Add custom origins from ICN_CORS_ORIGINS env var (comma-separated)
@@ -498,6 +501,10 @@ mod tests {
             assert!(origins.iter().any(|o| o == "http://127.0.0.1:3000"));
             assert!(origins.iter().any(|o| o == "http://127.0.0.1:8080"));
             assert!(origins.iter().any(|o| o == "http://127.0.0.1:5173"));
+            // Check ::1 variants (dual-stack)
+            assert!(origins.iter().any(|o| o == "http://[::1]:3000"));
+            assert!(origins.iter().any(|o| o == "http://[::1]:8080"));
+            assert!(origins.iter().any(|o| o == "http://[::1]:5173"));
         } else {
             panic!("Development config should use AllowedOrigins");
         }

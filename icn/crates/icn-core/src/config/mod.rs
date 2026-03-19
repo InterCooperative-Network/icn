@@ -111,7 +111,7 @@ impl Default for Config {
                 .join("icn"),
             network: NetworkConfig {
                 mdns_enabled: true,
-                listen_addr: "0.0.0.0:7777".to_string(),
+                listen_addr: "[::]:7777".to_string(),
                 rpc_port: 5601,
                 bootstrap_peers: vec![],
                 stun_servers: default_stun_servers(),
@@ -214,9 +214,11 @@ impl Config {
                 ));
             }
 
-            if self.gateway.bind_addr.starts_with("0.0.0.0") {
+            if self.gateway.bind_addr.starts_with("0.0.0.0")
+                || self.gateway.bind_addr.starts_with("[::]:")
+            {
                 warnings.push(
-                    "Gateway binding to 0.0.0.0 - ensure proper firewall/reverse proxy in production"
+                    "Gateway binding to all interfaces - ensure proper firewall/reverse proxy in production"
                         .to_string(),
                 );
             }
@@ -588,7 +590,7 @@ burst_capacity = 3
         let config = GatewayConfig::default();
 
         assert!(!config.enabled); // Disabled by default
-        assert_eq!(config.bind_addr, "127.0.0.1:8080");
+        assert_eq!(config.bind_addr, "[::1]:8080");
         assert_eq!(config.token_expiry_hours, 24);
         assert_eq!(config.challenge_ttl_minutes, 5);
         assert_eq!(config.jwt_secret, "");
@@ -619,7 +621,7 @@ jwt_secret = "test-secret"
 
         // Verify gateway config is present and has defaults
         assert!(!config.gateway.enabled);
-        assert_eq!(config.gateway.bind_addr, "127.0.0.1:8080");
+        assert_eq!(config.gateway.bind_addr, "[::1]:8080");
 
         // Serialize to TOML
         let toml_str = toml::to_string_pretty(&config).unwrap();
@@ -628,7 +630,7 @@ jwt_secret = "test-secret"
         // Deserialize back
         let deserialized: Config = toml::from_str(&toml_str).unwrap();
         assert!(!deserialized.gateway.enabled);
-        assert_eq!(deserialized.gateway.bind_addr, "127.0.0.1:8080");
+        assert_eq!(deserialized.gateway.bind_addr, "[::1]:8080");
     }
 
     #[test]

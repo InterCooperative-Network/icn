@@ -20,7 +20,7 @@ data:
     data_dir = "/data"
 
     [network]
-    listen_addr = "0.0.0.0:7777"
+    listen_addr = "[::]:7777"
     rpc_port = 5601
     mdns_enabled = true
     bootstrap_peers = []
@@ -33,7 +33,7 @@ data:
 
     [gateway]
     enabled = true
-    bind_addr = "0.0.0.0:8080"
+    bind_addr = "[::]:8080"
     # JWT token validity period (1-168 hours typical; longer = more convenience, shorter = more secure)
     token_expiry_hours = 24
     # Auth challenge validity period in minutes (1-15 minutes typical; shorter = more secure)
