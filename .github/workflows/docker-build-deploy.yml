@@ -25,6 +25,8 @@ on:
 env:
   IMAGE_NAME: icn
   IMAGE_TAG: ${{ github.sha }}
+  K3S_CONTROL: 10.8.30.40
+  K3S_REGISTRY: 10.8.30.40:30500
   # Increase rustc stack size to prevent compiler crashes (SIGSEGV) on large crates
   # Error suggested 536870912 (512MB) when 256MB was insufficient
   RUST_MIN_STACK: 536870912
@@ -109,7 +111,7 @@ jobs:
 
       - name: Push to local registry
         run: |
-          REGISTRY="10.8.30.40:30500"
+          REGISTRY="${K3S_REGISTRY}"
 
           echo "Tagging for local registry..."
           docker tag ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} ${REGISTRY}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
@@ -121,16 +123,12 @@ jobs:
 
           echo "✓ Image pushed to local registry"
 
-          # Pull on all nodes via containerd (K3s will do this automatically, but we can pre-pull)
-          echo "Pre-pulling on control node..."
-          sudo k3s ctr images pull --plain-http ${REGISTRY}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
-
-          echo "Pre-pulling on worker nodes..."
-          WORKERS="10.8.30.41 10.8.30.42"
-          for WORKER in $WORKERS; do
-            echo "  → Pulling on $WORKER..."
-            ssh -o BatchMode=yes ubuntu@$WORKER "sudo k3s ctr images pull --plain-http ${REGISTRY}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}" || {
-              echo "  ⚠ Failed to pull on $WORKER (node may be down, K3s will pull on deploy)"
+          # Pre-pull on all K3s nodes via SSH (ci-runner is not a K3s node)
+          K3S_NODES="${K3S_CONTROL} 10.8.30.41 10.8.30.42"
+          for NODE in $K3S_NODES; do
+            echo "Pre-pulling on $NODE..."
+            ssh -o BatchMode=yes ubuntu@$NODE "sudo k3s ctr images pull --plain-http ${REGISTRY}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}" || {
+              echo "  ⚠ Failed to pull on $NODE (node may be down, K3s will pull on deploy)"
             }
           done
 
@@ -139,57 +137,66 @@ jobs:
       - name: Deploy to K3s
         if: ${{ github.event.inputs.deploy != 'false' }}
         run: |
-          echo "Deploying to K3s..."
-          REGISTRY="localhost:30500"
+          echo "Deploying to K3s via SSH to ${K3S_CONTROL}..."
+          REGISTRY="${K3S_REGISTRY}"
           IMAGE="${REGISTRY}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
 
-          # Update main daemon
-          sudo kubectl -n icn set image deployment/icn-daemon icnd=${IMAGE}
+          # All kubectl commands run on the K3s control node via SSH
+          ssh -o BatchMode=yes ubuntu@${K3S_CONTROL} bash -s <<DEPLOY_EOF
+            set -e
+            IMAGE="${IMAGE}"
 
-          # Update coop nodes
-          for COOP in alpha beta gamma delta; do
-            NS="icn-coop-${COOP}"
-            if sudo kubectl get namespace ${NS} &>/dev/null; then
-              echo "Updating icn-${COOP}..."
-              sudo kubectl -n ${NS} set image deployment/icn-${COOP} icnd=${IMAGE} 2>/dev/null || true
-            fi
-          done
+            # Update main daemon
+            sudo kubectl -n icn set image deployment/icn-daemon icnd=\${IMAGE}
 
-          # Restart deployments
-          sudo kubectl -n icn rollout restart deployment/icn-daemon
-          for COOP in alpha beta gamma delta; do
-            NS="icn-coop-${COOP}"
-            if sudo kubectl get namespace ${NS} &>/dev/null; then
-              sudo kubectl -n ${NS} rollout restart deployment/icn-${COOP} 2>/dev/null || true
-            fi
-          done
+            # Update coop nodes
+            for COOP in alpha beta gamma delta; do
+              NS="icn-coop-\${COOP}"
+              if sudo kubectl get namespace \${NS} &>/dev/null; then
+                echo "Updating icn-\${COOP}..."
+                sudo kubectl -n \${NS} set image deployment/icn-\${COOP} icnd=\${IMAGE} 2>/dev/null || true
+              fi
+            done
 
-          echo "✓ Deployment initiated"
+            # Restart deployments
+            sudo kubectl -n icn rollout restart deployment/icn-daemon
+            for COOP in alpha beta gamma delta; do
+              NS="icn-coop-\${COOP}"
+              if sudo kubectl get namespace \${NS} &>/dev/null; then
+                sudo kubectl -n \${NS} rollout restart deployment/icn-\${COOP} 2>/dev/null || true
+              fi
+            done
+
+            echo "✓ Deployment initiated"
+          DEPLOY_EOF
 
       - name: Wait for rollout
         if: ${{ github.event.inputs.deploy != 'false' }}
         run: |
           echo "Waiting for rollout..."
-          sudo kubectl -n icn rollout status deployment/icn-daemon --timeout=180s
+          ssh -o BatchMode=yes ubuntu@${K3S_CONTROL} bash -s <<'ROLLOUT_EOF'
+            set -e
+            sudo kubectl -n icn rollout status deployment/icn-daemon --timeout=180s
 
-          for COOP in alpha beta gamma delta; do
-            NS="icn-coop-${COOP}"
-            if sudo kubectl get namespace ${NS} &>/dev/null; then
-              sudo kubectl -n ${NS} rollout status deployment/icn-${COOP} --timeout=120s 2>/dev/null || true
-            fi
-          done
+            for COOP in alpha beta gamma delta; do
+              NS="icn-coop-${COOP}"
+              if sudo kubectl get namespace ${NS} &>/dev/null; then
+                sudo kubectl -n ${NS} rollout status deployment/icn-${COOP} --timeout=120s 2>/dev/null || true
+              fi
+            done
 
-          echo "✓ Rollout complete"
+            echo "✓ Rollout complete"
+          ROLLOUT_EOF
 
       - name: Show deployment status
         if: always()
         run: |
           echo "=== Pod Status ==="
-          sudo kubectl get pods -A | grep icn || true
+          ssh -o BatchMode=yes ubuntu@${K3S_CONTROL} "sudo kubectl get pods -A | grep icn" || true
 
           echo ""
           echo "=== Recent Events ==="
-          sudo kubectl -n icn get events --sort-by='.lastTimestamp' | tail -10 || true
+          ssh -o BatchMode=yes ubuntu@${K3S_CONTROL} "sudo kubectl -n icn get events --sort-by='.lastTimestamp' | tail -10" || true
 
       - name: Output summary
         run: |
@@ -201,7 +208,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Deployed Pods" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          sudo kubectl get pods -A | grep icn >> $GITHUB_STEP_SUMMARY || echo "No pods found" >> $GITHUB_STEP_SUMMARY
+          ssh -o BatchMode=yes ubuntu@${K3S_CONTROL} "sudo kubectl get pods -A | grep icn" >> $GITHUB_STEP_SUMMARY || echo "No pods found" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
 
   # Cleanup old images (runs weekly)
@@ -213,18 +220,14 @@ jobs:
       - name: Remove old images on all nodes
         run: |
           echo "Cleaning up old images on all nodes..."
-          WORKERS="10.8.30.41 10.8.30.42"
+          K3S_NODES="${K3S_CONTROL} 10.8.30.41 10.8.30.42"
 
-          # Cleanup on control node
-          echo "Cleaning control node..."
-          sudo k3s ctr images ls | grep "docker.io/library/icn:" | sort -r | tail -n +6 | awk '{print $1}' | xargs -r sudo k3s ctr images rm 2>/dev/null || true
-
-          # Cleanup on worker nodes
-          for WORKER in $WORKERS; do
-            echo "Cleaning $WORKER..."
-            ssh -o BatchMode=yes ubuntu@$WORKER "sudo k3s ctr images ls | grep 'docker.io/library/icn:' | sort -r | tail -n +6 | awk '{print \$1}' | xargs -r sudo k3s ctr images rm" 2>/dev/null || true
+          # Cleanup on all K3s nodes via SSH
+          for NODE in $K3S_NODES; do
+            echo "Cleaning $NODE..."
+            ssh -o BatchMode=yes ubuntu@$NODE "sudo k3s ctr images ls | grep 'docker.io/library/icn:' | sort -r | tail -n +6 | awk '{print \$1}' | xargs -r sudo k3s ctr images rm" 2>/dev/null || true
           done
 
-          # Cleanup local docker
+          # Cleanup local docker on ci-runner
           docker image prune -f
           echo "✓ Cleanup complete"
