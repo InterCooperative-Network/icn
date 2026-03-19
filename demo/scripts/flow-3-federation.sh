@@ -333,7 +333,7 @@ echo ""
 # Register River City in federation (from Finger Lakes CDN's view)
 echo "  Registering River City Tool Library..."
 _do_curl "${FINGERLAKES_URL}/v1/federation/coops" POST \
-  "{\"coop_id\":\"${RIVERCITY_COOP_ID}\",\"name\":\"River City Tool Library\",\"did\":\"${RIVERCITY_NODE_DID}\"}" \
+  "{\"coop_id\":\"${RIVERCITY_COOP_ID}\",\"name\":\"River City Tool Library\",\"public_did\":\"${RIVERCITY_NODE_DID}\"}" \
   "$FINGERLAKES_TOKEN"
 
 if [[ "$DEMO_LAST_HTTP_CODE" =~ ^2 ]]; then
@@ -347,7 +347,7 @@ fi
 # Register BrightWorks in federation
 echo "  Registering BrightWorks Cooperative..."
 _do_curl "${FINGERLAKES_URL}/v1/federation/coops" POST \
-  "{\"coop_id\":\"${BRIGHTWORKS_COOP_ID}\",\"name\":\"BrightWorks Cooperative\",\"did\":\"${BRIGHTWORKS_NODE_DID}\"}" \
+  "{\"coop_id\":\"${BRIGHTWORKS_COOP_ID}\",\"name\":\"BrightWorks Cooperative\",\"public_did\":\"${BRIGHTWORKS_NODE_DID}\"}" \
   "$FINGERLAKES_TOKEN"
 
 if [[ "$DEMO_LAST_HTTP_CODE" =~ ^2 ]]; then
@@ -379,9 +379,9 @@ echo "  A vouch says: 'we know this organization, we support this agreement.'"
 echo "  It is NOT a grant of authority."
 echo ""
 
-# Vouch for River City
+# Vouch for River City (target_coop_id in body; path param is also used by the handler)
 _do_curl "${FINGERLAKES_URL}/v1/federation/coops/${RIVERCITY_COOP_ID}/vouch" POST \
-  "{\"attested_by\":\"${FINGERLAKES_NODE_DID}\",\"attestation\":\"River City Tool Library is a known member cooperative in the Finger Lakes CDN network. Active since 2022. Equipment sharing agreement approved by member vote ${RC_PROPOSAL_ID}.\"}" \
+  "{\"target_coop_id\":\"${RIVERCITY_COOP_ID}\",\"trust_score\":0.85,\"expires_in_days\":365}" \
   "$FINGERLAKES_TOKEN"
 
 if [[ "$DEMO_LAST_HTTP_CODE" =~ ^2 ]]; then
@@ -394,7 +394,7 @@ fi
 
 # Vouch for BrightWorks
 _do_curl "${FINGERLAKES_URL}/v1/federation/coops/${BRIGHTWORKS_COOP_ID}/vouch" POST \
-  "{\"attested_by\":\"${FINGERLAKES_NODE_DID}\",\"attestation\":\"BrightWorks Cooperative is a known member cooperative in the Finger Lakes CDN network. Active since 2022. Equipment sharing agreement approved by member vote ${BW_PROPOSAL_ID}.\"}" \
+  "{\"target_coop_id\":\"${BRIGHTWORKS_COOP_ID}\",\"trust_score\":0.85,\"expires_in_days\":365}" \
   "$FINGERLAKES_TOKEN"
 
 if [[ "$DEMO_LAST_HTTP_CODE" =~ ^2 ]]; then
@@ -411,20 +411,23 @@ echo ""
 # ---------------------------------------------------------------------------
 narrate "Step 7: Clearing agreement — tracking value across boundaries"
 _beat "The agreement is now on the network. Every exchange of off-peak equipment access for maintenance hours gets recorded here — not in a spreadsheet, not in someone's email."
-echo "  The clearing agreement is how the federation tracks what's owed"
-echo "  between the two coops over the 90-day term."
+echo "  River City establishes a bilateral clearing agreement with BrightWorks."
+echo "  The clearing layer tracks what's owed between them over the 90-day term."
 echo ""
-echo "  River City provides equipment access (valued in access-hours)."
-echo "  BrightWorks provides maintenance labor (valued in labor-hours)."
-echo "  The clearing layer settles the balance quarterly."
+echo "  River City provides equipment access; BrightWorks provides maintenance labor."
+echo "  Max imbalance: 100 exchange-hours. Settlement: monthly."
 echo ""
 
-_do_curl "${FINGERLAKES_URL}/v1/federation/clearing" POST \
-  "{\"name\":\"River City ↔ BrightWorks Equipment Exchange Q2-2026 (${_DEMO_RUN_TAG})\",\"parties\":[\"${RIVERCITY_COOP_ID}\",\"${BRIGHTWORKS_COOP_ID}\"],\"facilitator\":\"${FINGERLAKES_COOP_ID}\",\"unit\":\"exchange_hours\",\"settlement_period_days\":90,\"description\":\"Clearing agreement for off-peak metalworking access vs. maintenance contribution. River City provides equipment access; BrightWorks provides 20 maintenance hours/quarter. Auto-settles at period close.\"}" \
-  "$FINGERLAKES_TOKEN"
+# Client-generated agreement ID (deterministic for idempotency across demo runs)
+_AGREEMENT_ID="rc-bw-equipment-${_DEMO_RUN_TAG}"
+
+_do_curl "${RIVERCITY_URL}/v1/federation/clearing" POST \
+  "{\"agreement_id\":\"${_AGREEMENT_ID}\",\"partner_coop_id\":\"${BRIGHTWORKS_COOP_ID}\",\"partner_did\":\"${BRIGHTWORKS_NODE_DID}\",\"max_imbalance\":100,\"settlement\":\"monthly\"}" \
+  "$RIVERCITY_TOKEN"
 
 if [[ "$DEMO_LAST_HTTP_CODE" =~ ^2 ]]; then
-  CLEARING_ID=$(_field "id")
+  CLEARING_ID=$(_field "agreement_id")
+  [ -z "$CLEARING_ID" ] && CLEARING_ID=$(_field "id")
   result "Clearing agreement created: ${CLEARING_ID}"
   echo ""
   echo "  Clearing agreement record:"
@@ -432,14 +435,11 @@ if [[ "$DEMO_LAST_HTTP_CODE" =~ ^2 ]]; then
 elif [ "$DEMO_LAST_HTTP_CODE" = "403" ] || [ "$DEMO_LAST_HTTP_CODE" = "401" ]; then
   warn "Clearing creation: HTTP ${DEMO_LAST_HTTP_CODE} — federation:write scope may be limited"
   echo ""
-  echo "  What the clearing agreement would track:"
-  echo "    Parties:     River City Tool Library ↔ BrightWorks Cooperative"
-  echo "    Facilitator: Finger Lakes CDN (visibility, not control)"
-  echo "    Unit:        exchange_hours"
-  echo "    Period:      90 days"
-  echo "    River City:  credits equipment access hours"
-  echo "    BrightWorks: credits maintenance hours"
-  echo "    Settlement:  quarterly automatic netting"
+  echo "  What the clearing agreement tracks:"
+  echo "    From:        River City Tool Library (equipment provider)"
+  echo "    To:          BrightWorks Cooperative (maintenance provider)"
+  echo "    Max balance: 100 exchange-hours"
+  echo "    Settlement:  monthly"
   echo ""
   aside "The clearing schema is implemented — this is a scope constraint in the demo cluster."
   CLEARING_ID="(pending scope fix)"
@@ -459,7 +459,7 @@ if [[ "$CLEARING_ID" =~ ^[0-9a-f-]{20,} ]] 2>/dev/null || \
   _beat ""
   echo ""
 
-  _do_curl "${FINGERLAKES_URL}/v1/federation/clearing/${CLEARING_ID}/position" GET "" "$FINGERLAKES_TOKEN"
+  _do_curl "${RIVERCITY_URL}/v1/federation/clearing/${CLEARING_ID}/position" GET "" "$RIVERCITY_TOKEN"
   if [[ "$DEMO_LAST_HTTP_CODE" =~ ^2 ]]; then
     result "Clearing position (HTTP ${DEMO_LAST_HTTP_CODE}):"
     _pretty
