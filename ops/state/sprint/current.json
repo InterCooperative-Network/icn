@@ -21,11 +21,11 @@
     {
       "id": "s16-t2",
       "title": "fix(demo): update Flow 2/4 scripts for renamed ledger routes (payment→settle, balance→position)",
-      "status": "todo",
-      "pr": null,
+      "status": "done",
+      "pr": 1355,
       "assignee": "claude",
       "epic": "1099",
-      "evidence": null
+      "evidence": "PR #1355. Routes updated: payment→settle, balance→position, currency→unit. All narration text updated."
     },
     {
       "id": "s16-t3",
