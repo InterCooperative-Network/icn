@@ -1,103 +1,68 @@
 {
-  "sprint": 15,
-  "name": "Sprint 15 — Receipt Chain & Demo Truth",
-  "started": "2026-03-20",
+  "sprint": 16,
+  "name": "Sprint 16 — Grant-Ready Demo & K3s Pipeline",
+  "started": "2026-03-19",
   "goals": [
-    "Audit all 4 demo flows on K3s — classify PROVEN/FRAGILE/BROKEN with evidence",
-    "Complete 6-link receipt chain: AllocationProposal → Execution gate wiring → vertical slice test",
-    "Close epic #1302 (regulatory-safe architecture): CCL formula extraction + CI linter",
-    "Support March 31 grant applications with credible demo proof"
+    "Make all 4 demo flows PROVEN on K3s (fix stale route names in demo scripts)",
+    "Fix K3s deploy pipeline (ci-runner → control node SSH)",
+    "Terminology rename: ledger → state change journal in user-facing docs (#1303)",
+    "Package grant-ready artifacts for March 31 deadline (Outta Excuses, Verizon Digital Ready)"
   ],
   "tasks": [
     {
-      "id": "s15-t1",
-      "title": "K3s demo audit: run all 4 flows, classify with evidence, write report",
-      "status": "done",
-      "pr": null,
-      "assignee": "claude",
-      "epic": "1099",
-      "evidence": "docs/status/demo-audit-2026-03-19.md — F1 PROVEN, F2 FRAGILE, F3 PROVEN (post-fix), F4 FRAGILE"
-    },
-    {
-      "id": "s15-t2",
-      "title": "fix(gateway): make decision_hash optional in /v1/receipts/allocations (#1334)",
-      "status": "done",
-      "pr": 1343,
-      "assignee": "claude",
-      "epic": "1302",
-      "evidence": "Merged 2026-03-19. 449 tests pass. Awaiting K3s deploy to verify flows 2/4."
-    },
-    {
-      "id": "s15-t3",
-      "title": "fix(demo): Flow 3 clearing agreement ID extraction (#1335)",
-      "status": "done",
-      "pr": 1344,
-      "assignee": "claude",
-      "epic": "1099",
-      "evidence": "Merged 2026-03-19. Steps 5/6/7 verified 2xx on live K3s. docs/status/demo-audit-2026-03-19-flow3-verified.md"
-    },
-    {
-      "id": "s15-t4",
-      "title": "feat(governance): AllocationProposal for participatory budgeting (#1311)",
-      "status": "done",
-      "pr": 1345,
-      "assignee": "claude",
-      "epic": "1302",
-      "evidence": "PR #1345. AllocationOption struct + Allocation variant in ProposalPayload, gateway, RPC. 3 new tests, 468 total pass. Clippy clean."
-    },
-    {
-      "id": "s15-t5",
-      "title": "feat(governance): wire AllocationProposal acceptance to ExecutionReceiptGate",
-      "status": "done",
-      "pr": 1350,
-      "assignee": "claude",
-      "epic": "1147",
-      "evidence": "PR #1350. Allocation match arm in translate_payload_to_effects() produces CreateBudget + Allocate effects. 1 new test, clippy clean."
-    },
-    {
-      "id": "s15-t6",
-      "title": "test(core): vertical slice integration test — full receipt chain in CI (#1147)",
-      "status": "done",
-      "pr": 1351,
-      "assignee": "claude",
-      "epic": "1147",
-      "evidence": "PR #1351. End-to-end test: Allocation proposal → vote → gate → effect translation → treasury effects → audit provenance. All 6 links proven."
-    },
-    {
-      "id": "s15-t7",
-      "title": "refactor(economics): extract commons credit formula to CommonsResourcePolicy (#1308)",
-      "status": "done",
-      "pr": 1348,
-      "assignee": "claude",
-      "epic": "1302",
-      "evidence": "PR #1348. CommonsResourcePolicy struct with Serialize/Deserialize. 3 new tests + all 41 existing pass. Clippy clean."
-    },
-    {
-      "id": "s15-t8",
-      "title": "chore(ci): regulatory compliance linter (#1312)",
-      "status": "done",
-      "pr": 1349,
-      "assignee": "claude",
-      "epic": "1302",
-      "evidence": "PR #1349. Python linter + CI job at warning phase. 33 pre-existing violations cataloged. Ratchet to blocking after cleanup."
-    },
-    {
-      "id": "s15-t9",
-      "title": "Close epic #1302 with verified evidence for all 10 sub-items",
-      "status": "done",
-      "pr": null,
-      "assignee": "claude",
-      "epic": "1302",
-      "evidence": "All 10 sub-issues checked off. 8 success criteria verified: no payment terms in API, ProvenanceRef required, ExecutionReceipt proven (vertical slice test PR #1351), PatronageTracker (PR #1325), CommonsResourcePolicy extracted (PR #1348), DelegationManager persisted (PR #1326), 7 invariants in CONTRIBUTING.md, meaning firewall CI passing, compliance linter CI (PR #1349)."
-    },
-    {
-      "id": "s15-t10",
-      "title": "feat(cli): icnctl audit verify — receipt chain verification command (Tier 2)",
+      "id": "s16-t1",
+      "title": "Merge PR #1354 + close Sprint 15",
       "status": "done",
       "pr": 1354,
       "assignee": "claude",
       "epic": "1147",
-      "evidence": "PR #1354. icnctl audit verify command with 7 integrity checks, --json output, non-zero exit on failure. All workspace tests pass."
+      "evidence": "PR #1354 merged. Sprint 15 archived to history/sprint-15.json."
+    },
+    {
+      "id": "s16-t2",
+      "title": "fix(demo): update Flow 2/4 scripts for renamed ledger routes (payment→settle, balance→position)",
+      "status": "done",
+      "pr": 1355,
+      "assignee": "claude",
+      "epic": "1099",
+      "evidence": "PR #1355. Routes updated: payment→settle, balance→position, currency→unit. All narration text updated."
+    },
+    {
+      "id": "s16-t3",
+      "title": "fix(ci): K3s deploy pipeline — SSH to control node instead of local k3s CLI",
+      "status": "in-progress",
+      "pr": null,
+      "assignee": "other-agent",
+      "epic": "1099",
+      "evidence": "Root cause: ci-runner (10.8.30.46) lacks k3s CLI and kubeconfig. Another agent working on fix."
+    },
+    {
+      "id": "s16-t4",
+      "title": "K3s redeploy + live demo verification (all 4 flows PROVEN)",
+      "status": "blocked",
+      "pr": null,
+      "assignee": "claude",
+      "epic": "1099",
+      "evidence": null,
+      "blocked_by": ["s16-t2", "s16-t3"]
+    },
+    {
+      "id": "s16-t5",
+      "title": "docs(terminology): rename ledger → state change journal in user-facing text (#1303)",
+      "status": "todo",
+      "pr": null,
+      "assignee": "claude",
+      "epic": "1302",
+      "evidence": null
+    },
+    {
+      "id": "s16-t6",
+      "title": "docs(grants): package grant-ready artifacts for March 31 deadline",
+      "status": "todo",
+      "pr": null,
+      "assignee": "claude",
+      "epic": "1099",
+      "evidence": null
     }
   ],
   "epics": {
