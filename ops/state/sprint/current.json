@@ -58,11 +58,11 @@
     {
       "id": "s16-t6",
       "title": "docs(grants): package grant-ready artifacts for March 31 deadline",
-      "status": "todo",
-      "pr": null,
+      "status": "done",
+      "pr": 1356,
       "assignee": "claude",
       "epic": "1099",
-      "evidence": null
+      "evidence": "6 modular grant files in docs/strategy/grants/. One-pager, narrative, budget, milestones, compliance, pilot readiness. Assembly guide per funder."
     }
   ],
   "epics": {
