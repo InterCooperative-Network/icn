@@ -102,6 +102,23 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
+      - name: Setup SSH for K3s nodes
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          # Ensure K3s node host keys are in known_hosts
+          for NODE in ${K3S_CONTROL} 10.8.30.41 10.8.30.42; do
+            ssh-keyscan -t ed25519 "$NODE" >> ~/.ssh/known_hosts 2>/dev/null
+          done
+          chmod 600 ~/.ssh/known_hosts
+          # Verify connectivity to control node
+          ssh -o BatchMode=yes -o ConnectTimeout=5 ubuntu@${K3S_CONTROL} "echo 'SSH OK'" || {
+            echo "::error::Cannot SSH to K3s control node at ${K3S_CONTROL}"
+            echo "Ensure ci-runner has an SSH key authorized on the K3s nodes."
+            echo "See: docs/guides/operations/ for key setup instructions."
+            exit 1
+          }
+
       - name: Build Docker image
         run: |
           echo "Building image ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
