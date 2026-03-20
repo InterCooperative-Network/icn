@@ -39,12 +39,11 @@
     {
       "id": "s16-t4",
       "title": "K3s redeploy + live demo verification (all 4 flows PROVEN)",
-      "status": "in-progress",
+      "status": "done",
       "pr": null,
       "assignee": "claude",
       "epic": "1099",
-      "evidence": "Deploy run 23328453265 triggered. Awaiting build completion + rollout.",
-      "blocked_by": []
+      "evidence": "Deploy run 23328453265 passed. All 5 pods running. All 4 flows PROVEN: F1 governance 2xx, F2 settle 201 + position 200, F3 both sides Accepted, F4 6 evidence items."
     },
     {
       "id": "s16-t5",
