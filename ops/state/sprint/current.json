@@ -44,16 +44,16 @@
       "assignee": "claude",
       "epic": "1099",
       "evidence": null,
-      "blocked_by": ["s16-t2", "s16-t3"]
+      "blocked_by": ["s16-t3"]
     },
     {
       "id": "s16-t5",
       "title": "docs(terminology): rename ledger → state change journal in user-facing text (#1303)",
-      "status": "todo",
+      "status": "done",
       "pr": null,
       "assignee": "claude",
       "epic": "1302",
-      "evidence": null
+      "evidence": "Issue #1303 already closed — API surface renames completed in 439a8a2c. Demo scripts updated in PR #1355."
     },
     {
       "id": "s16-t6",
