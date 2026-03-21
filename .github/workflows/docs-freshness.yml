@@ -1,0 +1,159 @@
+name: Documentation Maintenance
+
+on:
+  push:
+    paths:
+      - 'docs/**'
+      - 'ARCHITECTURE.md'
+      - 'README.md'
+      - 'CONTRIBUTING.md'
+      - '.github/workflows/docs-freshness.yml'
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'ARCHITECTURE.md'
+      - 'README.md'
+      - 'CONTRIBUTING.md'
+  schedule:
+    # Sunday at midnight UTC
+    - cron: '0 0 * * 0'
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  lint:
+    name: Lint Architecture Doc
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run architecture linter
+        run: |
+          python3 docs/scripts/lint-arch.py docs/ARCHITECTURE.md --cargo icn/Cargo.toml
+        continue-on-error: false
+
+  freshness:
+    name: Check Documentation Freshness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for git log
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python3 -m pip install tomli
+
+      - name: Check freshness
+        id: freshness
+        run: |
+          python3 docs/scripts/freshness-check.py \
+            --freshness docs/freshness.toml \
+            --status docs/status.toml \
+            --repo . | tee freshness-report.txt
+        continue-on-error: true
+
+      - name: Upload freshness report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: freshness-report
+          path: freshness-report.txt
+          retention-days: 30
+
+      - name: Comment PR with freshness status
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let report = 'Freshness report not available';
+            try { report = fs.readFileSync('freshness-report.txt', 'utf8'); } catch(e) {}
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## Documentation Freshness\n\n\`\`\`\n${report}\n\`\`\``
+            });
+
+  index:
+    name: Generate Documentation Index
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python3 -m pip install tomli
+
+      - name: Generate INDEX.md
+        run: |
+          python3 docs/scripts/generate-index.py --registry docs/registry.toml > docs/INDEX.md.new
+
+      - name: Upload generated INDEX.md
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-index
+          path: docs/INDEX.md.new
+          retention-days: 7
+
+      - name: Check if INDEX.md changed
+        id: check_diff
+        run: |
+          if ! diff -q docs/INDEX.generated.md docs/INDEX.md.new >/dev/null 2>&1; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "INDEX.generated.md is out of date"
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+          rm -f docs/INDEX.md.new
+
+      - name: Report if INDEX.md out of date
+        if: steps.check_diff.outputs.changed == 'true'
+        run: |
+          echo "::warning::docs/INDEX.generated.md is out of date. Run: just index"
+        continue-on-error: true
+
+  summary:
+    name: Documentation CI Summary
+    needs: [lint, freshness, index]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check results
+        run: |
+          if [ "${{ needs.lint.result }}" = "failure" ]; then
+            echo "::error::Documentation lint failed"
+            exit 1
+          fi
+          if [ "${{ needs.freshness.result }}" = "failure" ]; then
+            echo "::warning::Documentation freshness check failed"
+          fi
+          if [ "${{ needs.index.result }}" = "failure" ]; then
+            echo "::error::INDEX.md generation failed"
+            exit 1
+          fi
+
+      - name: Report success
+        if: success()
+        run: |
+          echo "✓ All documentation checks passed"

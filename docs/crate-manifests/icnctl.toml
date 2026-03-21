@@ -1,0 +1,41 @@
+[crate]
+name = "icnctl"
+layer = "binary"
+infection_status = "n/a - binary"
+owner = "core"
+doc_entry = "docs/reference/binaries/icnctl.md"
+status = "active"
+exports_surface = false
+regulated_terms_allowed = false
+primitives = []
+description = "CLI for managing ICNd"
+
+[documentation]
+overview = true
+examples = false
+safety = true
+tests = false
+integration = true
+
+[implementation]
+test_count = 0
+example_count = 0
+unsafe_blocks = 0
+feature_flags = ["post-quantum"]
+dependencies = ["tokio", "tracing", "anyhow", "clap", "clap_complete", "rust-i18n", "sys-locale", "serde", "toml", "zeroize", "serde_json", "rpassword", "dirs", "sha2", "hex", "base64", "rand", "x25519-dalek", "tar", "walkdir", "chrono", "tempfile", "reqwest", "uuid", "qrcode", "image"]
+peer_dependencies = ["icn-core", "icn-identity", "icn-crypto-pq", "icn-store", "icn-trust", "icn-obs", "icn-rpc", "icn-ccl", "icn-ledger", "icn-snapshot", "icn-governance", "icn-federation", "icn-steward", "icn-gateway"]
+
+[publication]
+published_to_crates_io = false
+version = "0.1.0"
+readme_exists = false
+changelog_exists = false
+api_stability = "experimental"
+
+[verification]
+tests_pass = true
+lint_clean = true
+docs_compile = true
+no_forbidden_terms = true
+infection_vectors_documented = false
+capability_leaks_tested = false

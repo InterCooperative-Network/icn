@@ -1,0 +1,50 @@
+# ICN Trust - Documentation Manifest
+
+[crate]
+name = "icn-trust"
+layer = "app"
+infection_status = "clean"
+owner = "core"
+doc_entry = "docs/reference/crates/icn-trust.md"
+status = "stable"
+exports_surface = true
+regulated_terms_allowed = false
+primitives = ["trust", "identity", "capability"]
+description = "Trust and reputation subsystem; capability delegation, trust graphs, reputation scoring"
+
+[documentation]
+overview = true
+examples = true
+safety = true
+tests = true
+integration = true
+
+[implementation]
+test_count = 235
+example_count = 14
+unsafe_blocks = 2
+feature_flags = ["graph-algorithms", "bench"]
+dependencies = ["serde", "serde_json", "thiserror", "petgraph"]
+peer_dependencies = ["icn-kernel-api", "icn-identity", "icn-zkp"]
+
+[publication]
+published_to_crates_io = true
+version = "0.4.2"
+readme_exists = true
+changelog_exists = true
+api_stability = "stable"
+
+[verification]
+tests_pass = true
+lint_clean = true
+docs_compile = true
+no_forbidden_terms = true
+infection_vectors_documented = false
+capability_leaks_tested = true
+
+[notes]
+"App layer: Uses public kernel-api surface via icn-kernel-api."
+"Trust subsystem: Capability delegation, trust graph traversal, reputation aggregation."
+"Tested at scale: 1000+ node testnet runs, no capability leaks detected."
+"Unsafe blocks (2) relate to graph traversal optimization - documented in code."
+"Integration: Works with identity for credentials and governance for threshold-based trust."

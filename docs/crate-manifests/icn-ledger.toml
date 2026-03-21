@@ -1,0 +1,50 @@
+# ICN Ledger - Documentation Manifest
+
+[crate]
+name = "icn-ledger"
+layer = "domain"
+infection_status = "needs-review"
+owner = "core"
+doc_entry = "docs/reference/crates/icn-ledger.md"
+status = "active"
+exports_surface = true
+regulated_terms_allowed = false
+primitives = ["ledger", "capability", "identity"]
+description = "Double-entry mutual credit ledger with receipt chain for auditability"
+
+[documentation]
+overview = true
+examples = false
+safety = false
+tests = true
+integration = false
+
+[implementation]
+# Actual values need verification against codebase
+test_count = 0  # TODO: verify with `cargo test -p icn-ledger -- --list 2>&1 | grep 'test$' | wc -l`
+example_count = 0
+unsafe_blocks = 0  # TODO: verify with `grep -r 'unsafe' icn/crates/icn-ledger/src/ | wc -l`
+feature_flags = []
+dependencies = ["async-trait", "serde", "serde_json", "anyhow", "thiserror", "tracing", "tokio", "bytes", "sha2", "hex", "ed25519-dalek"]
+peer_dependencies = ["icn-encoding", "icn-identity", "icn-entity", "icn-time", "icn-store", "icn-gossip", "icn-kernel-api", "icn-obs", "icn-security"]
+
+[publication]
+published_to_crates_io = false
+version = "0.1.0"
+readme_exists = false
+changelog_exists = false
+api_stability = "unstable"
+
+[verification]
+tests_pass = false  # TODO: verify
+lint_clean = false  # TODO: verify
+docs_compile = false  # TODO: verify
+no_forbidden_terms = true
+infection_vectors_documented = false
+capability_leaks_tested = false
+
+[notes]
+"Domain layer crate implementing the mutual credit ledger."
+"Uses double-entry bookkeeping model with AllocationReceipts."
+"No forbidden terms: Does NOT use 'balance', 'wallet', 'transaction' — uses 'capability-transfer'."
+"Infection status needs review — may have kernel API leaks."

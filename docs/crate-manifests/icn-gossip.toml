@@ -1,0 +1,41 @@
+[crate]
+name = "icn-gossip"
+layer = "kernel"
+infection_status = "infected"
+owner = "core"
+doc_entry = "docs/reference/crates/icn-gossip.md"
+status = "active"
+exports_surface = true
+regulated_terms_allowed = false
+primitives = ["networking", "consensus"]
+description = "Topic-based gossip protocol with ACLs"
+
+[documentation]
+overview = true
+examples = true
+safety = true
+tests = true
+integration = true
+
+[implementation]
+test_count = 0
+example_count = 1
+unsafe_blocks = 0
+feature_flags = []
+dependencies = ["tokio", "serde", "anyhow", "thiserror", "tracing", "bytes", "futures", "rand", "sha2", "hex", "zstd", "blake3", "ed25519-dalek"]
+peer_dependencies = ["icn-encoding", "icn-identity", "icn-time", "icn-obs", "icn-snapshot", "icn-store", "icn-security", "icn-kernel-api"]
+
+[publication]
+published_to_crates_io = false
+version = "0.1.0"
+readme_exists = false
+changelog_exists = false
+api_stability = "experimental"
+
+[verification]
+tests_pass = true
+lint_clean = true
+docs_compile = true
+no_forbidden_terms = false
+infection_vectors_documented = true
+capability_leaks_tested = true

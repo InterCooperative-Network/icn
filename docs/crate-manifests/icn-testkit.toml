@@ -1,0 +1,41 @@
+[crate]
+name = "icn-testkit"
+layer = "kernel"
+infection_status = "needs-review"
+owner = "core"
+doc_entry = "docs/reference/crates/icn-testkit.md"
+status = "active"
+exports_surface = true
+regulated_terms_allowed = false
+primitives = []
+description = "Testing utilities and simulation harness"
+
+[documentation]
+overview = true
+examples = true
+safety = true
+tests = true
+integration = true
+
+[implementation]
+test_count = 0
+example_count = 1
+unsafe_blocks = 0
+feature_flags = []
+dependencies = ["tokio", "futures", "anyhow", "thiserror", "tracing", "portpicker", "rand", "rustls", "hex"]
+peer_dependencies = ["icn-core", "icn-identity", "icn-net", "icn-gossip", "icn-trust", "icn-ledger", "icn-store", "icn-kernel-api"]
+
+[publication]
+published_to_crates_io = false
+version = "0.1.0"
+readme_exists = false
+changelog_exists = false
+api_stability = "experimental"
+
+[verification]
+tests_pass = true
+lint_clean = true
+docs_compile = true
+no_forbidden_terms = true
+infection_vectors_documented = false
+capability_leaks_tested = false

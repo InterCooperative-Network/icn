@@ -1,0 +1,41 @@
+[crate]
+name = "icn-coop"
+layer = "kernel"
+infection_status = "infected"
+owner = "core"
+doc_entry = "docs/reference/crates/icn-coop.md"
+status = "active"
+exports_surface = true
+regulated_terms_allowed = false
+primitives = ["governance", "ledger"]
+description = "Cooperative management and lifecycle"
+
+[documentation]
+overview = true
+examples = false
+safety = true
+tests = true
+integration = true
+
+[implementation]
+test_count = 0
+example_count = 0
+unsafe_blocks = 0
+feature_flags = ["utoipa", "test_deterministic_keys"]
+dependencies = ["serde", "tokio", "thiserror", "tracing", "sled", "chrono", "uuid", "hex", "blake3", "bs58", "utoipa"]
+peer_dependencies = ["icn-encoding", "icn-entity", "icn-identity", "icn-governance", "icn-ledger", "icn-store", "icn-gossip", "icn-trust"]
+
+[publication]
+published_to_crates_io = false
+version = "0.1.0"
+readme_exists = false
+changelog_exists = false
+api_stability = "experimental"
+
+[verification]
+tests_pass = true
+lint_clean = true
+docs_compile = true
+no_forbidden_terms = false
+infection_vectors_documented = true
+capability_leaks_tested = true

@@ -1,0 +1,41 @@
+[crate]
+name = "icn-rpc"
+layer = "kernel"
+infection_status = "needs-review"
+owner = "core"
+doc_entry = "docs/reference/crates/icn-rpc.md"
+status = "active"
+exports_surface = true
+regulated_terms_allowed = false
+primitives = ["networking"]
+description = "JSON-RPC API for daemon communication"
+
+[documentation]
+overview = true
+examples = false
+safety = true
+tests = true
+integration = true
+
+[implementation]
+test_count = 0
+example_count = 0
+unsafe_blocks = 0
+feature_flags = []
+dependencies = ["tokio", "serde", "serde_json", "anyhow", "thiserror", "tracing", "hyper", "hyper-util", "http-body-util", "reqwest", "sha2", "hex", "base64", "uuid", "jsonwebtoken", "ed25519-dalek", "rand", "metrics"]
+peer_dependencies = ["icn-identity", "icn-time", "icn-net", "icn-ledger", "icn-ccl", "icn-gossip", "icn-governance", "icn-compute", "icn-kernel-api", "icn-store", "icn-federation", "icn-coop", "icn-api"]
+
+[publication]
+published_to_crates_io = false
+version = "0.1.0"
+readme_exists = false
+changelog_exists = false
+api_stability = "experimental"
+
+[verification]
+tests_pass = true
+lint_clean = true
+docs_compile = true
+no_forbidden_terms = true
+infection_vectors_documented = false
+capability_leaks_tested = false

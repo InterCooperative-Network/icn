@@ -1,0 +1,41 @@
+[crate]
+name = "icn-governance-actor"
+layer = "app"
+infection_status = "n/a - app layer"
+owner = "core"
+doc_entry = "docs/reference/apps/governance.md"
+status = "active"
+exports_surface = true
+regulated_terms_allowed = false
+primitives = ["governance"]
+description = "ICN Governance Actor — distributed decision-making for the cooperative network"
+
+[documentation]
+overview = true
+examples = false
+safety = true
+tests = true
+integration = true
+
+[implementation]
+test_count = 0
+example_count = 0
+unsafe_blocks = 0
+feature_flags = []
+dependencies = ["async-trait", "tokio", "serde", "serde_json", "anyhow", "uuid", "hex", "blake3", "ed25519-dalek", "actix-web", "utoipa", "sled", "thiserror", "tracing"]
+peer_dependencies = ["icn-kernel-api", "icn-governance", "icn-identity", "icn-entity", "icn-store", "icn-gossip", "icn-federation", "icn-obs", "icn-time", "icn-encoding", "icn-http-kit"]
+
+[publication]
+published_to_crates_io = false
+version = "0.1.0"
+readme_exists = false
+changelog_exists = false
+api_stability = "experimental"
+
+[verification]
+tests_pass = true
+lint_clean = true
+docs_compile = true
+no_forbidden_terms = true
+infection_vectors_documented = false
+capability_leaks_tested = false

@@ -1,0 +1,41 @@
+[crate]
+name = "icn-steward"
+layer = "kernel"
+infection_status = "infected"
+owner = "core"
+doc_entry = "docs/reference/crates/icn-steward.md"
+status = "active"
+exports_surface = true
+regulated_terms_allowed = false
+primitives = ["identity", "governance"]
+description = "SDIS Steward Network - enrollment ceremonies, VUI registry, token issuance"
+
+[documentation]
+overview = true
+examples = false
+safety = true
+tests = true
+integration = true
+
+[implementation]
+test_count = 0
+example_count = 0
+unsafe_blocks = 0
+feature_flags = []
+dependencies = ["tokio", "serde", "serde_json", "ed25519-dalek", "rand", "sha2", "sha3", "hmac", "anyhow", "thiserror", "tracing", "bloomfilter", "hex"]
+peer_dependencies = ["icn-identity", "icn-crypto-pq", "icn-store", "icn-time"]
+
+[publication]
+published_to_crates_io = false
+version = "0.1.0"
+readme_exists = false
+changelog_exists = false
+api_stability = "experimental"
+
+[verification]
+tests_pass = true
+lint_clean = true
+docs_compile = true
+no_forbidden_terms = false
+infection_vectors_documented = true
+capability_leaks_tested = true

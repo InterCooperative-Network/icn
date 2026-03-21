@@ -1,0 +1,41 @@
+[crate]
+name = "icn-ccl"
+layer = "kernel"
+infection_status = "needs-review"
+owner = "core"
+doc_entry = "docs/reference/crates/icn-ccl.md"
+status = "active"
+exports_surface = true
+regulated_terms_allowed = false
+primitives = ["governance", "consensus"]
+description = "Cooperative Contract Language runtime"
+
+[documentation]
+overview = true
+examples = true
+safety = true
+tests = true
+integration = true
+
+[implementation]
+test_count = 0
+example_count = 1
+unsafe_blocks = 0
+feature_flags = []
+dependencies = ["serde", "serde_json", "serde_yaml", "anyhow", "thiserror", "tracing", "tokio", "ed25519-dalek", "sha2", "hex", "blake3"]
+peer_dependencies = ["icn-encoding", "icn-identity", "icn-kernel-api", "icn-time", "icn-ledger", "icn-obs", "icn-store", "icn-trust"]
+
+[publication]
+published_to_crates_io = false
+version = "0.1.0"
+readme_exists = false
+changelog_exists = false
+api_stability = "experimental"
+
+[verification]
+tests_pass = true
+lint_clean = true
+docs_compile = true
+no_forbidden_terms = true
+infection_vectors_documented = false
+capability_leaks_tested = false
