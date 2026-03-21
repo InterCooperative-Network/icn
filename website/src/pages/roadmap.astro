@@ -4,6 +4,7 @@ import Layout from '../layouts/Layout.astro';
 import fs from 'node:fs';
 import { renderMarkdown } from '../lib/markdown';
 import { resolveRepoDoc } from '../lib/paths';
+import roadmap from '../data/roadmap.json';
 
 // Phase history from repo root docs/
 const phaseHistoryPath = resolveRepoDoc('PHASE_HISTORY.md');
@@ -20,47 +21,30 @@ if (fs.existsSync(phaseHistoryPath)) {
         <span class="badge badge-amber">Project Roadmap</span>
         <h1>Development Roadmap</h1>
         <p>ICN is developed in phases, each building on the last. The project has completed 18+ development milestones across identity, networking, governance, economics, and federation.</p>
+        {roadmap.currentSprint && (
+          <p class="sprint-indicator">
+            Active: <strong>Sprint {roadmap.currentSprint.number}</strong> — {roadmap.currentSprint.name}
+          </p>
+        )}
       </div>
     </div>
   </section>
 
-  <!-- Vision roadmap stages -->
+  <!-- Vision roadmap stages (data-driven from src/data/roadmap.json) -->
   <section class="section-alt">
     <div class="container">
       <h2 style="margin-bottom: var(--space-xl);">Product Vision Stages</h2>
       <div class="roadmap-timeline">
-        <div class="timeline-item">
-          <div class="timeline-marker" style="background: var(--accent-teal);"></div>
-          <div class="timeline-content">
-            <span class="badge badge-teal">Stage A — Now</span>
-            <h3>Institution-in-a-Box</h3>
-            <p>Charter templates, guided cooperative formation, membership onboarding, treasury ledger, and proposal-to-vote loop. The minimum viable institution.</p>
+        {roadmap.stages.map((stage) => (
+          <div class="timeline-item">
+            <div class="timeline-marker" style={`background: ${stage.markerColor};`}></div>
+            <div class="timeline-content">
+              <span class={`badge ${stage.badge}`}>{stage.label}</span>
+              <h3>{stage.title}</h3>
+              <p>{stage.description}</p>
+            </div>
           </div>
-        </div>
-        <div class="timeline-item">
-          <div class="timeline-marker" style="background: var(--accent-blue);"></div>
-          <div class="timeline-content">
-            <span class="badge badge-blue">Stage B</span>
-            <h3>Federation Layer</h3>
-            <p>Inter-cooperative agreements with treaty-based governance, cross-group trust propagation, and federation clearing for mutual credit networks.</p>
-          </div>
-        </div>
-        <div class="timeline-item">
-          <div class="timeline-marker" style="background: var(--accent-purple);"></div>
-          <div class="timeline-content">
-            <span class="badge badge-purple">Stage C</span>
-            <h3>Compute Commons</h3>
-            <p>Shared compute resources contributed to a commons and allocated via cooperative fuel metering. Members contribute hardware; the network rewards them with cooperative capacity.</p>
-          </div>
-        </div>
-        <div class="timeline-item">
-          <div class="timeline-marker" style="background: var(--accent-amber);"></div>
-          <div class="timeline-content">
-            <span class="badge" style="background: rgba(251, 191, 36, 0.12); color: var(--accent-amber); border: 1px solid rgba(251, 191, 36, 0.25);">Stage D</span>
-            <h3>Civilization Tools</h3>
-            <p>Participatory budgeting at city scale. Municipal governance platforms. Public infrastructure coordination. The long-term vision: democratic technology governance beyond the co-op.</p>
-          </div>
-        </div>
+        ))}
       </div>
     </div>
   </section>
@@ -123,5 +107,15 @@ if (fs.existsSync(phaseHistoryPath)) {
 
   .timeline-content p {
     margin: 0;
+  }
+
+  .sprint-indicator {
+    margin-top: var(--space-md);
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+  }
+
+  .sprint-indicator strong {
+    color: var(--accent-teal);
   }
 </style>
