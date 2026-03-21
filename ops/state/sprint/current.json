@@ -1,67 +1,68 @@
 {
-  "sprint": 18,
-  "name": "Sprint 18 — IPv6 Connectivity: KnownPeer Endpoint Sets + Happy Eyeballs",
+  "sprint": 19,
+  "name": "Sprint 19 — IPv6 Epic Completion + Pilot Genesis",
   "started": "2026-03-21",
   "goals": [
-    "Close #1342 fully: gossip-layer author validation for compute payment settlement",
-    "KnownPeer endpoint field (#1300): replace Vec<String> with Vec<EndpointCandidate>",
-    "mDNS multi-address (#1298): collect all resolved addresses per peer (advertisement remains single-IP; multi-address advertisement deferred)",
-    "Happy Eyeballs (#1299): race IPv4/IPv6 within address categories (RFC 8305)"
+    "Close Sprint 18: merge PR #1360 (gossip auth) + PR #1363 (Happy Eyeballs)",
+    "Complete Epic #1295: wire Happy Eyeballs into dial_parallel (#1364) + TURN relay IPv6 (#1301)",
+    "Start Pilot Completion (Epic #1099): genesis bundle schema + icnd --init (#1097)",
+    "Close #1120: record auth semantics decision for service discovery GET"
   ],
   "execution_order": [
-    "t1 (#1342) — security gap, always first; gossip-layer entry.author == task.submitter guard",
-    "t2 (#1300) — KnownPeer type change; gates mDNS multi-address usefulness",
-    "t3 (#1298) — mDNS multi-address; needs #1300 for typed storage",
-    "t4 (#1299) — Happy Eyeballs dial racing; separate module, can overlap with t3"
+    "Pre: fix format + tests on S18 PRs, merge, archive sprint board",
+    "t1 (#1364) — small wire-up; can parallel with t2",
+    "t2 (#1301) — TURN relay IPv6; closes Epic #1295",
+    "t4 (#1120) — spec decision only; anytime",
+    "t3 (#1097) — largest; pilot genesis bundle"
   ],
   "tasks": [
     {
-      "id": "s18-t1",
-      "title": "fix(compute): gossip-layer author validation for payer authorization (#1342)",
+      "id": "s19-t1",
+      "title": "feat(net): integrate dial_happy_eyeballs() into dial_parallel() (#1364)",
       "status": "pending",
       "pr": null,
       "assignee": null,
-      "issue": 1342,
+      "issue": 1364,
+      "epic": "1295",
+      "note": "In nat_dial.rs::dial_parallel(), replace single-address per-category dial with dial_happy_eyeballs() calls. For each EndpointKind (Local, Public): collect all addrs, call dial_happy_eyeballs, return (AddrType, SocketAddr) on first success. Relay fallback unchanged. Single-addr fast-path already in dial_happy_eyeballs."
+    },
+    {
+      "id": "s19-t2",
+      "title": "feat(net): TURN relay proxy IPv6 support (#1301)",
+      "status": "pending",
+      "pr": null,
+      "assignee": null,
+      "issue": 1301,
+      "epic": "1295",
+      "note": "relay_proxy.rs: implement xor_encode_address_v6() per RFC 5766 §10.2 (turn.rs decode already correct). Update build_send_indication() to dispatch on addr family. Update socket binding. Remove 3 bail!(IPv6 not supported) guards. Add IPv6 relay integration tests. Closes Epic #1295."
+    },
+    {
+      "id": "s19-t3",
+      "title": "feat(devops): Genesis bundle schema + icnd --init (#1097)",
+      "status": "pending",
+      "pr": null,
+      "assignee": null,
+      "issue": 1097,
       "epic": "1099",
-      "note": "Add entry.author == task.submitter guard in init_notifications.rs handle_compute_message(). Pass entry_author: Did through to the TaskSubmitted match arm. Closes the spoofing vector without needing PaymentRequest struct change."
+      "note": "PR12 in Epic #1099 critical path. Read issue #1097 for full spec before starting. Gates devnet compose (#1098, PR13). Involves bins/icnd/ and config schema types."
     },
     {
-      "id": "s18-t2",
-      "title": "refactor(net): KnownPeer endpoint field — Vec<String> → Vec<EndpointCandidate> (#1300)",
-      "status": "pending",
+      "id": "s19-t4",
+      "title": "spec(gateway): close auth semantics for GET /v1/services/:id (#1120)",
+      "status": "done",
       "pr": null,
       "assignee": null,
-      "issue": 1300,
-      "epic": "1295",
-      "note": "Intentional wire format change. Update protocol.rs KnownPeer struct. Update peer_exchange.rs construction. Update init_network.rs .addresses accesses. Add serde compat notes."
-    },
-    {
-      "id": "s18-t3",
-      "title": "feat(net): mDNS multi-address — advertise all local addrs, collect Vec<SocketAddr> (#1298)",
-      "status": "pending",
-      "pr": null,
-      "assignee": null,
-      "issue": 1298,
-      "epic": "1295",
-      "note": "Modify PeerInfo to store Vec<SocketAddr>. Update browse handler to collect all get_addresses(). Integrate with EndpointCandidate::local() for KnownPeer construction."
-    },
-    {
-      "id": "s18-t4",
-      "title": "feat(net): Happy Eyeballs — race IPv4/IPv6 in parallel with 250ms stagger (#1299)",
-      "status": "pending",
-      "pr": null,
-      "assignee": null,
-      "issue": 1299,
-      "epic": "1295",
-      "note": "RFC 8305 adaptation. Add dial_happy_eyeballs() to nat_dial.rs. IPv6 preferred, IPv4 fallback after 250ms. Add happy_eyeballs_delay_ms to NatDialConfig (serde default). Works per EndpointKind category."
+      "issue": 1120,
+      "epic": null,
+      "note": "Spec decision only. Issue body already has Option B (all service discovery endpoints require JWT, return 404 both for missing resources AND unauthorized/unauthenticated requests to prevent service ID enumeration — returning 401 for 'exists but unauthorized' vs 404 for 'not found' leaks which service IDs are valid). Document decision, check if any implementation gap follows, close issue. No code unless a gap is found — scope that to a new issue."
     }
   ],
   "epics": {
-    "1099": "[EPIC] ICN Pilot Completion — End-to-End Demos (P0)",
-    "1295": "[EPIC] IPv6 dual-stack transport and endpoint sets (Phases 21-22)"
+    "1295": "[EPIC] IPv6 dual-stack transport and endpoint sets (Phases 21-22)",
+    "1099": "[EPIC] ICN Pilot Completion — End-to-End Demos (P0)"
   },
-  "deferred_from_s17": {
-    "note": "Issues deferred S14→S17 that are now S18 targets (after PR #1358 merge). #1301 (IPv6 federation transport) deferred to S19 — depends on #1298+#1299. #1120 has zero code references — flag for human review/closure.",
-    "issues": [1298, 1299, 1300, 1301, 1120]
+  "deferred_from_s18": {
+    "note": "#1364 and #1301 are S19 execution targets after #1298+#1299 landed in S18. #1120 carried from S14+; closing this sprint.",
+    "issues": [1364, 1301, 1120]
   }
 }
