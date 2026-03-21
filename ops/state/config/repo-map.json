@@ -32,9 +32,7 @@
     "managed_by": "scripts/worktrees.sh",
     "base_branch": "origin/main",
     "active": [
-      "main",
-      "1084-names-gateway-a",
-      "1120-auth-semantics-b"
+      "1310-execution-receipt-gate"
     ]
   },
   "relationships": [
@@ -50,8 +48,8 @@
       "to": "k3s-cluster",
       "type": "deployment",
       "direction": "push",
-      "cluster_control": "10.8.10.40",
-      "workers": ["10.8.10.41", "10.8.10.42"]
+      "cluster_control": "10.8.30.40",
+      "workers": ["10.8.30.41", "10.8.30.42"]
     },
     {
       "from": "homelab-inventory",
@@ -63,13 +61,13 @@
   ],
   "infrastructure": {
     "k3s": {
-      "control": "10.8.10.40",
-      "workers": ["10.8.10.41", "10.8.10.42"],
-      "icn_dev": "10.8.10.45",
+      "control": "10.8.30.40",
+      "workers": ["10.8.30.41", "10.8.30.42"],
+      "icn_dev": "10.8.30.45",
       "services": {
-        "gateway": "10.8.10.40:30080",
-        "pilot_ui": "10.8.10.40:30030",
-        "metrics": "10.8.10.40:30091"
+        "gateway": "10.8.30.40:30080",
+        "pilot_ui": "10.8.30.40:30030",
+        "metrics": "10.8.30.40:30090"
       }
     }
   }

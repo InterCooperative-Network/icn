@@ -66,13 +66,13 @@ git rev-parse --show-toplevel
 test -f Cargo.toml && echo "Rust root" || echo "Not Rust root"
 ```
 
-**Crates** (in `icn/crates/`):
+**Crates** (34 in `icn/crates/`):
 - `icn-core` - Tokio runtime, supervisor, actor lifecycle management
 - `icn-identity` - DID generation, Ed25519 keypairs, Age-encrypted keystore
 - `icn-trust` - Trust graph storage & transitive trust computation
 - `icn-net` - QUIC/TLS sessions, mDNS discovery, NetworkActor
 - `icn-gossip` - Topic-based gossip with vector clocks & Bloom filters
-- `icn-ledger` - Double-entry mutual credit with Merkle-DAG
+- `icn-ledger` - Double-entry mutual credit / state change journal (Merkle-DAG)
 - `icn-ccl` - Contract language AST, interpreter, fuel metering
 - `icn-store` - Persistent KV storage (Sled)
 - `icn-rpc` - gRPC API server
@@ -97,10 +97,20 @@ test -f Cargo.toml && echo "Rust root" || echo "Not Rust root"
 - `icn-protocol` - Unified protocol layer (facade re-exporting icn-gossip + icn-net)
 - `icn-services` - Unified service layer (facade re-exporting icn-api + icn-rpc + icn-gateway)
 - `icn-crypto` - Unified crypto layer (facade re-exporting icn-crypto-pq)
+- `icn-authz` - Authorization primitives and capability tokens
+- `icn-http-kit` - HTTP utilities shared across gateway and API layers
+- `icn-kernel-api` - Kernel API surface (enforces kernel/app boundary)
+- `icn-naming` - Cooperative naming service and DID resolution
+
+**Apps** (4 in `icn/apps/`):
+- `governance` - Governance app (PolicyOracle wiring)
+- `ledger` - Ledger/journal app (PatronageTracker, settlement engine)
+- `membership` - Membership management app
+- `charter` - Charter and org lifecycle app
 
 **Binaries** (in `icn/bins/`):
 - `icnd` - The ICN daemon
-- `icnctl` - CLI management tool
+- `icnctl` - CLI management tool (`audit verify`, node mgmt)
 - `icn-console` - Interactive TUI for cooperative management
 
 ## Documentation Structure
