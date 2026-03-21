@@ -242,6 +242,9 @@ impl ServiceDiscoveryManager {
         }
 
         // Merge loaded endpoints into registry — brief lock window, no I/O inside.
+        // Note: extend() overwrites in-memory entries on service_id collision.
+        // This is intentional: persistence is called at startup before gossip has
+        // had a chance to announce anything, so there should be no conflicting entries.
         let loaded_count = loaded.len();
         {
             let mut registry = self.registry.write().await;
