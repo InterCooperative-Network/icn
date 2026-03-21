@@ -10,6 +10,17 @@ P2P_PORT="${ICN_P2P_PORT:-9000}"
 BOOTSTRAP_PEERS="${ICN_BOOTSTRAP_PEERS:-}"
 NODE_NAME="${ICN_NODE_NAME:-node}"
 KEYSTORE_PASSPHRASE="${ICN_KEYSTORE_PASSPHRASE:-devnet-insecure}"
+GENESIS_FILE="${ICN_GENESIS_FILE:-}"
+
+# Determine network_id: read from shared genesis file if present, else fall back to NODE_NAME
+NETWORK_ID="$NODE_NAME"
+if [ -n "$GENESIS_FILE" ] && [ -f "$GENESIS_FILE" ]; then
+  _gid=$(python3 -c "import json; d=json.load(open('$GENESIS_FILE')); print(d.get('network_id',''))" 2>/dev/null || echo "")
+  if [ -n "$_gid" ]; then
+    NETWORK_ID="$_gid"
+  fi
+  echo "[$NODE_NAME] Genesis file: $GENESIS_FILE (network_id=$NETWORK_ID)"
+fi
 
 # Create data dir
 mkdir -p "$DATA_DIR"
@@ -17,7 +28,7 @@ mkdir -p "$DATA_DIR"
 # Initialize identity + config if not already done
 if [ ! -f "$CONFIG_FILE" ]; then
   echo "[$NODE_NAME] First run — initializing identity and config..."
-  echo "$KEYSTORE_PASSPHRASE" | icnd --init --data-dir "$DATA_DIR"
+  echo "$KEYSTORE_PASSPHRASE" | icnd --init --data-dir "$DATA_DIR" --node-name "$NETWORK_ID"
   echo "[$NODE_NAME] Identity initialized."
 fi
 

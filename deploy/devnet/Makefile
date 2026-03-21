@@ -1,4 +1,4 @@
-.PHONY: up down restart logs clean status build demo test
+.PHONY: up down restart logs clean status build demo demo-all test
 
 # Start the 3-node devnet
 up:
@@ -60,3 +60,7 @@ test:
 demo:
 	@echo "Running demo against devnet node-a..."
 	ICN_GATEWAY=http://localhost:8080 bash ../../scripts/demo-single-node.sh
+
+# Boot the 3-node devnet and run all demo flows (one command end-to-end)
+demo-all:
+	bash ../../demo/run-all.sh
