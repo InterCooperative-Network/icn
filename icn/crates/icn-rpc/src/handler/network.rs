@@ -22,7 +22,9 @@ pub async fn handle_network_peers(id: u64, state: &Arc<RpcServer>) -> RpcRespons
                 .into_iter()
                 .map(|p| PeerInfo {
                     did: p.did.as_str().to_string(),
-                    addr: p.addr.to_string(),
+                    // Use first address for the RPC response string field.
+                    // All addresses are available via the discovery layer for internal use.
+                    addr: p.addrs.first().map(|a| a.to_string()).unwrap_or_default(),
                     version: p.version,
                 })
                 .collect();

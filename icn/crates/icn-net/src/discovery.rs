@@ -20,10 +20,15 @@ const SERVICE_TYPE: &str = "_icn._udp.local.";
 const SCAN_INTERVAL: Duration = Duration::from_secs(30);
 
 /// Discovered peer information
+///
+/// `addrs` collects all IP addresses advertised by the peer via mDNS (#1298).
+/// Multi-homed nodes (with both IPv4 and IPv6 interfaces) will have multiple entries.
+/// All addresses use the same port as the mDNS service registration.
 #[derive(Debug, Clone)]
 pub struct PeerInfo {
     pub did: Did,
-    pub addr: SocketAddr,
+    /// All local addresses where this peer can be reached (IPv4 and/or IPv6).
+    pub addrs: Vec<SocketAddr>,
     pub version: String,
 }
 
@@ -146,15 +151,19 @@ impl Discovery {
             ServiceEvent::ServiceResolved(info) => {
                 // Extract DID from TXT properties
                 if let Some(did_str) = info.get_property_val_str("did") {
-                    // Parse socket address
-                    // mdns-sd 0.17+ returns ScopedIp; extract the IpAddr for SocketAddr
-                    let addr = match info.get_addresses().iter().next() {
-                        Some(scoped_ip) => SocketAddr::new(scoped_ip.to_ip_addr(), info.get_port()),
-                        None => {
-                            debug!("No address for peer {}", did_str);
-                            return;
-                        }
-                    };
+                    // Collect ALL addresses advertised by this peer (#1298 mDNS multi-address).
+                    // mdns-sd 0.17+ returns ScopedIp; extract the IpAddr for SocketAddr.
+                    let port = info.get_port();
+                    let addrs: Vec<SocketAddr> = info
+                        .get_addresses()
+                        .iter()
+                        .map(|scoped_ip| SocketAddr::new(scoped_ip.to_ip_addr(), port))
+                        .collect();
+
+                    if addrs.is_empty() {
+                        debug!("No addresses for peer {}", did_str);
+                        return;
+                    }
 
                     // Parse DID
                     let did = match parse_did(did_str) {
@@ -170,13 +179,13 @@ impl Discovery {
                         .unwrap_or("unknown")
                         .to_string();
 
+                    info!("Discovered peer: {} at {:?}", did.as_str(), addrs);
+
                     let peer_info = PeerInfo {
                         did: did.clone(),
-                        addr,
+                        addrs,
                         version,
                     };
-
-                    info!("Discovered peer: {} at {}", did.as_str(), addr);
 
                     peers
                         .write()
