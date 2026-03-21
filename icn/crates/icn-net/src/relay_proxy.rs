@@ -5,7 +5,7 @@
 //! SEND-INDICATION messages and unwrapping inbound DATA-INDICATION messages.
 //!
 //! ```text
-//!   Quinn (raw UDP) <-> [local_socket 127.0.0.1:ephemeral] <-> relay task <-> [turn_socket] <-> TURN server
+//!   Quinn (raw UDP) <-> [local_socket 127.0.0.1:ephemeral] <-> relay task <-> [turn_socket (matches TURN server AF)] <-> TURN server
 //! ```
 //!
 //! The relay task is a `tokio::spawn`ed loop that:
@@ -101,27 +101,23 @@ impl TurnRelayProxy {
         peer_relay_addr: SocketAddr,
         turn_client: Arc<TurnClient>,
     ) -> Result<ProxyHandle> {
-        // Bind local loopback socket (Quinn side) matching the peer's address family.
-        let local_socket = if peer_relay_addr.is_ipv6() {
-            UdpSocket::bind(SocketAddr::V6(SocketAddrV6::new(
-                Ipv6Addr::LOCALHOST,
-                0,
-                0,
-                0,
-            )))
-            .await
-            .context("failed to bind local relay socket (IPv6)")?
-        } else {
+        // Bind local loopback socket (Quinn side) always to IPv4 loopback.
+        // The Quinn relay endpoint in actor/messages.rs binds to 127.0.0.1:0 and
+        // cannot send to an IPv6 destination, so this side must stay IPv4 regardless
+        // of the peer's relay address family.
+        let local_socket =
             UdpSocket::bind(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 0)))
                 .await
-                .context("failed to bind local relay socket (IPv4)")?
-        };
+                .context("failed to bind local relay socket")?;
         let local_addr = local_socket
             .local_addr()
             .context("failed to get local relay address")?;
 
-        // Bind TURN-side socket matching the peer's address family.
-        let turn_socket = if peer_relay_addr.is_ipv6() {
+        // Bind TURN-side socket matching the TURN server's address family — not the
+        // peer relay address. The TURN socket communicates with turn_server_addr, so
+        // a mismatch (e.g. IPv4 TURN server + IPv6 peer relay) would prevent the
+        // socket from reaching the server.
+        let turn_socket = if turn_server_addr.is_ipv6() {
             UdpSocket::bind(SocketAddr::V6(SocketAddrV6::new(
                 Ipv6Addr::UNSPECIFIED,
                 0,
