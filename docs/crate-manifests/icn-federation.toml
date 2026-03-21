@@ -1,0 +1,41 @@
+[crate]
+name = "icn-federation"
+layer = "kernel"
+infection_status = "infected"
+owner = "core"
+doc_entry = "docs/reference/crates/icn-federation.md"
+status = "active"
+exports_surface = true
+regulated_terms_allowed = false
+primitives = ["networking", "governance", "trust"]
+description = "Federation layer for inter-cooperative coordination in ICN"
+
+[documentation]
+overview = true
+examples = false
+safety = true
+tests = true
+integration = true
+
+[implementation]
+test_count = 0
+example_count = 0
+unsafe_blocks = 0
+feature_flags = ["utoipa"]
+dependencies = ["tokio", "futures", "serde", "serde_json", "anyhow", "thiserror", "tracing", "lru", "metrics", "ed25519-dalek", "sha2", "uuid", "reqwest", "hex", "urlencoding", "utoipa"]
+peer_dependencies = ["icn-identity", "icn-kernel-api", "icn-trust", "icn-gossip", "icn-ledger", "icn-store", "icn-obs", "icn-testkit"]
+
+[publication]
+published_to_crates_io = false
+version = "0.1.0"
+readme_exists = false
+changelog_exists = false
+api_stability = "experimental"
+
+[verification]
+tests_pass = true
+lint_clean = true
+docs_compile = true
+no_forbidden_terms = false
+infection_vectors_documented = true
+capability_leaks_tested = true

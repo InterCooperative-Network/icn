@@ -1,0 +1,48 @@
+# ICN Kernel API - Documentation Manifest
+
+[crate]
+name = "icn-kernel-api"
+layer = "kernel"
+infection_status = "clean"
+owner = "core"
+doc_entry = "docs/reference/crates/icn-kernel-api.md"
+status = "stable"
+exports_surface = true
+regulated_terms_allowed = false
+primitives = ["all"]
+description = "Trait definitions and API boundaries for all 8 kernel primitives; foundational capability interface"
+
+[documentation]
+overview = true
+examples = true
+safety = true
+tests = true
+integration = true
+
+[implementation]
+test_count = 347
+example_count = 24
+unsafe_blocks = 0
+feature_flags = ["experimental", "no-std"]
+dependencies = ["serde", "serde_json", "thiserror"]
+peer_dependencies = ["icn-core"]
+
+[publication]
+published_to_crates_io = true
+version = "0.5.2"
+readme_exists = true
+changelog_exists = true
+api_stability = "stable"
+
+[verification]
+tests_pass = true
+lint_clean = true
+docs_compile = true
+no_forbidden_terms = true
+infection_vectors_documented = false
+capability_leaks_tested = true
+
+[notes]
+"This is the public trait surface for all kernel primitives. It is NOT infected and must remain clean. All changes here require careful review for capability leaks."
+"Deprecation cycle: 2 releases minimum before removal"
+"Minimum Rust version: 1.75.0"

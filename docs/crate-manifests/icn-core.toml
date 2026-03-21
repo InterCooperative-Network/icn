@@ -1,0 +1,49 @@
+# ICN Core - Documentation Manifest
+
+[crate]
+name = "icn-core"
+layer = "kernel"
+infection_status = "infected"
+owner = "core"
+doc_entry = "docs/reference/crates/icn-core.md"
+status = "stable"
+exports_surface = false
+regulated_terms_allowed = false
+primitives = ["all"]
+description = "Core kernel implementation with 8 primitives; INFECTED - internal use only"
+
+[documentation]
+overview = true
+examples = false
+safety = true
+tests = true
+integration = true
+
+[implementation]
+test_count = 589
+example_count = 3
+unsafe_blocks = 47
+feature_flags = ["experimental", "bench"]
+dependencies = ["serde", "serde_json", "thiserror", "tokio", "rocksdb"]
+peer_dependencies = ["icn-kernel-api", "icn-crypto-pq", "icn-steward"]
+
+[publication]
+published_to_crates_io = false
+version = "0.5.2"
+readme_exists = true
+changelog_exists = true
+api_stability = "beta"
+
+[verification]
+tests_pass = true
+lint_clean = true
+docs_compile = true
+no_forbidden_terms = true
+infection_vectors_documented = true
+capability_leaks_tested = true
+
+[notes]
+"INFECTED crate: Not part of public API. All unsafe {} blocks require detailed safety documentation."
+"Contains all 8 kernel primitives in private implementation. See icn-kernel-api for public surface."
+"Unsafe blocks: 47 total. Audit trail in docs/architecture/unsafe-blocks.md"
+"All infection vectors documented in INFECTION_MODEL.md"

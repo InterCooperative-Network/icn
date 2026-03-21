@@ -1,0 +1,41 @@
+[crate]
+name = "icnd"
+layer = "binary"
+infection_status = "n/a - binary"
+owner = "core"
+doc_entry = "docs/reference/binaries/icnd.md"
+status = "active"
+exports_surface = false
+regulated_terms_allowed = false
+primitives = []
+description = "ICNd - The ICN substrate daemon"
+
+[documentation]
+overview = true
+examples = false
+safety = true
+tests = false
+integration = true
+
+[implementation]
+test_count = 0
+example_count = 0
+unsafe_blocks = 0
+feature_flags = ["wasm", "hsm", "tpm-experimental"]
+dependencies = ["tokio", "tracing", "anyhow", "clap", "rpassword", "rustls", "zeroize", "sled"]
+peer_dependencies = ["icn-core", "icn-identity", "icn-kernel-api", "icn-trust", "icn-net", "icn-gossip", "icn-ledger", "icn-ccl", "icn-store", "icn-rpc", "icn-obs", "icn-governance"]
+
+[publication]
+published_to_crates_io = false
+version = "0.1.0"
+readme_exists = false
+changelog_exists = false
+api_stability = "experimental"
+
+[verification]
+tests_pass = true
+lint_clean = true
+docs_compile = true
+no_forbidden_terms = true
+infection_vectors_documented = false
+capability_leaks_tested = false

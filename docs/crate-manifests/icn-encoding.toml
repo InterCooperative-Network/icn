@@ -1,0 +1,41 @@
+[crate]
+name = "icn-encoding"
+layer = "kernel"
+infection_status = "needs-review"
+owner = "core"
+doc_entry = "docs/reference/crates/icn-encoding.md"
+status = "stable"
+exports_surface = true
+regulated_terms_allowed = false
+primitives = []
+description = "Encoding abstraction layer for ICN serialization using postcard"
+
+[documentation]
+overview = true
+examples = false
+safety = true
+tests = true
+integration = true
+
+[implementation]
+test_count = 0
+example_count = 0
+unsafe_blocks = 0
+feature_flags = []
+dependencies = ["serde", "postcard", "thiserror"]
+peer_dependencies = []
+
+[publication]
+published_to_crates_io = false
+version = "0.1.0"
+readme_exists = false
+changelog_exists = false
+api_stability = "stable"
+
+[verification]
+tests_pass = true
+lint_clean = true
+docs_compile = true
+no_forbidden_terms = true
+infection_vectors_documented = false
+capability_leaks_tested = false

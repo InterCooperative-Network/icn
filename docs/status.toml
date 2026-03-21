@@ -1,0 +1,245 @@
+# ICN Implementation Status Scorecard
+# Machine-readable assessment of subsystem completion and operational readiness
+# Source of truth: docs/strategy/ICN-Gap-Analysis-March-2026.md
+#
+# Status values: exceeds-spec, confirmed, partially-confirmed, working-immature,
+#                simplified, foundation-only
+# Truth classes: operational (proven in tests/demos/CI),
+#                descriptive (code exists, not fully verified),
+#                normative (architecture only, not yet implemented)
+# Evidence types: test, demo, ci, code-review, human-asserted
+
+[subsystems.identity]
+name = "Identity & Cryptography"
+status = "exceeds-spec"
+truth_class = "operational"
+evidence_type = "test"
+evidence = [
+  "SDIS complete through Phase S6",
+  "Post-quantum crypto (ML-DSA + ML-KEM) operational with feature flags",
+  "ZKP credential presentation (3 levels: QR, NFC/BLE, Network)",
+  "Steward network with threshold PRF for VUI computation",
+  "Age-encrypted keystore with auto-migration (v1-v4)",
+  "Social key recovery via steward attestations",
+]
+last_verified = "2026-03-17"
+verified_by = "gap-analysis"
+crates = ["icn-identity", "icn-crypto-pq", "icn-steward", "icn-zkp"]
+gaps = ["Enrollment flow (icn-enrollment) planned but not built"]
+
+[subsystems.governance]
+name = "Governance"
+status = "confirmed"
+truth_class = "operational"
+evidence_type = "demo"
+evidence = [
+  "547 tests passing in governance module",
+  "Full proposal lifecycle proven: Draft -> Deliberation -> Open -> Accepted/Rejected/NoQuorum/Cancelled/Vetoed/ForceClosed",
+  "Liquid democracy delegation (scope + expiry aware)",
+  "Cryptographic decision proofs (Ed25519 hashes + voter attestations)",
+  "20+ REST API endpoints",
+  "Charter system (TOML format per coop/community)",
+  "14-call governance demo flow verified on K3s",
+]
+last_verified = "2026-03-17"
+verified_by = "gap-analysis"
+crates = ["icn-governance", "apps/governance"]
+gaps = [
+  "3 of 7 voting models deferred (Futarchy, Sociocracy circles, Sortition)",
+  "Charter templates not yet created",
+  "CCL formula extraction from Rust (#1308)",
+]
+
+[subsystems.economics]
+name = "Economics (Mutual Credit Ledger)"
+status = "confirmed"
+truth_class = "operational"
+evidence_type = "test"
+evidence = [
+  "Double-entry mutual credit ledger (Merkle-DAG, append-only, content-addressed)",
+  "Multi-unit support (Hours, USD, kWh, custom)",
+  "Credit limits per-participant per-unit",
+  "Settlement operations (cross-cooperative)",
+  "Patronage distribution (S14 complete, internal capital accounts)",
+  "Treasury anchor (deterministic DID derivation)",
+  "Budget management + escrow system",
+  "Python Mesa simulation validating mutual credit parameters",
+]
+last_verified = "2026-03-17"
+verified_by = "gap-analysis"
+crates = ["icn-ledger", "apps/ledger"]
+gaps = [
+  "Commons credit formula hardcoded in Rust, not in CCL (#1308)",
+  "Terminology rename pending: payment->settlement, currency->unit, balance->position (#1303)",
+]
+
+[subsystems.federation]
+name = "Federation"
+status = "partially-confirmed"
+truth_class = "descriptive"
+evidence_type = "code-review"
+evidence = [
+  "Federation registry and attestations working",
+  "Cross-coop settlement working",
+  "Gossip-based registry discovery",
+  "DID resolution across federation boundaries",
+  "Demo federation (4 personas: BrightWorks, River City Tool Library, Harbor Homes, Finger Lakes CDN)",
+  "Federation joining/leaving proposal types",
+]
+last_verified = "2026-03-17"
+verified_by = "gap-analysis"
+crates = ["icn-federation"]
+gaps = [
+  "Three-epoch checkpoint system NOT BUILT",
+  "Partition healing NOT BUILT",
+  "Byzantine fault tolerance NOT IMPLEMENTED",
+  "Cross-federation async proof exchange NOT SPECIFIED",
+  "Netting algorithm NOT BUILT",
+  "Inter-org dispute resolution NOT BUILT",
+  "treasury:write and federation:write scopes missing from K3s ALLOWED_SCOPES",
+]
+
+[subsystems.ccl]
+name = "Contract Execution (CCL)"
+status = "working-immature"
+truth_class = "descriptive"
+evidence_type = "test"
+evidence = [
+  "CCL interpreter with fuel metering",
+  "Deterministic execution",
+  "Capability-based security",
+  "WASM execution via wasmtime (optional feature flag)",
+  "Fuzz testing target",
+]
+last_verified = "2026-03-17"
+verified_by = "gap-analysis"
+crates = ["icn-ccl"]
+gaps = [
+  "No pre-built contract library for common cooperative patterns",
+  "No charter-to-CCL translation pipeline",
+  "Commons credit formula not extracted to CCL (#1308)",
+  "CCL requires programming expertise (non-programmer interface missing)",
+]
+
+[subsystems.storage]
+name = "Storage (DAG)"
+status = "simplified"
+truth_class = "descriptive"
+evidence_type = "code-review"
+evidence = [
+  "Merkle-DAG working for ledger",
+  "Sled KV store for local persistence",
+  "NFS-backed persistent volumes on K3s",
+  "Tamper-evident, independently verifiable",
+]
+last_verified = "2026-03-17"
+verified_by = "gap-analysis"
+crates = ["icn-store", "icn-snapshot"]
+gaps = [
+  "Three-tier storage (Hot/Warm/Cold) not implemented",
+  "Archive cooperative compensation not built",
+  "Node class differentiation not implemented",
+]
+
+[subsystems.compute]
+name = "Distributed Compute"
+status = "foundation-only"
+truth_class = "descriptive"
+evidence_type = "code-review"
+evidence = [
+  "Trust-gated distributed execution (icn-compute)",
+  "WASM execution via wasmtime",
+  "CCL contract execution with fuel metering",
+  "Gossip-based task distribution",
+  "ExecutionReceiptGate merged",
+]
+last_verified = "2026-03-17"
+verified_by = "gap-analysis"
+crates = ["icn-compute"]
+gaps = [
+  "Workload manifest schema NOT BUILT",
+  "Deterministic vs advisory classification NOT BUILT",
+  "Job marketplace with bidding NOT BUILT",
+  "Cell operator boundary NOT DEFINED",
+]
+
+[subsystems.security]
+name = "Security & Privacy"
+status = "confirmed"
+truth_class = "operational"
+evidence_type = "test"
+evidence = [
+  "Transport security: QUIC/TLS with DID-TLS binding",
+  "Message authentication: SignedEnvelope, Ed25519",
+  "Replay protection: sequence tracking",
+  "Encrypted topics: ChaCha20-Poly1305",
+  "Bloom filter deduplication",
+  "Trust graph: 3D (Social, Economic, Technical)",
+]
+last_verified = "2026-03-17"
+verified_by = "gap-analysis"
+crates = ["icn-net", "icn-crypto", "icn-security", "icn-privacy"]
+gaps = [
+  "Onion routing NOT BUILT (Phase 20)",
+  "Traffic obfuscation NOT BUILT (Phase 20)",
+  "Active attack detection STUB (icn-security minimal)",
+]
+
+[subsystems.network]
+name = "Network & Transport"
+status = "confirmed"
+truth_class = "operational"
+evidence_type = "demo"
+evidence = [
+  "QUIC/TLS (quinn + rustls)",
+  "mDNS + DHT discovery",
+  "Topic-based gossip with anti-entropy + Bloom filter dedup",
+  "SignedEnvelope + EncryptedEnvelope formats",
+  "DID bootstrap format",
+  "K3s deployment running 2+ months",
+]
+last_verified = "2026-03-17"
+verified_by = "gap-analysis"
+crates = ["icn-net", "icn-gossip"]
+gaps = [
+  "NAT traversal needs hardening for production internet use",
+]
+
+[subsystems.entity]
+name = "Entity Model"
+status = "confirmed"
+truth_class = "descriptive"
+evidence_type = "test"
+evidence = [
+  "Full EntityId format with type + identifier",
+  "Cooperative lifecycle (Formation -> Active -> Dissolution)",
+  "Community types (Geographic, Interest, Solidarity)",
+  "Federation entity (inter-coop coordination)",
+  "Recursive composite membership",
+  "Naming service with bounded alias resolution",
+  "Deterministic treasury DID derivation",
+]
+last_verified = "2026-03-17"
+verified_by = "gap-analysis"
+crates = ["icn-entity", "icn-coop", "icn-community"]
+gaps = []
+
+# Meaning Firewall is tracked separately as a cross-cutting concern
+[meaning-firewall]
+total_crates = 29
+clean = 9
+infected = 11
+needs_review = 9
+source = "kernel_surface.toml"
+last_verified = "2026-03-17"
+notes = "11 infected crates. Highest priority: icn-trust (cascades infections), icn-ledger (most heavily infected). GovernanceActor extracted to apps/governance Feb 2026. 6-phase extraction plan in progress."
+
+# Aggregate stats
+[summary]
+total_subsystems = 10
+total_tests = 2287
+total_crates = "34 crates + 4 apps + 3 binaries = 41 workspace members"
+loc_approx = "414K"
+deployment = "K3s cluster 10.8.30.40-42 (3 nodes), running since Dec 2025"
+last_full_verification = "2026-03-17"
+verification_source = "docs/strategy/ICN-Gap-Analysis-March-2026.md"

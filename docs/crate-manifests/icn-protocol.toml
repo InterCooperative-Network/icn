@@ -1,0 +1,41 @@
+[crate]
+name = "icn-protocol"
+layer = "kernel"
+infection_status = "clean"
+owner = "core"
+doc_entry = "docs/reference/crates/icn-protocol.md"
+status = "stable"
+exports_surface = true
+regulated_terms_allowed = false
+primitives = ["networking", "consensus"]
+description = "Unified protocol layer for ICN (gossip + networking)"
+
+[documentation]
+overview = true
+examples = true
+safety = true
+tests = true
+integration = true
+
+[implementation]
+test_count = 0
+example_count = 1
+unsafe_blocks = 0
+feature_flags = ["post-quantum"]
+dependencies = []
+peer_dependencies = ["icn-gossip", "icn-net"]
+
+[publication]
+published_to_crates_io = false
+version = "0.1.0"
+readme_exists = false
+changelog_exists = false
+api_stability = "experimental"
+
+[verification]
+tests_pass = true
+lint_clean = true
+docs_compile = true
+no_forbidden_terms = true
+infection_vectors_documented = false
+capability_leaks_tested = false

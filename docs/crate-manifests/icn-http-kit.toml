@@ -1,0 +1,41 @@
+[crate]
+name = "icn-http-kit"
+layer = "infrastructure"
+infection_status = "n/a - infrastructure"
+owner = "core"
+doc_entry = "docs/reference/crates/icn-http-kit.md"
+status = "active"
+exports_surface = true
+regulated_terms_allowed = false
+primitives = []
+description = "Shared HTTP scaffolding for ICN API crates"
+
+[documentation]
+overview = true
+examples = false
+safety = true
+tests = true
+integration = true
+
+[implementation]
+test_count = 0
+example_count = 0
+unsafe_blocks = 0
+feature_flags = []
+dependencies = ["actix-web", "serde", "serde_json", "thiserror", "anyhow", "tracing", "base64", "chrono"]
+peer_dependencies = []
+
+[publication]
+published_to_crates_io = false
+version = "0.1.0"
+readme_exists = false
+changelog_exists = false
+api_stability = "experimental"
+
+[verification]
+tests_pass = true
+lint_clean = true
+docs_compile = true
+no_forbidden_terms = true
+infection_vectors_documented = false
+capability_leaks_tested = false

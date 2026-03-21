@@ -1,0 +1,41 @@
+[crate]
+name = "icn-net"
+layer = "kernel"
+infection_status = "infected"
+owner = "core"
+doc_entry = "docs/reference/crates/icn-net.md"
+status = "active"
+exports_surface = true
+regulated_terms_allowed = false
+primitives = ["networking"]
+description = "Network transport, discovery, and session management"
+
+[documentation]
+overview = true
+examples = false
+safety = true
+tests = true
+integration = true
+
+[implementation]
+test_count = 0
+example_count = 0
+unsafe_blocks = 0
+feature_flags = ["post-quantum"]
+dependencies = ["tokio", "quinn", "rustls", "tokio-rustls", "mdns-sd", "sha2", "serde", "serde_json", "anyhow", "thiserror", "tracing", "bytes", "futures", "rcgen", "time", "ed25519-dalek", "x25519-dalek", "chacha20poly1305", "zeroize", "hostname", "x509-parser", "rand", "bitflags", "zstd"]
+peer_dependencies = ["icn-identity", "icn-encoding", "icn-crypto-pq", "icn-time", "icn-gossip", "icn-kernel-api", "icn-store", "icn-obs", "icn-snapshot", "icn-security", "icn-privacy"]
+
+[publication]
+published_to_crates_io = false
+version = "0.1.0"
+readme_exists = false
+changelog_exists = false
+api_stability = "experimental"
+
+[verification]
+tests_pass = true
+lint_clean = true
+docs_compile = true
+no_forbidden_terms = false
+infection_vectors_documented = true
+capability_leaks_tested = true

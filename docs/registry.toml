@@ -1,0 +1,2329 @@
+# ICN Documentation Registry
+# Machine-readable source of truth for all documentation
+# Categories: architecture, design, strategy, guide, reference, operations, security, archive
+# Statuses: canonical, living, draft, archived, superseded, missing
+
+# ============================================================================
+# ROOT LEVEL DOCUMENTS
+# ============================================================================
+
+[docs."README.md"]
+category = "reference"
+status = "canonical"
+title = "ICN - InterCooperative Network"
+description = "Main project README with overview, quick start, and CI/CD status badge"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["contributors", "public"]
+
+[docs."CLAUDE.md"]
+category = "reference"
+status = "canonical"
+title = "Claude Agent Onboarding"
+description = "Guidance for Claude Code sessions working with ICN codebase"
+last_updated = "2026-03-21"
+owner = "matt"
+audiences = ["agents", "developers"]
+
+[docs."CONTRIBUTING.md"]
+category = "guide"
+status = "canonical"
+title = "Contributing to ICN"
+description = "Architectural guardrails, contribution workflow, code standards, and review process"
+last_updated = "2026-03-01"
+owner = "matt"
+audiences = ["contributors"]
+
+[docs."VISION.md"]
+category = "architecture"
+status = "canonical"
+title = "ICN Vision Statement"
+description = "Core vision, values, and long-term aspiration for InterCooperative Network"
+last_updated = "2026-02-01"
+owner = "matt"
+audiences = ["all"]
+
+[docs."CODE_OF_CONDUCT.md"]
+category = "reference"
+status = "canonical"
+title = "Code of Conduct"
+description = "Community guidelines and expected behavior for contributors"
+last_updated = "2025-12-01"
+owner = "matt"
+audiences = ["contributors", "community"]
+
+[docs."AGENTS.md"]
+category = "reference"
+status = "living"
+title = "Agent Registry"
+description = "Catalog of authorized AI agents and their capabilities for ICN development"
+last_updated = "2026-03-01"
+owner = "matt"
+audiences = ["agents", "team"]
+
+[docs."CHANGELOG.md"]
+category = "reference"
+status = "living"
+title = "Changelog"
+description = "Release notes and version history"
+last_updated = "2026-03-21"
+owner = "matt"
+audiences = ["contributors", "public"]
+
+# ============================================================================
+# CORE DOCUMENTATION (docs/ root)
+# ============================================================================
+
+[docs."docs/ARCHITECTURE.md"]
+category = "architecture"
+status = "canonical"
+title = "ICN Architecture Reference"
+description = "Single authoritative architecture covering all 8 primitives, kernel-app separation, subsystems, and implementation status"
+last_updated = "2026-03-21"
+owner = "matt"
+audiences = ["developers", "architects", "grant-reviewers"]
+sections = 20
+
+[docs."docs/INDEX.md"]
+category = "reference"
+status = "canonical"
+title = "ICN Documentation Index"
+description = "Master navigation and directory of all documentation with cross-references"
+last_updated = "2026-03-15"
+owner = "matt"
+audiences = ["all"]
+
+[docs."docs/README.md"]
+category = "reference"
+status = "canonical"
+title = "Docs Directory README"
+description = "Overview of documentation structure and navigation guide"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["contributors"]
+
+[docs."docs/GETTING_STARTED.md"]
+category = "guide"
+status = "canonical"
+title = "Getting Started with ICN"
+description = "Quick-start guide for new developers to set up ICN in minutes"
+last_updated = "2026-03-15"
+owner = "matt"
+audiences = ["developers", "contributors"]
+
+[docs."docs/GOLDEN_PROMPT.md"]
+category = "reference"
+status = "living"
+title = "ICN Golden Development Prompt"
+description = "Master context and instructions for AI-assisted development on ICN"
+last_updated = "2026-03-18"
+owner = "matt"
+audiences = ["agents", "developers"]
+
+# ============================================================================
+# ARCHITECTURE SUBSYSTEM DOCUMENTS
+# ============================================================================
+
+[docs."docs/architecture/KERNEL_APP_SEPARATION.md"]
+category = "architecture"
+status = "living"
+title = "Kernel/App Separation Architecture"
+description = "Normative specification of kernel-app boundary, infection vectors, and capability propagation rules"
+last_updated = "2026-03-17"
+owner = "matt"
+audiences = ["developers", "architects"]
+depends_on = ["docs/ARCHITECTURE.md"]
+
+[docs."docs/architecture/CELLS_AND_SCOPES.md"]
+category = "architecture"
+status = "living"
+title = "Cells and Scopes Architecture"
+description = "Design of ICN's cell-based organization model and scope hierarchy"
+last_updated = "2026-03-15"
+owner = "matt"
+audiences = ["architects", "developers"]
+
+[docs."docs/architecture/IDENTITY_MEMBERSHIP_ARCHITECTURE.md"]
+category = "architecture"
+status = "living"
+title = "Identity and Membership Architecture"
+description = "Design of identity primitives, membership verification, and member lifecycle"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["architects", "developers"]
+
+[docs."docs/architecture/GOVERNANCE_STATE_MACHINE.md"]
+category = "architecture"
+status = "living"
+title = "Governance State Machine Architecture"
+description = "State machine design for governance decision-making and enforcement"
+last_updated = "2026-03-12"
+owner = "matt"
+audiences = ["architects", "developers"]
+
+[docs."docs/architecture/FEDERATION_ACTIONS.md"]
+category = "architecture"
+status = "living"
+title = "Federation Actions"
+description = "Design of federated action execution across network boundaries"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["architects", "developers"]
+
+[docs."docs/architecture/FEDERATION_INTEROP_CONTRACT.md"]
+category = "architecture"
+status = "living"
+title = "Federation Interoperability Contract"
+description = "Specification of contracts and interfaces for federation interoperability"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["architects", "developers"]
+
+[docs."docs/architecture/CLIENT_MODEL.md"]
+category = "architecture"
+status = "living"
+title = "Client Model Architecture"
+description = "Architecture of ICN client models and their relationship to kernel primitives"
+last_updated = "2026-03-15"
+owner = "matt"
+audiences = ["developers", "architects"]
+
+[docs."docs/architecture/CANONICAL_ENCODING.md"]
+category = "architecture"
+status = "living"
+title = "Canonical Encoding"
+description = "Specification for deterministic serialization of ICN data structures"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers", "architects"]
+
+[docs."docs/architecture/SCOPE_BOUNDED_TRUST.md"]
+category = "architecture"
+status = "living"
+title = "Scope Bounded Trust"
+description = "Trust model design limiting trust scope to organizational boundaries"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["architects", "security"]
+
+[docs."docs/architecture/README.md"]
+category = "reference"
+status = "canonical"
+title = "Architecture Directory README"
+description = "Navigation guide for architecture documentation"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["architects"]
+
+# ============================================================================
+# DESIGN DOCUMENTS - Core Subsystems
+# ============================================================================
+
+[docs."docs/design/deterministic-core.md"]
+category = "design"
+status = "living"
+title = "ICN Deterministic Core Specification"
+description = "Specification for deterministic computation substrate ensuring reproducible state machines"
+last_updated = "2026-03-15"
+owner = "matt"
+audiences = ["developers", "architects"]
+
+[docs."docs/design/compute-substrate-design.md"]
+category = "design"
+status = "living"
+title = "Compute Substrate Design"
+description = "Design for ICN's execution environment and compute resource management"
+last_updated = "2025-11-18"
+owner = "matt"
+audiences = ["architects", "developers"]
+
+[docs."docs/design/capability-based-features.md"]
+category = "design"
+status = "living"
+title = "Capability-Based Feature Gating"
+description = "System for graceful version handling via capability advertisement and negotiation"
+last_updated = "2026-03-15"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/design/institution-in-a-box.md"]
+category = "design"
+status = "living"
+title = "Institution-in-a-Box"
+description = "Design pattern for embedding ICN primitives into legacy digital infrastructure with CRDTs and replication"
+last_updated = "2026-03-15"
+owner = "matt"
+audiences = ["architects", "product"]
+depends_on = ["docs/ARCHITECTURE.md", "docs/strategy/ADR-001-What-ICN-Is.md"]
+
+[docs."docs/design/MINIMAL-VIABLE-COOP.md"]
+category = "design"
+status = "living"
+title = "Minimal Viable Coop Track"
+description = "Program for shipping one end-to-end cooperative use case for production 6-month validation"
+last_updated = "2026-03-15"
+owner = "matt"
+audiences = ["product", "architects"]
+
+[docs."docs/design/COMMONS_EVOLUTION.md"]
+category = "design"
+status = "living"
+title = "RFC: ICN Commons Evolution"
+description = "Design for evolving ICN commons governance and stewardship models over phases 0-3"
+last_updated = "2026-03-15"
+owner = "matt"
+audiences = ["architects", "stakeholders"]
+
+[docs."docs/design/execution-bridge-spec.md"]
+category = "design"
+status = "living"
+title = "Execution Bridge Specification"
+description = "Authoritative design for bridging between ICN and external execution environments"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["architects", "developers"]
+
+[docs."docs/design/regulatory-safe-verifiable-state.md"]
+category = "design"
+status = "living"
+title = "Regulatory-Safe Verifiable State"
+description = "Design maintaining provable state satisfying regulatory audits without exposing ledger internals"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["architects", "compliance"]
+depends_on = ["docs/ARCHITECTURE.md", "docs/strategy/ICN-Definition.md"]
+
+# ============================================================================
+# DESIGN DOCUMENTS - Identity, Cryptography, and Recovery
+# ============================================================================
+
+[docs."docs/design/multi-device-identity-design.md"]
+category = "design"
+status = "draft"
+title = "Multi-Device Identity Design"
+description = "Design for managing identity across multiple devices within a single agent"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers", "architects"]
+
+[docs."docs/design/social-recovery-design.md"]
+category = "design"
+status = "draft"
+title = "Social Recovery Design"
+description = "M-of-N social recovery mechanism for lost devices and identity recovery"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["architects", "security"]
+
+[docs."docs/design/post-quantum-crypto.md"]
+category = "design"
+status = "draft"
+title = "Post-Quantum Cryptography in ICN"
+description = "Experimental post-quantum cryptography integration and migration strategy"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["architects", "security"]
+
+[docs."docs/design/nat-traversal-design.md"]
+category = "design"
+status = "draft"
+title = "NAT Traversal Design"
+description = "Design for peer-to-peer connectivity across NAT boundaries"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["architects", "developers"]
+
+[docs."docs/design/ipv6-endpoint-sets-design.md"]
+category = "design"
+status = "draft"
+title = "IPv6 Endpoint Sets Design"
+description = "Design for managing multiple network endpoints with IPv6"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["architects", "developers"]
+
+# ============================================================================
+# DESIGN DOCUMENTS - Governance and Economics
+# ============================================================================
+
+[docs."docs/design/governance/governance-primitives.md"]
+category = "design"
+status = "draft"
+title = "Governance Primitives"
+description = "Fundamental governance building blocks and decision-making patterns"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["architects"]
+
+[docs."docs/design/governance/governance.md"]
+category = "design"
+status = "draft"
+title = "Governance Framework"
+description = "Comprehensive governance framework for cooperative decision-making"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["architects", "product"]
+
+[docs."docs/design/governance/PROJECT_GOVERNANCE.md"]
+category = "design"
+status = "living"
+title = "ICN Project Governance"
+description = "Governance structure for ICN development and decision-making"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["team", "stakeholders"]
+
+[docs."docs/design/governance/README.md"]
+category = "reference"
+status = "canonical"
+title = "Governance Directory README"
+description = "Navigation guide for governance documentation"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["architects"]
+
+[docs."docs/design/economics/ECONOMIC_ARCHITECTURE.md"]
+category = "design"
+status = "living"
+title = "ICN Economic Architecture"
+description = "Design of value flows, contribution accounting, and economic incentives"
+last_updated = "2026-01-17"
+owner = "matt"
+audiences = ["architects", "product"]
+
+[docs."docs/design/economics/ECONOMIC_VISION.md"]
+category = "design"
+status = "living"
+title = "Economic Vision"
+description = "Long-term vision for ICN's economic model and cooperative ownership"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["architects", "stakeholders"]
+
+[docs."docs/design/economics/contribution-credits-design.md"]
+category = "design"
+status = "draft"
+title = "Contribution Credits Design"
+description = "Design for tracking and accounting for contributions to cooperative entities"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["architects"]
+
+[docs."docs/design/economics/economic-safety.md"]
+category = "design"
+status = "draft"
+title = "Economic Safety Design"
+description = "Safety mechanisms preventing economic attacks and misuse of economic primitives"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["architects", "security"]
+
+[docs."docs/design/economics/README.md"]
+category = "reference"
+status = "canonical"
+title = "Economics Directory README"
+description = "Navigation for economics and value flow documentation"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["architects"]
+
+# ============================================================================
+# DESIGN DOCUMENTS - Other Topics
+# ============================================================================
+
+[docs."docs/design/platform-layer-design.md"]
+category = "design"
+status = "draft"
+title = "Platform Layer Design"
+description = "Design for platform abstractions and portability across systems"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers", "architects"]
+
+[docs."docs/design/scope-scheduling.md"]
+category = "design"
+status = "draft"
+title = "Scope Scheduling Design"
+description = "Design for scheduling and resource allocation within organizational scopes"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["architects", "developers"]
+
+[docs."docs/design/scheduler-evolution-plan.md"]
+category = "design"
+status = "draft"
+title = "Scheduler Evolution Plan"
+description = "Plan for evolving ICN's scheduling substrate over multiple phases"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["architects"]
+
+[docs."docs/design/repo-reality-map.md"]
+category = "design"
+status = "draft"
+title = "Repository Reality Map"
+description = "Mapping between git repository structure and architectural reality"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/design/razeto-integration-design.md"]
+category = "design"
+status = "draft"
+title = "Razeto Integration Design"
+description = "Design for integrating external systems via Razeto protocol"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["architects", "developers"]
+
+[docs."docs/design/entity-dissolution.md"]
+category = "design"
+status = "draft"
+title = "Entity Dissolution Design"
+description = "Design for graceful shutdown and dissolution of cooperative entities"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["architects"]
+
+[docs."docs/design/README.md"]
+category = "reference"
+status = "canonical"
+title = "Design Directory README"
+description = "Navigation guide for design documentation"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["architects", "developers"]
+
+# ============================================================================
+# STRATEGY DOCUMENTS
+# ============================================================================
+
+[docs."docs/strategy/ADR-001-What-ICN-Is.md"]
+category = "strategy"
+status = "living"
+title = "ADR-001: What ICN Is"
+description = "Architectural Decision Record defining ICN scope, non-goals, and boundary conditions"
+last_updated = "2026-02-28"
+owner = "matt"
+audiences = ["developers", "architects", "stakeholders"]
+
+[docs."docs/strategy/ICN-Definition.md"]
+category = "strategy"
+status = "living"
+title = "What ICN Is"
+description = "Canonical definition: problem statement, solution approach, scope and non-goals"
+last_updated = "2026-03-17"
+owner = "matt"
+audiences = ["all"]
+
+[docs."docs/strategy/ICN-Technical-Whitepaper.md"]
+category = "strategy"
+status = "living"
+title = "ICN Technical Whitepaper"
+description = "Formal technical specification for grants, regulatory review, and architectural validation"
+last_updated = "2026-03-15"
+owner = "matt"
+audiences = ["grant-reviewers", "architects", "compliance"]
+
+[docs."docs/strategy/ICN-Pitch.md"]
+category = "strategy"
+status = "living"
+title = "ICN Pitch"
+description = "Elevator pitch, one-pagers, and public communication messaging framework"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["stakeholders", "public"]
+
+[docs."docs/strategy/ICN-Evolution-Arc.md"]
+category = "strategy"
+status = "living"
+title = "ICN Evolution Arc"
+description = "Long-term vision across phases 0-3, from MVP to mature cooperative ecosystem"
+last_updated = "2026-03-08"
+owner = "matt"
+audiences = ["architects", "stakeholders"]
+
+[docs."docs/strategy/ICN-Scenarios.md"]
+category = "strategy"
+status = "living"
+title = "ICN Scenarios"
+description = "Use case narratives and operational scenarios demonstrating ICN in practice"
+last_updated = "2026-03-09"
+owner = "matt"
+audiences = ["product", "marketing"]
+
+[docs."docs/strategy/ICN-Gap-Analysis-March-2026.md"]
+category = "strategy"
+status = "living"
+title = "ICN Gap Analysis March 2026"
+description = "Comprehensive implementation assessment across 10 subsystems with evidence and gaps"
+last_updated = "2026-03-17"
+owner = "matt"
+audiences = ["grant-reviewers", "architects", "product"]
+
+[docs."docs/strategy/ICN-Roadmap-Strategy.md"]
+category = "strategy"
+status = "living"
+title = "ICN Roadmap Strategy"
+description = "Strategic roadmap phases 0-3 with dependencies, milestones, and long-term vision"
+last_updated = "2026-03-12"
+owner = "matt"
+audiences = ["architects", "stakeholders", "grant-reviewers"]
+
+[docs."docs/strategy/ICN-Roadmap-Live.md"]
+category = "strategy"
+status = "living"
+title = "ICN Live Roadmap"
+description = "Current sprint and quarterly priorities, immediate milestones, and dependencies"
+last_updated = "2026-03-21"
+owner = "matt"
+audiences = ["team", "stakeholders"]
+
+[docs."docs/strategy/ICN-Sprint-March17.md"]
+category = "strategy"
+status = "living"
+title = "ICN Sprint March 17"
+description = "Specific sprint plan and tactical objectives for week of March 17, 2026"
+last_updated = "2026-03-17"
+owner = "matt"
+audiences = ["team"]
+
+# ============================================================================
+# SECURITY DOCUMENTS
+# ============================================================================
+
+[docs."docs/security/README.md"]
+category = "security"
+status = "canonical"
+title = "Security Documentation Index"
+description = "Navigation and overview of security-related documentation"
+last_updated = "2026-03-15"
+owner = "matt"
+audiences = ["security", "architects"]
+
+[docs."docs/security/threat-model.md"]
+category = "security"
+status = "living"
+title = "ICN Threat Model"
+description = "Comprehensive threat model covering attack vectors, adversary capabilities, and mitigations"
+last_updated = "2026-03-15"
+owner = "matt"
+audiences = ["security", "architects"]
+
+[docs."docs/security/TOFU_SECURITY_MODEL.md"]
+category = "security"
+status = "living"
+title = "TOFU (Trust-On-First-Use) Security Model"
+description = "Trust establishment for first-time peer contact without certificates or CAs"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["security", "developers"]
+
+[docs."docs/security/production-hardening.md"]
+category = "security"
+status = "living"
+title = "Production Hardening"
+description = "Hardening measures protecting against DoS, resource exhaustion, and operational failures"
+last_updated = "2026-03-15"
+owner = "matt"
+audiences = ["operators", "security"]
+
+[docs."docs/security/SECRET_MANAGEMENT.md"]
+category = "security"
+status = "living"
+title = "Secret Management"
+description = "Policy and design for managing cryptographic secrets and sensitive data"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["security", "operators"]
+
+[docs."docs/security/GATEWAY_CSP.md"]
+category = "security"
+status = "living"
+title = "Gateway Content Security Policy"
+description = "CSP configuration for ICN gateway ensuring safe web integration"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["security", "developers"]
+
+# ============================================================================
+# API AND REFERENCE DOCUMENTS
+# ============================================================================
+
+[docs."docs/api/OPENAPI.md"]
+category = "reference"
+status = "living"
+title = "ICN Gateway API Documentation"
+description = "HTTP API specification and usage guide for ICN Gateway"
+last_updated = "2026-03-15"
+owner = "matt"
+audiences = ["developers", "integrators"]
+
+[docs."docs/api/openapi.yaml"]
+category = "reference"
+status = "living"
+title = "OpenAPI Specification"
+description = "Machine-readable API specification in OpenAPI 3.0 format"
+last_updated = "2026-03-15"
+owner = "matt"
+audiences = ["developers", "tools"]
+
+[docs."docs/api/README.md"]
+category = "reference"
+status = "canonical"
+title = "API Documentation Index"
+description = "Navigation and overview for API-related documentation"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers", "integrators"]
+
+[docs."docs/reference/api/API_REFERENCE.md"]
+category = "reference"
+status = "living"
+title = "API Reference"
+description = "Detailed API endpoint reference with examples and error codes"
+last_updated = "2026-03-15"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/reference/api/api-versioning.md"]
+category = "reference"
+status = "living"
+title = "API Versioning Strategy"
+description = "Versioning scheme and compatibility policy for ICN APIs"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers", "architects"]
+
+[docs."docs/reference/api/topic-subscriptions-api.md"]
+category = "reference"
+status = "draft"
+title = "Topic Subscriptions API"
+description = "API for subscribing to and consuming topic streams"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+# ============================================================================
+# DEPLOYMENT AND OPERATIONS DOCUMENTS
+# ============================================================================
+
+[docs."docs/deployment/DEPLOYMENT_GUIDE.md"]
+category = "operations"
+status = "living"
+title = "ICN Deployment Guide"
+description = "Comprehensive guide for deploying ICN to production environments"
+last_updated = "2026-03-15"
+owner = "matt"
+audiences = ["operators", "developers"]
+
+[docs."docs/deployment/QUICK_START.md"]
+category = "guide"
+status = "living"
+title = "Quick Deploy Guide"
+description = "Fast path for getting ICN running locally"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers", "operators"]
+
+[docs."docs/deployment/DEPLOY_TO_K3S.md"]
+category = "guide"
+status = "living"
+title = "Deploy to K3s"
+description = "Steps for deploying ICN to Kubernetes using K3s"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["operators", "developers"]
+
+[docs."docs/deployment/DEPLOY_TEST_NETWORK.md"]
+category = "guide"
+status = "living"
+title = "Deploy Test Network"
+description = "Guide for setting up multi-node test networks for validation"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers", "testers"]
+
+[docs."docs/operations/deployment/deployment-guide.md"]
+category = "operations"
+status = "living"
+title = "Operations Deployment Guide"
+description = "Deep operational guide for production deployments"
+last_updated = "2026-03-15"
+owner = "matt"
+audiences = ["operators"]
+
+[docs."docs/operations/deployment/distributed-tracing.md"]
+category = "operations"
+status = "draft"
+title = "Distributed Tracing Setup"
+description = "Configuration for distributed tracing and observability"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["operators"]
+
+[docs."docs/operations/deployment/incident-response.md"]
+category = "operations"
+status = "draft"
+title = "Incident Response Plan"
+description = "Procedures for responding to production incidents"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["operators"]
+
+[docs."docs/operations/README.md"]
+category = "operations"
+status = "canonical"
+title = "Operations Directory README"
+description = "Navigation for operations and deployment documentation"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["operators"]
+
+# ============================================================================
+# DEVELOPER GUIDES AND ONBOARDING
+# ============================================================================
+
+[docs."docs/guides/developer/README.md"]
+category = "guide"
+status = "canonical"
+title = "Developer Guides"
+description = "Index of guides for developers building on or contributing to ICN"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/guides/user/README.md"]
+category = "guide"
+status = "canonical"
+title = "User Guides"
+description = "End-user documentation and tutorials"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["users"]
+
+[docs."docs/guides/operations/README.md"]
+category = "guide"
+status = "canonical"
+title = "Operations Guides"
+description = "Operational guides for running ICN deployments"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["operators"]
+
+[docs."docs/onboarding/README.md"]
+category = "guide"
+status = "canonical"
+title = "Developer Onboarding Curriculum"
+description = "Structured learning path for new ICN developers"
+last_updated = "2026-03-15"
+owner = "matt"
+audiences = ["developers", "contributors"]
+
+[docs."docs/onboarding/path/phase-2-architecture/04-actors-and-concurrency.md"]
+category = "guide"
+status = "living"
+title = "Actors and Concurrency"
+description = "Learning module on ICN's actor model and concurrent execution"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/path/phase-2-architecture/05-the-meaning-firewall.md"]
+category = "guide"
+status = "living"
+title = "The Meaning Firewall"
+description = "Learning module on ICN's type-safe boundary enforcement"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/path/phase-2-architecture/06-persistence-and-ledger.md"]
+category = "guide"
+status = "living"
+title = "Persistence and Ledger"
+description = "Learning module on state persistence and event logging"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/reference/module-02-architecture-overview.md"]
+category = "guide"
+status = "living"
+title = "Module 02: Architecture Overview"
+description = "Reference module providing high-level architecture overview"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/reference/module-13-security-privacy.md"]
+category = "guide"
+status = "living"
+title = "Module 13: Security and Privacy"
+description = "Reference module on security and privacy in ICN"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers", "security"]
+
+# ============================================================================
+# PLANNING AND DEVELOPMENT DOCS
+# ============================================================================
+
+[docs."docs/planning/agent-knowledge-architecture.md"]
+category = "reference"
+status = "draft"
+title = "Agent Knowledge Architecture"
+description = "Design for AI agent knowledge bases and context management"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["agents", "architects"]
+
+[docs."docs/performance/README.md"]
+category = "reference"
+status = "canonical"
+title = "Performance Documentation"
+description = "Performance requirements, benchmarks, and optimization guidance"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers", "architects"]
+
+[docs."docs/internal/README.md"]
+category = "reference"
+status = "canonical"
+title = "Internal Documentation"
+description = "Internal-only documentation for team coordination"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["team"]
+
+[docs."docs/demo/README.md"]
+category = "reference"
+status = "living"
+title = "Demo System Documentation"
+description = "Documentation for ICN demonstration system"
+last_updated = "2026-03-15"
+owner = "matt"
+audiences = ["team", "demo-users"]
+
+[docs."docs/examples/policies/README.md"]
+category = "reference"
+status = "canonical"
+title = "Policy Examples"
+description = "Example governance policies for cooperative organizations"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["users", "architects"]
+
+# ============================================================================
+# ARCHITECTURE — Additional
+# ============================================================================
+
+[docs."docs/architecture/ARCHITECTURAL_GAPS_AND_FIXES.md"]
+category = "architecture"
+status = "living"
+title = "Architectural Gaps & Remediation Plan"
+description = "Analysis of architectural weaknesses and remediation strategies"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["architects"]
+
+[docs."docs/spec/KERNEL_CONTRACTS.md"]
+category = "architecture"
+status = "draft"
+title = "ICN Kernel Contracts Specification"
+description = "Specification of kernel contract primitives"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["architects", "developers"]
+
+# ============================================================================
+# DESIGN — Compute, Entity, Misc
+# ============================================================================
+
+[docs."docs/design/compute-classes.md"]
+category = "design"
+status = "living"
+title = "Compute Classes: Legitimacy vs Utility"
+description = "Design distinguishing between legitimacy compute and utility compute subsystems"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["architects", "developers"]
+
+[docs."docs/design/entity-dissolution-example.md"]
+category = "design"
+status = "living"
+title = "Entity Dissolution: Before and After"
+description = "Practical example of entity dissolution workflow"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["architects"]
+
+# ============================================================================
+# DESIGN — Economics (Additional)
+# ============================================================================
+
+[docs."docs/design/economics/econ-modeling.md"]
+category = "design"
+status = "living"
+title = "Economic Modeling for Mutual Credit"
+description = "Simulation and validation of mutual credit economic models"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["architects"]
+
+[docs."docs/design/economics/economics-truth-contract.md"]
+category = "design"
+status = "living"
+title = "Economics Truth Contract"
+description = "Truth contract auditing all economics-related code against specification"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["architects", "developers"]
+
+[docs."docs/design/economics/model-validation.md"]
+category = "design"
+status = "living"
+title = "Economic Model Validation"
+description = "Maps economic operations against implementation state"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["architects"]
+
+# ============================================================================
+# DESIGN — Governance (Additional)
+# ============================================================================
+
+[docs."docs/design/governance/model-validation.md"]
+category = "design"
+status = "living"
+title = "Governance Model Validation"
+description = "Maps governance operations against implementation state"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["architects"]
+
+[docs."docs/design/governance/witness-trust-validation.md"]
+category = "design"
+status = "living"
+title = "Trust-Graph Integration for Witness Validation"
+description = "Trust-graph integration for witness validation in ledger operations"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["architects", "security"]
+
+# ============================================================================
+# SDIS (Sovereign Digital Identity System)
+# ============================================================================
+
+[docs."docs/sdis/SDIS_SYSTEM.md"]
+category = "design"
+status = "draft"
+title = "SDIS: Secure Distributed Identity System"
+description = "SDIS design with implemented flows and planned endpoints"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["architects", "developers"]
+
+[docs."docs/sdis/SDIS_API_GUIDE.md"]
+category = "reference"
+status = "living"
+title = "SDIS API Guide"
+description = "Complete API guide for Sovereign Digital Identity System"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/sdis/SDIS_USER_GUIDE.md"]
+category = "guide"
+status = "living"
+title = "SDIS User Guide"
+description = "End-user guide for credential presentation system"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["users"]
+
+[docs."docs/sdis/SDIS_STATUS.md"]
+category = "reference"
+status = "draft"
+title = "SDIS + Steward System Status"
+description = "Snapshot of SDIS deployment status"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["team"]
+
+[docs."docs/sdis/SDIS_BUILD_PLAN.md"]
+category = "strategy"
+status = "draft"
+title = "SDIS Complete Build Plan"
+description = "Detailed SDIS build plan from API to mobile"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["architects"]
+
+[docs."docs/sdis/SDIS_STEWARD_ROADMAP.md"]
+category = "strategy"
+status = "draft"
+title = "SDIS & Steward Completion Roadmap"
+description = "Roadmap for SDIS and steward system completion"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["architects"]
+
+[docs."docs/design/sdis/social-recovery.md"]
+category = "design"
+status = "living"
+title = "Social Recovery Guide"
+description = "M-of-N social recovery mechanism for identity recovery"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["architects", "security"]
+
+[docs."docs/design/sdis/README.md"]
+category = "reference"
+status = "canonical"
+title = "SDIS Design Documentation"
+description = "Navigation guide for Sovereign Digital Identity System design"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["architects"]
+
+# ============================================================================
+# SECURITY (Additional)
+# ============================================================================
+
+[docs."docs/security/security-roadmap.md"]
+category = "security"
+status = "living"
+title = "ICN Security Roadmap"
+description = "Security architecture and phased hardening approach"
+last_updated = "2026-03-15"
+owner = "matt"
+audiences = ["security", "architects"]
+
+[docs."docs/security/phase-10c-security-analysis.md"]
+category = "security"
+status = "draft"
+title = "Phase 10C Security Analysis"
+description = "Security analysis and hardening for multi-party contracts"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["security"]
+
+# ============================================================================
+# REFERENCE — API (Additional)
+# ============================================================================
+
+[docs."docs/reference/api/README.md"]
+category = "reference"
+status = "canonical"
+title = "API Reference Documentation"
+description = "Navigation guide for API reference documents"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/reference/config/CONFIGURATION.md"]
+category = "reference"
+status = "living"
+title = "ICN Configuration Management Guide"
+description = "Complete configuration reference for ICN nodes"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["operators", "developers"]
+
+[docs."docs/reference/config/README.md"]
+category = "reference"
+status = "canonical"
+title = "Configuration Reference"
+description = "Navigation guide for configuration documentation"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["operators"]
+
+[docs."docs/reference/config/identity-backend-configuration.md"]
+category = "reference"
+status = "draft"
+title = "Identity Backend Configuration"
+description = "Identity keystore backend configuration guide"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["operators"]
+
+[docs."docs/reference/config/trust-threshold-configuration.md"]
+category = "reference"
+status = "draft"
+title = "Trust Threshold Configuration"
+description = "Trust score threshold configuration guide"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["operators"]
+
+[docs."docs/glossary.md"]
+category = "reference"
+status = "living"
+title = "ICN Glossary"
+description = "Reference document with ICN terminology and definitions"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["all"]
+
+# ============================================================================
+# OPERATIONS — Runbooks
+# ============================================================================
+
+[docs."docs/ops/runbooks/README.md"]
+category = "reference"
+status = "canonical"
+title = "ICN Operations Runbooks"
+description = "Navigation guide for production runbooks"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["operators"]
+
+[docs."docs/ops/runbooks/01-emergency-restart.md"]
+category = "operations"
+status = "living"
+title = "Emergency Node Restart"
+description = "Runbook for emergency node restart procedures"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["operators"]
+
+[docs."docs/ops/runbooks/02-data-recovery.md"]
+category = "operations"
+status = "living"
+title = "Data Recovery Procedure"
+description = "Runbook for node data recovery from backup"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["operators"]
+
+[docs."docs/ops/runbooks/03-version-upgrade.md"]
+category = "operations"
+status = "living"
+title = "Version Upgrade Procedure"
+description = "Runbook for upgrading daemon to new version"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["operators"]
+
+[docs."docs/ops/runbooks/04-security-incident.md"]
+category = "operations"
+status = "living"
+title = "Security Incident Response"
+description = "Runbook for security incident response"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["operators", "security"]
+
+[docs."docs/ops/runbooks/05-troubleshooting.md"]
+category = "operations"
+status = "living"
+title = "Troubleshooting Guide"
+description = "Common issues and solutions for node operations"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["operators"]
+
+[docs."docs/ops/runbooks/06-secrets-rotation.md"]
+category = "operations"
+status = "living"
+title = "Secrets Rotation Procedure"
+description = "Runbook for rotating cryptographic secrets"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["operators", "security"]
+
+[docs."docs/ops/runbooks/07-pilot-vertical-slice-smoke.md"]
+category = "operations"
+status = "living"
+title = "Pilot Vertical Slice Smoke"
+description = "Runbook for pilot deployment verification"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["operators"]
+
+# ============================================================================
+# GUIDES — Developer
+# ============================================================================
+
+[docs."docs/dev/language-guide.md"]
+category = "guide"
+status = "canonical"
+title = "ICN UX Language Guide"
+description = "Enforced communications style guide for regulatory-safe messaging"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["all"]
+
+[docs."docs/guides/developer/DEV_ENVIRONMENT.md"]
+category = "guide"
+status = "living"
+title = "ICN Development Environment"
+description = "Setup guide for icn-dev development VM"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/guides/developer/DOCUMENTATION_STYLE.md"]
+category = "guide"
+status = "canonical"
+title = "Documentation Style Guide"
+description = "Consistent documentation formatting standards"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["contributors"]
+
+[docs."docs/guides/developer/i18n-guide.md"]
+category = "guide"
+status = "draft"
+title = "Internationalization (i18n) Guide"
+description = "i18n implementation across Rust, React Native, web"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/features/witness-signature-best-practices.md"]
+category = "guide"
+status = "living"
+title = "Witness Signature Best Practices"
+description = "Developer guide for witness signature implementation"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+# ============================================================================
+# GUIDES — Operations (Additional)
+# ============================================================================
+
+[docs."docs/guides/operations/backup-and-recovery.md"]
+category = "guide"
+status = "living"
+title = "Backup and Recovery Guide"
+description = "Operator procedures for node backup and recovery"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["operators"]
+
+[docs."docs/guides/operations/backup-restore.md"]
+category = "guide"
+status = "living"
+title = "Backup and Restore: Operator Recovery"
+description = "Low-level Sled database and keystore recovery"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["operators"]
+
+[docs."docs/guides/operations/daemon-mode-governance.md"]
+category = "guide"
+status = "living"
+title = "Daemon Mode with Governance Receipts"
+description = "Phase 0 pilot daemon mode operations"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["operators"]
+
+[docs."docs/guides/operations/nat-traversal.md"]
+category = "guide"
+status = "living"
+title = "NAT Traversal Operations Guide"
+description = "Configuring and operating nodes behind NAT"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["operators"]
+
+[docs."docs/guides/operations/nat-traversal-pilot-test.md"]
+category = "guide"
+status = "living"
+title = "NAT Traversal Pilot Test Guide"
+description = "Manual testing guide for NAT traversal feature"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["operators", "testers"]
+
+[docs."docs/guides/operations/network-policies.md"]
+category = "operations"
+status = "draft"
+title = "Network Policy Design — K3s"
+description = "K3s network policy design (deferred)"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["operators"]
+
+[docs."docs/guides/operations/operations-guide.md"]
+category = "guide"
+status = "living"
+title = "ICN Operations Guide"
+description = "Comprehensive operational procedures and workflows"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["operators"]
+
+[docs."docs/guides/operations/phase-0-monitoring.md"]
+category = "operations"
+status = "living"
+title = "Phase 0 Operational Monitoring"
+description = "Monitoring configuration for Phase 0 pilot"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["operators"]
+
+[docs."docs/guides/operations/pilot-smoke.md"]
+category = "guide"
+status = "living"
+title = "Pilot Smoke Runbook"
+description = "Deterministic operator check for pilot deployment"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["operators"]
+
+[docs."docs/guides/operations/replication-operations.md"]
+category = "guide"
+status = "living"
+title = "Replication Operations Guide"
+description = "Replication procedures for Phase 17 storage hardening"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["operators"]
+
+[docs."docs/guides/operations/troubleshooting.md"]
+category = "guide"
+status = "living"
+title = "ICN Troubleshooting Runbooks"
+description = "Step-by-step procedures for diagnosing operational issues"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["operators"]
+
+# ============================================================================
+# GUIDES — User (Additional)
+# ============================================================================
+
+[docs."docs/guides/user/cooperative-setup-guide.md"]
+category = "guide"
+status = "living"
+title = "Cooperative Setup Guide"
+description = "Instructions for setting up a new cooperative on ICN"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["users"]
+
+[docs."docs/guides/user/summit-demo.md"]
+category = "guide"
+status = "living"
+title = "Summit Decision Registry Demo"
+description = "Demo script for decision registry and treasury spending"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["team", "demo-users"]
+
+# ============================================================================
+# ONBOARDING — Curriculum Structure
+# ============================================================================
+
+[docs."docs/onboarding/syllabus.md"]
+category = "guide"
+status = "canonical"
+title = "Onboarding Syllabus"
+description = "Overall course structure for Foundations and Accelerated tracks"
+last_updated = "2026-03-15"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/assessments.md"]
+category = "guide"
+status = "living"
+title = "Onboarding Assessments"
+description = "Module checkpoints and self-review questions"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/capstone.md"]
+category = "guide"
+status = "living"
+title = "Capstone: Local Two-Node ICN + Ledger Flow"
+description = "Final capstone project demonstrating end-to-end ICN"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/patterns.md"]
+category = "reference"
+status = "living"
+title = "ICN Common Patterns Reference"
+description = "Quick reference for recurring code patterns in ICN"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/reading-map.md"]
+category = "guide"
+status = "living"
+title = "Onboarding Reading Map"
+description = "Links between modules and high-signal source files"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/review-plan.md"]
+category = "guide"
+status = "living"
+title = "Curriculum Gap Analysis"
+description = "Analysis of curriculum gaps and iteration plan"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["team"]
+
+[docs."docs/onboarding/update-process.md"]
+category = "guide"
+status = "living"
+title = "Curriculum Update Process"
+description = "Process for keeping onboarding aligned with codebase"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["team"]
+
+[docs."docs/onboarding/module-template.md"]
+category = "reference"
+status = "draft"
+title = "Module Template"
+description = "Template for creating onboarding modules"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["team"]
+
+# ============================================================================
+# ONBOARDING — Tracks
+# ============================================================================
+
+[docs."docs/onboarding/tracks/foundations.md"]
+category = "guide"
+status = "canonical"
+title = "Foundations Track (8 weeks)"
+description = "Comprehensive onboarding track for Rust beginners"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/tracks/accelerated.md"]
+category = "guide"
+status = "canonical"
+title = "Accelerated Track (4 weeks)"
+description = "Fast-track onboarding for Rust-intermediate developers"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/tracks/contributor-ladder.md"]
+category = "guide"
+status = "canonical"
+title = "ICN Contributor Ladder"
+description = "Tier-based contributor skill progression (Observer → Contributor → Maintainer → Architect)"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["contributors"]
+
+# ============================================================================
+# ONBOARDING — Labs (8 labs)
+# ============================================================================
+
+[docs."docs/onboarding/labs/lab-01-workspace/README.md"]
+category = "guide"
+status = "living"
+title = "Lab 01: Workspace Setup"
+description = "Learning lab for workspace organization"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/labs/lab-02-error-receipt/README.md"]
+category = "guide"
+status = "living"
+title = "Lab 02: Error Receipts and Tracing"
+description = "Learning lab for structured errors and tracing"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/labs/lab-03-mini-actor/README.md"]
+category = "guide"
+status = "living"
+title = "Lab 03: Mini Actor Runtime"
+description = "Learning lab for actor model implementation"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/labs/lab-04-firewall-oracle/README.md"]
+category = "guide"
+status = "living"
+title = "Lab 04: Firewall Oracle (Keystone Lab)"
+description = "Keystone lab proving the Meaning Firewall boundary"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/labs/lab-05-mini-ledger/README.md"]
+category = "guide"
+status = "living"
+title = "Lab 05: Mini Ledger with Double-Entry"
+description = "Learning lab for ledger implementation"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/labs/lab-06-signed-envelope/README.md"]
+category = "guide"
+status = "living"
+title = "Lab 06: Signed Envelopes with Replay Protection"
+description = "Learning lab for cryptographic signatures"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/labs/lab-07-gossip-sync/README.md"]
+category = "guide"
+status = "living"
+title = "Lab 07: Gossip Sync with Vector Clocks"
+description = "Learning lab for eventual consistency"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/labs/lab-08-governance-flow/README.md"]
+category = "guide"
+status = "living"
+title = "Lab 08: Governance Flow"
+description = "Learning lab for governance proposal to constraint update"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+# ============================================================================
+# ONBOARDING — Learning Path Modules
+# ============================================================================
+
+[docs."docs/onboarding/path/phase-1-foundations/01-environment.md"]
+category = "guide"
+status = "living"
+title = "01: Environment Setup & Repository Navigation"
+description = "Foundational module on environment and repo layout"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/path/phase-1-foundations/02-rust-through-icn.md"]
+category = "guide"
+status = "living"
+title = "02: Rust Through ICN's Lens"
+description = "Foundational module on Rust patterns used in ICN"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/path/phase-1-foundations/03-errors-and-tracing.md"]
+category = "guide"
+status = "living"
+title = "03: Errors and Tracing"
+description = "Foundational module on error handling and distributed visibility"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/path/phase-3-systems/07-identity-and-crypto.md"]
+category = "guide"
+status = "living"
+title = "07: Identity and Cryptography"
+description = "Systems module on identity and cryptographic operations"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/path/phase-3-systems/08-network-and-gossip.md"]
+category = "guide"
+status = "living"
+title = "08: Network and Gossip"
+description = "Systems module on network communication and eventual consistency"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/path/phase-3-systems/09-governance-and-contracts.md"]
+category = "guide"
+status = "living"
+title = "09: Governance and Contracts"
+description = "Systems module on governance and contracts"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/path/phase-4-ownership/10-federation-and-ops.md"]
+category = "guide"
+status = "living"
+title = "10: Federation and Operations"
+description = "Ownership module on federation and production deployment"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/path/phase-4-ownership/11-maintainer.md"]
+category = "guide"
+status = "living"
+title = "11: Maintainer Skills"
+description = "Ownership module on reshaping architecture safely"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/path/phase-4-ownership/capstone.md"]
+category = "guide"
+status = "living"
+title = "Maintainer Capstone"
+description = "Final capstone gate for Maintainer tier"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+# ============================================================================
+# ONBOARDING — Reference Modules
+# ============================================================================
+
+[docs."docs/onboarding/reference/module-00-setup.md"]
+category = "guide"
+status = "living"
+title = "Module 0: Setup and Tooling"
+description = "Reference module on development environment setup"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/reference/module-01-rust-fundamentals.md"]
+category = "guide"
+status = "living"
+title = "Module 1: Rust Fundamentals"
+description = "Reference module on Rust concepts for ICN"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/reference/module-03-runtime-actors.md"]
+category = "guide"
+status = "living"
+title = "Module 3: Runtime and Actor Model"
+description = "Reference module on actor model and constraint engine"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/reference/module-04-identity-trust.md"]
+category = "guide"
+status = "living"
+title = "Module 4: Identity and Trust"
+description = "Reference module on identity and trust primitives"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/reference/module-05-network-gossip.md"]
+category = "guide"
+status = "living"
+title = "Module 5: Network and Gossip"
+description = "Reference module on network communication and state sync"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/reference/module-06-ledger-contracts.md"]
+category = "guide"
+status = "living"
+title = "Module 6: Ledger and Contracts"
+description = "Reference module on ledger and CCL programming"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/reference/module-08-web-ui.md"]
+category = "guide"
+status = "living"
+title = "Module 8: Web UI Integration"
+description = "Reference module on web UI integration"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/reference/module-09-ops-deploy.md"]
+category = "guide"
+status = "living"
+title = "Module 9: Operations and Deployment"
+description = "Reference module on production deployment"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/reference/module-10-contributor-workflow.md"]
+category = "guide"
+status = "living"
+title = "Module 10: Contributor Workflow"
+description = "Reference module on contribution processes"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/reference/module-11-federation.md"]
+category = "guide"
+status = "living"
+title = "Module 11: Federation"
+description = "Reference module on federation and inter-cooperative agreements"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/reference/module-12-observability.md"]
+category = "guide"
+status = "living"
+title = "Module 12: Observability and Metrics"
+description = "Reference module on monitoring"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/reference/module-14-governance-ccl-deep-dive.md"]
+category = "guide"
+status = "living"
+title = "Module 14: Governance and CCL Deep Dive"
+description = "Reference module on governance and contract language"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+# ============================================================================
+# ONBOARDING — Workshops (15 workshops)
+# ============================================================================
+
+[docs."docs/onboarding/workshops/workshop-00-setup.md"]
+category = "guide"
+status = "living"
+title = "Workshop 0: Local Build and Repo Orientation"
+description = "Workshop on local build and repository structure"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/workshops/workshop-01-rust-fundamentals.md"]
+category = "guide"
+status = "living"
+title = "Workshop 1: Rust Fundamentals in Practice"
+description = "Workshop applying Rust patterns to ICN code"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/workshops/workshop-02-architecture.md"]
+category = "guide"
+status = "living"
+title = "Workshop 2: Architecture Mapping Exercise"
+description = "Workshop for building architecture mental models"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/workshops/workshop-03-runtime.md"]
+category = "guide"
+status = "living"
+title = "Workshop 3: Runtime and Actor Lifecycle"
+description = "Workshop on actor model and lifecycle"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/workshops/workshop-04-identity-trust.md"]
+category = "guide"
+status = "living"
+title = "Workshop 4: Identity and Trust Hands-On"
+description = "Workshop on identity and trust operations"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/workshops/workshop-05-network-gossip.md"]
+category = "guide"
+status = "living"
+title = "Workshop 5: Network and Gossip Deep Dive"
+description = "Workshop on network and gossip systems"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/workshops/workshop-06-ledger-contracts.md"]
+category = "guide"
+status = "living"
+title = "Workshop 6: Ledger and Contract Flow"
+description = "Workshop on ledger and contract operations"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/workshops/workshop-08-web-ui.md"]
+category = "guide"
+status = "living"
+title = "Workshop 8: Web UI Exploration"
+description = "Workshop on web UI and gateway integration"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/workshops/workshop-09-ops.md"]
+category = "guide"
+status = "living"
+title = "Workshop 9: Local Deployment and Observability"
+description = "Workshop on deployment and monitoring"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/workshops/workshop-10-contributor.md"]
+category = "guide"
+status = "living"
+title = "Workshop 10: Contributor Workflow"
+description = "Workshop on contribution workflow"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/workshops/workshop-11-federation.md"]
+category = "guide"
+status = "living"
+title = "Workshop 11: Federation Hands-On"
+description = "Workshop on federation code paths"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/workshops/workshop-12-observability.md"]
+category = "guide"
+status = "living"
+title = "Workshop 12: Observability and Metrics"
+description = "Workshop on observability"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/workshops/workshop-13-security-privacy.md"]
+category = "guide"
+status = "living"
+title = "Workshop 13: Security and Privacy"
+description = "Workshop on security and privacy layers"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/onboarding/workshops/workshop-14-governance-ccl.md"]
+category = "guide"
+status = "living"
+title = "Workshop 14: Governance and CCL Deep Dive"
+description = "Workshop on governance and contract language"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+# ============================================================================
+# DEVELOPMENT — Substantive Docs (not session logs)
+# ============================================================================
+
+[docs."docs/development/README.md"]
+category = "reference"
+status = "canonical"
+title = "Development Documentation"
+description = "Navigation guide for development activities"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/development/code-quality-improvements.md"]
+category = "operations"
+status = "living"
+title = "Code Quality Improvement Tracker"
+description = "Tracks error handling and code quality audits"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/development/federation-roadmap-implementation.md"]
+category = "guide"
+status = "living"
+title = "Federation Roadmap Implementation Guide"
+description = "Step-by-step federation feature implementation guide"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/development/gossip-signed-envelope-migration.md"]
+category = "design"
+status = "draft"
+title = "Gossip SignedEnvelope Migration"
+description = "Migration plan for gossip cryptographic authentication"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/development/identity-bundle-refactor-plan.md"]
+category = "design"
+status = "draft"
+title = "IdentityBundle Refactor Plan"
+description = "Hardware-backed signing implementation plan"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/development/module-splitting-analysis.md"]
+category = "design"
+status = "living"
+title = "Module Splitting Analysis"
+description = "Analysis of large modules for potential splitting"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["architects"]
+
+[docs."docs/development/trust-multi-graph-migration.md"]
+category = "guide"
+status = "living"
+title = "Trust Multi-Graph Migration Guide"
+description = "Migration guide for multi-graph architecture"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/development/testing/README.md"]
+category = "reference"
+status = "canonical"
+title = "Testing Documentation"
+description = "Navigation guide for testing guides"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+# ============================================================================
+# PILOTS AND INTERNAL
+# ============================================================================
+
+[docs."docs/internal/legal-considerations.md"]
+category = "reference"
+status = "draft"
+title = "ICN Legal Considerations"
+description = "Legal questions and considerations for cooperative communities"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["compliance"]
+
+[docs."docs/internal/pilots/pilot-coordinator-guide.md"]
+category = "guide"
+status = "living"
+title = "Pilot Coordinator Guide"
+description = "Practical guide for cooperative coordinators deploying ICN"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["operators"]
+
+[docs."docs/internal/pilots/pilot-limitations.md"]
+category = "reference"
+status = "living"
+title = "Pilot Deployment Limitations"
+description = "Known limitations and constraints in pilot phase"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["team"]
+
+[docs."docs/internal/pilots/pilot-playbook.md"]
+category = "guide"
+status = "living"
+title = "Pilot Deployment Playbook"
+description = "Step-by-step guide for pilot cooperative deployment"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["operators"]
+
+[docs."docs/internal/pilots/pilot-readiness-gaps.md"]
+category = "reference"
+status = "living"
+title = "Pilot Readiness Gaps"
+description = "Critical gaps between implementation and pilot readiness"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["team"]
+
+[docs."docs/pilots/decision_registry_treasury_vote.md"]
+category = "reference"
+status = "living"
+title = "Decision Registry + Treasury Vote Pilot"
+description = "Economic receipt chain implementation in pilot"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["team"]
+
+[docs."docs/pilots/hosted-approach.md"]
+category = "reference"
+status = "draft"
+title = "Hosted Pilot Approach"
+description = "Approach for hosted cooperative pilot deployments"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["team"]
+
+[docs."docs/pilots/pilot-proposal-template.md"]
+category = "guide"
+status = "draft"
+title = "Pilot Proposal Template"
+description = "Template for approaching potential pilot communities"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["team"]
+
+# ============================================================================
+# PLANNING AND STRATEGY (Additional)
+# ============================================================================
+
+[docs."docs/planning/icn-crate-reference.md"]
+category = "reference"
+status = "living"
+title = "ICN Crate Reference"
+description = "Authoritative inventory of workspace crates"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/planning/icn-demo-one-pager.md"]
+category = "reference"
+status = "living"
+title = "ICN Governance Demo One-Pager"
+description = "One-page demo explanation and value proposition"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["stakeholders"]
+
+[docs."docs/planning/icn-ecosystem-map.md"]
+category = "reference"
+status = "living"
+title = "ICN Ecosystem Map"
+description = "System component interconnection map"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["architects"]
+
+[docs."docs/strategy/grants/README.md"]
+category = "reference"
+status = "canonical"
+title = "Grant Application Artifacts"
+description = "Navigation for grant application templates and materials"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["team"]
+
+[docs."docs/strategy/grants/grant-narrative-core.md"]
+category = "strategy"
+status = "draft"
+title = "ICN Grant Narrative Core"
+description = "Reusable grant narrative sections"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["team"]
+
+[docs."docs/strategy/grants/grant-one-pager.md"]
+category = "strategy"
+status = "draft"
+title = "ICN Grant One-Pager"
+description = "One-page ICN summary for grant applications"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["grant-reviewers"]
+
+[docs."docs/strategy/grants/compliance-architecture.md"]
+category = "strategy"
+status = "draft"
+title = "ICN Compliance Architecture"
+description = "Regulatory-safe design rationale for grants"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["compliance", "grant-reviewers"]
+
+[docs."docs/strategy/grants/budget-skeleton.md"]
+category = "reference"
+status = "draft"
+title = "ICN Budget Skeleton"
+description = "Grant budget template"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["team"]
+
+[docs."docs/strategy/grants/milestones.md"]
+category = "strategy"
+status = "draft"
+title = "ICN Milestones"
+description = "Project timeline through pilot deployment"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["grant-reviewers"]
+
+[docs."docs/strategy/grants/pilot-readiness.md"]
+category = "strategy"
+status = "draft"
+title = "Pilot Readiness Assessment"
+description = "Assessment of pilot readiness and gaps"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["team"]
+
+# ============================================================================
+# MOBILE, OBSERVABILITY, MIGRATION, TESTING, MISC
+# ============================================================================
+
+[docs."docs/mobile/icn-mobile-ux-spec-v1.md"]
+category = "design"
+status = "draft"
+title = "ICN Mobile Member UX Spec v1"
+description = "Mobile application UX specification"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers", "product"]
+
+[docs."docs/observability/storage-metrics.md"]
+category = "reference"
+status = "draft"
+title = "Storage Metrics Reference"
+description = "Prometheus metrics for storage and database monitoring"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["operators"]
+
+[docs."docs/observability/tail-based-sampling.md"]
+category = "guide"
+status = "draft"
+title = "Tail-Based Sampling Configuration"
+description = "Tail-based sampling setup for traces"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["operators"]
+
+[docs."docs/migration-guides/keystore-versions.md"]
+category = "guide"
+status = "draft"
+title = "Keystore Version Migration"
+description = "Guide for keystore format version migration"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["operators"]
+
+[docs."docs/migration-guides/version-upgrades.md"]
+category = "guide"
+status = "draft"
+title = "ICN Version Upgrade Guide"
+description = "Guide for upgrading between ICN versions"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["operators"]
+
+[docs."docs/testing/MOBILE_APP_TESTING_GUIDE.md"]
+category = "guide"
+status = "living"
+title = "Mobile App Testing Guide"
+description = "Testing guide for mobile application"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["testers"]
+
+[docs."docs/performance/trust-score-benchmark-results.md"]
+category = "reference"
+status = "living"
+title = "Trust Score Benchmark Results"
+description = "Benchmark results for trust score performance"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/performance/trust-service-performance.md"]
+category = "reference"
+status = "living"
+title = "Trust Service Performance Characteristics"
+description = "Performance characteristics and optimization guidance"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/templates/README.md"]
+category = "reference"
+status = "canonical"
+title = "Documentation Templates"
+description = "Navigation guide for documentation templates"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["contributors"]
+
+[docs."docs/templates/dev-journal.md"]
+category = "reference"
+status = "draft"
+title = "Development Journal Template"
+description = "Template for development session journals"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+[docs."docs/vision/README.md"]
+category = "reference"
+status = "canonical"
+title = "Vision & Strategy"
+description = "Navigation guide for vision and strategy documents"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["all"]
+
+[docs."docs/adr/ADR-0010-app-topology.md"]
+category = "architecture"
+status = "living"
+title = "ADR-0010: App Topology"
+description = "Architectural decision record on app topology"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["architects"]
+
+[docs."docs/ci/README.md"]
+category = "reference"
+status = "living"
+title = "CI Documentation"
+description = "CI status, gates, and ratchet plan"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
+
+# ============================================================================
+# ARCHIVED AND SUPERSEDED DOCUMENTS
+# ============================================================================
+
+[docs."docs/strategy/old-roadmap-2025.md"]
+category = "strategy"
+status = "superseded"
+title = "Old Roadmap 2025"
+description = "Historical roadmap from late 2025"
+superseded_by = "docs/strategy/ICN-Roadmap-Live.md"
+reason = "Roadmap updated for 2026 priorities"
+date = "2026-03-01"
+historical_value = false
+
+[docs."docs/architecture/legacy-state-machine.md"]
+category = "architecture"
+status = "archived"
+title = "Legacy State Machine Design"
+description = "Early design iteration, no longer in use"
+date = "2025-10-15"
+historical_value = false
+
+# ============================================================================
+# METADATA AND REGISTRY
+# ============================================================================
+
+[registry]
+version = "2.0"
+last_updated = "2026-03-21"
+total_entries = 241
+categories_covered = ["architecture", "design", "strategy", "guide", "reference", "operations", "security"]
+maintained_by = "matt"
+note = "Comprehensive registry of ICN documentation. Status indicates authority level: canonical (authoritative), living (actively maintained), draft (in development), archived (historical reference only)."

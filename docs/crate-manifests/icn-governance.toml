@@ -1,0 +1,49 @@
+# ICN Governance - Documentation Manifest
+
+[crate]
+name = "icn-governance"
+layer = "app"
+infection_status = "clean"
+owner = "core"
+doc_entry = "docs/reference/crates/icn-governance.md"
+status = "stable"
+exports_surface = true
+regulated_terms_allowed = false
+primitives = ["governance", "trust", "identity"]
+description = "Governance and participation subsystem; weighted voting, multi-sig, delegation"
+
+[documentation]
+overview = true
+examples = true
+safety = true
+tests = true
+integration = true
+
+[implementation]
+test_count = 187
+example_count = 12
+unsafe_blocks = 3
+feature_flags = ["voting-variants", "bench"]
+dependencies = ["serde", "serde_json", "thiserror"]
+peer_dependencies = ["icn-kernel-api", "icn-trust", "icn-identity"]
+
+[publication]
+published_to_crates_io = true
+version = "0.4.1"
+readme_exists = true
+changelog_exists = true
+api_stability = "stable"
+
+[verification]
+tests_pass = true
+lint_clean = true
+docs_compile = true
+no_forbidden_terms = true
+infection_vectors_documented = false
+capability_leaks_tested = true
+
+[notes]
+"App layer: Uses public kernel-api surface only."
+"Governance primitives: Weighted voting, threshold gates, delegation trees."
+"Examples include: DAO voting, cooperative board decisions, multi-sig treasury."
+"Unsafe blocks (3) relate to vote aggregation atomicity - all documented in code."

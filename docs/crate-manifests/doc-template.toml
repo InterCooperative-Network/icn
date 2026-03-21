@@ -1,0 +1,49 @@
+# ICN Crate Documentation Manifest Template
+# Copy and fill out for each crate in the workspace
+# This is a machine-readable inventory of a single crate's documentation requirements
+
+[crate]
+name = "CRATE_NAME"
+layer = "kernel"  # kernel | app | infrastructure | binary
+infection_status = "clean"  # clean | infected | needs-review (kernel only)
+owner = "core"  # github team or person
+doc_entry = "docs/reference/crates/CRATE_NAME.md"  # path to primary documentation
+status = "stable"  # stable | active | experimental | deprecated
+exports_surface = true  # public API surface
+regulated_terms_allowed = false  # can this crate reference forbidden terms?
+primitives = ["all"]  # which of the 8 primitives [identity, trust, governance, ledger, consensus, networking, persistence, capability]
+description = "Brief description of what this crate does"
+
+# Documentation sections required for each crate
+[documentation]
+overview = true  # exists
+examples = true  # has code examples
+safety = true  # documents unsafe {} blocks or special concerns
+tests = true  # test coverage documented
+integration = true  # how it integrates with kernel/app layer
+
+# Implementation details for verification
+[implementation]
+test_count = 0  # approximate number of tests
+example_count = 0  # number of code examples
+unsafe_blocks = 0  # count of unsafe blocks (kernel only)
+feature_flags = []  # list of cfg features
+dependencies = []  # external crates this depends on
+peer_dependencies = []  # other ICN crates this depends on
+
+# Publication and visibility
+[publication]
+published_to_crates_io = false  # on crates.io?
+version = "0.1.0"  # current version
+readme_exists = true
+changelog_exists = true
+api_stability = "experimental"  # experimental | beta | stable
+
+# Verification checklist
+[verification]
+tests_pass = true
+lint_clean = true
+docs_compile = true
+no_forbidden_terms = true
+infection_vectors_documented = false  # kernel only
+capability_leaks_tested = false  # kernel only
