@@ -380,14 +380,24 @@ pub enum PeerExchangeMessage {
 }
 
 /// Information about a known peer for exchange
+///
+/// # Wire Format Change (intentional, #1300)
+///
+/// Previously stored `addresses: Vec<String>` (plain socket address strings). Now stores
+/// `endpoints: Vec<EndpointCandidate>` to carry endpoint kind classification (Local, Public,
+/// Relay) alongside each address. This enables mDNS multi-address (#1298) and Happy Eyeballs
+/// (#1299) — peers can now distinguish which addresses to prefer for LAN-local connections.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KnownPeer {
     /// Peer's DID
     pub did: String,
 
-    /// Socket addresses where peer can be reached
-    /// Multiple addresses support multi-homed nodes
-    pub addresses: Vec<String>,
+    /// Candidate endpoints where this peer can be reached, classified by kind.
+    ///
+    /// Use `EndpointKind::Local` for mDNS-discovered LAN addresses,
+    /// `EndpointKind::Public` for STUN-discovered NAT addresses, and
+    /// `EndpointKind::Relay` for TURN relay fallbacks.
+    pub endpoints: Vec<crate::candidate::EndpointCandidate>,
 
     /// Protocol version
     pub version: String,
@@ -1376,7 +1386,9 @@ mod tests {
         let peers = vec![
             KnownPeer {
                 did: "did:icn:peer1".to_string(),
-                addresses: vec!["192.168.1.100:7777".to_string()],
+                endpoints: vec![crate::candidate::EndpointCandidate::public(
+                    "192.168.1.100:7777".parse().unwrap(),
+                )],
                 version: "0.1.0".to_string(),
                 network_name: Some("my-coop".to_string()),
                 observed_trust: Some(0.5),
@@ -1385,7 +1397,9 @@ mod tests {
             },
             KnownPeer {
                 did: "did:icn:peer2".to_string(),
-                addresses: vec!["192.168.1.101:7777".to_string()],
+                endpoints: vec![crate::candidate::EndpointCandidate::local(
+                    "192.168.1.101:7777".parse().unwrap(),
+                )],
                 version: "0.1.0".to_string(),
                 network_name: None,
                 observed_trust: None,
@@ -1422,7 +1436,10 @@ mod tests {
 
         let peer = KnownPeer {
             did: "did:icn:newpeer".to_string(),
-            addresses: vec!["10.0.0.1:7777".to_string(), "10.0.0.2:7777".to_string()],
+            endpoints: vec![
+                crate::candidate::EndpointCandidate::public("10.0.0.1:7777".parse().unwrap()),
+                crate::candidate::EndpointCandidate::local("10.0.0.2:7777".parse().unwrap()),
+            ],
             version: "0.2.0".to_string(),
             network_name: Some("icn-mainnet".to_string()),
             observed_trust: Some(0.8),
@@ -1442,7 +1459,7 @@ mod tests {
             decoded.payload
         {
             assert_eq!(decoded_peer.did, "did:icn:newpeer");
-            assert_eq!(decoded_peer.addresses.len(), 2);
+            assert_eq!(decoded_peer.endpoints.len(), 2);
             assert_eq!(decoded_peer.observed_trust, Some(0.8));
         } else {
             panic!("Expected PeerExchange::Announce payload");

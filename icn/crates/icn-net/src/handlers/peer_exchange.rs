@@ -7,6 +7,7 @@
 //! - Unannounce: Peer departure notification
 
 use super::ConnectionContext;
+use crate::candidate::EndpointCandidate;
 use crate::protocol::{KnownPeer, NetworkMessage, PeerExchangeMessage};
 use icn_identity::Did;
 use tracing::{info, warn};
@@ -74,7 +75,7 @@ impl ConnectionContext {
 
             known_peers.push(KnownPeer {
                 did: did_str.to_string(),
-                addresses: vec![conn.remote_address().to_string()],
+                endpoints: vec![EndpointCandidate::public(conn.remote_address())],
                 version: "0.1.0".to_string(),
                 network_name: network_filter.clone(),
                 observed_trust: None,
@@ -143,7 +144,7 @@ impl ConnectionContext {
 
     /// Handle peer announce - new peer introduction
     fn handle_peer_announce(&self, message: NetworkMessage, peer: &KnownPeer) {
-        info!("Peer announced: {} at {:?}", peer.did, peer.addresses);
+        info!("Peer announced: {} at {:?}", peer.did, peer.endpoints);
         icn_obs::metrics::peer_exchange::announces_received_inc();
         self.forward_to_handler(message);
     }
