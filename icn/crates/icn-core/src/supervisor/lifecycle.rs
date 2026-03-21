@@ -380,7 +380,7 @@ async fn spawn_actors_with_identity(
     // Store entity handle for notification routing
     let entity_handle = entity_services.entity_handle.clone();
 
-    // Initialize service discovery manager with gossip propagation
+    // Initialize service discovery manager with gossip propagation (and optional sled persistence)
     let service_discovery_mgr =
         match icn_gateway::service_discovery_mgr::ServiceDiscoveryManager::with_gossip(
             gossip_handle.clone(),
@@ -388,7 +388,34 @@ async fn spawn_actors_with_identity(
         )
         .await
         {
-            Ok(mgr) => {
+            Ok(mut mgr) => {
+                if config.gateway.service_discovery_persist {
+                    let sd_path = config.store_path().join("service-discovery");
+                    match sled::open(&sd_path) {
+                        Ok(db) => {
+                            if let Err(e) = mgr.with_persistence(&db) {
+                                warn!(
+                                    "Failed to attach service discovery persistence: {}; \
+                                     continuing without persistence",
+                                    e
+                                );
+                            } else {
+                                info!(
+                                    "Service discovery persistence enabled at {}",
+                                    sd_path.display()
+                                );
+                            }
+                        }
+                        Err(e) => {
+                            warn!(
+                                "Failed to open service discovery sled db at {}: {}; \
+                                 continuing without persistence",
+                                sd_path.display(),
+                                e
+                            );
+                        }
+                    }
+                }
                 let mgr = Arc::new(mgr);
                 info!("Service discovery manager initialized with gossip wiring");
                 Some(mgr)

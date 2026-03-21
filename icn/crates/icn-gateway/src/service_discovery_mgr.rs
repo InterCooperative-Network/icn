@@ -195,6 +195,61 @@ impl ServiceDiscoveryManager {
         Ok(manager)
     }
 
+    /// Attach sled persistence to an already-constructed manager.
+    ///
+    /// Loads all non-expired endpoints from sled into the existing in-memory
+    /// registry and wires up write-through for future announce/withdraw calls.
+    /// Call this after `with_gossip()` to combine gossip propagation with
+    /// durable persistence across daemon restarts.
+    pub fn with_persistence(&mut self, db: &sled::Db) -> Result<(), NamingError> {
+        let tree = db
+            .open_tree(SLED_TREE_NAME)
+            .map_err(|e| NamingError::Internal(format!("Failed to open sled tree: {e}")))?;
+
+        // Load non-expired entries from sled into the existing registry
+        let mut expired_keys = Vec::new();
+        {
+            let mut registry = self
+                .registry
+                .try_write()
+                .map_err(|_| NamingError::Internal("Registry lock contention".to_string()))?;
+
+            for entry in tree.iter() {
+                let (key, value) = entry.map_err(|e| {
+                    NamingError::Internal(format!("Failed to read sled entry: {e}"))
+                })?;
+                match serde_json::from_slice::<ServiceEndpoint>(&value) {
+                    Ok(ep) => {
+                        if ep.is_expired() {
+                            expired_keys.push(key);
+                        } else {
+                            registry.insert(ep.service_id.clone(), ep);
+                        }
+                    }
+                    Err(e) => {
+                        warn!("Skipping corrupt sled entry: {}", e);
+                        expired_keys.push(key);
+                    }
+                }
+            }
+        }
+
+        for key in expired_keys {
+            let _ = tree.remove(key);
+        }
+
+        info!(
+            "Loaded {} service endpoints from sled persistence",
+            self.registry
+                .try_read()
+                .map(|r| r.len())
+                .unwrap_or_default()
+        );
+
+        self.sled_tree = Some(tree);
+        Ok(())
+    }
+
     /// Set the signing key for generating signed responses to incoming queries.
     ///
     /// Without a signing key, the manager cannot respond to remote queries.
