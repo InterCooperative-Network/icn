@@ -159,138 +159,87 @@ pub async fn dial_with_fallback(
     DialResult::Failed { errors }
 }
 
-/// Dial local and public addresses in parallel, return first success
+/// Dial local and public address categories in parallel using Happy Eyeballs within each.
 ///
-/// Note: Uses unwrap() in select! branches that are guarded by is_some() checks.
-/// These are safe because the guards ensure the Option is Some before accessing.
-#[allow(clippy::unwrap_used)]
+/// Each endpoint category (Local, Public) is raced via `dial_happy_eyeballs()`, which
+/// handles IPv4/IPv6 racing per RFC 8305. The two category tasks are then raced against
+/// each other: first success wins. Relay is intentionally excluded here — it is handled
+/// by the caller (`dial_with_fallback`) as a last-resort fallback.
+///
+/// Composition:
+/// - `dial_parallel` races **across** endpoint kinds (Local vs Public)
+/// - `dial_happy_eyeballs` races **within** a kind (IPv6 vs IPv4)
 async fn dial_parallel(
     network_handle: &NetworkHandle,
     candidate: &ConnectionCandidate,
     config: &NatDialConfig,
 ) -> Result<(AddrType, SocketAddr), Vec<DialError>> {
-    let did = candidate.did.clone();
-    let Some(local_addr) = candidate.local_addr() else {
-        // No local address in candidate — skip parallel dial, try public only
-        let public_addr = candidate.public_addr();
-        if let Some(pub_addr) = public_addr {
-            icn_obs::metrics::nat::dial_attempt_inc("public");
-            let public_timeout = Duration::from_millis(config.public_dial_timeout_ms);
-            return match tokio::time::timeout(
-                public_timeout,
-                network_handle.dial(pub_addr, did.clone()),
-            )
-            .await
-            {
-                Ok(Ok(_)) => Ok((AddrType::Public, pub_addr)),
-                Ok(Err(e)) => Err(vec![DialError {
-                    addr_type: AddrType::Public,
-                    addr: pub_addr,
-                    error: e.to_string(),
-                }]),
-                Err(_) => Err(vec![DialError {
-                    addr_type: AddrType::Public,
-                    addr: pub_addr,
-                    error: format!("Timeout after {}ms", config.public_dial_timeout_ms),
-                }]),
-            };
-        }
-        return Err(vec![]);
-    };
-    let public_addr = candidate.public_addr();
+    use icn_net::candidate::EndpointKind;
 
+    let did = &candidate.did;
     let local_timeout = Duration::from_millis(config.local_dial_timeout_ms);
     let public_timeout = Duration::from_millis(config.public_dial_timeout_ms);
 
-    // Track metrics
-    icn_obs::metrics::nat::dial_attempt_inc("local");
-    if public_addr.is_some() {
-        icn_obs::metrics::nat::dial_attempt_inc("public");
+    let local_addrs: Vec<SocketAddr> = candidate.endpoints_of_kind(EndpointKind::Local).collect();
+    let public_addrs: Vec<SocketAddr> = candidate.endpoints_of_kind(EndpointKind::Public).collect();
+
+    if local_addrs.is_empty() && public_addrs.is_empty() {
+        return Err(vec![]);
     }
 
-    // Spawn local dial task
-    let local_handle = network_handle.clone();
-    let local_did = did.clone();
-    let mut local_task = tokio::spawn(async move {
-        tokio::time::timeout(local_timeout, local_handle.dial(local_addr, local_did)).await
-    });
-
-    // Spawn public dial task (if public address available)
-    let mut public_task = if let Some(pub_addr) = public_addr {
-        let public_handle = network_handle.clone();
-        let public_did = did.clone();
+    // Spawn Happy Eyeballs tasks for each category
+    let local_task = if !local_addrs.is_empty() {
+        icn_obs::metrics::nat::dial_attempt_inc("local");
+        let handle = network_handle.clone();
+        let d = did.clone();
+        let cfg = config.clone();
         Some(tokio::spawn(async move {
-            tokio::time::timeout(public_timeout, public_handle.dial(pub_addr, public_did)).await
+            dial_happy_eyeballs(local_addrs, &d, &handle, local_timeout, &cfg).await
         }))
     } else {
         None
     };
 
-    let mut errors = Vec::new();
-    let mut local_done = false;
-    let mut public_done = public_addr.is_none(); // Already done if no public address
+    let public_task = if !public_addrs.is_empty() {
+        icn_obs::metrics::nat::dial_attempt_inc("public");
+        let handle = network_handle.clone();
+        let d = did.clone();
+        let cfg = config.clone();
+        Some(tokio::spawn(async move {
+            dial_happy_eyeballs(public_addrs, &d, &handle, public_timeout, &cfg).await
+        }))
+    } else {
+        None
+    };
 
-    // Race the tasks using a loop
-    while !local_done || !public_done {
-        tokio::select! {
-            result = &mut local_task, if !local_done => {
-                local_done = true;
-                match result {
-                    Ok(Ok(Ok(_))) => return Ok((AddrType::Local, local_addr)),
-                    Ok(Ok(Err(e))) => {
-                        errors.push(DialError {
-                            addr_type: AddrType::Local,
-                            addr: local_addr,
-                            error: e.to_string(),
-                        });
-                    }
-                    Ok(Err(_)) => {
-                        errors.push(DialError {
-                            addr_type: AddrType::Local,
-                            addr: local_addr,
-                            error: format!("Timeout after {}ms", config.local_dial_timeout_ms),
-                        });
-                    }
-                    Err(e) => {
-                        errors.push(DialError {
-                            addr_type: AddrType::Local,
-                            addr: local_addr,
-                            error: format!("Task failed: {e}"),
-                        });
-                    }
+    // Race the two category tasks; first Some(_) wins
+    let (local_result, public_result) = match (local_task, public_task) {
+        (Some(l), Some(p)) => {
+            tokio::select! {
+                res = l => {
+                    let addr = res.ok().flatten();
+                    (addr, None)
                 }
-            }
-            result = async { public_task.as_mut().unwrap().await }, if !public_done && public_task.is_some() => {
-                public_done = true;
-                match result {
-                    Ok(Ok(Ok(_))) => return Ok((AddrType::Public, public_addr.unwrap())),
-                    Ok(Ok(Err(e))) => {
-                        errors.push(DialError {
-                            addr_type: AddrType::Public,
-                            addr: public_addr.unwrap(),
-                            error: e.to_string(),
-                        });
-                    }
-                    Ok(Err(_)) => {
-                        errors.push(DialError {
-                            addr_type: AddrType::Public,
-                            addr: public_addr.unwrap(),
-                            error: format!("Timeout after {}ms", config.public_dial_timeout_ms),
-                        });
-                    }
-                    Err(e) => {
-                        errors.push(DialError {
-                            addr_type: AddrType::Public,
-                            addr: public_addr.unwrap(),
-                            error: format!("Task failed: {e}"),
-                        });
-                    }
+                res = p => {
+                    let addr = res.ok().flatten();
+                    (None, addr)
                 }
             }
         }
+        (Some(l), None) => (l.await.ok().flatten(), None),
+        (None, Some(p)) => (None, p.await.ok().flatten()),
+        (None, None) => (None, None),
+    };
+
+    if let Some(addr) = local_result {
+        return Ok((AddrType::Local, addr));
+    }
+    if let Some(addr) = public_result {
+        return Ok((AddrType::Public, addr));
     }
 
-    Err(errors)
+    // Both categories exhausted — return empty error list (caller collects relay fallback)
+    Err(vec![])
 }
 
 /// Dial addresses sequentially: local first, then public
