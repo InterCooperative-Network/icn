@@ -19,8 +19,8 @@
     {
       "id": "s19-t1",
       "title": "feat(net): integrate dial_happy_eyeballs() into dial_parallel() (#1364)",
-      "status": "pending",
-      "pr": null,
+      "status": "in_review",
+      "pr": 1377,
       "assignee": null,
       "issue": 1364,
       "epic": "1295",
@@ -29,8 +29,8 @@
     {
       "id": "s19-t2",
       "title": "feat(net): TURN relay proxy IPv6 support (#1301)",
-      "status": "pending",
-      "pr": null,
+      "status": "done",
+      "pr": 1373,
       "assignee": null,
       "issue": 1301,
       "epic": "1295",
@@ -39,8 +39,8 @@
     {
       "id": "s19-t3",
       "title": "feat(devops): Genesis bundle schema + icnd --init (#1097)",
-      "status": "pending",
-      "pr": null,
+      "status": "done",
+      "pr": 1374,
       "assignee": null,
       "issue": 1097,
       "epic": "1099",
