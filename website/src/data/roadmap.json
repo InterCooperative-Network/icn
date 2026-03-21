@@ -1,0 +1,45 @@
+{
+  "currentSprint": {
+    "number": 18,
+    "name": "IPv6 Connectivity: KnownPeer Endpoint Sets + Happy Eyeballs",
+    "status": "active"
+  },
+  "stages": [
+    {
+      "id": "A",
+      "label": "Stage A — Now",
+      "badge": "badge-teal",
+      "markerColor": "var(--accent-teal)",
+      "title": "Institution-in-a-Box",
+      "description": "Charter templates, guided cooperative formation, membership onboarding, treasury ledger, and proposal-to-vote loop. The minimum viable institution.",
+      "status": "active"
+    },
+    {
+      "id": "B",
+      "label": "Stage B",
+      "badge": "badge-blue",
+      "markerColor": "var(--accent-blue)",
+      "title": "Federation Layer",
+      "description": "Inter-cooperative agreements with treaty-based governance, cross-group trust propagation, and federation clearing for mutual credit networks.",
+      "status": "planned"
+    },
+    {
+      "id": "C",
+      "label": "Stage C",
+      "badge": "badge-purple",
+      "markerColor": "var(--accent-purple)",
+      "title": "Compute Commons",
+      "description": "Shared compute resources contributed to a commons and allocated via cooperative fuel metering. Members contribute hardware; the network rewards them with cooperative capacity.",
+      "status": "planned"
+    },
+    {
+      "id": "D",
+      "label": "Stage D",
+      "badge": "badge-amber",
+      "markerColor": "var(--accent-amber)",
+      "title": "Civilization Tools",
+      "description": "Participatory budgeting at city scale. Municipal governance platforms. Public infrastructure coordination. The long-term vision: democratic technology governance beyond the co-op.",
+      "status": "vision"
+    }
+  ]
+}
