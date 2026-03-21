@@ -14,7 +14,7 @@
 
 use anyhow::{bail, Context, Result};
 use rand::RngCore;
-use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::sync::Arc;
 use tokio::net::UdpSocket;
 use tokio::sync::mpsc;
@@ -101,25 +101,40 @@ impl TurnRelayProxy {
         peer_relay_addr: SocketAddr,
         turn_client: Arc<TurnClient>,
     ) -> Result<ProxyHandle> {
-        // Only IPv4 peer addresses are supported for now.
-        if peer_relay_addr.is_ipv6() {
-            bail!("IPv6 peer relay addresses are not yet supported");
-        }
-
-        // Bind local loopback socket (Quinn side).
-        let local_socket =
+        // Bind local loopback socket (Quinn side) matching the peer's address family.
+        let local_socket = if peer_relay_addr.is_ipv6() {
+            UdpSocket::bind(SocketAddr::V6(SocketAddrV6::new(
+                Ipv6Addr::LOCALHOST,
+                0,
+                0,
+                0,
+            )))
+            .await
+            .context("failed to bind local relay socket (IPv6)")?
+        } else {
             UdpSocket::bind(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 0)))
                 .await
-                .context("failed to bind local relay socket")?;
+                .context("failed to bind local relay socket (IPv4)")?
+        };
         let local_addr = local_socket
             .local_addr()
             .context("failed to get local relay address")?;
 
-        // Bind TURN-side socket (talks to TURN server).
-        let turn_socket =
+        // Bind TURN-side socket matching the peer's address family.
+        let turn_socket = if peer_relay_addr.is_ipv6() {
+            UdpSocket::bind(SocketAddr::V6(SocketAddrV6::new(
+                Ipv6Addr::UNSPECIFIED,
+                0,
+                0,
+                0,
+            )))
+            .await
+            .context("failed to bind TURN-side relay socket (IPv6)")?
+        } else {
             UdpSocket::bind(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, 0)))
                 .await
-                .context("failed to bind TURN-side relay socket")?;
+                .context("failed to bind TURN-side relay socket (IPv4)")?
+        };
         let turn_side_addr = turn_socket
             .local_addr()
             .context("failed to get TURN-side relay address")?;
@@ -259,18 +274,15 @@ async fn relay_loop(
 /// - XOR-PEER-ADDRESS attribute (the peer to relay to)
 /// - DATA attribute (the actual payload)
 ///
-/// Only IPv4 peer addresses are supported.
+/// Both IPv4 and IPv6 peer addresses are supported.
 pub fn build_send_indication(peer_addr: SocketAddr, data: &[u8]) -> Result<Vec<u8>> {
-    if peer_addr.is_ipv6() {
-        bail!("IPv6 peer addresses are not yet supported in SEND-INDICATION");
-    }
-
     // Generate random transaction ID
     let mut transaction_id = [0u8; 12];
     rand::thread_rng().fill_bytes(&mut transaction_id);
 
-    // Estimate capacity: 20 header + 12 xor-peer-address attr + data attr
-    let mut msg = Vec::with_capacity(20 + 12 + 4 + data.len() + 4);
+    // Estimate capacity: 20 header + xor-peer-address attr (8 v4 / 20 v6) + data attr
+    let xor_attr_val_len = if peer_addr.is_ipv6() { 20 } else { 8 };
+    let mut msg = Vec::with_capacity(20 + 4 + xor_attr_val_len + 4 + data.len() + 4);
 
     // Message type: SEND-INDICATION
     msg.extend_from_slice(&SEND_INDICATION.to_be_bytes());
@@ -285,8 +297,12 @@ pub fn build_send_indication(peer_addr: SocketAddr, data: &[u8]) -> Result<Vec<u
     // Transaction ID
     msg.extend_from_slice(&transaction_id);
 
-    // XOR-PEER-ADDRESS attribute
-    let xor_addr = xor_encode_address_v4(peer_addr, &transaction_id)?;
+    // XOR-PEER-ADDRESS attribute (dispatch on address family)
+    let xor_addr = if peer_addr.is_ipv6() {
+        xor_encode_address_v6(peer_addr, &transaction_id)?
+    } else {
+        xor_encode_address_v4(peer_addr, &transaction_id)?
+    };
     msg.extend_from_slice(&XOR_PEER_ADDRESS.to_be_bytes());
     msg.extend_from_slice(&(xor_addr.len() as u16).to_be_bytes());
     msg.extend_from_slice(&xor_addr);
@@ -319,7 +335,7 @@ pub fn build_send_indication(peer_addr: SocketAddr, data: &[u8]) -> Result<Vec<u
 /// - 2 bytes XOR'd port
 /// - 4 bytes XOR'd IPv4 address
 pub fn xor_encode_address_v4(addr: SocketAddr, transaction_id: &[u8; 12]) -> Result<Vec<u8>> {
-    let _ = transaction_id; // Not used for IPv4 XOR, but kept for API consistency
+    let _ = transaction_id; // Not used for IPv4 XOR, but kept for API consistency with v6
 
     match addr {
         SocketAddr::V4(v4) => {
@@ -339,7 +355,44 @@ pub fn xor_encode_address_v4(addr: SocketAddr, transaction_id: &[u8; 12]) -> Res
             Ok(result)
         }
         SocketAddr::V6(_) => {
-            bail!("IPv6 addresses are not yet supported in xor_encode_address_v4");
+            bail!("xor_encode_address_v4 called with IPv6 address; use xor_encode_address_v6");
+        }
+    }
+}
+
+/// XOR-encode an IPv6 socket address per RFC 5766 section 10.2.
+///
+/// Produces the attribute value bytes (without the attribute type/length header):
+/// - 1 byte reserved (0x00)
+/// - 1 byte family (0x02 for IPv6)
+/// - 2 bytes XOR'd port (XOR with high 16 bits of magic cookie)
+/// - 4 bytes XOR'd with magic cookie (first 4 bytes of IPv6 address)
+/// - 12 bytes XOR'd with transaction ID (remaining 12 bytes of IPv6 address)
+pub fn xor_encode_address_v6(addr: SocketAddr, transaction_id: &[u8; 12]) -> Result<Vec<u8>> {
+    match addr {
+        SocketAddr::V6(v6) => {
+            let mut result = Vec::with_capacity(20);
+            result.push(0x00); // Reserved
+            result.push(0x02); // IPv6 family
+
+            let port = v6.port() ^ ((MAGIC_COOKIE >> 16) as u16);
+            result.extend_from_slice(&port.to_be_bytes());
+
+            let ip_bytes = v6.ip().octets();
+            let cookie_bytes = MAGIC_COOKIE.to_be_bytes();
+            // First 4 bytes XOR'd with magic cookie
+            for i in 0..4 {
+                result.push(ip_bytes[i] ^ cookie_bytes[i]);
+            }
+            // Remaining 12 bytes XOR'd with transaction ID
+            for i in 0..12 {
+                result.push(ip_bytes[4 + i] ^ transaction_id[i]);
+            }
+
+            Ok(result)
+        }
+        SocketAddr::V4(_) => {
+            bail!("xor_encode_address_v6 called with IPv4 address; use xor_encode_address_v4");
         }
     }
 }
@@ -593,12 +646,105 @@ mod tests {
     fn test_xor_encode_address_v4_rejects_ipv6() {
         let addr: SocketAddr = "[::1]:8080".parse().unwrap();
         let txn_id = [0u8; 12];
+        // v4 encoder must reject IPv6 input
         assert!(xor_encode_address_v4(addr, &txn_id).is_err());
     }
 
     #[test]
-    fn test_build_send_indication_rejects_ipv6() {
-        let addr: SocketAddr = "[::1]:5000".parse().unwrap();
-        assert!(build_send_indication(addr, b"data").is_err());
+    fn test_xor_encode_address_v6_roundtrip() {
+        // Build a known IPv6 address and verify XOR encoding + manual decode round-trips.
+        let ip: std::net::Ipv6Addr = "2001:db8::1".parse().unwrap();
+        let addr = SocketAddr::new(std::net::IpAddr::V6(ip), 9876);
+        let txn_id: [u8; 12] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+
+        let encoded = xor_encode_address_v6(addr, &txn_id).unwrap();
+        assert_eq!(encoded.len(), 20);
+        assert_eq!(encoded[0], 0x00); // reserved
+        assert_eq!(encoded[1], 0x02); // IPv6 family
+
+        // Decode port
+        let decoded_port =
+            u16::from_be_bytes([encoded[2], encoded[3]]) ^ ((MAGIC_COOKIE >> 16) as u16);
+        assert_eq!(decoded_port, 9876);
+
+        // Decode IP
+        let ip_bytes = ip.octets();
+        let cookie_bytes = MAGIC_COOKIE.to_be_bytes();
+        for i in 0..4 {
+            assert_eq!(encoded[4 + i], ip_bytes[i] ^ cookie_bytes[i]);
+        }
+        for i in 0..12 {
+            assert_eq!(encoded[8 + i], ip_bytes[4 + i] ^ txn_id[i]);
+        }
+    }
+
+    #[test]
+    fn test_xor_encode_address_v6_rejects_ipv4() {
+        let addr: SocketAddr = "192.168.1.1:8080".parse().unwrap();
+        let txn_id = [0u8; 12];
+        assert!(xor_encode_address_v6(addr, &txn_id).is_err());
+    }
+
+    #[test]
+    fn test_build_send_indication_accepts_ipv6() {
+        let addr: SocketAddr = "[2001:db8::1]:5000".parse().unwrap();
+        let data = b"test payload v6";
+        let msg = build_send_indication(addr, data).unwrap();
+
+        // Verify SEND-INDICATION header
+        let msg_type = u16::from_be_bytes([msg[0], msg[1]]);
+        assert_eq!(msg_type, SEND_INDICATION);
+        let cookie = u32::from_be_bytes([msg[4], msg[5], msg[6], msg[7]]);
+        assert_eq!(cookie, MAGIC_COOKIE);
+
+        // Verify total length is 4-byte aligned
+        assert_eq!(msg.len() % 4, 0);
+
+        // Walk attributes and find XOR-PEER-ADDRESS (should be 20 bytes for IPv6)
+        let msg_len = u16::from_be_bytes([msg[2], msg[3]]) as usize;
+        let mut pos = 20;
+        let mut found_peer = false;
+        let mut found_data = false;
+        while pos + 4 <= 20 + msg_len && pos + 4 <= msg.len() {
+            let attr_type = u16::from_be_bytes([msg[pos], msg[pos + 1]]);
+            let attr_len = u16::from_be_bytes([msg[pos + 2], msg[pos + 3]]) as usize;
+            match attr_type {
+                XOR_PEER_ADDRESS => {
+                    assert_eq!(attr_len, 20, "IPv6 XOR-PEER-ADDRESS should be 20 bytes");
+                    assert_eq!(msg[pos + 5], 0x02, "family byte should be 0x02 for IPv6");
+                    found_peer = true;
+                }
+                DATA_ATTR => {
+                    assert_eq!(&msg[pos + 4..pos + 4 + attr_len], data);
+                    found_data = true;
+                }
+                _ => {}
+            }
+            pos += 4 + ((attr_len + 3) & !3);
+        }
+        assert!(found_peer, "XOR-PEER-ADDRESS attribute missing");
+        assert!(found_data, "DATA attribute missing");
+    }
+
+    #[tokio::test]
+    async fn test_proxy_start_with_ipv6_peer() {
+        // Verify that start() no longer rejects IPv6 peer addresses.
+        // Use a fake TURN server on IPv6 loopback.
+        let fake_turn = UdpSocket::bind("[::1]:0").await;
+        if fake_turn.is_err() {
+            // IPv6 loopback not available in this environment — skip.
+            return;
+        }
+        let fake_turn = fake_turn.unwrap();
+        let fake_turn_addr = fake_turn.local_addr().unwrap();
+
+        let peer_v6: SocketAddr = "[::1]:9000".parse().unwrap();
+        let result = TurnRelayProxy::start_test(fake_turn_addr, peer_v6).await;
+        assert!(
+            result.is_ok(),
+            "start() should accept IPv6 peer: {:?}",
+            result.err()
+        );
+        result.unwrap().shutdown().await.unwrap();
     }
 }
