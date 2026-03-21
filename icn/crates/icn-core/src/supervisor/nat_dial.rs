@@ -416,75 +416,89 @@ pub async fn dial_happy_eyeballs(
 
     let delay = Duration::from_millis(config.happy_eyeballs_delay_ms);
 
-    // Fast path: only one IP version present — dial it directly, no stagger needed
+    // Fast path: only one IP version present — try all addresses in order, no stagger needed
     let has_ipv6 = sorted.iter().any(|a| a.is_ipv6());
     let has_ipv4 = sorted.iter().any(|a| a.is_ipv4());
     if !has_ipv6 || !has_ipv4 {
-        let addr = sorted[0];
-        debug!(%did, %addr, "happy_eyeballs: single IP version, dialing directly");
-        return tokio::time::timeout(dial_timeout, network_handle.dial(addr, did.clone()))
-            .await
-            .ok()
-            .and_then(|r| r.ok())
-            .map(|_| addr);
+        icn_obs::metrics::nat::dial_attempt_inc("happy_eyeballs");
+        debug!(%did, candidates = sorted.len(), "happy_eyeballs: single IP version, dialing sequentially");
+        for addr in &sorted {
+            if let Ok(Ok(_)) =
+                tokio::time::timeout(dial_timeout, network_handle.dial(*addr, did.clone())).await
+            {
+                icn_obs::metrics::nat::dial_success_inc(
+                    if addr.is_ipv6() { "ipv6" } else { "ipv4" },
+                );
+                info!(%did, %addr, "happy_eyeballs: connected");
+                return Some(*addr);
+            }
+        }
+        icn_obs::metrics::nat::dial_failure_inc();
+        return None;
     }
 
-    // Dual-stack path: IPv6 first, IPv4 after stagger
+    // Dual-stack path: IPv6 first (immediate), IPv4 after stagger (RFC 8305 §5)
     let ipv6_addrs: Vec<SocketAddr> = sorted.iter().filter(|a| a.is_ipv6()).copied().collect();
     let ipv4_addrs: Vec<SocketAddr> = sorted.iter().filter(|a| a.is_ipv4()).copied().collect();
 
-    let ipv6_addr = ipv6_addrs[0];
-    let ipv4_addr = ipv4_addrs[0];
-
     debug!(
         %did,
-        ipv6 = %ipv6_addr,
-        ipv4 = %ipv4_addr,
+        ipv6_candidates = ipv6_addrs.len(),
+        ipv4_candidates = ipv4_addrs.len(),
         stagger_ms = config.happy_eyeballs_delay_ms,
         "happy_eyeballs: racing IPv6 (preferred) and IPv4 (staggered)"
     );
+    icn_obs::metrics::nat::dial_attempt_inc("happy_eyeballs");
 
     let (result_tx, mut result_rx) = tokio::sync::mpsc::channel::<SocketAddr>(1);
 
-    // Spawn IPv6 task (immediate)
-    let ipv6_handle_clone = network_handle.clone();
+    // Spawn IPv6 task: try all IPv6 addresses in order, send first success
+    let ipv6_handle = network_handle.clone();
     let ipv6_did = did.clone();
     let ipv6_tx = result_tx.clone();
     let ipv6_task = tokio::spawn(async move {
-        if let Ok(Ok(_)) =
-            tokio::time::timeout(dial_timeout, ipv6_handle_clone.dial(ipv6_addr, ipv6_did)).await
-        {
-            let _ = ipv6_tx.send(ipv6_addr).await;
+        for addr in ipv6_addrs {
+            if let Ok(Ok(_)) =
+                tokio::time::timeout(dial_timeout, ipv6_handle.dial(addr, ipv6_did.clone())).await
+            {
+                let _ = ipv6_tx.send(addr).await;
+                break;
+            }
         }
     });
 
-    // Spawn IPv4 task (staggered)
-    let ipv4_handle_clone = network_handle.clone();
+    // Spawn IPv4 task: sleep stagger, then try all IPv4 addresses in order
+    let ipv4_handle = network_handle.clone();
     let ipv4_did = did.clone();
     let ipv4_tx = result_tx.clone();
     let ipv4_task = tokio::spawn(async move {
         tokio::time::sleep(delay).await;
-        if let Ok(Ok(_)) =
-            tokio::time::timeout(dial_timeout, ipv4_handle_clone.dial(ipv4_addr, ipv4_did)).await
-        {
-            let _ = ipv4_tx.send(ipv4_addr).await;
+        for addr in ipv4_addrs {
+            if let Ok(Ok(_)) =
+                tokio::time::timeout(dial_timeout, ipv4_handle.dial(addr, ipv4_did.clone())).await
+            {
+                let _ = ipv4_tx.send(addr).await;
+                break;
+            }
         }
     });
 
     // Drop the original sender so the channel closes when both tasks finish
     drop(result_tx);
 
-    // Wait for first success or both tasks finishing
+    // Wait for first success or both tasks exhausted
     let winner = result_rx.recv().await;
 
-    // Cancel the other task (best-effort; the task is already detached but the result is ignored)
+    // Cancel the other task (best-effort)
     ipv6_task.abort();
     ipv4_task.abort();
 
     if let Some(addr) = winner {
+        icn_obs::metrics::nat::dial_success_inc(if addr.is_ipv6() { "ipv6" } else { "ipv4" });
         info!(%did, %addr, "happy_eyeballs: connected");
     } else {
-        debug!(%did, "happy_eyeballs: both IPv4 and IPv6 failed");
+        icn_obs::metrics::nat::dial_failure_inc();
+        debug!(%did, "happy_eyeballs: all candidates exhausted");
     }
 
     winner

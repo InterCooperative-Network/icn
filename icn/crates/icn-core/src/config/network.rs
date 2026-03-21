@@ -204,7 +204,8 @@ pub struct NatDialConfig {
     /// spawning an IPv4 dial task. The first successful connection wins.
     ///
     /// 250ms matches RFC 8305 §5 and the value used by all major browsers.
-    /// Set to 0 to disable IPv6 preference and dial all addresses simultaneously.
+    /// Set to 0 to start the IPv4 task immediately alongside IPv6 (no stagger delay).
+    /// IPv6 is still preferred — this only removes the delay before IPv4 is spawned.
     ///
     /// Default: 250 (milliseconds)
     #[serde(default = "default_happy_eyeballs_delay_ms")]
