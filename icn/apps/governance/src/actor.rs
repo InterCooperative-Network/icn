@@ -2813,7 +2813,12 @@ mod tests {
         let store = make_store();
         let d = Delegation::new(did(), did(), DelegationScope::Blanket);
 
-        handle_incoming(&store, GovernanceMessage::delegation_created(d.clone()), None).unwrap();
+        handle_incoming(
+            &store,
+            GovernanceMessage::delegation_created(d.clone()),
+            None,
+        )
+        .unwrap();
 
         let loaded = store
             .get_delegation(&d.id)
@@ -2831,9 +2836,19 @@ mod tests {
         let store = make_store();
         let d = Delegation::new(did(), did(), DelegationScope::Blanket);
 
-        handle_incoming(&store, GovernanceMessage::delegation_created(d.clone()), None).unwrap();
+        handle_incoming(
+            &store,
+            GovernanceMessage::delegation_created(d.clone()),
+            None,
+        )
+        .unwrap();
         // Second application of the same message must not error.
-        handle_incoming(&store, GovernanceMessage::delegation_created(d.clone()), None).unwrap();
+        handle_incoming(
+            &store,
+            GovernanceMessage::delegation_created(d.clone()),
+            None,
+        )
+        .unwrap();
 
         let loaded = store.get_delegation(&d.id).unwrap().unwrap();
         assert_eq!(loaded.id, d.id);

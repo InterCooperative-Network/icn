@@ -50,8 +50,8 @@ async fn test_candidate_cache_flow() -> Result<()> {
     assert!(retrieved.is_some());
     let retrieved = retrieved.unwrap();
     assert_eq!(retrieved.did, did2);
-    assert_eq!(retrieved.local_addr, candidate2.local_addr);
-    assert_eq!(retrieved.public_addr, candidate2.public_addr);
+    assert_eq!(retrieved.local_addr(), candidate2.local_addr());
+    assert_eq!(retrieved.public_addr(), candidate2.public_addr());
 
     // Simulate Node 2 receiving Node 1's candidate
     assert!(cache.store(candidate1.clone()).await);
@@ -132,7 +132,7 @@ async fn test_candidate_update_priority() -> Result<()> {
 
     // Verify original candidate is still cached
     let retrieved = cache.get(&did).await.unwrap();
-    assert_eq!(retrieved.local_addr, candidate1.local_addr);
+    assert_eq!(retrieved.local_addr(), candidate1.local_addr());
 
     // Store newer candidate (should update)
     let mut newer_candidate = ConnectionCandidate::new(
@@ -146,8 +146,8 @@ async fn test_candidate_update_priority() -> Result<()> {
 
     // Verify newer candidate replaced the old one
     let retrieved = cache.get(&did).await.unwrap();
-    assert_eq!(retrieved.local_addr, newer_candidate.local_addr);
-    assert_eq!(retrieved.public_addr, newer_candidate.public_addr);
+    assert_eq!(retrieved.local_addr(), newer_candidate.local_addr());
+    assert_eq!(retrieved.public_addr(), newer_candidate.public_addr());
     assert_eq!(cache.len().await, 1); // Still just one entry
 
     Ok(())
@@ -185,8 +185,8 @@ async fn test_multiple_peer_candidates() -> Result<()> {
         assert!(retrieved.is_some());
         let retrieved = retrieved.unwrap();
         assert_eq!(retrieved.did, *did);
-        assert_eq!(retrieved.local_addr, original.local_addr);
-        assert_eq!(retrieved.public_addr, original.public_addr);
+        assert_eq!(retrieved.local_addr(), original.local_addr());
+        assert_eq!(retrieved.public_addr(), original.public_addr());
     }
 
     Ok(())

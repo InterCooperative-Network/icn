@@ -75,8 +75,10 @@ impl CandidateCache {
             }
             None => {
                 info!(
-                    "Storing new candidate for {} (local={}, public={:?})",
-                    did, candidate.local_addr, candidate.public_addr
+                    "Storing new candidate for {} (local={:?}, public={:?})",
+                    did,
+                    candidate.local_addr(),
+                    candidate.public_addr()
                 );
                 true
             }
@@ -238,7 +240,7 @@ mod tests {
 
         // Should have the newer candidate
         let retrieved = cache.get(&did).await.unwrap();
-        assert_eq!(retrieved.local_addr, candidate2.local_addr);
+        assert_eq!(retrieved.local_addr(), candidate2.local_addr());
         assert_eq!(cache.len().await, 1); // Still just one entry
     }
 
@@ -270,7 +272,7 @@ mod tests {
 
         // Should still have the original candidate
         let retrieved = cache.get(&did).await.unwrap();
-        assert_eq!(retrieved.local_addr, candidate1.local_addr);
+        assert_eq!(retrieved.local_addr(), candidate1.local_addr());
     }
 
     #[tokio::test]

@@ -112,7 +112,7 @@ pub async fn dial_with_fallback(
     }
 
     // Fallback to relay if available and direct connection failed
-    if let Some(relay_addr) = candidate.relay_addr {
+    if let Some(relay_addr) = candidate.relay_addr() {
         debug!(
             "Direct connection failed, attempting relay via {}",
             relay_addr
@@ -170,8 +170,34 @@ async fn dial_parallel(
     config: &NatDialConfig,
 ) -> Result<(AddrType, SocketAddr), Vec<DialError>> {
     let did = candidate.did.clone();
-    let local_addr = candidate.local_addr;
-    let public_addr = candidate.public_addr;
+    let Some(local_addr) = candidate.local_addr() else {
+        // No local address in candidate — skip parallel dial, try public only
+        let public_addr = candidate.public_addr();
+        if let Some(pub_addr) = public_addr {
+            icn_obs::metrics::nat::dial_attempt_inc("public");
+            let public_timeout = Duration::from_millis(config.public_dial_timeout_ms);
+            return match tokio::time::timeout(
+                public_timeout,
+                network_handle.dial(pub_addr, did.clone()),
+            )
+            .await
+            {
+                Ok(Ok(_)) => Ok((AddrType::Public, pub_addr)),
+                Ok(Err(e)) => Err(vec![DialError {
+                    addr_type: AddrType::Public,
+                    addr: pub_addr,
+                    error: e.to_string(),
+                }]),
+                Err(_) => Err(vec![DialError {
+                    addr_type: AddrType::Public,
+                    addr: pub_addr,
+                    error: format!("Timeout after {}ms", config.public_dial_timeout_ms),
+                }]),
+            };
+        }
+        return Err(vec![]);
+    };
+    let public_addr = candidate.public_addr();
 
     let local_timeout = Duration::from_millis(config.local_dial_timeout_ms);
     let public_timeout = Duration::from_millis(config.public_dial_timeout_ms);
@@ -276,47 +302,46 @@ async fn dial_sequential(
 ) -> Option<(AddrType, SocketAddr)> {
     let did = candidate.did.clone();
 
-    // Try local address first
-    icn_obs::metrics::nat::dial_attempt_inc("local");
-    let local_timeout = Duration::from_millis(config.local_dial_timeout_ms);
+    // Try local address first (if available)
+    if let Some(local_addr) = candidate.local_addr() {
+        icn_obs::metrics::nat::dial_attempt_inc("local");
+        let local_timeout = Duration::from_millis(config.local_dial_timeout_ms);
 
-    debug!(
-        "Attempting connection to {} via local address {}",
-        did, candidate.local_addr
-    );
+        debug!(
+            "Attempting connection to {} via local address {}",
+            did, local_addr
+        );
 
-    match tokio::time::timeout(
-        local_timeout,
-        network_handle.dial(candidate.local_addr, did.clone()),
-    )
-    .await
-    {
-        Ok(Ok(_)) => {
-            return Some((AddrType::Local, candidate.local_addr));
-        }
-        Ok(Err(e)) => {
-            debug!("Failed to connect via local address: {}", e);
-            errors.push(DialError {
-                addr_type: AddrType::Local,
-                addr: candidate.local_addr,
-                error: e.to_string(),
-            });
-        }
-        Err(_) => {
-            debug!(
-                "Local address dial timeout after {}ms",
-                config.local_dial_timeout_ms
-            );
-            errors.push(DialError {
-                addr_type: AddrType::Local,
-                addr: candidate.local_addr,
-                error: format!("Timeout after {}ms", config.local_dial_timeout_ms),
-            });
+        match tokio::time::timeout(local_timeout, network_handle.dial(local_addr, did.clone()))
+            .await
+        {
+            Ok(Ok(_)) => {
+                return Some((AddrType::Local, local_addr));
+            }
+            Ok(Err(e)) => {
+                debug!("Failed to connect via local address: {}", e);
+                errors.push(DialError {
+                    addr_type: AddrType::Local,
+                    addr: local_addr,
+                    error: e.to_string(),
+                });
+            }
+            Err(_) => {
+                debug!(
+                    "Local address dial timeout after {}ms",
+                    config.local_dial_timeout_ms
+                );
+                errors.push(DialError {
+                    addr_type: AddrType::Local,
+                    addr: local_addr,
+                    error: format!("Timeout after {}ms", config.local_dial_timeout_ms),
+                });
+            }
         }
     }
 
     // Try public address if available
-    if let Some(public_addr) = candidate.public_addr {
+    if let Some(public_addr) = candidate.public_addr() {
         icn_obs::metrics::nat::dial_attempt_inc("public");
         let public_timeout = Duration::from_millis(config.public_dial_timeout_ms);
 

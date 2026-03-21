@@ -448,8 +448,11 @@ pub async fn handle_connection_candidate(
     match serde_json::from_slice::<icn_net::ConnectionCandidate>(&entry_data) {
         Ok(candidate) => {
             info!(
-                "Received connection candidate from {}: local={}, public={:?}, relay={:?}",
-                candidate.did, candidate.local_addr, candidate.public_addr, candidate.relay_addr
+                "Received connection candidate from {}: local={:?}, public={:?}, relay={:?}",
+                candidate.did,
+                candidate.local_addr(),
+                candidate.public_addr(),
+                candidate.relay_addr()
             );
 
             let did = candidate.did.clone();

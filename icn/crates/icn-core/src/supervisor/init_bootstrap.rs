@@ -168,8 +168,10 @@ pub async fn announce_connection_candidate(
     match network_handle.connection_candidate().await {
         Ok(candidate) => {
             info!(
-                "Connection candidate: local={}, public={:?}, relay={:?}",
-                candidate.local_addr, candidate.public_addr, candidate.relay_addr
+                "Connection candidate: local={:?}, public={:?}, relay={:?}",
+                candidate.local_addr(),
+                candidate.public_addr(),
+                candidate.relay_addr()
             );
 
             // Serialize candidate and publish to gossip

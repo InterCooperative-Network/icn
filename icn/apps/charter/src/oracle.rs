@@ -328,7 +328,10 @@ governance:
 
         // After removal: deny (charter no longer deployed — fail closed)
         let decision = oracle.evaluate(&make_request(Some("coop-gamma")));
-        assert!(!decision.is_allowed(), "Removed charter must deny, not allow");
+        assert!(
+            !decision.is_allowed(),
+            "Removed charter must deny, not allow"
+        );
     }
 
     #[test]
