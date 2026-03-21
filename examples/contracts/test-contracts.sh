@@ -5,7 +5,7 @@
 set -e
 
 ICNCTL="../../icn/target/debug/icnctl"
-ENDPOINT="127.0.0.1:5601"
+ENDPOINT="[::1]:5601"
 
 # Colors for output
 GREEN='\033[0;32m'

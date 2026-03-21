@@ -444,7 +444,7 @@ icnctl
 
 **Notable flags:**
 - `-d <dir>` — data directory (default `~/.icn`)
-- `-e <addr>` — RPC endpoint (default `127.0.0.1:5601`)
+- `-e <addr>` — RPC endpoint (default `[::1]:5601`)
 - `--features post-quantum` — PQ identity support
 
 **i18n support:** `rust-i18n` + `sys-locale` — CLI messages in local language

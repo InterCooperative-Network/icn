@@ -40,7 +40,7 @@ pub struct RpcDeps {
 
 /// Configuration for RPC server
 pub struct RpcConfig {
-    /// RPC server address (usually 127.0.0.1:rpc_port)
+    /// RPC server address (usually [::1]:rpc_port after IPv6 bind change in PR #1338)
     pub addr: SocketAddr,
     /// JWT secret for authentication (optional, enables auth if provided)
     pub jwt_secret: Option<Vec<u8>>,

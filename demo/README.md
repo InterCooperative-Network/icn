@@ -202,7 +202,7 @@ demo/
 **Demo configuration for:**
 - Rochester Tool Library cooperative
 - Network: 127.0.0.1:7777
-- API: 127.0.0.1:5601
+- API: [::1]:5601
 - Gateway: 127.0.0.1:8080
 - Metrics: 127.0.0.1:9100
 - Timebank ledger type
