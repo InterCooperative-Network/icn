@@ -560,11 +560,14 @@ pub async fn handle_snapshot_coordination(
 /// `entry_author` is the DID of the gossip entry author as authenticated by the gossip layer.
 /// For `TaskSubmitted`, we validate that it matches `task.submitter` to prevent payer spoofing
 /// (#1342): a malicious peer could publish a TaskSubmitted message naming a victim DID as payer.
+///
+/// Returns `true` if the message passed the author guard and was forwarded (or would have been
+/// forwarded if the compute handle were present), `false` if rejected by the guard or malformed.
 pub async fn handle_compute_message(
     entry_data: Vec<u8>,
     entry_author: Did,
     compute_handle: ComputeHandleHolder,
-) {
+) -> bool {
     match icn_encoding::decode::<icn_compute::ComputeMessage>(&entry_data) {
         Ok(compute_msg) => {
             // Security (#1342): validate gossip entry author matches declared task submitter.
@@ -577,7 +580,7 @@ pub async fn handle_compute_message(
                         task_id = %task.id,
                         "Payer spoofing attempt: gossip entry author does not match task.submitter; rejecting"
                     );
-                    return;
+                    return false;
                 }
             }
 
@@ -586,9 +589,11 @@ pub async fn handle_compute_message(
                     warn!("Failed to handle compute message: {}", e);
                 }
             }
+            true
         }
         Err(e) => {
             warn!("Failed to deserialize compute message: {}", e);
+            false
         }
     }
 }
@@ -1121,10 +1126,12 @@ mod tests {
         let msg = ComputeMessage::TaskSubmitted(Box::new(task));
         let entry_data = icn_encoding::encode(&msg).unwrap();
 
-        // handle_compute_message with attacker as entry_author should silently drop the message
         let compute_handle: ComputeHandleHolder = Arc::new(RwLock::new(None));
-        handle_compute_message(entry_data, attacker_did, compute_handle).await;
-        // If we reach here without panic, the rejection path executed correctly
+        let forwarded = handle_compute_message(entry_data, attacker_did, compute_handle).await;
+        assert!(
+            !forwarded,
+            "spoofed TaskSubmitted (entry_author != task.submitter) must be rejected"
+        );
     }
 
     /// Verify legitimate TaskSubmitted (author == submitter) passes the guard.
@@ -1142,7 +1149,10 @@ mod tests {
         let entry_data = icn_encoding::encode(&msg).unwrap();
 
         let compute_handle: ComputeHandleHolder = Arc::new(RwLock::new(None));
-        // Should not early-return — guard passes, then no-ops (handle is None)
-        handle_compute_message(entry_data, did, compute_handle).await;
+        let forwarded = handle_compute_message(entry_data, did, compute_handle).await;
+        assert!(
+            forwarded,
+            "matching author/submitter must pass the guard (returns true even when handle is None)"
+        );
     }
 }
