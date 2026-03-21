@@ -18,6 +18,11 @@ on:
     # Sunday at midnight UTC
     - cron: '0 0 * * 0'
 
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
 jobs:
   lint:
     name: Lint Architecture Doc
