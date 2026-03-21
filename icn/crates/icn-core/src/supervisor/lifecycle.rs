@@ -393,7 +393,7 @@ async fn spawn_actors_with_identity(
                     let sd_path = config.store_path().join("service-discovery");
                     match sled::open(&sd_path) {
                         Ok(db) => {
-                            if let Err(e) = mgr.with_persistence(&db) {
+                            if let Err(e) = mgr.with_persistence(&db).await {
                                 warn!(
                                     "Failed to attach service discovery persistence: {}; \
                                      continuing without persistence",
