@@ -18,7 +18,7 @@
     {
       "id": "s18-t1",
       "title": "fix(compute): gossip-layer author validation for payer authorization (#1342)",
-      "status": "in_review",
+      "status": "in-review",
       "pr": 1360,
       "assignee": null,
       "issue": 1342,
@@ -28,7 +28,7 @@
     {
       "id": "s18-t2",
       "title": "refactor(net): KnownPeer endpoint field — Vec<String> → Vec<EndpointCandidate> (#1300)",
-      "status": "in_review",
+      "status": "in-review",
       "pr": 1361,
       "assignee": null,
       "issue": 1300,
@@ -38,7 +38,7 @@
     {
       "id": "s18-t3",
       "title": "feat(net): mDNS multi-address — advertise all local addrs, collect Vec<SocketAddr> (#1298)",
-      "status": "in_review",
+      "status": "in-review",
       "pr": 1362,
       "assignee": null,
       "issue": 1298,
@@ -48,7 +48,7 @@
     {
       "id": "s18-t4",
       "title": "feat(net): Happy Eyeballs — race IPv4/IPv6 in parallel with 250ms stagger (#1299)",
-      "status": "in_review",
+      "status": "in-review",
       "pr": 1363,
       "assignee": null,
       "issue": 1299,
