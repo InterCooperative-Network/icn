@@ -377,7 +377,15 @@ fn handle_init(args: &Args) -> Result<()> {
         .to_file(&genesis_path)
         .context("Failed to write genesis bundle")?;
 
-    println!("  Genesis:  {}\n", genesis_path.display());
+    println!("  Genesis:  {}", genesis_path.display());
+    if bundle.seed_peers.is_empty() {
+        println!(
+            "  NOTE: genesis.json has no seed_peers. Edit it to add this node's address before\n\
+             \x20        sharing with other nodes: add \"<host>:{}\" to the seed_peers list.",
+            gossip_port
+        );
+    }
+    println!();
     println!("Node initialized successfully.");
     println!("  Start with: icnd --config {}", config_path.display());
 
