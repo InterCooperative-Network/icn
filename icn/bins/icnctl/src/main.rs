@@ -35,8 +35,8 @@ struct Args {
     #[arg(short, long)]
     data_dir: Option<PathBuf>,
 
-    /// RPC endpoint (defaults to 127.0.0.1:5601)
-    #[arg(short, long, default_value = "127.0.0.1:5601")]
+    /// RPC endpoint (defaults to [::1]:5601 for dual-stack bind)
+    #[arg(short, long, default_value = "[::1]:5601")]
     endpoint: String,
 
     #[command(subcommand)]
@@ -10486,7 +10486,7 @@ async fn handle_preflight_command(
     check_count += 1;
     let check_num = if skip_keystore { 3 } else { 5 };
     print!("  [{}] Default RPC port (5601) available... ", check_num);
-    match std::net::TcpListener::bind("127.0.0.1:5601") {
+    match std::net::TcpListener::bind("[::1]:5601") {
         Ok(_) => {
             println!("✓ PASS");
             passed_count += 1;

@@ -179,7 +179,18 @@ pub fn create_payment_callback(ledger: LedgerHandle) -> icn_compute::PaymentCall
                     }
                 };
 
-            // Create journal entry for transfer
+            // Security (#1342): `req.from` originates from `claimed_task.submitter`, which is
+            // set by the task submitter at submission time. When tasks arrive via the gateway
+            // REST API the submitter DID is extracted from the JWT (authenticated). However,
+            // when a TaskSubmitted message is received via gossip, the submitter field comes
+            // from the gossip payload and could be spoofed by a malicious peer to name a
+            // victim DID as payer.
+            //
+            // Full fix requires the gossip layer to verify `entry.author == task.submitter`
+            // before calling `on_task_submitted` (tracked in #1342). Until that is in place,
+            // we record the payer DID in the provenance reason so audit logs can detect
+            // mismatches. We intentionally do NOT use system provenance without the payer DID
+            // to avoid hiding who was charged.
             let amount_i64 = match i64::try_from(req.amount) {
                 Ok(v) => v,
                 Err(_) => {
@@ -191,10 +202,11 @@ pub fn create_payment_callback(ledger: LedgerHandle) -> icn_compute::PaymentCall
                     return;
                 }
             };
+            let provenance_reason = format!("compute-payment:payer={}", req.from);
             let entry = match icn_ledger::entry::JournalEntryBuilder::new(from_did.clone())
                 .debit(from_did, req.currency.clone(), amount_i64)
                 .credit(to_did, req.currency.clone(), amount_i64)
-                .with_system_provenance("compute-payment")
+                .with_system_provenance(provenance_reason)
                 .build()
             {
                 Ok(e) => e,

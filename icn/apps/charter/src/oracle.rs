@@ -107,12 +107,15 @@ impl CharterPolicyOracle {
     /// Below this call: generic kernel constraints (opaque key-value pairs).
     ///
     /// The kernel cannot determine WHY these constraint values were chosen.
-    fn constraints_for_charter(doc: &CclDocument, ctx: &CharterContext) -> ConstraintSet {
+    ///
+    /// Returns `None` if translation fails — callers must treat this as Deny,
+    /// not Allow. A malformed charter must not silently grant unconstrained access.
+    fn constraints_for_charter(doc: &CclDocument, ctx: &CharterContext) -> Option<ConstraintSet> {
         match charter_to_constraints(doc, ctx) {
-            Ok(cs) => cs,
+            Ok(cs) => Some(cs),
             Err(e) => {
-                tracing::warn!(error = %e, "charter_to_constraints() failed; returning empty constraints");
-                ConstraintSet::new()
+                tracing::warn!(error = %e, "charter_to_constraints() failed; denying request");
+                None
             }
         }
     }
@@ -130,14 +133,20 @@ impl PolicyOracle for CharterPolicyOracle {
         // Callers pass `charter_id` in request metadata.
         let charter_id = request.context.metadata.get("charter_id").cloned();
 
-        let constraints = match charter_id {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
+        match charter_id {
             None => {
-                // No charter specified — allow with empty constraints.
+                // No charter_id in request — operation doesn't reference a charter.
+                // Allow with empty constraints; charter policy is not applicable here.
                 tracing::debug!(
                     actor = %request.core.actor,
-                    "No charter_id in request; returning empty constraints"
+                    "No charter_id in request; charter oracle abstaining"
                 );
-                ConstraintSet::new()
+                PolicyDecision::allow_with_provenance(ConstraintSet::new(), "charter", now)
             }
             Some(id) => {
                 let guard = self.charters.read();
@@ -152,26 +161,29 @@ impl PolicyOracle for CharterPolicyOracle {
                         let doc = doc.clone();
                         let ctx_clone = ctx.clone();
                         drop(guard);
-                        Self::constraints_for_charter(&doc, &ctx_clone)
+                        match Self::constraints_for_charter(&doc, &ctx_clone) {
+                            Some(cs) => PolicyDecision::allow_with_provenance(cs, "charter", now),
+                            None => {
+                                // Translation failed — fail closed. A malformed charter
+                                // must not silently grant unconstrained access.
+                                PolicyDecision::deny("charter_translation_failed")
+                            }
+                        }
                     }
                     None => {
+                        // Charter explicitly requested but not deployed — fail closed.
+                        // This prevents a race where a charter is removed between
+                        // request routing and oracle evaluation.
                         tracing::warn!(
                             actor = %request.core.actor,
                             charter_id = %id,
-                            "Unknown charter_id; returning empty constraints"
+                            "Unknown charter_id; denying request"
                         );
-                        ConstraintSet::new()
+                        PolicyDecision::deny("charter_not_deployed")
                     }
                 }
             }
-        };
-
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
-
-        PolicyDecision::allow_with_provenance(constraints, "charter", now)
+        }
     }
 
     fn domain(&self) -> Domain {
@@ -233,16 +245,13 @@ governance:
     }
 
     #[test]
-    fn test_unknown_charter_id_returns_allow_empty() {
+    fn test_unknown_charter_id_returns_deny() {
         let oracle = CharterPolicyOracle::new();
         let decision = oracle.evaluate(&make_request(Some("nonexistent")));
 
-        assert!(decision.is_allowed());
-        let cs = decision.constraints().unwrap();
-        assert!(
-            cs.custom.is_empty(),
-            "Unknown charter → empty ConstraintSet"
-        );
+        // Fail closed: an explicitly-referenced charter that isn't deployed must deny,
+        // not silently allow with empty constraints.
+        assert!(!decision.is_allowed(), "Unknown charter_id must deny");
     }
 
     #[test]
@@ -317,13 +326,9 @@ governance:
         assert!(removed);
         assert_eq!(oracle.deployed_count(), 0);
 
-        // After removal: empty constraints
-        let cs = oracle
-            .evaluate(&make_request(Some("coop-gamma")))
-            .constraints()
-            .unwrap()
-            .clone();
-        assert!(cs.custom.is_empty());
+        // After removal: deny (charter no longer deployed — fail closed)
+        let decision = oracle.evaluate(&make_request(Some("coop-gamma")));
+        assert!(!decision.is_allowed(), "Removed charter must deny, not allow");
     }
 
     #[test]

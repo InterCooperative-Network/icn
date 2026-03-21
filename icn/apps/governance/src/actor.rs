@@ -1069,7 +1069,9 @@ impl GovernanceActor {
                             did_notify,
                             msg.message_type()
                         );
-                        if let Err(e) = handle_incoming(store_notify.as_ref(), msg) {
+                        if let Err(e) =
+                            handle_incoming(store_notify.as_ref(), msg, Some(&entry.author))
+                        {
                             warn!("Failed to handle incoming governance message: {}", e);
                         }
                     }
@@ -2508,8 +2510,18 @@ impl GovernanceActor {
     }
 }
 
-/// Handle incoming governance messages from gossip
-fn handle_incoming(store: &dyn GovernanceStateStore, msg: GovernanceMessage) -> Result<()> {
+/// Handle incoming governance messages from gossip.
+///
+/// `sender` is the `GossipEntry::author` DID of the peer that published the message.
+/// For delegation messages, the sender must match the delegator (or `revoked_by`) to
+/// prevent any peer from injecting or revoking delegations they do not own.
+/// If `sender` is `None` (e.g. in tests that don't have a real gossip entry), delegation
+/// sender validation is skipped.
+fn handle_incoming(
+    store: &dyn GovernanceStateStore,
+    msg: GovernanceMessage,
+    sender: Option<&icn_identity::Did>,
+) -> Result<()> {
     match msg {
         GovernanceMessage::DomainCreated { domain } => {
             store.save_domain(&domain)?;
@@ -2654,6 +2666,19 @@ fn handle_incoming(store: &dyn GovernanceStateStore, msg: GovernanceMessage) -> 
         }
 
         GovernanceMessage::DelegationCreated { delegation } => {
+            // Security: verify the gossip sender is the delegator.
+            // Any peer that can publish to the governance topic could otherwise inject
+            // delegations on behalf of DIDs they don't control.
+            if let Some(sender_did) = sender {
+                if *sender_did != delegation.delegator {
+                    warn!(
+                        "DelegationCreated gossip rejected: sender {} does not match delegator {} \
+                         (delegation {})",
+                        sender_did, delegation.delegator, delegation.id.0
+                    );
+                    return Ok(());
+                }
+            }
             match store.get_delegation(&delegation.id)? {
                 None => {
                     store.save_delegation(&delegation)?;
@@ -2683,9 +2708,30 @@ fn handle_incoming(store: &dyn GovernanceStateStore, msg: GovernanceMessage) -> 
         GovernanceMessage::DelegationRevoked {
             id,
             revoked_at,
-            revoked_by: _,
+            revoked_by,
         } => {
             if let Some(delegation) = store.get_delegation(&id)? {
+                // Security: verify the gossip sender is the original delegator.
+                // The `revoked_by` field in the message must also match the stored delegator,
+                // preventing a third party from revoking a delegation they don't own.
+                if let Some(sender_did) = sender {
+                    if *sender_did != delegation.delegator {
+                        warn!(
+                            "DelegationRevoked gossip rejected: sender {} does not match stored \
+                             delegator {} (delegation {})",
+                            sender_did, delegation.delegator, id.0
+                        );
+                        return Ok(());
+                    }
+                }
+                if revoked_by != delegation.delegator {
+                    warn!(
+                        "DelegationRevoked gossip rejected: revoked_by {} does not match stored \
+                         delegator {} (delegation {})",
+                        revoked_by, delegation.delegator, id.0
+                    );
+                    return Ok(());
+                }
                 store.save_revoked_delegation(&delegation, revoked_at)?;
                 info!("Delegation revocation synced via gossip: {}", id.0);
             } else {
@@ -2767,7 +2813,7 @@ mod tests {
         let store = make_store();
         let d = Delegation::new(did(), did(), DelegationScope::Blanket);
 
-        handle_incoming(&store, GovernanceMessage::delegation_created(d.clone())).unwrap();
+        handle_incoming(&store, GovernanceMessage::delegation_created(d.clone()), None).unwrap();
 
         let loaded = store
             .get_delegation(&d.id)
@@ -2785,9 +2831,9 @@ mod tests {
         let store = make_store();
         let d = Delegation::new(did(), did(), DelegationScope::Blanket);
 
-        handle_incoming(&store, GovernanceMessage::delegation_created(d.clone())).unwrap();
+        handle_incoming(&store, GovernanceMessage::delegation_created(d.clone()), None).unwrap();
         // Second application of the same message must not error.
-        handle_incoming(&store, GovernanceMessage::delegation_created(d.clone())).unwrap();
+        handle_incoming(&store, GovernanceMessage::delegation_created(d.clone()), None).unwrap();
 
         let loaded = store.get_delegation(&d.id).unwrap().unwrap();
         assert_eq!(loaded.id, d.id);
@@ -2808,6 +2854,7 @@ mod tests {
         handle_incoming(
             &store,
             GovernanceMessage::delegation_revoked(d.id.clone(), delegator, revoke_ts),
+            None,
         )
         .unwrap();
 
@@ -2828,12 +2875,105 @@ mod tests {
         let result = handle_incoming(
             &store,
             GovernanceMessage::delegation_revoked(d.id.clone(), delegator, 1234),
+            None,
         );
 
         assert!(result.is_ok(), "out-of-order revoke must not error");
         assert!(
             store.get_delegation(&d.id).unwrap().is_none(),
             "unknown delegation must not be created by revoke"
+        );
+    }
+
+    /// DelegationCreated gossip with wrong sender is rejected (security: #1340).
+    #[test]
+    fn test_delegation_created_wrong_sender_rejected() {
+        let store = make_store();
+        let delegator = did();
+        let attacker = did();
+        let d = Delegation::new(delegator.clone(), did(), DelegationScope::Blanket);
+
+        // Attacker tries to inject a delegation owned by `delegator`.
+        let result = handle_incoming(
+            &store,
+            GovernanceMessage::delegation_created(d.clone()),
+            Some(&attacker),
+        );
+
+        assert!(result.is_ok(), "wrong-sender rejection must not error");
+        assert!(
+            store.get_delegation(&d.id).unwrap().is_none(),
+            "delegation from wrong sender must not be persisted"
+        );
+    }
+
+    /// DelegationCreated gossip with correct sender is accepted (security: #1340).
+    #[test]
+    fn test_delegation_created_correct_sender_accepted() {
+        let store = make_store();
+        let delegator = did();
+        let d = Delegation::new(delegator.clone(), did(), DelegationScope::Blanket);
+
+        handle_incoming(
+            &store,
+            GovernanceMessage::delegation_created(d.clone()),
+            Some(&delegator),
+        )
+        .unwrap();
+
+        assert!(
+            store.get_delegation(&d.id).unwrap().is_some(),
+            "delegation from correct sender must be persisted"
+        );
+    }
+
+    /// DelegationRevoked gossip with wrong sender is rejected (security: #1340).
+    #[test]
+    fn test_delegation_revoked_wrong_sender_rejected() {
+        let store = make_store();
+        let delegator = did();
+        let attacker = did();
+        let d = Delegation::new(delegator.clone(), did(), DelegationScope::Blanket);
+
+        store.save_delegation(&d).unwrap();
+
+        let result = handle_incoming(
+            &store,
+            GovernanceMessage::delegation_revoked(d.id.clone(), delegator.clone(), 1234),
+            Some(&attacker),
+        );
+
+        assert!(result.is_ok(), "wrong-sender rejection must not error");
+        // revoked_at should still be None — revocation was dropped
+        let loaded = store.get_delegation(&d.id).unwrap().unwrap();
+        assert!(
+            loaded.revoked_at.is_none(),
+            "delegation revoked by wrong sender must not be revoked"
+        );
+    }
+
+    /// DelegationRevoked with mismatched revoked_by field is rejected (security: #1340).
+    #[test]
+    fn test_delegation_revoked_mismatched_revoked_by_rejected() {
+        let store = make_store();
+        let delegator = did();
+        let impersonator = did();
+        let d = Delegation::new(delegator.clone(), did(), DelegationScope::Blanket);
+
+        store.save_delegation(&d).unwrap();
+
+        // Sender matches delegator but revoked_by is a different DID.
+        let result = handle_incoming(
+            &store,
+            GovernanceMessage::delegation_revoked(d.id.clone(), impersonator.clone(), 1234),
+            Some(&delegator),
+        );
+
+        assert!(result.is_ok(), "mismatched revoked_by must not error");
+        let loaded = store.get_delegation(&d.id).unwrap().unwrap();
+        assert!(
+            loaded.revoked_at.is_none(),
+            "delegation with mismatched revoked_by must not be revoked"
         );
     }
 }
