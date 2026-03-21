@@ -35,6 +35,14 @@ pub struct GatewayConfig {
     /// Default trust score for unknown peers (0.0 to 1.0)
     #[serde(default)]
     pub default_trust_score: Option<f64>,
+
+    /// Persist service discovery endpoints to sled across restarts.
+    ///
+    /// When true, `ServiceDiscoveryManager` is backed by a sled tree at
+    /// `<store_path>/service-discovery`. Endpoints survive daemon restarts and
+    /// are automatically expired on reload.
+    #[serde(default)]
+    pub service_discovery_persist: bool,
 }
 
 fn default_gateway_bind_addr() -> String {
@@ -59,6 +67,7 @@ impl Default for GatewayConfig {
             jwt_secret: String::new(),
             audit_retention: AuditRetentionConfig::default(),
             default_trust_score: None,
+            service_discovery_persist: false,
         }
     }
 }
