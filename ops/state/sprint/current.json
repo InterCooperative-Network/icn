@@ -70,7 +70,7 @@
       "id": "s17-t6",
       "title": "feat(net): EndpointCandidate type + ConnectionCandidate refactor (#1297)",
       "status": "in_review",
-      "pr": null,
+      "pr": 1358,
       "assignee": "claude",
       "issue": 1297,
       "epic": "1295",
