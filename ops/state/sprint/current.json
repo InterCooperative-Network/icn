@@ -1,68 +1,67 @@
 {
-  "sprint": 19,
-  "name": "Sprint 19 — IPv6 Epic Completion + Pilot Genesis",
+  "sprint": 20,
+  "name": "Sprint 20 — Meaning Firewall Audit + Service Discovery Hardening",
   "started": "2026-03-21",
   "goals": [
-    "Close Sprint 18: merge PR #1360 (gossip auth) + PR #1363 (Happy Eyeballs)",
-    "Complete Epic #1295: wire Happy Eyeballs into dial_parallel (#1364) + TURN relay IPv6 (#1301)",
-    "Start Pilot Completion (Epic #1099): genesis bundle schema + icnd --init (#1097)",
-    "Close #1120: record auth semantics decision for service discovery GET"
+    "Audit 11 infected kernel crates for domain semantic leakage, document findings, extract worst violations (#1370)",
+    "Add sled-backed persistence to ServiceDiscoveryManager to survive restarts (#953)",
+    "Close #1051: gateway timestamp bounds + ServiceEndpointResponse field update",
+    "Start settlement finality spec for federation (#1365) — doc-only phase"
   ],
   "execution_order": [
-    "Pre: fix format + tests on S18 PRs, merge, archive sprint board",
-    "t1 (#1364) — small wire-up; can parallel with t2",
-    "t2 (#1301) — TURN relay IPv6; closes Epic #1295",
-    "t4 (#1120) — spec decision only; anytime",
-    "t3 (#1097) — largest; pilot genesis bundle"
+    "t3 (#1051) — tiny gateway fix, close it first",
+    "t2 (#953) — isolated gateway change, no dependencies",
+    "t4 (#1365) — write finality spec doc (Phase 1 only)",
+    "t1 (#1370) — largest; audit all 11 crates, extract domain logic from worst offenders"
   ],
   "tasks": [
     {
-      "id": "s19-t1",
-      "title": "feat(net): integrate dial_happy_eyeballs() into dial_parallel() (#1364)",
-      "status": "done",
-      "pr": 1377,
-      "assignee": null,
-      "issue": 1364,
-      "epic": "1295",
-      "note": "In nat_dial.rs::dial_parallel(), replace single-address per-category dial with dial_happy_eyeballs() calls. For each EndpointKind (Local, Public): collect all addrs, call dial_happy_eyeballs, return (AddrType, SocketAddr) on first success. Relay fallback unchanged. Single-addr fast-path already in dial_happy_eyeballs."
-    },
-    {
-      "id": "s19-t2",
-      "title": "feat(net): TURN relay proxy IPv6 support (#1301)",
-      "status": "done",
-      "pr": 1373,
-      "assignee": null,
-      "issue": 1301,
-      "epic": "1295",
-      "note": "relay_proxy.rs: implement xor_encode_address_v6() per RFC 5766 §10.2 (turn.rs decode already correct). Update build_send_indication() to dispatch on addr family. Update socket binding. Remove 3 bail!(IPv6 not supported) guards. Add IPv6 relay integration tests. Closes Epic #1295."
-    },
-    {
-      "id": "s19-t3",
-      "title": "feat(devops): Genesis bundle schema + icnd --init (#1097)",
-      "status": "done",
-      "pr": 1374,
-      "assignee": null,
-      "issue": 1097,
-      "epic": "1099",
-      "note": "PR12 in Epic #1099 critical path. Read issue #1097 for full spec before starting. Gates devnet compose (#1098, PR13). Involves bins/icnd/ and config schema types."
-    },
-    {
-      "id": "s19-t4",
-      "title": "spec(gateway): close auth semantics for GET /v1/services/:id (#1120)",
-      "status": "done",
+      "id": "s20-t1",
+      "title": "refactor(kernel): Meaning Firewall phase 2 — audit + extract domain logic (#1370)",
+      "status": "pending",
       "pr": null,
       "assignee": null,
-      "issue": 1120,
+      "issue": 1370,
+      "epic": "1147",
+      "note": "Audit all 11 infected crates (icn-core, icn-gossip, icn-net, icn-gateway, icn-store, icn-rpc, icn-obs, icn-compute, icn-ledger, icn-federation, icn-security). For each: identify domain semantic decisions, document in docs/architecture/meaning-firewall-audit.md, move worst violations to PolicyOracle app layer. CI gate already blocks new violations — this backfills existing ones. Accept partial progress per PR (not all 11 in one PR)."
+    },
+    {
+      "id": "s20-t2",
+      "title": "feat(gateway): persistent storage for service discovery registry (#953)",
+      "status": "pending",
+      "pr": null,
+      "assignee": null,
+      "issue": 953,
       "epic": null,
-      "note": "Spec decision only. Issue body already has Option B (all service discovery endpoints require JWT, return 404 both for missing resources AND unauthorized/unauthenticated requests to prevent service ID enumeration — returning 401 for 'exists but unauthorized' vs 404 for 'not found' leaks which service IDs are valid). Document decision, check if any implementation gap follows, close issue. No code unless a gap is found — scope that to a new issue."
+      "note": "ServiceDiscoveryManager in icn-gateway/src/service_discovery_mgr.rs uses in-memory HashMap. Add opt-in sled backing via icn-store: write-through on announce/withdraw, load+filter-expired on startup, background expiry task cleans persisted entries. Config: persistence.enabled = false by default. Test: restart cycle preserves non-expired endpoints."
+    },
+    {
+      "id": "s20-t3",
+      "title": "feat(gateway): timestamp validation + ServiceEndpointResponse fields (#1051)",
+      "status": "pending",
+      "pr": null,
+      "assignee": null,
+      "issue": 1051,
+      "epic": null,
+      "note": "Two tasks: (1) Validate created_at/updated_at not more than 3600s in future in service endpoint registration handler. (2) Add endpoint_type, addresses, updated_at to ServiceEndpointResponse struct. Location: icn-gateway/src/api/services.rs. Good-first-issue level. Close #1051."
+    },
+    {
+      "id": "s20-t4",
+      "title": "spec(federation): settlement finality — doc phase (#1365)",
+      "status": "pending",
+      "pr": null,
+      "assignee": null,
+      "issue": 1365,
+      "epic": "1147",
+      "note": "Phase 1 only: write docs/spec/federation-settlement-finality.md covering finality conditions (quorum, timeout, receipt chain completeness), dispute lifecycle (Raised → Under Review → Resolved/Escalated), and netting rules for bilateral/multilateral positions. No code changes this sprint. If time allows: add DisputeResolution message type skeleton to federation protocol."
     }
   ],
   "epics": {
-    "1295": "[EPIC] IPv6 dual-stack transport and endpoint sets (Phases 21-22)",
+    "1147": "[EPIC] Vertical Slice: Identity → Governance → Compute → Receipts → Audit",
     "1099": "[EPIC] ICN Pilot Completion — End-to-End Demos (P0)"
   },
-  "deferred_from_s18": {
-    "note": "#1364 and #1301 are S19 execution targets after #1298+#1299 landed in S18. #1120 carried from S14+; closing this sprint.",
-    "issues": [1364, 1301, 1120]
+  "carried_from_s19": {
+    "note": "Epic #1295 (IPv6 dual-stack) closed — all sub-issues done. Epic #1099 PR13 (#1098) merged. Sprint 20 shifts focus to architectural hardening (Meaning Firewall) and service layer persistence.",
+    "closed_epics": [1295]
   }
 }
