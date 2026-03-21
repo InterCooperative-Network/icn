@@ -635,4 +635,75 @@ mod tests {
         assert_eq!(params.scope, "cell");
         assert_eq!(params.min_trust, 0.3);
     }
+
+    fn make_service_endpoint(
+        service_id: &str,
+        endpoint_type: icn_kernel_api::naming::EndpointType,
+    ) -> ServiceEndpoint {
+        use icn_kernel_api::naming::ServiceType;
+        use icn_kernel_api::scope::ScopeLevel;
+        ServiceEndpoint {
+            service_id: service_id.to_string(),
+            provider: "did:icn:test".to_string(),
+            endpoint_type,
+            service_type: ServiceType {
+                name: "test-service".to_string(),
+                version: "1.0".to_string(),
+            },
+            endpoints: vec![],
+            addresses: vec!["/ip4/127.0.0.1/tcp/9000".to_string()],
+            capabilities: vec![],
+            trust_threshold: 0.0,
+            scope_visibility: ScopeLevel::Org,
+            cell_id: None,
+            ttl_secs: 3600,
+            signature: icn_kernel_api::Signature(vec![]),
+            created_at: 0,
+            updated_at: 1_000_000,
+        }
+    }
+
+    #[test]
+    fn test_endpoint_type_to_str_all_variants() {
+        use icn_kernel_api::naming::EndpointType;
+        assert_eq!(endpoint_type_to_str(&EndpointType::Quic), "quic");
+        assert_eq!(endpoint_type_to_str(&EndpointType::Http), "http");
+        assert_eq!(endpoint_type_to_str(&EndpointType::Grpc), "grpc");
+        assert_eq!(endpoint_type_to_str(&EndpointType::WebSocket), "websocket");
+    }
+
+    #[test]
+    fn test_to_response_populates_new_fields() {
+        use icn_kernel_api::naming::EndpointType;
+
+        let ep = make_service_endpoint("svc-1", EndpointType::Grpc);
+        let response = to_response(&ep);
+
+        assert_eq!(response.service_id, "svc-1");
+        assert_eq!(response.endpoint_type, "grpc");
+        assert_eq!(
+            response.addresses,
+            vec!["/ip4/127.0.0.1/tcp/9000".to_string()]
+        );
+        assert_eq!(response.updated_at, 1_000_000);
+    }
+
+    #[test]
+    fn test_to_response_endpoint_type_matches_variant() {
+        use icn_kernel_api::naming::EndpointType;
+
+        for (variant, expected_str) in [
+            (EndpointType::Quic, "quic"),
+            (EndpointType::Http, "http"),
+            (EndpointType::Grpc, "grpc"),
+            (EndpointType::WebSocket, "websocket"),
+        ] {
+            let ep = make_service_endpoint("svc", variant);
+            let response = to_response(&ep);
+            assert_eq!(
+                response.endpoint_type, expected_str,
+                "endpoint_type mismatch for variant"
+            );
+        }
+    }
 }
