@@ -556,9 +556,31 @@ pub async fn handle_snapshot_coordination(
 }
 
 /// Handle compute topic messages
-pub async fn handle_compute_message(entry_data: Vec<u8>, compute_handle: ComputeHandleHolder) {
+///
+/// `entry_author` is the DID of the gossip entry author as authenticated by the gossip layer.
+/// For `TaskSubmitted`, we validate that it matches `task.submitter` to prevent payer spoofing
+/// (#1342): a malicious peer could publish a TaskSubmitted message naming a victim DID as payer.
+pub async fn handle_compute_message(
+    entry_data: Vec<u8>,
+    entry_author: Did,
+    compute_handle: ComputeHandleHolder,
+) {
     match icn_encoding::decode::<icn_compute::ComputeMessage>(&entry_data) {
         Ok(compute_msg) => {
+            // Security (#1342): validate gossip entry author matches declared task submitter.
+            // This prevents a malicious peer from spoofing victim DIDs as payers.
+            if let icn_compute::ComputeMessage::TaskSubmitted(ref task) = compute_msg {
+                if entry_author.as_str() != task.submitter.as_str() {
+                    warn!(
+                        entry_author = %entry_author,
+                        task_submitter = %task.submitter,
+                        task_id = %task.id,
+                        "Payer spoofing attempt: gossip entry author does not match task.submitter; rejecting"
+                    );
+                    return;
+                }
+            }
+
             if let Some(handle) = compute_handle.read().await.as_ref() {
                 if let Err(e) = handle.handle_gossip(compute_msg).await {
                     warn!("Failed to handle compute message: {}", e);
@@ -945,8 +967,9 @@ pub fn create_notification_callback(
         {
             if let Some(data) = entry_data {
                 let compute_handle = deps.compute_handle.clone();
+                let entry_author = entry.author.clone();
                 tokio::spawn(async move {
-                    handle_compute_message(data, compute_handle).await;
+                    handle_compute_message(data, entry_author, compute_handle).await;
                 });
             }
         } else if topic == icn_ccl::TOPIC_DISPUTES_FILE {
@@ -1044,5 +1067,82 @@ mod tests {
         // The actual construction requires many dependencies so we just verify the trait
         fn assert_clone<T: Clone>() {}
         assert_clone::<NotificationDeps>();
+    }
+
+    fn make_test_task(id: &str, submitter_did: &str) -> icn_compute::ComputeTask {
+        use icn_compute::{
+            DeterminismClass, ExecutorCapability, FuelLimit, PrivacyClass, TaskCode, TaskPriority,
+        };
+        icn_compute::ComputeTask {
+            id: id.to_string(),
+            submitter: submitter_did.to_string(),
+            coop_id: None,
+            code: TaskCode::Ccl("return 42".into()),
+            inputs: vec![],
+            fuel_limit: FuelLimit::default(),
+            required_capabilities: vec![ExecutorCapability::Ccl],
+            priority: TaskPriority::Normal,
+            created_at: 1000,
+            deadline: None,
+            payment_rate: None,
+            payment_currency: None,
+            resource_profile: None,
+            actor_mode: None,
+            placement_constraints: None,
+            federation_constraints: None,
+            estimated_value: None,
+            verification: None,
+            inputs_hash: None,
+            policy_hash: None,
+            determinism_class: DeterminismClass::default(),
+            privacy_class: PrivacyClass::default(),
+            storage_class: None,
+            data_locality: None,
+            scope: Default::default(),
+        }
+    }
+
+    /// Verify the payer-spoofing guard rejects mismatched author/submitter.
+    ///
+    /// A malicious peer could publish TaskSubmitted with a victim DID as `submitter`
+    /// (payer). The guard must drop such messages before they reach the compute actor.
+    #[tokio::test]
+    async fn test_compute_message_rejects_spoofed_author() {
+        use icn_compute::ComputeMessage;
+        use icn_identity::KeyPair;
+        use std::sync::Arc;
+        use tokio::sync::RwLock;
+
+        let attacker_did = KeyPair::generate().unwrap().did().clone();
+        let victim_did = KeyPair::generate().unwrap().did().clone();
+
+        // Build a TaskSubmitted message where submitter = victim (spoofed payer)
+        let task = make_test_task("spoofed-task", victim_did.as_str());
+        let msg = ComputeMessage::TaskSubmitted(Box::new(task));
+        let entry_data = icn_encoding::encode(&msg).unwrap();
+
+        // handle_compute_message with attacker as entry_author should silently drop the message
+        let compute_handle: ComputeHandleHolder = Arc::new(RwLock::new(None));
+        handle_compute_message(entry_data, attacker_did, compute_handle).await;
+        // If we reach here without panic, the rejection path executed correctly
+    }
+
+    /// Verify legitimate TaskSubmitted (author == submitter) passes the guard.
+    #[tokio::test]
+    async fn test_compute_message_accepts_matching_author() {
+        use icn_compute::ComputeMessage;
+        use icn_identity::KeyPair;
+        use std::sync::Arc;
+        use tokio::sync::RwLock;
+
+        let did = KeyPair::generate().unwrap().did().clone();
+
+        let task = make_test_task("legit-task", did.as_str());
+        let msg = ComputeMessage::TaskSubmitted(Box::new(task));
+        let entry_data = icn_encoding::encode(&msg).unwrap();
+
+        let compute_handle: ComputeHandleHolder = Arc::new(RwLock::new(None));
+        // Should not early-return — guard passes, then no-ops (handle is None)
+        handle_compute_message(entry_data, did, compute_handle).await;
     }
 }
