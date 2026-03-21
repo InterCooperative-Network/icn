@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: read
 
 jobs:
   sync-stats:
@@ -16,6 +17,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          # Full history needed for git log --merges fallback in gen-stats.mjs
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -30,8 +33,9 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git diff --quiet website/src/data/stats.json 2>/dev/null || {
-            git add website/src/data/stats.json
+          # stats.json is gitignored (generated at build time) so force-add is required
+          git add -f website/src/data/stats.json
+          git diff --quiet --cached website/src/data/stats.json || {
             git commit -m "chore(website): update stats.json [skip ci]"
             git push
           }
