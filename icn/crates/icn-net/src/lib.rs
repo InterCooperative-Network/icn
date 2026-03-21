@@ -37,7 +37,7 @@ pub use actor::{
 pub use blob_registry::{
     BlobLocation, BlobLocationRegistry, BlobRegistryConfig, BlobRegistryError,
 };
-pub use candidate::ConnectionCandidate;
+pub use candidate::{ConnectionCandidate, EndpointCandidate, EndpointKind};
 pub use candidate_cache::CandidateCache;
 pub use discovery::{Discovery, PeerInfo};
 pub use encryption::{EncryptedEnvelope, EncryptionType};

@@ -69,12 +69,12 @@
     {
       "id": "s17-t6",
       "title": "feat(net): EndpointCandidate type + ConnectionCandidate refactor (#1297)",
-      "status": "pending",
+      "status": "in_review",
       "pr": null,
-      "assignee": null,
+      "assignee": "claude",
       "issue": 1297,
       "epic": "1295",
-      "note": "IPv6 type refactor — gates mDNS multi-address (#1298), Happy Eyeballs (#1299), KnownPeer endpoint field (#1300)."
+      "note": "EndpointKind + EndpointCandidate added. ConnectionCandidate refactored to Vec<EndpointCandidate>. Backward-compat new() + accessor methods. PR open. 250+308 tests pass."
     }
   ],
   "epics": {

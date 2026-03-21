@@ -581,7 +581,7 @@ impl Default for CandidateAnnouncementConfig {
 /// Cached connection candidate for change detection
 #[derive(Clone, Debug, PartialEq)]
 struct CachedCandidate {
-    local_addr: std::net::SocketAddr,
+    local_addr: Option<std::net::SocketAddr>,
     public_addr: Option<std::net::SocketAddr>,
     relay_addr: Option<std::net::SocketAddr>,
 }
@@ -634,16 +634,16 @@ pub fn spawn_candidate_announcement_task(
 
                     // Check if candidate has changed
                     let current = CachedCandidate {
-                        local_addr: candidate.local_addr,
-                        public_addr: candidate.public_addr,
-                        relay_addr: candidate.relay_addr,
+                        local_addr: candidate.local_addr(),
+                        public_addr: candidate.public_addr(),
+                        relay_addr: candidate.relay_addr(),
                     };
 
                     let changed = last_candidate.as_ref() != Some(&current);
 
                     if changed {
                         info!(
-                            "Connection candidate changed: local={}, public={:?}, relay={:?}",
+                            "Connection candidate changed: local={:?}, public={:?}, relay={:?}",
                             current.local_addr, current.public_addr, current.relay_addr
                         );
                         icn_obs::metrics::nat::dial_attempt_inc("candidate_change");
