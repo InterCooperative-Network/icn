@@ -9,7 +9,7 @@ listen_addr = "127.0.0.1:7777"
 mdns_enabled = true
 
 [api]
-listen_addr = "127.0.0.1:5601"
+listen_addr = "[::1]:5601"
 
 [gateway]
 listen_addr = "127.0.0.1:8080"

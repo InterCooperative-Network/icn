@@ -21,8 +21,8 @@ sed -i 's/min_trust_threshold = 0.1/min_trust_threshold = 0.0/' $BASE/node-a/con
 ICN_KEYSTORE_PASSPHRASE=test $ICND --config $BASE/node-a/config.toml &
 sleep 5
 
-ICN_KEYSTORE_PASSPHRASE=test $ICNCTL --data-dir $BASE/node-a -e 127.0.0.1:5601 network status
-ICN_KEYSTORE_PASSPHRASE=test $ICNCTL --data-dir $BASE/node-a -e 127.0.0.1:5601 ledger head
+ICN_KEYSTORE_PASSPHRASE=test $ICNCTL --data-dir $BASE/node-a -e '[::1]:5601' network status
+ICN_KEYSTORE_PASSPHRASE=test $ICNCTL --data-dir $BASE/node-a -e '[::1]:5601' ledger head
 ```
 
 **Expected output:**
@@ -30,7 +30,7 @@ ICN_KEYSTORE_PASSPHRASE=test $ICNCTL --data-dir $BASE/node-a -e 127.0.0.1:5601 l
 ```
 Network Actor Status:
   Running:               true
-  Listening on:      127.0.0.1:5601
+  Listening on:      [::1]:5601
   NAT Traversal:
     Public endpoint:  <your-public-IP>:<port>
     TURN relay:       none
@@ -120,10 +120,10 @@ The gateway starts automatically (enabled by default in the generated config).
 
 ```bash
 # Node A
-ICN_KEYSTORE_PASSPHRASE=test $ICNCTL --data-dir $BASE/node-a -e 127.0.0.1:5601 network status
+ICN_KEYSTORE_PASSPHRASE=test $ICNCTL --data-dir $BASE/node-a -e '[::1]:5601' network status
 
 # Node B
-ICN_KEYSTORE_PASSPHRASE=test $ICNCTL --data-dir $BASE/node-b -e 127.0.0.1:5602 network status
+ICN_KEYSTORE_PASSPHRASE=test $ICNCTL --data-dir $BASE/node-b -e '[::1]:5602' network status
 ```
 
 Both should show:
@@ -144,7 +144,7 @@ curl -s http://127.0.0.1:8001/v1/health
 **Ledger (confirms RPC null-result handling):**
 
 ```bash
-ICN_KEYSTORE_PASSPHRASE=test $ICNCTL --data-dir $BASE/node-a -e 127.0.0.1:5601 ledger head
+ICN_KEYSTORE_PASSPHRASE=test $ICNCTL --data-dir $BASE/node-a -e '[::1]:5601' ledger head
 # Ledger is empty
 ```
 
