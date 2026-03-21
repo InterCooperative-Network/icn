@@ -15,7 +15,6 @@ Requires: Python 3.11+ (uses tomllib)
 import sys
 import argparse
 from pathlib import Path
-from datetime import datetime
 from typing import Dict, List, Any
 
 # Try tomllib (Python 3.11+) first, fall back to manual TOML parsing if needed
@@ -70,33 +69,30 @@ def format_audiences(audiences: List[str]) -> str:
 
 
 def make_relative_link(doc_path: str, output_dir: str = "docs") -> str:
-    """Make doc paths relative to the output directory.
+    """Make doc paths repo-root-absolute so links work from any location.
 
-    If the index lives in docs/ and a doc path is docs/foo.md,
-    the link should be foo.md (strip the docs/ prefix).
-    If the path doesn't start with the output dir, use ../ prefix.
+    Prefixes paths with '/' so they resolve from the repo root regardless
+    of where the index file lives. This avoids broken relative paths when
+    the index is written to docs/INDEX.generated.md (which would otherwise
+    resolve 'docs/foo.md' as 'docs/docs/foo.md').
     """
-    if doc_path.startswith(output_dir + "/"):
-        return doc_path[len(output_dir) + 1:]
-    elif doc_path.startswith("/"):
+    if doc_path.startswith("/"):
         return doc_path
     else:
-        return "../" + doc_path
+        return "/" + doc_path
 
 
 def generate_index(registry: Dict[str, Any], timestamp: str = "") -> str:
     """Generate markdown index content."""
     lines = []
 
-    if not timestamp:
-        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')
-
     # Header
     lines.append("# ICN Documentation Index")
     lines.append("")
     lines.append("Canonical index of all ICN documentation, organized by category.")
-    lines.append(f"*Generated: {timestamp}*")
-    lines.append("")
+    if timestamp:
+        lines.append(f"*Generated: {timestamp}*")
+        lines.append("")
     lines.append("---")
     lines.append("")
 
@@ -191,7 +187,7 @@ def main():
     parser.add_argument(
         "--timestamp",
         default="",
-        help="Override timestamp (for deterministic output). Empty = use current time."
+        help="Optional timestamp to embed in generated output header. Omit for fully deterministic output."
     )
 
     args = parser.parse_args()

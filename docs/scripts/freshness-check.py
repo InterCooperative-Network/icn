@@ -70,11 +70,15 @@ def get_git_log_date(file_globs: List[str], repo_path: str) -> datetime:
 
 
 def parse_date(date_str: str) -> datetime:
-    """Parse date string to naive datetime."""
+    """Parse date string to naive datetime.
+
+    Returns datetime.min on failure so invalid timestamps appear maximally
+    stale rather than silently appearing fresh.
+    """
     try:
         return strip_tz(datetime.fromisoformat(date_str))
-    except:
-        return datetime.now()
+    except Exception:
+        return datetime.min
 
 
 def check_freshness(
@@ -101,13 +105,13 @@ def check_freshness(
     sections = freshness.get("sections", {})
     for section_name, section_data in sorted(sections.items()):
         evidence_type = section_data.get("evidence_type", "human-asserted")
+        last_updated_str = section_data.get("last_updated", "")
 
-        # Skip auto-generated sections
-        if evidence_type == "auto":
+        # Skip auto-generated sections — accept either evidence_type = "auto"
+        # or last_updated = "auto" as the skip signal (freshness.toml uses both)
+        if evidence_type == "auto" or last_updated_str == "auto":
             lines.append(f"⊕ {section_name}: auto-generated (fresh by definition)")
             continue
-
-        last_updated_str = section_data.get("last_updated", "")
         threshold_days = section_data.get("staleness_threshold_days", 30)
 
         if not last_updated_str:

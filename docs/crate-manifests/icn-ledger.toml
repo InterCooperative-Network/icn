@@ -25,8 +25,8 @@ test_count = 0  # TODO: verify with `cargo test -p icn-ledger -- --list 2>&1 | g
 example_count = 0
 unsafe_blocks = 0  # TODO: verify with `grep -r 'unsafe' icn/crates/icn-ledger/src/ | wc -l`
 feature_flags = []
-dependencies = ["serde", "serde_json", "thiserror"]
-peer_dependencies = ["icn-kernel-api", "icn-types"]
+dependencies = ["async-trait", "serde", "serde_json", "anyhow", "thiserror", "tracing", "tokio", "bytes", "sha2", "hex", "ed25519-dalek"]
+peer_dependencies = ["icn-encoding", "icn-identity", "icn-entity", "icn-time", "icn-store", "icn-gossip", "icn-kernel-api", "icn-obs", "icn-security"]
 
 [publication]
 published_to_crates_io = false
