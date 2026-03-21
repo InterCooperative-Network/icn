@@ -10,13 +10,18 @@ use icn_identity::{BindingInfo, Did};
 use serde::{Deserialize, Serialize};
 
 /// Network protocol version
-pub const PROTOCOL_VERSION: u32 = 1;
+///
+/// Bumped to 2 for the KnownPeer wire format change: `addresses: Vec<String>` →
+/// `endpoints: Vec<EndpointCandidate>`. Postcard encoding is positional so this
+/// is a binary-incompatible change; version negotiation now rejects v1 nodes to
+/// prevent mid-session deserialization failures.
+pub const PROTOCOL_VERSION: u32 = 2;
 
 /// Minimum supported protocol version (for backward compatibility)
-pub const MIN_SUPPORTED_VERSION: u32 = 1;
+pub const MIN_SUPPORTED_VERSION: u32 = 2;
 
 /// Maximum supported protocol version (for forward compatibility)
-pub const MAX_SUPPORTED_VERSION: u32 = 1;
+pub const MAX_SUPPORTED_VERSION: u32 = 2;
 
 /// Maximum message size (10MB)
 pub const MAX_MESSAGE_SIZE: usize = 10 * 1024 * 1024;
