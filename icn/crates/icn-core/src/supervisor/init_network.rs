@@ -240,19 +240,27 @@ fn handle_peer_exchange(
             );
 
             if federation_enabled {
-                // Auto-dial discovered peers
+                // Auto-dial discovered peers — prefer the first public endpoint, fall back to
+                // the first endpoint of any kind if no public endpoint is available.
                 let peers_to_dial: Vec<_> = peers
                     .iter()
                     .filter_map(|p| {
-                        p.addresses
-                            .first()
-                            .and_then(|addr_str| addr_str.parse::<std::net::SocketAddr>().ok())
-                            .map(|addr| (p.did.clone(), addr))
+                        use icn_net::candidate::EndpointKind;
+                        let addr = p
+                            .endpoints
+                            .iter()
+                            .find(|e| e.kind == EndpointKind::Public)
+                            .or_else(|| p.endpoints.first())
+                            .map(|e| e.addr);
+                        addr.map(|a| (p.did.clone(), a))
                     })
                     .collect();
 
                 tokio::spawn(async move {
-                    if let Some(net_handle) = network_handle_holder.read().await.as_ref() {
+                    // Clone handle out of RwLock before awaiting dials — holding a
+                    // Tokio RwLock guard across .await starves writers unnecessarily.
+                    let net_handle = network_handle_holder.read().await.clone();
+                    if let Some(net_handle) = net_handle {
                         for (did_str, addr) in peers_to_dial {
                             let peer_did = match icn_identity::Did::from_str(&did_str) {
                                 Ok(d) => d,
@@ -279,7 +287,7 @@ fn handle_peer_exchange(
                 for peer in peers {
                     debug!(
                         "Discovered peer (federation disabled): {} at {:?}",
-                        peer.did, peer.addresses
+                        peer.did, peer.endpoints
                     );
                 }
             }
@@ -287,33 +295,41 @@ fn handle_peer_exchange(
         PeerExchangeMessage::Announce { peer } => {
             info!(
                 "Peer announced by {}: {} at {:?}",
-                sender_did, peer.did, peer.addresses
+                sender_did, peer.did, peer.endpoints
             );
 
             if federation_enabled {
-                if let Some(addr_str) = peer.addresses.first() {
-                    if let Ok(addr) = addr_str.parse::<std::net::SocketAddr>() {
-                        let peer_did_str = peer.did.clone();
-                        tokio::spawn(async move {
-                            if let Some(net_handle) = network_handle_holder.read().await.as_ref() {
-                                if let Ok(peer_did) = icn_identity::Did::from_str(&peer_did_str) {
-                                    info!("Auto-dialing announced peer {} at {}", peer_did, addr);
-                                    match net_handle.dial(addr, peer_did.clone()).await {
-                                        Ok(_) => {
-                                            icn_obs::metrics::peer_exchange::peers_dialed_inc();
-                                        }
-                                        Err(e) => {
-                                            debug!(
-                                                "Failed to dial announced peer {}: {}",
-                                                peer_did, e
-                                            );
-                                            icn_obs::metrics::peer_exchange::dial_failures_inc();
-                                        }
+                use icn_net::candidate::EndpointKind;
+                // Prefer Public endpoint for announced peers — Announce is broadcast to ALL
+                // connected peers, not only LAN neighbors, so a Local-only address would be
+                // unreachable for WAN recipients. Fall back to the first endpoint of any kind
+                // if no Public endpoint is available.
+                let addr_opt = peer
+                    .endpoints
+                    .iter()
+                    .find(|e| e.kind == EndpointKind::Public)
+                    .or_else(|| peer.endpoints.first())
+                    .map(|e| e.addr);
+                if let Some(addr) = addr_opt {
+                    let peer_did_str = peer.did.clone();
+                    tokio::spawn(async move {
+                        // Clone handle out before awaiting dial — avoid holding RwLock across await.
+                        let net_handle = network_handle_holder.read().await.clone();
+                        if let Some(net_handle) = net_handle {
+                            if let Ok(peer_did) = icn_identity::Did::from_str(&peer_did_str) {
+                                info!("Auto-dialing announced peer {} at {}", peer_did, addr);
+                                match net_handle.dial(addr, peer_did.clone()).await {
+                                    Ok(_) => {
+                                        icn_obs::metrics::peer_exchange::peers_dialed_inc();
+                                    }
+                                    Err(e) => {
+                                        debug!("Failed to dial announced peer {}: {}", peer_did, e);
+                                        icn_obs::metrics::peer_exchange::dial_failures_inc();
                                     }
                                 }
                             }
-                        });
-                    }
+                        }
+                    });
                 }
             }
         }
