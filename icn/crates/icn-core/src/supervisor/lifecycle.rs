@@ -819,6 +819,7 @@ async fn spawn_actors_with_identity(
             identity_bundle: identity_bundle.clone(),
             store_path: config.store_path(),
             contract_registry: Some(contract_registry_handle.clone()),
+            policy_config: config.compute.policy.clone(),
         })
         .await?;
 

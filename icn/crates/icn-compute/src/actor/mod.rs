@@ -198,6 +198,16 @@ impl ComputeActor {
         self.commons_pool_policy = Some(policy);
     }
 
+    /// Set the sybil resistance policy for commons pool participation.
+    ///
+    /// Replaces the commons pool with a fresh instance configured with the given
+    /// sybil policy. Must be called at startup before any participants join.
+    pub fn set_commons_sybil_policy(&mut self, policy: crate::commons_pool::SybilPolicy) {
+        self.commons_pool = Arc::new(RwLock::new(crate::commons_pool::CommonsPool::with_policy(
+            policy,
+        )));
+    }
+
     /// Set balance callback for commons credit ceiling enforcement (E7 - #1134).
     ///
     /// The callback receives a submitter DID string and returns their current credit balance.

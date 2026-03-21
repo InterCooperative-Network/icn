@@ -40,6 +40,8 @@ pub struct ComputeDeps {
     pub store_path: std::path::PathBuf,
     /// Contract registry for CclRef resolution (optional)
     pub contract_registry: Option<icn_ccl::ContractRegistryHandle>,
+    /// Governance policy thresholds for commons pool admission and cost estimation
+    pub policy_config: crate::config::ComputePolicyConfig,
 }
 
 /// Services returned from compute initialization
@@ -360,7 +362,29 @@ pub async fn init_compute_services(deps: ComputeDeps) -> anyhow::Result<ComputeS
     let usage_tracker = Arc::new(icn_compute::UsageTracker::new());
     let policy_manager = Arc::new(icn_compute::PolicyManager::new(usage_tracker.clone()));
     compute_actor.set_policy_manager(policy_manager.clone());
-    info!("Policy manager initialized for cooperative scheduling");
+
+    // Apply governance policy thresholds from config.
+    // min_standing and fuel_cost_divisor go into CommonsPoolPolicy (submission gate).
+    // min_trust_score goes into SybilPolicy (pool admission gate).
+    let commons_pool_policy = icn_compute::CommonsPoolPolicy {
+        min_standing: deps.policy_config.min_standing,
+        fuel_cost_divisor: deps.policy_config.fuel_cost_divisor,
+        ..icn_compute::CommonsPoolPolicy::default()
+    };
+    compute_actor.set_commons_pool_policy(commons_pool_policy);
+
+    let sybil_policy = icn_compute::SybilPolicy {
+        min_trust_score: deps.policy_config.min_trust_score,
+        ..icn_compute::SybilPolicy::default()
+    };
+    compute_actor.set_commons_sybil_policy(sybil_policy);
+
+    info!(
+        "Policy manager initialized (min_standing={}, min_trust_score={}, fuel_cost_divisor={})",
+        deps.policy_config.min_standing,
+        deps.policy_config.min_trust_score,
+        deps.policy_config.fuel_cost_divisor
+    );
 
     // Spawn DisputeActor with shared system
     let dispute_store_path = deps.store_path.join("disputes");

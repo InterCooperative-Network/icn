@@ -8,6 +8,12 @@
 //! actor_model_enabled = false  # Enable stateful compute actors
 //! max_actors = 100             # Maximum hosted actors
 //!
+//! # Governance policy thresholds (defaults are cooperative-neutral starting points)
+//! [compute.policy]
+//! min_standing = 0.3           # Min trust standing to submit to commons pool
+//! min_trust_score = 0.1        # Min trust score for sybil admission
+//! fuel_cost_divisor = 1000     # Fuel units per credit (1 credit per N fuel)
+//!
 //! # Task result verification settings
 //! [compute.verification]
 //! low_value_threshold = 100    # Credits below this: single executor
@@ -20,12 +26,66 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Governance policy thresholds for the compute subsystem.
+///
+/// These values encode cooperative-level governance decisions. Different cooperatives
+/// running different risk profiles should be able to set them via config without
+/// recompiling. Default values preserve the original hardcoded behavior.
+///
+/// Config section: `[compute.policy]`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ComputePolicyConfig {
+    /// Minimum trust standing required to submit tasks to the commons pool (0.0–1.0).
+    /// Members below this threshold are rejected at the gate.
+    /// Original hardcoded value: 0.3
+    #[serde(default = "default_min_standing")]
+    pub min_standing: f64,
+
+    /// Minimum trust score required for sybil-resistance admission to the commons pool (0.0–1.0).
+    /// Nodes below this threshold cannot join as commons participants.
+    /// Original hardcoded value: 0.1
+    #[serde(default = "default_min_trust_score")]
+    pub min_trust_score: f64,
+
+    /// Fuel units per commons credit for cost estimation.
+    /// A divisor of 1000 means 1 credit per 1000 fuel units consumed.
+    /// Original hardcoded value: 1000
+    #[serde(default = "default_fuel_cost_divisor")]
+    pub fuel_cost_divisor: u64,
+}
+
+fn default_min_standing() -> f64 {
+    0.3
+}
+
+fn default_min_trust_score() -> f64 {
+    0.1
+}
+
+fn default_fuel_cost_divisor() -> u64 {
+    1000
+}
+
+impl Default for ComputePolicyConfig {
+    fn default() -> Self {
+        Self {
+            min_standing: default_min_standing(),
+            min_trust_score: default_min_trust_score(),
+            fuel_cost_divisor: default_fuel_cost_divisor(),
+        }
+    }
+}
+
 /// Distributed compute configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ComputeConfig {
     /// Maximum concurrent tasks this node will execute
     #[serde(default = "default_max_concurrent_tasks")]
     pub max_concurrent_tasks: usize,
+
+    /// Governance policy thresholds for commons pool and cost estimation
+    #[serde(default)]
+    pub policy: ComputePolicyConfig,
 
     /// Task result verification settings
     #[serde(default)]
@@ -44,6 +104,7 @@ impl Default for ComputeConfig {
     fn default() -> Self {
         Self {
             max_concurrent_tasks: default_max_concurrent_tasks(),
+            policy: ComputePolicyConfig::default(),
             verification: VerificationConfig::default(),
             actor_model_enabled: default_false(),
             max_actors: default_max_actors(),
@@ -179,6 +240,7 @@ mod tests {
     fn test_compute_config_toml_serialization() {
         let config = ComputeConfig {
             max_concurrent_tasks: 20,
+            policy: ComputePolicyConfig::default(),
             verification: VerificationConfig {
                 low_value_threshold: 200,
                 medium_value_threshold: 2000,
