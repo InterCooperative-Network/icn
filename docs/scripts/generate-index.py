@@ -69,15 +69,33 @@ def format_audiences(audiences: List[str]) -> str:
     return ", ".join(f"`{a}`" for a in audiences)
 
 
-def generate_index(registry: Dict[str, Any]) -> str:
+def make_relative_link(doc_path: str, output_dir: str = "docs") -> str:
+    """Make doc paths relative to the output directory.
+
+    If the index lives in docs/ and a doc path is docs/foo.md,
+    the link should be foo.md (strip the docs/ prefix).
+    If the path doesn't start with the output dir, use ../ prefix.
+    """
+    if doc_path.startswith(output_dir + "/"):
+        return doc_path[len(output_dir) + 1:]
+    elif doc_path.startswith("/"):
+        return doc_path
+    else:
+        return "../" + doc_path
+
+
+def generate_index(registry: Dict[str, Any], timestamp: str = "") -> str:
     """Generate markdown index content."""
     lines = []
+
+    if not timestamp:
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')
 
     # Header
     lines.append("# ICN Documentation Index")
     lines.append("")
     lines.append("Canonical index of all ICN documentation, organized by category.")
-    lines.append(f"*Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}*")
+    lines.append(f"*Generated: {timestamp}*")
     lines.append("")
     lines.append("---")
     lines.append("")
@@ -108,8 +126,9 @@ def generate_index(registry: Dict[str, Any]) -> str:
             audiences = doc_data.get("audiences", [])
             last_updated = doc_data.get("last_updated", "unknown")
 
-            # Build entry
-            lines.append(f"### {status_badge(status)} [{title}]({doc_path})")
+            # Build entry — links relative to docs/ where INDEX lives
+            rel_path = make_relative_link(doc_path)
+            lines.append(f"### {status_badge(status)} [{title}]({rel_path})")
             lines.append("")
 
             if description:
@@ -131,7 +150,8 @@ def generate_index(registry: Dict[str, Any]) -> str:
             if status == "superseded":
                 superseded_by = doc_data.get("superseded_by", "unknown")
                 reason = doc_data.get("reason", "")
-                lines.append(f"> Superseded by [{superseded_by}]({superseded_by})")
+                rel_superseded = make_relative_link(superseded_by)
+                lines.append(f"> Superseded by [{superseded_by}]({rel_superseded})")
                 if reason:
                     lines.append(f"> Reason: {reason}")
                 lines.append("")
@@ -168,6 +188,11 @@ def main():
         default="registry.toml",
         help="Path to registry.toml (default: registry.toml in cwd)"
     )
+    parser.add_argument(
+        "--timestamp",
+        default="",
+        help="Override timestamp (for deterministic output). Empty = use current time."
+    )
 
     args = parser.parse_args()
 
@@ -179,7 +204,7 @@ def main():
     # Load and generate
     try:
         registry = load_registry(args.registry)
-        index = generate_index(registry)
+        index = generate_index(registry, timestamp=args.timestamp)
         print(index)
     except Exception as e:
         print(f"ERROR: {e}", file=sys.stderr)

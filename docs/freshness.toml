@@ -192,13 +192,13 @@ notes = "Three-layer model proven. Privacy features deferred to Phase 20-21."
 title = "Crate Map"
 last_updated = "auto"
 truth_class = "descriptive"
-source = "scripts/docs/generate-crate-map.py"
+source = "docs/scripts/generate-index.py"
 depends_on = [
   "icn/Cargo.toml",
   "kernel_surface.toml",
   "icn/crates/*/doc.toml",
 ]
-evidence_type = "code"
+evidence_type = "auto"
 notes = "Auto-generated from Cargo.toml + kernel_surface.toml."
 
 [sections."18-institution-primitives"]
@@ -215,19 +215,19 @@ notes = "Compositional layer. Changes only when primitives or institution model 
 title = "Implementation Status"
 last_updated = "auto"
 truth_class = "operational"
-source = "scripts/docs/generate-status.py"
+source = "docs/scripts/freshness-check.py"
 depends_on = [
   "docs/status.toml",
   "kernel_surface.toml",
 ]
-evidence_type = "test"
+evidence_type = "auto"
 notes = "Auto-generated from status.toml + CI results."
 
 [sections."20-reference-index"]
 title = "Reference Index"
 last_updated = "auto"
 truth_class = "descriptive"
-source = "scripts/docs/generate-index.py"
+source = "docs/scripts/generate-index.py"
 depends_on = ["docs/registry.toml"]
-evidence_type = "code"
+evidence_type = "auto"
 notes = "Auto-generated from registry.toml."

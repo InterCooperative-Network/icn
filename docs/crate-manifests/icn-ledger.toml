@@ -2,50 +2,49 @@
 
 [crate]
 name = "icn-ledger"
-layer = "app"
-infection_status = "clean"
+layer = "domain"
+infection_status = "needs-review"
 owner = "core"
 doc_entry = "docs/reference/crates/icn-ledger.md"
-status = "stable"
+status = "active"
 exports_surface = true
 regulated_terms_allowed = false
 primitives = ["ledger", "capability", "identity"]
-description = "Ledger and state subsystem; UTXO model, state proofs, auditability"
+description = "Double-entry mutual credit ledger with receipt chain for auditability"
 
 [documentation]
 overview = true
-examples = true
-safety = true
+examples = false
+safety = false
 tests = true
-integration = true
+integration = false
 
 [implementation]
-test_count = 412
-example_count = 18
-unsafe_blocks = 8
-feature_flags = ["utxo-variant", "bench", "proof-generation"]
-dependencies = ["serde", "serde_json", "thiserror", "rocksdb"]
-peer_dependencies = ["icn-kernel-api", "icn-crypto-pq", "icn-meaning-firewall"]
+# Actual values need verification against codebase
+test_count = 0  # TODO: verify with `cargo test -p icn-ledger -- --list 2>&1 | grep 'test$' | wc -l`
+example_count = 0
+unsafe_blocks = 0  # TODO: verify with `grep -r 'unsafe' icn/crates/icn-ledger/src/ | wc -l`
+feature_flags = []
+dependencies = ["serde", "serde_json", "thiserror"]
+peer_dependencies = ["icn-kernel-api", "icn-types"]
 
 [publication]
-published_to_crates_io = true
-version = "0.5.1"
-readme_exists = true
-changelog_exists = true
-api_stability = "stable"
+published_to_crates_io = false
+version = "0.1.0"
+readme_exists = false
+changelog_exists = false
+api_stability = "unstable"
 
 [verification]
-tests_pass = true
-lint_clean = true
-docs_compile = true
+tests_pass = false  # TODO: verify
+lint_clean = false  # TODO: verify
+docs_compile = false  # TODO: verify
 no_forbidden_terms = true
 infection_vectors_documented = false
-capability_leaks_tested = true
+capability_leaks_tested = false
 
 [notes]
-"App layer: Uses public kernel-api surface. Directly implements regulatory-safe state."
-"Ledger model: UTXO-style immutable state model with commitment proofs."
-"No forbidden terms: Does NOT use 'balance', 'wallet', 'transaction' (uses 'capability-transfer')."
-"Unsafe blocks (8) relate to serialization and merkle tree proofs - all documented."
-"State proofs: Can generate zero-knowledge proofs of state without exposing ledger internals."
-"Integration: Works with meaning-firewall for regulatory compliance and audit trails."
+"Domain layer crate implementing the mutual credit ledger."
+"Uses double-entry bookkeeping model with AllocationReceipts."
+"No forbidden terms: Does NOT use 'balance', 'wallet', 'transaction' — uses 'capability-transfer'."
+"Infection status needs review — may have kernel API leaks."
