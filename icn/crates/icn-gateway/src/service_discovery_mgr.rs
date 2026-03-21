@@ -201,49 +201,57 @@ impl ServiceDiscoveryManager {
     /// registry and wires up write-through for future announce/withdraw calls.
     /// Call this after `with_gossip()` to combine gossip propagation with
     /// durable persistence across daemon restarts.
-    pub fn with_persistence(&mut self, db: &sled::Db) -> Result<(), NamingError> {
+    ///
+    /// The sled scan happens outside the registry lock to keep the lock window
+    /// short; the lock is only held for the final merge into memory.
+    pub async fn with_persistence(&mut self, db: &sled::Db) -> Result<(), NamingError> {
         let tree = db
             .open_tree(SLED_TREE_NAME)
             .map_err(|e| NamingError::Internal(format!("Failed to open sled tree: {e}")))?;
 
-        // Load non-expired entries from sled into the existing registry
+        // Scan sled outside the registry lock — this is the slow part.
+        let mut loaded: HashMap<String, ServiceEndpoint> = HashMap::new();
         let mut expired_keys = Vec::new();
-        {
-            let mut registry = self
-                .registry
-                .try_write()
-                .map_err(|_| NamingError::Internal("Registry lock contention".to_string()))?;
 
-            for entry in tree.iter() {
-                let (key, value) = entry.map_err(|e| {
-                    NamingError::Internal(format!("Failed to read sled entry: {e}"))
-                })?;
-                match serde_json::from_slice::<ServiceEndpoint>(&value) {
-                    Ok(ep) => {
-                        if ep.is_expired() {
-                            expired_keys.push(key);
-                        } else {
-                            registry.insert(ep.service_id.clone(), ep);
-                        }
-                    }
-                    Err(e) => {
-                        warn!("Skipping corrupt sled entry: {}", e);
+        for entry in tree.iter() {
+            let (key, value) = entry
+                .map_err(|e| NamingError::Internal(format!("Failed to read sled entry: {e}")))?;
+            match serde_json::from_slice::<ServiceEndpoint>(&value) {
+                Ok(ep) => {
+                    if ep.is_expired() {
                         expired_keys.push(key);
+                    } else {
+                        loaded.insert(ep.service_id.clone(), ep);
                     }
+                }
+                Err(e) => {
+                    warn!("Skipping corrupt sled entry: {}", e);
+                    expired_keys.push(key);
                 }
             }
         }
 
-        for key in expired_keys {
-            let _ = tree.remove(key);
+        // Prune expired/corrupt entries from sled now that we've finished scanning.
+        for key in &expired_keys {
+            if let Err(e) = tree.remove(key) {
+                warn!(
+                    "Failed to remove expired sled entry for key {:?}: {}",
+                    key, e
+                );
+            }
+        }
+
+        // Merge loaded endpoints into registry — brief lock window, no I/O inside.
+        let loaded_count = loaded.len();
+        {
+            let mut registry = self.registry.write().await;
+            registry.extend(loaded);
         }
 
         info!(
-            "Loaded {} service endpoints from sled persistence",
-            self.registry
-                .try_read()
-                .map(|r| r.len())
-                .unwrap_or_default()
+            "Loaded {} service endpoints from sled persistence ({} expired entries pruned)",
+            loaded_count,
+            expired_keys.len()
         );
 
         self.sled_tree = Some(tree);
@@ -1570,5 +1578,138 @@ mod tests {
 
         // Verify sled is also cleaned
         assert!(tree.get("will-expire").unwrap().is_none());
+    }
+
+    // ========== N4: with_persistence() Tests ==========
+
+    /// Attaching persistence to a fresh manager loads previously persisted endpoints.
+    #[tokio::test]
+    async fn test_with_persistence_loads_existing_endpoints() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let db = sled::open(tmpdir.path()).unwrap();
+
+        // Seed sled directly with a valid endpoint
+        let ep = make_endpoint("pre-existing-svc", ScopeLevel::Org, 3600);
+        let tree = db.open_tree(super::SLED_TREE_NAME).unwrap();
+        tree.insert(ep.service_id.as_bytes(), serde_json::to_vec(&ep).unwrap())
+            .unwrap();
+        drop(tree);
+
+        // Attach persistence to a freshly constructed manager
+        let mut mgr = ServiceDiscoveryManager::new();
+        mgr.with_persistence(&db).await.unwrap();
+
+        // Previously persisted endpoint should be visible
+        assert!(
+            mgr.get("pre-existing-svc").await.is_some(),
+            "with_persistence should load previously persisted endpoints"
+        );
+    }
+
+    /// with_persistence merges with any in-memory entries already in the manager
+    /// (e.g. from with_gossip bootstrapping).
+    #[tokio::test]
+    async fn test_with_persistence_merges_with_existing_memory() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let db = sled::open(tmpdir.path()).unwrap();
+
+        // Seed sled
+        let sled_ep = make_endpoint("sled-svc", ScopeLevel::Org, 3600);
+        let tree = db.open_tree(super::SLED_TREE_NAME).unwrap();
+        tree.insert(
+            sled_ep.service_id.as_bytes(),
+            serde_json::to_vec(&sled_ep).unwrap(),
+        )
+        .unwrap();
+        drop(tree);
+
+        // Pre-populate registry in-memory
+        let mut mgr = ServiceDiscoveryManager::new();
+        let mem_ep = make_endpoint("memory-svc", ScopeLevel::Org, 3600);
+        mgr.announce(mem_ep).await.unwrap();
+
+        // Attach persistence
+        mgr.with_persistence(&db).await.unwrap();
+
+        // Both endpoints should be present
+        assert!(
+            mgr.get("sled-svc").await.is_some(),
+            "sled entry should be loaded"
+        );
+        assert!(
+            mgr.get("memory-svc").await.is_some(),
+            "in-memory entry should survive"
+        );
+    }
+
+    /// with_persistence prunes expired entries from sled on attach.
+    #[tokio::test]
+    async fn test_with_persistence_prunes_expired_on_attach() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let db = sled::open(tmpdir.path()).unwrap();
+
+        // Seed sled with one expired and one valid endpoint
+        let mut expired_ep = make_endpoint("expired-svc", ScopeLevel::Org, 1);
+        expired_ep.updated_at = 1000; // Far in the past → expired
+        let valid_ep = make_endpoint("valid-svc", ScopeLevel::Org, 3600);
+
+        let tree = db.open_tree(super::SLED_TREE_NAME).unwrap();
+        tree.insert(
+            expired_ep.service_id.as_bytes(),
+            serde_json::to_vec(&expired_ep).unwrap(),
+        )
+        .unwrap();
+        tree.insert(
+            valid_ep.service_id.as_bytes(),
+            serde_json::to_vec(&valid_ep).unwrap(),
+        )
+        .unwrap();
+        drop(tree);
+
+        let mut mgr = ServiceDiscoveryManager::new();
+        mgr.with_persistence(&db).await.unwrap();
+
+        // Expired entry should not be in memory
+        assert!(mgr.get("expired-svc").await.is_none());
+        // Valid entry should be
+        assert!(mgr.get("valid-svc").await.is_some());
+        // Expired entry should be gone from sled too
+        let tree = db.open_tree(super::SLED_TREE_NAME).unwrap();
+        assert!(
+            tree.get("expired-svc").unwrap().is_none(),
+            "expired entry should be pruned from sled"
+        );
+    }
+
+    /// After with_persistence, announce() and withdraw() write-through to sled.
+    #[tokio::test]
+    async fn test_with_persistence_enables_write_through() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let db = sled::open(tmpdir.path()).unwrap();
+
+        let mut mgr = ServiceDiscoveryManager::new();
+        mgr.with_persistence(&db).await.unwrap();
+
+        // Announce a new endpoint
+        let ep = make_endpoint("write-through-svc", ScopeLevel::Org, 3600);
+        mgr.announce(ep).await.unwrap();
+
+        // Verify it landed in sled
+        let tree = db.open_tree(super::SLED_TREE_NAME).unwrap();
+        assert!(
+            tree.get("write-through-svc").unwrap().is_some(),
+            "announce should write-through to sled"
+        );
+
+        // Withdraw it
+        mgr.withdraw("write-through-svc", "did:icn:test")
+            .await
+            .unwrap();
+
+        // Verify it was removed from sled
+        assert!(
+            tree.get("write-through-svc").unwrap().is_none(),
+            "withdraw should remove from sled"
+        );
     }
 }
