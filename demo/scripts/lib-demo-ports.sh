@@ -567,3 +567,83 @@ demo_require_2xx() {
   fail "  Got HTTP $code"
   exit 1
 }
+
+# ===========================================================================
+# DEVNET MODE OVERRIDES
+# Set ICN_DEMO_TARGET=devnet to activate. Replaces kubectl-based functions
+# with direct Docker devnet equivalents (localhost:8080/8081/8082).
+# ===========================================================================
+if [ "${ICN_DEMO_TARGET:-}" = "devnet" ]; then
+
+  # Override gateway URLs to point at the local 3-node devnet
+  export BRIGHTWORKS_URL="http://localhost:8080"   # node-a
+  export RIVERCITY_URL="http://localhost:8081"      # node-b
+  export HARBOR_URL="http://localhost:8082"         # node-c
+  export FINGERLAKES_URL="http://localhost:8080"    # reuse node-a (devnet has 3 nodes)
+
+  # demo_ports_up: devnet is already running via docker compose; no port-forwards needed
+  demo_ports_up() {
+    aside "Devnet mode: gateway ports are localhost:8080/8081/8082 (no kubectl port-forward)"
+  }
+
+  # demo_ports_down: leave the devnet running; caller controls lifecycle
+  demo_ports_down() {
+    aside "Devnet mode: devnet left running (stop with: cd deploy/devnet && docker compose down)"
+    # Still clean up the token cache
+    rm -rf "${_DEMO_TOKEN_CACHE_DIR:-}" 2>/dev/null || true
+    rm -f "${_DEMO_LAST_RESP_FILE:-}" 2>/dev/null || true
+    _DEMO_LAST_RESP_FILE=""
+  }
+
+  # demo_get_token: use icnctl inside the devnet container (icnctl ships in the image)
+  demo_get_token() {
+    local _refresh=0
+    if [ "${1:-}" = "--refresh" ]; then
+      _refresh=1
+      shift
+    fi
+
+    local coop="${1:-}"
+    if [ -z "$coop" ]; then
+      fail "demo_get_token: coop name required (alpha/beta/gamma/delta)"
+      return 1
+    fi
+
+    local cache_file="${_DEMO_TOKEN_CACHE_DIR}/token-${coop}"
+    if [ "$_refresh" = "1" ]; then
+      rm -f "$cache_file"
+    fi
+    if [ -f "$cache_file" ] && [ -s "$cache_file" ]; then
+      cat "$cache_file"
+      return 0
+    fi
+
+    local container coop_id gateway_url
+    case "$coop" in
+      alpha) container="icn-devnet-node-a"; coop_id="$BRIGHTWORKS_COOP_ID"; gateway_url="$BRIGHTWORKS_URL" ;;
+      beta)  container="icn-devnet-node-b"; coop_id="$RIVERCITY_COOP_ID";   gateway_url="$RIVERCITY_URL" ;;
+      gamma) container="icn-devnet-node-c"; coop_id="$HARBOR_COOP_ID";      gateway_url="$HARBOR_URL" ;;
+      delta) container="icn-devnet-node-a"; coop_id="$FINGERLAKES_COOP_ID"; gateway_url="$FINGERLAKES_URL" ;;
+      *)     fail "demo_get_token: unknown coop '$coop' (must be alpha/beta/gamma/delta)"; return 1 ;;
+    esac
+
+    local token
+    token=$(docker exec "$container" \
+      env ICN_KEYSTORE_PASSPHRASE="devnet-insecure" \
+      icnctl auth token \
+      --gateway "$gateway_url" \
+      --coop-id "$coop_id" \
+      --scopes "$DEMO_DEFAULT_SCOPES" \
+      2>/dev/null | grep -oE 'eyJ[A-Za-z0-9_.-]+\.[A-Za-z0-9_.-]+\.[A-Za-z0-9_.-]+' | head -1 || true)
+
+    if [ -z "$token" ]; then
+      fail "demo_get_token: failed to get token for coop '$coop' (devnet mode)"
+      fail "  Tried: docker exec $container icnctl auth token --gateway $gateway_url --coop-id $coop_id"
+      return 1
+    fi
+
+    echo "$token" > "$cache_file"
+    echo "$token"
+  }
+
+fi  # end ICN_DEMO_TARGET=devnet overrides
