@@ -1,72 +1,88 @@
 {
-  "sprint": 16,
-  "name": "Sprint 16 — Grant-Ready Demo & K3s Pipeline",
-  "started": "2026-03-19",
+  "sprint": 17,
+  "name": "Sprint 17 — Security Hardening & IPv6 Foundation",
+  "started": "2026-03-21",
   "goals": [
-    "Make all 4 demo flows PROVEN on K3s (fix stale route names in demo scripts)",
-    "Fix K3s deploy pipeline (ci-runner → control node SSH)",
-    "Terminology rename: ledger → state change journal in user-facing docs (#1303)",
-    "Package grant-ready artifacts for March 31 deadline (Outta Excuses, Verizon Digital Ready)"
+    "Fix 4 security/correctness bugs flagged in S14-S16 code review (grant deadline: these undermine compliance claims)",
+    "IPv6 type refactor: EndpointCandidate + ConnectionCandidate (#1297) — gates all subsequent IPv6 work",
+    "Close PR #1338 (IPv6 dual-stack bind defaults) which has been in-review since S14"
+  ],
+  "execution_order": [
+    "t1 (icnctl [::1]) — 1-line fix, unblocks IPv6 CLI usage immediately",
+    "t2 (delegation gossip validation) — adversarial-by-default, security bug",
+    "t3 (CharterPolicyOracle fail-closed) — meaning firewall integrity, security bug",
+    "t4 (payer authorization) — partial fix now, full fix requires PaymentRequest refactor (track in #1342)",
+    "t5 (PR #1338) — already merged in S16; icnctl default gap fixed in t1",
+    "t6 (EndpointCandidate type) — IPv6 type refactor, leads S17 networking track"
   ],
   "tasks": [
     {
-      "id": "s16-t1",
-      "title": "Merge PR #1354 + close Sprint 15",
-      "status": "done",
-      "pr": 1354,
-      "assignee": "claude",
-      "epic": "1147",
-      "evidence": "PR #1354 merged. Sprint 15 archived to history/sprint-15.json."
-    },
-    {
-      "id": "s16-t2",
-      "title": "fix(demo): update Flow 2/4 scripts for renamed ledger routes (payment→settle, balance→position)",
-      "status": "done",
-      "pr": 1355,
-      "assignee": "claude",
-      "epic": "1099",
-      "evidence": "PR #1355. Routes updated: payment→settle, balance→position, currency→unit. All narration text updated."
-    },
-    {
-      "id": "s16-t3",
-      "title": "fix(ci): K3s deploy pipeline — SSH to control node instead of local k3s CLI",
-      "status": "done",
-      "pr": 1357,
-      "assignee": "claude",
-      "epic": "1099",
-      "evidence": "PR #1357. SSH keypair generated on ci-runner, authorized on all K3s nodes. Workflow gets ssh-keyscan setup step. Deploy run 23328453265 in progress."
-    },
-    {
-      "id": "s16-t4",
-      "title": "K3s redeploy + live demo verification (all 4 flows PROVEN)",
+      "id": "s17-t1",
+      "title": "fix(cli): icnctl RPC default [::1]:5601 after IPv6 bind change (#1339)",
       "status": "done",
       "pr": null,
       "assignee": "claude",
-      "epic": "1099",
-      "evidence": "Deploy run 23328453265 passed. All 5 pods running. All 4 flows PROVEN: F1 governance 2xx, F2 settle 201 + position 200, F3 both sides Accepted, F4 6 evidence items."
+      "issue": 1339,
+      "epic": "1295",
+      "note": "1-line fix: default_value 127.0.0.1:5601 → [::1]:5601. Also fix healthcheck bind. Committed 88d091b0."
     },
     {
-      "id": "s16-t5",
-      "title": "docs(terminology): rename ledger → state change journal in user-facing text (#1303)",
+      "id": "s17-t2",
+      "title": "fix(governance): validate delegation gossip sender before overwrite (#1340)",
       "status": "done",
       "pr": null,
       "assignee": "claude",
-      "epic": "1302",
-      "evidence": "Issue #1303 already closed — API surface renames completed in 439a8a2c. Demo scripts updated in PR #1355."
+      "issue": 1340,
+      "epic": "1099",
+      "note": "Validate gossip sender DID == delegation.delegator before accept/revoke. 4 new security tests. Committed 88d091b0."
     },
     {
-      "id": "s16-t6",
-      "title": "docs(grants): package grant-ready artifacts for March 31 deadline",
+      "id": "s17-t3",
+      "title": "fix(governance): CharterPolicyOracle fail-closed on translation error (#1341)",
       "status": "done",
-      "pr": 1356,
+      "pr": null,
       "assignee": "claude",
+      "issue": 1341,
       "epic": "1099",
-      "evidence": "6 modular grant files in docs/strategy/grants/. One-pager, narrative, budget, milestones, compliance, pilot readiness. Assembly guide per funder."
+      "note": "Return Deny on charter_to_constraints() failure and unknown charter_id. Updated tests. Committed 88d091b0."
+    },
+    {
+      "id": "s17-t4",
+      "title": "fix(compute): payer authorization audit trail for compute settlements (#1342)",
+      "status": "done",
+      "pr": null,
+      "assignee": "claude",
+      "issue": 1342,
+      "epic": "1099",
+      "note": "Minimal fix: embed payer DID in provenance for auditability. Full fix (capability token in PaymentRequest) tracked in #1342. Committed 88d091b0."
+    },
+    {
+      "id": "s17-t5",
+      "title": "merge PR #1338: IPv6 dual-stack bind defaults ([::] and [::1])",
+      "status": "done",
+      "pr": 1338,
+      "assignee": null,
+      "issue": 1296,
+      "epic": "1295",
+      "note": "Already merged in S16 deploy work. icnctl default gap closed by t1."
+    },
+    {
+      "id": "s17-t6",
+      "title": "feat(net): EndpointCandidate type + ConnectionCandidate refactor (#1297)",
+      "status": "pending",
+      "pr": null,
+      "assignee": null,
+      "issue": 1297,
+      "epic": "1295",
+      "note": "IPv6 type refactor — gates mDNS multi-address (#1298), Happy Eyeballs (#1299), KnownPeer endpoint field (#1300)."
     }
   ],
   "epics": {
-    "1099": "[EPIC] Pilot Completion (P0) — Flows A/B/C",
-    "1147": "[EPIC] Vertical Slice (P0) — Identity→Governance→Compute→Receipts→Audit",
-    "1302": "[EPIC] Regulatory-safe verifiable state architecture"
+    "1099": "[EPIC] ICN Pilot Completion — End-to-End Demos (P0)",
+    "1295": "[EPIC] IPv6 dual-stack transport and endpoint sets (Phases 21-22)"
+  },
+  "deferred_from_s14": {
+    "note": "Items deferred S14→S15→S16 that are now S17 targets",
+    "issues": [1297, 1298, 1299, 1300, 1301, 1120]
   }
 }
