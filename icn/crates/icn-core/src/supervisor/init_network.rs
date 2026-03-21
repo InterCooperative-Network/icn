@@ -304,7 +304,11 @@ fn handle_peer_exchange(
                 // We try all candidates so that out-of-LAN peers, which cannot reach
                 // a local address, can fall through to the public endpoint.
                 let mut addrs: Vec<std::net::SocketAddr> = Vec::new();
-                for kind in [EndpointKind::Local, EndpointKind::Public, EndpointKind::Relay] {
+                for kind in [
+                    EndpointKind::Local,
+                    EndpointKind::Public,
+                    EndpointKind::Relay,
+                ] {
                     for e in peer.endpoints.iter().filter(|e| e.kind == kind) {
                         addrs.push(e.addr);
                     }
@@ -318,10 +322,7 @@ fn handle_peer_exchange(
                         if let Some(net_handle) = net_handle {
                             if let Ok(peer_did) = icn_identity::Did::from_str(&peer_did_str) {
                                 for addr in &addrs {
-                                    info!(
-                                        "Auto-dialing announced peer {} at {}",
-                                        peer_did, addr
-                                    );
+                                    info!("Auto-dialing announced peer {} at {}", peer_did, addr);
                                     match net_handle.dial(*addr, peer_did.clone()).await {
                                         Ok(_) => {
                                             icn_obs::metrics::peer_exchange::peers_dialed_inc();
