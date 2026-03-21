@@ -10,7 +10,7 @@
 use anyhow::Context;
 use anyhow::Result;
 use clap::Parser;
-use icn_core::{Config, Runtime};
+use icn_core::{Config, GenesisBundle, Runtime};
 use icn_identity::{AgeKeyStore, KeyStore};
 use icn_kernel_api::protocol_params::ProtocolParameterStore;
 use icn_kernel_api::ServiceRegistry;
@@ -362,7 +362,21 @@ fn handle_init(args: &Args) -> Result<()> {
         .to_file(&config_path)
         .with_context(|| format!("Failed to write config to {}", config_path.display()))?;
 
-    println!("  Config:   {}\n", config_path.display());
+    println!("  Config:   {}", config_path.display());
+
+    // Generate genesis bundle — a sealed, versioned document of initial network state.
+    // Uses the node name as the network_id so bundles from different init invocations
+    // are distinguishable. The bundle records the node's DID and seed peers so it can
+    // be shared with other nodes joining the same devnet.
+    let genesis_path = data_dir.join("genesis.json");
+    let mut bundle = GenesisBundle::new_single_node(&args.node_name, did.to_string());
+    bundle.seed_peers = args.bootstrap_peer.clone();
+    let bundle = bundle.seal().context("Failed to seal genesis bundle")?;
+    bundle
+        .to_file(&genesis_path)
+        .context("Failed to write genesis bundle")?;
+
+    println!("  Genesis:  {}\n", genesis_path.display());
     println!("Node initialized successfully.");
     println!("  Start with: icnd --config {}", config_path.display());
 
