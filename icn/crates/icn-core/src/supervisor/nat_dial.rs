@@ -384,6 +384,112 @@ async fn dial_sequential(
     None
 }
 
+/// Race IPv4 and IPv6 addresses within a single endpoint category (RFC 8305 Happy Eyeballs).
+///
+/// IPv6 is preferred: it is dialed immediately. If the IPv6 dial does not succeed within
+/// `config.happy_eyeballs_delay_ms` (default 250ms), an IPv4 dial is spawned in parallel.
+/// The first successful connection wins; all other tasks are cancelled.
+///
+/// If `addrs` contains only one IP version, that address is dialed directly with no stagger.
+/// If `addrs` is empty, returns `None`.
+///
+/// # Design (ADR-0009)
+///
+/// This function races addresses **within** a single `EndpointKind`. The existing
+/// `dial_parallel()` continues to race **across** kinds (Local vs Public). These two
+/// levels of racing compose: for each category of addresses that has both IPv4 and IPv6,
+/// Happy Eyeballs finds the faster path automatically.
+pub async fn dial_happy_eyeballs(
+    addrs: Vec<SocketAddr>,
+    did: &icn_identity::Did,
+    network_handle: &NetworkHandle,
+    dial_timeout: Duration,
+    config: &NatDialConfig,
+) -> Option<SocketAddr> {
+    if addrs.is_empty() {
+        return None;
+    }
+
+    // Sort: IPv6 first, IPv4 second (RFC 8305 §5 preference order)
+    let mut sorted = addrs;
+    sorted.sort_by_key(|a| !a.is_ipv6());
+
+    let delay = Duration::from_millis(config.happy_eyeballs_delay_ms);
+
+    // Fast path: only one IP version present — dial it directly, no stagger needed
+    let has_ipv6 = sorted.iter().any(|a| a.is_ipv6());
+    let has_ipv4 = sorted.iter().any(|a| a.is_ipv4());
+    if !has_ipv6 || !has_ipv4 {
+        let addr = sorted[0];
+        debug!(%did, %addr, "happy_eyeballs: single IP version, dialing directly");
+        return tokio::time::timeout(dial_timeout, network_handle.dial(addr, did.clone()))
+            .await
+            .ok()
+            .and_then(|r| r.ok())
+            .map(|_| addr);
+    }
+
+    // Dual-stack path: IPv6 first, IPv4 after stagger
+    let ipv6_addrs: Vec<SocketAddr> = sorted.iter().filter(|a| a.is_ipv6()).copied().collect();
+    let ipv4_addrs: Vec<SocketAddr> = sorted.iter().filter(|a| a.is_ipv4()).copied().collect();
+
+    let ipv6_addr = ipv6_addrs[0];
+    let ipv4_addr = ipv4_addrs[0];
+
+    debug!(
+        %did,
+        ipv6 = %ipv6_addr,
+        ipv4 = %ipv4_addr,
+        stagger_ms = config.happy_eyeballs_delay_ms,
+        "happy_eyeballs: racing IPv6 (preferred) and IPv4 (staggered)"
+    );
+
+    let (result_tx, mut result_rx) = tokio::sync::mpsc::channel::<SocketAddr>(1);
+
+    // Spawn IPv6 task (immediate)
+    let ipv6_handle_clone = network_handle.clone();
+    let ipv6_did = did.clone();
+    let ipv6_tx = result_tx.clone();
+    let ipv6_task = tokio::spawn(async move {
+        if let Ok(Ok(_)) =
+            tokio::time::timeout(dial_timeout, ipv6_handle_clone.dial(ipv6_addr, ipv6_did)).await
+        {
+            let _ = ipv6_tx.send(ipv6_addr).await;
+        }
+    });
+
+    // Spawn IPv4 task (staggered)
+    let ipv4_handle_clone = network_handle.clone();
+    let ipv4_did = did.clone();
+    let ipv4_tx = result_tx.clone();
+    let ipv4_task = tokio::spawn(async move {
+        tokio::time::sleep(delay).await;
+        if let Ok(Ok(_)) =
+            tokio::time::timeout(dial_timeout, ipv4_handle_clone.dial(ipv4_addr, ipv4_did)).await
+        {
+            let _ = ipv4_tx.send(ipv4_addr).await;
+        }
+    });
+
+    // Drop the original sender so the channel closes when both tasks finish
+    drop(result_tx);
+
+    // Wait for first success or both tasks finishing
+    let winner = result_rx.recv().await;
+
+    // Cancel the other task (best-effort; the task is already detached but the result is ignored)
+    ipv6_task.abort();
+    ipv4_task.abort();
+
+    if let Some(addr) = winner {
+        info!(%did, %addr, "happy_eyeballs: connected");
+    } else {
+        debug!(%did, "happy_eyeballs: both IPv4 and IPv6 failed");
+    }
+
+    winner
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -403,5 +509,32 @@ mod tests {
         assert_eq!(config.public_dial_timeout_ms, 10000);
         assert_eq!(config.relay_dial_timeout_ms, 30000);
         assert_eq!(config.candidate_announce_interval_secs, 150);
+        assert_eq!(config.happy_eyeballs_delay_ms, 250);
+    }
+
+    #[test]
+    fn test_happy_eyeballs_delay_default() {
+        let config = NatDialConfig::default();
+        assert_eq!(
+            config.happy_eyeballs_delay_ms, 250,
+            "RFC 8305 §5 mandates 250ms stagger"
+        );
+    }
+
+    #[test]
+    fn test_ipv6_sort_order() {
+        // Verify that our sort puts IPv6 first
+        let mut addrs: Vec<SocketAddr> = vec![
+            "192.168.1.1:7777".parse().unwrap(), // IPv4
+            "[::1]:7777".parse().unwrap(),       // IPv6
+            "10.0.0.1:7777".parse().unwrap(),    // IPv4
+            "[fe80::1]:7777".parse().unwrap(),   // IPv6
+        ];
+        addrs.sort_by_key(|a| !a.is_ipv6());
+
+        assert!(addrs[0].is_ipv6(), "first address must be IPv6");
+        assert!(addrs[1].is_ipv6(), "second address must be IPv6");
+        assert!(addrs[2].is_ipv4(), "third address must be IPv4");
+        assert!(addrs[3].is_ipv4(), "fourth address must be IPv4");
     }
 }
