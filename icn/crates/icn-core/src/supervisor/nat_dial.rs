@@ -426,9 +426,11 @@ pub async fn dial_happy_eyeballs(
             if let Ok(Ok(_)) =
                 tokio::time::timeout(dial_timeout, network_handle.dial(*addr, did.clone())).await
             {
-                icn_obs::metrics::nat::dial_success_inc(
-                    if addr.is_ipv6() { "ipv6" } else { "ipv4" },
-                );
+                icn_obs::metrics::nat::dial_success_inc(if addr.is_ipv6() {
+                    "ipv6"
+                } else {
+                    "ipv4"
+                });
                 info!(%did, %addr, "happy_eyeballs: connected");
                 return Some(*addr);
             }
