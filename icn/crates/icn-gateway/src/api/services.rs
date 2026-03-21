@@ -150,14 +150,20 @@ pub struct DiscoverResponse {
 pub struct ServiceEndpointResponse {
     pub service_id: String,
     pub provider: String,
+    /// Transport protocol type: "quic", "http", "grpc", or "websocket"
+    pub endpoint_type: String,
     pub service_type: String,
     pub service_version: String,
     pub endpoints: Vec<EndpointResponse>,
+    /// String addresses (multiaddr or similar) for direct dialing
+    pub addresses: Vec<String>,
     pub capabilities: Vec<String>,
     pub trust_threshold: f64,
     pub scope_visibility: String,
     pub ttl_secs: u64,
     pub created_at: u64,
+    /// Unix timestamp of last update
+    pub updated_at: u64,
 }
 
 /// Network endpoint in API response format.
@@ -188,10 +194,20 @@ fn scope_to_string(scope: ScopeLevel) -> String {
     scope.to_string()
 }
 
+fn endpoint_type_to_str(t: &icn_kernel_api::naming::EndpointType) -> &'static str {
+    match t {
+        icn_kernel_api::naming::EndpointType::Quic => "quic",
+        icn_kernel_api::naming::EndpointType::Http => "http",
+        icn_kernel_api::naming::EndpointType::Grpc => "grpc",
+        icn_kernel_api::naming::EndpointType::WebSocket => "websocket",
+    }
+}
+
 fn to_response(ep: &ServiceEndpoint) -> ServiceEndpointResponse {
     ServiceEndpointResponse {
         service_id: ep.service_id.clone(),
         provider: ep.provider.clone(),
+        endpoint_type: endpoint_type_to_str(&ep.endpoint_type).to_string(),
         service_type: ep.service_type.name.clone(),
         service_version: ep.service_type.version.clone(),
         endpoints: ep
@@ -204,11 +220,13 @@ fn to_response(ep: &ServiceEndpoint) -> ServiceEndpointResponse {
                 path: e.path.clone(),
             })
             .collect(),
+        addresses: ep.addresses.clone(),
         capabilities: ep.capabilities.clone(),
         trust_threshold: ep.trust_threshold,
         scope_visibility: scope_to_string(ep.scope_visibility),
         ttl_secs: ep.ttl_secs,
         created_at: ep.created_at,
+        updated_at: ep.updated_at,
     }
 }
 
