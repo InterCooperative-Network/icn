@@ -1,6 +1,7 @@
 #!/bin/bash
 # Hook: PreToolUse guard for panics in protocol paths
-# Warns (does not block) when unwrap/expect is added to non-test Rust code
+# BLOCKS on panic!() in non-test Rust code (ICN invariant: No panics in protocol paths)
+# WARNS on .unwrap()/.expect() in non-test Rust code
 
 INPUT=$(cat)
 FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty')
@@ -21,33 +22,38 @@ if [[ -z "$NEW_CONTENT" ]]; then
   exit 0
 fi
 
-# Check for panic-inducing patterns in non-test code
+# --- BLOCKING: panic!() is never allowed in non-test protocol paths ---
+# Skip if the panic is inside a #[cfg(test)] block or #[allow(clippy::panic)] annotation
+if echo "$NEW_CONTENT" | grep -qE 'panic!\('; then
+  if ! echo "$NEW_CONTENT" | grep -qE '#\[cfg\(test\)\]|#\[allow\(clippy::panic\)\]'; then
+    echo "PANIC GUARD VIOLATION in ${FILE_PATH}:" >&2
+    echo "  panic!() found in non-test code." >&2
+    echo "  ICN invariant: 'No panics in protocol paths'" >&2
+    echo "  Use Result<T, E> and propagate errors instead." >&2
+    echo "  If this is intentionally unreachable, use unreachable!() with a comment." >&2
+    exit 1
+  fi
+fi
+
+# --- WARNING: .unwrap()/.expect() outside test modules ---
 WARNINGS=""
 
-# Check for .unwrap() - but not in test modules
 if echo "$NEW_CONTENT" | grep -qE '\.unwrap\(\)'; then
-  # Don't flag if inside #[cfg(test)] block (approximation)
-  if ! echo "$NEW_CONTENT" | grep -qE '#\[cfg\(test\)\]'; then
-    WARNINGS="${WARNINGS}\n  - .unwrap() found - use Result<T,E> or proper error handling instead"
+  if ! echo "$NEW_CONTENT" | grep -qE '#\[cfg\(test\)\]|#\[allow\(clippy::unwrap_used\)\]'; then
+    WARNINGS="${WARNINGS}\n  - .unwrap() found - prefer Result<T,E> or document why it cannot fail with .expect(\"reason\")"
   fi
 fi
 
 if echo "$NEW_CONTENT" | grep -qE '\.expect\('; then
-  if ! echo "$NEW_CONTENT" | grep -qE '#\[cfg\(test\)\]'; then
-    WARNINGS="${WARNINGS}\n  - .expect() found - use Result<T,E> or proper error handling instead"
+  if ! echo "$NEW_CONTENT" | grep -qE '#\[cfg\(test\)\]|#\[allow\(clippy::expect_used\)\]'; then
+    WARNINGS="${WARNINGS}\n  - .expect() found - ensure this truly cannot fail in production; add a // SAFETY: comment if so"
   fi
 fi
 
-if echo "$NEW_CONTENT" | grep -qE 'panic!\('; then
-  WARNINGS="${WARNINGS}\n  - panic!() found - never panic in protocol/actor/network paths"
-fi
-
 if [[ -n "$WARNINGS" ]]; then
-  # Output as JSON with system message (warning, not blocking)
   cat <<EOF
-{"continue": true, "systemMessage": "Warning: Potential panic in protocol code (${FILE_PATH}):${WARNINGS}\nConsider using Result<T, E> instead. See AGENTS.md invariant: 'No panics in protocol paths'."}
+{"continue": true, "systemMessage": "Panic guard warning in ${FILE_PATH}:${WARNINGS}\nSee AGENTS.md invariant: 'No panics in protocol paths'. Use #[allow(clippy::unwrap_used)] with a SAFETY comment if the panic is truly unreachable."}
 EOF
-  exit 0
 fi
 
 exit 0
