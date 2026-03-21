@@ -300,12 +300,14 @@ fn handle_peer_exchange(
 
             if federation_enabled {
                 use icn_net::candidate::EndpointKind;
-                // Prefer local endpoint for announced peers (they're likely on the same LAN);
-                // fall back to the first endpoint of any kind.
+                // Prefer Public endpoint for announced peers — Announce is broadcast to ALL
+                // connected peers, not only LAN neighbors, so a Local-only address would be
+                // unreachable for WAN recipients. Fall back to the first endpoint of any kind
+                // if no Public endpoint is available.
                 let addr_opt = peer
                     .endpoints
                     .iter()
-                    .find(|e| e.kind == EndpointKind::Local)
+                    .find(|e| e.kind == EndpointKind::Public)
                     .or_else(|| peer.endpoints.first())
                     .map(|e| e.addr);
                 if let Some(addr) = addr_opt {
