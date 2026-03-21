@@ -35,7 +35,7 @@ pub use apps::{
     AppBuilder, AppHandle, AppId, AppRuntime, AppStatus, ComputeDispatcher, Event, Manifest,
     Reducer, Request, Response, RuntimeError, Service, StateDelta, StateSnapshot,
 };
-pub use config::Config;
+pub use config::{Config, GenesisBundle, InitialContract, InitialCoop, GENESIS_SCHEMA_VERSION};
 pub use dead_letter::{DeadLetterQueue, EntryStatus, FailedOperation, FailureType};
 pub use error::{CoreError, Result};
 pub use events::{EventBus, EventCallback, SystemEvent};
