@@ -1,88 +1,67 @@
 {
-  "sprint": 17,
-  "name": "Sprint 17 — Security Hardening & IPv6 Foundation",
+  "sprint": 18,
+  "name": "Sprint 18 — IPv6 Connectivity: KnownPeer Endpoint Sets + Happy Eyeballs",
   "started": "2026-03-21",
   "goals": [
-    "Fix 4 security/correctness bugs flagged in S14-S16 code review (grant deadline: these undermine compliance claims)",
-    "IPv6 type refactor: EndpointCandidate + ConnectionCandidate (#1297) — gates all subsequent IPv6 work",
-    "Close PR #1338 (IPv6 dual-stack bind defaults) which has been in-review since S14"
+    "Close #1342 fully: gossip-layer author validation for compute payment settlement",
+    "KnownPeer endpoint field (#1300): replace Vec<String> with Vec<EndpointCandidate>",
+    "mDNS multi-address (#1298): advertise and collect all local addresses",
+    "Happy Eyeballs (#1299): race IPv4/IPv6 within address categories (RFC 8305)"
   ],
   "execution_order": [
-    "t1 (icnctl [::1]) — 1-line fix, unblocks IPv6 CLI usage immediately",
-    "t2 (delegation gossip validation) — adversarial-by-default, security bug",
-    "t3 (CharterPolicyOracle fail-closed) — meaning firewall integrity, security bug",
-    "t4 (payer authorization) — partial fix now, full fix requires PaymentRequest refactor (track in #1342)",
-    "t5 (PR #1338) — already merged in S16; icnctl default gap fixed in t1",
-    "t6 (EndpointCandidate type) — IPv6 type refactor, leads S17 networking track"
+    "t1 (#1342) — security gap, always first; gossip-layer entry.author == task.submitter guard",
+    "t2 (#1300) — KnownPeer type change; gates mDNS multi-address usefulness",
+    "t3 (#1298) — mDNS multi-address; needs #1300 for typed storage",
+    "t4 (#1299) — Happy Eyeballs dial racing; separate module, can overlap with t3"
   ],
   "tasks": [
     {
-      "id": "s17-t1",
-      "title": "fix(cli): icnctl RPC default [::1]:5601 after IPv6 bind change (#1339)",
-      "status": "done",
+      "id": "s18-t1",
+      "title": "fix(compute): gossip-layer author validation for payer authorization (#1342)",
+      "status": "pending",
       "pr": null,
-      "assignee": "claude",
-      "issue": 1339,
-      "epic": "1295",
-      "note": "1-line fix: default_value 127.0.0.1:5601 → [::1]:5601. Also fix healthcheck bind. Committed 88d091b0."
-    },
-    {
-      "id": "s17-t2",
-      "title": "fix(governance): validate delegation gossip sender before overwrite (#1340)",
-      "status": "done",
-      "pr": null,
-      "assignee": "claude",
-      "issue": 1340,
-      "epic": "1099",
-      "note": "Validate gossip sender DID == delegation.delegator before accept/revoke. 4 new security tests. Committed 88d091b0."
-    },
-    {
-      "id": "s17-t3",
-      "title": "fix(governance): CharterPolicyOracle fail-closed on translation error (#1341)",
-      "status": "done",
-      "pr": null,
-      "assignee": "claude",
-      "issue": 1341,
-      "epic": "1099",
-      "note": "Return Deny on charter_to_constraints() failure and unknown charter_id. Updated tests. Committed 88d091b0."
-    },
-    {
-      "id": "s17-t4",
-      "title": "fix(compute): payer authorization audit trail for compute settlements (#1342)",
-      "status": "done",
-      "pr": null,
-      "assignee": "claude",
+      "assignee": null,
       "issue": 1342,
       "epic": "1099",
-      "note": "Minimal fix: embed payer DID in provenance for auditability. Full fix (capability token in PaymentRequest) tracked in #1342. Committed 88d091b0."
+      "note": "Add entry.author == task.submitter guard in init_notifications.rs handle_compute_message(). Pass entry_author: Did through to the TaskSubmitted match arm. Closes the spoofing vector without needing PaymentRequest struct change."
     },
     {
-      "id": "s17-t5",
-      "title": "merge PR #1338: IPv6 dual-stack bind defaults ([::] and [::1])",
-      "status": "done",
-      "pr": 1338,
+      "id": "s18-t2",
+      "title": "refactor(net): KnownPeer endpoint field — Vec<String> → Vec<EndpointCandidate> (#1300)",
+      "status": "pending",
+      "pr": null,
       "assignee": null,
-      "issue": 1296,
+      "issue": 1300,
       "epic": "1295",
-      "note": "Already merged in S16 deploy work. icnctl default gap closed by t1."
+      "note": "Intentional wire format change. Update protocol.rs KnownPeer struct. Update peer_exchange.rs construction. Update init_network.rs .addresses accesses. Add serde compat notes."
     },
     {
-      "id": "s17-t6",
-      "title": "feat(net): EndpointCandidate type + ConnectionCandidate refactor (#1297)",
-      "status": "in_review",
-      "pr": 1358,
-      "assignee": "claude",
-      "issue": 1297,
+      "id": "s18-t3",
+      "title": "feat(net): mDNS multi-address — advertise all local addrs, collect Vec<SocketAddr> (#1298)",
+      "status": "pending",
+      "pr": null,
+      "assignee": null,
+      "issue": 1298,
       "epic": "1295",
-      "note": "EndpointKind + EndpointCandidate added. ConnectionCandidate refactored to Vec<EndpointCandidate>. Backward-compat new() + accessor methods. PR open. 250+308 tests pass."
+      "note": "Modify PeerInfo to store Vec<SocketAddr>. Update browse handler to collect all get_addresses(). Integrate with EndpointCandidate::local() for KnownPeer construction."
+    },
+    {
+      "id": "s18-t4",
+      "title": "feat(net): Happy Eyeballs — race IPv4/IPv6 in parallel with 250ms stagger (#1299)",
+      "status": "pending",
+      "pr": null,
+      "assignee": null,
+      "issue": 1299,
+      "epic": "1295",
+      "note": "RFC 8305 adaptation. Add dial_happy_eyeballs() to nat_dial.rs. IPv6 preferred, IPv4 fallback after 250ms. Add happy_eyeballs_delay_ms to NatDialConfig (serde default). Works per EndpointKind category."
     }
   ],
   "epics": {
     "1099": "[EPIC] ICN Pilot Completion — End-to-End Demos (P0)",
     "1295": "[EPIC] IPv6 dual-stack transport and endpoint sets (Phases 21-22)"
   },
-  "deferred_from_s14": {
-    "note": "Items deferred S14→S15→S16 that are now S17 targets",
-    "issues": [1297, 1298, 1299, 1300, 1301, 1120]
+  "deferred_from_s17": {
+    "note": "Issues deferred S14→S17 that are now S18 targets (after PR #1358 merge). #1301 (IPv6 federation transport) deferred to S19 — depends on #1298+#1299. #1120 has zero code references — flag for human review/closure.",
+    "issues": [1298, 1299, 1300, 1301, 1120]
   }
 }
