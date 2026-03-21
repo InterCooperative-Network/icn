@@ -196,6 +196,20 @@ pub struct NatDialConfig {
     /// Default: 150 (2.5 minutes)
     #[serde(default = "default_candidate_announce_interval_secs")]
     pub candidate_announce_interval_secs: u64,
+
+    /// Delay before attempting the IPv4 fallback in Happy Eyeballs dialing (RFC 8305), in milliseconds
+    ///
+    /// When multiple addresses of different IP versions are available within one endpoint
+    /// category (Local or Public), ICN dials IPv6 first and waits this long before also
+    /// spawning an IPv4 dial task. The first successful connection wins.
+    ///
+    /// 250ms matches RFC 8305 §5 and the value used by all major browsers.
+    /// Set to 0 to start the IPv4 task immediately alongside IPv6 (no stagger delay).
+    /// IPv6 is still preferred — this only removes the delay before IPv4 is spawned.
+    ///
+    /// Default: 250 (milliseconds)
+    #[serde(default = "default_happy_eyeballs_delay_ms")]
+    pub happy_eyeballs_delay_ms: u64,
 }
 
 impl Default for NatDialConfig {
@@ -206,6 +220,7 @@ impl Default for NatDialConfig {
             public_dial_timeout_ms: default_public_dial_timeout_ms(),
             relay_dial_timeout_ms: default_relay_dial_timeout_ms(),
             candidate_announce_interval_secs: default_candidate_announce_interval_secs(),
+            happy_eyeballs_delay_ms: default_happy_eyeballs_delay_ms(),
         }
     }
 }
@@ -224,6 +239,10 @@ fn default_relay_dial_timeout_ms() -> u64 {
 
 fn default_candidate_announce_interval_secs() -> u64 {
     150
+}
+
+fn default_happy_eyeballs_delay_ms() -> u64 {
+    250
 }
 
 fn default_circuit_breaker_threshold() -> u32 {
