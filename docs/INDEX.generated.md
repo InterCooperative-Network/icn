@@ -95,10 +95,6 @@ Trust model design limiting trust scope to organizational boundaries
 
 **For:** `architects`, `security` | **Updated:** 2026-03-10
 
-### ⏮️ **Archived** [Legacy State Machine Design](/docs/architecture/legacy-state-machine.md)
-
-Early design iteration, no longer in use
-
 ### 📋 **Draft** [ICN Kernel Contracts Specification](/docs/spec/KERNEL_CONTRACTS.md)
 
 Specification of kernel contract primitives
@@ -1065,9 +1061,15 @@ Navigation guide for architecture documentation
 
 **For:** `architects` | **Updated:** 2026-03-10
 
-### 📝 **Living** [CI Documentation](/docs/ci/README.md)
+### 📝 **Living** [CI Current Status](/docs/ci/CI_CURRENT_STATUS.md)
 
-CI status, gates, and ratchet plan
+Current state of all CI checks and gate enforcement levels
+
+**For:** `developers` | **Updated:** 2026-03-10
+
+### 📝 **Living** [CI Gate Ratchet Plan](/docs/ci/GATE_RATCHET_PLAN.md)
+
+CI gates, ratchet phases, required checks, and failure index
 
 **For:** `developers` | **Updated:** 2026-03-10
 
@@ -1473,23 +1475,14 @@ Assessment of pilot readiness and gaps
 
 **For:** `team` | **Updated:** 2026-03-10
 
-### ❌ **Superseded** [Old Roadmap 2025](/docs/strategy/old-roadmap-2025.md)
-
-Historical roadmap from late 2025
-
-> Superseded by [docs/strategy/ICN-Roadmap-Live.md](/docs/strategy/ICN-Roadmap-Live.md)
-> Reason: Roadmap updated for 2026 priorities
-
 
 ---
 
 ## Summary
 
-**Total documents:** 241
+**Total documents:** 240
 
 **By status:**
-- Archived: 1
 - Canonical: 38
 - Draft: 47
-- Living: 154
-- Superseded: 1
+- Living: 155

@@ -2285,36 +2285,23 @@ last_updated = "2026-03-10"
 owner = "matt"
 audiences = ["architects"]
 
-[docs."docs/ci/README.md"]
+[docs."docs/ci/GATE_RATCHET_PLAN.md"]
 category = "reference"
 status = "living"
-title = "CI Documentation"
-description = "CI status, gates, and ratchet plan"
+title = "CI Gate Ratchet Plan"
+description = "CI gates, ratchet phases, required checks, and failure index"
 last_updated = "2026-03-10"
 owner = "matt"
 audiences = ["developers"]
 
-# ============================================================================
-# ARCHIVED AND SUPERSEDED DOCUMENTS
-# ============================================================================
-
-[docs."docs/strategy/old-roadmap-2025.md"]
-category = "strategy"
-status = "superseded"
-title = "Old Roadmap 2025"
-description = "Historical roadmap from late 2025"
-superseded_by = "docs/strategy/ICN-Roadmap-Live.md"
-reason = "Roadmap updated for 2026 priorities"
-date = "2026-03-01"
-historical_value = false
-
-[docs."docs/architecture/legacy-state-machine.md"]
-category = "architecture"
-status = "archived"
-title = "Legacy State Machine Design"
-description = "Early design iteration, no longer in use"
-date = "2025-10-15"
-historical_value = false
+[docs."docs/ci/CI_CURRENT_STATUS.md"]
+category = "reference"
+status = "living"
+title = "CI Current Status"
+description = "Current state of all CI checks and gate enforcement levels"
+last_updated = "2026-03-10"
+owner = "matt"
+audiences = ["developers"]
 
 # ============================================================================
 # METADATA AND REGISTRY
@@ -2323,7 +2310,7 @@ historical_value = false
 [registry]
 version = "2.0"
 last_updated = "2026-03-21"
-total_entries = 241
+total_entries = 240
 categories_covered = ["architecture", "design", "strategy", "guide", "reference", "operations", "security"]
 maintained_by = "matt"
 note = "Comprehensive registry of ICN documentation. Status indicates authority level: canonical (authoritative), living (actively maintained), draft (in development), archived (historical reference only)."
