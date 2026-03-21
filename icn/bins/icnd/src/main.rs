@@ -293,12 +293,13 @@ async fn build_services(
     Ok((registry, Some(bootstrap_handles)))
 }
 
-/// Handle `icnd --init`: generate a fresh identity and default config, then exit.
+/// Handle `icnd --init`: generate a fresh identity, default config, and genesis bundle, then exit.
 ///
 /// Creates:
 /// 1. Data directory structure
 /// 2. Age-encrypted keystore with a new Ed25519 identity
 /// 3. `config.toml` with sane defaults for the node
+/// 4. `genesis.json` sealing the initial network identity and seed peers
 ///
 /// Uses `ICN_KEYSTORE_PASSPHRASE` env var or prompts interactively.
 fn handle_init(args: &Args) -> Result<()> {

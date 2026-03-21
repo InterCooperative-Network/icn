@@ -90,8 +90,8 @@ impl GenesisBundle {
     /// Create a minimal genesis bundle for a single node.
     ///
     /// This is the default used by `icnd --init` when no bundle file is provided.
-    /// It records the node's DID and config address so the bundle can be extended
-    /// when additional nodes join.
+    /// It records the node's DID as the initial member, with no seed peers, so the
+    /// bundle can be extended when additional nodes join.
     pub fn new_single_node(network_id: impl Into<String>, node_did: impl Into<String>) -> Self {
         Self {
             schema_version: GENESIS_SCHEMA_VERSION,
@@ -202,13 +202,9 @@ fn sort_value(v: serde_json::Value) -> serde_json::Value {
     }
 }
 
-/// Compute the SHA-256 hex digest of bytes using the ring crate.
+/// Compute the SHA-256 hex digest of bytes using the `sha2` crate.
 fn sha256_hex(data: &[u8]) -> String {
     use std::fmt::Write as _;
-    // Use a simple SHA-256 implementation via sha2 (already in workspace deps via icn-crypto-pq)
-    // We use the raw bytes approach compatible with what's available.
-    // Fallback: use icn_crypto_pq or a direct dependency.
-    // For now, implement using the sha2 crate that is already available in the workspace.
     let digest = sha2_256(data);
     let mut hex = String::with_capacity(64);
     for byte in digest {
