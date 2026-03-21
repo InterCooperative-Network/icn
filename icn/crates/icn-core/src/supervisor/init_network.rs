@@ -300,31 +300,50 @@ fn handle_peer_exchange(
 
             if federation_enabled {
                 use icn_net::candidate::EndpointKind;
-                // Prefer Public endpoint for announced peers — Announce is broadcast to ALL
-                // connected peers, not only LAN neighbors, so a Local-only address would be
-                // unreachable for WAN recipients. Fall back to the first endpoint of any kind
-                // if no Public endpoint is available.
-                let addr_opt = peer
-                    .endpoints
-                    .iter()
-                    .find(|e| e.kind == EndpointKind::Public)
-                    .or_else(|| peer.endpoints.first())
-                    .map(|e| e.addr);
-                if let Some(addr) = addr_opt {
+                // Per-kind cap: peer.endpoints is peer-controlled and unbounded.
+                // Without a cap a malicious peer can force many sequential dials
+                // (each awaiting the default dial timeout) creating resource exhaustion.
+                const MAX_ENDPOINTS_PER_KIND: usize = 3;
+                // Build a priority-ordered address list (Local → Public → Relay).
+                // We try all candidates so that out-of-LAN peers, which cannot reach
+                // a local address, can fall through to the public endpoint.
+                let mut addrs: Vec<std::net::SocketAddr> = Vec::new();
+                for kind in [
+                    EndpointKind::Local,
+                    EndpointKind::Public,
+                    EndpointKind::Relay,
+                ] {
+                    for e in peer
+                        .endpoints
+                        .iter()
+                        .filter(|e| e.kind == kind)
+                        .take(MAX_ENDPOINTS_PER_KIND)
+                    {
+                        addrs.push(e.addr);
+                    }
+                }
+                if !addrs.is_empty() {
                     let peer_did_str = peer.did.clone();
                     tokio::spawn(async move {
-                        // Clone handle out before awaiting dial — avoid holding RwLock across await.
+                        // Clone handle out before any dial await — avoids holding
+                        // RwLock guard across async boundaries.
                         let net_handle = network_handle_holder.read().await.clone();
                         if let Some(net_handle) = net_handle {
                             if let Ok(peer_did) = icn_identity::Did::from_str(&peer_did_str) {
-                                info!("Auto-dialing announced peer {} at {}", peer_did, addr);
-                                match net_handle.dial(addr, peer_did.clone()).await {
-                                    Ok(_) => {
-                                        icn_obs::metrics::peer_exchange::peers_dialed_inc();
-                                    }
-                                    Err(e) => {
-                                        debug!("Failed to dial announced peer {}: {}", peer_did, e);
-                                        icn_obs::metrics::peer_exchange::dial_failures_inc();
+                                for addr in &addrs {
+                                    info!("Auto-dialing announced peer {} at {}", peer_did, addr);
+                                    match net_handle.dial(*addr, peer_did.clone()).await {
+                                        Ok(_) => {
+                                            icn_obs::metrics::peer_exchange::peers_dialed_inc();
+                                            break; // connected — stop trying
+                                        }
+                                        Err(e) => {
+                                            debug!(
+                                                "Failed to dial announced peer {} at {}: {}",
+                                                peer_did, addr, e
+                                            );
+                                            icn_obs::metrics::peer_exchange::dial_failures_inc();
+                                        }
                                     }
                                 }
                             }
