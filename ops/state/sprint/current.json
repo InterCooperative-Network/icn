@@ -1,67 +1,48 @@
 {
-  "sprint": 20,
-  "name": "Sprint 20 — Meaning Firewall Audit + Service Discovery Hardening",
+  "sprint": 21,
+  "name": "Sprint 21 — Meaning Firewall Policy Extraction",
   "started": "2026-03-21",
   "goals": [
-    "Audit 11 infected kernel crates for domain semantic leakage, document findings, extract worst violations (#1370)",
-    "Add sled-backed persistence to ServiceDiscoveryManager to survive restarts (#953)",
-    "Close #1051: gateway timestamp bounds + ServiceEndpointResponse field update",
-    "Start settlement finality spec for federation (#1365) — doc-only phase"
-  ],
-  "execution_order": [
-    "t3 (#1051) — tiny gateway fix, close it first",
-    "t2 (#953) — isolated gateway change, no dependencies",
-    "t4 (#1365) — write finality spec doc (Phase 1 only)",
-    "t1 (#1370) — largest; audit all 11 crates, extract domain logic from worst offenders"
+    "Close Sprint 20: merge PRs #1380 #1381 #1382 #1383",
+    "Make compute admission thresholds config-driven: min_standing, min_trust_score, fuel_cost_divisor",
+    "Make reputation severity scoring config-driven: SeverityWeights, penalty_rate",
+    "Update meaning firewall audit doc with Sprint 21 remediations"
   ],
   "tasks": [
     {
-      "id": "s20-t1",
-      "title": "refactor(kernel): Meaning Firewall phase 2 — audit + extract domain logic (#1370)",
+      "id": "s21-t0",
+      "title": "chore(ops): close Sprint 20 — merge PRs and update sprint board",
+      "status": "done",
+      "prs": [1380, 1381, 1382, 1383],
+      "note": "Merged in order: doc PRs first (1382, 1383), then code PRs (1380, 1381). Used --admin for #1381 (behind main by docs-only commits)."
+    },
+    {
+      "id": "s21-t1",
+      "title": "feat(compute): make admission thresholds config-driven (#1370 partial)",
       "status": "pending",
       "pr": null,
-      "assignee": null,
       "issue": 1370,
-      "epic": "1147",
-      "note": "Audit all 11 infected crates (icn-core, icn-gossip, icn-net, icn-gateway, icn-store, icn-rpc, icn-obs, icn-compute, icn-ledger, icn-federation, icn-security). For each: identify domain semantic decisions, document in docs/architecture/meaning-firewall-audit.md, move worst violations to PolicyOracle app layer. CI gate already blocks new violations — this backfills existing ones. Accept partial progress per PR (not all 11 in one PR)."
+      "note": "ComputePolicyConfig in icn-core/config/compute.rs. min_standing, min_trust_score, fuel_cost_divisor. Wire into lifecycle.rs. Defaults match current hardcoded values."
     },
     {
-      "id": "s20-t2",
-      "title": "feat(gateway): persistent storage for service discovery registry (#953)",
+      "id": "s21-t2",
+      "title": "feat(security): make severity scoring config-driven (#1370 partial)",
       "status": "pending",
       "pr": null,
-      "assignee": null,
-      "issue": 953,
-      "epic": null,
-      "note": "ServiceDiscoveryManager in icn-gateway/src/service_discovery_mgr.rs uses in-memory HashMap. Add opt-in sled backing via icn-store: write-through on announce/withdraw, load+filter-expired on startup, background expiry task cleans persisted entries. Config: persistence.enabled = false by default. Test: restart cycle preserves non-expired endpoints."
+      "issue": 1370,
+      "note": "SeverityWeights struct, severity_with_weights() method, penalty_rate in ReputationPolicyConfig. Wire into MisbehaviorDetector via lifecycle.rs. Defaults match current hardcoded values."
     },
     {
-      "id": "s20-t3",
-      "title": "feat(gateway): timestamp validation + ServiceEndpointResponse fields (#1051)",
+      "id": "s21-t3",
+      "title": "docs(arch): update meaning firewall audit post-sprint",
       "status": "pending",
       "pr": null,
-      "assignee": null,
-      "issue": 1051,
-      "epic": null,
-      "note": "Two tasks: (1) Validate created_at/updated_at not more than 3600s in future in service endpoint registration handler. (2) Add endpoint_type, addresses, updated_at to ServiceEndpointResponse struct. Location: icn-gateway/src/api/services.rs. Good-first-issue level. Close #1051."
-    },
-    {
-      "id": "s20-t4",
-      "title": "spec(federation): settlement finality — doc phase (#1365)",
-      "status": "pending",
-      "pr": null,
-      "assignee": null,
-      "issue": 1365,
-      "epic": "1147",
-      "note": "Phase 1 only: write docs/spec/federation-settlement-finality.md covering finality conditions (quorum, timeout, receipt chain completeness), dispute lifecycle (Raised → Under Review → Resolved/Escalated), and netting rules for bilateral/multilateral positions. No code changes this sprint. If time allows: add DisputeResolution message type skeleton to federation protocol."
+      "issue": 1370,
+      "note": "Update docs/architecture/meaning-firewall-audit.md to mark compute and security violations as remediated. Update summary table."
     }
   ],
-  "epics": {
-    "1147": "[EPIC] Vertical Slice: Identity → Governance → Compute → Receipts → Audit",
-    "1099": "[EPIC] ICN Pilot Completion — End-to-End Demos (P0)"
-  },
-  "carried_from_s19": {
-    "note": "Epic #1295 (IPv6 dual-stack) closed — all sub-issues done. Epic #1099 PR13 (#1098) merged. Sprint 20 shifts focus to architectural hardening (Meaning Firewall) and service layer persistence.",
-    "closed_epics": [1295]
+  "deferred_to_s22": {
+    "note": "icn-ledger CreditPolicy extraction, icn-obs attestation thresholds, full PolicyOracle wiring for per-coop dynamic values",
+    "issues": [1370]
   }
 }
