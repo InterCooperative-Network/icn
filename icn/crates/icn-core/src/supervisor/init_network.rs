@@ -300,6 +300,10 @@ fn handle_peer_exchange(
 
             if federation_enabled {
                 use icn_net::candidate::EndpointKind;
+                // Per-kind cap: peer.endpoints is peer-controlled and unbounded.
+                // Without a cap a malicious peer can force many sequential dials
+                // (each awaiting the default dial timeout) creating resource exhaustion.
+                const MAX_ENDPOINTS_PER_KIND: usize = 3;
                 // Build a priority-ordered address list (Local → Public → Relay).
                 // We try all candidates so that out-of-LAN peers, which cannot reach
                 // a local address, can fall through to the public endpoint.
@@ -309,7 +313,12 @@ fn handle_peer_exchange(
                     EndpointKind::Public,
                     EndpointKind::Relay,
                 ] {
-                    for e in peer.endpoints.iter().filter(|e| e.kind == kind) {
+                    for e in peer
+                        .endpoints
+                        .iter()
+                        .filter(|e| e.kind == kind)
+                        .take(MAX_ENDPOINTS_PER_KIND)
+                    {
                         addrs.push(e.addr);
                     }
                 }
