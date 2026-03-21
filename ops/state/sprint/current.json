@@ -5,7 +5,7 @@
   "goals": [
     "Close #1342 fully: gossip-layer author validation for compute payment settlement",
     "KnownPeer endpoint field (#1300): replace Vec<String> with Vec<EndpointCandidate>",
-    "mDNS multi-address (#1298): advertise and collect all local addresses",
+    "mDNS multi-address (#1298): collect all resolved addresses per peer (advertisement remains single-IP; multi-address advertisement deferred)",
     "Happy Eyeballs (#1299): race IPv4/IPv6 within address categories (RFC 8305)"
   ],
   "execution_order": [
