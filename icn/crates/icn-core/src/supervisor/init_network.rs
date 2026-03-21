@@ -257,7 +257,10 @@ fn handle_peer_exchange(
                     .collect();
 
                 tokio::spawn(async move {
-                    if let Some(net_handle) = network_handle_holder.read().await.as_ref() {
+                    // Clone handle out of RwLock before awaiting dials — holding a
+                    // Tokio RwLock guard across .await starves writers unnecessarily.
+                    let net_handle = network_handle_holder.read().await.clone();
+                    if let Some(net_handle) = net_handle {
                         for (did_str, addr) in peers_to_dial {
                             let peer_did = match icn_identity::Did::from_str(&did_str) {
                                 Ok(d) => d,
@@ -308,7 +311,9 @@ fn handle_peer_exchange(
                 if let Some(addr) = addr_opt {
                     let peer_did_str = peer.did.clone();
                     tokio::spawn(async move {
-                        if let Some(net_handle) = network_handle_holder.read().await.as_ref() {
+                        // Clone handle out before awaiting dial — avoid holding RwLock across await.
+                        let net_handle = network_handle_holder.read().await.clone();
+                        if let Some(net_handle) = net_handle {
                             if let Ok(peer_did) = icn_identity::Did::from_str(&peer_did_str) {
                                 info!("Auto-dialing announced peer {} at {}", peer_did, addr);
                                 match net_handle.dial(addr, peer_did.clone()).await {

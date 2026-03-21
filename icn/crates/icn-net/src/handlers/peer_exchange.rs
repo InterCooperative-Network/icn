@@ -7,9 +7,10 @@
 //! - Unannounce: Peer departure notification
 
 use super::ConnectionContext;
-use crate::candidate::EndpointCandidate;
+use crate::candidate::{EndpointCandidate, EndpointKind};
 use crate::protocol::{KnownPeer, NetworkMessage, PeerExchangeMessage};
 use icn_identity::Did;
+use std::net::{IpAddr, SocketAddr};
 use tracing::{info, warn};
 
 impl ConnectionContext {
@@ -73,9 +74,11 @@ impl ConnectionContext {
                 continue;
             }
 
+            let remote = conn.remote_address();
+            let ep = EndpointCandidate::new(remote, endpoint_kind_for_addr(remote));
             known_peers.push(KnownPeer {
                 did: did_str.to_string(),
-                endpoints: vec![EndpointCandidate::public(conn.remote_address())],
+                endpoints: vec![ep],
                 version: "0.1.0".to_string(),
                 network_name: network_filter.clone(),
                 observed_trust: None,
@@ -154,5 +157,36 @@ impl ConnectionContext {
         info!("Peer unannounced: {}", did);
         icn_obs::metrics::peer_exchange::unannounces_received_inc();
         self.forward_to_handler(message);
+    }
+}
+
+/// Derive an `EndpointKind` from the socket address's IP characteristics.
+///
+/// Private/loopback/link-local addresses (RFC1918, ULA, fe80::/10) are classified
+/// as `Local`; everything else is `Public`. This prevents misclassifying LAN peers
+/// as publicly reachable when the observed remote address is non-routable.
+fn endpoint_kind_for_addr(addr: SocketAddr) -> EndpointKind {
+    match addr.ip() {
+        IpAddr::V4(ip) => {
+            if ip.is_private() || ip.is_loopback() || ip.is_link_local() {
+                EndpointKind::Local
+            } else {
+                EndpointKind::Public
+            }
+        }
+        IpAddr::V6(ip) => {
+            let octets = ip.octets();
+            // Loopback: ::1
+            // ULA: fc00::/7 (first byte high bits 1111110x)
+            // Link-local: fe80::/10 (first byte 0xfe, second byte high bits 10)
+            let is_loopback = ip.is_loopback();
+            let is_ula = octets[0] & 0xfe == 0xfc;
+            let is_link_local = octets[0] == 0xfe && (octets[1] & 0xc0) == 0x80;
+            if is_loopback || is_ula || is_link_local {
+                EndpointKind::Local
+            } else {
+                EndpointKind::Public
+            }
+        }
     }
 }
