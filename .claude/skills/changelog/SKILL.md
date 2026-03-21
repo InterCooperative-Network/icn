@@ -1,93 +1,76 @@
 ---
 name: changelog
-description: Generate a Keep-a-Changelog entry from commits since the last git tag. Prepends to CHANGELOG.md.
-argument-hint: "[--dry-run] [--since <tag>]"
+description: Generate a CHANGELOG.md entry from commits since the last git tag. Groups by type (feat/fix/refactor/etc), formats as Keep-a-Changelog.
+argument-hint: "[version] [--dry-run]"
 user-invocable: true
 allowed-tools: "Bash, Read, Edit"
 ---
 
-Generate a changelog entry from commits since the last tag. Follows Keep-a-Changelog format.
+Generate a Keep-a-Changelog entry from commits since the last git tag and prepend it to CHANGELOG.md.
 
 ## Steps
 
-### 1. Find range
+### 1. Gather context
 
-```bash
-# Last tag (or use $ARGUMENTS --since <tag> if specified)
-LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-if [ -z "$LAST_TAG" ]; then
-  echo "No tags found. Using all commits."
-  RANGE="HEAD"
-else
-  echo "Last tag: $LAST_TAG"
-  RANGE="${LAST_TAG}..HEAD"
-fi
-```
+Run in parallel:
+- `git tag --sort=-version:refname | head -5` — find last release tag
+- `git branch --show-current` — confirm branch
+- `git log --oneline $(git describe --tags --abbrev=0 2>/dev/null || echo "")..HEAD` — commits since last tag (or all if no tags)
 
-### 2. Collect commits
+### 2. Determine version
 
-```bash
-git log $RANGE --oneline --no-merges --pretty=format:"%s"
-```
+- If `$ARGUMENTS` contains a version (e.g. `0.2.0`), use that.
+- Otherwise, infer from last tag + increment (patch for fixes only, minor if any feat, major if any breaking change marked with `!`).
+- Print the determined version before proceeding.
 
-### 3. Group by conventional commit prefix
+### 3. Parse commits into groups
 
-Map commits to changelog categories:
-| Prefix | Category |
-|--------|----------|
-| `feat` | **Added** |
-| `fix` | **Fixed** |
-| `refactor` | **Changed** |
-| `docs` | **Documentation** |
-| `test` | **Testing** |
-| `chore`, `ci`, `build` | **Infrastructure** |
-| `perf` | **Performance** |
-| `security` | **Security** |
+Group commits by conventional-commit type:
+- `feat` → `### Added`
+- `fix` → `### Fixed`
+- `refactor` → `### Changed`
+- `docs` → `### Documentation`
+- `test` → `### Tests`
+- `chore`, `ci` → `### Internal`
+- `perf` → `### Performance`
 
-Commits without a prefix go under **Changed**.
+Skip merge commits (`Merge pull request`, `Merge branch`). Skip commits with scope `ops` or `chore(ops)`.
 
-Strip the `type(scope): ` prefix, capitalize first letter of the summary.
+Extract PR number from commit message if present (e.g., `(#1234)`) and format as link: `([#1234](../../pull/1234))`.
 
 ### 4. Format the entry
 
 ```markdown
-## [Unreleased] - YYYY-MM-DD
+## [X.Y.Z] - YYYY-MM-DD
 
 ### Added
-- ...
+- feat(scope): description ([#N](../../pull/N))
 
 ### Fixed
-- ...
+- fix(scope): description
 
 ### Changed
 - ...
 ```
 
-Date = today (`date +%Y-%m-%d`).
+Use today's date (ISO 8601). Omit sections that have no entries.
 
-Only include sections that have entries. Omit empty sections.
+### 5. Prepend to CHANGELOG.md
 
-### 5. Output / write
+- Read current CHANGELOG.md
+- Insert the new entry after the `# Changelog` header line (or at top if no header)
+- Write the updated file
 
-- If `$ARGUMENTS` includes `--dry-run`: print the entry to stdout only. Do NOT write to file.
-- Otherwise: prepend the entry to `CHANGELOG.md` (after the `# Changelog` header line if present).
-  - Read current `CHANGELOG.md`
-  - Insert new entry after the header (or at top if no header)
-  - Write back
+Skip this step if `$ARGUMENTS` contains `--dry-run` (print entry to stdout only, don't write).
 
-### 6. Report
+### 6. Confirm
 
-Print:
-```
-Changelog entry generated for <N> commits since <tag>.
-Categories: Added(<n>), Fixed(<n>), Changed(<n>), ...
-Written to CHANGELOG.md (or --dry-run: printed only)
-Review and commit: git add CHANGELOG.md && git commit -m "chore(release): update changelog"
-```
+Print: "Changelog updated for vX.Y.Z with N entries."
+List the sections and entry counts.
 
 ## Important
 
-- Do NOT auto-commit the changelog. User reviews first.
-- If a commit message is unclear or too long (>80 chars), truncate at word boundary + "..."
-- Skip commits with `[skip changelog]` in the message.
-- If `CHANGELOG.md` doesn't exist, create it with a standard header first.
+- Do NOT create a git commit — leave that to the user.
+- If CHANGELOG.md doesn't exist, create it with the `# Changelog` header followed by the entry.
+- Keep entries concise: one line per commit.
+- Scope is law: do not rewrite or reformat existing CHANGELOG entries.
