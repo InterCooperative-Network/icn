@@ -19,7 +19,7 @@
     {
       "id": "s19-t1",
       "title": "feat(net): integrate dial_happy_eyeballs() into dial_parallel() (#1364)",
-      "status": "in_review",
+      "status": "done",
       "pr": 1377,
       "assignee": null,
       "issue": 1364,
