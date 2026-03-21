@@ -49,12 +49,12 @@
     {
       "id": "s19-t4",
       "title": "spec(gateway): close auth semantics for GET /v1/services/:id (#1120)",
-      "status": "pending",
+      "status": "done",
       "pr": null,
       "assignee": null,
       "issue": 1120,
       "epic": null,
-      "note": "Spec decision only. Issue body already has Option B (all service discovery endpoints require JWT, 404 on missing resource for auth'd callers). Document decision, check if any implementation gap follows, close issue. No code unless a gap is found — scope that to a new issue."
+      "note": "Spec decision only. Issue body already has Option B (all service discovery endpoints require JWT, return 404 both for missing resources AND unauthorized/unauthenticated requests to prevent service ID enumeration — returning 401 for 'exists but unauthorized' vs 404 for 'not found' leaks which service IDs are valid). Document decision, check if any implementation gap follows, close issue. No code unless a gap is found — scope that to a new issue."
     }
   ],
   "epics": {
