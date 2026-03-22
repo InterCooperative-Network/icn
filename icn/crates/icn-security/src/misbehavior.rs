@@ -686,7 +686,9 @@ impl MisbehaviorDetector {
     fn should_rate_limit_quarantine(&self, did: &Did) -> bool {
         if let Some(violations) = self.violations.get(did) {
             let now = SystemTime::now();
-            let one_hour_ago = now - Duration::from_secs(3600);
+            let one_hour_ago = now
+                .checked_sub(Duration::from_secs(3600))
+                .unwrap_or(SystemTime::UNIX_EPOCH);
 
             let recent_count = violations
                 .iter()
@@ -703,7 +705,9 @@ impl MisbehaviorDetector {
     fn cleanup_old_violations(&mut self) {
         let now = SystemTime::now();
         let retention_duration = Duration::from_secs(self.thresholds.violation_retention_secs);
-        let cutoff = now - retention_duration;
+        let cutoff = now
+            .checked_sub(retention_duration)
+            .unwrap_or(SystemTime::UNIX_EPOCH);
 
         for violations in self.violations.values_mut() {
             violations.retain(|v| v.detected_at > cutoff);
