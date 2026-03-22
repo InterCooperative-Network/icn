@@ -43,6 +43,19 @@ cargo check --workspace             # Must pass
 
 ---
 
+## Track A Execution Order
+
+Track A tasks must run in this order (each depends on the repo state established by the previous):
+
+1. **s23-t2** — commit dirty file (establishes clean working tree)
+2. **s23-t3** — remove stale worktree (removes dangling directory state)
+3. **s23-t1** — fix CI failure (can now run against clean repo)
+4. **s23-t4** — reconcile Sprint 22 board (only after the above are done)
+
+Track B (t5, t6, t7) runs in parallel with Track A and is independent of its ordering.
+
+---
+
 ## Task 1 (s23-t1): Fix Test Coverage CI failure on `main`
 
 **Acceptance:** `main` passes all non-observational gates, or remaining failures are explicitly classified in `ops/state/ci-exceptions.md`. ("Non-observational" = gates with `GATE_RATCHET_PHASE_*: blocking` or `warning`; excludes `observational`, flaky preview deployments, advisory jobs.)
@@ -130,8 +143,19 @@ EOF
 
 ```bash
 git checkout -b fix/s23-t1-ci-coverage
-git add .github/workflows/ci.yml   # or ops/state/ci-exceptions.md
+```
+
+If you modified `ci.yml`:
+```bash
+git add .github/workflows/ci.yml
 git commit -m "fix(ci): resolve Test Coverage failure on main (s23-t1)"
+```
+
+If you are classifying (not fixing) the failure:
+```bash
+git add ops/state/ci-exceptions.md
+git commit -m "chore(ci): document Test Coverage as non-blocking exception (s23-t1)"
+```
 gh pr create --title "fix(ci): resolve Test Coverage failure (s23-t1)" \
   --body "Fixes the failing Test Coverage job on main. See Sprint 23 s23-t1."
 ```
@@ -258,14 +282,26 @@ gh pr view 1392 --json state,mergedAt | python3 -c "import json,sys; d=json.load
 
 - [ ] **Step 4.2: Archive Sprint 22 board — write the closed sprint JSON**
 
-Create `ops/state/sprint/sprint-22-closed.json` as a record:
+Create `ops/state/sprint/sprint-22-closed.json` as a record, then mark all tasks done:
 
 ```bash
 cp /home/ubuntu/projects/icn/ops/state/sprint/current.json \
    /home/ubuntu/projects/icn/ops/state/sprint/sprint-22-closed.json
-```
 
-Then edit the archived copy to set status `"done"` for all tasks.
+# Mark all Sprint 22 tasks as "done" in the archive
+jq '.tasks[].status = "done"' \
+  /home/ubuntu/projects/icn/ops/state/sprint/sprint-22-closed.json \
+  > /tmp/s22-closed-tmp.json \
+  && mv /tmp/s22-closed-tmp.json \
+     /home/ubuntu/projects/icn/ops/state/sprint/sprint-22-closed.json
+
+# Also covers both s22-t3 and s22-t5 which share PR #1392:
+# (4 unique PRs cover all 5 sprint tasks — #1389, #1390, #1391, #1392)
+
+# Verify
+jq '.tasks[].status' /home/ubuntu/projects/icn/ops/state/sprint/sprint-22-closed.json
+# Expected: "done" "done" "done" "done" "done"
+```
 
 - [ ] **Step 4.3: Write Sprint 23 initial board to `current.json`**
 
@@ -284,7 +320,7 @@ cat > /home/ubuntu/projects/icn/ops/state/sprint/current.json << 'ENDJSON'
     {
       "id": "s23-t1",
       "title": "Fix Test Coverage CI failure on main",
-      "status": "done",
+      "status": "pending",
       "assignee": null,
       "epic": "baseline-lock",
       "artifact": "ops/state/ci-exceptions.md or ci.yml fix"
@@ -292,7 +328,7 @@ cat > /home/ubuntu/projects/icn/ops/state/sprint/current.json << 'ENDJSON'
     {
       "id": "s23-t2",
       "title": "Resolve dirty file in icn/ (from #1394 merge)",
-      "status": "done",
+      "status": "pending",
       "assignee": null,
       "epic": "baseline-lock",
       "artifact": "docs/development/sessions/2026-03/2026-03-22-sprint22-close.md"
@@ -300,14 +336,14 @@ cat > /home/ubuntu/projects/icn/ops/state/sprint/current.json << 'ENDJSON'
     {
       "id": "s23-t3",
       "title": "Remove stale 1310-execution-receipt-gate worktree",
-      "status": "done",
+      "status": "pending",
       "assignee": null,
       "epic": "baseline-lock"
     },
     {
       "id": "s23-t4",
       "title": "Formally close Sprint 22",
-      "status": "done",
+      "status": "pending",
       "assignee": null,
       "epic": "baseline-lock",
       "artifact": "ops/state/sprint/current.json"
@@ -428,27 +464,44 @@ Only follow this path if explicitly asked to implement.
 - Create: `icn/crates/icn-kernel-api/src/crdt/or_set.rs`
 - Create: `icn/crates/icn-kernel-api/src/crdt/lww_register.rs`
 
-- [ ] **Step 5B.1: Write failing tests first**
+- [ ] **Step 5B.1: Write failing tests first (compiler error is the red bar)**
 
 In `icn/crates/icn-kernel-api/src/coord.rs` test module, add:
 ```rust
 #[test]
 fn test_or_set_merge_is_deterministic() {
-    // Two nodes add the same element independently
-    // Merge result must be identical regardless of merge order
-    // Use fixed byte values (not random) so test is deterministic
-    let a = OrSet::new();
-    let b = OrSet::new();
-    // ... (implement once struct exists)
-    todo!("implement after OrSet struct")
+    // OrSet::new() will not compile until the struct exists — that is the red bar.
+    // Use fixed byte values, not random, so the test is deterministic once it runs.
+    let mut a = OrSet::new();
+    let mut b = OrSet::new();
+    a.add(b"element-x".to_vec());
+    b.add(b"element-x".to_vec());
+    let mut a_then_b = a.clone();
+    a_then_b.merge(&b);
+    let mut b_then_a = b.clone();
+    b_then_a.merge(&a);
+    assert_eq!(a_then_b, b_then_a, "OrSet merge must be commutative");
+    assert!(a_then_b.contains(b"element-x"));
 }
 
 #[test]
 fn test_lww_register_last_write_wins() {
-    // Two writes at different timestamps
-    // Higher timestamp wins regardless of application order
-    todo!("implement after LwwRegister struct")
+    // LwwRegister::new() will not compile until the struct exists.
+    let mut r = LwwRegister::new();
+    r.set(1000, b"first".to_vec());
+    r.set(2000, b"second".to_vec());
+    assert_eq!(r.get(), Some(b"second".as_ref()));
+    // Earlier timestamp must not overwrite later
+    r.set(500, b"old".to_vec());
+    assert_eq!(r.get(), Some(b"second".as_ref()));
 }
+```
+
+Run and verify it fails to compile (not a runtime panic):
+```bash
+cd /home/ubuntu/projects/icn/icn
+cargo test -p icn-kernel-api 2>&1 | grep "cannot find\|error\[E"
+# Expected: compiler error — OrSet and LwwRegister not found
 ```
 
 - [ ] **Step 5B.2: Implement `OrSet`**
@@ -659,6 +712,13 @@ pub trait ContainerRuntime: Send + Sync {
 
 Add `pub mod container;` to `icn/crates/icn-kernel-api/src/lib.rs`.
 
+The existing `pub mod` list is alphabetical. Insert between `pub mod budget;` and `pub mod comms;`:
+```
+pub mod budget;
+pub mod container;   ← add here
+pub mod comms;
+```
+
 - [ ] **Step 6.5: Run tests**
 
 ```bash
@@ -758,7 +818,8 @@ See `icn-snapshot` crate for graceful restart protocol.
 - [ ] **Step 7.3: Commit**
 
 ```bash
-mkdir -p /home/ubuntu/projects/icn/docs/state
+cd /home/ubuntu/projects/icn
+mkdir -p docs/state
 git add docs/state/storage-governance-spec.md
 git commit -m "docs(storage): add storage governance spec for #1131 (s23-t7)"
 ```
@@ -776,9 +837,44 @@ gh issue close 1131
 
 ---
 
+---
+
+## Checkpoint: Operational Truth Restored
+
+**Do not begin s23-t8, s23-t9, or s23-t10 until ALL of these pass.**
+
+```bash
+cd /home/ubuntu/projects/icn
+
+# 1. Repo is clean
+git status --short
+# Expected: no output (completely clean)
+
+# 2. Stale worktree is gone
+ls icn-wt/ 2>/dev/null || echo "icn-wt/ empty or absent"
+git worktree list
+# Expected: only /home/ubuntu/projects/icn [main]
+
+# 3. CI is green or exceptions are documented
+gh run list --branch main --limit 1 --json conclusion,name
+# Expected: "success", OR ci-exceptions.md exists with documented rationale
+
+# 4. Sprint 22 board is closed
+jq '.sprint, .tasks[].status' ops/state/sprint/sprint-22-closed.json
+# Expected: 22, then all "done"
+
+# 5. Sprint 23 board is initialized
+jq '.sprint, (.tasks | length)' ops/state/sprint/current.json
+# Expected: 23, 10
+```
+
+If any of these fail, resolve the failure before proceeding to Track C.
+
+---
+
 ## Task 8 (s23-t8): Publish current platform baseline
 
-**Depends on:** s23-t1, s23-t2, s23-t3, s23-t4 (all Track A must be complete first)
+**Depends on:** s23-t1, s23-t2, s23-t3, s23-t4 (all Track A must be complete first — see Checkpoint above)
 
 **Acceptance:** `docs/state/ICN-Platform-Baseline-2026-03.md` exists and answers: what ICN is now, what is complete, what is in progress, what is next. A new contributor can orient from this document without oral tradition.
 
@@ -983,28 +1079,45 @@ git commit -m "docs(roadmap): update roadmap through Sprint 23, list Sprint 24 c
 
 ```bash
 cd /home/ubuntu/projects/icn
+
+# Source the port library first (sets BRIGHTWORKS_URL etc.)
+source demo/scripts/lib-demo-ports.sh local
+
+# Start the local devnet
 make devnet-up 2>&1 | tail -20
-# Wait for all services healthy
-curl -sf http://localhost:30080/v1/health | python3 -m json.tool
+
+# Wait for healthy — gateway binds 8080 on local devnet
+curl -sf http://localhost:8080/v1/health | python3 -m json.tool
+# Expected: {"status":"ok", "git_sha":"...", ...}
+# NOTE: Use port 8080 for local devnet. Use port 30080 only for K3s NodePort.
 ```
 
-Record actual output. If anything fails, fix it before writing the doc.
+Record actual output. If health check fails, the devnet is not ready. Do not proceed until it passes.
 
-- [ ] **Step 10.2: Run Flow A (WASM)**
+- [ ] **Step 10.2: Run Flow 1 (Governance / full vertical slice)**
 
 ```bash
-# Per the existing demo script:
-bash demo/scripts/present-governance.sh --port 9080
-# Or the individual flow commands — run them, record exact output
+cd /home/ubuntu/projects/icn
+bash demo/scripts/flow-1-governance.sh 2>&1 | tee /tmp/flow-1-output.txt
 ```
 
-- [ ] **Step 10.3: Run Flow B (Discovery)**
+Record actual output in `/tmp/flow-1-output.txt`. Copy the key commands and their outputs into the demo doc.
 
-Run service discovery demo, record exact commands and expected output.
+- [ ] **Step 10.3: Run Flow 2 (Patronage — ledger settlement)**
 
-- [ ] **Step 10.4: Run Flow C (Treasury governance)**
+```bash
+bash demo/scripts/flow-2-patronage.sh 2>&1 | tee /tmp/flow-2-output.txt
+```
 
-Run treasury governance demo, record exact commands and expected output.
+Record actual output. This demonstrates: patronage distribution as governance-approved action, ledger settlement, receipt chain linking to governance decision.
+
+- [ ] **Step 10.4: Run Flow 3 (Federation — cross-coop coordination)**
+
+```bash
+bash demo/scripts/flow-3-federation.sh 2>&1 | tee /tmp/flow-3-output.txt
+```
+
+Record actual output. This demonstrates: three autonomous nodes, cross-coop coordination without central authority, federation clearing.
 
 - [ ] **Step 10.5: Write the document with exactly what you ran**
 
@@ -1060,14 +1173,55 @@ git commit -m "docs(demo): add canonical demo path validated against main (s23-t
 
 ---
 
-## Sprint Close Checklist
+## Sprint 23 Final Audit
 
-When all 10 tasks are complete:
+Run this block when all 10 tasks are complete. Every check must pass (or have a documented exception) before the sprint is declared closed.
 
-- [ ] All `current.json` task statuses set to `"done"`
-- [ ] `git status --short` clean on `main`
-- [ ] `gh run list --branch main --limit 1 --json conclusion` shows `"success"` (or exceptions documented)
-- [ ] `docs/state/` contains three new files: `ICN-Platform-Baseline-2026-03.md`, `storage-governance-spec.md`, `demo-path-2026-03.md`
-- [ ] `docs/strategy/ICN-Roadmap-Live.md` updated
-- [ ] GitHub issues #1095, #1096, #1131 have disposition comments
-- [ ] Governing rule holds: **repo state, board state, and narrative state agree**
+```bash
+cd /home/ubuntu/projects/icn
+
+echo "=== 1. REPO STATE ==="
+git status --short
+# Expected: no output
+
+git worktree list
+# Expected: only /home/ubuntu/projects/icn [main]
+
+echo ""
+echo "=== 2. CI STATE ==="
+gh run list --branch main --limit 1 --json conclusion,name,createdAt
+# Expected: "success", OR ci-exceptions.md exists and is committed
+
+echo ""
+echo "=== 3. BOARD STATE ==="
+jq '{sprint: .sprint, name: .name, task_count: (.tasks | length), statuses: [.tasks[].status]}' \
+  ops/state/sprint/current.json
+# Expected: sprint 23, 10 tasks, all "done"
+
+echo ""
+echo "=== 4. NARRATIVE STATE ==="
+ls -la docs/state/ICN-Platform-Baseline-2026-03.md \
+        docs/state/storage-governance-spec.md \
+        docs/state/demo-path-2026-03.md
+# Expected: all three files exist
+
+echo ""
+echo "=== 5. ROADMAP STATE ==="
+grep -c "Sprint 23\|Sprint 24" docs/strategy/ICN-Roadmap-Live.md
+# Expected: at least 2 (one heading for each)
+
+echo ""
+echo "=== 6. ISSUE DISPOSITION ==="
+gh issue view 1095 --json state,comments | jq '{state, comment_count: (.comments | length)}'
+gh issue view 1096 --json state,comments | jq '{state, comment_count: (.comments | length)}'
+gh issue view 1131 --json state | jq '.state'
+# Expected: each has a comment or is closed
+
+echo ""
+echo "=== GOVERNING RULE CHECK ==="
+echo "Repo state, board state, and narrative state agree: verify above outputs manually"
+```
+
+The sprint is done when all outputs match expectations.
+
+**Governing rule:** A task is only done when repo state, board state, and narrative state agree.
