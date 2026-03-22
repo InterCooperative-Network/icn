@@ -105,15 +105,12 @@ pub fn build_witness_config(
 /// * `baseline` — base credit limit in smallest currency unit
 /// * `trust_multiplier` — bonus fraction from trust score (0.0–1.0)
 /// * `history_bonus_rate` — bonus fraction from cleared volume
-/// * `credit_currency` — currency identifier (e.g. "hours")
+/// * `credit_currency` — currency identifier (e.g. "hours"); used for both
+///   the credit policy and the new-member policy (the ledger does not currently
+///   support distinct per-phase currencies)
 /// * `initial_limit` — starting limit for new members
 /// * `ramp_period_days` — days over which credit ramps to full limit
 /// * `cleared_volume_threshold` — credits received to bypass time-based ramp
-/// * `new_member_currency` — currency identifier for new member policy
-// Eight args mirrors the 8 primitive config fields that map to CreditPolicy +
-// NewMemberPolicy. A struct would require importing icn-core types here, which
-// violates the "no kernel-config imports in app crates" convention.
-#[allow(clippy::too_many_arguments)]
 pub fn build_credit_policy_manager(
     baseline: i64,
     trust_multiplier: f64,
@@ -122,21 +119,23 @@ pub fn build_credit_policy_manager(
     initial_limit: i64,
     ramp_period_days: u64,
     cleared_volume_threshold: i64,
-    new_member_currency: String,
 ) -> icn_ledger::CreditPolicyManager {
     use std::time::Duration;
-    const SECONDS_PER_DAY: u64 = 86_400;
+    // Reuse the ledger crate's constant to avoid drift.
+    let ramp_secs = ramp_period_days
+        .checked_mul(icn_ledger::credit_policy::SECONDS_PER_DAY)
+        .unwrap_or(u64::MAX);
     let credit_policy = icn_ledger::CreditPolicy::new(
         baseline,
         trust_multiplier,
         history_bonus_rate,
-        credit_currency,
+        credit_currency.clone(),
     );
     let new_member_policy = icn_ledger::NewMemberPolicy::new(
         initial_limit,
-        Duration::from_secs(ramp_period_days * SECONDS_PER_DAY),
+        Duration::from_secs(ramp_secs),
         cleared_volume_threshold,
-        new_member_currency,
+        credit_currency,
     );
     icn_ledger::CreditPolicyManager::new(credit_policy, new_member_policy)
 }
@@ -320,5 +319,52 @@ mod tests {
             oracle_config.suspicious_rate_thresholds.get("USD:JPY"),
             Some(&200.0)
         );
+    }
+
+    #[test]
+    fn test_build_credit_policy_manager_defaults() {
+        // Build with values matching CreditPolicy::conservative() defaults.
+        let mgr = build_credit_policy_manager(
+            10_000, // baseline
+            0.3,    // trust_multiplier
+            0.05,   // history_bonus_rate
+            "hours".to_string(),
+            1_000, // initial_limit
+            90,    // ramp_period_days
+            5_000, // cleared_volume_threshold
+        );
+
+        // Verify credit policy fields are threaded through correctly.
+        let policy = &mgr.credit_policy;
+        assert_eq!(policy.baseline, 10_000);
+        assert!((policy.trust_multiplier - 0.3).abs() < f64::EPSILON);
+        assert!((policy.history_bonus_rate - 0.05).abs() < f64::EPSILON);
+        assert_eq!(policy.currency, "hours");
+
+        // Verify new-member policy fields.
+        let nm = &mgr.new_member_policy;
+        assert_eq!(nm.initial_limit, 1_000);
+        assert_eq!(
+            nm.ramp_period.as_secs(),
+            90 * icn_ledger::credit_policy::SECONDS_PER_DAY
+        );
+        assert_eq!(nm.cleared_volume_threshold, 5_000);
+        assert_eq!(nm.currency, "hours");
+    }
+
+    #[test]
+    fn test_build_credit_policy_manager_ramp_overflow_saturates() {
+        // u64::MAX / SECONDS_PER_DAY overflows — should saturate to u64::MAX,
+        // not wrap, so the ramp period is always finite rather than silently short.
+        let mgr = build_credit_policy_manager(
+            10_000,
+            0.3,
+            0.05,
+            "hours".to_string(),
+            1_000,
+            u64::MAX,
+            5_000,
+        );
+        assert_eq!(mgr.new_member_policy.ramp_period.as_secs(), u64::MAX);
     }
 }

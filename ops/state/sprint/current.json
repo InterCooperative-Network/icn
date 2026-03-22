@@ -29,8 +29,8 @@
     {
       "id": "s22-t3",
       "title": "icn-ledger: extract CreditPolicy + NewMemberPolicy factory values to CreditPolicyConfig (highest regulatory priority)",
-      "status": "pending",
-      "pr": null,
+      "status": "in-review",
+      "pr": 1392,
       "assignee": null,
       "epic": "meaning-firewall"
     },
@@ -45,8 +45,8 @@
     {
       "id": "s22-t5",
       "title": "docs: update meaning-firewall-audit.md to mark all Sprint 22 remediations complete",
-      "status": "pending",
-      "pr": null,
+      "status": "in-review",
+      "pr": 1392,
       "assignee": null,
       "epic": "meaning-firewall"
     }

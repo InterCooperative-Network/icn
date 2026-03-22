@@ -238,7 +238,6 @@ async fn build_services(
         config.ledger.new_member.initial_limit,
         config.ledger.new_member.ramp_period_days,
         config.ledger.new_member.cleared_volume_threshold,
-        config.ledger.new_member.currency.clone(),
     );
     let ledger_services = icn_ledger_app::init::init_ledger_services(
         ledger_handle.clone(),

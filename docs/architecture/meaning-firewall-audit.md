@@ -106,11 +106,11 @@ Observability layer exposes domain thresholds as constants.
 
 | File | Lines | Violation | Severity | Status |
 |------|-------|-----------|----------|--------|
-| `src/attestation.rs` | ~82–85 | `CONTRIBUTION_THRESHOLD`, `MIN_TRUST_TO_ATTEST`, `MIN_MEMBERSHIP_AGE_SECS`, `ORG_ATTESTATION_THRESHOLD` hardcoded | MEDIUM | ✅ Config-driven via `ContributionAttestationConfig` (PR #1389, Sprint 22) |
+| `src/attestation.rs` | ~82–85 | `CONTRIBUTION_THRESHOLD`, `MIN_TRUST_TO_ATTEST`, `MIN_MEMBERSHIP_AGE_SECS`, `ORG_ATTESTATION_THRESHOLD` hardcoded | MEDIUM | ✅ Config-driven via `ContributionAttestationConfig` (PR #1390, Sprint 22) |
 
 **Pattern**: Governance-specific thresholds are in the observability substrate. These should come from config or app layer.
 
-**Sprint 22 remediation (PR #1389)**: Added `AttestationThresholds` struct to `icn-obs/src/attestation.rs` (parallel to `SeverityWeights` pattern in `icn-security`). All 5 constants (`MIN_TRUST_TO_ATTEST`=0.3, `MIN_MEMBERSHIP_AGE_SECS`=7_776_000, `MAX_ATTESTATIONS_PER_PERIOD`=10, `ORG_ATTESTATION_THRESHOLD`=500, `CONTRIBUTION_THRESHOLD`=1.0) retained as backward-compat aliases; runtime now uses `AttestationThresholds` fields. Added `ContributionAttestationConfig` and `ObsConfig` in `icn-core/src/config/obs.rs` with `to_attestation_thresholds()` converter. `ContributionValidator` gains `thresholds: AttestationThresholds` field; wiring happens at init time from config.
+**Sprint 22 remediation (PR #1390)**: Added `AttestationThresholds` struct to `icn-obs/src/attestation.rs` (parallel to `SeverityWeights` pattern in `icn-security`). All 5 constants (`MIN_TRUST_TO_ATTEST`=0.3, `MIN_MEMBERSHIP_AGE_SECS`=7_776_000, `MAX_ATTESTATIONS_PER_PERIOD`=10, `ORG_ATTESTATION_THRESHOLD`=500, `CONTRIBUTION_THRESHOLD`=1.0) retained as backward-compat aliases; runtime now uses `AttestationThresholds` fields. Added `ContributionAttestationConfig` and `ObsConfig` in `icn-core/src/config/obs.rs` with `to_attestation_thresholds()` converter. `ContributionValidator` gains `thresholds: AttestationThresholds` field; wiring happens at init time from config.
 
 **Remaining**: No outstanding violations. Old `pub const` values are kept as backward-compat aliases; they can be deprecated in a future cleanup sprint.
 
@@ -147,7 +147,7 @@ Observability layer exposes domain thresholds as constants.
 
 **Sprint 21 result**: 5 of 8 original HIGH/MEDIUM violations resolved. All HIGH violations in `icn-compute` and `icn-security` are now config-driven.
 
-**Sprint 22 result**: Remaining 10 violations resolved. All hardcoded governance values in `icn-compute`, `icn-security`, `icn-ledger`, and `icn-obs` are now externalized as serde-default config fields. Zero-impact upgrades — all defaults match previously-hardcoded values. Only `icn-core`'s effect routing labels (LOW, deferred) remain.
+**Sprint 22 result**: All 3 remaining violations resolved via updates to 10 config fields across 4 crates. All hardcoded governance values in `icn-compute`, `icn-security`, `icn-ledger`, and `icn-obs` are now externalized as serde-default config fields. Zero-impact upgrades — all defaults match previously-hardcoded values. Only `icn-core`'s effect routing labels (LOW, deferred) remain.
 
 ---
 
@@ -170,7 +170,7 @@ Observability layer exposes domain thresholds as constants.
    - ⏳ Full `LedgerPolicyOracle` extraction (move `CreditPolicy` struct to `apps/ledger`): future sprint
 
 4. **`icn-obs` attestation thresholds** (Sprint 22 — ✅ complete)
-   - ✅ `ContributionAttestationConfig` with 5 fields replacing compiled constants (PR #1389, Sprint 22)
+   - ✅ `ContributionAttestationConfig` with 5 fields replacing compiled constants (PR #1390, Sprint 22)
 
 5. **`icn-core` effect labels** (Low priority, Sprint 23+)
    - `effect_type_label()` maps domain effect variants to label strings — LOW severity
