@@ -131,6 +131,7 @@ impl Default for Config {
                 encryption_cleanup_circuit_breaker_threshold: 3,
                 nat_dial: NatDialConfig::default(),
                 blob_registry: BlobRegistryConfig::default(),
+                advertised_addr: None,
             },
             observability: ObservabilityConfig {
                 metrics_port: 9100,

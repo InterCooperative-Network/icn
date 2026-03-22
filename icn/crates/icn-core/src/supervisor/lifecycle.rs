@@ -1030,6 +1030,20 @@ async fn spawn_network_actor(
 
     let turn_config = config.network.turn_config();
 
+    // Parse optional explicit advertised address (for containerized deployments)
+    let advertised_addr = config.network.advertised_addr.as_deref().and_then(|s| {
+        match s.parse::<std::net::SocketAddr>() {
+            Ok(addr) => {
+                info!("Using explicit advertised address: {}", addr);
+                Some(addr)
+            }
+            Err(e) => {
+                warn!("Failed to parse advertised_addr '{}': {} — falling back to auto-detect", s, e);
+                None
+            }
+        }
+    });
+
     // Create store for replay protection persistence
     let network_store_path = config.store_path().join("network");
     let network_store: Arc<dyn icn_store::Store> =
@@ -1053,6 +1067,7 @@ async fn spawn_network_actor(
         Some(network_store),
         None, // Personhood store for Sybil resistance
         None, // Anchor rate limit config
+        advertised_addr,
     )
     .await?;
 

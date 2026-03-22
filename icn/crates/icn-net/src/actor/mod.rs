@@ -998,6 +998,11 @@ impl NetworkActor {
         store: Option<Arc<dyn Store>>,
         personhood_store: Option<Arc<dyn PersonhoodStoreTrait>>,
         anchor_rate_config: Option<AnchorRateLimitConfig>,
+        // Explicit advertised address for connection candidates.
+        // When set, overrides the auto-detected local address in candidate announcements.
+        // Required in K8s/Docker where the QUIC endpoint binds to `0.0.0.0` but must
+        // advertise the pod/container IP so other nodes can dial back.
+        advertised_addr: Option<SocketAddr>,
     ) -> Result<NetworkHandle> {
         let did = identity_bundle.did().clone();
 
@@ -1014,6 +1019,9 @@ impl NetworkActor {
 
         // Start session manager (no TLS trust gating anymore - handled by PolicyOracle in protocol)
         let mut session_manager = SessionManager::new();
+        if let Some(addr) = advertised_addr {
+            session_manager.set_advertised_addr(addr);
+        }
         session_manager
             .start(&identity_bundle, listen_addr, stun_servers, turn_config)
             .await
@@ -1375,6 +1383,7 @@ mod tests {
             None, // store (tests don't need persistence)
             None, // personhood_store
             None, // anchor_rate_config
+            None, // advertised_addr
         )
         .await
         .unwrap();

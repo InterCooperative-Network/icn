@@ -77,6 +77,13 @@ pub struct SessionManager {
 
     /// Shutdown channel receiver
     _shutdown_rx: mpsc::Receiver<()>,
+
+    /// Explicit advertised local address override.
+    ///
+    /// When set, this address is used instead of `endpoint.local_addr()` when building
+    /// connection candidates. Required in containerized environments (Docker/K8s) where
+    /// the QUIC endpoint binds to `0.0.0.0` but must advertise the container/pod IP.
+    advertised_addr: Option<SocketAddr>,
 }
 
 impl SessionManager {
@@ -94,7 +101,17 @@ impl SessionManager {
             turn_config: Arc::new(RwLock::new(None)),
             shutdown_tx: Some(shutdown_tx),
             _shutdown_rx: shutdown_rx,
+            advertised_addr: None,
         }
+    }
+
+    /// Set an explicit advertised address for connection candidates.
+    ///
+    /// Use this in containerized environments where the bind address (`0.0.0.0`) is not
+    /// a dialable address. When set, this takes precedence over `endpoint.local_addr()`
+    /// and the auto-detection fallback.
+    pub fn set_advertised_addr(&mut self, addr: SocketAddr) {
+        self.advertised_addr = Some(addr);
     }
 
     /// Start the session manager with a QUIC endpoint
@@ -440,8 +457,23 @@ impl SessionManager {
             .as_ref()
             .context("Session manager not started")?;
 
-        let local_addr = endpoint.local_addr()?;
+        let raw_local_addr = endpoint.local_addr()?;
         let public_addr = *self.public_endpoint.read().await;
+
+        // Resolve the actual dialable local address.
+        //
+        // When the endpoint binds to 0.0.0.0 (wildcard), the raw local_addr is not
+        // dialable by peers. Resolve in priority order:
+        //   1. Explicit `advertised_addr` config override (e.g. K8s pod IP)
+        //   2. Auto-detect via routing-socket trick (works in containers/VMs)
+        //   3. Raw endpoint address as last resort (may be 0.0.0.0)
+        let local_addr = if let Some(addr) = self.advertised_addr {
+            addr
+        } else if raw_local_addr.ip().is_unspecified() {
+            resolve_local_addr(raw_local_addr.port()).unwrap_or(raw_local_addr)
+        } else {
+            raw_local_addr
+        };
 
         // Include relay address if TURN allocation is active (Phase 4 M1)
         let relay_addr = *self.relay_addr.read().await;
@@ -633,8 +665,28 @@ impl SessionManager {
             turn_config: self.turn_config.clone(),
             shutdown_tx: None, // Test clones don't control shutdown
             _shutdown_rx: mpsc::channel(1).1,
+            advertised_addr: self.advertised_addr,
         }
     }
+}
+
+/// Determine the local IP that would be used to route packets to an external host.
+///
+/// Uses the routing-socket trick: binding a UDP socket and calling `connect()` to a
+/// well-known external address makes the OS select the egress interface without
+/// sending any packets. The bound socket's local address then reveals the real IP.
+///
+/// Works correctly in Docker/K8s containers where the bind address is `0.0.0.0`
+/// but the container has a real routable IP on eth0.
+///
+/// Returns None if the trick fails (e.g., no network, weird routing table).
+fn resolve_local_addr(port: u16) -> Option<SocketAddr> {
+    let socket = std::net::UdpSocket::bind("0.0.0.0:0").ok()?;
+    // Connecting UDP does not send any packets — it only sets the routing destination.
+    // 8.8.8.8:80 is used as a well-known routable external address.
+    socket.connect("8.8.8.8:80").ok()?;
+    let local_ip = socket.local_addr().ok()?.ip();
+    Some(SocketAddr::new(local_ip, port))
 }
 
 #[cfg(test)]

@@ -378,6 +378,7 @@ impl TestNode {
             None, // No store
             None, // No personhood store (Sybil resistance)
             None, // No anchor rate config
+            None, // No advertised addr override
         )
         .await?;
 

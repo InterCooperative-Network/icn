@@ -86,6 +86,7 @@ impl TestNode {
             None, // No store for tests
             None, // personhood_store
             None, // anchor_rate_config
+            None, // advertised_addr
         )
         .await?;
 
@@ -278,6 +279,7 @@ async fn test_graceful_restart_preserves_state() -> Result<()> {
         None, // No store for tests
         None, // personhood_store
         None, // anchor_rate_config
+        None, // advertised_addr
     )
     .await?;
 
@@ -496,6 +498,7 @@ async fn test_x25519_keys_persist_across_restart() -> Result<()> {
         None, // No store for tests
         None, // personhood_store
         None, // anchor_rate_config
+        None, // advertised_addr
     )
     .await?;
 
