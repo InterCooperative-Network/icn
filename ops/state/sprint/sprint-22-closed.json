@@ -1,0 +1,56 @@
+{
+  "sprint": 22,
+  "name": "Sprint 22 \u2014 Meaning Firewall Completion",
+  "started": "2026-03-22",
+  "goals": [
+    "Extract remaining icn-security hardcoded violations (max_violations_per_hour, violation_retention_secs) to MisbehaviorThresholdsConfig",
+    "Extract remaining icn-compute violations (CharterPriority preemption, credit ceiling) to ComputePolicyConfig",
+    "Extract icn-ledger CreditPolicy/NewMemberPolicy factory values to CreditPolicyConfig (highest regulatory priority)",
+    "Extract icn-obs attestation threshold constants to AttestationConfig",
+    "Update meaning-firewall-audit.md to reflect Sprint 22 remediations"
+  ],
+  "tasks": [
+    {
+      "id": "s22-t1",
+      "title": "icn-security: extract max_violations_per_hour + violation_retention_secs to MisbehaviorThresholdsConfig",
+      "status": "done",
+      "pr": 1389,
+      "assignee": null,
+      "epic": "meaning-firewall"
+    },
+    {
+      "id": "s22-t2",
+      "title": "icn-compute: extract CharterPriority preemption routing + credit ceiling validation to ComputePolicyConfig",
+      "status": "done",
+      "pr": 1391,
+      "assignee": null,
+      "epic": "meaning-firewall"
+    },
+    {
+      "id": "s22-t3",
+      "title": "icn-ledger: extract CreditPolicy + NewMemberPolicy factory values to CreditPolicyConfig (highest regulatory priority)",
+      "status": "done",
+      "pr": 1392,
+      "assignee": null,
+      "epic": "meaning-firewall"
+    },
+    {
+      "id": "s22-t4",
+      "title": "icn-obs: extract 5 attestation threshold constants to AttestationConfig",
+      "status": "done",
+      "pr": 1390,
+      "assignee": null,
+      "epic": "meaning-firewall"
+    },
+    {
+      "id": "s22-t5",
+      "title": "docs: update meaning-firewall-audit.md to mark all Sprint 22 remediations complete",
+      "status": "done",
+      "pr": 1392,
+      "assignee": null,
+      "epic": "meaning-firewall"
+    }
+  ],
+  "closed_date": "2026-03-22",
+  "closure_note": "All PRs merged (verified 2026-03-22). Board showed in-review due to automation lag."
+}
