@@ -12,8 +12,8 @@ concurrency:
 jobs:
   claude-review:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    # Advisory only — SDK crashes should not block PRs
+    timeout-minutes: 20
+    # Advisory only — never blocks merge
     continue-on-error: true
     permissions:
       contents: read
@@ -25,7 +25,94 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
-          fetch-depth: 1
+          fetch-depth: 0
+
+      - name: Detect change scope
+        id: scope
+        run: |
+          BASE="${{ github.event.pull_request.base.sha }}"
+          HEAD="${{ github.event.pull_request.head.sha }}"
+          ALL_CHANGED=$(git diff --name-only "$BASE" "$HEAD" 2>/dev/null || true)
+          # Truncate to 60 paths for domain-hint matching; track the real total separately.
+          CHANGED=$(printf '%s' "$ALL_CHANGED" | head -60)
+          TOTAL=$(printf '%s' "$ALL_CHANGED" | grep -c . || echo 0)
+
+          DOMAIN_HINTS=""
+
+          # Kernel / app boundary
+          if echo "$CHANGED" | grep -qE 'crates/icn-(core|net|gossip|store|kernel-api)/'; then
+            DOMAIN_HINTS="${DOMAIN_HINTS}
+          - KERNEL CRATE changed: verify no domain imports (icn-trust, icn-governance, icn-ledger, icn-ccl). Kernel must only see ConstraintSet and PolicyOracle. Check firewall-guard hook logic."
+          fi
+
+          # Trust / federation
+          if echo "$CHANGED" | grep -qE 'crates/icn-(trust|federation)/|apps/trust'; then
+            DOMAIN_HINTS="${DOMAIN_HINTS}
+          - TRUST/FEDERATION scope: verify trust score math is correct, TrustPolicyOracle boundary respected, no trust semantics leaking into kernel, federation settlement defined."
+          fi
+
+          # Ledger / economics
+          if echo "$CHANGED" | grep -qE 'crates/icn-ledger/|apps/ledger'; then
+            DOMAIN_HINTS="${DOMAIN_HINTS}
+          - LEDGER scope: verify double-entry invariant (debits == credits), no negative balances without explicit overdraft policy, commons credit accounting correct, settlement dedup in place."
+          fi
+
+          # Governance / CCL
+          if echo "$CHANGED" | grep -qE 'crates/icn-(governance|ccl|community|coop)/|apps/governance'; then
+            DOMAIN_HINTS="${DOMAIN_HINTS}
+          - GOVERNANCE/CCL scope: verify quorum math, proposal lifecycle state machine, CCL determinism (same inputs → same outputs), no panics in CCL interpreter, voting weight calculation."
+          fi
+
+          # Gateway / API
+          if echo "$CHANGED" | grep -qE 'crates/icn-(gateway|rpc|api|http-kit)/'; then
+            DOMAIN_HINTS="${DOMAIN_HINTS}
+          - GATEWAY scope: verify JWT scopes enforced on all protected routes, OpenAPI spec stays in sync (run: icnctl api export-openapi), TypeScript types regenerated if API changed, no sensitive data in error responses."
+          fi
+
+          # Identity / IAM
+          if echo "$CHANGED" | grep -qE 'crates/icn-(identity|naming|authz|entity)/'; then
+            DOMAIN_HINTS="${DOMAIN_HINTS}
+          - IDENTITY scope: verify Ed25519 key operations are correct, DID format unchanged, keystore encryption intact, no key material in logs or error messages, replay protection in place."
+          fi
+
+          # Network / gossip
+          if echo "$CHANGED" | grep -qE 'crates/icn-(net|gossip|protocol)/'; then
+            DOMAIN_HINTS="${DOMAIN_HINTS}
+          - NETWORK scope: verify SignedEnvelope verification, replay guard sequence tracking, QUIC session lifecycle, gossip vector clock causal ordering, no blocking operations in async network paths."
+          fi
+
+          # Compute
+          if echo "$CHANGED" | grep -qE 'crates/icn-compute/'; then
+            DOMAIN_HINTS="${DOMAIN_HINTS}
+          - COMPUTE scope: verify fuel metering prevents infinite loops, WASM sandbox isolation, task scheduling fairness, trust-gated execution correctly enforced."
+          fi
+
+          # Security / crypto
+          if echo "$CHANGED" | grep -qE 'crates/icn-(security|crypto|crypto-pq|privacy|zkp)/'; then
+            DOMAIN_HINTS="${DOMAIN_HINTS}
+          - SECURITY/CRYPTO scope: flag for icn-security-reviewer agent. Verify constant-time comparisons for secrets, no timing side-channels, post-quantum hybrid correctness."
+          fi
+
+          # SDK / mobile
+          if echo "$CHANGED" | grep -qE '^sdk/|^web/'; then
+            DOMAIN_HINTS="${DOMAIN_HINTS}
+          - SDK/WEB scope: verify TypeScript strict mode, no any types, ICNError codes stable, auth flow correct (challenge → sign → verify → JWT), offline patterns safe."
+          fi
+
+          # Deploy / infra
+          if echo "$CHANGED" | grep -qE '^deploy/|^\.github/workflows/'; then
+            DOMAIN_HINTS="${DOMAIN_HINTS}
+          - DEPLOY/CI scope: verify no secrets committed, placeholder values only in example files, workflow changes don't weaken security gates or ratchet phases."
+          fi
+
+          if [ -z "$DOMAIN_HINTS" ]; then
+            DOMAIN_HINTS="No specific domain detected. Apply general ICN review: check 5 invariants."
+          fi
+
+          # Write to output (escape newlines for GitHub Actions)
+          HINTS_ESCAPED="${DOMAIN_HINTS//$'\n'/%0A}"
+          echo "domain_hints=$HINTS_ESCAPED" >> "$GITHUB_OUTPUT"
+          echo "changed_files=${TOTAL}" >> "$GITHUB_OUTPUT"
 
       - name: Run Claude Code Review
         id: claude-review
@@ -34,4 +121,18 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
           plugins: 'code-review@claude-code-plugins'
-          prompt: '/code-review:code-review ${{ github.event.pull_request.number }}'
+          prompt: |
+            /code-review:code-review ${{ github.event.pull_request.number }}
+
+            ICN-specific review context (${{ steps.scope.outputs.changed_files }} files changed):
+            ${{ steps.scope.outputs.domain_hints }}
+
+            ICN invariants to enforce in ALL reviews:
+            1. Adversarial-by-default: peers are untrusted until trust established
+            2. Determinism: same inputs → same outputs in protocol paths
+            3. Canonical encodings: wire/proof formats unchanged without versioning
+            4. No panics in protocol paths: use Result<T,E>, never unwrap() in network/actor code
+            5. Kernel/app boundaries: kernel crates must not import domain crates (icn-trust, icn-governance, icn-ledger, icn-ccl)
+
+            High signal-to-noise: only surface issues that genuinely matter (bugs, security, invariant violations).
+            Skip style nits. Skip issues already caught by clippy.

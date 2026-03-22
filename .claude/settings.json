@@ -31,7 +31,14 @@
       "Bash(rustc --version)",
       "Bash(docker compose *)",
       "Bash(docker ps *)",
-      "Bash(ss -tlnp *)"
+      "Bash(ss -tlnp *)",
+      "Bash(git commit *)",
+      "Bash(git stash *)",
+      "Bash(git tag *)",
+      "Bash(git show *)",
+      "Bash(wc -l *)",
+      "Bash(cat *.toml)",
+      "Bash(cat *.md)"
     ],
     "deny": [
       "Bash(rm -rf *)",
@@ -78,6 +85,18 @@
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/dep-guard.sh",
             "timeout": 5,
             "statusMessage": "Checking dependency hygiene..."
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/scope-guard.sh",
+            "timeout": 5,
+            "statusMessage": "Checking branch scope..."
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/todo-guard.sh",
+            "timeout": 5,
+            "statusMessage": "Checking TODO format..."
           }
         ]
       }
@@ -101,7 +120,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo '📋 ICN Session Started. Commands: /preflight, /verify, /push, /review-apply, /merge-pr, /pr-create, /devnet, /demo-validate, /diag-infra, /firewall-check'"
+            "command": "BRANCH=$(git branch --show-current 2>/dev/null || echo 'detached'); SPRINT=$(grep -m1 '^## ' docs/strategy/ICN-Active-Sprint.md 2>/dev/null || grep -m1 'Phase 2' docs/planning/FORWARD_PLAN_2026-03.md 2>/dev/null | head -c80 || echo 'see docs/planning/FORWARD_PLAN_2026-03.md'); echo \"ICN Session | branch: $BRANCH | sprint: $SPRINT\"; echo 'Skills: /preflight /verify /push /pr-create /merge-pr /review-apply /fix-ci /changelog /handoff /sync-docs /devnet /firewall-check /demo-validate'; echo 'Invariants: adversarial-by-default | determinism | canonical-encodings | no-panics | kernel/app-boundaries'"
           }
         ]
       },

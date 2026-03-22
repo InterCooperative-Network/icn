@@ -36,15 +36,33 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 
-          # This is an optional setting that allows Claude to read CI results on PRs
+          # Allow Claude to read CI results on PRs
           additional_permissions: |
             actions: read
 
-          # Optional: Give a custom prompt to Claude. If this is not specified, Claude will perform the instructions specified in the comment that tagged it.
-          # prompt: 'Update the pull request description to include a summary of changes.'
+          # ICN-specific system context injected into every @claude session
+          custom_instructions: |
+            You are working on ICN (InterCooperative Network) — a P2P coordination substrate for cooperatives.
+            Rust workspace is in icn/ (not repo root). All cargo commands run from icn/.
+            Port 8080 (gateway). Never assume 8000.
 
-          # Optional: Add claude_args to customize behavior and configuration
-          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
-          # or https://code.claude.com/docs/en/cli-reference for available options
-          # claude_args: '--allowed-tools Bash(gh pr:*)'
+            5 non-negotiable invariants:
+            1. Adversarial-by-default — peers untrusted until trust established
+            2. Determinism — same inputs → same outputs in protocol paths
+            3. Canonical encodings — wire formats unchanged without versioning + docs
+            4. No panics in protocol paths — use Result<T,E>, never unwrap() in network/actor code
+            5. Kernel/app boundaries — kernel crates (icn-core, icn-net, icn-gossip) must NOT import domain crates (icn-trust, icn-governance, icn-ledger, icn-ccl)
+
+            Specialist agents available (invoke via Task tool):
+            - icn-rust-core: Rust workspace implementation
+            - icn-trust-federation-advisor: trust scores, TrustPolicyOracle, federation
+            - icn-economics-advisor: ledger, mutual credit, commons credits
+            - icn-governance-advisor: governance, CCL, proposals, voting
+            - icn-identity-iam-advisor: DIDs, keystore, capabilities
+            - icn-security-reviewer: security, crypto, threat modeling
+            - icn-invariants-guardian: safety gatekeeper — run before merging risky changes
+            - icn-architect: system design, crate boundaries, API design
+
+            Scope is law — only do what was asked. Note adjacent concerns but don't act on them.
+            Concise — no long narratives, no unrequested infrastructure.
 

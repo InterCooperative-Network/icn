@@ -271,6 +271,48 @@ When running multiple agents in parallel, each agent gets its own Git worktree w
 
 ---
 
+## Agent handoff protocol
+
+When ending a session or passing work to another agent, write a handoff note using `/handoff`.
+
+**What to capture:**
+
+```markdown
+# Session Handoff — YYYY-MM-DD
+
+## Branch
+`feat/<slug>` — base: main
+
+## Commits this session
+- <sha> <message>
+
+## Open PRs
+- #<N>: <title> (state)
+
+## Open threads
+- [ ] <unfinished work or decision needed>
+
+## TODOs added this session
+- `<file>:<line>` — <text>
+
+## Next steps
+1. <first action for next session>
+```
+
+**Rules:**
+- Write to `docs/dev-journal/session-YYYY-MM-DD.md` (append if file exists today)
+- Stash must be empty before ending — commit or drop stashes
+- If pushing, use `/push` (runs fmt + clippy gates first)
+- The handoff file is for context continuity — do not auto-commit it
+
+**Resuming from a handoff:**
+1. Read `docs/dev-journal/session-YYYY-MM-DD.md` (most recent date)
+2. Run `/preflight` to verify environment
+3. Run `git fetch origin && git rebase origin/main` if branch is stale
+4. Check open threads from the handoff note before starting new work
+
+---
+
 ## Repo-provided agent rules (must follow)
 
 - **Copilot instructions**: `.github/copilot-instructions.md`
