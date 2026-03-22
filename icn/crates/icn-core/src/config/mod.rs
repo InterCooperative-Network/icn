@@ -12,6 +12,7 @@ mod gossip;
 mod identity;
 mod ledger;
 mod network;
+mod obs;
 mod observability;
 mod privacy;
 mod security;
@@ -29,6 +30,7 @@ pub use gossip::*;
 pub use identity::*;
 pub use ledger::*;
 pub use network::*;
+pub use obs::{ContributionAttestationConfig, ObsConfig};
 pub use observability::*;
 pub use privacy::*;
 pub use security::*;
@@ -109,6 +111,10 @@ pub struct Config {
     /// Security subsystem configuration (misbehavior detection, reputation scoring)
     #[serde(default)]
     pub security: SecurityConfig,
+
+    /// Observability subsystem configuration (contribution attestation thresholds)
+    #[serde(default)]
+    pub obs: ObsConfig,
 }
 
 impl Default for Config {
@@ -153,6 +159,7 @@ impl Default for Config {
             compute: ComputeConfig::default(),
             trust: TrustConfig::default(),
             security: SecurityConfig::default(),
+            obs: ObsConfig::default(),
         }
     }
 }

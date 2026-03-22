@@ -40,19 +40,67 @@ use crate::contribution::{ResourceType, Timestamp};
 /// Content hash for evidence linking
 pub type ContentHash = [u8; 32];
 
-/// Minimum trust score required to attest
+/// Thresholds that govern contribution attestation eligibility and scoring.
+///
+/// These values were previously hardcoded as module-level constants.
+/// They are now config-driven via `icn-core::config::obs::ContributionAttestationConfig`.
+///
+/// Construct a [`ContributionValidator`] via [`ContributionValidator::new_with_thresholds`]
+/// to inject operator-provided values, or use [`AttestationThresholds::default`] for the
+/// cooperative governance defaults.
+#[derive(Debug, Clone)]
+pub struct AttestationThresholds {
+    /// Minimum trust score required to attest (0.0–1.0)
+    pub min_trust_to_attest: f64,
+    /// Minimum membership age in seconds before a member may attest
+    pub min_membership_age_secs: u64,
+    /// Maximum attestations per attester per scoring period
+    pub max_attestations_per_period: u32,
+    /// Credit unit threshold above which org-level attestation is required
+    pub org_attestation_threshold: u64,
+    /// Minimum weighted score (sum of attester trust scores) to verify a claim
+    pub contribution_threshold: f64,
+}
+
+impl Default for AttestationThresholds {
+    fn default() -> Self {
+        Self {
+            min_trust_to_attest: 0.3,
+            min_membership_age_secs: 90 * 24 * 60 * 60,
+            max_attestations_per_period: 10,
+            org_attestation_threshold: 500,
+            contribution_threshold: 1.0,
+        }
+    }
+}
+
+// Legacy constants retained for backward compatibility.
+// Use `AttestationThresholds::default()` or inject from
+// `icn-core::config::obs::ContributionAttestationConfig` instead.
+#[deprecated(
+    since = "0.1.0",
+    note = "Use `AttestationThresholds::default().min_trust_to_attest` or inject via config"
+)]
 pub const MIN_TRUST_TO_ATTEST: f64 = 0.3;
-
-/// Minimum membership age in seconds (90 days)
+#[deprecated(
+    since = "0.1.0",
+    note = "Use `AttestationThresholds::default().min_membership_age_secs` or inject via config"
+)]
 pub const MIN_MEMBERSHIP_AGE_SECS: u64 = 90 * 24 * 60 * 60;
-
-/// Maximum attestations per period per attester
+#[deprecated(
+    since = "0.1.0",
+    note = "Use `AttestationThresholds::default().max_attestations_per_period` or inject via config"
+)]
 pub const MAX_ATTESTATIONS_PER_PERIOD: u32 = 10;
-
-/// Threshold for requiring org attestation (in credit units)
+#[deprecated(
+    since = "0.1.0",
+    note = "Use `AttestationThresholds::default().org_attestation_threshold` or inject via config"
+)]
 pub const ORG_ATTESTATION_THRESHOLD: u64 = 500;
-
-/// Minimum weighted attestation score for claim verification
+#[deprecated(
+    since = "0.1.0",
+    note = "Use `AttestationThresholds::default().contribution_threshold` or inject via config"
+)]
 pub const CONTRIBUTION_THRESHOLD: f64 = 1.0;
 
 /// Status of a contribution claim
@@ -124,9 +172,23 @@ impl ContributionClaim {
         }
     }
 
-    /// Check if this claim requires org-level attestation
+    /// Check if this claim requires org-level attestation using the legacy threshold.
+    ///
+    /// **Deprecated**: Use [`ContributionValidator::claim_requires_org_attestation`] which
+    /// consults the operator-configured threshold, or call
+    /// [`requires_org_attestation_with_threshold`](Self::requires_org_attestation_with_threshold)
+    /// directly.
+    #[deprecated(
+        since = "0.1.0",
+        note = "Use ContributionValidator::claim_requires_org_attestation or requires_org_attestation_with_threshold"
+    )]
     pub fn requires_org_attestation(&self) -> bool {
-        self.amount > ORG_ATTESTATION_THRESHOLD
+        self.amount > 500 // legacy default; operator threshold not consulted
+    }
+
+    /// Check if this claim requires org-level attestation given a specific threshold.
+    pub fn requires_org_attestation_with_threshold(&self, threshold: u64) -> bool {
+        self.amount > threshold
     }
 }
 
@@ -242,11 +304,15 @@ pub struct EligibilityContext {
     pub attesters_of_attester: Vec<String>,
 }
 
-/// Check if an attester is eligible to attest a claim
-pub fn check_eligibility(
+/// Check if an attester is eligible to attest a claim using the provided thresholds.
+///
+/// Prefer this over [`check_eligibility`] (deprecated) so operator-configured values
+/// are respected.
+pub fn check_eligibility_with_thresholds(
     attester_did: &str,
     claim: &ContributionClaim,
     context: &EligibilityContext,
+    thresholds: &AttestationThresholds,
 ) -> EligibilityStatus {
     // Can't attest own claim
     if attester_did == claim.contributor {
@@ -254,17 +320,17 @@ pub fn check_eligibility(
     }
 
     // Check trust score
-    if context.trust_score < MIN_TRUST_TO_ATTEST {
+    if context.trust_score < thresholds.min_trust_to_attest {
         return EligibilityStatus::InsufficientTrust(context.trust_score);
     }
 
     // Check membership age
-    if context.membership_age_secs < MIN_MEMBERSHIP_AGE_SECS {
+    if context.membership_age_secs < thresholds.min_membership_age_secs {
         return EligibilityStatus::InsufficientAge(context.membership_age_secs);
     }
 
     // Check attestation budget
-    if context.attestations_this_period >= MAX_ATTESTATIONS_PER_PERIOD {
+    if context.attestations_this_period >= thresholds.max_attestations_per_period {
         return EligibilityStatus::BudgetExhausted(context.attestations_this_period);
     }
 
@@ -278,6 +344,28 @@ pub fn check_eligibility(
     }
 
     EligibilityStatus::Eligible
+}
+
+/// Check if an attester is eligible to attest a claim using cooperative governance defaults.
+///
+/// **Deprecated**: Operator-configured thresholds are ignored. Use
+/// [`check_eligibility_with_thresholds`] and supply the operator's
+/// [`AttestationThresholds`] instead.
+#[deprecated(
+    since = "0.1.0",
+    note = "Use check_eligibility_with_thresholds to respect operator-configured thresholds"
+)]
+pub fn check_eligibility(
+    attester_did: &str,
+    claim: &ContributionClaim,
+    context: &EligibilityContext,
+) -> EligibilityStatus {
+    check_eligibility_with_thresholds(
+        attester_did,
+        claim,
+        context,
+        &AttestationThresholds::default(),
+    )
 }
 
 /// Validation result for a contribution attestation
@@ -317,22 +405,53 @@ pub struct ContributionValidator {
     attestation_count_lookup: AttestationCountLookup,
     /// Lookup function for who has attested for a DID
     attesters_of_lookup: AttestersOfLookup,
+    /// Eligibility and scoring thresholds (config-driven)
+    thresholds: AttestationThresholds,
 }
 
 impl ContributionValidator {
-    /// Create a new validator with the provided lookup functions
-    pub fn new(
+    /// Create a new validator with lookup functions and operator-configured thresholds.
+    ///
+    /// Pass thresholds derived from `ContributionAttestationConfig::to_attestation_thresholds()`
+    /// so operator configuration is honoured at runtime.
+    pub fn new_with_thresholds(
         trust_lookup: TrustLookup,
         membership_age_lookup: MembershipAgeLookup,
         attestation_count_lookup: AttestationCountLookup,
         attesters_of_lookup: AttestersOfLookup,
+        thresholds: AttestationThresholds,
     ) -> Self {
         Self {
             trust_lookup,
             membership_age_lookup,
             attestation_count_lookup,
             attesters_of_lookup,
+            thresholds,
         }
+    }
+
+    /// Create a new validator using cooperative governance defaults for all thresholds.
+    ///
+    /// **Deprecated**: Operator-configured thresholds are ignored. Use
+    /// [`new_with_thresholds`](Self::new_with_thresholds) and supply thresholds from
+    /// `ContributionAttestationConfig::to_attestation_thresholds()` instead.
+    #[deprecated(
+        since = "0.1.0",
+        note = "Use new_with_thresholds to respect operator-configured thresholds"
+    )]
+    pub fn new(
+        trust_lookup: TrustLookup,
+        membership_age_lookup: MembershipAgeLookup,
+        attestation_count_lookup: AttestationCountLookup,
+        attesters_of_lookup: AttestersOfLookup,
+    ) -> Self {
+        Self::new_with_thresholds(
+            trust_lookup,
+            membership_age_lookup,
+            attestation_count_lookup,
+            attesters_of_lookup,
+            AttestationThresholds::default(),
+        )
     }
 
     /// Build eligibility context for an attester
@@ -373,7 +492,12 @@ impl ContributionValidator {
             };
 
             // Check eligibility
-            let status = check_eligibility(attester_did, &attestation.claim, &context);
+            let status = check_eligibility_with_thresholds(
+                attester_did,
+                &attestation.claim,
+                &context,
+                &self.thresholds,
+            );
 
             if status.is_eligible() {
                 // Add trust score to weighted sum
@@ -389,7 +513,7 @@ impl ContributionValidator {
             fraud_indicators.push(ring);
         }
 
-        let verified = weighted_score >= CONTRIBUTION_THRESHOLD;
+        let verified = weighted_score >= self.thresholds.contribution_threshold;
 
         ValidationResult {
             verified,
@@ -398,6 +522,15 @@ impl ContributionValidator {
             ineligible,
             fraud_indicators,
         }
+    }
+
+    /// Check if a claim requires org-level attestation using the configured threshold.
+    ///
+    /// Use this in preference to [`ContributionClaim::requires_org_attestation`] so that
+    /// operator-configured values from `AttestationThresholds.org_attestation_threshold`
+    /// are respected.
+    pub fn claim_requires_org_attestation(&self, claim: &ContributionClaim) -> bool {
+        claim.requires_org_attestation_with_threshold(self.thresholds.org_attestation_threshold)
     }
 
     /// Check if a specific attester is eligible to attest a claim
@@ -409,7 +542,7 @@ impl ContributionValidator {
         let Some(context) = self.build_context(attester_did) else {
             return EligibilityStatus::InsufficientTrust(0.0);
         };
-        check_eligibility(attester_did, claim, &context)
+        check_eligibility_with_thresholds(attester_did, claim, &context, &self.thresholds)
     }
 
     /// Detect attestation rings (circular attestation patterns)
@@ -744,7 +877,8 @@ mod tests {
         assert_eq!(claim.resource_type, ResourceType::Compute);
         assert_eq!(claim.amount, 100);
         assert_eq!(claim.status, ClaimStatus::Pending);
-        assert!(!claim.requires_org_attestation());
+        // Use the non-deprecated API with explicit threshold.
+        assert!(!claim.requires_org_attestation_with_threshold(500));
     }
 
     #[test]
@@ -758,7 +892,7 @@ mod tests {
             1000,
         );
 
-        assert!(claim.requires_org_attestation());
+        assert!(claim.requires_org_attestation_with_threshold(500));
     }
 
     #[test]
@@ -815,12 +949,17 @@ mod tests {
 
         let context = EligibilityContext {
             trust_score: 0.5,
-            membership_age_secs: MIN_MEMBERSHIP_AGE_SECS + 1,
+            membership_age_secs: AttestationThresholds::default().min_membership_age_secs + 1,
             attestations_this_period: 0,
             attesters_of_attester: vec![],
         };
 
-        let result = check_eligibility(TEST_DID_CONTRIBUTOR, &claim, &context);
+        let result = check_eligibility_with_thresholds(
+            TEST_DID_CONTRIBUTOR,
+            &claim,
+            &context,
+            &AttestationThresholds::default(),
+        );
         assert_eq!(result, EligibilityStatus::SelfAttestationNotAllowed);
     }
 
@@ -837,12 +976,17 @@ mod tests {
 
         let context = EligibilityContext {
             trust_score: 0.2, // Below threshold
-            membership_age_secs: MIN_MEMBERSHIP_AGE_SECS + 1,
+            membership_age_secs: AttestationThresholds::default().min_membership_age_secs + 1,
             attestations_this_period: 0,
             attesters_of_attester: vec![],
         };
 
-        let result = check_eligibility(TEST_DID_ATTESTER, &claim, &context);
+        let result = check_eligibility_with_thresholds(
+            TEST_DID_ATTESTER,
+            &claim,
+            &context,
+            &AttestationThresholds::default(),
+        );
         assert!(matches!(result, EligibilityStatus::InsufficientTrust(_)));
     }
 
@@ -864,7 +1008,12 @@ mod tests {
             attesters_of_attester: vec![],
         };
 
-        let result = check_eligibility(TEST_DID_ATTESTER, &claim, &context);
+        let result = check_eligibility_with_thresholds(
+            TEST_DID_ATTESTER,
+            &claim,
+            &context,
+            &AttestationThresholds::default(),
+        );
         assert!(matches!(result, EligibilityStatus::InsufficientAge(_)));
     }
 
@@ -881,12 +1030,17 @@ mod tests {
 
         let context = EligibilityContext {
             trust_score: 0.5,
-            membership_age_secs: MIN_MEMBERSHIP_AGE_SECS + 1,
-            attestations_this_period: MAX_ATTESTATIONS_PER_PERIOD,
+            membership_age_secs: AttestationThresholds::default().min_membership_age_secs + 1,
+            attestations_this_period: AttestationThresholds::default().max_attestations_per_period,
             attesters_of_attester: vec![],
         };
 
-        let result = check_eligibility(TEST_DID_ATTESTER, &claim, &context);
+        let result = check_eligibility_with_thresholds(
+            TEST_DID_ATTESTER,
+            &claim,
+            &context,
+            &AttestationThresholds::default(),
+        );
         assert!(matches!(result, EligibilityStatus::BudgetExhausted(_)));
     }
 
@@ -903,13 +1057,18 @@ mod tests {
 
         let context = EligibilityContext {
             trust_score: 0.5,
-            membership_age_secs: MIN_MEMBERSHIP_AGE_SECS + 1,
+            membership_age_secs: AttestationThresholds::default().min_membership_age_secs + 1,
             attestations_this_period: 0,
             // Contributor has attested for the attester before
             attesters_of_attester: vec![TEST_DID_CONTRIBUTOR.to_string()],
         };
 
-        let result = check_eligibility(TEST_DID_ATTESTER, &claim, &context);
+        let result = check_eligibility_with_thresholds(
+            TEST_DID_ATTESTER,
+            &claim,
+            &context,
+            &AttestationThresholds::default(),
+        );
         assert_eq!(result, EligibilityStatus::ReciprocalNotAllowed);
     }
 
@@ -926,12 +1085,17 @@ mod tests {
 
         let context = EligibilityContext {
             trust_score: 0.5,
-            membership_age_secs: MIN_MEMBERSHIP_AGE_SECS + 1,
+            membership_age_secs: AttestationThresholds::default().min_membership_age_secs + 1,
             attestations_this_period: 5,
             attesters_of_attester: vec![TEST_DID_ATTESTER_2.to_string()], // Different DID
         };
 
-        let result = check_eligibility(TEST_DID_ATTESTER, &claim, &context);
+        let result = check_eligibility_with_thresholds(
+            TEST_DID_ATTESTER,
+            &claim,
+            &context,
+            &AttestationThresholds::default(),
+        );
         assert_eq!(result, EligibilityStatus::Eligible);
     }
 
@@ -964,11 +1128,12 @@ mod tests {
         trust_scores: std::collections::HashMap<String, f64>,
     ) -> ContributionValidator {
         let trust_scores_clone = trust_scores.clone();
-        ContributionValidator::new(
+        ContributionValidator::new_with_thresholds(
             Box::new(move |did| trust_scores_clone.get(did).copied()),
-            Box::new(|_| Some(MIN_MEMBERSHIP_AGE_SECS + 1)), // Always old enough
-            Box::new(|_| 0),                                 // No attestations yet
-            Box::new(|_| vec![]),                            // No attesters
+            Box::new(|_| Some(AttestationThresholds::default().min_membership_age_secs + 1)), // Always old enough
+            Box::new(|_| 0),      // No attestations yet
+            Box::new(|_| vec![]), // No attesters
+            AttestationThresholds::default(),
         )
     }
 
