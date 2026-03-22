@@ -13,6 +13,8 @@
 //! min_standing = 0.3           # Min trust standing to submit to commons pool
 //! min_trust_score = 0.1        # Min trust score for sybil admission
 //! fuel_cost_divisor = 1000     # Fuel units per credit (1 credit per N fuel)
+//! credit_ceiling = 5000        # Optional: max credits a submitter may spend (omit to disable)
+//! preemptable_priorities = ["ubs_first", "emergency_first"]  # Modes that allow preemption
 //!
 //! # Task result verification settings
 //! [compute.verification]
@@ -52,6 +54,20 @@ pub struct ComputePolicyConfig {
     /// Original hardcoded value: 1000
     #[serde(default = "default_fuel_cost_divisor")]
     pub fuel_cost_divisor: u64,
+
+    /// Credit ceiling for cost validation (in credit units).
+    /// Tasks whose estimated cost exceeds available credits are rejected.
+    /// `None` (default) disables ceiling enforcement.
+    #[serde(default)]
+    pub credit_ceiling: Option<i64>,
+
+    /// Charter priority modes that allow task preemption.
+    ///
+    /// When preemption is enabled and the active charter priority is in this list,
+    /// higher-priority tasks may interrupt running lower-priority tasks.
+    /// Default: `[ubs_first, emergency_first]` (previous hardcoded behavior).
+    #[serde(default = "default_preemptable_priorities")]
+    pub preemptable_priorities: Vec<icn_compute::CharterPriority>,
 }
 
 fn default_min_standing() -> f64 {
@@ -66,12 +82,21 @@ fn default_fuel_cost_divisor() -> u64 {
     1000
 }
 
+fn default_preemptable_priorities() -> Vec<icn_compute::CharterPriority> {
+    vec![
+        icn_compute::CharterPriority::UbsFirst,
+        icn_compute::CharterPriority::EmergencyFirst,
+    ]
+}
+
 impl Default for ComputePolicyConfig {
     fn default() -> Self {
         Self {
             min_standing: default_min_standing(),
             min_trust_score: default_min_trust_score(),
             fuel_cost_divisor: default_fuel_cost_divisor(),
+            credit_ceiling: None,
+            preemptable_priorities: default_preemptable_priorities(),
         }
     }
 }
@@ -327,5 +352,52 @@ low_value_threshold = 150
         // Consensus threshold should be between 0 and 1
         assert!(config.consensus_threshold > 0.0);
         assert!(config.consensus_threshold <= 1.0);
+    }
+
+    #[test]
+    fn test_compute_policy_config_defaults() {
+        let config = ComputePolicyConfig::default();
+        assert!((config.min_standing - 0.3).abs() < f64::EPSILON);
+        assert!((config.min_trust_score - 0.1).abs() < f64::EPSILON);
+        assert_eq!(config.fuel_cost_divisor, 1000);
+        assert!(config.credit_ceiling.is_none());
+        assert_eq!(config.preemptable_priorities.len(), 2);
+        assert!(config
+            .preemptable_priorities
+            .contains(&icn_compute::CharterPriority::UbsFirst));
+        assert!(config
+            .preemptable_priorities
+            .contains(&icn_compute::CharterPriority::EmergencyFirst));
+    }
+
+    #[test]
+    fn test_compute_policy_config_credit_ceiling_toml() {
+        let toml_str = r#"
+[policy]
+credit_ceiling = 5000
+"#;
+        let config: ComputeConfig = toml::from_str(toml_str).unwrap();
+        assert_eq!(config.policy.credit_ceiling, Some(5000));
+        // Other fields use defaults
+        assert!((config.policy.min_standing - 0.3).abs() < f64::EPSILON);
+        assert_eq!(config.policy.fuel_cost_divisor, 1000);
+    }
+
+    #[test]
+    fn test_compute_policy_config_preemptable_priorities_toml() {
+        let toml_str = r#"
+[policy]
+preemptable_priorities = ["emergency_first"]
+"#;
+        let config: ComputeConfig = toml::from_str(toml_str).unwrap();
+        assert_eq!(config.policy.preemptable_priorities.len(), 1);
+        assert!(config
+            .policy
+            .preemptable_priorities
+            .contains(&icn_compute::CharterPriority::EmergencyFirst));
+        assert!(!config
+            .policy
+            .preemptable_priorities
+            .contains(&icn_compute::CharterPriority::UbsFirst));
     }
 }
