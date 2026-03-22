@@ -10,6 +10,6 @@
 pub mod misbehavior;
 
 pub use misbehavior::{
-    MisbehaviorDetector, MisbehaviorStats, MisbehaviorThresholds, ReputationScore,
+    MisbehaviorDetector, MisbehaviorStats, MisbehaviorThresholds, ReputationScore, SeverityWeights,
     StorageFailureReason, TrustPenaltyCallback, Violation, ViolationRecord,
 };

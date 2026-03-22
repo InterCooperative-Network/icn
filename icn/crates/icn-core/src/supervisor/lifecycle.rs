@@ -251,6 +251,13 @@ async fn spawn_actors_with_identity(
     let recovery_store = trust_services.recovery_store.clone();
     let security_store = trust_services.security_store.clone();
 
+    // Apply reputation policy config (severity weights + penalty rate) from governance config.
+    {
+        let mut det = misbehavior_detector.write().await;
+        det.set_severity_weights(config.security.reputation.to_severity_weights());
+        det.set_penalty_rate(config.security.reputation.penalty_rate);
+    }
+
     // Initialize snapshot coordinator
     let snapshot_coordinator = super::init_snapshot::init_snapshot_coordinator(did.clone()).await?;
     info!("Snapshot coordinator initialized");
