@@ -77,6 +77,27 @@ impl std::fmt::Display for SybilRejection {
 
 impl std::error::Error for SybilRejection {}
 
+/// Configuration for stale participant expiry.
+///
+/// Participants whose `last_announce` is older than `max_age` are removed
+/// from the pool on the next [`CommonsPool::expire_stale`] call.
+///
+/// The default (300 seconds) matches a typical keep-alive interval of 60–120
+/// seconds with a 2–3× safety margin.
+#[derive(Debug, Clone)]
+pub struct StaleParticipantConfig {
+    /// Maximum age of a participant's last announce before they are evicted.
+    pub max_age: std::time::Duration,
+}
+
+impl Default for StaleParticipantConfig {
+    fn default() -> Self {
+        Self {
+            max_age: std::time::Duration::from_secs(300),
+        }
+    }
+}
+
 /// A node participating in the commons resource pool.
 #[derive(Debug, Clone)]
 pub struct CommonsParticipant {
@@ -97,10 +118,8 @@ pub struct CommonsParticipant {
     /// `SybilPolicy::commons_admission_min_trust` threshold.
     pub is_affiliated: bool,
     /// When we last heard from this node. In-memory only — not serialized,
-    /// not sent over the wire. Enables future stale-participant expiry
-    /// without migration.
-    // TODO(#964): Implement stale participant expiry using last_announce.
-    // Nodes not announcing for >5 minutes should be removed from the pool.
+    /// not sent over the wire. Used by [`CommonsPool::expire_stale`] to
+    /// remove participants that have gone silent.
     pub last_announce: Instant,
 }
 
@@ -234,6 +253,30 @@ impl CommonsPool {
     /// Iterate over all participants.
     pub fn participants(&self) -> impl Iterator<Item = &CommonsParticipant> {
         self.participants.values()
+    }
+
+    /// Remove participants that have not re-announced within `max_age`.
+    ///
+    /// Returns the DIDs of all removed participants. The caller should emit
+    /// a metric and log entry proportional to the count.
+    ///
+    /// Designed to be called inside `on_capacity_announce()` on each incoming
+    /// announce — piggybacking on the announce cadence avoids a background
+    /// timer for V1. Callers with more precise timing requirements may call
+    /// this on their own schedule.
+    ///
+    /// Idempotent: calling with `max_age = Duration::MAX` removes nothing.
+    pub fn expire_stale(&mut self, max_age: std::time::Duration) -> Vec<String> {
+        let stale: Vec<String> = self
+            .participants
+            .iter()
+            .filter(|(_, p)| p.last_announce.elapsed() > max_age)
+            .map(|(did, _)| did.clone())
+            .collect();
+        for did in &stale {
+            self.participants.remove(did);
+        }
+        stale
     }
 
     /// Compute the total commons-weighted capacity across all participants.
@@ -501,6 +544,63 @@ mod tests {
             })
         );
         assert!(!pool.contains("did:icn:affiliated-newcomer"));
+    }
+
+    // ─── expire_stale tests (#964) ───────────────────────────────────────────
+
+    /// Build a participant whose last_announce is `age_secs` seconds in the past.
+    fn make_stale_participant(did: &str, age_secs: u64) -> CommonsParticipant {
+        CommonsParticipant {
+            did: did.to_string(),
+            capacity: make_capacity(4.0, 8192, 50000),
+            budget: CapacityBudget {
+                commons_share: 1.0,
+                ..CapacityBudget::default()
+            },
+            trust_score: 0.5,
+            is_affiliated: false,
+            last_announce: Instant::now() - std::time::Duration::from_secs(age_secs),
+        }
+    }
+
+    #[test]
+    fn test_expire_stale_removes_old_participants() {
+        // Participants older than max_age are evicted; recent ones are retained.
+        let mut pool = CommonsPool::new();
+        pool.add_participant(make_stale_participant("did:icn:old", 400));
+        pool.add_participant(make_participant("did:icn:recent", 4.0, 8192, 50000, 1.0));
+
+        let expired = pool.expire_stale(std::time::Duration::from_secs(300));
+
+        assert_eq!(expired, vec!["did:icn:old".to_string()]);
+        assert_eq!(pool.participant_count(), 1);
+        assert!(!pool.contains("did:icn:old"));
+        assert!(pool.contains("did:icn:recent"));
+    }
+
+    #[test]
+    fn test_expire_stale_retains_all_when_none_stale() {
+        // When all participants announced recently, expire_stale removes nothing.
+        let mut pool = CommonsPool::new();
+        pool.add_participant(make_participant("did:icn:a", 4.0, 8192, 50000, 1.0));
+        pool.add_participant(make_participant("did:icn:b", 4.0, 8192, 50000, 1.0));
+
+        let expired = pool.expire_stale(std::time::Duration::from_secs(300));
+
+        assert!(expired.is_empty());
+        assert_eq!(pool.participant_count(), 2);
+    }
+
+    #[test]
+    fn test_expire_stale_duration_max_removes_nothing() {
+        // Duration::MAX is the "disabled" sentinel — idempotent, no evictions.
+        let mut pool = CommonsPool::new();
+        pool.add_participant(make_stale_participant("did:icn:ancient", 999_999));
+
+        let expired = pool.expire_stale(std::time::Duration::MAX);
+
+        assert!(expired.is_empty());
+        assert_eq!(pool.participant_count(), 1);
     }
 
     #[test]

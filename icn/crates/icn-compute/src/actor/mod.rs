@@ -107,6 +107,9 @@ pub struct ComputeActor {
     /// Commons resource pool for tracking nodes contributing to the commons (Epic 6 #946).
     /// Advisory scheduling state only — ledger is authoritative economic state.
     commons_pool: Arc<RwLock<crate::commons_pool::CommonsPool>>,
+    /// Maximum age before a commons pool participant is considered stale (#964).
+    /// None = expiry disabled (default). Set via `set_stale_participant_config()`.
+    stale_participant_max_age: Option<std::time::Duration>,
     /// Commons pool governance policy (E7 - #1134).
     /// When set, all task submissions are validated against this policy:
     /// standing checks, credit ceiling enforcement, and charter priority ordering.
@@ -163,6 +166,7 @@ impl ComputeActor {
             capacity_budget: Arc::new(RwLock::new(crate::scheduler::CapacityBudget::default())),
             demand_adjustment_config: crate::scheduler::DemandAdjustmentConfig::default(),
             commons_pool: Arc::new(RwLock::new(crate::commons_pool::CommonsPool::new())),
+            stale_participant_max_age: None,
             commons_pool_policy: None,
             balance_callback: None,
             commons_settlement_callback: None,
@@ -206,6 +210,18 @@ impl ComputeActor {
         self.commons_pool = Arc::new(RwLock::new(crate::commons_pool::CommonsPool::with_policy(
             policy,
         )));
+    }
+
+    /// Configure stale participant expiry for the commons pool (#964).
+    ///
+    /// When set, `on_capacity_announce` prunes participants whose
+    /// `last_announce` exceeds `config.max_age` before each new admission.
+    /// Disabled by default — participants accumulate until explicitly expired.
+    pub fn set_stale_participant_config(
+        &mut self,
+        config: crate::commons_pool::StaleParticipantConfig,
+    ) {
+        self.stale_participant_max_age = Some(config.max_age);
     }
 
     /// Set balance callback for commons credit ceiling enforcement (E7 - #1134).

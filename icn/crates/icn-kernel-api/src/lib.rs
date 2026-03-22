@@ -36,8 +36,8 @@ pub mod authz;
 pub mod bootstrap;
 pub mod budget;
 pub mod comms;
-pub mod container;
 pub mod compute;
+pub mod container;
 pub mod coord;
 pub mod economics;
 pub mod effects;
@@ -74,11 +74,10 @@ pub use budget::{
     BeginSpendOutcome, BudgetRecord, BudgetSpendError, BudgetStatus, BudgetStore, PendingSpend,
 };
 pub use comms::{PubSub, RequestResponse, Streams};
-pub use container::{
-    ContainerError, ContainerResult, ContainerRuntime, ContainerSpec, ResourceLimits,
-    ResourceUsage,
-};
 pub use compute::{ComputeEngine, DeterminismClass, Job, OperatorMode, PrivacyClass, Trigger};
+pub use container::{
+    ContainerError, ContainerResult, ContainerRuntime, ContainerSpec, ResourceLimits, ResourceUsage,
+};
 pub use coord::Coordination;
 pub use economics::{AssetType, DepreciationSchedule, SettlementIntent};
 pub use effects::{
