@@ -337,8 +337,8 @@ impl ReputationScore {
         self.score = (self.score - penalty).clamp(0.0, 1.0);
 
         // Update counters
-        self.total_violations += 1;
-        self.severity_points += severity;
+        self.total_violations = self.total_violations.saturating_add(1);
+        self.severity_points = self.severity_points.saturating_add(severity);
         self.last_violation = Some(SystemTime::now());
         self.updated_at = SystemTime::now();
 
