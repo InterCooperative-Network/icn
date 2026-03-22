@@ -23,6 +23,140 @@ pub struct LedgerConfig {
     /// Witness signature requirements for material transactions (Issue #676)
     #[serde(default)]
     pub witness: WitnessSettings,
+
+    /// Credit policy for dynamic credit limits based on trust + history
+    #[serde(default)]
+    pub credit: CreditPolicyConfig,
+
+    /// New member policy for initial credit throttling
+    #[serde(default)]
+    pub new_member: NewMemberPolicyConfig,
+}
+
+/// Configuration for dynamic credit limit calculation.
+///
+/// Controls how member credit limits are computed from trust score and
+/// cleared transaction history. All defaults match `CreditPolicy::conservative()`
+/// (the prior hardcoded production values) for zero-impact upgrade.
+///
+/// Config section: `[ledger.credit]`
+///
+/// ```toml
+/// [ledger.credit]
+/// baseline = 10000        # Base limit in smallest currency unit (100 hrs @ 2 decimals)
+/// trust_multiplier = 0.3  # Bonus fraction from trust score (0.0–1.0)
+/// history_bonus_rate = 0.05  # Bonus fraction from cleared volume
+/// currency = "hours"      # Currency this policy applies to
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreditPolicyConfig {
+    /// Base credit limit in smallest currency unit.
+    /// Default: 10_000 (100 hours assuming 2 decimal places).
+    #[serde(default = "default_credit_baseline")]
+    pub baseline: i64,
+
+    /// Multiplier for trust score (0.0–1.0).
+    /// Default: 0.3 — a fully trusted member gets 30% additional credit.
+    #[serde(default = "default_trust_multiplier")]
+    pub trust_multiplier: f64,
+
+    /// Fraction of cleared volume added as bonus credit.
+    /// Default: 0.05 — 5% of total cleared transactions.
+    #[serde(default = "default_history_bonus_rate")]
+    pub history_bonus_rate: f64,
+
+    /// Currency this policy applies to.
+    /// Default: "hours" (cooperative time credits).
+    #[serde(default = "default_credit_currency")]
+    pub currency: String,
+}
+
+fn default_credit_baseline() -> i64 {
+    10_000 // 100 hours (2 decimals)
+}
+
+fn default_trust_multiplier() -> f64 {
+    0.3
+}
+
+fn default_history_bonus_rate() -> f64 {
+    0.05
+}
+
+fn default_credit_currency() -> String {
+    "hours".to_string()
+}
+
+impl Default for CreditPolicyConfig {
+    fn default() -> Self {
+        Self {
+            baseline: default_credit_baseline(),
+            trust_multiplier: default_trust_multiplier(),
+            history_bonus_rate: default_history_bonus_rate(),
+            currency: default_credit_currency(),
+        }
+    }
+}
+
+/// Configuration for new member credit throttling.
+///
+/// New members start with conservative limits that ramp up over time or
+/// when they reach a cleared-volume contribution threshold.
+/// All defaults match `NewMemberPolicy::conservative()` for zero-impact upgrade.
+///
+/// Config section: `[ledger.new_member]`
+///
+/// ```toml
+/// [ledger.new_member]
+/// initial_limit = 1000          # Starting limit (10 hrs @ 2 decimals)
+/// ramp_period_days = 90         # Days to ramp to full limit
+/// cleared_volume_threshold = 5000  # Credits received to bypass ramp
+/// currency = "hours"
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NewMemberPolicyConfig {
+    /// Initial credit limit for brand-new members.
+    /// Default: 1_000 (10 hours assuming 2 decimal places).
+    #[serde(default = "default_initial_limit")]
+    pub initial_limit: i64,
+
+    /// Number of days over which credit ramps to the full limit.
+    /// Default: 90 days.
+    #[serde(default = "default_ramp_period_days")]
+    pub ramp_period_days: u64,
+
+    /// Minimum cleared volume (credits received) to bypass time-based ramping.
+    /// Default: 5_000 (50 hours assuming 2 decimal places).
+    #[serde(default = "default_cleared_volume_threshold")]
+    pub cleared_volume_threshold: i64,
+
+    /// Currency this policy applies to.
+    /// Default: "hours" (cooperative time credits).
+    #[serde(default = "default_credit_currency")]
+    pub currency: String,
+}
+
+fn default_initial_limit() -> i64 {
+    1_000 // 10 hours (2 decimals)
+}
+
+fn default_ramp_period_days() -> u64 {
+    90
+}
+
+fn default_cleared_volume_threshold() -> i64 {
+    5_000 // 50 hours (2 decimals)
+}
+
+impl Default for NewMemberPolicyConfig {
+    fn default() -> Self {
+        Self {
+            initial_limit: default_initial_limit(),
+            ramp_period_days: default_ramp_period_days(),
+            cleared_volume_threshold: default_cleared_volume_threshold(),
+            currency: default_credit_currency(),
+        }
+    }
 }
 
 /// Configuration for witness signatures on ledger entries
@@ -313,5 +447,61 @@ collection_timeout_secs = 600
         assert_eq!(config.oracle.default_ttl_secs, 3600);
         assert_eq!(config.witness.default_policy, "none");
         assert!(config.witness.threshold.is_none());
+    }
+
+    #[test]
+    fn test_credit_policy_config_defaults() {
+        let config = CreditPolicyConfig::default();
+        assert_eq!(config.baseline, 10_000);
+        assert!((config.trust_multiplier - 0.3).abs() < f64::EPSILON);
+        assert!((config.history_bonus_rate - 0.05).abs() < f64::EPSILON);
+        assert_eq!(config.currency, "hours");
+    }
+
+    #[test]
+    fn test_new_member_policy_config_defaults() {
+        let config = NewMemberPolicyConfig::default();
+        assert_eq!(config.initial_limit, 1_000);
+        assert_eq!(config.ramp_period_days, 90);
+        assert_eq!(config.cleared_volume_threshold, 5_000);
+        assert_eq!(config.currency, "hours");
+    }
+
+    #[test]
+    fn test_credit_policy_config_toml_roundtrip() {
+        let toml_str = r#"
+baseline = 50000
+trust_multiplier = 0.5
+history_bonus_rate = 0.15
+currency = "usd"
+"#;
+        let config: CreditPolicyConfig = toml::from_str(toml_str).unwrap();
+        assert_eq!(config.baseline, 50_000);
+        assert!((config.trust_multiplier - 0.5).abs() < f64::EPSILON);
+        assert!((config.history_bonus_rate - 0.15).abs() < f64::EPSILON);
+        assert_eq!(config.currency, "usd");
+    }
+
+    #[test]
+    fn test_new_member_policy_config_toml_roundtrip() {
+        let toml_str = r#"
+initial_limit = 2000
+ramp_period_days = 30
+cleared_volume_threshold = 10000
+currency = "credits"
+"#;
+        let config: NewMemberPolicyConfig = toml::from_str(toml_str).unwrap();
+        assert_eq!(config.initial_limit, 2_000);
+        assert_eq!(config.ramp_period_days, 30);
+        assert_eq!(config.cleared_volume_threshold, 10_000);
+        assert_eq!(config.currency, "credits");
+    }
+
+    #[test]
+    fn test_ledger_config_includes_credit_fields() {
+        let config = LedgerConfig::default();
+        assert_eq!(config.credit.baseline, 10_000);
+        assert_eq!(config.new_member.initial_limit, 1_000);
+        assert_eq!(config.new_member.ramp_period_days, 90);
     }
 }

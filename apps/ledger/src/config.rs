@@ -96,6 +96,51 @@ pub fn build_witness_config(
     })
 }
 
+/// Build an [`icn_ledger::CreditPolicyManager`] from primitive config values.
+///
+/// Takes the same primitive types stored in `icn-core` config structs, so
+/// the caller (icnd) does not need to import `icn_ledger` credit types directly.
+///
+/// # Arguments
+/// * `baseline` — base credit limit in smallest currency unit
+/// * `trust_multiplier` — bonus fraction from trust score (0.0–1.0)
+/// * `history_bonus_rate` — bonus fraction from cleared volume
+/// * `credit_currency` — currency identifier (e.g. "hours")
+/// * `initial_limit` — starting limit for new members
+/// * `ramp_period_days` — days over which credit ramps to full limit
+/// * `cleared_volume_threshold` — credits received to bypass time-based ramp
+/// * `new_member_currency` — currency identifier for new member policy
+// Eight args mirrors the 8 primitive config fields that map to CreditPolicy +
+// NewMemberPolicy. A struct would require importing icn-core types here, which
+// violates the "no kernel-config imports in app crates" convention.
+#[allow(clippy::too_many_arguments)]
+pub fn build_credit_policy_manager(
+    baseline: i64,
+    trust_multiplier: f64,
+    history_bonus_rate: f64,
+    credit_currency: String,
+    initial_limit: i64,
+    ramp_period_days: u64,
+    cleared_volume_threshold: i64,
+    new_member_currency: String,
+) -> icn_ledger::CreditPolicyManager {
+    use std::time::Duration;
+    const SECONDS_PER_DAY: u64 = 86_400;
+    let credit_policy = icn_ledger::CreditPolicy::new(
+        baseline,
+        trust_multiplier,
+        history_bonus_rate,
+        credit_currency,
+    );
+    let new_member_policy = icn_ledger::NewMemberPolicy::new(
+        initial_limit,
+        Duration::from_secs(ramp_period_days * SECONDS_PER_DAY),
+        cleared_volume_threshold,
+        new_member_currency,
+    );
+    icn_ledger::CreditPolicyManager::new(credit_policy, new_member_policy)
+}
+
 /// Build an [`icn_ledger::oracle::OracleConfig`] from primitive config values.
 ///
 /// All parameters are primitives so the caller (icnd) does not need to

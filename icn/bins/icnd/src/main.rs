@@ -230,12 +230,23 @@ async fn build_services(
         config.ledger.witness.min_witness_trust,
     )
     .context("Invalid witness configuration")?;
+    let credit_manager = icn_ledger_app::config::build_credit_policy_manager(
+        config.ledger.credit.baseline,
+        config.ledger.credit.trust_multiplier,
+        config.ledger.credit.history_bonus_rate,
+        config.ledger.credit.currency.clone(),
+        config.ledger.new_member.initial_limit,
+        config.ledger.new_member.ramp_period_days,
+        config.ledger.new_member.cleared_volume_threshold,
+        config.ledger.new_member.currency.clone(),
+    );
     let ledger_services = icn_ledger_app::init::init_ledger_services(
         ledger_handle.clone(),
         ledger_store.clone(),
         own_did.clone(),
         oracle_config,
         witness_config,
+        credit_manager,
     )
     .await
     .context("Failed to initialize ledger services")?;
