@@ -328,9 +328,13 @@ impl ReputationScore {
             }
         }
 
+        // Clamp penalty_rate to a non-negative range to preserve score invariants
+        // even under misconfiguration (e.g. a negative or >1.0 configured value).
+        let clamped_penalty_rate = penalty_rate.clamp(0.0, 1.0);
+
         // Apply penalty: severity_points * penalty_rate reduces the score
-        let penalty = severity as f64 * penalty_rate;
-        self.score = (self.score - penalty).max(0.0);
+        let penalty = severity as f64 * clamped_penalty_rate;
+        self.score = (self.score - penalty).clamp(0.0, 1.0);
 
         // Update counters
         self.total_violations += 1;
@@ -2004,7 +2008,7 @@ mod tests {
 
         assert!(
             score_heavy < score_default,
-            "Heavier critical weight must produce lower reputation score: {} < {}",
+            "Heavier minor weight must produce lower reputation score: {} < {}",
             score_heavy,
             score_default
         );
