@@ -159,22 +159,28 @@ mod tests {
 
     #[test]
     fn test_contribution_attestation_config_validate_bad_trust() {
-        let mut cfg = ContributionAttestationConfig::default();
-        cfg.min_trust_to_attest = 1.5;
+        let cfg = ContributionAttestationConfig {
+            min_trust_to_attest: 1.5,
+            ..Default::default()
+        };
         assert!(cfg.validate().is_err());
     }
 
     #[test]
     fn test_contribution_attestation_config_validate_zero_max_attestations() {
-        let mut cfg = ContributionAttestationConfig::default();
-        cfg.max_attestations_per_period = 0;
+        let cfg = ContributionAttestationConfig {
+            max_attestations_per_period: 0,
+            ..Default::default()
+        };
         assert!(cfg.validate().is_err());
     }
 
     #[test]
     fn test_contribution_attestation_config_validate_zero_org_threshold() {
-        let mut cfg = ContributionAttestationConfig::default();
-        cfg.org_attestation_threshold = 0;
+        let cfg = ContributionAttestationConfig {
+            org_attestation_threshold: 0,
+            ..Default::default()
+        };
         assert!(cfg.validate().is_err());
     }
 
