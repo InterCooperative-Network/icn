@@ -69,36 +69,42 @@
       "id": "s23-t8",
       "title": "Publish current platform baseline",
       "track": "C",
-      "status": "pending",
+      "status": "done",
       "artifact": "docs/state/ICN-Platform-Baseline-2026-03.md",
       "depends_on": [
         "s23-t1",
         "s23-t2",
         "s23-t3",
         "s23-t4"
-      ]
+      ],
+      "completed_date": "2026-03-22",
+      "commit": "20e05271"
     },
     {
       "id": "s23-t9",
       "title": "Roadmap + sprint-state refresh",
       "track": "C",
-      "status": "pending",
+      "status": "done",
       "artifact": "docs/strategy/ICN-Roadmap-Live.md",
       "depends_on": [
         "s23-t4",
         "s23-t7"
-      ]
+      ],
+      "completed_date": "2026-03-22",
+      "commit": "7005034b"
     },
     {
       "id": "s23-t10",
       "title": "Validate and document canonical demo path",
       "track": "C",
-      "status": "pending",
+      "status": "done",
       "artifact": "docs/state/demo-path-2026-03.md",
       "depends_on": [
         "s23-t5",
         "s23-t6"
-      ]
+      ],
+      "completed_date": "2026-03-22",
+      "commit": "2dbe9950"
     }
   ]
 }
