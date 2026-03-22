@@ -949,7 +949,7 @@ mod tests {
 
         let context = EligibilityContext {
             trust_score: 0.5,
-            membership_age_secs: MIN_MEMBERSHIP_AGE_SECS + 1,
+            membership_age_secs: AttestationThresholds::default().min_membership_age_secs + 1,
             attestations_this_period: 0,
             attesters_of_attester: vec![],
         };
@@ -976,7 +976,7 @@ mod tests {
 
         let context = EligibilityContext {
             trust_score: 0.2, // Below threshold
-            membership_age_secs: MIN_MEMBERSHIP_AGE_SECS + 1,
+            membership_age_secs: AttestationThresholds::default().min_membership_age_secs + 1,
             attestations_this_period: 0,
             attesters_of_attester: vec![],
         };
@@ -1030,8 +1030,8 @@ mod tests {
 
         let context = EligibilityContext {
             trust_score: 0.5,
-            membership_age_secs: MIN_MEMBERSHIP_AGE_SECS + 1,
-            attestations_this_period: MAX_ATTESTATIONS_PER_PERIOD,
+            membership_age_secs: AttestationThresholds::default().min_membership_age_secs + 1,
+            attestations_this_period: AttestationThresholds::default().max_attestations_per_period,
             attesters_of_attester: vec![],
         };
 
@@ -1057,7 +1057,7 @@ mod tests {
 
         let context = EligibilityContext {
             trust_score: 0.5,
-            membership_age_secs: MIN_MEMBERSHIP_AGE_SECS + 1,
+            membership_age_secs: AttestationThresholds::default().min_membership_age_secs + 1,
             attestations_this_period: 0,
             // Contributor has attested for the attester before
             attesters_of_attester: vec![TEST_DID_CONTRIBUTOR.to_string()],
@@ -1085,7 +1085,7 @@ mod tests {
 
         let context = EligibilityContext {
             trust_score: 0.5,
-            membership_age_secs: MIN_MEMBERSHIP_AGE_SECS + 1,
+            membership_age_secs: AttestationThresholds::default().min_membership_age_secs + 1,
             attestations_this_period: 5,
             attesters_of_attester: vec![TEST_DID_ATTESTER_2.to_string()], // Different DID
         };
