@@ -467,6 +467,20 @@ impl MisbehaviorDetector {
         self.thresholds.penalty_rate = rate;
     }
 
+    /// Set the maximum violations per peer per hour before auto-quarantine.
+    ///
+    /// Default: 10. Must be called at startup if non-default value is configured.
+    pub fn set_max_violations_per_hour(&mut self, n: usize) {
+        self.thresholds.max_violations_per_hour = n;
+    }
+
+    /// Set how long violation history is retained in seconds.
+    ///
+    /// Default: 604800 (7 days). Must be called at startup if non-default value is configured.
+    pub fn set_violation_retention_secs(&mut self, secs: u64) {
+        self.thresholds.violation_retention_secs = secs;
+    }
+
     /// Set the TrustService for reporting violations to the trust subsystem.
     ///
     /// This is the preferred way to integrate with the trust layer, replacing

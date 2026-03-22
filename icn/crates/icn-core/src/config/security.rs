@@ -12,6 +12,8 @@
 //! storage_suspicious_severity = 5 # Severity for data/challenge mismatches
 //! storage_missing_severity = 3   # Severity for content-not-found responses
 //! storage_timeout_severity = 1   # Severity for timeouts/expired challenges
+//! max_violations_per_hour = 10   # Violations per peer per hour before auto-quarantine
+//! violation_retention_secs = 604800  # How long to keep violation history (7 days)
 //! ```
 
 use serde::{Deserialize, Serialize};
@@ -69,6 +71,16 @@ pub struct ReputationPolicyConfig {
     /// Severity weight for storage timeouts and expired challenges.
     #[serde(default = "default_storage_timeout_severity")]
     pub storage_timeout_severity: u32,
+
+    /// Violations per peer per hour before auto-quarantine.
+    /// Governance decision: lower = stricter, higher = more lenient.
+    #[serde(default = "default_max_violations_per_hour")]
+    pub max_violations_per_hour: usize,
+
+    /// How long to keep violation history in seconds.
+    /// Default: 604800 (7 days). Longer retention uses more memory.
+    #[serde(default = "default_violation_retention_secs")]
+    pub violation_retention_secs: u64,
 }
 
 impl Default for ReputationPolicyConfig {
@@ -82,6 +94,8 @@ impl Default for ReputationPolicyConfig {
             storage_suspicious_severity: default_storage_suspicious_severity(),
             storage_missing_severity: default_storage_missing_severity(),
             storage_timeout_severity: default_storage_timeout_severity(),
+            max_violations_per_hour: default_max_violations_per_hour(),
+            violation_retention_secs: default_violation_retention_secs(),
         }
     }
 }
@@ -118,6 +132,14 @@ fn default_storage_timeout_severity() -> u32 {
     1
 }
 
+fn default_max_violations_per_hour() -> usize {
+    10
+}
+
+fn default_violation_retention_secs() -> u64 {
+    7 * 24 * 3600 // 7 days
+}
+
 impl ReputationPolicyConfig {
     /// Convert to `icn_security::SeverityWeights` for use in `MisbehaviorDetector`.
     pub fn to_severity_weights(&self) -> icn_security::SeverityWeights {
@@ -148,6 +170,8 @@ mod tests {
         assert_eq!(config.storage_suspicious_severity, 5);
         assert_eq!(config.storage_missing_severity, 3);
         assert_eq!(config.storage_timeout_severity, 1);
+        assert_eq!(config.max_violations_per_hour, 10);
+        assert_eq!(config.violation_retention_secs, 7 * 24 * 3600);
     }
 
     #[test]
@@ -170,6 +194,7 @@ mod tests {
                 storage_suspicious_severity: 8,
                 storage_missing_severity: 4,
                 storage_timeout_severity: 2,
+                ..Default::default()
             },
         };
 
@@ -193,6 +218,20 @@ penalty_rate = 0.10
         // Remaining fields use defaults
         assert_eq!(config.reputation.critical_severity, 10);
         assert_eq!(config.reputation.minor_severity, 1);
+        assert_eq!(config.reputation.max_violations_per_hour, 10);
+        assert_eq!(config.reputation.violation_retention_secs, 7 * 24 * 3600);
+    }
+
+    #[test]
+    fn test_security_config_threshold_fields_roundtrip() {
+        let toml_str = r#"
+[reputation]
+max_violations_per_hour = 5
+violation_retention_secs = 86400
+"#;
+        let config: SecurityConfig = toml::from_str(toml_str).unwrap();
+        assert_eq!(config.reputation.max_violations_per_hour, 5);
+        assert_eq!(config.reputation.violation_retention_secs, 86400);
     }
 
     #[test]
@@ -219,6 +258,7 @@ penalty_rate = 0.10
             storage_suspicious_severity: 8,
             storage_missing_severity: 4,
             storage_timeout_severity: 2,
+            ..Default::default()
         };
         let weights = config.to_severity_weights();
         assert_eq!(weights.critical, 20);
