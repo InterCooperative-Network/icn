@@ -16,14 +16,25 @@ use crate::scheduler::{CapacityBudget, NodeCapacity};
 
 /// Sybil resistance policy for commons pool participation.
 ///
-/// Gates admission to the commons pool based on trust score and
-/// proof-of-personhood level. Without these checks, an attacker
-/// could spin up many low-trust nodes to dilute or farm the pool.
+/// Two-tier trust threshold:
+/// - **Affiliated nodes** (with `cell_id`) are held to `min_trust_score`
+///   (default 0.1). Org membership implies accountability; a higher bar
+///   prevents low-quality nodes from diluting cell-endorsed capacity.
+/// - **Unaffiliated nodes** (no `cell_id`) are admitted under
+///   `commons_admission_min_trust` (default 0.0). The commons is
+///   open-participation by design. Trust score still influences scheduling
+///   priority — it just does not gate admission for unaffiliated nodes.
+///
+/// `max_participants` caps the pool for both paths (spam guard).
 #[derive(Debug, Clone)]
 pub struct SybilPolicy {
-    /// Minimum trust score required to join the commons pool (0.0–1.0).
-    /// Nodes below this threshold are rejected.
+    /// Minimum trust score for **affiliated** nodes (with cell_id) to join.
+    /// Default: 0.1. Nodes below this threshold are rejected.
     pub min_trust_score: f64,
+    /// Minimum trust score for **unaffiliated** nodes (no cell_id) to join.
+    /// Default: 0.0 — any node may attempt commons participation.
+    /// Set higher on curated networks that require prior trust relationships.
+    pub commons_admission_min_trust: f64,
     /// Maximum number of participants in the pool.
     /// Prevents unbounded growth from sybil flooding.
     pub max_participants: usize,
@@ -33,6 +44,7 @@ impl Default for SybilPolicy {
     fn default() -> Self {
         Self {
             min_trust_score: 0.1,
+            commons_admission_min_trust: 0.0,
             max_participants: 10_000,
         }
     }
@@ -78,10 +90,16 @@ pub struct CommonsParticipant {
     /// Used for sybil resistance: participants below the policy threshold
     /// are rejected.
     pub trust_score: f64,
+    /// Whether this node has a cell affiliation (cell_id was Some on announce).
+    ///
+    /// Affiliated nodes are held to `SybilPolicy::min_trust_score`.
+    /// Unaffiliated nodes are admitted under the lower
+    /// `SybilPolicy::commons_admission_min_trust` threshold.
+    pub is_affiliated: bool,
     /// When we last heard from this node. In-memory only — not serialized,
     /// not sent over the wire. Enables future stale-participant expiry
     /// without migration.
-    // TODO(#925): Implement stale participant expiry using last_announce.
+    // TODO(#964): Implement stale participant expiry using last_announce.
     // Nodes not announcing for >5 minutes should be removed from the pool.
     pub last_announce: Instant,
 }
@@ -146,7 +164,9 @@ impl CommonsPool {
     /// Add a participant after validating against the sybil policy.
     ///
     /// Returns `Err(SybilRejection)` if the participant fails checks:
-    /// - Trust score below `min_trust_score` (both new and existing)
+    /// - Trust score below the applicable threshold (both new and existing):
+    ///   - Affiliated nodes: `min_trust_score` (default 0.1)
+    ///   - Unaffiliated nodes: `commons_admission_min_trust` (default 0.0)
     /// - Pool at `max_participants` capacity (new participants only)
     ///
     /// Existing participants whose trust drops below threshold are
@@ -159,13 +179,23 @@ impl CommonsPool {
     ) -> Result<(), SybilRejection> {
         let is_existing = self.participants.contains_key(&participant.did);
 
+        // Select the trust threshold based on affiliation.
+        // Affiliated nodes (with a cell_id) are held to the higher bar.
+        // Unaffiliated nodes use the lower commons admission threshold so
+        // that a new node with zero trust-graph history can still participate.
+        let min_trust = if participant.is_affiliated {
+            self.sybil_policy.min_trust_score
+        } else {
+            self.sybil_policy.commons_admission_min_trust
+        };
+
         // Trust score check applies to both new and existing participants.
-        // A participant whose trust drops below threshold is evicted on
+        // A participant whose trust drops below their threshold is evicted on
         // next announce rather than silently remaining.
-        if participant.trust_score < self.sybil_policy.min_trust_score {
+        if participant.trust_score < min_trust {
             return Err(SybilRejection::InsufficientTrust {
                 score: participant.trust_score,
-                required: self.sybil_policy.min_trust_score,
+                required: min_trust,
             });
         }
 
@@ -276,6 +306,7 @@ mod tests {
                 ..CapacityBudget::default()
             },
             trust_score: 0.5,
+            is_affiliated: false,
             last_announce: Instant::now(),
         }
     }
@@ -349,6 +380,7 @@ mod tests {
                 ..CapacityBudget::default()
             },
             trust_score,
+            is_affiliated: true,
             last_announce: Instant::now(),
         }
     }
@@ -357,6 +389,7 @@ mod tests {
     fn test_sybil_rejects_low_trust() {
         let policy = SybilPolicy {
             min_trust_score: 0.2,
+            commons_admission_min_trust: 0.0,
             max_participants: 100,
         };
         let mut pool = CommonsPool::with_policy(policy);
@@ -377,6 +410,7 @@ mod tests {
     fn test_sybil_accepts_sufficient_trust() {
         let policy = SybilPolicy {
             min_trust_score: 0.2,
+            commons_admission_min_trust: 0.0,
             max_participants: 100,
         };
         let mut pool = CommonsPool::with_policy(policy);
@@ -390,6 +424,7 @@ mod tests {
     fn test_sybil_rejects_pool_full() {
         let policy = SybilPolicy {
             min_trust_score: 0.0,
+            commons_admission_min_trust: 0.0,
             max_participants: 2,
         };
         let mut pool = CommonsPool::with_policy(policy);
@@ -408,6 +443,7 @@ mod tests {
     fn test_sybil_allows_existing_participant_update() {
         let policy = SybilPolicy {
             min_trust_score: 0.0,
+            commons_admission_min_trust: 0.0,
             max_participants: 1,
         };
         let mut pool = CommonsPool::with_policy(policy);
@@ -422,9 +458,56 @@ mod tests {
     }
 
     #[test]
+    fn test_unaffiliated_zero_trust_admitted() {
+        // Acceptance criterion #1 (#947): unaffiliated node with 0.0 trust joins
+        // the commons pool under default SybilPolicy (commons_admission_min_trust = 0.0).
+        let mut pool = CommonsPool::new();
+        let participant = CommonsParticipant {
+            did: "did:icn:newcomer".to_string(),
+            capacity: make_capacity(4.0, 8192, 50000),
+            budget: CapacityBudget {
+                commons_share: 1.0,
+                ..CapacityBudget::default()
+            },
+            trust_score: 0.0,
+            is_affiliated: false,
+            last_announce: Instant::now(),
+        };
+        assert!(pool.try_add_participant(participant).is_ok());
+        assert!(pool.contains("did:icn:newcomer"));
+    }
+
+    #[test]
+    fn test_affiliated_zero_trust_rejected() {
+        // Acceptance criterion #4 (#947): affiliated node with 0.0 trust is still
+        // rejected by the default affiliated threshold (min_trust_score = 0.1).
+        let mut pool = CommonsPool::new();
+        let participant = CommonsParticipant {
+            did: "did:icn:affiliated-newcomer".to_string(),
+            capacity: make_capacity(4.0, 8192, 50000),
+            budget: CapacityBudget {
+                commons_share: 0.1,
+                ..CapacityBudget::default()
+            },
+            trust_score: 0.0,
+            is_affiliated: true,
+            last_announce: Instant::now(),
+        };
+        assert_eq!(
+            pool.try_add_participant(participant),
+            Err(SybilRejection::InsufficientTrust {
+                score: 0.0,
+                required: 0.1,
+            })
+        );
+        assert!(!pool.contains("did:icn:affiliated-newcomer"));
+    }
+
+    #[test]
     fn test_sybil_evicts_on_trust_drop() {
         let policy = SybilPolicy {
             min_trust_score: 0.2,
+            commons_admission_min_trust: 0.0,
             max_participants: 100,
         };
         let mut pool = CommonsPool::with_policy(policy);

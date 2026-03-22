@@ -762,6 +762,7 @@ impl ComputeActor {
                 capacity,
                 budget: effective_budget,
                 trust_score,
+                is_affiliated: cell_id.is_some(),
                 last_announce: std::time::Instant::now(),
             };
             let mut pool = self.commons_pool.write().await;
