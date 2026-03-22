@@ -415,54 +415,21 @@ jobs:
     name: Test Coverage
     needs: [changes]
     if: needs.changes.outputs.docs_only != 'true'
-    timeout-minutes: 45
-    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    runs-on: [self-hosted, linux, x64, coverage]
     steps:
       - uses: actions/checkout@v6
 
-      - name: Free disk space
-        uses: ./.github/actions/free-disk-space
-        with:
-          verbose: 'true'
-          aggressive: 'true'
-
-      - name: Install build tools
-        uses: ./.github/actions/install-build-tools
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      # NOTE: No rust-cache for coverage job - tarpaulin needs fresh instrumented
-      # builds anyway, and the cache just wastes disk space
-
-      - name: Install cargo-tarpaulin
-        run: cargo install cargo-tarpaulin --locked
-
-      - name: Pre-tarpaulin cleanup
-        run: |
-          echo "Additional disk cleanup for coverage job..."
-          
-          # Remove cargo caches to free space (tarpaulin downloads what it needs)
-          # These are safe to remove - they're user-level caches, not system files
-          rm -rf ~/.cargo/registry/cache || true
-          rm -rf ~/.cargo/git/db || true
-          
-          # Show remaining space
-          echo "Disk space before tarpaulin:"
-          df -h /
-
       - name: Generate coverage
-        run: cargo tarpaulin --workspace --timeout 300 --out Xml --output-dir ./coverage
+        run: cargo llvm-cov --workspace --lcov --output-path ./lcov.info
         working-directory: ./icn
-        continue-on-error: ${{ env.GATE_RATCHET_PHASE_COVERAGE != 'blocking' }}  # Tarpaulin can have spurious failures even when tests pass
+        continue-on-error: ${{ env.GATE_RATCHET_PHASE_COVERAGE != 'blocking' }}
 
       - name: Upload coverage to Codecov
-        # Only upload if tarpaulin actually produced the report.
-        # When tarpaulin crashes (continue-on-error above), the XML may not exist;
-        # Codecov treating a missing file as a hard failure defeats the non-blocking intent.
-        if: hashFiles('./icn/coverage/cobertura.xml') != ''
+        if: hashFiles('./icn/lcov.info') != ''
         uses: codecov/codecov-action@v5
         with:
-          files: ./icn/coverage/cobertura.xml
+          files: ./icn/lcov.info
           fail_ci_if_error: false
 
   security:
