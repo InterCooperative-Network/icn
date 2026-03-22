@@ -416,6 +416,19 @@ impl ComputeActor {
         self.resource_refresh_config = config;
     }
 
+    /// Returns a cloned Arc to the internal commons pool.
+    ///
+    /// Test-only: allows integration tests to inspect pool state after driving
+    /// messages through the actor, without adding a production observability API.
+    /// Named `_for_test` to signal intent; kept `#[doc(hidden)]` to suppress
+    /// documentation but still compile in integration test binaries.
+    #[doc(hidden)]
+    pub fn commons_pool_for_test(
+        &self,
+    ) -> std::sync::Arc<tokio::sync::RwLock<crate::commons_pool::CommonsPool>> {
+        std::sync::Arc::clone(&self.commons_pool)
+    }
+
     /// Spawn the actor and return a handle
     pub fn spawn(self) -> ComputeHandle {
         let (tx, mut rx) = mpsc::channel::<ComputeCommand>(256);
