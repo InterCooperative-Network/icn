@@ -96,45 +96,103 @@ pub enum StorageFailureReason {
     Expired,
 }
 
+/// Per-violation-type severity weights.
+///
+/// These values encode governance decisions about how severely each violation class
+/// should penalize a peer's reputation. Different cooperatives running different risk
+/// profiles should be able to adjust these without recompiling.
+///
+/// Default values match the original hardcoded constants.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SeverityWeights {
+    /// Critical violations (provably malicious): equivocation, replay attacks.
+    /// Default: 10
+    pub critical: u32,
+    /// Major violations (likely malicious): compute forgery, invalid signatures.
+    /// Default: 5
+    pub major: u32,
+    /// Minor violations (possibly accidental): spam, resource abuse.
+    /// Default: 1
+    pub minor: u32,
+    /// Storage: cryptographic proof failure (almost certainly malicious).
+    /// Default: 8
+    pub storage_invalid: u32,
+    /// Storage: data mismatch or challenge mismatch (likely intentional).
+    /// Default: 5
+    pub storage_suspicious: u32,
+    /// Storage: content not found (concerning but ambiguous).
+    /// Default: 3
+    pub storage_missing: u32,
+    /// Storage: network timeout or expired challenge (might be transient).
+    /// Default: 1
+    pub storage_timeout: u32,
+}
+
+impl Default for SeverityWeights {
+    fn default() -> Self {
+        Self {
+            critical: 10,
+            major: 5,
+            minor: 1,
+            storage_invalid: 8,
+            storage_suspicious: 5,
+            storage_missing: 3,
+            storage_timeout: 1,
+        }
+    }
+}
+
 impl Violation {
-    /// Get a severity score for this violation type
+    /// Get a severity score for this violation type using default hardcoded weights.
     /// Higher score = more severe
     pub fn severity(&self) -> u32 {
+        self.severity_with_weights(&SeverityWeights::default())
+    }
+
+    /// Get a severity score using governance-configured weights.
+    pub fn severity_with_weights(&self, weights: &SeverityWeights) -> u32 {
         match self {
-            // Critical violations (10 points) - clear malicious intent
-            Violation::ConflictingLedgerEntries { .. } => 10,
-            Violation::ConflictingSignedStatements { .. } => 10,
-            Violation::ReplayAttack { .. } => 10,
+            // Critical violations — clear malicious intent
+            Violation::ConflictingLedgerEntries { .. } => weights.critical,
+            Violation::ConflictingSignedStatements { .. } => weights.critical,
+            Violation::ReplayAttack { .. } => weights.critical,
 
-            // Major violations (5 points) - likely malicious
-            Violation::FailedComputeVerification { .. } => 5,
-            Violation::InvalidSignature { .. } => 5,
+            // Major violations — likely malicious
+            Violation::FailedComputeVerification { .. } => weights.major,
+            Violation::InvalidSignature { .. } => weights.major,
 
-            // Minor violations (1 point) - might be accidental
-            Violation::ExcessiveResourceUse { .. } => 1,
-            Violation::TrustGraphSpam { .. } => 1,
+            // Minor violations — might be accidental
+            Violation::ExcessiveResourceUse { .. } => weights.minor,
+            Violation::TrustGraphSpam { .. } => weights.minor,
 
-            // Storage violations (variable severity based on reason)
-            Violation::FailedStorageChallenge { reason, .. } => reason.severity(),
+            // Storage violations — variable severity based on reason
+            Violation::FailedStorageChallenge { reason, .. } => {
+                reason.severity_with_weights(weights)
+            }
         }
     }
 }
 
 impl StorageFailureReason {
-    /// Get severity score for this failure type
+    /// Get severity score for this failure type using default hardcoded weights.
     pub fn severity(&self) -> u32 {
+        self.severity_with_weights(&SeverityWeights::default())
+    }
+
+    /// Get severity score using governance-configured weights.
+    pub fn severity_with_weights(&self, weights: &SeverityWeights) -> u32 {
         match self {
-            // Network/timing issues - might be temporary
-            StorageFailureReason::NoResponse => 1,
-            StorageFailureReason::Expired => 1,
-            // Data issues - concerning
-            StorageFailureReason::ContentNotFound => 3,
+            // Network/timing issues — might be temporary
+            StorageFailureReason::NoResponse => weights.storage_timeout,
+            StorageFailureReason::Expired => weights.storage_timeout,
+            // Data issues — concerning
+            StorageFailureReason::ContentNotFound => weights.storage_missing,
             // Likely intentional misbehavior
-            StorageFailureReason::DataMismatch => 5,
-            StorageFailureReason::ChallengeMismatch => 5,
+            StorageFailureReason::DataMismatch => weights.storage_suspicious,
+            StorageFailureReason::ChallengeMismatch => weights.storage_suspicious,
             // Almost certainly malicious
-            StorageFailureReason::InvalidMerkleProof => 8,
-            StorageFailureReason::InvalidSignature => 8,
+            StorageFailureReason::InvalidMerkleProof => weights.storage_invalid,
+            StorageFailureReason::InvalidSignature => weights.storage_invalid,
         }
     }
 
@@ -255,10 +313,13 @@ impl ReputationScore {
         }
     }
 
-    /// Apply a violation penalty
-    pub fn apply_penalty(&mut self, violation: &Violation, decay_rate: f64) {
-        let severity = violation.severity();
-
+    /// Apply a violation penalty.
+    ///
+    /// `severity`: pre-computed severity points (use `Violation::severity_with_weights()` for
+    ///   governance-configured weights, or `Violation::severity()` for defaults).
+    /// `decay_rate`: score recovery per hour (from `MisbehaviorThresholds.decay_rate`).
+    /// `penalty_rate`: fraction of score lost per severity point (from `MisbehaviorThresholds.penalty_rate`).
+    pub fn apply_penalty(&mut self, severity: u32, decay_rate: f64, penalty_rate: f64) {
         // Decay existing score based on time since last violation
         if let Some(last) = self.last_violation {
             if let Ok(elapsed) = SystemTime::now().duration_since(last) {
@@ -267,13 +328,17 @@ impl ReputationScore {
             }
         }
 
-        // Apply penalty (severity directly reduces score)
-        let penalty = severity as f64 * 0.05; // 5% per severity point
-        self.score = (self.score - penalty).max(0.0);
+        // Clamp penalty_rate to a non-negative range to preserve score invariants
+        // even under misconfiguration (e.g. a negative or >1.0 configured value).
+        let clamped_penalty_rate = penalty_rate.clamp(0.0, 1.0);
+
+        // Apply penalty: severity_points * penalty_rate reduces the score
+        let penalty = severity as f64 * clamped_penalty_rate;
+        self.score = (self.score - penalty).clamp(0.0, 1.0);
 
         // Update counters
-        self.total_violations += 1;
-        self.severity_points += severity;
+        self.total_violations = self.total_violations.saturating_add(1);
+        self.severity_points = self.severity_points.saturating_add(severity);
         self.last_violation = Some(SystemTime::now());
         self.updated_at = SystemTime::now();
 
@@ -317,6 +382,11 @@ pub struct MisbehaviorThresholds {
 
     /// How long to keep violation history (seconds)
     pub violation_retention_secs: u64,
+
+    /// Penalty per severity point as a fraction of the score (0.0–1.0).
+    /// Default: 0.05 (5% per severity point — a critical violation costs 50% score).
+    /// Governance decision: adjust for cooperative risk tolerance.
+    pub penalty_rate: f64,
 }
 
 impl Default for MisbehaviorThresholds {
@@ -327,6 +397,7 @@ impl Default for MisbehaviorThresholds {
             max_violations_per_hour: 10,
             decay_rate: 0.01,                        // 1% per hour
             violation_retention_secs: 7 * 24 * 3600, // 7 days
+            penalty_rate: 0.05,                      // 5% per severity point
         }
     }
 }
@@ -346,8 +417,11 @@ pub struct MisbehaviorDetector {
     /// Reputation scores per DID
     reputation_scores: HashMap<Did, ReputationScore>,
 
-    /// Detection thresholds
+    /// Detection thresholds (including configurable penalty_rate)
     thresholds: MisbehaviorThresholds,
+
+    /// Per-violation-type severity weights (governance-configured)
+    severity_weights: SeverityWeights,
 
     /// Quarantined DIDs
     quarantined: HashMap<Did, SystemTime>,
@@ -369,11 +443,28 @@ impl MisbehaviorDetector {
             violations: HashMap::new(),
             reputation_scores: HashMap::new(),
             thresholds,
+            severity_weights: SeverityWeights::default(),
             quarantined: HashMap::new(),
             banned: HashMap::new(),
             trust_service: None,
             trust_penalty_callback: None,
         }
+    }
+
+    /// Set governance-configured severity weights.
+    ///
+    /// Controls how many reputation points each violation class costs.
+    /// Must be called at startup if non-default weights are configured.
+    pub fn set_severity_weights(&mut self, weights: SeverityWeights) {
+        self.severity_weights = weights;
+    }
+
+    /// Set the per-severity-point penalty rate (fraction of score, 0.0–1.0).
+    ///
+    /// Default: 0.05 (5% per point). Must be called at startup if non-default
+    /// rate is configured.
+    pub fn set_penalty_rate(&mut self, rate: f64) {
+        self.thresholds.penalty_rate = rate;
     }
 
     /// Set the TrustService for reporting violations to the trust subsystem.
@@ -479,10 +570,16 @@ impl MisbehaviorDetector {
         // Prune old violations to prevent unbounded growth (O(1) truncation from back)
         self.prune_violations_for_peer(did);
 
-        // Update reputation score and capture thresholds for later checks
+        // Update reputation score and capture thresholds for later checks.
+        // Use governance-configured severity weights and penalty rate.
+        let severity = violation.severity_with_weights(&self.severity_weights);
         let (is_auto_ban, should_ban, should_quarantine) = {
             let score = self.reputation_scores.entry(did.clone()).or_default();
-            score.apply_penalty(&violation, self.thresholds.decay_rate);
+            score.apply_penalty(
+                severity,
+                self.thresholds.decay_rate,
+                self.thresholds.penalty_rate,
+            );
 
             (
                 violation.is_auto_ban(),
@@ -1063,7 +1160,7 @@ mod tests {
             limit: 5,
         };
 
-        score.apply_penalty(&violation, 0.01);
+        score.apply_penalty(violation.severity(), 0.01, 0.05);
 
         assert_eq!(score.total_violations, 1);
         assert!(score.score < 1.0);
@@ -1080,7 +1177,7 @@ mod tests {
             let violation = Violation::InvalidSignature {
                 message_hash: [0u8; 32],
             };
-            score.apply_penalty(&violation, 0.01);
+            score.apply_penalty(violation.severity(), 0.01, 0.05);
         }
 
         assert!(
@@ -1763,5 +1860,164 @@ mod tests {
             detector2.get_reputation(&did).is_none(),
             "DID state should be cleared from storage"
         );
+    }
+
+    // ── Sprint 21 s21-t2: SeverityWeights config-driven tests ──────────────
+
+    #[test]
+    fn test_severity_weights_defaults_match_hardcoded() {
+        let weights = SeverityWeights::default();
+        // These must match the previously-hardcoded values so no behaviour change on upgrade.
+        assert_eq!(weights.critical, 10);
+        assert_eq!(weights.major, 5);
+        assert_eq!(weights.minor, 1);
+        assert_eq!(weights.storage_invalid, 8);
+        assert_eq!(weights.storage_suspicious, 5);
+        assert_eq!(weights.storage_missing, 3);
+        assert_eq!(weights.storage_timeout, 1);
+    }
+
+    #[test]
+    fn test_severity_with_custom_weights() {
+        let weights = SeverityWeights {
+            critical: 20,
+            major: 10,
+            minor: 2,
+            storage_invalid: 16,
+            storage_suspicious: 10,
+            storage_missing: 6,
+            storage_timeout: 2,
+        };
+
+        // Critical violation: ConflictingLedgerEntries maps to weights.critical
+        let critical = Violation::ConflictingLedgerEntries {
+            entry1: [0u8; 32],
+            entry2: [1u8; 32],
+        };
+        assert_eq!(critical.severity_with_weights(&weights), 20);
+
+        // Minor violation: ExcessiveResourceUse maps to weights.minor
+        let minor = Violation::ExcessiveResourceUse {
+            metric: "cpu".to_string(),
+            observed: 11,
+            limit: 10,
+        };
+        assert_eq!(minor.severity_with_weights(&weights), 2);
+    }
+
+    #[test]
+    fn test_severity_with_weights_unchanged_by_default() {
+        // severity() and severity_with_weights(default) must be identical
+        let violations = [
+            Violation::ConflictingLedgerEntries {
+                entry1: [0u8; 32],
+                entry2: [1u8; 32],
+            },
+            Violation::ReplayAttack {
+                message_hash: [0u8; 32],
+                sequence: 42,
+            },
+            Violation::ExcessiveResourceUse {
+                metric: "m".to_string(),
+                observed: 2,
+                limit: 1,
+            },
+            Violation::InvalidSignature {
+                message_hash: [0u8; 32],
+            },
+        ];
+        let defaults = SeverityWeights::default();
+        for v in &violations {
+            assert_eq!(
+                v.severity(),
+                v.severity_with_weights(&defaults),
+                "severity() must equal severity_with_weights(default) for {:?}",
+                v
+            );
+        }
+    }
+
+    #[test]
+    fn test_penalty_rate_configurable_via_thresholds() {
+        let did = test_did();
+
+        // Use ExcessiveResourceUse (minor, no auto-ban) so penalty_rate drives the difference.
+        // Default penalty_rate=0.05: score = 1.0 - 1*0.05 = 0.95
+        let mut det_default = MisbehaviorDetector::new(MisbehaviorThresholds::default());
+        det_default.record_violation(
+            &did,
+            Violation::ExcessiveResourceUse {
+                metric: "cpu".to_string(),
+                observed: 11,
+                limit: 10,
+            },
+            vec![],
+        );
+        let score_default = det_default.get_reputation(&did).unwrap().score;
+
+        // Higher penalty rate: score = 1.0 - 1*0.20 = 0.80
+        let mut det_high = MisbehaviorDetector::new(MisbehaviorThresholds {
+            penalty_rate: 0.20,
+            ..Default::default()
+        });
+        det_high.record_violation(
+            &did,
+            Violation::ExcessiveResourceUse {
+                metric: "cpu".to_string(),
+                observed: 11,
+                limit: 10,
+            },
+            vec![],
+        );
+        let score_high = det_high.get_reputation(&did).unwrap().score;
+
+        // Higher penalty_rate → lower score after same violation
+        assert!(
+            score_high < score_default,
+            "Higher penalty_rate must produce lower reputation score: {} < {}",
+            score_high,
+            score_default
+        );
+    }
+
+    #[test]
+    fn test_set_severity_weights_affects_penalty() {
+        let did = test_did();
+        // Use ExcessiveResourceUse (minor, no auto-ban) so weight drives the difference.
+        // Default weights (minor=1): score = 1.0 - 1*0.05 = 0.95
+        let violation = Violation::ExcessiveResourceUse {
+            metric: "cpu".to_string(),
+            observed: 11,
+            limit: 10,
+        };
+
+        // Detector with default weights (minor=1)
+        let mut det_default = MisbehaviorDetector::new(MisbehaviorThresholds::default());
+        det_default.record_violation(&did, violation.clone(), vec![]);
+        let score_default = det_default.get_reputation(&did).unwrap().score;
+
+        // Detector with heavier minor weight (minor=5): score = 1.0 - 5*0.05 = 0.75
+        let heavy = SeverityWeights {
+            minor: 5,
+            ..SeverityWeights::default()
+        };
+        let mut det_heavy = MisbehaviorDetector::new(MisbehaviorThresholds::default());
+        det_heavy.set_severity_weights(heavy);
+        det_heavy.record_violation(&did, violation, vec![]);
+        let score_heavy = det_heavy.get_reputation(&did).unwrap().score;
+
+        assert!(
+            score_heavy < score_default,
+            "Heavier minor weight must produce lower reputation score: {} < {}",
+            score_heavy,
+            score_default
+        );
+    }
+
+    #[test]
+    fn test_reputation_policy_config_defaults_match_hardcoded() {
+        // penalty_rate default must match the previously-hardcoded value
+        let thresholds = MisbehaviorThresholds::default();
+        assert!((thresholds.penalty_rate - 0.05).abs() < f64::EPSILON);
     }
 }

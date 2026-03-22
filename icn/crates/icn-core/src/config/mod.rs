@@ -14,6 +14,7 @@ mod ledger;
 mod network;
 mod observability;
 mod privacy;
+mod security;
 mod steward;
 mod supervisor;
 mod trust;
@@ -30,6 +31,7 @@ pub use ledger::*;
 pub use network::*;
 pub use observability::*;
 pub use privacy::*;
+pub use security::*;
 pub use steward::*;
 pub use supervisor::*;
 pub use trust::*;
@@ -103,6 +105,10 @@ pub struct Config {
     /// Trust graph configuration
     #[serde(default)]
     pub trust: TrustConfig,
+
+    /// Security subsystem configuration (misbehavior detection, reputation scoring)
+    #[serde(default)]
+    pub security: SecurityConfig,
 }
 
 impl Default for Config {
@@ -145,6 +151,7 @@ impl Default for Config {
             gossip: GossipConfig::default(),
             compute: ComputeConfig::default(),
             trust: TrustConfig::default(),
+            security: SecurityConfig::default(),
         }
     }
 }
