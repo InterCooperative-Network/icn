@@ -16,8 +16,8 @@ use tracing::info;
 
 use icn_identity::Did;
 use icn_ledger::{
-    CreditPolicy, CreditPolicyManager, DisputeManager, Ledger, NewMemberPolicy, OracleManager,
-    SledMembershipStore, TreasuryManager,
+    CreditPolicyManager, DisputeManager, Ledger, OracleManager, SledMembershipStore,
+    TreasuryManager,
 };
 use icn_store::SledStore;
 
@@ -52,12 +52,14 @@ pub struct LedgerServices {
 /// * `did` - Node's DID
 /// * `oracle_config` - Oracle configuration (built from primitive config values by daemon)
 /// * `witness_config` - Witness configuration (built from primitive config values by daemon)
+/// * `credit_manager` - Credit policy manager (built via `config::build_credit_policy_manager`)
 pub async fn init_ledger_services(
     ledger_handle: Arc<RwLock<Ledger>>,
     store: Arc<SledStore>,
     did: Did,
     oracle_config: icn_ledger::oracle::OracleConfig,
     witness_config: icn_ledger::WitnessConfig,
+    credit_manager: CreditPolicyManager,
 ) -> anyhow::Result<LedgerServices> {
     // Configure ledger with oracle, witness, membership, and credit policies.
     // Note: This write lock is held for the entire configuration block.
@@ -110,15 +112,18 @@ pub async fn init_ledger_services(
         ledger.set_membership_store(membership_store);
         info!("Membership store initialized for new member tracking");
 
-        // Initialize credit policy for server-side credit limit enforcement
-        let credit_policy = CreditPolicy::conservative("hours".to_string());
-        let new_member_policy = NewMemberPolicy::conservative("hours".to_string());
-        let credit_manager = CreditPolicyManager::new(credit_policy, new_member_policy);
+        // Initialize credit policy for server-side credit limit enforcement.
+        // Values come from icn-core config (ledger.credit / ledger.new_member sections).
+        let credit_currency = credit_manager.credit_policy.currency.clone();
+        let nm_currency = credit_manager.new_member_policy.currency.clone();
+        let initial_limit = credit_manager.new_member_policy.initial_limit;
+        let ramp_secs = credit_manager.new_member_policy.ramp_period.as_secs();
         ledger.set_credit_policy_manager(credit_manager);
 
         info!(
-            "Credit policy manager initialized with conservative policy for 'hours' currency \
-             (new members: 10hr initial, 90-day ramp, 50hr contribution threshold)"
+            "Credit policy manager initialized: currency={} new_member_currency={} \
+             initial_limit={} ramp_secs={}",
+            credit_currency, nm_currency, initial_limit, ramp_secs
         );
     }
 
