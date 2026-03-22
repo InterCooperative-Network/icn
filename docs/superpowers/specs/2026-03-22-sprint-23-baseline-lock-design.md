@@ -88,13 +88,15 @@ Each has hard dependency relationships to the Track A/B work it crystallizes.
 
 **s23-t9** — Roadmap + sprint-state refresh
 - **Depends on:** s23-t4 (Sprint 22 closed), s23-t7 (P0 tail disposition known)
-- **Artifact:** `docs/strategy/ICN-Roadmap-Live.md` (update in place; create Sprint 23 section if absent)
-- **Acceptance:** `ICN-Roadmap-Live.md` updated to reflect post-Sprint-22 completion state. Sprint 23 board is current in `ops/state/sprint/current.json`. Sprint 24 candidate backlog listed with at least the Commons Compute trio (#925, #947, #964) shaped as candidates.
+- **Artifacts:**
+  - `docs/strategy/ICN-Roadmap-Live.md` (update in place; create Sprint 23 section if absent)
+  - `ops/state/sprint/current.json` (Sprint 23 tasks populated — distinct from s23-t4 which closes Sprint 22 in this file)
+- **Acceptance:** `ICN-Roadmap-Live.md` updated to reflect post-Sprint-22 completion state. `ops/state/sprint/current.json` contains the Sprint 23 task list (separate from Sprint 22 closure handled by s23-t4). Sprint 24 candidate backlog listed with at least the Commons Compute trio (#925, #947, #964) shaped as candidates.
 
 **s23-t10** — Validate and document canonical demo path
-- **Depends on:** s23-t5, s23-t6 (P0 disposition must be known so the demo doc can explicitly state what is included and what is deferred — not because the demo flows depend on CRDTs or ContainerRuntime directly)
+- **Depends on:** s23-t5, s23-t6 (P0 disposition must be known so the demo doc can explicitly state what is included and what is deferred. Note: #1095 CRDT OrSet and #1096 ContainerRuntime are not on the critical path for Flows A, B, or C — they are post-demo completion items. The dependency is about disposition documentation, not flow enablement.)
 - **Artifact:** `docs/demo-path-2026-03.md`
-- **Acceptance:** One document with exact commands to reproduce the current demo on `main`. Tested against reality, not aspiration. Covers at minimum: devnet startup, Flow A (WASM), Flow B (discovery), Flow C (treasury governance). Explicitly notes disposition of #1095 and #1096 where relevant to demo coverage.
+- **Acceptance:** One document with exact commands to reproduce the current demo on `main`. Tested against reality, not aspiration. Covers at minimum: devnet startup, Flow A (WASM), Flow B (discovery), Flow C (treasury governance). Includes a brief "scope note" stating the current disposition of #1095 and #1096 and confirming they do not affect these three flows.
 
 ---
 
