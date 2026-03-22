@@ -677,16 +677,33 @@ impl SessionManager {
 /// sending any packets. The bound socket's local address then reveals the real IP.
 ///
 /// Works correctly in Docker/K8s containers where the bind address is `0.0.0.0`
-/// but the container has a real routable IP on eth0.
+/// but the container has a real routable IP on eth0. In IPv6-only environments,
+/// falls back to the same trick using an IPv6 wildcard and destination.
 ///
 /// Returns None if the trick fails (e.g., no network, weird routing table).
 fn resolve_local_addr(port: u16) -> Option<SocketAddr> {
-    let socket = std::net::UdpSocket::bind("0.0.0.0:0").ok()?;
+    // Try IPv4 first to preserve existing behavior on dual-stack/IPv4 hosts.
     // Connecting UDP does not send any packets — it only sets the routing destination.
-    // 8.8.8.8:80 is used as a well-known routable external address.
-    socket.connect("8.8.8.8:80").ok()?;
-    let local_ip = socket.local_addr().ok()?.ip();
-    Some(SocketAddr::new(local_ip, port))
+    // 8.8.8.8:80 is used as a well-known routable external IPv4 address.
+    if let Ok(socket) = std::net::UdpSocket::bind("0.0.0.0:0") {
+        if socket.connect("8.8.8.8:80").is_ok() {
+            if let Ok(local_addr) = socket.local_addr() {
+                return Some(SocketAddr::new(local_addr.ip(), port));
+            }
+        }
+    }
+
+    // Fallback: try the same routing trick using IPv6 for IPv6-only environments.
+    // 2001:4860:4860::8888 is Google's well-known routable IPv6 address.
+    if let Ok(socket) = std::net::UdpSocket::bind("[::]:0") {
+        if socket.connect("[2001:4860:4860::8888]:80").is_ok() {
+            if let Ok(local_addr) = socket.local_addr() {
+                return Some(SocketAddr::new(local_addr.ip(), port));
+            }
+        }
+    }
+
+    None
 }
 
 #[cfg(test)]

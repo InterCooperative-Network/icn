@@ -1035,6 +1035,14 @@ async fn spawn_network_actor(
         match s.parse::<std::net::SocketAddr>() {
             Ok(addr) => {
                 info!("Using explicit advertised address: {}", addr);
+                if addr.port() != listen_addr.port() {
+                    warn!(
+                        "advertised_addr {} uses port {} but network.listen_addr {} uses port {}. \
+                        Peers will dial a port this node may not be listening on — \
+                        verify port-forwarding or proxy configuration.",
+                        addr, addr.port(), listen_addr, listen_addr.port()
+                    );
+                }
                 Some(addr)
             }
             Err(e) => {
