@@ -12,9 +12,9 @@ Audit documentation drift. Reports problems; does not auto-fix (unless --fix-ind
 
 ### 1. Crate inventory drift
 
-Read workspace members:
+Read workspace members (parse only the `members = [...]` array to avoid picking up dependency versions and paths):
 ```bash
-grep -A999 '^\[workspace\]' icn/Cargo.toml | grep '"' | grep -v '#' | sed 's/.*"\(.*\)".*/\1/'
+grep -A999 '^\[workspace\]' icn/Cargo.toml | awk '/members *= *\[/,/\]/' | grep '"' | grep -v '#' | sed 's/.*"\(.*\)".*/\1/'
 ```
 
 Compare against crate names mentioned in:

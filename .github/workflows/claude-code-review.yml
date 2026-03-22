@@ -32,7 +32,10 @@ jobs:
         run: |
           BASE="${{ github.event.pull_request.base.sha }}"
           HEAD="${{ github.event.pull_request.head.sha }}"
-          CHANGED=$(git diff --name-only "$BASE" "$HEAD" 2>/dev/null | head -60 || echo "")
+          ALL_CHANGED=$(git diff --name-only "$BASE" "$HEAD" 2>/dev/null || true)
+          # Truncate to 60 paths for domain-hint matching; track the real total separately.
+          CHANGED=$(printf '%s' "$ALL_CHANGED" | head -60)
+          TOTAL=$(printf '%s' "$ALL_CHANGED" | grep -c . || echo 0)
 
           DOMAIN_HINTS=""
 
@@ -109,7 +112,7 @@ jobs:
           # Write to output (escape newlines for GitHub Actions)
           HINTS_ESCAPED="${DOMAIN_HINTS//$'\n'/%0A}"
           echo "domain_hints=$HINTS_ESCAPED" >> "$GITHUB_OUTPUT"
-          echo "changed_files=$(echo "$CHANGED" | wc -l | tr -d ' ')" >> "$GITHUB_OUTPUT"
+          echo "changed_files=${TOTAL}" >> "$GITHUB_OUTPUT"
 
       - name: Run Claude Code Review
         id: claude-review

@@ -28,22 +28,27 @@ if ! echo "$BRANCH" | grep -qE '^(feat|fix|refactor|docs|chore|test|ci)/'; then
   exit 0
 fi
 
-# Extract scope hint from branch name (e.g. fix/ledger-overflow → ledger)
-SCOPE_HINT=$(echo "$BRANCH" | sed 's|^[^/]*/||' | cut -d'-' -f1)
+# Extract full scope segment from branch name (e.g. fix/http-kit-refactor → http-kit-refactor)
+# Using the full segment (not just up to the first '-') allows matching hyphenated scopes.
+SCOPE_SEGMENT=$(echo "$BRANCH" | sed -E 's|^[^/]+/([^/]+).*|\1|')
 
-if [[ -z "$SCOPE_HINT" ]] || [[ ${#SCOPE_HINT} -lt 3 ]]; then
+if [[ -z "$SCOPE_SEGMENT" ]] || [[ ${#SCOPE_SEGMENT} -lt 3 ]]; then
   exit 0
 fi
 
 # Build list of known ICN crate scopes
 KNOWN_SCOPES="core identity trust net gossip ledger ccl store rpc obs gateway governance compute security time snapshot crypto steward zkp community coop entity encoding api naming authz federation privacy protocol services http-kit"
 
-# Check if scope hint matches a known crate
+# Find the longest matching known scope (prefix match against full segment).
+# Longest match handles hyphenated scopes correctly: "http-kit-refactor" matches "http-kit", not "http".
 MATCHED_SCOPE=""
+LONGEST_MATCH_LEN=0
 for scope in $KNOWN_SCOPES; do
-  if [[ "$SCOPE_HINT" == "$scope" ]]; then
-    MATCHED_SCOPE="$scope"
-    break
+  if [[ "$SCOPE_SEGMENT" == "$scope"* ]]; then
+    if (( ${#scope} > LONGEST_MATCH_LEN )); then
+      MATCHED_SCOPE="$scope"
+      LONGEST_MATCH_LEN=${#scope}
+    fi
   fi
 done
 

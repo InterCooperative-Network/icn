@@ -28,40 +28,35 @@ Your job is to write tests that are correct, non-flaky, and cover error paths �
 ## TestNode Pattern
 
 ```rust
-use icn_testkit::{TestNode, TestCluster};
+use icn_gossip::AccessControl;
+use icn_testkit::prelude::*;
 
 #[tokio::test]
-async fn test_two_node_gossip_convergence() {
-    // Each node gets a unique port (use port 0 for OS allocation)
-    let node_a = TestNode::builder()
-        .with_random_identity()
-        .with_port(0)  // OS picks available port
-        .build()
-        .await
-        .expect("node_a startup");
+async fn test_two_node_gossip_convergence() -> anyhow::Result<()> {
+    // Create a 2-node cluster — nodes get unique ports and identities via NodeConfig
+    let cluster = TestCluster::new(2).await?;
+    cluster.fully_connect().await?;
 
-    let node_b = TestNode::builder()
-        .with_random_identity()
-        .with_port(0)
-        .build()
-        .await
-        .expect("node_b startup");
+    let node_a = cluster.node(0).expect("node_a");
+    let node_b = cluster.node(1).expect("node_b");
 
-    // Connect nodes
-    node_a.connect_to(&node_b).await.expect("connect");
+    // Create topic on both nodes
+    node_a.create_topic("test:topic", AccessControl::Public).await;
+    node_b.create_topic("test:topic", AccessControl::Public).await;
+
+    // Subscribe node_b to node_a's topic so it replicates entries
+    node_b.subscribe_to("test:topic", node_a).await?;
 
     // Publish on node_a
-    node_a.gossip_publish("test:topic", b"hello").await.expect("publish");
+    node_a.publish("test:topic", b"hello").await.expect("publish");
 
-    // Verify convergence on node_b with retry
-    let received = icn_testkit::wait_for(
-        || async { node_b.gossip_received("test:topic").await },
-        std::time::Duration::from_secs(5),
-    )
-    .await
-    .expect("convergence timeout");
+    // Wait for convergence — all nodes must have 1 entry for "test:topic"
+    cluster
+        .await_gossip_convergence("test:topic", 1, std::time::Duration::from_secs(5))
+        .await
+        .expect("convergence timeout");
 
-    assert_eq!(received, b"hello");
+    Ok(())
 }
 ```
 

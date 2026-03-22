@@ -16,22 +16,35 @@ if echo "$FILE_PATH" | grep -qE '/tests/|/test_|_test\.rs$'; then
   exit 0
 fi
 
-NEW_CONTENT=$(echo "$INPUT" | jq -r '.tool_input.new_string // .tool_input.content // empty')
+NEW_STRING=$(echo "$INPUT" | jq -r '.tool_input.new_string // empty')
+FULL_CONTENT=$(echo "$INPUT" | jq -r '.tool_input.content // empty')
+NEW_CONTENT="${NEW_STRING}${FULL_CONTENT}"
 
 if [[ -z "$NEW_CONTENT" ]]; then
   exit 0
 fi
 
 # --- BLOCKING: panic!() is never allowed in non-test protocol paths ---
-# Skip if the panic is inside a #[cfg(test)] block or #[allow(clippy::panic)] annotation
+# For Write operations we have the full file content and can block reliably.
+# For Edit operations we only have the snippet (new_string), so we can't tell
+# if the panic is inside an existing #[cfg(test)] block — downgrade to warning.
 if echo "$NEW_CONTENT" | grep -qE 'panic!\('; then
   if ! echo "$NEW_CONTENT" | grep -qE '#\[cfg\(test\)\]|#\[allow\(clippy::panic\)\]'; then
-    echo "PANIC GUARD VIOLATION in ${FILE_PATH}:" >&2
-    echo "  panic!() found in non-test code." >&2
-    echo "  ICN invariant: 'No panics in protocol paths'" >&2
-    echo "  Use Result<T, E> and propagate errors instead." >&2
-    echo "  If this is intentionally unreachable, use unreachable!() with a comment." >&2
-    exit 1
+    if [[ -n "$FULL_CONTENT" ]]; then
+      # Full file content available (Write operation) — hard block
+      echo "PANIC GUARD VIOLATION in ${FILE_PATH}:" >&2
+      echo "  panic!() found in non-test code." >&2
+      echo "  ICN invariant: 'No panics in protocol paths'" >&2
+      echo "  Use Result<T, E> and propagate errors instead." >&2
+      echo "  If this branch is intended to be unreachable, model it as a typed error" >&2
+      echo "  or, in non-protocol code only, a debug_assert! with a SAFETY comment." >&2
+      exit 1
+    else
+      # Snippet only (Edit operation) — warn, context may be inside a test block
+      cat <<EOF
+{"continue": true, "systemMessage": "Panic guard warning in ${FILE_PATH}:\n  panic!() in snippet — if this is inside a #[cfg(test)] block ignore this warning.\n  Otherwise, use Result<T, E>. Never use unreachable!() as a substitute (it also panics)."}
+EOF
+    fi
   fi
 fi
 
