@@ -100,6 +100,35 @@ impl ContributionAttestationConfig {
             contribution_threshold: self.contribution_threshold,
         }
     }
+
+    /// Validate configuration invariants.
+    ///
+    /// Called from higher-level config validation (e.g., `Config::validate`) to catch
+    /// operator mistakes before the daemon starts.
+    pub fn validate(&self) -> Result<(), String> {
+        if !(0.0..=1.0).contains(&self.min_trust_to_attest) {
+            return Err(format!(
+                "obs.contribution.min_trust_to_attest must be in [0.0, 1.0], got {}",
+                self.min_trust_to_attest
+            ));
+        }
+        if self.max_attestations_per_period == 0 {
+            return Err("obs.contribution.max_attestations_per_period must be > 0".to_string());
+        }
+        if self.contribution_threshold < 0.0 {
+            return Err(format!(
+                "obs.contribution.contribution_threshold must be >= 0.0, got {}",
+                self.contribution_threshold
+            ));
+        }
+        if self.min_membership_age_secs == 0 {
+            return Err("obs.contribution.min_membership_age_secs must be > 0".to_string());
+        }
+        if self.org_attestation_threshold == 0 {
+            return Err("obs.contribution.org_attestation_threshold must be > 0".to_string());
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -121,6 +150,32 @@ mod tests {
         let config = ObsConfig::default();
         assert!((config.contribution.min_trust_to_attest - 0.3).abs() < f64::EPSILON);
         assert_eq!(config.contribution.max_attestations_per_period, 10);
+    }
+
+    #[test]
+    fn test_contribution_attestation_config_validate_ok() {
+        assert!(ContributionAttestationConfig::default().validate().is_ok());
+    }
+
+    #[test]
+    fn test_contribution_attestation_config_validate_bad_trust() {
+        let mut cfg = ContributionAttestationConfig::default();
+        cfg.min_trust_to_attest = 1.5;
+        assert!(cfg.validate().is_err());
+    }
+
+    #[test]
+    fn test_contribution_attestation_config_validate_zero_max_attestations() {
+        let mut cfg = ContributionAttestationConfig::default();
+        cfg.max_attestations_per_period = 0;
+        assert!(cfg.validate().is_err());
+    }
+
+    #[test]
+    fn test_contribution_attestation_config_validate_zero_org_threshold() {
+        let mut cfg = ContributionAttestationConfig::default();
+        cfg.org_attestation_threshold = 0;
+        assert!(cfg.validate().is_err());
     }
 
     #[test]

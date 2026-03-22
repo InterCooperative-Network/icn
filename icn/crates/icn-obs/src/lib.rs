@@ -74,14 +74,16 @@ use metrics_exporter_prometheus::PrometheusBuilder;
 use std::net::SocketAddr;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
+#[allow(deprecated)]
 pub use attestation::{
-    check_eligibility, AttestationCountLookup, AttestationGraphLookup, AttestationThresholds,
-    AttestersOfLookup, ClaimHistoryLookup, ClaimStatus, ContributionAttestation, ContributionClaim,
-    ContributionMessage, ContributionValidator, EligibilityContext, EligibilityStatus,
-    FraudDetector, FraudIndicator, MembershipAgeLookup, NetworkObservationsLookup, PeerAttestation,
-    TrustLookup, ValidationResult, CONTRIBUTION_THRESHOLD, MAX_ATTESTATIONS_PER_PERIOD,
-    MIN_MEMBERSHIP_AGE_SECS, MIN_TRUST_TO_ATTEST, ORG_ATTESTATION_THRESHOLD,
-    TOPIC_CONTRIBUTION_ATTESTATION, TOPIC_CONTRIBUTION_CLAIM, TOPIC_CONTRIBUTION_VERIFIED,
+    check_eligibility, check_eligibility_with_thresholds, AttestationCountLookup,
+    AttestationGraphLookup, AttestationThresholds, AttestersOfLookup, ClaimHistoryLookup,
+    ClaimStatus, ContributionAttestation, ContributionClaim, ContributionMessage,
+    ContributionValidator, EligibilityContext, EligibilityStatus, FraudDetector, FraudIndicator,
+    MembershipAgeLookup, NetworkObservationsLookup, PeerAttestation, TrustLookup, ValidationResult,
+    CONTRIBUTION_THRESHOLD, MAX_ATTESTATIONS_PER_PERIOD, MIN_MEMBERSHIP_AGE_SECS,
+    MIN_TRUST_TO_ATTEST, ORG_ATTESTATION_THRESHOLD, TOPIC_CONTRIBUTION_ATTESTATION,
+    TOPIC_CONTRIBUTION_CLAIM, TOPIC_CONTRIBUTION_VERIFIED,
 };
 pub use contribution::{AggregatedMetrics, ResourceMetrics, ResourceType};
 pub use health::{start_monitoring_server, HealthService, HealthState, HealthStatus};
