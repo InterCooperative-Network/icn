@@ -30,6 +30,11 @@ jobs:
         run: node website/scripts/gen-stats.mjs
 
       - name: Commit if changed
+        # stats.json is gitignored and regenerated at build time, so a failed push
+        # (e.g. branch protection requires PRs) is non-fatal — the file is always
+        # fresh at deploy time. continue-on-error prevents the daily cron from
+        # turning red when GITHUB_TOKEN cannot bypass protected-branch rules.
+        continue-on-error: true
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
