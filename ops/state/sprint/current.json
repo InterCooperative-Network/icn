@@ -1,48 +1,54 @@
 {
-  "sprint": 21,
-  "name": "Sprint 21 — Meaning Firewall Policy Extraction",
-  "started": "2026-03-21",
+  "sprint": 22,
+  "name": "Sprint 22 — Meaning Firewall Completion",
+  "started": "2026-03-22",
   "goals": [
-    "Close Sprint 20: merge PRs #1380 #1381 #1382 #1383",
-    "Make compute admission thresholds config-driven: min_standing, min_trust_score, fuel_cost_divisor",
-    "Make reputation severity scoring config-driven: SeverityWeights, penalty_rate",
-    "Update meaning firewall audit doc with Sprint 21 remediations"
+    "Extract remaining icn-security hardcoded violations (max_violations_per_hour, violation_retention_secs) to MisbehaviorThresholdsConfig",
+    "Extract remaining icn-compute violations (CharterPriority preemption, credit ceiling) to ComputePolicyConfig",
+    "Extract icn-ledger CreditPolicy/NewMemberPolicy factory values to CreditPolicyConfig (highest regulatory priority)",
+    "Extract icn-obs attestation threshold constants to AttestationConfig",
+    "Update meaning-firewall-audit.md to reflect Sprint 22 remediations"
   ],
   "tasks": [
     {
-      "id": "s21-t0",
-      "title": "chore(ops): close Sprint 20 — merge PRs and update sprint board",
-      "status": "done",
-      "prs": [1380, 1381, 1382, 1383],
-      "note": "Merged in order: doc PRs first (1382, 1383), then code PRs (1380, 1381). Used --admin for #1381 (behind main by docs-only commits)."
+      "id": "s22-t1",
+      "title": "icn-security: extract max_violations_per_hour + violation_retention_secs to MisbehaviorThresholdsConfig",
+      "status": "in-review",
+      "pr": 1389,
+      "assignee": null,
+      "epic": "meaning-firewall"
     },
     {
-      "id": "s21-t1",
-      "title": "feat(compute): make admission thresholds config-driven (#1370 partial)",
-      "status": "done",
-      "pr": 1384,
-      "issue": 1370,
-      "note": "Merged. ComputePolicyConfig (min_standing, min_trust_score, fuel_cost_divisor) + CommonsPoolPolicy.fuel_cost_divisor + SybilPolicy.min_trust_score wired from lifecycle.rs."
+      "id": "s22-t2",
+      "title": "icn-compute: extract CharterPriority preemption routing + credit ceiling validation to ComputePolicyConfig",
+      "status": "in-review",
+      "pr": 1391,
+      "assignee": null,
+      "epic": "meaning-firewall"
     },
     {
-      "id": "s21-t2",
-      "title": "feat(security): make severity scoring config-driven (#1370 partial)",
-      "status": "in_progress",
-      "pr": 1385,
-      "issue": 1370,
-      "note": "PR open. SeverityWeights, severity_with_weights(), penalty_rate in ReputationPolicyConfig/SecurityConfig. Wired in lifecycle.rs. CI running."
+      "id": "s22-t3",
+      "title": "icn-ledger: extract CreditPolicy + NewMemberPolicy factory values to CreditPolicyConfig (highest regulatory priority)",
+      "status": "pending",
+      "pr": null,
+      "assignee": null,
+      "epic": "meaning-firewall"
     },
     {
-      "id": "s21-t3",
-      "title": "docs(arch): update meaning firewall audit post-sprint",
-      "status": "in_progress",
-      "pr": 1387,
-      "issue": 1370,
-      "note": "PR open. Updated violation tables with Sprint 21 status column. Marked compute (3/6) and security (3/5) violations as remediated. CI running."
+      "id": "s22-t4",
+      "title": "icn-obs: extract 5 attestation threshold constants to AttestationConfig",
+      "status": "in-review",
+      "pr": 1390,
+      "assignee": null,
+      "epic": "meaning-firewall"
+    },
+    {
+      "id": "s22-t5",
+      "title": "docs: update meaning-firewall-audit.md to mark all Sprint 22 remediations complete",
+      "status": "pending",
+      "pr": null,
+      "assignee": null,
+      "epic": "meaning-firewall"
     }
-  ],
-  "deferred_to_s22": {
-    "note": "icn-ledger CreditPolicy extraction, icn-obs attestation thresholds, full PolicyOracle wiring for per-coop dynamic values",
-    "issues": [1370]
-  }
+  ]
 }

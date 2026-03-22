@@ -30,15 +30,15 @@ Domain-specific policy logic embedded directly in compute kernel code.
 | `src/policy.rs` | ~98 | `min_standing: 0.3` — hardcoded trust threshold for commons pool access | HIGH | ✅ Config-driven via `ComputePolicyConfig.min_standing` (PR #1384, Sprint 21) |
 | `src/policy.rs` | ~176–184 | `check_standing()` calls trust score against hardcoded policy threshold | HIGH | ✅ Config-driven via `ComputePolicyConfig.min_standing` (PR #1384, Sprint 21) |
 | `src/policy.rs` | ~142–150 | `estimate_task_cost()` contains domain payment logic (fuel → credits, hardcoded `1000` divisor) | MEDIUM | ✅ Config-driven via `CommonsPoolPolicy.fuel_cost_divisor` (PR #1384, Sprint 21) |
-| `src/policy.rs` | ~113–137 | Credit ceiling validation against cooperative-specific rules | MEDIUM | ✅ Config-driven via `ComputePolicyConfig.credit_ceiling` (PR #1390, Sprint 22) |
-| `src/policy.rs` | ~157–173 | `CharterPriority::UbsFirst`, `EmergencyFirst` as kernel-level preemption arms | MEDIUM | ✅ Config-driven via `CommonsPoolPolicy.preemptable_priorities` (PR #1390, Sprint 22) |
+| `src/policy.rs` | ~113–137 | Credit ceiling validation against cooperative-specific rules | MEDIUM | ✅ Config-driven via `ComputePolicyConfig.credit_ceiling` (PR #1391, Sprint 22) |
+| `src/policy.rs` | ~157–173 | `CharterPriority::UbsFirst`, `EmergencyFirst` as kernel-level preemption arms | MEDIUM | ✅ Config-driven via `CommonsPoolPolicy.preemptable_priorities` (PR #1391, Sprint 22) |
 | `src/commons_pool.rs` | ~156–182 | `try_add_participant()` enforces sybil policy with hardcoded `min_trust_score: 0.1` | HIGH | ✅ Config-driven via `ComputePolicyConfig.min_trust_score` (PR #1384, Sprint 21) |
 
 **Pattern**: `icn-compute` implements admission, scheduling, and cost decisions using trust scores and charter priorities directly — domain knowledge that belongs in a `ComputePolicyOracle` app.
 
 **Sprint 21 remediation (PR #1384)**: Extracted `min_standing`, `min_trust_score`, and `fuel_cost_divisor` into `ComputePolicyConfig` in `icn-core/src/config/compute.rs`. Wired from `lifecycle.rs` into `CommonsPoolPolicy` and `SybilPolicy` on startup.
 
-**Sprint 22 remediation (PR #1390)**: Extracted `CharterPriority` preemption routing into `CommonsPoolPolicy.preemptable_priorities: Vec<CharterPriority>` (config-driven, default `[UbsFirst, EmergencyFirst]`). Added `credit_ceiling: Option<i64>` to `ComputePolicyConfig`, wired from `init_compute.rs`. `CharterPriority::allows_preemption()` (hardcoded policy decision in an enum method) replaced by `preemptable_priorities.contains()` lookup.
+**Sprint 22 remediation (PR #1391)**: Extracted `CharterPriority` preemption routing into `CommonsPoolPolicy.preemptable_priorities: Vec<CharterPriority>` (config-driven, default `[UbsFirst, EmergencyFirst]`). Added `credit_ceiling: Option<i64>` to `ComputePolicyConfig`, wired from `init_compute.rs`. `CharterPriority::allows_preemption()` (hardcoded policy decision in an enum method) replaced by `preemptable_priorities.contains()` lookup.
 
 **Remaining**: No outstanding violations. Full `ComputePolicyOracle` extraction (moving `CommonsPoolPolicy` entirely out of the kernel crate) is a future sprint concern.
 
@@ -72,14 +72,14 @@ Credit policy calculations use trust score inputs directly.
 
 | File | Lines | Violation | Severity | Status |
 |------|-------|-----------|----------|--------|
-| `src/credit_policy.rs` | ~88–101 | `calculate_limit()`: `limit = baseline + (baseline * trust_score * trust_multiplier) + (cleared_volume * history_bonus_rate)` | MEDIUM | ✅ Config-driven via `CreditPolicyConfig` (PR #1391, Sprint 22) |
-| `src/credit_policy.rs` | ~30 | `trust_multiplier: f64` presets encode governance choices: conservative=0.3, permissive=0.5 | MEDIUM | ✅ Config-driven via `CreditPolicyConfig.trust_multiplier` (PR #1391, Sprint 22) |
-| `src/credit_policy.rs` | ~59–73 | `conservative()` and `permissive()` presets bake policy choices as code constants | MEDIUM | ✅ Config-driven via `CreditPolicyConfig` defaults (PR #1391, Sprint 22) |
-| `src/credit_policy.rs` | ~119–144 | `NewMemberPolicy` encodes onboarding semantics (time-based ramp vs. cleared-volume bypass) | MEDIUM | ✅ Config-driven via `NewMemberPolicyConfig` (PR #1391, Sprint 22) |
+| `src/credit_policy.rs` | ~88–101 | `calculate_limit()`: `limit = baseline + (baseline * trust_score * trust_multiplier) + (cleared_volume * history_bonus_rate)` | MEDIUM | ✅ Config-driven via `CreditPolicyConfig` (PR #1392, Sprint 22) |
+| `src/credit_policy.rs` | ~30 | `trust_multiplier: f64` presets encode governance choices: conservative=0.3, permissive=0.5 | MEDIUM | ✅ Config-driven via `CreditPolicyConfig.trust_multiplier` (PR #1392, Sprint 22) |
+| `src/credit_policy.rs` | ~59–73 | `conservative()` and `permissive()` presets bake policy choices as code constants | MEDIUM | ✅ Config-driven via `CreditPolicyConfig` defaults (PR #1392, Sprint 22) |
+| `src/credit_policy.rs` | ~119–144 | `NewMemberPolicy` encodes onboarding semantics (time-based ramp vs. cleared-volume bypass) | MEDIUM | ✅ Config-driven via `NewMemberPolicyConfig` (PR #1392, Sprint 22) |
 
 **Pattern**: `CreditPolicy` implements cooperative financial governance (who gets how much credit, on what basis) inside the ledger kernel crate. The `trust_multiplier`, ramp schedule, and baseline limits are all governance decisions.
 
-**Sprint 22 remediation (PR #1391)**: Added `CreditPolicyConfig` (baseline=10_000, trust_multiplier=0.3, history_bonus_rate=0.05, currency="hours") and `NewMemberPolicyConfig` (initial_limit=1_000, ramp_period_days=90, cleared_volume_threshold=5_000) to `icn-core/src/config/ledger.rs`. Added `build_credit_policy_manager()` in `apps/ledger/src/config.rs` (takes primitives → `CreditPolicyManager`; maintains 4-layer indirection: icn-core config → apps/ledger/config.rs → init.rs → icnd). Updated `init_ledger_services()` to accept `CreditPolicyManager` instead of hardcoding `CreditPolicy::conservative()`. Wired from `icnd/src/main.rs`.
+**Sprint 22 remediation (PR #1392)**: Added `CreditPolicyConfig` (baseline=10_000, trust_multiplier=0.3, history_bonus_rate=0.05, currency="hours") and `NewMemberPolicyConfig` (initial_limit=1_000, ramp_period_days=90, cleared_volume_threshold=5_000) to `icn-core/src/config/ledger.rs`. Added `build_credit_policy_manager()` in `apps/ledger/src/config.rs` (takes primitives → `CreditPolicyManager`; maintains 4-layer indirection: icn-core config → apps/ledger/config.rs → init.rs → icnd). Updated `init_ledger_services()` to accept `CreditPolicyManager` instead of hardcoding `CreditPolicy::conservative()`. Wired from `icnd/src/main.rs`.
 
 **Remaining**: `CreditPolicy::conservative()` / `permissive()` factory methods still exist in `icn-ledger` for test use. Full `LedgerPolicyOracle` extraction (moving credit policy struct entirely out of kernel) is a future sprint concern.
 
@@ -155,8 +155,8 @@ Observability layer exposes domain thresholds as constants.
 
 1. **`icn-compute` → `ComputePolicyOracle`** (Sprint 21 + Sprint 22 — ✅ config extraction complete)
    - ✅ `min_standing`, `min_trust_score`, `fuel_cost_divisor` in `ComputePolicyConfig` (PR #1384, Sprint 21)
-   - ✅ `CharterPriority` preemption routing → `preemptable_priorities` (PR #1390, Sprint 22)
-   - ✅ credit ceiling → `ComputePolicyConfig.credit_ceiling` (PR #1390, Sprint 22)
+   - ✅ `CharterPriority` preemption routing → `preemptable_priorities` (PR #1391, Sprint 22)
+   - ✅ credit ceiling → `ComputePolicyConfig.credit_ceiling` (PR #1391, Sprint 22)
    - ⏳ Full `ComputePolicyOracle` extraction (move struct out of kernel): future sprint
 
 2. **`icn-security` → `ReputationPolicyOracle`** (Sprint 21 + Sprint 22 — ✅ config extraction complete)
@@ -165,8 +165,8 @@ Observability layer exposes domain thresholds as constants.
    - ⏳ Full `ReputationPolicyOracle` extraction: future sprint
 
 3. **`icn-ledger` → `LedgerPolicyOracle`** (Sprint 22 — ✅ config extraction complete)
-   - ✅ `CreditPolicyConfig` (baseline, trust_multiplier, history_bonus_rate, currency) (PR #1391, Sprint 22)
-   - ✅ `NewMemberPolicyConfig` (initial_limit, ramp_period_days, cleared_volume_threshold) (PR #1391, Sprint 22)
+   - ✅ `CreditPolicyConfig` (baseline, trust_multiplier, history_bonus_rate, currency) (PR #1392, Sprint 22)
+   - ✅ `NewMemberPolicyConfig` (initial_limit, ramp_period_days, cleared_volume_threshold) (PR #1392, Sprint 22)
    - ⏳ Full `LedgerPolicyOracle` extraction (move `CreditPolicy` struct to `apps/ledger`): future sprint
 
 4. **`icn-obs` attestation thresholds** (Sprint 22 — ✅ complete)
@@ -210,6 +210,7 @@ This ratchet prevents regression while remediation proceeds incrementally.
 - Issues #916, #871 — Phase 1 CI enforcement (complete)
 - PR #1384 — Sprint 21 s21-t1: `ComputePolicyConfig` extraction (merged)
 - PR #1385 — Sprint 21 s21-t2: `ReputationPolicyConfig` / `SeverityWeights` extraction (merged)
-- PR #1389 — Sprint 22 s22-t1+t4: `ReputationPolicyConfig` threshold fields + `ContributionAttestationConfig`
-- PR #1390 — Sprint 22 s22-t2: `ComputePolicyConfig` preemption + credit ceiling
-- PR #1391 — Sprint 22 s22-t3: `CreditPolicyConfig` + `NewMemberPolicyConfig`
+- PR #1389 — Sprint 22 s22-t1: `ReputationPolicyConfig` threshold fields (`max_violations_per_hour`, `violation_retention_secs`)
+- PR #1390 — Sprint 22 s22-t4: `ContributionAttestationConfig` (5 attestation threshold constants)
+- PR #1391 — Sprint 22 s22-t2: `ComputePolicyConfig` preemption + credit ceiling
+- PR #1392 — Sprint 22 s22-t3+t5: `CreditPolicyConfig` + `NewMemberPolicyConfig` + audit doc
