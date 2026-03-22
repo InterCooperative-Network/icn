@@ -44,7 +44,7 @@ Turn current completion into a stable, legible, demoable platform baseline. Do t
 *Make the repo tell the truth.*
 
 **s23-t1** — Fix `Test Coverage` CI failure on `main`
-- **Acceptance:** Test Coverage failure resolved; `main` passes all required non-observational gates, or remaining failures are explicitly classified as non-blocking with rationale committed to `ops/state/ci-exceptions.md`.
+- **Acceptance:** Test Coverage failure resolved; `main` passes all required non-observational gates, or remaining failures are explicitly classified as non-blocking with rationale committed to `ops/state/ci-exceptions.md`. ("Non-observational gates" = gates with `GATE_RATCHET_PHASE_*: blocking` or `warning` in `ci.yml`; excludes gates marked `observational`, flaky preview deployments, and advisory telemetry jobs.)
 
 **s23-t2** — Resolve dirty file in `icn/` (from #1394 skills rewrite merge)
 - **Acceptance:** `git status` is clean on `main`. The dirty file is either committed with a rationale commit message, or deleted. Stash is not an acceptable resolution — it is not a portable terminal state.
@@ -83,7 +83,7 @@ Each has hard dependency relationships to the Track A/B work it crystallizes.
 
 **s23-t8** — Publish current platform baseline
 - **Depends on:** s23-t1, s23-t2, s23-t3, s23-t4 (operational truth fully restored before doc is authored)
-- **Artifact:** `docs/platform-baseline-2026-03.md`
+- **Artifact:** `docs/state/ICN-Platform-Baseline-2026-03.md`
 - **Acceptance:** One document exists that answers: what ICN is now, what is complete, what is in progress, what is next. A new contributor can orient from this document without requiring oral tradition.
 
 **s23-t9** — Roadmap + sprint-state refresh
@@ -91,7 +91,7 @@ Each has hard dependency relationships to the Track A/B work it crystallizes.
 - **Artifacts:**
   - `docs/strategy/ICN-Roadmap-Live.md` (update in place; create Sprint 23 section if absent)
   - `ops/state/sprint/current.json` (Sprint 23 tasks populated — distinct from s23-t4 which closes Sprint 22 in this file)
-- **Acceptance:** `ICN-Roadmap-Live.md` updated to reflect post-Sprint-22 completion state. `ops/state/sprint/current.json` contains the Sprint 23 task list (separate from Sprint 22 closure handled by s23-t4). Sprint 24 candidate backlog listed with at least the Commons Compute trio (#925, #947, #964) shaped as candidates.
+- **Acceptance:** `ICN-Roadmap-Live.md` updated to reflect post-Sprint-22 completion state. `ops/state/sprint/current.json` contains the Sprint 23 task list (separate from Sprint 22 closure handled by s23-t4). Sprint 24 candidate backlog listed with at least the Commons Compute trio (#925, #947, #964) shaped as candidates — meaning: title, one-line scope description, and rationale only. No full decomposition required. Full Sprint 24 planning is out of scope for this task.
 
 **s23-t10** — Validate and document canonical demo path
 - **Depends on:** s23-t5, s23-t6 (P0 disposition must be known so the demo doc can explicitly state what is included and what is deferred. Note: #1095 CRDT OrSet and #1096 ContainerRuntime are not on the critical path for Flows A, B, or C — they are post-demo completion items. The dependency is about disposition documentation, not flow enablement.)
