@@ -75,8 +75,8 @@ use std::net::SocketAddr;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 pub use attestation::{
-    check_eligibility, AttestationCountLookup, AttestationGraphLookup, AttestersOfLookup,
-    ClaimHistoryLookup, ClaimStatus, ContributionAttestation, ContributionClaim,
+    check_eligibility, AttestationCountLookup, AttestationGraphLookup, AttestationThresholds,
+    AttestersOfLookup, ClaimHistoryLookup, ClaimStatus, ContributionAttestation, ContributionClaim,
     ContributionMessage, ContributionValidator, EligibilityContext, EligibilityStatus,
     FraudDetector, FraudIndicator, MembershipAgeLookup, NetworkObservationsLookup, PeerAttestation,
     TrustLookup, ValidationResult, CONTRIBUTION_THRESHOLD, MAX_ATTESTATIONS_PER_PERIOD,
