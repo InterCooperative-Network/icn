@@ -71,6 +71,7 @@ impl TestNode {
             None, // No misbehavior detector for tests
             None, // No store for tests
             None, // anchor_rate_config
+            None, // advertised_addr
         )
         .await?;
 

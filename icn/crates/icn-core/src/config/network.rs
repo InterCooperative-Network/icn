@@ -92,6 +92,20 @@ pub struct NetworkConfig {
     /// Blob registry configuration for distributed data tracking
     #[serde(default)]
     pub blob_registry: BlobRegistryConfig,
+
+    /// Explicit advertised address for connection candidates (format: "IP:PORT").
+    ///
+    /// When set, this address is announced to peers as the local dialable address,
+    /// overriding both the auto-detected address and `endpoint.local_addr()`.
+    ///
+    /// Required in containerized environments (Docker/K8s) where the node binds
+    /// to `0.0.0.0` but must advertise the container/pod IP so other nodes can
+    /// dial back. If not set, the node auto-detects its routing IP via the
+    /// routing-socket trick (usually correct for containers).
+    ///
+    /// Example: `advertised_addr = "10.42.2.101:7827"`
+    #[serde(default)]
+    pub advertised_addr: Option<String>,
 }
 
 /// Blob registry configuration for distributed data tracking

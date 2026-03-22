@@ -186,6 +186,7 @@ impl TestNode {
             None, // No store
             None, // personhood_store
             None, // anchor_rate_config
+            None, // advertised_addr
         )
         .await?;
 
