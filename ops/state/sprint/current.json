@@ -109,6 +109,16 @@
       ],
       "completed_date": "2026-03-22",
       "commit": "2dbe9950"
+    },
+    {
+      "id": "p24-pre-2",
+      "title": "Migrate coverage CI to cargo-llvm-cov on Zentith self-hosted runner",
+      "track": "pre-sprint",
+      "status": "done",
+      "completed_date": "2026-03-22",
+      "artifact": "docs/superpowers/specs/2026-03-22-zenith-coverage-runner-setup.md",
+      "pr": "https://github.com/InterCooperative-Network/icn/pull/1395",
+      "notes": "Runner: zentith-coverage (WSL2, Zenith). Tooling: cargo-llvm-cov v0.8.5, Rust 1.88.0+1.89.0. Validated: 11min, 288K LCOV lines, 7.2GB peak RAM. First successful Codecov upload in project history."
     }
   ]
 }

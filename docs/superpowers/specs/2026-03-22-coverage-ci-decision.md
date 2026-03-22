@@ -1,7 +1,7 @@
 # Coverage CI Decision — p24-pre-2
 
 **Date:** 2026-03-22
-**Status:** Revised — ci-runner validated insufficient; estate census complete; new path selected
+**Status:** COMPLETE — PR #1395 merged; Codecov receiving data for the first time
 **Author:** Sprint 23 close session + live validation
 
 ---
