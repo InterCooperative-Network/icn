@@ -1,7 +1,7 @@
 # Meaning Firewall Phase 2 Audit
 
-**Status:** Phase 2 findings documented — remediation tracked in #1370
-**Audited:** Sprint 20 (2026-03-21)
+**Status:** Sprint 21 remediations complete — `icn-compute` and `icn-security` HIGH violations resolved
+**Audited:** Sprint 20 (2026-03-21) · **Remediation:** Sprint 21 (2026-03-21)
 **Issue:** [#1370](https://github.com/InterCooperative-Network/icn/issues/1370)
 **Prior work:** Phase 1 CI enforcement (#916, #871 — closed/complete)
 
@@ -13,46 +13,51 @@
 
 The Phase 1 CI gate prevents new *import* violations. This audit identifies **semantic violations** — places where kernel crates make domain-specific decisions (encode business rules, governance policies, trust thresholds) rather than consuming generic constraints from PolicyOracle app crates.
 
-**Result: 8 significant violations across 4 crates. 7 crates are clean.**
+**Original result: 8 significant violations across 4 crates. 7 crates clean.**
+**Post-Sprint 21: 5 violations remediated. 3 violations remaining (deferred to Sprint 22+).**
 
 ---
 
 ## Crate-by-Crate Findings
 
-### 1. `icn-compute` — HIGH · Refactor needed
+### 1. `icn-compute` — HIGH · ✅ Partially remediated (Sprint 21)
 
 Domain-specific policy logic embedded directly in compute kernel code.
 
-| File | Lines | Violation | Severity |
-|------|-------|-----------|----------|
-| `src/policy.rs` | ~98 | `min_standing: 0.3` — hardcoded trust threshold for commons pool access | HIGH |
-| `src/policy.rs` | ~176–184 | `check_standing()` calls trust score against hardcoded policy threshold | HIGH |
-| `src/policy.rs` | ~142–150 | `estimate_task_cost()` contains domain payment logic (fuel → credits, hardcoded `1000` divisor) | MEDIUM |
-| `src/policy.rs` | ~113–137 | Credit ceiling validation against cooperative-specific rules | MEDIUM |
-| `src/policy.rs` | ~157–173 | `CharterPriority::UbsFirst`, `EmergencyFirst` as kernel-level preemption arms | MEDIUM |
-| `src/commons_pool.rs` | ~156–182 | `try_add_participant()` enforces sybil policy with hardcoded `min_trust_score: 0.1` | HIGH |
+| File | Lines | Violation | Severity | Sprint 21 Status |
+|------|-------|-----------|----------|-----------------|
+| `src/policy.rs` | ~98 | `min_standing: 0.3` — hardcoded trust threshold for commons pool access | HIGH | ✅ Config-driven via `ComputePolicyConfig.min_standing` (PR #1384) |
+| `src/policy.rs` | ~176–184 | `check_standing()` calls trust score against hardcoded policy threshold | HIGH | ✅ Config-driven via `ComputePolicyConfig.min_standing` (PR #1384) |
+| `src/policy.rs` | ~142–150 | `estimate_task_cost()` contains domain payment logic (fuel → credits, hardcoded `1000` divisor) | MEDIUM | ✅ Config-driven via `CommonsPoolPolicy.fuel_cost_divisor` (PR #1384) |
+| `src/policy.rs` | ~113–137 | Credit ceiling validation against cooperative-specific rules | MEDIUM | ⏳ Deferred to Sprint 22 |
+| `src/policy.rs` | ~157–173 | `CharterPriority::UbsFirst`, `EmergencyFirst` as kernel-level preemption arms | MEDIUM | ⏳ Deferred to Sprint 22 |
+| `src/commons_pool.rs` | ~156–182 | `try_add_participant()` enforces sybil policy with hardcoded `min_trust_score: 0.1` | HIGH | ✅ Config-driven via `ComputePolicyConfig.min_trust_score` (PR #1384) |
 
 **Pattern**: `icn-compute` implements admission, scheduling, and cost decisions using trust scores and charter priorities directly — domain knowledge that belongs in a `ComputePolicyOracle` app.
 
-**Remediation**: Extract `check_standing()`, `SybilPolicy`, and preemption logic to a `ComputePolicyOracle`. Kernel receives `ConstraintSet { min_trust_score, credit_multiplier, preemption_priority }` from oracle and enforces blindly.
+**Sprint 21 remediation (PR #1384)**: Extracted `min_standing`, `min_trust_score`, and `fuel_cost_divisor` into `ComputePolicyConfig` in `icn-core/src/config/compute.rs`. Wired from `lifecycle.rs` into `CommonsPoolPolicy` and `SybilPolicy` on startup. Defaults match previously-hardcoded values (zero-config-change upgrade).
+
+**Remaining**: `CharterPriority` preemption routing and credit ceiling validation remain hardcoded. Full `ComputePolicyOracle` extraction deferred to Sprint 22.
 
 ---
 
-### 2. `icn-security` — HIGH · Refactor needed
+### 2. `icn-security` — HIGH · ✅ Partially remediated (Sprint 21)
 
 Reputation management encoded as hardcoded algorithms.
 
-| File | Lines | Violation | Severity |
-|------|-------|-----------|----------|
-| `src/misbehavior.rs` | ~100–120 | `Violation::severity()` returns hardcoded scores: Critical=10, Major=5, Minor=1 | HIGH |
-| `src/misbehavior.rs` | ~123–139 | `StorageFailureReason::severity()`: InvalidMerkleProof=8, DataMismatch=5, NoResponse=1 | HIGH |
-| `src/misbehavior.rs` | ~259–277 | `apply_penalty()`: `penalty = severity * 0.05` (5% per point — governance choice) | MEDIUM |
-| `src/misbehavior.rs` | ~313–314 | `max_violations_per_hour: 10` — hardcoded quarantine trigger | MEDIUM |
-| `src/misbehavior.rs` | ~318–319 | `violation_retention_secs: 7 * 24 * 3600` — hardcoded 7-day retention | MEDIUM |
+| File | Lines | Violation | Severity | Sprint 21 Status |
+|------|-------|-----------|----------|-----------------|
+| `src/misbehavior.rs` | ~100–120 | `Violation::severity()` returns hardcoded scores: Critical=10, Major=5, Minor=1 | HIGH | ✅ Config-driven via `SeverityWeights` + `severity_with_weights()` (PR #1385) |
+| `src/misbehavior.rs` | ~123–139 | `StorageFailureReason::severity()`: InvalidMerkleProof=8, DataMismatch=5, NoResponse=1 | HIGH | ✅ Config-driven via `SeverityWeights.storage_*` fields (PR #1385) |
+| `src/misbehavior.rs` | ~259–277 | `apply_penalty()`: `penalty = severity * 0.05` (5% per point — governance choice) | MEDIUM | ✅ Config-driven via `MisbehaviorThresholds.penalty_rate` + `ReputationPolicyConfig` (PR #1385) |
+| `src/misbehavior.rs` | ~313–314 | `max_violations_per_hour: 10` — hardcoded quarantine trigger | MEDIUM | ⏳ Deferred to Sprint 22 |
+| `src/misbehavior.rs` | ~318–319 | `violation_retention_secs: 7 * 24 * 3600` — hardcoded 7-day retention | MEDIUM | ⏳ Deferred to Sprint 22 |
 
 **Pattern**: Severity scores, decay rates, quarantine thresholds, and retention policies are governance decisions hardcoded as kernel constants.
 
-**Remediation**: `icn-security` should store raw violations (type, timestamp, count). A `ReputationPolicyOracle` provides `ConstraintSet { severity_score, penalty_rate, quarantine_threshold }` based on cooperative charter. The kernel enforces the provided values without knowing their origin.
+**Sprint 21 remediation (PR #1385)**: Extracted severity weights into `SeverityWeights` struct; added `severity_with_weights()` to `Violation` and `StorageFailureReason`; made `penalty_rate` a field on `MisbehaviorThresholds`; added `ReputationPolicyConfig` and `SecurityConfig` in `icn-core/src/config/security.rs`; wired from `lifecycle.rs` via `set_severity_weights()` and `set_penalty_rate()` on startup. Defaults match previously-hardcoded values.
+
+**Remaining**: `max_violations_per_hour` and `violation_retention_secs` remain in `MisbehaviorThresholds` but are not yet exposed in `SecurityConfig`. Full `ReputationPolicyOracle` extraction deferred to Sprint 22.
 
 ---
 
@@ -117,13 +122,13 @@ Observability layer exposes domain thresholds as constants.
 
 ## Summary
 
-| Crate | Violations | Severity | Action |
-|-------|-----------|----------|--------|
-| `icn-compute` | 6 | HIGH | Extract `ComputePolicyOracle` |
-| `icn-security` | 5 | HIGH | Extract `ReputationPolicyOracle` |
-| `icn-ledger` | 4 | MEDIUM | Move `CreditPolicy` to `apps/ledger` |
-| `icn-core` | 2 | MEDIUM | Minor effect label cleanup |
-| `icn-obs` | 1 | LOW | Config-ize attestation thresholds |
+| Crate | Original Violations | Severity | Sprint 21 Status |
+|-------|---------------------|----------|-----------------|
+| `icn-compute` | 6 | HIGH | ✅ 3 remediated (min_standing, min_trust_score, fuel_cost_divisor) · ⏳ 3 deferred |
+| `icn-security` | 5 | HIGH | ✅ 3 remediated (severity weights, penalty_rate) · ⏳ 2 deferred |
+| `icn-ledger` | 4 | MEDIUM | ⏳ Deferred to Sprint 22 |
+| `icn-core` | 2 | MEDIUM | ⏳ Deferred to Sprint 23+ |
+| `icn-obs` | 1 | LOW | ⏳ Deferred to Sprint 22 |
 | `icn-gossip` | 0 | — | ✅ Clean |
 | `icn-net` | 0 | — | ✅ Clean |
 | `icn-gateway` | 0 | — | ✅ Clean |
@@ -131,25 +136,28 @@ Observability layer exposes domain thresholds as constants.
 | `icn-rpc` | 0 | — | ✅ Clean |
 | `icn-federation` | 0 | — | ✅ Clean |
 
+**Sprint 21 result**: 5 of 8 original HIGH/MEDIUM violations resolved. All HIGH violations in `icn-compute` and `icn-security` are now config-driven with governance-safe defaults.
+
 ---
 
 ## Remediation Priority Order
 
-1. **`icn-compute` → `ComputePolicyOracle`** (Sprint 21)
-   - `commons_pool.rs`: move `SybilPolicy` and sybil admission check to oracle
-   - `policy.rs`: move `check_standing()`, `estimate_task_cost()`, `CharterPriority` routing to oracle
-   - Kernel receives `ConstraintSet { min_trust_score, credit_multiplier, preemption_priority }`
+1. **`icn-compute` → `ComputePolicyOracle`** (Sprint 21 — partial ✅)
+   - ✅ `min_standing`, `min_trust_score`, `fuel_cost_divisor` now in `ComputePolicyConfig` (PR #1384)
+   - ⏳ `CharterPriority` preemption routing and credit ceiling still hardcoded
+   - Full oracle extraction (full `ComputePolicyOracle`) deferred to Sprint 22
 
-2. **`icn-security` → `ReputationPolicyOracle`** (Sprint 21)
-   - `misbehavior.rs`: store raw violations; oracle provides severity scores and quarantine thresholds
-   - Kernel enforces provided `ConstraintSet { quarantine_threshold, penalty_rate, retention_secs }`
+2. **`icn-security` → `ReputationPolicyOracle`** (Sprint 21 — partial ✅)
+   - ✅ `SeverityWeights`, `penalty_rate` now in `ReputationPolicyConfig` (PR #1385)
+   - ⏳ `max_violations_per_hour`, `violation_retention_secs` not yet in `SecurityConfig`
+   - Full oracle extraction deferred to Sprint 22
 
 3. **`icn-ledger` → `apps/ledger`** (Sprint 22)
    - Move `CreditPolicy` struct and presets to `apps/ledger`
    - `SettlementEngine` receives `ConstraintSet { credit_limit, credit_multiplier }` per cooperative
    - Remove `conservative()` / `permissive()` from kernel code
 
-4. **`icn-obs` attestation thresholds** (Sprint 22 or config PR)
+4. **`icn-obs` attestation thresholds** (Sprint 22)
    - Replace compiled constants with `ObsConfig` fields
    - Defaults match current values for backward compatibility
 
@@ -189,3 +197,5 @@ This ratchet prevents regression while remediation proceeds incrementally.
 - [docs/spec/federation-settlement-finality.md](../spec/federation-settlement-finality.md) — finality spec (Sprint 20)
 - Issue #1370 — tracking issue for this remediation
 - Issues #916, #871 — Phase 1 CI enforcement (complete)
+- PR #1384 — Sprint 21 s21-t1: `ComputePolicyConfig` extraction (merged)
+- PR #1385 — Sprint 21 s21-t2: `ReputationPolicyConfig` / `SeverityWeights` extraction

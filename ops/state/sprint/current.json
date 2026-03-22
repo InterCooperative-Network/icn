@@ -19,26 +19,26 @@
     {
       "id": "s21-t1",
       "title": "feat(compute): make admission thresholds config-driven (#1370 partial)",
-      "status": "pending",
-      "pr": null,
+      "status": "done",
+      "pr": 1384,
       "issue": 1370,
-      "note": "ComputePolicyConfig in icn-core/config/compute.rs. min_standing, min_trust_score, fuel_cost_divisor. Wire into lifecycle.rs. Defaults match current hardcoded values."
+      "note": "Merged. ComputePolicyConfig (min_standing, min_trust_score, fuel_cost_divisor) + CommonsPoolPolicy.fuel_cost_divisor + SybilPolicy.min_trust_score wired from lifecycle.rs."
     },
     {
       "id": "s21-t2",
       "title": "feat(security): make severity scoring config-driven (#1370 partial)",
-      "status": "pending",
-      "pr": null,
+      "status": "in_progress",
+      "pr": 1385,
       "issue": 1370,
-      "note": "SeverityWeights struct, severity_with_weights() method, penalty_rate in ReputationPolicyConfig. Wire into MisbehaviorDetector via lifecycle.rs. Defaults match current hardcoded values."
+      "note": "PR open. SeverityWeights, severity_with_weights(), penalty_rate in ReputationPolicyConfig/SecurityConfig. Wired in lifecycle.rs. CI running."
     },
     {
       "id": "s21-t3",
       "title": "docs(arch): update meaning firewall audit post-sprint",
-      "status": "pending",
-      "pr": null,
+      "status": "in_progress",
+      "pr": 1387,
       "issue": 1370,
-      "note": "Update docs/architecture/meaning-firewall-audit.md to mark compute and security violations as remediated. Update summary table."
+      "note": "PR open. Updated violation tables with Sprint 21 status column. Marked compute (3/6) and security (3/5) violations as remediated. CI running."
     }
   ],
   "deferred_to_s22": {
