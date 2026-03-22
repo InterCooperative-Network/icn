@@ -3,6 +3,7 @@
 **Date:** 2026-03-22
 **Status:** Approved
 **Author:** Matt Faherty
+**Owner:** Matt Faherty (sole executor unless otherwise assigned)
 
 ---
 
@@ -43,16 +44,17 @@ Turn current completion into a stable, legible, demoable platform baseline. Do t
 *Make the repo tell the truth.*
 
 **s23-t1** — Fix `Test Coverage` CI failure on `main`
-- **Acceptance:** Test Coverage failure resolved; `main` passes all required non-observational gates, or remaining failures are explicitly classified and documented as non-blocking with rationale committed.
+- **Acceptance:** Test Coverage failure resolved; `main` passes all required non-observational gates, or remaining failures are explicitly classified as non-blocking with rationale committed to `ops/state/ci-exceptions.md`.
 
 **s23-t2** — Resolve dirty file in `icn/` (from #1394 skills rewrite merge)
-- **Acceptance:** `git status` is clean on `main`. The dirty file is either committed, stashed with documented intent, or deleted with documented rationale.
+- **Acceptance:** `git status` is clean on `main`. The dirty file is either committed with a rationale commit message, or deleted. Stash is not an acceptable resolution — it is not a portable terminal state.
 
 **s23-t3** — Remove stale `1310-execution-receipt-gate` worktree
 - **Acceptance:** `icn-wt/` contains no detached or branchless worktree entries. Stale branch pruned or deleted.
 
 **s23-t4** — Formally close Sprint 22
-- **Acceptance:** Sprint 22 state reconciled across board + `current.json` + merged issue disposition. All five s22 tasks marked done. Sprint board closed. No "in-review" state pointing at already-merged PRs.
+- **Artifact:** `ops/state/sprint/current.json` (sprint board source of truth)
+- **Acceptance:** Sprint 22 state reconciled across board + `ops/state/sprint/current.json` + merged issue disposition on GitHub. All five s22 tasks marked done. Sprint board closed. No "in-review" state pointing at already-merged PRs.
 
 ---
 
@@ -62,10 +64,10 @@ Turn current completion into a stable, legible, demoable platform baseline. Do t
 Runs in parallel with Track A. Does not block Track A.
 
 **s23-t5** — `#1095` CRDT OrSet + LwwRegister implementation
-- **Acceptance:** Merged, explicitly deferred with documented rationale, or decomposed into bounded child tasks with named ownership and acceptance criteria. No ambiguity about disposition.
+- **Acceptance:** `#1095` (CRDT OrSet + LwwRegister) is merged, explicitly deferred with documented rationale committed, or decomposed into bounded child tasks with named ownership and acceptance criteria. No ambiguity about disposition.
 
 **s23-t6** — `#1096` ContainerRuntime trait interface
-- **Acceptance:** Merged, explicitly deferred with documented rationale, or decomposed into bounded child tasks with named ownership and acceptance criteria. No ambiguity about disposition.
+- **Acceptance:** `#1096` (ContainerRuntime trait) is merged, explicitly deferred with documented rationale committed, or decomposed into bounded child tasks with named ownership and acceptance criteria. No ambiguity about disposition.
 
 **s23-t7** — `#1131` Storage Specification — Storage is Governance
 - **Acceptance:** Written spec merged to `docs/`, issue closed or explicitly deferred with rationale committed. Independent of t5/t6 — proceed in parallel.
@@ -80,31 +82,37 @@ These are **first-class sprint tasks**, not documentation exhaust. They are synt
 Each has hard dependency relationships to the Track A/B work it crystallizes.
 
 **s23-t8** — Publish current platform baseline
-- **Depends on:** s23-t1, s23-t2, s23-t4 (operational truth restored)
+- **Depends on:** s23-t1, s23-t2, s23-t3, s23-t4 (operational truth fully restored before doc is authored)
 - **Artifact:** `docs/platform-baseline-2026-03.md`
 - **Acceptance:** One document exists that answers: what ICN is now, what is complete, what is in progress, what is next. A new contributor can orient from this document without requiring oral tradition.
 
 **s23-t9** — Roadmap + sprint-state refresh
 - **Depends on:** s23-t4 (Sprint 22 closed), s23-t7 (P0 tail disposition known)
-- **Acceptance:** `roadmap-current.yaml` updated to reflect post-Sprint-22 state. Sprint 23 board is current. Sprint 24 candidate backlog listed with at least the Commons Compute trio (#925, #947, #964) shaped as candidates.
+- **Artifact:** `docs/strategy/ICN-Roadmap-Live.md` (update in place; create Sprint 23 section if absent)
+- **Acceptance:** `ICN-Roadmap-Live.md` updated to reflect post-Sprint-22 completion state. Sprint 23 board is current in `ops/state/sprint/current.json`. Sprint 24 candidate backlog listed with at least the Commons Compute trio (#925, #947, #964) shaped as candidates.
 
 **s23-t10** — Validate and document canonical demo path
-- **Depends on:** s23-t5, s23-t6 (P0 implementation disposition resolved)
+- **Depends on:** s23-t5, s23-t6 (P0 disposition must be known so the demo doc can explicitly state what is included and what is deferred — not because the demo flows depend on CRDTs or ContainerRuntime directly)
 - **Artifact:** `docs/demo-path-2026-03.md`
-- **Acceptance:** One document with exact commands to reproduce the current demo on `main`. Tested against reality, not aspiration. Covers at minimum: devnet startup, Flow A (WASM), Flow B (discovery), Flow C (treasury governance).
+- **Acceptance:** One document with exact commands to reproduce the current demo on `main`. Tested against reality, not aspiration. Covers at minimum: devnet startup, Flow A (WASM), Flow B (discovery), Flow C (treasury governance). Explicitly notes disposition of #1095 and #1096 where relevant to demo coverage.
 
 ---
 
 ## Dependencies
 
 ```
-Track A (t1–t4)  ──────────────────────────────────┐
-                                                    ├──▶ t8 (baseline doc)
-Track B (t5–t6)  ──────────────────────────────────┘
-     │                                              └──▶ t10 (demo path)
-     └─ t7 (independent) ──────────────────────────▶ t9 (roadmap refresh)
+t1 ─┐
+t2 ─┼──▶ t8 (baseline doc)
+t3 ─┤
+t4 ─┘
 
-Track A t4 ────────────────────────────────────────▶ t9 (roadmap refresh)
+t4 ──────────────────────────────────────────────▶ t9 (roadmap refresh)
+t7 ──────────────────────────────────────────────▶ t9
+
+t5 ─┬────────────────────────────────────────────▶ t10 (demo path)
+t6 ─┘
+
+t7  (independent — runs in parallel with t5/t6)
 ```
 
 ---
