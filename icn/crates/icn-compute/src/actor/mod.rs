@@ -107,6 +107,9 @@ pub struct ComputeActor {
     /// Commons resource pool for tracking nodes contributing to the commons (Epic 6 #946).
     /// Advisory scheduling state only — ledger is authoritative economic state.
     commons_pool: Arc<RwLock<crate::commons_pool::CommonsPool>>,
+    /// Maximum age before a commons pool participant is considered stale (#964).
+    /// None = expiry disabled (default). Set via `set_stale_participant_config()`.
+    stale_participant_max_age: Option<std::time::Duration>,
     /// Commons pool governance policy (E7 - #1134).
     /// When set, all task submissions are validated against this policy:
     /// standing checks, credit ceiling enforcement, and charter priority ordering.
@@ -163,6 +166,7 @@ impl ComputeActor {
             capacity_budget: Arc::new(RwLock::new(crate::scheduler::CapacityBudget::default())),
             demand_adjustment_config: crate::scheduler::DemandAdjustmentConfig::default(),
             commons_pool: Arc::new(RwLock::new(crate::commons_pool::CommonsPool::new())),
+            stale_participant_max_age: None,
             commons_pool_policy: None,
             balance_callback: None,
             commons_settlement_callback: None,
@@ -206,6 +210,18 @@ impl ComputeActor {
         self.commons_pool = Arc::new(RwLock::new(crate::commons_pool::CommonsPool::with_policy(
             policy,
         )));
+    }
+
+    /// Configure stale participant expiry for the commons pool (#964).
+    ///
+    /// When set, `on_capacity_announce` prunes participants whose
+    /// `last_announce` exceeds `config.max_age` before each new admission.
+    /// Disabled by default — participants accumulate until explicitly expired.
+    pub fn set_stale_participant_config(
+        &mut self,
+        config: crate::commons_pool::StaleParticipantConfig,
+    ) {
+        self.stale_participant_max_age = Some(config.max_age);
     }
 
     /// Set balance callback for commons credit ceiling enforcement (E7 - #1134).
@@ -414,6 +430,19 @@ impl ComputeActor {
     /// Set resource refresh configuration
     pub fn set_resource_refresh_config(&mut self, config: crate::scheduler::ResourceRefreshConfig) {
         self.resource_refresh_config = config;
+    }
+
+    /// Returns a cloned Arc to the internal commons pool.
+    ///
+    /// Test-only: allows integration tests to inspect pool state after driving
+    /// messages through the actor, without adding a production observability API.
+    /// Named `_for_test` to signal intent; kept `#[doc(hidden)]` to suppress
+    /// documentation but still compile in integration test binaries.
+    #[doc(hidden)]
+    pub fn commons_pool_for_test(
+        &self,
+    ) -> std::sync::Arc<tokio::sync::RwLock<crate::commons_pool::CommonsPool>> {
+        std::sync::Arc::clone(&self.commons_pool)
     }
 
     /// Spawn the actor and return a handle

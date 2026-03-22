@@ -62,7 +62,8 @@ pub use checkpoint_store::{
     CheckpointBackend, CheckpointStore, InMemoryBackend, SledCheckpointBackend,
 };
 pub use commons_pool::{
-    AggregateCapacity, CommonsParticipant, CommonsPool, SybilPolicy, SybilRejection,
+    AggregateCapacity, CommonsParticipant, CommonsPool, StaleParticipantConfig, SybilPolicy,
+    SybilRejection,
 };
 pub use dispute::{
     ComputeDispute, ComputeResult as DisputeComputeResult, DisputeManager, DisputeResolution,

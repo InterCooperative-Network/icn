@@ -723,6 +723,22 @@ impl ComputeActor {
         icn_obs::metrics::compute::executors_available_set(registry.len() as f64);
         drop(registry);
 
+        // --- Stale participant expiry (#964) ---
+        //
+        // Prune participants that have not re-announced within the configured max_age.
+        // Piggybacking on each incoming announce avoids a background timer for V1.
+        if let Some(max_age) = self.stale_participant_max_age {
+            let expired = {
+                let mut pool = self.commons_pool.write().await;
+                pool.expire_stale(max_age)
+            };
+            if !expired.is_empty() {
+                let count = expired.len() as u64;
+                tracing::debug!(count, "Expired stale commons pool participants");
+                icn_obs::metrics::compute::commons_pool_expired_inc(count);
+            }
+        }
+
         // --- Commons pool decision matrix (Epic 6 #947) ---
         //
         // | cell_id | capacity_budget | Behavior                                     |
@@ -762,6 +778,7 @@ impl ComputeActor {
                 capacity,
                 budget: effective_budget,
                 trust_score,
+                is_affiliated: cell_id.is_some(),
                 last_announce: std::time::Instant::now(),
             };
             let mut pool = self.commons_pool.write().await;

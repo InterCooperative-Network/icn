@@ -2,7 +2,9 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use icn_compute::commons_pool::{CommonsParticipant, CommonsPool};
-use icn_compute::{CapacityBudget, NodeCapacity};
+use icn_compute::{CapacityBudget, ComputeActor, ComputeMessage, NodeCapacity, TrustCallback};
+use icn_kernel_api::CellId;
+use std::sync::Arc;
 use std::time::Instant;
 
 /// Helper to create a NodeCapacity for testing.
@@ -36,6 +38,7 @@ fn test_unaffiliated_node_joins_pool() {
             commons_share: 1.0,
         },
         trust_score: 0.5,
+        is_affiliated: false,
         last_announce: Instant::now(),
     };
 
@@ -208,6 +211,7 @@ fn test_pool_participant_lifecycle() {
                 ..CapacityBudget::default()
             },
             trust_score: 0.5,
+            is_affiliated: false,
             last_announce: Instant::now(),
         });
     }
@@ -230,4 +234,88 @@ fn test_pool_participant_lifecycle() {
     assert!((agg2.cpu_cores - 4.2).abs() < 1e-10);
     // node1: 8192*1.0=8192, node3: 4096*0.1=409 → 8601
     assert_eq!(agg2.memory_mb, 8601);
+}
+
+// ─── s24-t2: live path through on_capacity_announce (#947) ───────────────────
+//
+// The unit tests (test_unaffiliated_zero_trust_admitted, test_affiliated_zero_trust_rejected)
+// prove the CommonsPool admission logic in isolation. These actor-level tests prove the
+// wiring: NodeCapacityAnnounce gossip message → on_capacity_announce() → trust_callback
+// invocation → pool admission decision.
+//
+// Seam: ComputeActor::commons_pool_for_test() returns a clone of the internal pool Arc,
+// allowing direct pool state inspection after async message processing without adding a
+// production observability API.
+
+/// Test 8 (s24-t2): Unaffiliated node with trust 0.0 is admitted via NodeCapacityAnnounce.
+///
+/// Proves the full gossip → actor loop → on_capacity_announce → pool admission path.
+/// Before s24-t1: trust 0.0 < min_trust_score 0.1 → rejected.
+/// After s24-t1: unaffiliated nodes use commons_admission_min_trust 0.0 → admitted.
+#[tokio::test]
+async fn test_unaffiliated_zero_trust_admitted_via_capacity_announce() {
+    // trust_callback returns 0.0 for all peers — simulates a node the trust graph
+    // has never seen (trust score defaults to 0.0 for unknown DIDs).
+    let trust_cb: TrustCallback = Arc::new(|_| 0.0);
+    let actor = ComputeActor::new("did:icn:scheduler".into(), trust_cb);
+
+    // Clone pool Arc before spawn — the actor holds the same Arc internally.
+    let pool_ref = actor.commons_pool_for_test();
+
+    let handle = actor.spawn();
+
+    // Unaffiliated announce: cell_id=None → is_affiliated=false → commons_admission_min_trust (0.0)
+    // capacity_budget=None → effective_budget = full commons (commons_share: 1.0)
+    handle
+        .handle_gossip(ComputeMessage::NodeCapacityAnnounce {
+            executor: "did:icn:newcomer".into(),
+            capacity: test_capacity(4.0, 8192, 50000),
+            cell_id: None,
+            capacity_budget: None,
+        })
+        .await
+        .expect("NodeCapacityAnnounce must be delivered");
+
+    // Allow the actor's async loop to process the message.
+    tokio::time::sleep(tokio::time::Duration::from_millis(30)).await;
+
+    let pool = pool_ref.read().await;
+    assert!(
+        pool.contains("did:icn:newcomer"),
+        "unaffiliated node with trust 0.0 must be admitted via on_capacity_announce"
+    );
+    assert_eq!(pool.participant_count(), 1);
+}
+
+/// Test 9 (s24-t2): Affiliated node with trust 0.0 is rejected via NodeCapacityAnnounce.
+///
+/// Mirror of Test 8. cell_id=Some(...) → is_affiliated=true → min_trust_score (0.1).
+/// Trust 0.0 < 0.1 → rejected (evicted if previously present).
+#[tokio::test]
+async fn test_affiliated_zero_trust_rejected_via_capacity_announce() {
+    let trust_cb: TrustCallback = Arc::new(|_| 0.0);
+    let actor = ComputeActor::new("did:icn:scheduler".into(), trust_cb);
+
+    let pool_ref = actor.commons_pool_for_test();
+    let handle = actor.spawn();
+
+    // Affiliated announce: cell_id=Some(...) → is_affiliated=true → min_trust_score (0.1)
+    handle
+        .handle_gossip(ComputeMessage::NodeCapacityAnnounce {
+            executor: "did:icn:affiliated-newcomer".into(),
+            capacity: test_capacity(4.0, 8192, 50000),
+            cell_id: Some(CellId([1u8; 32])),
+            capacity_budget: None,
+        })
+        .await
+        .expect("NodeCapacityAnnounce must be delivered");
+
+    tokio::time::sleep(tokio::time::Duration::from_millis(30)).await;
+
+    let pool = pool_ref.read().await;
+    assert!(
+        !pool.contains("did:icn:affiliated-newcomer"),
+        "affiliated node with trust 0.0 must be rejected via on_capacity_announce (min_trust_score 0.1)"
+    );
+    assert_eq!(pool.participant_count(), 0);
 }

@@ -1,54 +1,69 @@
 {
-  "sprint": 22,
-  "name": "Sprint 22 — Meaning Firewall Completion",
-  "started": "2026-03-22",
-  "goals": [
-    "Extract remaining icn-security hardcoded violations (max_violations_per_hour, violation_retention_secs) to MisbehaviorThresholdsConfig",
-    "Extract remaining icn-compute violations (CharterPriority preemption, credit ceiling) to ComputePolicyConfig",
-    "Extract icn-ledger CreditPolicy/NewMemberPolicy factory values to CreditPolicyConfig (highest regulatory priority)",
-    "Extract icn-obs attestation threshold constants to AttestationConfig",
-    "Update meaning-firewall-audit.md to reflect Sprint 22 remediations"
+  "sprint": 24,
+  "theme": "Commons Compute Spine",
+  "governing_rule": "A task is only done when repo state, board state, and narrative state agree.",
+  "start_date": "2026-03-22",
+  "status": "active",
+  "spine": [
+    "#925",
+    "#947",
+    "#964"
   ],
   "tasks": [
     {
-      "id": "s22-t1",
-      "title": "icn-security: extract max_violations_per_hour + violation_retention_secs to MisbehaviorThresholdsConfig",
-      "status": "in-review",
-      "pr": 1389,
-      "assignee": null,
-      "epic": "meaning-firewall"
+      "id": "s24-t1",
+      "title": "#947 Trust bootstrap for unaffiliated commons pool nodes",
+      "track": "A",
+      "status": "ready",
+      "github_issue": 947,
+      "branch": "feat/947-unaffiliated-trust-bootstrap",
+      "scope": "icn-compute/src/commons_pool.rs + actor/placement.rs",
+      "notes": "Add commons_admission_min_trust:0.0 to SybilPolicy, is_affiliated:bool to CommonsParticipant, branch in try_add_participant(). ~40 lines."
     },
     {
-      "id": "s22-t2",
-      "title": "icn-compute: extract CharterPriority preemption routing + credit ceiling validation to ComputePolicyConfig",
-      "status": "in-review",
-      "pr": 1391,
-      "assignee": null,
-      "epic": "meaning-firewall"
+      "id": "s24-t2",
+      "title": "#947 Integration test: unaffiliated node full path (announce\u2192pool\u2192task\u2192settlement)",
+      "track": "A",
+      "status": "ready",
+      "github_issue": 947,
+      "depends_on": [
+        "s24-t1"
+      ],
+      "scope": "icn-compute/tests/commons_integration.rs",
+      "notes": "Test through on_capacity_announce with trust_callback returning 0.0. Verify pool admission, task routing, credit settlement."
     },
     {
-      "id": "s22-t3",
-      "title": "icn-ledger: extract CreditPolicy + NewMemberPolicy factory values to CreditPolicyConfig (highest regulatory priority)",
-      "status": "in-review",
-      "pr": 1392,
-      "assignee": null,
-      "epic": "meaning-firewall"
+      "id": "s24-t3",
+      "title": "#964 Stale commons pool participant expiry",
+      "track": "A",
+      "status": "ready",
+      "github_issue": 964,
+      "depends_on": [
+        "s24-t1"
+      ],
+      "scope": "icn-compute/src/commons_pool.rs + actor/placement.rs",
+      "notes": "Add expire_stale(max_age) method, StaleParticipantConfig, call on each announce, emit commons_pool_expired_total metric. ~30 lines."
     },
     {
-      "id": "s22-t4",
-      "title": "icn-obs: extract 5 attestation threshold constants to AttestationConfig",
-      "status": "in-review",
-      "pr": 1390,
-      "assignee": null,
-      "epic": "meaning-firewall"
+      "id": "s24-t4",
+      "title": "Close #947 and #925 after t1+t2 pass CI",
+      "track": "A",
+      "status": "waiting",
+      "depends_on": [
+        "s24-t1",
+        "s24-t2"
+      ],
+      "notes": "Merge branch, close #947, verify #946+#947+#948+#949 all closed, then close parent #925."
     },
     {
-      "id": "s22-t5",
-      "title": "docs: update meaning-firewall-audit.md to mark all Sprint 22 remediations complete",
-      "status": "in-review",
-      "pr": 1392,
-      "assignee": null,
-      "epic": "meaning-firewall"
+      "id": "s24-t5",
+      "title": "Close #964 after t3 passes CI",
+      "track": "A",
+      "status": "waiting",
+      "depends_on": [
+        "s24-t3"
+      ],
+      "notes": "Merge stale expiry PR, close #964."
     }
   ]
 }

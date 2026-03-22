@@ -1894,6 +1894,7 @@ mod tests {
             trust_score: 0.3, // below 0.5 threshold
             capacity: zero_capacity(),
             budget: CapacityBudget::default(),
+            is_affiliated: true,
             last_announce: Instant::now(),
         };
         assert!(
@@ -1906,6 +1907,7 @@ mod tests {
             trust_score: 0.7, // above 0.5 threshold
             capacity: zero_capacity(),
             budget: CapacityBudget::default(),
+            is_affiliated: true,
             last_announce: Instant::now(),
         };
         assert!(

@@ -3904,6 +3904,11 @@ pub mod compute {
         .increment(1);
     }
 
+    /// Record commons pool participants removed by stale expiry (#964).
+    pub fn commons_pool_expired_inc(count: u64) {
+        counter!("icn_compute_commons_pool_expired_total").increment(count);
+    }
+
     // === Commons Credit Accounting Metrics (Epic 6 #925) ===
 
     /// Record commons credits earned by a contributor.
