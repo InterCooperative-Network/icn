@@ -44,17 +44,21 @@
       "id": "s23-t5",
       "title": "#1095 CRDT OrSet + LwwRegister implementation",
       "track": "B",
-      "status": "pending",
-      "artifact": null,
-      "depends_on": []
+      "status": "done",
+      "artifact": "ops/state/deferrals/s23-t5-crdt-deferral.md",
+      "depends_on": [],
+      "completed_date": "2026-03-22",
+      "commit": "6588a8e9"
     },
     {
       "id": "s23-t6",
       "title": "#1096 ContainerRuntime trait interface",
       "track": "B",
-      "status": "pending",
-      "artifact": null,
-      "depends_on": []
+      "status": "done",
+      "artifact": "icn/crates/icn-kernel-api/src/container.rs",
+      "depends_on": [],
+      "completed_date": "2026-03-22",
+      "commit": "4c055f0f"
     },
     {
       "id": "s23-t7",
