@@ -35,9 +35,10 @@
       "id": "s23-t4",
       "title": "Formally close Sprint 22",
       "track": "A",
-      "status": "in-progress",
+      "status": "done",
       "artifact": "ops/state/sprint/current.json",
-      "depends_on": []
+      "depends_on": [],
+      "completed_date": "2026-03-22"
     },
     {
       "id": "s23-t5",
@@ -57,7 +58,7 @@
     },
     {
       "id": "s23-t7",
-      "title": "#1131 Storage Specification — Storage is Governance",
+      "title": "#1131 Storage Specification \u2014 Storage is Governance",
       "track": "B",
       "status": "done",
       "completed_date": "2026-03-22",
@@ -70,7 +71,12 @@
       "track": "C",
       "status": "pending",
       "artifact": "docs/state/ICN-Platform-Baseline-2026-03.md",
-      "depends_on": ["s23-t1", "s23-t2", "s23-t3", "s23-t4"]
+      "depends_on": [
+        "s23-t1",
+        "s23-t2",
+        "s23-t3",
+        "s23-t4"
+      ]
     },
     {
       "id": "s23-t9",
@@ -78,7 +84,10 @@
       "track": "C",
       "status": "pending",
       "artifact": "docs/strategy/ICN-Roadmap-Live.md",
-      "depends_on": ["s23-t4", "s23-t7"]
+      "depends_on": [
+        "s23-t4",
+        "s23-t7"
+      ]
     },
     {
       "id": "s23-t10",
@@ -86,7 +95,10 @@
       "track": "C",
       "status": "pending",
       "artifact": "docs/state/demo-path-2026-03.md",
-      "depends_on": ["s23-t5", "s23-t6"]
+      "depends_on": [
+        "s23-t5",
+        "s23-t6"
+      ]
     }
   ]
 }
