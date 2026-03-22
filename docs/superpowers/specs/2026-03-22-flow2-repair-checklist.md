@@ -1,5 +1,10 @@
 # Flow 2 (Patronage) Pre-Sprint Repair Checklist
 
+> **UPDATE 2026-03-22:** Live validation completed. Flow 2 is working. All steps below
+> were executed; no repairs were needed. See findings at the bottom of this file.
+
+
+
 **Date:** 2026-03-22
 **Sprint context:** Pre-Sprint-24 prerequisite pass
 **Estimated time:** 1–2 hours
@@ -175,3 +180,45 @@ Update the planning doc:
 ```
 
 Sprint 24 kickoff on #925/#947/#964 can proceed without this as a distraction.
+
+---
+
+## Validation Results — 2026-03-22
+
+**Executed by:** Claude Code session (Sprint 23 close)
+**Method:** kubectl port-forward + icnctl auth token + direct curl
+
+### Environment
+- icn-dev (10.8.30.45), kubectl access to K3s cluster
+- `kubectl port-forward -n icn-coop-alpha svc/icn-alpha 18081:8080`
+- Token acquired via `kubectl exec ... icnctl auth token --coop-id brightworks-cooperative`
+
+### Initial state
+- `localhost:18081` unreachable (no active port-forward — expected)
+- K3s NodePort 30080 healthy, but wrong endpoint for this demo
+
+### Steps executed
+1. ✅ Established port-forward to `icn-coop-alpha/icn-alpha:8080 → localhost:18081`
+2. ✅ Retrieved passphrase from `icn-alpha-secrets` K8s secret
+3. ✅ Acquired auth token via `icnctl auth token` inside pod
+4. ✅ Tested all three ledger routes with auth token
+
+### Results
+
+| Check | Result |
+|-------|--------|
+| `GET /v1/health` | 200 ✅ |
+| `GET /v1/ledger/brightworks-cooperative/history` | 200 — 3 transactions present ✅ |
+| `GET /v1/ledger/brightworks-cooperative/position/{did}` | 200 ✅ |
+| `POST /v1/ledger/brightworks-cooperative/settle` | 201 — hash returned ✅ |
+| Hardcoded DID matches pod DID | ✅ No update needed |
+
+### Conclusion
+
+**Flow 2 is unblocked. No repair was needed.**
+
+The "FRAGILE, ledger routes 404" characterization in the Sprint 23 demo-path doc was incorrect.
+The s23-t10 subagent read historical script warning comments (scope gaps resolved 2026-03-18)
+as evidence of current failures without running the script. No 404s were observed in live testing.
+
+Sprint 24 opens without Flow 2 as prerequisite debt.

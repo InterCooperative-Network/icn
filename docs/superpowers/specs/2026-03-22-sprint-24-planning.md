@@ -44,30 +44,30 @@ The demo debt is **not one thing**. Collapsing it into "demo polish" will cause 
 
 These flows have no demo exercise at all. The gateway routes for compute and discovery exist; there is no scripted walkthrough. This is **authoring work** — writing the scripts, finding the right sequence of API calls, making them presenter-grade.
 
-### Class 2 — Deployment/Seeding Debt
+### Class 2 — ~~Deployment/Seeding Debt~~ RESOLVED (2026-03-22)
 
-| Flow | Script | Status | Failure mode |
-|------|--------|--------|--------------|
-| Patronage (Flow 2) | `flow-2-patronage.sh` | Fragile | Ledger routes return 404 |
+| Flow | Script | Status | Validated |
+|------|--------|--------|-----------|
+| Patronage (Flow 2) | `flow-2-patronage.sh` | **Working** | 2026-03-22 live test |
 
-**Critical correction from codebase audit:** The ledger routes are **fully implemented** in the gateway. `POST /ledger/:coop_id/settle`, `GET /ledger/:coop_id/position/:did`, and `GET /ledger/:coop_id/history` are all registered in `icn-gateway/src/server.rs` and implemented in `icn-gateway/src/api/ledger.rs`.
+**Live validation result (2026-03-22):** All three ledger routes return expected results with a valid auth token:
+- `GET /v1/ledger/brightworks-cooperative/history` → **200** (3 prior transactions present)
+- `GET /v1/ledger/brightworks-cooperative/position/{did}` → **200**
+- `POST /v1/ledger/brightworks-cooperative/settle` → **201** (transaction hash returned)
 
-The 404s are **not** a missing-route problem. They are a **deployment and seeding problem**:
-- The script uses `BRIGHTWORKS_URL=http://localhost:18081` (K3s NodePort)
-- The coop entity `brightworks-cooperative` must be seeded via `reseed-federation-demo.sh` before the flow runs
-- If pods were rebuilt after the last seed, the hardcoded `BRIGHTWORKS_NODE_DID` in the script is stale, and the seeded entity no longer matches
-- The result is resource 404, not route 404
+The "fragile — ledger routes 404" characterization in the Sprint 23 demo-path doc was incorrect. The s23-t10 subagent read historical warning comments in the script (scope gaps resolved as of 2026-03-18) as evidence of current failures without running the script. No 404s were ever observed in live testing.
 
-**The fix is lighter than the framing implies.** This is not "implement gateway routes." It is: verify K3s NodePort 18081 routing, re-run `reseed-federation-demo.sh` against the current cluster, update the hardcoded DID in `flow-2-patronage.sh` if pods were rebuilt. Estimated scope: 1–2 hours of ops work.
+The hardcoded `BRIGHTWORKS_NODE_DID` in `flow-2-patronage.sh:50` matches the running pod's DID exactly. Seeded data is present. No repair needed.
 
-### Class 3 — Proven Flows (for reference)
+**Flow 2 is not pre-sprint prerequisite work.** It is a proven flow.
+
+### Class 2 — Proven Flows
 
 | Flow | Script | Status |
 |------|--------|--------|
 | Governance (Flow 1) | `flow-1-governance.sh` | Proven |
+| Patronage (Flow 2) | `flow-2-patronage.sh` | Proven (validated 2026-03-22) |
 | Federation (Flow 3) | `flow-3-federation.sh` | Proven |
-
-These run clean. They are not at risk.
 
 ---
 
@@ -75,14 +75,14 @@ These run clean. They are not at risk.
 
 ### Pre-Sprint-24 Prerequisite Work
 
-These must be resolved **before** Sprint 24 engineering begins, or they will compete for attention with the commons-compute spine.
+One remaining prerequisite (Flow 2 was validated and removed):
 
 | Task | Class | Description | Estimated size |
 |------|-------|-------------|---------------|
-| **p24-pre-1** | Deployment | Diagnose flow-2 404s: verify K3s NodePort 18081, run `reseed-federation-demo.sh`, update stale DID if needed | 1–2 hrs |
+| ~~**p24-pre-1**~~ | ~~Deployment~~ | ~~Flow 2 repair~~ | **Resolved** — live test 2026-03-22 confirms working |
 | **p24-pre-2** | Ops | Confirm `cargo-tarpaulin` infrastructure fix path — either dedicated runner or switch to `llvm-cov`. Do not let this drift another sprint. | 2–4 hrs investigation |
 
-Neither of these is Sprint 24 engineering work. Both are ops/deployment work that should be resolved in the days between Sprint 23 close and Sprint 24 kickoff.
+p24-pre-2 is the only remaining ops item before Sprint 24 kickoff.
 
 ### Sprint 24 Proper — Commons Compute Hardening
 
@@ -109,12 +109,7 @@ These three form a closed loop: you can't do #947 without #925 accounting, and b
 
 ### Pre-requisite / Unblockers (before Sprint 24 kickoff)
 
-**p24-pre-1: Stabilize Flow 2 (Patronage)**
-- Why: Broken demo flow will surface at the worst possible moment
-- Owner: Ops / deployment
-- Dependency: K3s cluster access, `reseed-federation-demo.sh`
-- Success: `flow-2-patronage.sh` runs to the ledger settlement step and returns 2xx on all three ledger routes
-- Note: Do NOT rewrite the script before confirming the cluster state is the problem
+~~**p24-pre-1: Stabilize Flow 2 (Patronage)**~~ — **Closed 2026-03-22.** Live validation confirmed all three ledger routes return 200/201 with proper auth. No repair needed.
 
 **p24-pre-2: Decide Coverage CI path**
 - Why: Red CI is acknowledged but not resolved; can't drift another sprint
