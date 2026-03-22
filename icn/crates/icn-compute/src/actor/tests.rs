@@ -1753,6 +1753,7 @@ fn commons_policy(
         max_concurrent_per_submitter: 5,
         preemption_enabled: false,
         credit_ceiling,
+        fuel_cost_divisor: 1000,
     }
 }
 

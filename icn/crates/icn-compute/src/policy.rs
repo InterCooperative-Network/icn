@@ -90,6 +90,16 @@ pub struct CommonsPoolPolicy {
     /// Tasks whose estimated cost exceeds available credits are rejected.
     #[serde(default)]
     pub credit_ceiling: Option<i64>,
+
+    /// Fuel units per commons credit for cost estimation.
+    /// A divisor of 1000 means 1 credit per 1000 fuel units consumed.
+    /// Governance decision: set via config, not compiled constant.
+    #[serde(default = "default_fuel_cost_divisor")]
+    pub fuel_cost_divisor: u64,
+}
+
+fn default_fuel_cost_divisor() -> u64 {
+    1000
 }
 
 impl Default for CommonsPoolPolicy {
@@ -100,6 +110,7 @@ impl Default for CommonsPoolPolicy {
             max_concurrent_per_submitter: 5,
             preemption_enabled: false,
             credit_ceiling: None,
+            fuel_cost_divisor: default_fuel_cost_divisor(),
         }
     }
 }
@@ -122,7 +133,7 @@ impl CommonsPoolPolicy {
         };
 
         // Estimate task cost from fuel limit and payment rate
-        let estimated_cost = Self::estimate_task_cost(task);
+        let estimated_cost = self.estimate_task_cost(task);
 
         // Check if submitter has room under their ceiling
         let available = ceiling.saturating_sub(submitter_balance);
@@ -138,15 +149,17 @@ impl CommonsPoolPolicy {
 
     /// Estimate the credit cost of a task.
     ///
-    /// Uses payment_rate if specified, otherwise derives from fuel limit.
-    fn estimate_task_cost(task: &ComputeTask) -> i64 {
+    /// Uses payment_rate if specified, otherwise derives from fuel limit using
+    /// `fuel_cost_divisor` (governance-configured, default 1000 fuel per credit).
+    pub fn estimate_task_cost(&self, task: &ComputeTask) -> i64 {
+        let divisor = self.fuel_cost_divisor.max(1) as i64;
         if let Some(rate) = task.payment_rate {
-            // payment_rate is credits per 1000 fuel units
+            // payment_rate is credits per fuel_cost_divisor fuel units
             let fuel = task.fuel_limit.0 as i64;
-            (fuel * rate as i64) / 1000
+            (fuel * rate as i64) / divisor
         } else {
-            // Default: 1 credit per 1000 fuel units
-            (task.fuel_limit.0 as i64) / 1000
+            // Default: 1 credit per fuel_cost_divisor fuel units
+            (task.fuel_limit.0 as i64) / divisor
         }
     }
 
@@ -1606,6 +1619,7 @@ mod tests {
             max_concurrent_per_submitter: 10,
             preemption_enabled: true,
             credit_ceiling: Some(1000),
+            fuel_cost_divisor: 1000,
         };
 
         let json = serde_json::to_string(&policy).unwrap();
@@ -1789,5 +1803,119 @@ mod tests {
         } else {
             panic!("Expected InsufficientTrust error");
         }
+    }
+
+    // ========== Sprint 21: config-driven policy threshold tests ==========
+
+    #[test]
+    fn test_commonspool_policy_uses_configured_min_standing() {
+        // Cooperative configured a higher bar — 0.7 instead of default 0.3
+        let policy = CommonsPoolPolicy {
+            min_standing: 0.7,
+            ..CommonsPoolPolicy::default()
+        };
+        assert!(
+            policy.check_standing(0.6).is_err(),
+            "0.6 should fail 0.7 threshold"
+        );
+        assert!(
+            policy.check_standing(0.8).is_ok(),
+            "0.8 should pass 0.7 threshold"
+        );
+    }
+
+    #[test]
+    fn test_commonspool_policy_fuel_cost_divisor_configurable() {
+        // Default divisor (1000): 10000 fuel = 10 credits
+        let policy_default = CommonsPoolPolicy::default();
+        let task = make_test_task(TaskPriority::Normal); // fuel_limit = 10000
+        assert_eq!(policy_default.estimate_task_cost(&task), 10);
+
+        // Custom divisor (500): 10000 fuel = 20 credits
+        let policy_custom = CommonsPoolPolicy {
+            fuel_cost_divisor: 500,
+            ..CommonsPoolPolicy::default()
+        };
+        assert_eq!(policy_custom.estimate_task_cost(&task), 20);
+
+        // Custom divisor (2000): 10000 fuel = 5 credits
+        let policy_cheap = CommonsPoolPolicy {
+            fuel_cost_divisor: 2000,
+            ..CommonsPoolPolicy::default()
+        };
+        assert_eq!(policy_cheap.estimate_task_cost(&task), 5);
+    }
+
+    #[test]
+    fn test_sybil_policy_uses_configured_min_trust() {
+        use crate::commons_pool::{CommonsParticipant, CommonsPool, SybilPolicy};
+        use crate::scheduler::{CapacityBudget, NodeCapacity};
+        use std::time::Instant;
+
+        fn zero_capacity() -> NodeCapacity {
+            NodeCapacity {
+                cpu_cores_total: 1.0,
+                cpu_cores_available: 1.0,
+                memory_mb_total: 256,
+                memory_mb_available: 256,
+                storage_mb_available: 1024,
+                network_mbps: 100.0,
+                gpu_devices: vec![],
+                updated_at: 0,
+            }
+        }
+
+        // Cooperative configured a higher sybil threshold — 0.5 instead of default 0.1
+        let policy = SybilPolicy {
+            min_trust_score: 0.5,
+            ..SybilPolicy::default()
+        };
+        let mut pool = CommonsPool::with_policy(policy);
+
+        let low_trust = CommonsParticipant {
+            did: "did:icn:low".to_string(),
+            trust_score: 0.3, // below 0.5 threshold
+            capacity: zero_capacity(),
+            budget: CapacityBudget::default(),
+            last_announce: Instant::now(),
+        };
+        assert!(
+            pool.try_add_participant(low_trust).is_err(),
+            "trust 0.3 should be rejected by 0.5 threshold"
+        );
+
+        let high_trust = CommonsParticipant {
+            did: "did:icn:high".to_string(),
+            trust_score: 0.7, // above 0.5 threshold
+            capacity: zero_capacity(),
+            budget: CapacityBudget::default(),
+            last_announce: Instant::now(),
+        };
+        assert!(
+            pool.try_add_participant(high_trust).is_ok(),
+            "trust 0.7 should be accepted by 0.5 threshold"
+        );
+    }
+
+    #[test]
+    fn test_compute_policy_config_defaults_match_hardcoded() {
+        // Verify the config defaults exactly match the original hardcoded values.
+        // If these drift, production behavior would change for unconfigured nodes.
+        let policy = CommonsPoolPolicy::default();
+        assert!(
+            (policy.min_standing - 0.3).abs() < f64::EPSILON,
+            "default min_standing must remain 0.3"
+        );
+        assert_eq!(
+            policy.fuel_cost_divisor, 1000,
+            "default fuel_cost_divisor must remain 1000"
+        );
+
+        use crate::commons_pool::SybilPolicy;
+        let sybil = SybilPolicy::default();
+        assert!(
+            (sybil.min_trust_score - 0.1).abs() < f64::EPSILON,
+            "default min_trust_score must remain 0.1"
+        );
     }
 }
