@@ -86,8 +86,18 @@ pub struct CommonsPoolPolicy {
     /// If true, higher-priority tasks can interrupt lower-priority ones.
     pub preemption_enabled: bool,
 
+    /// Charter priority modes that support task preemption.
+    ///
+    /// When `preemption_enabled` is true and the active `priority` mode is in this
+    /// list, higher-priority tasks may interrupt running lower-priority tasks.
+    /// Governance decision: cooperatives choose which modes support preemption.
+    /// Default: `[UbsFirst, EmergencyFirst]` (matches previous hardcoded behavior).
+    #[serde(default = "default_preemptable_priorities")]
+    pub preemptable_priorities: Vec<CharterPriority>,
+
     /// Credit ceiling for cost validation.
     /// Tasks whose estimated cost exceeds available credits are rejected.
+    /// `None` disables ceiling enforcement. Set via governance config.
     #[serde(default)]
     pub credit_ceiling: Option<i64>,
 
@@ -102,6 +112,10 @@ fn default_fuel_cost_divisor() -> u64 {
     1000
 }
 
+fn default_preemptable_priorities() -> Vec<CharterPriority> {
+    vec![CharterPriority::UbsFirst, CharterPriority::EmergencyFirst]
+}
+
 impl Default for CommonsPoolPolicy {
     fn default() -> Self {
         Self {
@@ -109,6 +123,7 @@ impl Default for CommonsPoolPolicy {
             priority: CharterPriority::default(),
             max_concurrent_per_submitter: 5,
             preemption_enabled: false,
+            preemptable_priorities: default_preemptable_priorities(),
             credit_ceiling: None,
             fuel_cost_divisor: default_fuel_cost_divisor(),
         }
@@ -165,16 +180,17 @@ impl CommonsPoolPolicy {
 
     /// Check if a new task can preempt a running task.
     ///
-    /// Returns `true` if preemption is enabled and the new task has
-    /// sufficiently higher priority to justify interrupting the running task.
+    /// Returns `true` if preemption is enabled, the active priority mode is in
+    /// the governance-configured `preemptable_priorities` list, and the new task
+    /// has strictly higher priority than the running task.
     pub fn can_preempt(&self, new_task: &ComputeTask, running_task: &ComputeTask) -> bool {
         // Preemption must be enabled
         if !self.preemption_enabled {
             return false;
         }
 
-        // Priority policy must allow preemption
-        if !self.priority.allows_preemption() {
+        // Priority policy must be in the governance-configured preemptable set
+        if !self.preemptable_priorities.contains(&self.priority) {
             return false;
         }
 
@@ -1620,6 +1636,7 @@ mod tests {
             preemption_enabled: true,
             credit_ceiling: Some(1000),
             fuel_cost_divisor: 1000,
+            ..Default::default()
         };
 
         let json = serde_json::to_string(&policy).unwrap();

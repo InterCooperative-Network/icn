@@ -364,11 +364,14 @@ pub async fn init_compute_services(deps: ComputeDeps) -> anyhow::Result<ComputeS
     compute_actor.set_policy_manager(policy_manager.clone());
 
     // Apply governance policy thresholds from config.
-    // min_standing and fuel_cost_divisor go into CommonsPoolPolicy (submission gate).
+    // min_standing, fuel_cost_divisor, credit_ceiling, and preemptable_priorities
+    // go into CommonsPoolPolicy (submission gate + preemption control).
     // min_trust_score goes into SybilPolicy (pool admission gate).
     let commons_pool_policy = icn_compute::CommonsPoolPolicy {
         min_standing: deps.policy_config.min_standing,
         fuel_cost_divisor: deps.policy_config.fuel_cost_divisor,
+        credit_ceiling: deps.policy_config.credit_ceiling,
+        preemptable_priorities: deps.policy_config.preemptable_priorities.clone(),
         ..icn_compute::CommonsPoolPolicy::default()
     };
     compute_actor.set_commons_pool_policy(commons_pool_policy);
@@ -380,10 +383,12 @@ pub async fn init_compute_services(deps: ComputeDeps) -> anyhow::Result<ComputeS
     compute_actor.set_commons_sybil_policy(sybil_policy);
 
     info!(
-        "Policy manager initialized (min_standing={}, min_trust_score={}, fuel_cost_divisor={})",
+        "Policy manager initialized (min_standing={}, min_trust_score={}, fuel_cost_divisor={}, credit_ceiling={:?}, preemptable_priorities={:?})",
         deps.policy_config.min_standing,
         deps.policy_config.min_trust_score,
-        deps.policy_config.fuel_cost_divisor
+        deps.policy_config.fuel_cost_divisor,
+        deps.policy_config.credit_ceiling,
+        deps.policy_config.preemptable_priorities
     );
 
     // Spawn DisputeActor with shared system
