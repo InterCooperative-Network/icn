@@ -1,6 +1,31 @@
 //! Task lifecycle handlers for ComputeActor.
 //!
 //! Handles task submission, claiming, result consensus, and cancellation.
+//!
+//! ## Commons Credit Reservation Lifecycle
+//!
+//! For Commons-scoped tasks the actor maintains an ephemeral
+//! `pending_reservations: HashMap<task_id → amount>` tracking outstanding holds.
+//!
+//! ```text
+//! handle_submit()
+//!   ├─ advisory balance check (fast-fail only — not race-free)
+//!   ├─ reserve_cb(task_id, amount) → Ok/Err  [authoritative atomic gate]
+//!   └─ pending_reservations.insert(task_id, amount)
+//!
+//! Termination paths (all non-success call release_commons_reservation):
+//!   Success              → consume_commons_reservation; settlement_cb reconciles hold
+//!   Failed / OutOfFuel   → release_commons_reservation("failure"); release_cb fires
+//!   Timeout              → release_commons_reservation("timeout"); release_cb fires
+//!   Cancel               → release_commons_reservation("failure"); release_cb fires
+//!   WasmRef / no-registry
+//!   WasmRef / fetch-err  → release_commons_reservation("failure"); fires before executor
+//! ```
+//!
+//! `HashMap::remove` inside each helper is the idempotence gate: a second call on
+//! the same `task_id` is a no-op, preventing double-release races (see PR #1406).
+//! Crash: `pending_reservations` is ephemeral — state is lost on restart, consistent
+//! with task state loss (V1 accepted limitation, documented in Issue #1404).
 
 use std::collections::HashMap;
 use std::sync::Arc;

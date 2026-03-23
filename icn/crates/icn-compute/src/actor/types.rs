@@ -191,8 +191,10 @@ pub type CommonsReserveCallback =
 
 /// Request to release a previously reserved commons credit hold (#1404).
 ///
-/// Fired by `on_task_completed()` when outcome is not Success, and by
-/// `check_timeouts()` when a task exceeds its deadline.
+/// Fired by `release_commons_reservation()` on all non-success termination paths:
+/// execution failure, timeout, explicit cancel, and WasmRef resolution failure
+/// (both missing-registry and fetch-error cases). See `lifecycle.rs` module doc
+/// for the complete state-machine diagram.
 #[derive(Debug, Clone)]
 pub struct CommonsReleaseRequest {
     /// DID of the consumer (submitter).
