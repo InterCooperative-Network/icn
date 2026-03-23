@@ -133,24 +133,90 @@ fn test_insufficient_credits_rejected() {
     assert_eq!(err.required, 200);
 }
 
-/// Test 5: Scheduling enforcement rejects tasks when credits are insufficient.
+/// Test 5: Scheduling enforcement rejects commons tasks when credits are insufficient.
 ///
-/// This test documents the intended integration point for credit enforcement
-/// at scheduling time. Currently deferred — Epic 6 is accounting only.
-#[test]
-#[ignore = "enforcement not yet implemented — Epic 6 is accounting infrastructure only"]
-fn test_scheduling_enforces_credits() {
-    // When integrated with the scheduler, this should look like:
-    //
-    //   let result = schedule_task_on_commons(task, submitter_did);
-    //   assert!(matches!(
-    //       result,
-    //       Err(icn_compute::ComputeError::InsufficientCommonsCredits { .. })
-    //   ));
-    //
-    // The InsufficientCommonsCredits error variant is defined in
-    // icn-compute/src/error.rs but not yet emitted in any code path.
-    unimplemented!("credit enforcement at scheduling time is deferred to a future epic");
+/// Proves the credit floor check added to handle_submit() in lifecycle.rs:
+/// - balance_callback returning 0 → InsufficientCommonsCredits for Commons-scoped tasks
+/// - balance_callback returning 1 → task accepted past the floor check
+/// - no balance_callback configured → gate skipped silently
+#[tokio::test]
+async fn test_scheduling_enforces_credits() {
+    use icn_compute::{
+        BalanceCallback, ComputeError, ComputeTask, DeterminismClass, ExecutorCapability,
+        FuelLimit, PrivacyClass, TaskCode, TaskPriority,
+    };
+
+    fn make_commons_task(submitter: &str) -> ComputeTask {
+        ComputeTask {
+            id: "test-enforce".into(),
+            submitter: submitter.into(),
+            coop_id: None,
+            code: TaskCode::Ccl("(define x 1)".into()),
+            inputs: vec![],
+            fuel_limit: FuelLimit(10_000),
+            required_capabilities: vec![ExecutorCapability::Ccl],
+            priority: TaskPriority::Normal,
+            created_at: 1000,
+            deadline: None,
+            payment_rate: None,
+            payment_currency: None,
+            resource_profile: None,
+            actor_mode: None,
+            placement_constraints: None,
+            federation_constraints: None,
+            estimated_value: None,
+            verification: None,
+            inputs_hash: None,
+            policy_hash: None,
+            determinism_class: DeterminismClass::default(),
+            privacy_class: PrivacyClass::default(),
+            storage_class: None,
+            data_locality: None,
+            scope: icn_kernel_api::ScopeLevel::Commons,
+        }
+    }
+
+    // --- Negative path: balance 0 → rejected ---
+    let trust_cb: TrustCallback = Arc::new(|_| 1.0); // trust above MIN_TRUST_SUBMIT
+    let zero_balance: BalanceCallback = Arc::new(|_| 0);
+    let mut actor = ComputeActor::new("did:icn:scheduler".into(), trust_cb.clone());
+    actor.set_balance_callback(zero_balance);
+    let handle = actor.spawn();
+
+    let result = handle
+        .submit(make_commons_task("did:icn:broke-submitter"))
+        .await;
+
+    assert!(
+        matches!(
+            result,
+            Err(ComputeError::InsufficientCommonsCredits {
+                balance: 0,
+                required: 1
+            })
+        ),
+        "expected InsufficientCommonsCredits, got: {result:?}"
+    );
+
+    // --- Positive path: balance 1 → not rejected by the floor check ---
+    // The task will fail for other reasons (no executor capability for CCL without
+    // wasm / CCL executor configured), but it must NOT fail with InsufficientCommonsCredits.
+    let sufficient_balance: BalanceCallback = Arc::new(|_| 1);
+    let mut actor2 = ComputeActor::new("did:icn:scheduler".into(), trust_cb);
+    actor2.set_balance_callback(sufficient_balance);
+    let handle2 = actor2.spawn();
+
+    let result2 = handle2
+        .submit(make_commons_task("did:icn:funded-submitter"))
+        .await;
+
+    assert!(
+        !matches!(
+            result2,
+            Err(ComputeError::InsufficientCommonsCredits { .. })
+        ),
+        "funded submitter must not be rejected for insufficient credits; got: {result2:?}"
+    );
 }
 
 /// Test 6: Receipt-backed earn entries produce distinct hashes (replay protection).
