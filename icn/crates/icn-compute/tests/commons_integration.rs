@@ -192,16 +192,16 @@ async fn test_scheduling_enforces_credits() {
             result,
             Err(ComputeError::InsufficientCommonsCredits {
                 balance: 0,
-                required: 1
+                required: 10
             })
         ),
         "expected InsufficientCommonsCredits, got: {result:?}"
     );
 
-    // --- Positive path: balance 1 → task accepted (Ok) ---
+    // --- Positive path: balance 10 → task accepted (Ok) ---
     // handle_submit() returns Ok(hash) once all gates pass. The task may not be
     // *executed* (no CCL executor configured in this test actor), but submission succeeds.
-    let sufficient_balance: BalanceCallback = Arc::new(|_| 1);
+    let sufficient_balance: BalanceCallback = Arc::new(|_| 10);
     let mut actor2 = ComputeActor::new("did:icn:scheduler".into(), trust_cb.clone());
     actor2.set_balance_callback(sufficient_balance);
     let handle2 = actor2.spawn();

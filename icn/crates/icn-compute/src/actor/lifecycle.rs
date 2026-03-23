@@ -1224,25 +1224,21 @@ impl ComputeActor {
         // Applies only to Commons-scoped tasks; Local/Cell tasks are unaffected.
         // Enforcement is opt-in: if balance_callback is not configured, this gate
         // is skipped silently (e.g., during tests that only exercise scheduling logic).
-        // V1 floor: 1 credit. Dynamic per-task cost estimation is a future concern.
+        // Cost computed via cost::compute_credits_required(&task) — fuel_limit-based V1 formula.
+        // Governance-configurable divisor is a follow-on; see icn-compute/src/cost.rs.
         if task.scope == icn_kernel_api::ScopeLevel::Commons {
             if let Some(ref balance_cb) = self.balance_callback {
                 let balance = balance_cb(&task.submitter);
-                // V1 floor: 1 credit required to submit a Commons-scoped task.
-                // Dynamic per-task cost estimation is deferred (#1397).
-                const COMMONS_CREDIT_FLOOR: i64 = 1;
-                if balance < COMMONS_CREDIT_FLOOR {
+                let required = crate::cost::compute_credits_required(&task);
+                if balance < required {
                     tracing::warn!(
                         task_id = %task.id,
                         submitter = %task.submitter,
                         balance,
-                        required = COMMONS_CREDIT_FLOOR,
+                        required,
                         "Commons task rejected: insufficient credits"
                     );
-                    return Err(ComputeError::InsufficientCommonsCredits {
-                        balance,
-                        required: COMMONS_CREDIT_FLOOR,
-                    });
+                    return Err(ComputeError::InsufficientCommonsCredits { balance, required });
                 }
             }
         }
