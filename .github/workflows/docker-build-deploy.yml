@@ -42,59 +42,13 @@ env:
   CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C link-arg=-fuse-ld=mold"
 
 jobs:
-  # Standard CI jobs run on GitHub-hosted runners
-  test:
-    name: Test
-    runs-on: [self-hosted, homelab, k3s]
-    timeout-minutes: 45
-    # Skip test on scheduled runs (cleanup only)
-    if: github.event_name != 'schedule'
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Free disk space
-        uses: ./.github/actions/free-disk-space
-        with:
-          verbose: 'true'
-          aggressive: 'true'
-
-      - name: Install build tools (clang + mold linker)
-        run: |
-          PACKAGES=""
-          if ! command -v clang &> /dev/null; then
-            PACKAGES="$PACKAGES clang"
-          fi
-          if ! command -v mold &> /dev/null; then
-            PACKAGES="$PACKAGES mold"
-          fi
-          if [ -n "$PACKAGES" ]; then
-            sudo apt-get update && sudo apt-get install -y $PACKAGES
-          fi
-          echo "Compiler: $(clang --version | head -1)"
-          echo "Linker: $(mold --version)"
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - name: Configure sccache
-        run: |
-          echo "RUSTC_WRAPPER=/usr/local/bin/sccache" >> $GITHUB_ENV
-          echo "SCCACHE_DIR=/home/ubuntu/.cache/sccache" >> $GITHUB_ENV
-          echo "SCCACHE_CACHE_SIZE=30G" >> $GITHUB_ENV
-          sccache --start-server || true
-          sccache --show-stats || true
-
-      - name: Run tests
-        run: cargo test --workspace
-        working-directory: ./icn
-
-      - name: sccache stats
-        if: always()
-        run: sccache --show-stats || true
-
-  # Build and deploy runs on self-hosted runner
+  # Build and deploy runs on self-hosted runner.
+  # Tests are not re-run here — ci.yml already runs cargo test --workspace as
+  # a required merge gate on ubuntu-latest. By the time code reaches main, the
+  # workspace tests are proven. This workflow's self-hosted lane is reserved
+  # for steps that actually require Docker/K3s/registry/SSH access.
   build-and-deploy:
     name: Build and Deploy
-    needs: test
     runs-on: [self-hosted, homelab, k3s]
     # Skip build/deploy on scheduled runs (cleanup only)
     if: github.event_name != 'schedule'
