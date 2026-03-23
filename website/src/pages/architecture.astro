@@ -30,7 +30,7 @@ if (fs.existsSync(archPath)) {
   <!-- Architecture overview cards -->
   <section class="section-alt">
     <div class="container">
-      <div class="grid grid-3">
+      <div class="arch-overview-grid">
         <div class="card card-accent-teal">
           <h3>Constraint Engine</h3>
           <p>Apps are "policy oracles" that translate governance into generic constraint sets. The kernel enforces constraints mechanically — no domain semantics leak through the Meaning Firewall.</p>
@@ -42,6 +42,10 @@ if (fs.existsSync(archPath)) {
         <div class="card card-accent-purple">
           <h3>P2P Everything</h3>
           <p>QUIC/TLS transport with mDNS discovery, gossip-based state replication with causal ordering, and trust-gated topic subscription. No central servers needed.</p>
+        </div>
+        <div class="card card-accent-amber">
+          <h3>Compute Commons</h3>
+          <p>Trust-gated distributed compute: the commons pool admits tasks from cooperatives with sufficient trust standing, enforces capability scope, and anchors each submission to the ledger via a provenance chain.</p>
         </div>
       </div>
     </div>
@@ -58,3 +62,19 @@ if (fs.existsSync(archPath)) {
     </div>
   </section>
 </Layout>
+
+<style>
+  .arch-overview-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-lg);
+  }
+
+  @media (max-width: 1100px) {
+    .arch-overview-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  @media (max-width: 600px) {
+    .arch-overview-grid { grid-template-columns: 1fr; }
+  }
+</style>
