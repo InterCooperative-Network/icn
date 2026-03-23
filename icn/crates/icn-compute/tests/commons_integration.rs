@@ -929,3 +929,132 @@ async fn test_double_cancel_is_idempotent() {
         captured.len()
     );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Issue #1407: WasmRef failure-path reservation release
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Test: release_cb fires when a commons-backed WasmRef task fails because the
+/// actor has no WASM registry configured (the None-registry branch).
+///
+/// This is a distinct execution path from the CCL failure path covered by
+/// `test_reservation_released_on_failure`. The CCL path goes through the full
+/// executor and produces `ExecutionOutcome::Failed` in `on_task_completed()`.
+/// The WasmRef None-registry path returns `Err` at the resolution stage, *before*
+/// the executor is ever called. The reservation release happens in lifecycle.rs at
+/// the `match &self.wasm_registry { None => { ... } }` branch, not in
+/// `on_task_completed()`.
+///
+/// Flow:
+/// submit → reserve_cb fires, reservation inserted into pending_reservations
+/// → gossip TaskSubmitted triggers claim
+/// → can_execute() passes (task declares [Ccl] capability, actor has [Ccl])
+/// → WasmRef block entered, wasm_registry is None
+/// → task marked Failed, release_commons_reservation() called with reason="failure"
+/// → release_cb fires exactly once
+///
+/// Invariant proved: no reservation leak when the WasmRef resolution path fails
+/// due to missing registry. The same `release_commons_reservation` helper
+/// introduced in PR #1406 covers this path — this test closes the named coverage gap.
+#[tokio::test]
+async fn test_reservation_released_on_wasm_ref_no_registry() {
+    use icn_compute::{
+        BalanceCallback, CommonsReleaseCallback, CommonsReleaseRequest, CommonsReserveCallback,
+        DeterminismClass, ExecutorCapability, FuelLimit, PrivacyClass, TaskCode, TaskPriority,
+    };
+    use std::sync::Mutex;
+
+    let releases: Arc<Mutex<Vec<CommonsReleaseRequest>>> = Arc::new(Mutex::new(vec![]));
+    let releases_cb = Arc::clone(&releases);
+    let reserve_calls: Arc<Mutex<Vec<i64>>> = Arc::new(Mutex::new(vec![]));
+    let reserve_calls_cb = Arc::clone(&reserve_calls);
+
+    let trust_cb: TrustCallback = Arc::new(|_| 1.0);
+    let balance_cb: BalanceCallback = Arc::new(|_| 1_000_000);
+    let reserve_cb: CommonsReserveCallback = Arc::new(move |req| {
+        reserve_calls_cb.lock().unwrap().push(req.amount);
+        Ok(())
+    });
+    let release_cb: CommonsReleaseCallback =
+        Arc::new(move |req| releases_cb.lock().unwrap().push(req));
+
+    // No set_wasm_registry call — actor's wasm_registry stays None.
+    let mut actor = ComputeActor::new(RES_EXECUTOR_DID.into(), trust_cb);
+    actor.set_balance_callback(balance_cb);
+    actor.set_commons_reserve_callback(reserve_cb);
+    actor.set_commons_release_callback(release_cb);
+    let handle = actor.spawn();
+
+    // WasmRef task with required_capabilities=[Ccl] so can_execute() passes.
+    // The actor's LocalExecutor has [Ccl] by default, so the task is claimed.
+    // The WasmRef resolution then fails because wasm_registry is None.
+    let task = icn_compute::ComputeTask {
+        id: "res-wasm-no-registry-1".to_string(),
+        submitter: RES_SUBMITTER_DID.to_string(),
+        coop_id: None,
+        code: TaskCode::WasmRef([0u8; 32]), // hash content irrelevant; registry lookup never occurs
+        inputs: vec![],
+        fuel_limit: FuelLimit(10_000),
+        required_capabilities: vec![ExecutorCapability::Ccl],
+        priority: TaskPriority::Normal,
+        created_at: 1_000,
+        deadline: None,
+        payment_rate: None,
+        payment_currency: None,
+        resource_profile: None,
+        actor_mode: None,
+        placement_constraints: None,
+        federation_constraints: None,
+        estimated_value: None,
+        verification: None,
+        inputs_hash: None,
+        policy_hash: None,
+        determinism_class: DeterminismClass::default(),
+        privacy_class: PrivacyClass::default(),
+        storage_class: None,
+        data_locality: None,
+        scope: icn_kernel_api::ScopeLevel::Commons,
+    };
+
+    // Phase 1: submit creates the reservation
+    handle
+        .submit(task.clone())
+        .await
+        .expect("submit must succeed");
+
+    // Phase 2: gossip triggers claim → WasmRef resolution → None-registry failure
+    handle
+        .handle_gossip(ComputeMessage::TaskSubmitted(Box::new(task)))
+        .await
+        .expect("gossip delivery must succeed");
+
+    tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+
+    // release_cb must have fired exactly once via the WasmRef None-registry path
+    let captured = releases.lock().unwrap();
+    assert_eq!(
+        captured.len(),
+        1,
+        "release_cb must fire exactly once on WasmRef no-registry failure; got {} calls",
+        captured.len()
+    );
+    assert_eq!(
+        captured[0].consumer, RES_SUBMITTER_DID,
+        "release consumer must be the submitter"
+    );
+    assert_eq!(
+        captured[0].task_id, "res-wasm-no-registry-1",
+        "release task_id must match"
+    );
+    assert!(
+        captured[0].reserved_amount > 0,
+        "released amount must be positive"
+    );
+
+    // released amount must equal what was reserved at submit time
+    let reserved = *reserve_calls.lock().unwrap().first().unwrap();
+    assert_eq!(
+        captured[0].reserved_amount, reserved,
+        "released amount must match reserved amount — no partial credit leak"
+    );
+}
