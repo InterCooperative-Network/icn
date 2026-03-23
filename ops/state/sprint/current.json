@@ -4,7 +4,11 @@
   "governing_rule": "A task is only done when repo state, board state, and narrative state agree.",
   "start_date": "2026-03-23",
   "status": "active",
-  "spine": [],
+  "spine": ["#1406"],
+  "shipped": [
+    "#1406 — refactor(compute): extract reservation helpers + idempotence tests (PR #1406)"
+  ],
+  "notes": "Centralized release_commons_reservation / consume_commons_reservation into free async helpers (9 sites → 2 fns). Added cancel-path and double-cancel idempotence tests (17/17 pass). Renamed trigger_timeout_sweep → trigger_timeout_sweep_for_test per _for_test convention. Adversarial review confirmed semantic equivalence at all 11 call sites; None-branch in check_timeouts documented as theoretically unreachable under lock semantics. Remaining debt: WasmRef failure-path integration test (non-blocking).",
   "closed_sprint": {
     "sprint": 25,
     "theme": "Pre-Execution Commons Credit Reservation",
