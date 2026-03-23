@@ -47,9 +47,10 @@ mod wasm_executor;
 mod wasm_registry;
 
 pub use actor::{
-    BalanceCallback, CommonsPaymentRequest, CommonsSettlementCallback, ComputeActor, ComputeEvent,
-    ComputeHandle, EventCallback, LocalityCallback, PaymentCallback, PaymentRequest, SendCallback,
-    TrustCallback,
+    BalanceCallback, CommonsPaymentRequest, CommonsReleaseCallback, CommonsReleaseRequest,
+    CommonsReserveCallback, CommonsReserveRequest, CommonsSettlementCallback, ComputeActor,
+    ComputeEvent, ComputeHandle, EventCallback, LocalityCallback, PaymentCallback, PaymentRequest,
+    SendCallback, TrustCallback,
 };
 pub use actor_model::{
     ActorCheckpoint, ActorEvent, ActorId, ActorMode, ActorRuntimeState, MigrationDecision,

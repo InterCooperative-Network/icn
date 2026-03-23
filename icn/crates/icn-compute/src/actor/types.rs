@@ -150,4 +150,61 @@ pub struct CommonsPaymentRequest {
 /// 1. Fetching the consumer's current commons credit balance.
 /// 2. Constructing a `CommonsSettlementRequest` and calling `settle_commons_receipt()`.
 /// 3. Appending the resulting earn/spend entries to the ledger.
+///
+/// **Settlement semantics change with reservation (#1404):** once `CommonsReserveCallback`
+/// is configured, the app-layer implementation of this callback must reconcile against
+/// the hold established for `task_id` rather than performing an unrelated free-pool debit.
+/// The callback interface is unchanged; the contract is not.
 pub type CommonsSettlementCallback = Arc<dyn Fn(CommonsPaymentRequest) + Send + Sync>;
+
+/// Request to reserve commons credits at task submission time (#1404).
+///
+/// Fired by `handle_submit()` for Commons-scoped tasks after the advisory balance
+/// floor check passes. The callee MUST atomically read the submitter's balance and
+/// hold `amount` credits against `task_id`. If the balance is insufficient after
+/// the atomic read (race condition — another task consumed credits between the
+/// advisory check and this call), return `Err(reason)`.
+#[derive(Debug, Clone)]
+pub struct CommonsReserveRequest {
+    /// DID of the consumer (submitter — credits are held from their balance).
+    pub consumer: String,
+    /// Credits to reserve. Computed by `cost::compute_credits_required(&task)`.
+    pub amount: i64,
+    /// Task ID used as the reservation key. Unique per submission.
+    pub task_id: String,
+}
+
+/// Authoritative race-free admission gate for commons tasks (#1404).
+///
+/// The advisory balance check in `handle_submit()` is a fast-fail hint only.
+/// This callback is the **authoritative** gate: it must atomically read-and-hold,
+/// making it safe against concurrent submissions from the same submitter.
+///
+/// Returns `Ok(())` if successfully reserved; `Err(reason)` if the balance is
+/// insufficient (race condition). On `Err`, `handle_submit()` rejects the task.
+///
+/// **Backward compatibility:** if this callback is not configured, the reservation
+/// gate is skipped silently. This is **rollout compatibility mode**, not race-free
+/// correctness mode. Configure this callback to enable correct enforcement.
+pub type CommonsReserveCallback =
+    Arc<dyn Fn(CommonsReserveRequest) -> Result<(), String> + Send + Sync>;
+
+/// Request to release a previously reserved commons credit hold (#1404).
+///
+/// Fired by `on_task_completed()` when outcome is not Success, and by
+/// `check_timeouts()` when a task exceeds its deadline.
+#[derive(Debug, Clone)]
+pub struct CommonsReleaseRequest {
+    /// DID of the consumer (submitter).
+    pub consumer: String,
+    /// Task ID used as the reservation key.
+    pub task_id: String,
+    /// Originally reserved amount (for audit). The callee keys on `task_id`, not this.
+    pub reserved_amount: i64,
+}
+
+/// Callback to release a pending commons credit reservation (#1404).
+///
+/// Must be idempotent: if no reservation exists for `task_id`, the callee
+/// must succeed silently (no-op). This handles double-release races gracefully.
+pub type CommonsReleaseCallback = Arc<dyn Fn(CommonsReleaseRequest) + Send + Sync>;

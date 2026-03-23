@@ -8,8 +8,8 @@ use tokio::sync::Mutex;
 
 use super::consensus::{outcome_to_value, results_match};
 use super::types::{
-    CommonsPaymentRequest, ComputeEvent, ExecutorInfo, PaymentRequest, ResultConsensus,
-    SendCallback,
+    CommonsPaymentRequest, CommonsReleaseCallback, CommonsReleaseRequest, CommonsReserveRequest,
+    ComputeEvent, ExecutorInfo, PaymentRequest, ResultConsensus, SendCallback,
 };
 use super::ComputeActor;
 use crate::error::ComputeError;
@@ -971,6 +971,10 @@ impl ComputeActor {
         //
         // Belt + suspenders: settle_commons_receipt() hard-rejects any scope != Commons,
         // so even if this check is bypassed, the ledger invariant holds.
+        //
+        // Settlement semantics change with reservation (#1404): once CommonsReserveCallback
+        // is configured, the app-layer implementation of this callback must reconcile against
+        // the hold established for task_id rather than performing an unrelated free-pool debit.
         if let crate::types::ExecutionOutcome::Success(_) = &result.outcome {
             if claimed_task.scope == icn_kernel_api::ScopeLevel::Commons {
                 if let Some(ref commons_cb) = self.commons_settlement_callback {
@@ -996,6 +1000,37 @@ impl ComputeActor {
                         task_id: claimed_task.id.clone(),
                     });
                 }
+                // Phase 2a: consume the reservation on success (#1404).
+                // The reservation hold is released by settlement reconciliation in the
+                // app layer; here we just remove it from the kernel's ephemeral index.
+                self.pending_reservations
+                    .lock()
+                    .await
+                    .remove(&claimed_task.id);
+            }
+        }
+
+        // Phase 2b: release reservation on non-success outcomes (#1404).
+        //
+        // On failure/out-of-fuel, credits were not consumed — return the hold to
+        // the submitter via the release callback (idempotent; no-op if no reservation).
+        if !matches!(&result.outcome, crate::types::ExecutionOutcome::Success(_))
+            && claimed_task.scope == icn_kernel_api::ScopeLevel::Commons
+        {
+            let reserved = self
+                .pending_reservations
+                .lock()
+                .await
+                .remove(&claimed_task.id);
+            if let (Some(reserved_amount), Some(ref release_cb)) =
+                (reserved, &self.commons_release_callback)
+            {
+                release_cb(CommonsReleaseRequest {
+                    consumer: claimed_task.submitter.clone(),
+                    task_id: claimed_task.id.clone(),
+                    reserved_amount,
+                });
+                icn_obs::metrics::compute::commons_reservation_released_inc("failure");
             }
         }
 
@@ -1075,6 +1110,8 @@ impl ComputeActor {
         send_callback: &Option<SendCallback>,
         scope_queue_depths: &Arc<Mutex<HashMap<icn_kernel_api::ScopeLevel, usize>>>,
         task_scope_map: &Arc<Mutex<HashMap<TaskHash, icn_kernel_api::ScopeLevel>>>,
+        pending_reservations: &Arc<Mutex<HashMap<String, i64>>>,
+        commons_release_callback: &Option<CommonsReleaseCallback>,
     ) -> Result<(), ComputeError> {
         let now = icn_time::current_timestamp_millis();
 
@@ -1098,12 +1135,13 @@ impl ComputeActor {
                 "Task exceeded deadline, marking as failed"
             );
 
-            // Get task info for broadcasting
+            // Get task info for broadcasting and reservation release
             let mut mgr = task_manager.lock().await;
             let task_id = mgr
                 .get(&hash)
                 .map(|t| t.id.clone())
                 .unwrap_or_else(|| "unknown".to_string());
+            let submitter = mgr.get(&hash).map(|t| t.submitter.clone());
 
             // Mark as failed
             mgr.fail(&hash, "Deadline exceeded".to_string())?;
@@ -1121,13 +1159,28 @@ impl ComputeActor {
                     }
                 }
             }
-            // Decrement scope queue depth
+            // Decrement scope queue depth and release commons reservation on timeout
             {
                 let scope = task_scope_map.lock().await.remove(&hash);
-                if let Some(scope) = scope {
+                if let Some(ref scope) = scope {
                     let mut depths = scope_queue_depths.lock().await;
-                    if let Some(count) = depths.get_mut(&scope) {
+                    if let Some(count) = depths.get_mut(scope) {
                         *count = count.saturating_sub(1);
+                    }
+                }
+                // Phase 2c: release commons credit reservation on timeout (#1404).
+                // Idempotent: no-op if no reservation exists for task_id.
+                if scope == Some(icn_kernel_api::ScopeLevel::Commons) {
+                    let reserved = pending_reservations.lock().await.remove(&task_id);
+                    if let (Some(reserved_amount), Some(ref release_cb), Some(consumer)) =
+                        (reserved, commons_release_callback, submitter)
+                    {
+                        release_cb(CommonsReleaseRequest {
+                            consumer,
+                            task_id: task_id.clone(),
+                            reserved_amount,
+                        });
+                        icn_obs::metrics::compute::commons_reservation_released_inc("timeout");
                     }
                 }
             }
@@ -1239,6 +1292,51 @@ impl ComputeActor {
                         "Commons task rejected: insufficient credits"
                     );
                     return Err(ComputeError::InsufficientCommonsCredits { balance, required });
+                }
+            }
+        }
+
+        // Phase 1: pre-execution commons credit reservation (#1404)
+        //
+        // The balance check above is an ADVISORY fast-fail only — it does not hold credits
+        // and cannot prevent a concurrent submission from consuming the same balance.
+        // This callback is the AUTHORITATIVE, race-free admission gate: it must atomically
+        // read-and-hold `amount` credits against `task_id`. On Err (race lost), reject.
+        //
+        // Backward compatibility: no reserve callback configured = advisory-check-only mode.
+        // This is not race-free correctness mode — configure the callback for correct enforcement.
+        if task.scope == icn_kernel_api::ScopeLevel::Commons {
+            if let Some(ref reserve_cb) = self.commons_reserve_callback {
+                let required = crate::cost::compute_credits_required(&task);
+                match reserve_cb(CommonsReserveRequest {
+                    consumer: task.submitter.clone(),
+                    amount: required,
+                    task_id: task.id.clone(),
+                }) {
+                    Ok(()) => {
+                        self.pending_reservations
+                            .lock()
+                            .await
+                            .insert(task.id.clone(), required);
+                        icn_obs::metrics::compute::commons_reservation_created_inc();
+                        tracing::debug!(
+                            task_id = %task.id,
+                            consumer = %task.submitter,
+                            amount = required,
+                            "Commons credit reservation created"
+                        );
+                    }
+                    Err(reason) => {
+                        tracing::warn!(
+                            task_id = %task.id,
+                            reason = %reason,
+                            "Commons reservation race: insufficient credits at atomic check"
+                        );
+                        return Err(ComputeError::InsufficientCommonsCredits {
+                            balance: 0,
+                            required,
+                        });
+                    }
                 }
             }
         }

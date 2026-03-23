@@ -3928,6 +3928,21 @@ pub mod compute {
     pub fn receipt_settlement_inc(scope: &'static str) {
         counter!("icn_compute_receipt_settlement_total", "scope" => scope).increment(1);
     }
+
+    // === Commons Credit Reservation Metrics (Sprint 25 #1404) ===
+
+    /// Increment counter when a commons credit reservation is created at submit time.
+    pub fn commons_reservation_created_inc() {
+        counter!("icn_compute_commons_reservation_created_total").increment(1);
+    }
+
+    /// Increment counter when a commons credit reservation is released.
+    ///
+    /// `reason` must be `"failure"` (non-success outcome) or `"timeout"` (deadline exceeded).
+    /// Low-cardinality label — no heap allocation on the hot path.
+    pub fn commons_reservation_released_inc(reason: &'static str) {
+        counter!("icn_compute_commons_reservation_released_total", "reason" => reason).increment(1);
+    }
 }
 
 /// Misbehavior detection metrics (Phase 18)

@@ -400,3 +400,319 @@ async fn test_affiliated_zero_trust_rejected_via_capacity_announce() {
     );
     assert_eq!(pool.participant_count(), 0);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sprint 25: Pre-execution commons credit reservation tests (#1404)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// DIDs reused across reservation tests.
+const RES_EXECUTOR_DID: &str = "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9";
+const RES_SUBMITTER_DID: &str = "did:icn:z9hSR6S7WPtxmTojgo6GG3k4yDPecgJY292j7xrsUGWBu";
+
+/// Build a commons task with the given `id` and CCL `code`.
+fn make_reservation_task(id: &str, code: &str) -> icn_compute::ComputeTask {
+    use icn_compute::{
+        DeterminismClass, ExecutorCapability, FuelLimit, PrivacyClass, TaskCode, TaskPriority,
+    };
+    icn_compute::ComputeTask {
+        id: id.to_string(),
+        submitter: RES_SUBMITTER_DID.to_string(),
+        coop_id: None,
+        code: TaskCode::Ccl(code.to_string()),
+        inputs: vec![],
+        fuel_limit: FuelLimit(10_000), // cost::compute_credits_required → 10 credits
+        required_capabilities: vec![ExecutorCapability::Ccl],
+        priority: TaskPriority::Normal,
+        created_at: 1_000,
+        deadline: None,
+        payment_rate: None,
+        payment_currency: None,
+        resource_profile: None,
+        actor_mode: None,
+        placement_constraints: None,
+        federation_constraints: None,
+        estimated_value: None,
+        verification: None,
+        inputs_hash: None,
+        policy_hash: None,
+        determinism_class: DeterminismClass::default(),
+        privacy_class: PrivacyClass::default(),
+        storage_class: None,
+        data_locality: None,
+        scope: icn_kernel_api::ScopeLevel::Commons,
+    }
+}
+
+/// Valid CCL contract that executes successfully (returns Int 1).
+fn valid_ccl() -> String {
+    format!(
+        r#"{{
+            "name": "ReservationTest",
+            "participants": ["{RES_EXECUTOR_DID}"],
+            "currency": null,
+            "state_vars": [],
+            "rules": [{{
+                "name": "run",
+                "params": [],
+                "requires": [],
+                "body": [{{ "Return": {{ "value": {{ "Literal": {{ "Int": 1 }} }} }} }}]
+            }}],
+            "triggers": []
+        }}"#
+    )
+}
+
+/// Invalid CCL (not JSON) that produces ExecutionOutcome::Failed.
+fn failing_ccl() -> &'static str {
+    "NOT_VALID_JSON"
+}
+
+/// Test: reserve_cb is called at submit time with the correct consumer / amount / task_id.
+///
+/// The advisory balance check passes (balance 1_000_000 >> required 10).
+/// The reserve_cb must be called exactly once before submit returns Ok.
+#[tokio::test]
+async fn test_reservation_created_at_submit() {
+    use icn_compute::{BalanceCallback, CommonsReserveCallback, CommonsReserveRequest};
+    use std::sync::Mutex;
+
+    let reserves: Arc<Mutex<Vec<CommonsReserveRequest>>> = Arc::new(Mutex::new(vec![]));
+    let reserves_cb = Arc::clone(&reserves);
+
+    let trust_cb: TrustCallback = Arc::new(|_| 1.0);
+    let balance_cb: BalanceCallback = Arc::new(|_| 1_000_000);
+    let reserve_cb: CommonsReserveCallback = Arc::new(move |req| {
+        reserves_cb.lock().unwrap().push(req);
+        Ok(())
+    });
+
+    let mut actor = ComputeActor::new(RES_EXECUTOR_DID.into(), trust_cb);
+    actor.set_balance_callback(balance_cb);
+    actor.set_commons_reserve_callback(reserve_cb);
+    let handle = actor.spawn();
+
+    let result = handle
+        .submit(make_reservation_task("res-submit-1", "{}"))
+        .await;
+    assert!(
+        result.is_ok(),
+        "submit must succeed with sufficient balance; got {result:?}"
+    );
+
+    let captured = reserves.lock().unwrap();
+    assert_eq!(
+        captured.len(),
+        1,
+        "reserve_cb must fire exactly once at submit"
+    );
+    assert_eq!(
+        captured[0].consumer, RES_SUBMITTER_DID,
+        "consumer must be the submitter DID"
+    );
+    assert_eq!(
+        captured[0].task_id, "res-submit-1",
+        "task_id must match the submitted task"
+    );
+    assert!(
+        captured[0].amount > 0,
+        "reserved amount must be positive (fuel=10000 → 10 credits)"
+    );
+}
+
+/// Test: release_cb is called (and pending map is empty) when a task fails execution.
+///
+/// Flow: submit creates reservation → gossip path triggers execution with invalid CCL
+/// → Failed outcome → release_cb fires with the reserved amount.
+#[tokio::test]
+async fn test_reservation_released_on_failure() {
+    use icn_compute::{
+        BalanceCallback, CommonsReleaseCallback, CommonsReleaseRequest, CommonsReserveCallback,
+    };
+    use std::sync::Mutex;
+
+    let releases: Arc<Mutex<Vec<CommonsReleaseRequest>>> = Arc::new(Mutex::new(vec![]));
+    let releases_cb = Arc::clone(&releases);
+    let reserve_calls: Arc<Mutex<Vec<i64>>> = Arc::new(Mutex::new(vec![]));
+    let reserve_calls_cb = Arc::clone(&reserve_calls);
+
+    let trust_cb: TrustCallback = Arc::new(|_| 1.0);
+    let balance_cb: BalanceCallback = Arc::new(|_| 1_000_000);
+    let reserve_cb: CommonsReserveCallback = Arc::new(move |req| {
+        reserve_calls_cb.lock().unwrap().push(req.amount);
+        Ok(())
+    });
+    let release_cb: CommonsReleaseCallback = Arc::new(move |req| {
+        releases_cb.lock().unwrap().push(req);
+    });
+
+    let mut actor = ComputeActor::new(RES_EXECUTOR_DID.into(), trust_cb);
+    actor.set_signing_key(vec![1u8; 32]);
+    actor.set_balance_callback(balance_cb);
+    actor.set_commons_reserve_callback(reserve_cb);
+    actor.set_commons_release_callback(release_cb);
+    let handle = actor.spawn();
+
+    let task = make_reservation_task("res-fail-1", failing_ccl());
+
+    // Phase 1: submit creates reservation
+    handle
+        .submit(task.clone())
+        .await
+        .expect("submit must succeed");
+
+    // Phase 2: gossip path triggers execution (invalid CCL → Failed)
+    handle
+        .handle_gossip(ComputeMessage::TaskSubmitted(Box::new(task)))
+        .await
+        .expect("gossip delivery must succeed");
+
+    tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+
+    // release_cb must have fired once
+    let captured = releases.lock().unwrap();
+    assert_eq!(
+        captured.len(),
+        1,
+        "release_cb must fire exactly once on failure"
+    );
+    assert_eq!(
+        captured[0].consumer, RES_SUBMITTER_DID,
+        "release consumer must be the submitter"
+    );
+    assert_eq!(
+        captured[0].task_id, "res-fail-1",
+        "release task_id must match"
+    );
+    assert!(
+        captured[0].reserved_amount > 0,
+        "released amount must be positive"
+    );
+
+    // reserve_cb fired → reserved_amount == released_amount
+    let reserved = *reserve_calls.lock().unwrap().first().unwrap();
+    assert_eq!(
+        captured[0].reserved_amount, reserved,
+        "released amount must match what was reserved"
+    );
+}
+
+/// Test: release_cb is NOT called (reservation consumed) when a task succeeds; settlement_cb IS called.
+///
+/// Flow: submit creates reservation → gossip path triggers execution with valid CCL
+/// → Success outcome → settlement_cb fires, release_cb silent.
+#[tokio::test]
+async fn test_reservation_consumed_on_success() {
+    use icn_compute::{
+        BalanceCallback, CommonsPaymentRequest, CommonsReleaseCallback, CommonsReserveCallback,
+        CommonsSettlementCallback,
+    };
+    use std::sync::Mutex;
+
+    let releases: Arc<Mutex<Vec<icn_compute::CommonsReleaseRequest>>> =
+        Arc::new(Mutex::new(vec![]));
+    let releases_cb = Arc::clone(&releases);
+    let settlements: Arc<Mutex<Vec<CommonsPaymentRequest>>> = Arc::new(Mutex::new(vec![]));
+    let settlements_cb = Arc::clone(&settlements);
+
+    let trust_cb: TrustCallback = Arc::new(|_| 1.0);
+    let balance_cb: BalanceCallback = Arc::new(|_| 1_000_000);
+    let reserve_cb: CommonsReserveCallback = Arc::new(|_| Ok(()));
+    let release_cb: CommonsReleaseCallback =
+        Arc::new(move |req| releases_cb.lock().unwrap().push(req));
+    let settlement_cb: CommonsSettlementCallback =
+        Arc::new(move |req| settlements_cb.lock().unwrap().push(req));
+
+    let mut actor = ComputeActor::new(RES_EXECUTOR_DID.into(), trust_cb);
+    actor.set_signing_key(vec![1u8; 32]);
+    actor.set_balance_callback(balance_cb);
+    actor.set_commons_reserve_callback(reserve_cb);
+    actor.set_commons_release_callback(release_cb);
+    actor.set_commons_settlement_callback(settlement_cb);
+    let handle = actor.spawn();
+
+    let task = make_reservation_task("res-success-1", &valid_ccl());
+
+    // Phase 1: submit creates reservation
+    handle
+        .submit(task.clone())
+        .await
+        .expect("submit must succeed");
+
+    // Phase 2: gossip path triggers execution (valid CCL → Success)
+    handle
+        .handle_gossip(ComputeMessage::TaskSubmitted(Box::new(task)))
+        .await
+        .expect("gossip delivery must succeed");
+
+    tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+
+    // release_cb must NOT fire on success (reservation consumed, not released)
+    let release_count = releases.lock().unwrap().len();
+    assert_eq!(
+        release_count, 0,
+        "release_cb must NOT fire on success; reservation is consumed"
+    );
+
+    // settlement_cb must fire (existing settlement path unaffected)
+    let settle_count = settlements.lock().unwrap().len();
+    assert_eq!(
+        settle_count, 1,
+        "settlement_cb must fire exactly once on success"
+    );
+}
+
+/// Test: reserve_cb returning Err causes handle_submit() to return InsufficientCommonsCredits.
+///
+/// Models a TOCTOU race where the balance was consumed between the advisory check and the
+/// atomic reserve. The task must be rejected.
+#[tokio::test]
+async fn test_reservation_race_rejection() {
+    use icn_compute::{BalanceCallback, CommonsReserveCallback, ComputeError};
+
+    let trust_cb: TrustCallback = Arc::new(|_| 1.0);
+    let balance_cb: BalanceCallback = Arc::new(|_| 1_000_000); // advisory check passes
+    let reserve_cb: CommonsReserveCallback =
+        Arc::new(|_| Err("balance consumed by concurrent submission".into()));
+
+    let mut actor = ComputeActor::new(RES_EXECUTOR_DID.into(), trust_cb);
+    actor.set_balance_callback(balance_cb);
+    actor.set_commons_reserve_callback(reserve_cb);
+    let handle = actor.spawn();
+
+    let result = handle
+        .submit(make_reservation_task("res-race-1", "{}"))
+        .await;
+
+    assert!(
+        matches!(result, Err(ComputeError::InsufficientCommonsCredits { .. })),
+        "race rejection must return InsufficientCommonsCredits; got {result:?}"
+    );
+}
+
+/// Test: actor without CommonsReserveCallback accepts Commons tasks without error.
+///
+/// This is ROLLOUT COMPATIBILITY MODE — advisory balance check only, not race-free.
+/// Document the trade-off: tasks without a reserve callback can still race to exhaust credits.
+#[tokio::test]
+async fn test_no_reserve_callback_is_backward_compatible() {
+    use icn_compute::{BalanceCallback, ComputeError};
+
+    let trust_cb: TrustCallback = Arc::new(|_| 1.0);
+    let balance_cb: BalanceCallback = Arc::new(|_| 1_000_000);
+
+    // No reserve callback configured — rollout compatibility mode
+    let mut actor = ComputeActor::new(RES_EXECUTOR_DID.into(), trust_cb);
+    actor.set_balance_callback(balance_cb);
+    let handle = actor.spawn();
+
+    let result = handle
+        .submit(make_reservation_task("res-compat-1", "{}"))
+        .await;
+
+    assert!(
+        !matches!(result, Err(ComputeError::InsufficientCommonsCredits { .. })),
+        "actor without reserve_cb must NOT reject with InsufficientCommonsCredits; got {result:?}"
+    );
+    // NOTE: This is advisory-only mode. The task is accepted, but no atomic hold is created.
+    // Configure CommonsReserveCallback for race-free correctness.
+}
