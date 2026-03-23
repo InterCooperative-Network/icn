@@ -30,6 +30,7 @@ mod actor_model;
 mod actor_runtime;
 mod checkpoint_store;
 pub mod commons_pool;
+pub mod cost;
 mod dispute;
 mod error;
 mod executor;
