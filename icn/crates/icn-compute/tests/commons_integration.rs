@@ -716,3 +716,78 @@ async fn test_no_reserve_callback_is_backward_compatible() {
     // NOTE: This is advisory-only mode. The task is accepted, but no atomic hold is created.
     // Configure CommonsReserveCallback for race-free correctness.
 }
+
+/// Test: reservation is released when task times out via check_timeouts() sweep.
+///
+/// Uses the test-only `trigger_timeout_sweep` command to avoid a 10-second background
+/// timer wait. The task is submitted with a near-future deadline; after sleeping past
+/// the deadline, the manual sweep marks the task failed and fires release_cb.
+#[tokio::test]
+async fn test_reservation_released_on_timeout() {
+    use icn_compute::{BalanceCallback, CommonsReleaseCallback, CommonsReserveCallback};
+    use std::sync::Mutex;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    let releases: Arc<Mutex<Vec<icn_compute::CommonsReleaseRequest>>> =
+        Arc::new(Mutex::new(vec![]));
+    let releases_cb = Arc::clone(&releases);
+
+    let trust_cb: TrustCallback = Arc::new(|_| 1.0);
+    let balance_cb: BalanceCallback = Arc::new(|_| 1_000_000);
+    let reserve_cb: CommonsReserveCallback = Arc::new(|_| Ok(()));
+    let release_cb: CommonsReleaseCallback =
+        Arc::new(move |req| releases_cb.lock().unwrap().push(req));
+
+    let mut actor = ComputeActor::new(RES_EXECUTOR_DID.into(), trust_cb);
+    actor.set_balance_callback(balance_cb);
+    actor.set_commons_reserve_callback(reserve_cb);
+    actor.set_commons_release_callback(release_cb);
+    let handle = actor.spawn();
+
+    // Set a deadline 150ms in the future so validation passes but expires quickly.
+    let now_ms = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64;
+    let mut task = make_reservation_task("res-timeout-1", "{}");
+    task.deadline = Some(now_ms + 150);
+    task.created_at = now_ms;
+
+    // Phase 1: submit creates the reservation
+    handle
+        .submit(task)
+        .await
+        .expect("submit must succeed when deadline is in the future");
+
+    // Wait for the deadline to pass
+    tokio::time::sleep(tokio::time::Duration::from_millis(250)).await;
+
+    // Phase 2c: trigger timeout sweep — should find the expired task and fire release_cb
+    handle
+        .trigger_timeout_sweep()
+        .await
+        .expect("timeout sweep must not error");
+
+    // Give the async release a moment to propagate
+    tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+    let captured = releases.lock().unwrap();
+    assert_eq!(
+        captured.len(),
+        1,
+        "release_cb must fire exactly once on timeout; got {} calls",
+        captured.len()
+    );
+    assert_eq!(
+        captured[0].consumer, RES_SUBMITTER_DID,
+        "release_cb consumer must match submitter"
+    );
+    assert_eq!(
+        captured[0].task_id, "res-timeout-1",
+        "release_cb task_id must match submitted task"
+    );
+    assert!(
+        captured[0].reserved_amount > 0,
+        "release_cb reserved_amount must be positive"
+    );
+}

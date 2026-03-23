@@ -263,6 +263,13 @@ impl ComputeActor {
     /// Without this callback: advisory check only — rollout compatibility mode, not
     /// race-free. Configure to enable correct concurrent-submission enforcement.
     pub fn set_commons_reserve_callback(&mut self, cb: CommonsReserveCallback) {
+        if self.commons_release_callback.is_none() {
+            tracing::warn!(
+                "setting commons_reserve_callback without commons_release_callback; \
+                 reservations will not be released on failure/timeout — \
+                 call set_commons_release_callback before first submit"
+            );
+        }
         self.commons_reserve_callback = Some(cb);
     }
 
@@ -896,6 +903,19 @@ impl ComputeActor {
                         } else {
                             let _ = resp.send(None);
                         }
+                    }
+                    ComputeCommand::TriggerTimeoutSweep { resp } => {
+                        let result = Self::check_timeouts(
+                            &self.task_manager,
+                            &self.executor_registry,
+                            &self.send_callback,
+                            &self.scope_queue_depths,
+                            &self.task_scope_map,
+                            &self.pending_reservations,
+                            &self.commons_release_callback,
+                        )
+                        .await;
+                        let _ = resp.send(result);
                     }
                 }
             }
