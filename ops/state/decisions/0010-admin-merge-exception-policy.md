@@ -9,11 +9,17 @@
 ICN uses GitHub branch protection with four required status checks:
 `Build Release`, `Test`, `Clippy`, `Format Check`.
 
-All four run on a single self-hosted CI runner (`ci-runner`, 10.8.30.46). When this
-runner is busy with a long-running job (e.g., benchmark comparison, multi-hour test
-suites), required jobs queue at `pending / 0s` indefinitely. The branch protection
-rule then blocks merges even though the blocking condition is infrastructure scarcity,
-not test failure.
+All four run on `ubuntu-latest` (GitHub-hosted runners). The self-hosted `ci-runner`
+(VM 446, 10.8.30.46, labels `homelab,k3s`) handles Docker build/deploy
+(`docker-build-deploy.yml`) only — it is not in the required-check path.
+
+Required jobs queue at `pending / 0s` when the GitHub-hosted runner pool for the
+repository is saturated. The principal cause is `benchmark.yml` lacking a concurrency
+group: every Rust-touching commit to a PR queues a new `Compare Against Base` job
+(two full Rust builds, ~30-60 min each). Without cancellation, these pile up and
+exhaust concurrent runner slots, leaving required CI jobs waiting indefinitely.
+The branch protection rule then blocks merges even though the blocking condition is
+infrastructure scarcity, not test failure.
 
 This produces a structural mismatch:
 
@@ -71,21 +77,26 @@ runner queue depth when local verification is clean.
 
 | Alternative | Why rejected |
 |-------------|-------------|
-| Wait indefinitely for the stalled runner | Correct but operationally untenable for small solo/team projects with one runner |
-| Move all required checks to GitHub-hosted runners | Correct long-term fix; not immediately viable due to build time on free tier |
-| Remove runner-dependent jobs from required checks | Removes safety signal; Security Audit and benchmark jobs can be non-required but Test and Build Release should remain required |
-| Add a second self-hosted runner | Correct; see infrastructure debt note below |
+| Wait indefinitely for the stalled runner pool | Correct but operationally untenable for solo/small-team projects |
+| Add concurrency group to benchmark.yml | **Correct root-cause fix; applied 2026-03-23.** Cancels stale Compare Against Base jobs when new commits arrive, freeing runner slots. |
+| Add a second self-hosted runner | Mitigates `docker-build-deploy.yml` throughput; does NOT help required-check latency (which uses GitHub-hosted runners). |
+| Remove required-check jobs | Removes safety signal. Test and Build Release should remain required. |
 
 ## Infrastructure Debt Named by This ADR
 
-The root cause of this exception is **one self-hosted runner gating all required
-checks**. This should be resolved by:
+The root cause of this exception is **`benchmark.yml` lacking a concurrency group**,
+which allows stale `Compare Against Base` jobs to pile up and saturate the
+GitHub-hosted runner pool. This has been fixed (concurrency group added 2026-03-23).
 
-1. Adding a second `ci-runner` (VM on Hyperion or node-2) to reduce starvation risk.
-2. Evaluating whether `Build Release` and `Test` can run on GitHub-hosted runners
-   for branches, reserving self-hosted for main-merge jobs only.
-3. Deciding whether `Security Audit` should be promoted to required once the
+Remaining items:
+
+1. Monitor whether admin-merge exceptions recur after the benchmark concurrency fix.
+   If they do, the runner pool exhaustion has a different cause.
+2. Deciding whether `Security Audit` should be promoted to required once the
    inherited CVE backlog is cleared.
+3. Adding a second `ci-runner` (VM 447) would benefit `docker-build-deploy.yml`
+   (build/deploy parallelism) but does NOT affect required-check latency, which
+   runs on GitHub-hosted infrastructure.
 
 These are not Sprint 26 tasks. They are named here so they are visible when
 capacity allows.
