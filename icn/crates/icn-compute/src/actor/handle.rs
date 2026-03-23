@@ -194,10 +194,10 @@ impl ComputeHandle {
 
     /// Trigger timeout sweep directly (test-only; production uses background timer).
     ///
-    /// # Note
-    /// This method exists solely to support integration tests. Do not call it in production.
+    /// Named with `_for_test` suffix to signal intent, consistent with other test-support
+    /// APIs in this crate (e.g., `commons_pool_for_test`). Do not call in production code.
     #[doc(hidden)]
-    pub async fn trigger_timeout_sweep(&self) -> Result<(), ComputeError> {
+    pub async fn trigger_timeout_sweep_for_test(&self) -> Result<(), ComputeError> {
         let (resp_tx, resp_rx) = tokio::sync::oneshot::channel();
         self.tx
             .send(ComputeCommand::TriggerTimeoutSweep { resp: resp_tx })
