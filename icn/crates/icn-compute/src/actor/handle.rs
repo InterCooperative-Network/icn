@@ -192,6 +192,22 @@ impl ComputeHandle {
             .map_err(|_| ComputeError::Internal("no response".into()))?
     }
 
+    /// Trigger timeout sweep directly (test-only; production uses background timer).
+    ///
+    /// # Note
+    /// This method exists solely to support integration tests. Do not call it in production.
+    #[doc(hidden)]
+    pub async fn trigger_timeout_sweep(&self) -> Result<(), ComputeError> {
+        let (resp_tx, resp_rx) = tokio::sync::oneshot::channel();
+        self.tx
+            .send(ComputeCommand::TriggerTimeoutSweep { resp: resp_tx })
+            .await
+            .map_err(|_| ComputeError::Internal("actor closed".into()))?;
+        resp_rx
+            .await
+            .map_err(|_| ComputeError::Internal("no response".into()))?
+    }
+
     /// Get dispute status by ID
     pub async fn get_dispute_status(
         &self,

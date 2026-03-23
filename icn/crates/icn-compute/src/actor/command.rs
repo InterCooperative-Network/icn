@@ -60,4 +60,8 @@ pub(crate) enum ComputeCommand {
         dispute_id: icn_ccl::DisputeId,
         resp: tokio::sync::oneshot::Sender<Option<icn_ccl::DisputeStatus>>,
     },
+    /// Trigger timeout sweep directly (test-only; production uses background timer).
+    TriggerTimeoutSweep {
+        resp: tokio::sync::oneshot::Sender<Result<(), crate::error::ComputeError>>,
+    },
 }

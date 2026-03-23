@@ -14,8 +14,9 @@ mod types;
 // Re-export public types
 pub use handle::ComputeHandle;
 pub use types::{
-    BalanceCallback, CommonsPaymentRequest, CommonsSettlementCallback, ComputeEvent, EventCallback,
-    LocalityCallback, PaymentCallback, PaymentRequest, SendCallback, TrustCallback,
+    BalanceCallback, CommonsPaymentRequest, CommonsReleaseCallback, CommonsReleaseRequest,
+    CommonsReserveCallback, CommonsReserveRequest, CommonsSettlementCallback, ComputeEvent,
+    EventCallback, LocalityCallback, PaymentCallback, PaymentRequest, SendCallback, TrustCallback,
 };
 
 // Internal imports from submodules
@@ -119,7 +120,22 @@ pub struct ComputeActor {
     balance_callback: Option<BalanceCallback>,
     /// Callback for settling commons credits on task completion (E7 - #948).
     /// Fires when a commons-scope task completes successfully.
+    /// App-layer implementation must reconcile against the reservation established
+    /// by `commons_reserve_callback` rather than performing a free-pool debit (#1404).
     commons_settlement_callback: Option<CommonsSettlementCallback>,
+    /// Authoritative race-free admission gate for commons tasks (#1404).
+    /// When set, `handle_submit()` calls this after the advisory balance check.
+    /// The callee atomically holds `amount` credits; on Err the task is rejected.
+    /// Not set = rollout compatibility mode (advisory check only, no hold).
+    commons_reserve_callback: Option<CommonsReserveCallback>,
+    /// Callback to release a commons credit hold on non-success outcomes (#1404).
+    /// Fires on task failure, out-of-fuel, or timeout. Must be idempotent.
+    commons_release_callback: Option<CommonsReleaseCallback>,
+    /// Ephemeral index of outstanding commons credit reservations (#1404).
+    /// Maps task_id → reserved_amount. Populated on successful reserve_cb call;
+    /// cleared on settlement (Success) or release (non-Success / timeout).
+    /// Not persisted — consistent with task state loss on process crash (V1 limitation).
+    pending_reservations: Arc<Mutex<HashMap<String, i64>>>,
     /// WASM registry for execute-by-hash (Issue #1074)
     wasm_registry: Option<Arc<WasmRegistry>>,
     /// Resource refresh configuration
@@ -170,6 +186,9 @@ impl ComputeActor {
             commons_pool_policy: None,
             balance_callback: None,
             commons_settlement_callback: None,
+            commons_reserve_callback: None,
+            commons_release_callback: None,
+            pending_reservations: Arc::new(Mutex::new(HashMap::new())),
             wasm_registry: None,
             resource_refresh_config: crate::scheduler::ResourceRefreshConfig::default(),
             cached_capacity: Arc::new(Mutex::new(None)),
@@ -230,6 +249,37 @@ impl ComputeActor {
     /// Must be set alongside `set_commons_pool_policy` for credit validation to activate.
     pub fn set_balance_callback(&mut self, cb: BalanceCallback) {
         self.balance_callback = Some(cb);
+    }
+
+    /// Set the authoritative commons credit reservation callback (#1404).
+    ///
+    /// When set, `handle_submit()` calls this after the advisory balance floor check
+    /// to atomically hold `compute_credits_required(&task)` credits. If the callee
+    /// returns `Err`, the task is rejected with `InsufficientCommonsCredits`.
+    ///
+    /// **Must be set alongside `set_commons_release_callback`** for complete two-phase
+    /// commit semantics. Without both, reservation is silently skipped.
+    ///
+    /// Without this callback: advisory check only — rollout compatibility mode, not
+    /// race-free. Configure to enable correct concurrent-submission enforcement.
+    pub fn set_commons_reserve_callback(&mut self, cb: CommonsReserveCallback) {
+        if self.commons_release_callback.is_none() {
+            tracing::warn!(
+                "setting commons_reserve_callback without commons_release_callback; \
+                 reservations will not be released on failure/timeout — \
+                 call set_commons_release_callback before first submit"
+            );
+        }
+        self.commons_reserve_callback = Some(cb);
+    }
+
+    /// Set the commons credit release callback (#1404).
+    ///
+    /// Fires when a commons-scope task fails, runs out of fuel, or times out.
+    /// The callee must release the hold established by `CommonsReserveCallback`
+    /// for the given `task_id`. Must be idempotent (no-op if task_id not found).
+    pub fn set_commons_release_callback(&mut self, cb: CommonsReleaseCallback) {
+        self.commons_release_callback = Some(cb);
     }
 
     /// Set dispute resolution system (Phase 18 Week 4)
@@ -459,6 +509,8 @@ impl ComputeActor {
         let send_callback_clone = self.send_callback.clone();
         let scope_depths_clone = Arc::clone(&self.scope_queue_depths);
         let task_scope_map_clone = Arc::clone(&self.task_scope_map);
+        let pending_reservations_clone = Arc::clone(&self.pending_reservations);
+        let commons_release_cb_clone = self.commons_release_callback.clone();
 
         // Spawn timeout checker task
         tokio::spawn(async move {
@@ -471,6 +523,8 @@ impl ComputeActor {
                     &send_callback_clone,
                     &scope_depths_clone,
                     &task_scope_map_clone,
+                    &pending_reservations_clone,
+                    &commons_release_cb_clone,
                 )
                 .await
                 {
@@ -849,6 +903,19 @@ impl ComputeActor {
                         } else {
                             let _ = resp.send(None);
                         }
+                    }
+                    ComputeCommand::TriggerTimeoutSweep { resp } => {
+                        let result = Self::check_timeouts(
+                            &self.task_manager,
+                            &self.executor_registry,
+                            &self.send_callback,
+                            &self.scope_queue_depths,
+                            &self.task_scope_map,
+                            &self.pending_reservations,
+                            &self.commons_release_callback,
+                        )
+                        .await;
+                        let _ = resp.send(result);
                     }
                 }
             }

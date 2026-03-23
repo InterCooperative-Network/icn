@@ -1,69 +1,77 @@
 {
-  "sprint": 24,
-  "theme": "Commons Compute Spine",
+  "sprint": 25,
+  "theme": "Pre-Execution Commons Credit Reservation",
   "governing_rule": "A task is only done when repo state, board state, and narrative state agree.",
-  "start_date": "2026-03-22",
+  "start_date": "2026-03-24",
   "status": "active",
   "spine": [
-    "#925",
-    "#947",
-    "#964"
+    "#1404"
   ],
+  "closed_sprint": {
+    "sprint": 24,
+    "theme": "Commons Compute Spine",
+    "start_date": "2026-03-22",
+    "closed_date": "2026-03-23",
+    "status": "done",
+    "shipped": [
+      "#947 — two-tier trust thresholds for unaffiliated pool admission (PR #1396)",
+      "#964 — stale commons pool participant expiry (PR #1396)",
+      "#925 — parent epic: commons resource pool + credit accounting substrate (closed as delivered)",
+      "#1397 — V1 scheduling-time credit enforcement floor at handle_submit() (PR #1398)",
+      "#1399 — cost-based commons credit enforcement: compute_credits_required() (PR #1400)"
+    ],
+    "ci_fixes": ["#1401 — hung docker-build-deploy Test job (PR #1402, #1403)"]
+  },
   "tasks": [
     {
-      "id": "s24-t1",
-      "title": "#947 Trust bootstrap for unaffiliated commons pool nodes",
-      "track": "A",
-      "status": "ready",
-      "github_issue": 947,
-      "branch": "feat/947-unaffiliated-trust-bootstrap",
-      "scope": "icn-compute/src/commons_pool.rs + actor/placement.rs",
-      "notes": "Add commons_admission_min_trust:0.0 to SybilPolicy, is_affiliated:bool to CommonsParticipant, branch in try_add_participant(). ~40 lines."
+      "id": "s25-t1",
+      "title": "Filed GitHub issue #1404 for pre-execution commons credit reservation",
+      "status": "done",
+      "github_issue": 1404
     },
     {
-      "id": "s24-t2",
-      "title": "#947 Integration test: unaffiliated node full path (announce\u2192pool\u2192task\u2192settlement)",
-      "track": "A",
-      "status": "ready",
-      "github_issue": 947,
-      "depends_on": [
-        "s24-t1"
-      ],
+      "id": "s25-t2",
+      "title": "New callback types + actor fields",
+      "status": "done",
+      "github_issue": 1404,
+      "branch": "feat/1404-commons-credit-reservation",
+      "scope": "icn-compute/src/actor/types.rs + mod.rs",
+      "notes": "Add CommonsReserveRequest, CommonsReleaseRequest, CommonsReserveCallback, CommonsReleaseCallback. Add pending_reservations field + setters. Extend check_timeouts() signature. ~60 lines."
+    },
+    {
+      "id": "s25-t3",
+      "title": "Two-phase commit in lifecycle.rs",
+      "status": "done",
+      "github_issue": 1404,
+      "depends_on": ["s25-t2"],
+      "scope": "icn-compute/src/actor/lifecycle.rs",
+      "notes": "Phase 1: reserve_cb call in handle_submit() after floor check. Phase 2a: remove from pending on success. Phase 2b: release_cb on non-success. Phase 2c: release_cb in check_timeouts() timeout sweep. ~65 lines."
+    },
+    {
+      "id": "s25-t4",
+      "title": "Tests: 5 functions covering all reservation paths",
+      "status": "done",
+      "github_issue": 1404,
+      "depends_on": ["s25-t3"],
       "scope": "icn-compute/tests/commons_integration.rs",
-      "notes": "Test through on_capacity_announce with trust_callback returning 0.0. Verify pool admission, task routing, credit settlement."
+      "notes": "reservation_created_at_submit, reservation_released_on_failure, reservation_consumed_on_success, reservation_race_rejection, no_reserve_callback_backward_compat. All backed by Arc<Mutex<Vec>> recorders. ~90 lines."
     },
     {
-      "id": "s24-t3",
-      "title": "#964 Stale commons pool participant expiry",
-      "track": "A",
-      "status": "ready",
-      "github_issue": 964,
-      "depends_on": [
-        "s24-t1"
-      ],
-      "scope": "icn-compute/src/commons_pool.rs + actor/placement.rs",
-      "notes": "Add expire_stale(max_age) method, StaleParticipantConfig, call on each announce, emit commons_pool_expired_total metric. ~30 lines."
+      "id": "s25-t5",
+      "title": "Metrics: 2 counters",
+      "status": "done",
+      "github_issue": 1404,
+      "depends_on": ["s25-t3"],
+      "scope": "icn-obs/src/metrics_legacy.rs",
+      "notes": "commons_reservation_created_total, commons_reservation_released_total{reason=failure|timeout}. ~12 lines."
     },
     {
-      "id": "s24-t4",
-      "title": "Close #947 and #925 after t1+t2 pass CI",
-      "track": "A",
-      "status": "waiting",
-      "depends_on": [
-        "s24-t1",
-        "s24-t2"
-      ],
-      "notes": "Merge branch, close #947, verify #946+#947+#948+#949 all closed, then close parent #925."
-    },
-    {
-      "id": "s24-t5",
-      "title": "Close #964 after t3 passes CI",
-      "track": "A",
-      "status": "waiting",
-      "depends_on": [
-        "s24-t3"
-      ],
-      "notes": "Merge stale expiry PR, close #964."
+      "id": "s25-t6",
+      "title": "PR → CI → merge",
+      "status": "in_progress",
+      "depends_on": ["s25-t4", "s25-t5"],
+      "pr": 1405,
+      "notes": "PR #1405 open. Waiting for CI. Merge when green."
     }
   ]
 }

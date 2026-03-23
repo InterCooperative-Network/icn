@@ -8,8 +8,8 @@ use tokio::sync::Mutex;
 
 use super::consensus::{outcome_to_value, results_match};
 use super::types::{
-    CommonsPaymentRequest, ComputeEvent, ExecutorInfo, PaymentRequest, ResultConsensus,
-    SendCallback,
+    CommonsPaymentRequest, CommonsReleaseCallback, CommonsReleaseRequest, CommonsReserveRequest,
+    ComputeEvent, ExecutorInfo, PaymentRequest, ResultConsensus, SendCallback,
 };
 use super::ComputeActor;
 use crate::error::ComputeError;
@@ -340,7 +340,10 @@ impl ComputeActor {
             let duration_ms = accepted_result.duration_ms;
 
             let mut mgr = self.task_manager.lock().await;
-            if mgr.get(&accepted_result.task_hash).is_some() {
+            let task_reservation_info = mgr
+                .get(&accepted_result.task_hash)
+                .map(|t| (t.id.clone(), t.scope, t.submitter.clone()));
+            if task_reservation_info.is_some() {
                 mgr.complete(accepted_result)?;
             }
             drop(mgr);
@@ -371,6 +374,27 @@ impl ComputeActor {
                     duration_ms,
                 });
             }
+
+            // Release/consume commons reservation based on outcome (#1404)
+            if let Some((task_id, icn_kernel_api::ScopeLevel::Commons, consumer)) =
+                task_reservation_info
+            {
+                if matches!(&outcome, crate::types::ExecutionOutcome::Success(_)) {
+                    self.pending_reservations.lock().await.remove(&task_id);
+                } else {
+                    let reserved = self.pending_reservations.lock().await.remove(&task_id);
+                    if let (Some(reserved_amount), Some(ref release_cb)) =
+                        (reserved, &self.commons_release_callback)
+                    {
+                        release_cb(CommonsReleaseRequest {
+                            consumer,
+                            task_id,
+                            reserved_amount,
+                        });
+                        icn_obs::metrics::compute::commons_reservation_released_inc("failure");
+                    }
+                }
+            }
         }
 
         Ok(())
@@ -385,7 +409,10 @@ impl ComputeActor {
         let duration_ms = result.duration_ms;
 
         let mut mgr = self.task_manager.lock().await;
-        if mgr.get(&task_hash).is_some() {
+        let task_reservation_info = mgr
+            .get(&task_hash)
+            .map(|t| (t.id.clone(), t.scope, t.submitter.clone()));
+        if task_reservation_info.is_some() {
             mgr.complete(result)?;
         }
         drop(mgr);
@@ -415,6 +442,27 @@ impl ComputeActor {
                 fuel_used,
                 duration_ms,
             });
+        }
+
+        // Release/consume commons reservation based on outcome (#1404)
+        if let Some((task_id, icn_kernel_api::ScopeLevel::Commons, consumer)) =
+            task_reservation_info
+        {
+            if matches!(&outcome, crate::types::ExecutionOutcome::Success(_)) {
+                self.pending_reservations.lock().await.remove(&task_id);
+            } else {
+                let reserved = self.pending_reservations.lock().await.remove(&task_id);
+                if let (Some(reserved_amount), Some(ref release_cb)) =
+                    (reserved, &self.commons_release_callback)
+                {
+                    release_cb(CommonsReleaseRequest {
+                        consumer,
+                        task_id,
+                        reserved_amount,
+                    });
+                    icn_obs::metrics::compute::commons_reservation_released_inc("failure");
+                }
+            }
         }
 
         Ok(())
@@ -527,14 +575,19 @@ impl ComputeActor {
             "Received task cancellation"
         );
 
-        // Get the executor if task was claimed
-        let executor_did = {
+        // Get executor and reservation info before cancellation
+        let (executor_did, task_reservation_info) = {
             let mgr = self.task_manager.lock().await;
-            if let Some(TaskStatus::Claimed { executor, .. }) = mgr.status(&task_hash) {
-                Some(executor.clone())
-            } else {
-                None
-            }
+            let executor_did =
+                if let Some(TaskStatus::Claimed { executor, .. }) = mgr.status(&task_hash) {
+                    Some(executor.clone())
+                } else {
+                    None
+                };
+            let task_reservation_info = mgr
+                .get(&task_hash)
+                .map(|t| (t.id.clone(), t.scope, t.submitter.clone()));
+            (executor_did, task_reservation_info)
         };
 
         // Cancel the task in our local manager
@@ -576,6 +629,24 @@ impl ComputeActor {
             task_hash = %task_hash_str,
             "Task cancelled successfully"
         );
+
+        // Release commons reservation on network-level cancellation (#1404).
+        // Idempotent: no-op if no reservation exists for this task_id.
+        if let Some((task_id, icn_kernel_api::ScopeLevel::Commons, consumer)) =
+            task_reservation_info
+        {
+            let reserved = self.pending_reservations.lock().await.remove(&task_id);
+            if let (Some(reserved_amount), Some(ref release_cb)) =
+                (reserved, &self.commons_release_callback)
+            {
+                release_cb(CommonsReleaseRequest {
+                    consumer,
+                    task_id,
+                    reserved_amount,
+                });
+                icn_obs::metrics::compute::commons_reservation_released_inc("cancelled");
+            }
+        }
 
         Ok(())
     }
@@ -760,6 +831,26 @@ impl ComputeActor {
                             }
                             drop(registry);
                             self.decrement_scope_queue(&hash).await;
+                            // Release commons reservation on WasmRef resolution failure (#1404)
+                            if claimed_task.scope == icn_kernel_api::ScopeLevel::Commons {
+                                let reserved = self
+                                    .pending_reservations
+                                    .lock()
+                                    .await
+                                    .remove(&claimed_task.id);
+                                if let (Some(reserved_amount), Some(ref release_cb)) =
+                                    (reserved, &self.commons_release_callback)
+                                {
+                                    release_cb(CommonsReleaseRequest {
+                                        consumer: claimed_task.submitter.clone(),
+                                        task_id: claimed_task.id.clone(),
+                                        reserved_amount,
+                                    });
+                                    icn_obs::metrics::compute::commons_reservation_released_inc(
+                                        "failure",
+                                    );
+                                }
+                            }
                             return Err(ComputeError::ModuleFetchFailed {
                                 hash: wasm_hash_hex,
                                 reason: e.to_string(),
@@ -785,6 +876,24 @@ impl ComputeActor {
                     }
                     drop(registry);
                     self.decrement_scope_queue(&hash).await;
+                    // Release commons reservation when WASM registry is missing (#1404)
+                    if claimed_task.scope == icn_kernel_api::ScopeLevel::Commons {
+                        let reserved = self
+                            .pending_reservations
+                            .lock()
+                            .await
+                            .remove(&claimed_task.id);
+                        if let (Some(reserved_amount), Some(ref release_cb)) =
+                            (reserved, &self.commons_release_callback)
+                        {
+                            release_cb(CommonsReleaseRequest {
+                                consumer: claimed_task.submitter.clone(),
+                                task_id: claimed_task.id.clone(),
+                                reserved_amount,
+                            });
+                            icn_obs::metrics::compute::commons_reservation_released_inc("failure");
+                        }
+                    }
                     return Err(ComputeError::ModuleFetchFailed {
                         hash: wasm_hash_hex,
                         reason: "WASM registry not configured".to_string(),
@@ -971,6 +1080,10 @@ impl ComputeActor {
         //
         // Belt + suspenders: settle_commons_receipt() hard-rejects any scope != Commons,
         // so even if this check is bypassed, the ledger invariant holds.
+        //
+        // Settlement semantics change with reservation (#1404): once CommonsReserveCallback
+        // is configured, the app-layer implementation of this callback must reconcile against
+        // the hold established for task_id rather than performing an unrelated free-pool debit.
         if let crate::types::ExecutionOutcome::Success(_) = &result.outcome {
             if claimed_task.scope == icn_kernel_api::ScopeLevel::Commons {
                 if let Some(ref commons_cb) = self.commons_settlement_callback {
@@ -996,6 +1109,37 @@ impl ComputeActor {
                         task_id: claimed_task.id.clone(),
                     });
                 }
+                // Phase 2a: consume the reservation on success (#1404).
+                // The reservation hold is released by settlement reconciliation in the
+                // app layer; here we just remove it from the kernel's ephemeral index.
+                self.pending_reservations
+                    .lock()
+                    .await
+                    .remove(&claimed_task.id);
+            }
+        }
+
+        // Phase 2b: release reservation on non-success outcomes (#1404).
+        //
+        // On failure/out-of-fuel, credits were not consumed — return the hold to
+        // the submitter via the release callback (idempotent; no-op if no reservation).
+        if !matches!(&result.outcome, crate::types::ExecutionOutcome::Success(_))
+            && claimed_task.scope == icn_kernel_api::ScopeLevel::Commons
+        {
+            let reserved = self
+                .pending_reservations
+                .lock()
+                .await
+                .remove(&claimed_task.id);
+            if let (Some(reserved_amount), Some(ref release_cb)) =
+                (reserved, &self.commons_release_callback)
+            {
+                release_cb(CommonsReleaseRequest {
+                    consumer: claimed_task.submitter.clone(),
+                    task_id: claimed_task.id.clone(),
+                    reserved_amount,
+                });
+                icn_obs::metrics::compute::commons_reservation_released_inc("failure");
             }
         }
 
@@ -1075,6 +1219,8 @@ impl ComputeActor {
         send_callback: &Option<SendCallback>,
         scope_queue_depths: &Arc<Mutex<HashMap<icn_kernel_api::ScopeLevel, usize>>>,
         task_scope_map: &Arc<Mutex<HashMap<TaskHash, icn_kernel_api::ScopeLevel>>>,
+        pending_reservations: &Arc<Mutex<HashMap<String, i64>>>,
+        commons_release_callback: &Option<CommonsReleaseCallback>,
     ) -> Result<(), ComputeError> {
         let now = icn_time::current_timestamp_millis();
 
@@ -1098,12 +1244,15 @@ impl ComputeActor {
                 "Task exceeded deadline, marking as failed"
             );
 
-            // Get task info for broadcasting
+            // Get task info for broadcasting and reservation release
             let mut mgr = task_manager.lock().await;
             let task_id = mgr
                 .get(&hash)
                 .map(|t| t.id.clone())
                 .unwrap_or_else(|| "unknown".to_string());
+            let submitter = mgr.get(&hash).map(|t| t.submitter.clone());
+            // task_scope covers Pending tasks that were never claimed (no task_scope_map entry)
+            let task_scope = mgr.get(&hash).map(|t| t.scope);
 
             // Mark as failed
             mgr.fail(&hash, "Deadline exceeded".to_string())?;
@@ -1121,13 +1270,32 @@ impl ComputeActor {
                     }
                 }
             }
-            // Decrement scope queue depth
+            // Decrement scope queue depth and release commons reservation on timeout
             {
                 let scope = task_scope_map.lock().await.remove(&hash);
-                if let Some(scope) = scope {
+                if let Some(ref scope) = scope {
                     let mut depths = scope_queue_depths.lock().await;
-                    if let Some(count) = depths.get_mut(&scope) {
+                    if let Some(count) = depths.get_mut(scope) {
                         *count = count.saturating_sub(1);
+                    }
+                }
+                // Phase 2c: release commons credit reservation on timeout (#1404).
+                // Idempotent: no-op if no reservation exists for task_id.
+                // scope covers claimed tasks (task_scope_map entry); task_scope covers
+                // Pending tasks that timed out before any executor claimed them.
+                let is_commons = scope == Some(icn_kernel_api::ScopeLevel::Commons)
+                    || task_scope == Some(icn_kernel_api::ScopeLevel::Commons);
+                if is_commons {
+                    let reserved = pending_reservations.lock().await.remove(&task_id);
+                    if let (Some(reserved_amount), Some(ref release_cb), Some(consumer)) =
+                        (reserved, commons_release_callback, submitter)
+                    {
+                        release_cb(CommonsReleaseRequest {
+                            consumer,
+                            task_id: task_id.clone(),
+                            reserved_amount,
+                        });
+                        icn_obs::metrics::compute::commons_reservation_released_inc("timeout");
                     }
                 }
             }
@@ -1239,6 +1407,51 @@ impl ComputeActor {
                         "Commons task rejected: insufficient credits"
                     );
                     return Err(ComputeError::InsufficientCommonsCredits { balance, required });
+                }
+            }
+        }
+
+        // Phase 1: pre-execution commons credit reservation (#1404)
+        //
+        // The balance check above is an ADVISORY fast-fail only — it does not hold credits
+        // and cannot prevent a concurrent submission from consuming the same balance.
+        // This callback is the AUTHORITATIVE, race-free admission gate: it must atomically
+        // read-and-hold `amount` credits against `task_id`. On Err (race lost), reject.
+        //
+        // Backward compatibility: no reserve callback configured = advisory-check-only mode.
+        // This is not race-free correctness mode — configure the callback for correct enforcement.
+        if task.scope == icn_kernel_api::ScopeLevel::Commons {
+            if let Some(ref reserve_cb) = self.commons_reserve_callback {
+                let required = crate::cost::compute_credits_required(&task);
+                match reserve_cb(CommonsReserveRequest {
+                    consumer: task.submitter.clone(),
+                    amount: required,
+                    task_id: task.id.clone(),
+                }) {
+                    Ok(()) => {
+                        self.pending_reservations
+                            .lock()
+                            .await
+                            .insert(task.id.clone(), required);
+                        icn_obs::metrics::compute::commons_reservation_created_inc();
+                        tracing::debug!(
+                            task_id = %task.id,
+                            consumer = %task.submitter,
+                            amount = required,
+                            "Commons credit reservation created"
+                        );
+                    }
+                    Err(reason) => {
+                        tracing::warn!(
+                            task_id = %task.id,
+                            reason = %reason,
+                            "Commons reservation race: insufficient credits at atomic check"
+                        );
+                        return Err(ComputeError::InsufficientCommonsCredits {
+                            balance: 0,
+                            required,
+                        });
+                    }
                 }
             }
         }
@@ -1415,6 +1628,13 @@ impl ComputeActor {
         // Cancel in local manager (validates authorization)
         let now = icn_time::current_timestamp_millis();
 
+        // Capture reservation info before cancellation
+        let task_reservation_info = {
+            let mgr = self.task_manager.lock().await;
+            mgr.get(task_hash)
+                .map(|t| (t.id.clone(), t.scope, t.submitter.clone()))
+        };
+
         let mut mgr = self.task_manager.lock().await;
         mgr.cancel(task_hash, requester, reason.clone())?;
         drop(mgr);
@@ -1434,6 +1654,24 @@ impl ComputeActor {
                 reason,
                 cancelled_at: now,
             });
+        }
+
+        // Release commons reservation on local cancellation (#1404).
+        // Idempotent: no-op if no reservation exists for this task_id.
+        if let Some((task_id, icn_kernel_api::ScopeLevel::Commons, consumer)) =
+            task_reservation_info
+        {
+            let reserved = self.pending_reservations.lock().await.remove(&task_id);
+            if let (Some(reserved_amount), Some(ref release_cb)) =
+                (reserved, &self.commons_release_callback)
+            {
+                release_cb(CommonsReleaseRequest {
+                    consumer,
+                    task_id,
+                    reserved_amount,
+                });
+                icn_obs::metrics::compute::commons_reservation_released_inc("cancelled");
+            }
         }
 
         Ok(())
