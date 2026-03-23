@@ -184,6 +184,10 @@ _beat "The foundation can see the vote. Not a summary, not a claim — the actua
 echo "  Querying Harbor Homes' governance record for capital reserve decisions..."
 echo ""
 
+# decision_hash extracted from GovernanceReceipt proof (if available)
+# Must be initialized before the nested conditional blocks to satisfy set -u
+HARBOR_DECISION_HASH=""
+
 # List recent proposals from Harbor Homes
 _do_curl "${HARBOR_URL}/v1/gov/proposals" GET "" "$HARBOR_TOKEN"
 if [[ "$DEMO_LAST_HTTP_CODE" =~ ^2 ]]; then
