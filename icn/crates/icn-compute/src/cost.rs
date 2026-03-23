@@ -70,7 +70,9 @@ pub fn compute_credits_required(task: &ComputeTask) -> i64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{ComputeTask, FuelLimit, TaskId, TaskCode, TaskPriority};
+    use crate::types::{
+        ComputeTask, DeterminismClass, FuelLimit, PrivacyClass, TaskCode, TaskId, TaskPriority,
+    };
 
     /// Helper to construct a minimal test task.
     fn test_task(fuel_limit: u64, payment_rate: Option<u64>) -> ComputeTask {
@@ -78,7 +80,7 @@ mod tests {
             id: TaskId::from("test_task"),
             submitter: "did:icn:test".to_string(),
             coop_id: None,
-            code: TaskCode::Ccl(vec![]),
+            code: TaskCode::Ccl(String::new()),
             inputs: vec![],
             fuel_limit: FuelLimit(fuel_limit),
             required_capabilities: vec![],
@@ -93,6 +95,13 @@ mod tests {
             federation_constraints: None,
             estimated_value: None,
             verification: None,
+            inputs_hash: None,
+            policy_hash: None,
+            determinism_class: DeterminismClass::default(),
+            privacy_class: PrivacyClass::default(),
+            storage_class: None,
+            data_locality: None,
+            scope: Default::default(),
         }
     }
 
