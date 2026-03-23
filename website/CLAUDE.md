@@ -30,6 +30,7 @@ using `import.meta.url`-relative path resolution. This works regardless of worki
 To change documentation, edit files in `docs/` at repo root.
 
 Files that resolve the docs path:
+
 - `src/pages/docs/[...slug].astro` — dynamic doc page renderer
 - `src/pages/docs/index.astro` — docs index/sidebar
 - `src/lib/markdown.ts` — markdown renderer with link rewriting

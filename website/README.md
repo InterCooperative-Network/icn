@@ -14,7 +14,7 @@ The official website for the InterCooperative Network (ICN) - a federated comput
 
 ### Prerequisites
 
-- Node.js 18+ 
+- Node.js 18+
 - npm or yarn
 
 ### Installation
@@ -65,7 +65,7 @@ The website uses a modern design system with:
 ### Color Palette
 
 - **Primary**: `#00D4AA` (Teal)
-- **Secondary**: `#3B82F6` (Blue) 
+- **Secondary**: `#3B82F6` (Blue)
 - **Accent**: `#32FFD2` (Bright Teal)
 - **Purple**: `#8B5CF6` (Purple)
 - **Background**: `#0A0E1A` (Dark Navy)
@@ -96,12 +96,15 @@ npm run deploy     # Deploy to GitHub Pages
 ### Adding Content
 
 #### New Pages
+
 Create `.astro` files in `src/pages/` directory. The file structure maps to URL routes.
 
 #### Blog Posts
+
 Add new blog posts in `src/pages/blog/` directory with frontmatter for metadata.
 
 #### Documentation
+
 Add documentation pages in `src/pages/docs/` directory with proper navigation.
 
 ### Styling Guidelines

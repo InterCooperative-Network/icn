@@ -13,9 +13,9 @@ const repoRoot = fs.existsSync(path.resolve(cwd, "icn", "crates"))
 
 const cratesDir = path.join(repoRoot, "icn", "crates");
 const crates = fs.existsSync(cratesDir)
-  ? fs.readdirSync(cratesDir).filter((d) =>
-      fs.statSync(path.join(cratesDir, d)).isDirectory()
-    ).length
+  ? fs
+      .readdirSync(cratesDir)
+      .filter((d) => fs.statSync(path.join(cratesDir, d)).isDirectory()).length
   : 0;
 
 function run(cmd, opts = {}) {
@@ -30,7 +30,7 @@ function run(cmd, opts = {}) {
 function countRustLoc() {
   try {
     const out = run(
-      `find "${path.join(repoRoot, "icn", "crates")}" -name "*.rs" | xargs wc -l 2>/dev/null | tail -1`
+      `find "${path.join(repoRoot, "icn", "crates")}" -name "*.rs" | xargs wc -l 2>/dev/null | tail -1`,
     );
     const match = out.match(/(\d+)/);
     return match ? parseInt(match[1], 10) : 0;
@@ -43,7 +43,7 @@ function countRustLoc() {
 function countTests() {
   try {
     const out = run(
-      `grep -r "#\\[test\\]" "${path.join(repoRoot, "icn", "crates")}" --include="*.rs" | wc -l`
+      `grep -r "#\\[test\\]" "${path.join(repoRoot, "icn", "crates")}" --include="*.rs" | wc -l`,
     );
     return parseInt(out.trim(), 10) || 0;
   } catch {
@@ -55,13 +55,13 @@ function countTests() {
 function countMergedPRs() {
   const ghOut = run(
     `gh pr list --state merged --limit 1000 --json number --jq 'length' -R InterCooperative-Network/icn 2>/dev/null`,
-    { cwd: repoRoot }
+    { cwd: repoRoot },
   );
   if (ghOut && /^\d+$/.test(ghOut)) return parseInt(ghOut, 10);
   try {
     const out = run(
       `git log --oneline --merges --format="%h" 2>/dev/null | wc -l`,
-      { cwd: repoRoot }
+      { cwd: repoRoot },
     );
     return parseInt(out.trim(), 10) || 0;
   } catch {
@@ -73,10 +73,12 @@ function countMergedPRs() {
 function countActiveBranches() {
   const ghOut = run(
     `gh api "repos/InterCooperative-Network/icn/branches?per_page=100" --paginate --jq 'length' 2>/dev/null | awk '{s+=$1} END{print s}'`,
-    { cwd: repoRoot }
+    { cwd: repoRoot },
   );
   if (ghOut && /^\d+$/.test(ghOut)) return parseInt(ghOut, 10);
-  const gitOut = run(`git branch -r 2>/dev/null | grep -v HEAD | wc -l`, { cwd: repoRoot });
+  const gitOut = run(`git branch -r 2>/dev/null | grep -v HEAD | wc -l`, {
+    cwd: repoRoot,
+  });
   return parseInt(gitOut.trim(), 10) || 0;
 }
 
@@ -88,7 +90,8 @@ function countDocFiles() {
   return parseInt(out.trim(), 10) || 0;
 }
 
-const latestCommit = run("git rev-parse --short HEAD", { cwd: repoRoot }) || "unknown";
+const latestCommit =
+  run("git rev-parse --short HEAD", { cwd: repoRoot }) || "unknown";
 const latestCommitFull = run("git rev-parse HEAD", { cwd: repoRoot }) || "";
 
 const rustLinesOfCode = countRustLoc();
@@ -110,14 +113,16 @@ const stats = {
 };
 
 const outPath = path.join(
-  fs.existsSync(path.resolve(cwd, "src")) ? cwd : path.join(repoRoot, "website"),
+  fs.existsSync(path.resolve(cwd, "src"))
+    ? cwd
+    : path.join(repoRoot, "website"),
   "src",
   "data",
-  "stats.json"
+  "stats.json",
 );
 
 fs.mkdirSync(path.dirname(outPath), { recursive: true });
 fs.writeFileSync(outPath, JSON.stringify(stats, null, 2) + "\n");
 console.log(
-  `[gen-stats] ${crates} crates · ${rustLinesOfCode.toLocaleString()} LoC · ${testCount} tests · ${mergedPRs} PRs · ${activeBranches} branches · ${docFiles} docs → ${outPath}`
+  `[gen-stats] ${crates} crates · ${rustLinesOfCode.toLocaleString()} LoC · ${testCount} tests · ${mergedPRs} PRs · ${activeBranches} branches · ${docFiles} docs → ${outPath}`,
 );

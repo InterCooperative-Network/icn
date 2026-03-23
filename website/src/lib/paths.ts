@@ -7,8 +7,8 @@ import path from "node:path";
 export function resolveRepoDocsRoot(): string {
   const cwd = process.cwd();
   const candidates = [
-    path.resolve(cwd, "docs"),        // repo root runner (npm --prefix website ...)
-    path.resolve(cwd, "..", "docs"),   // website/ runner (cd website && npm run build)
+    path.resolve(cwd, "docs"), // repo root runner (npm --prefix website ...)
+    path.resolve(cwd, "..", "docs"), // website/ runner (cd website && npm run build)
   ];
 
   const init = process.env.INIT_CWD;
@@ -19,7 +19,7 @@ export function resolveRepoDocsRoot(): string {
   }
 
   throw new Error(
-    `Cannot locate docs/. Tried:\n${candidates.map((c) => `- ${c}`).join("\n")}`
+    `Cannot locate docs/. Tried:\n${candidates.map((c) => `- ${c}`).join("\n")}`,
   );
 }
 
