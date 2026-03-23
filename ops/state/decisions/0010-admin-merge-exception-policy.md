@@ -1,4 +1,4 @@
-# ADR-0010: Admin Merge Exception Policy for Self-Hosted Runner Starvation
+# ADR-0010: Admin Merge Exception Policy for GitHub Runner Pool Saturation
 
 **Date**: 2026-03-23
 **Status**: accepted
@@ -35,9 +35,10 @@ ceremonial theater. This ADR names the exception explicitly so it remains a
 
 `gh pr merge --admin` is **permitted** when ALL of the following conditions hold:
 
-1. **Non-runner required checks are green.** `Clippy` and `Format Check` run on
-   GitHub-hosted infrastructure and are not subject to runner starvation. Both must
-   pass before an admin merge is considered.
+1. **All completed required checks are green.** Any required check that has started
+   and finished must have passed. Only checks that are `pending at 0s` (queued, not
+   yet assigned a runner) may be bypassed. If any check has completed with failure or
+   a timeout result, do not admin-merge — that is evidence, not queue starvation.
 
 2. **Blocking condition is queue starvation, not failure.** The required jobs must
    be `pending` at 0s duration, not `failure` or `timed out`. A job that has started
@@ -65,9 +66,9 @@ not a policy bypass. When any condition is absent, wait or fix.
 runner queue depth when local verification is clean.
 
 **Harder / riskier**:
-- The single-runner bottleneck is papered over rather than fixed. This ADR should
-  not reduce pressure to add a second runner or move required jobs to GitHub-hosted
-  runners.
+- The benchmark concurrency fix (2026-03-23) addresses the root cause of pool
+  saturation. If admin merges recur frequently after that fix, a different saturation
+  source exists and should be identified before normalizing the exception further.
 - Admin merges bypass `--strict` up-to-date enforcement. The branch must be rebased
   onto current main before local verification to ensure correctness.
 - Any future contributor who sees admin merges in history without knowing this policy
