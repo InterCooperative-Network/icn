@@ -536,6 +536,44 @@ seed_fingerlakes() {
 }
 
 # ---------------------------------------------------------------------------
+# seed_fingerlakes_compute
+#
+# Flow 5 (commons compute) requires a trust edge in the Delta node's in-memory
+# TrustGraph. The compute actor calls trust_service.trust_score(submitter_did)
+# on admission; MIN_TRUST_SUBMIT = 0.1.
+#
+# Trust state lives in-memory and resets on pod restart. The HTTP trust API
+# (/v1/trust/attest) was added after the current K3s binary was deployed
+# (2026-02-28). We use icnctl trust add via gRPC (port 5655 inside pod) as
+# the supported path for this binary vintage.
+#
+# Idempotent: adding the same trust edge multiple times is safe.
+#
+# NOTE: Port 5655 is the internal gRPC port inside the Delta pod. It is NOT
+# the Kubernetes NodePort (30655). Use kubectl exec to reach it.
+# ---------------------------------------------------------------------------
+_DELTA_GRPC_INTERNAL="[::1]:5655"
+
+seed_fingerlakes_compute() {
+  narrate "Seeding Finger Lakes CDN compute trust (Flow 5)"
+
+  aside "  Seeding trust edge: $DELTA_DID → score 0.85 (MIN_TRUST_SUBMIT = 0.1)"
+  aside "  via gRPC at $_DELTA_GRPC_INTERNAL inside pod"
+
+  if kubectl exec -n "$FINGERLAKES_NS" deploy/icn-delta -- \
+      icnctl --endpoint "$_DELTA_GRPC_INTERNAL" trust add \
+      "$DELTA_DID" 0.85 --label "compute-demo" \
+      >/dev/null 2>&1; then
+    result "  Compute trust seeded: $DELTA_DID score=0.85"
+    _count_seeded
+  else
+    warn "  Compute trust seed failed — Flow 5 may reject task submission"
+    warn "  Retry: kubectl exec -n icn-coop-delta deploy/icn-delta -- icnctl --endpoint $_DELTA_GRPC_INTERNAL trust add $DELTA_DID 0.85"
+    _count_failed
+  fi
+}
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -551,6 +589,7 @@ seed_brightworks
 seed_rivercity
 seed_harborhomes
 seed_fingerlakes
+seed_fingerlakes_compute
 
 _stop_port_forwards
 
@@ -569,12 +608,13 @@ echo "Canonical state:"
 echo "  brightworks-cooperative  — coop + governance domain + Q1 patronage proposal (Draft)"
 echo "  river-city-tool-library  — coop + governance domain (no pending proposals)"
 echo "  harbor-homes-cooperative — coop + governance domain (no pending proposals)"
-echo "  fingerlakes-cdn          — coop + governance domain (no pending proposals)"
+echo "  fingerlakes-cdn          — coop + governance domain + compute trust seeded (score=0.85)"
 echo ""
 echo "Run flows:"
-echo "  Flow 1 (Harbor Homes governance):  ./demo/scripts/flow-1-governance.sh"
-echo "  Flow 2 (BrightWorks patronage):    ./demo/scripts/flow-2-patronage.sh"
-echo "  Flow 3 (federation agreement):     ./demo/scripts/flow-3-federation.sh"
+echo "  Flow 1 (Harbor Homes governance):  bash demo/scripts/flow-1-governance.sh"
+echo "  Flow 2 (BrightWorks patronage):    bash demo/scripts/flow-2-patronage.sh"
+echo "  Flow 3 (federation agreement):     bash demo/scripts/flow-3-federation.sh"
+echo "  Flow 5 (commons compute):          bash demo/scripts/flow-5-compute.sh"
 echo ""
 if [ "$_FAILED" -gt 0 ]; then
   echo "WARNING: ${_FAILED} operation(s) failed. Demo may be in partial state."
