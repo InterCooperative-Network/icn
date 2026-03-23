@@ -1219,6 +1219,34 @@ impl ComputeActor {
             }
         }
 
+        // Commons credit floor check (#1397)
+        // Prevents zero-balance submitters from consuming commons compute.
+        // Applies only to Commons-scoped tasks; Local/Cell tasks are unaffected.
+        // Enforcement is opt-in: if balance_callback is not configured, this gate
+        // is skipped silently (e.g., during tests that only exercise scheduling logic).
+        // V1 floor: 1 credit. Dynamic per-task cost estimation is a future concern.
+        if task.scope == icn_kernel_api::ScopeLevel::Commons {
+            if let Some(ref balance_cb) = self.balance_callback {
+                let balance = balance_cb(&task.submitter);
+                // V1 floor: 1 credit required to submit a Commons-scoped task.
+                // Dynamic per-task cost estimation is deferred (#1397).
+                const COMMONS_CREDIT_FLOOR: i64 = 1;
+                if balance < COMMONS_CREDIT_FLOOR {
+                    tracing::warn!(
+                        task_id = %task.id,
+                        submitter = %task.submitter,
+                        balance,
+                        required = COMMONS_CREDIT_FLOOR,
+                        "Commons task rejected: insufficient credits"
+                    );
+                    return Err(ComputeError::InsufficientCommonsCredits {
+                        balance,
+                        required: COMMONS_CREDIT_FLOOR,
+                    });
+                }
+            }
+        }
+
         // Check policy compliance (Phase 16E)
         let mut adjusted_task = task.clone();
         if let Some(ref policy_manager) = self.policy_manager {
