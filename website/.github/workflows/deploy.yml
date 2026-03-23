@@ -5,8 +5,8 @@ on:
     branches:
       - main
     paths:
-      - 'website/**'
-      - 'docs/**'
+      - "website/**"
+      - "docs/**"
   workflow_dispatch:
 
 permissions:

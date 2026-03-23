@@ -100,23 +100,26 @@ const commitUrl = 'https://github.com/InterCooperative-Network/icn/commits/main'
     <div class="container">
       <div class="demo-callout">
         <div class="demo-text">
-          <span class="badge badge-green">Live Demo</span>
-          <h2>See it working.<br/>Right now.</h2>
+          <span class="badge badge-green">Live on K3s</span>
+          <h2>Five cooperatives.<br/>Running now.</h2>
           <p>
-            Alice, Bob, and Carol formed a cooperative, unanimously ratified their charter,
-            and approved a $12,000 equipment proposal — each receiving a cryptographic
-            receipt they can verify independently. No central server. No admin account. No platform lock-in.
+            Brightworks Collective governs by vote. Harbor Freight Workers settles patronage dividends.
+            Rochester Cooperative Clearinghouse runs the treasury. New England Mesh files compliance reports.
+            Finger Lakes CDN submits compute tasks to the commons pool.
+            Five flows. Five cryptographic receipts. No central server.
           </p>
           <div class="demo-actions">
-            <a href="https://github.com/InterCooperative-Network/icn/tree/main/demo" target="_blank" class="btn btn-primary">
-              View Demo Scripts
+            <a href="/docs/demo" class="btn btn-primary">
+              Demo Walkthrough →
+            </a>
+            <a href="https://github.com/InterCooperative-Network/icn/tree/main/demo" target="_blank" class="btn btn-ghost">
+              View Scripts on GitHub
               <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
             </a>
-            <a href="/docs/GETTING_STARTED" class="btn btn-ghost">Run it locally →</a>
           </div>
           <p class="demo-note">
-            The demo runs the full governance stack locally — no network, no cloud, no accounts.
-            Start it with <code>bash demo/scripts/start-demo.sh</code>.
+            Requires kubectl access to the K3s cluster. Run any flow:
+            <code>bash demo/scripts/flow-1-governance.sh [--present | --narrated]</code>
           </p>
         </div>
         <div class="demo-terminal">
@@ -124,26 +127,22 @@ const commitUrl = 'https://github.com/InterCooperative-Network/icn/commits/main'
             <span class="terminal-dot red"></span>
             <span class="terminal-dot yellow"></span>
             <span class="terminal-dot green"></span>
-            <span class="terminal-title">demo-governance.py</span>
+            <span class="terminal-title">flow-1-governance.sh · flow-5-compute.sh</span>
           </div>
-          <pre class="terminal-body"><code><span class="t-dim">✓</span> Alice: <span class="t-teal">did:icn:zG3PibF2D8jyyQ17wsFKJZ...</span>
-<span class="t-dim">✓</span> Bob:   <span class="t-teal">did:icn:z7iesUTnpyfhw1wPishDw...</span>
-<span class="t-dim">✓</span> Carol: <span class="t-teal">did:icn:zCUpdSZcQxr217wmLacYMZ...</span>
+          <pre class="terminal-body"><code><span class="t-dim">✓</span> Brightworks: <span class="t-teal">did:icn:zH4PkcBG8jyyQ18wsFKJZ...</span>
+<span class="t-dim">✓</span> Harbor:      <span class="t-teal">did:icn:zM9jxVQaTpzfh2wPishDw...</span>
+<span class="t-dim">✓</span> Finger Lakes: <span class="t-teal">did:icn:zE5E8bz7XrJGr6WozTbUN...</span>
 
-<span class="t-dim">✓</span> Cooperative created: <span class="t-heading">Finger Lakes Food Co-op</span>
-<span class="t-dim">✓</span> Governance domain:   <span class="t-amber">coop:finger-lakes-food</span>
-<span class="t-dim">✓</span> Bob added  — voting weight <span class="t-green">1.0</span>
-<span class="t-dim">✓</span> Carol added — voting weight <span class="t-green">1.0</span>
-
-<span class="t-dim">✓</span> Charter proposal submitted
+<span class="t-dim">✓</span> Governance: <span class="t-heading">"Expand to Digital Services"</span>
 <span class="t-dim">✓</span> Alice: <span class="t-green">FOR</span>  · Bob: <span class="t-green">FOR</span>  · Carol: <span class="t-green">FOR</span>
-<span class="t-dim">✓</span> Charter ratified — <span class="t-amber">3/3 unanimous</span>
+<span class="t-dim">✓</span> Accepted — decision_hash: <span class="t-purple">9a717129bb8c70a0...</span>
 
-<span class="t-dim">✓</span> Bob proposes: <span class="t-heading">Approve $12,000 for kitchen equipment</span>
-<span class="t-dim">✓</span> Alice: <span class="t-green">FOR</span>  · Bob: <span class="t-green">FOR</span>  · Carol: <span class="t-green">FOR</span>
-<span class="t-dim">✓</span> Vote closed by Carol · Outcome: <span class="t-green">ACCEPTED</span>
+<span class="t-dim">✓</span> Patronage round: 3 members · <span class="t-amber">$4,200 allocated</span>
+<span class="t-dim">✓</span> Harbor compliance report: <span class="t-amber">127 transactions signed</span>
 
-<span class="t-dim">✓</span> Receipt: <span class="t-purple">9a717129bb8c70a0dd2eec47...</span></code></pre>
+<span class="t-dim">✓</span> Compute trust gate: <span class="t-green">0.85 ≥ 0.1 PASS</span>
+<span class="t-dim">✓</span> Task admitted: <span class="t-heading">fl-route-opt-847291</span>
+<span class="t-dim">✓</span> hash: <span class="t-purple">a8f2d4e9c1b7...</span>  status: <span class="t-amber">Pending</span></code></pre>
         </div>
       </div>
     </div>
@@ -266,16 +265,22 @@ const commitUrl = 'https://github.com/InterCooperative-Network/icn/commits/main'
         <div class="stage-card card animate-in animate-delay-1">
           <div class="stage-num stage-b">B</div>
           <div class="stage-body">
+            <div class="stage-status">
+              <span class="badge badge-blue">In Development</span>
+            </div>
             <h3>Federation Layer</h3>
-            <p>Inter-cooperative agreements with treaty-based governance, cross-group trust propagation, and federation clearing for mutual credit networks.</p>
+            <p>Inter-cooperative trust and federated coordination live on K3s. Shared trust graphs, cross-coop governance receipts, and ledger integration proven. Treaty-based clearing follows.</p>
           </div>
         </div>
 
         <div class="stage-card card animate-in animate-delay-2">
           <div class="stage-num stage-c">C</div>
           <div class="stage-body">
+            <div class="stage-status">
+              <span class="badge badge-purple">In Development</span>
+            </div>
             <h3>Compute Commons</h3>
-            <p>Shared compute resources contributed to a commons and allocated via cooperative fuel metering. Members contribute hardware; the network rewards them with cooperative capacity.</p>
+            <p>Trust-gated compute task admission is live on K3s: scope enforcement, trust score gate, and ledger integration proven. Task execution and settlement receipts follow.</p>
           </div>
         </div>
 

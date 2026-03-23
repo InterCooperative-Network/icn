@@ -184,6 +184,10 @@ _beat "The foundation can see the vote. Not a summary, not a claim — the actua
 echo "  Querying Harbor Homes' governance record for capital reserve decisions..."
 echo ""
 
+# decision_hash extracted from GovernanceReceipt proof (if available)
+# Must be initialized before the nested conditional blocks to satisfy set -u
+HARBOR_DECISION_HASH=""
+
 # List recent proposals from Harbor Homes
 _do_curl "${HARBOR_URL}/v1/gov/proposals" GET "" "$HARBOR_TOKEN"
 if [[ "$DEMO_LAST_HTTP_CODE" =~ ^2 ]]; then
@@ -219,9 +223,23 @@ for p in d.get('data', []):
       result "GovernanceReceipt available:"
       _pretty
       _evidence "Harbor Homes: cryptographic governance proof on record"
+      # Extract decision_hash for use in the receipt chain query (step 5).
+      # GovernanceProofV2 serializes as {"receipt": {"decision_hash": [u8;32], ...}, ...}
+      # decision_hash is a raw [u8;32] byte array — convert to hex for the query param.
+      HARBOR_DECISION_HASH=$(python3 -c "
+import sys, json, binascii
+with open('$_RESP_FILE') as f:
+    d = json.load(f)
+dh = d.get('receipt', {}).get('decision_hash', [])
+if isinstance(dh, list) and len(dh) == 32:
+    print(binascii.hexlify(bytes(dh)).decode())
+elif isinstance(dh, str) and len(dh) == 64:
+    print(dh)  # already hex-encoded
+" 2>/dev/null || echo "")
     else
       aside "Proof endpoint: HTTP ${DEMO_LAST_HTTP_CODE} (signing key not configured in pod)"
       _gap "Harbor Homes: GovernanceReceipt (Flow 1B — pending PR #1327)"
+      HARBOR_DECISION_HASH=""
     fi
   else
     aside "No closed capital decisions found yet on Harbor Homes node."
@@ -313,25 +331,39 @@ narrate "Step 5: Receipt chain — allocation provenance across the federation"
 _beat ""
 echo ""
 
-_do_curl "${FINGERLAKES_URL}/v1/receipts/chain" GET "" "$FINGERLAKES_TOKEN"
-_show_or_narrate \
-  "Receipt chain from Finger Lakes CDN view" \
-  "receipts require elevated scope; receipt schema is implemented and ready"
-
-if [[ ! "$DEMO_LAST_HTTP_CODE" =~ ^2 ]]; then
-  echo "  The receipt chain answers the funder's key question:"
-  echo "    'Not just did you pay people — can you show the governance decision"
-  echo "     that authorized the payment, and the formula that determined the amount?'"
+if [ -n "$HARBOR_DECISION_HASH" ]; then
+  aside "Querying Harbor Homes receipt chain for decision: ${HARBOR_DECISION_HASH:0:16}..."
+  _do_curl "${HARBOR_URL}/v1/receipts/chain?decision_hash=${HARBOR_DECISION_HASH}" GET "" "$HARBOR_TOKEN"
+  if [[ "$DEMO_LAST_HTTP_CODE" =~ ^2 ]]; then
+    result "Receipt chain (HTTP ${DEMO_LAST_HTTP_CODE}):"
+    _pretty
+    _evidence "Harbor Homes: governance decision linked in receipt chain"
+    echo ""
+    echo "  The chain shows:"
+    echo "    governance:    the signed decision that authorized action"
+    echo "    allocations:   economic receipts linked to this decision"
+    echo "    chain_complete: whether all expected links are present"
+    echo ""
+    echo "  This is what a funder or regulator verifies — not a PDF,"
+    echo "  a cryptographic chain from vote to settlement."
+  else
+    aside "Receipt chain: HTTP ${DEMO_LAST_HTTP_CODE}"
+    echo "  The receipt chain infrastructure is live — the economic allocation"
+    echo "  layer is the next integration milestone (Sprint 28 work)."
+    echo ""
+    echo "  What the chain will show when fully wired:"
+    echo "    decision_hash:  links to the governance proposal"
+    echo "    allocations:    each member's patronage, amount, and timing"
+    echo "    chain_complete: confirmed when all settlement intents are present"
+  fi
+else
+  _beat "Receipt chain requires a GovernanceReceipt with a decision_hash."
+  echo "  Run flow-1-governance.sh first, then flow-4, to see the full chain."
   echo ""
-  echo "  A receipt chain entry contains:"
-  echo "    decision_hash:  links to the governance proposal"
-  echo "    recipient:      DID of the receiving member"
-  echo "    amount:         credits allocated"
-  echo "    formula_note:   human-readable derivation"
-  echo "    timestamp:      when the allocation was posted"
-  echo "    block_height:   position in the cooperative's ledger DAG"
-  echo ""
-  _gap "Full receipt chain (federation:read + ledger:read scope constraint)"
+  echo "  When available, the chain links:"
+  echo "    governance decision → allocation receipts → settlement intents"
+  echo "  Giving funders a single verifiable audit trail."
+  _gap "Receipt chain: no GovernanceReceipt decision_hash available this run"
 fi
 echo ""
 

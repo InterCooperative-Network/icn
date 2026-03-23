@@ -386,6 +386,37 @@ if [ "$FINAL_STATE" != "Accepted" ]; then
   aside "The governance record still exists and is auditable regardless of outcome."
 fi
 echo ""
+
+# Extract GovernanceReceipt and decision_hash for receipt chain threading.
+# GovernanceProofV2 serializes as {"receipt": {"decision_hash": [u8;32], ...}, ...}
+# decision_hash is a raw [u8;32] byte array — convert to hex for query params.
+BRIGHTWORKS_DECISION_HASH=""
+_do_curl "${BRIGHTWORKS_URL}/v1/gov/proposals/${PROPOSAL_ID}/proof" GET "" "$BRIGHTWORKS_TOKEN"
+if [[ "$DEMO_LAST_HTTP_CODE" =~ ^2 ]]; then
+  result "GovernanceReceipt available (HTTP ${DEMO_LAST_HTTP_CODE})"
+  _pretty
+  BRIGHTWORKS_DECISION_HASH=$(python3 -c "
+import sys, json, binascii
+with open('$_RESP_FILE') as f:
+    d = json.load(f)
+dh = d.get('receipt', {}).get('decision_hash', [])
+if isinstance(dh, list) and len(dh) == 32:
+    print(binascii.hexlify(bytes(dh)).decode())
+elif isinstance(dh, str) and len(dh) == 64:
+    print(dh)
+" 2>/dev/null || echo "")
+  if [ -n "$BRIGHTWORKS_DECISION_HASH" ]; then
+    result "decision_hash: ${BRIGHTWORKS_DECISION_HASH:0:16}..."
+    aside "This hash links every downstream receipt to the governance decision that authorized them"
+  else
+    aside "decision_hash not found in proof response — receipt chain queries will run without it"
+  fi
+else
+  aside "GovernanceReceipt: HTTP ${DEMO_LAST_HTTP_CODE} — signing key may not be configured in pod"
+  aside "Receipt chain queries will run without decision_hash"
+fi
+echo ""
+
 _beat "The proposal is now closed. On to settlement — or the fallback explanation if quorum wasn't met."
 
 # ---------------------------------------------------------------------------
@@ -509,10 +540,17 @@ echo ""
 narrate "Step 11: Receipt chain — allocation provenance"
 _beat "This is the foundation for grant reporting, audit, external accountability — anyone the coop authorizes can follow this chain."
 echo ""
-aside "GET /v1/receipts/allocations — links settlements to approved decisions"
+
+_ALLOC_URL="${BRIGHTWORKS_URL}/v1/receipts/allocations"
+if [ -n "${BRIGHTWORKS_DECISION_HASH:-}" ]; then
+  aside "GET /v1/receipts/allocations?decision_hash=${BRIGHTWORKS_DECISION_HASH:0:16}..."
+  _ALLOC_URL="${BRIGHTWORKS_URL}/v1/receipts/allocations?decision_hash=${BRIGHTWORKS_DECISION_HASH}"
+else
+  aside "GET /v1/receipts/allocations (no decision_hash — GovernanceReceipt not available)"
+fi
 echo ""
 
-_do_curl "${BRIGHTWORKS_URL}/v1/receipts/allocations" GET "" "$BRIGHTWORKS_TOKEN"
+_do_curl "$_ALLOC_URL" GET "" "$BRIGHTWORKS_TOKEN"
 
 if [[ "$DEMO_LAST_HTTP_CODE" =~ ^2 ]]; then
   result "Allocation receipts (HTTP ${DEMO_LAST_HTTP_CODE}):"
@@ -522,6 +560,10 @@ if [[ "$DEMO_LAST_HTTP_CODE" =~ ^2 ]]; then
   echo "    - The decision that authorized this allocation"
   echo "    - The amount and recipient"
   echo "    - A cryptographic hash linking to the governance record"
+elif [ "$DEMO_LAST_HTTP_CODE" = "400" ] && [ -z "${BRIGHTWORKS_DECISION_HASH:-}" ]; then
+  warn "HTTP 400 — allocations endpoint requires decision_hash (Bug #1334)"
+  warn "GovernanceReceipt proof endpoint must return a valid decision_hash for this step."
+  aside "The receipt schema is live; the threading fix resolves this once proof is available."
 elif [ "$DEMO_LAST_HTTP_CODE" = "403" ] || [ "$DEMO_LAST_HTTP_CODE" = "401" ]; then
   aside "Receipt chain scope error — verify token includes settlements:read scope"
   echo ""
@@ -536,6 +578,43 @@ elif [ "$DEMO_LAST_HTTP_CODE" = "403" ] || [ "$DEMO_LAST_HTTP_CODE" = "401" ]; t
 else
   warn "Unexpected response (HTTP ${DEMO_LAST_HTTP_CODE}):"
   _pretty
+fi
+echo ""
+
+# ---------------------------------------------------------------------------
+# STEP 12: Receipt chain — governance → settlement provenance link
+# ---------------------------------------------------------------------------
+narrate "Step 12: Receipt chain — governance → settlement provenance"
+_beat "The receipt chain is the cryptographic proof that the right governance decision authorized the right settlement. This is the audit trail."
+echo ""
+
+if [ -n "${BRIGHTWORKS_DECISION_HASH:-}" ]; then
+  aside "GET /v1/receipts/chain?decision_hash=${BRIGHTWORKS_DECISION_HASH:0:16}..."
+  _do_curl "${BRIGHTWORKS_URL}/v1/receipts/chain?decision_hash=${BRIGHTWORKS_DECISION_HASH}" GET "" "$BRIGHTWORKS_TOKEN"
+  if [[ "$DEMO_LAST_HTTP_CODE" =~ ^2 ]]; then
+    result "Receipt chain (HTTP ${DEMO_LAST_HTTP_CODE}):"
+    _pretty
+    echo ""
+    echo "  The receipt chain links:"
+    echo "    governance decision → ledger settlement → member allocation"
+    echo "  Any member with access can verify this chain independently."
+  elif [ "$DEMO_LAST_HTTP_CODE" = "404" ]; then
+    result "Receipt chain: no entries yet (HTTP 404)"
+    aside "Chain entries are written on settlement. If settlement succeeded above, this will populate."
+  else
+    warn "Receipt chain: HTTP ${DEMO_LAST_HTTP_CODE}"
+    _pretty
+  fi
+else
+  aside "decision_hash not available — receipt chain query requires GovernanceReceipt"
+  echo ""
+  echo "  The receipt chain query:"
+  echo "    GET /v1/receipts/chain?decision_hash=<hex>"
+  echo ""
+  echo "  Links every settlement receipt back to the governance decision."
+  echo "  When the GovernanceReceipt proof endpoint is fully configured in this"
+  echo "  pod deployment, this step provides cryptographic proof of the full chain:"
+  echo "    proposal → vote → accepted → settlement → member credit"
 fi
 echo ""
 

@@ -31,9 +31,9 @@ const posts = (await getCollection('blog')).sort(
 										day: 'numeric',
 									})}
 								</time>
-								{post.data.tags.length > 0 && (
+								{(post.data.tags ?? []).length > 0 && (
 									<span class="blog-tags">
-										{post.data.tags.map(tag => `#${tag}`).join(' ')}
+										{(post.data.tags ?? []).map(tag => `#${tag}`).join(' ')}
 									</span>
 								)}
 							</div>

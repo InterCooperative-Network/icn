@@ -1,0 +1,403 @@
+---
+// src/pages/docs/demo.astro — Five-flow demo walkthrough
+import Layout from '../../layouts/Layout.astro';
+---
+
+<Layout title="Demo Walkthrough" activeNav="docs">
+  <section class="section" style="padding-top: calc(64px + var(--space-2xl));">
+    <div class="container-narrow">
+
+      <nav class="breadcrumb">
+        <a href="/docs">Docs</a>
+        <span class="breadcrumb-sep">/</span>
+        <span class="breadcrumb-current">Demo Walkthrough</span>
+      </nav>
+
+      <div class="demo-header">
+        <span class="badge badge-green">Live on K3s</span>
+        <h1>ICN Demo: Five Cooperative Flows</h1>
+        <p class="lead">
+          Five cooperatives running on a real Kubernetes cluster.
+          Five end-to-end flows covering governance, economics, federation, reporting, and compute.
+          Each flow issues cryptographic receipts — not mocked, not simulated.
+        </p>
+      </div>
+
+      <!-- Prerequisites -->
+      <div class="prereq-box">
+        <h4>Prerequisites</h4>
+        <p>kubectl access to the K3s cluster. Run <code>demo/scripts/reseed-federation-demo.sh</code> before any demo day to seed identity, trust, and state.</p>
+        <p>Each flow accepts <code>--present</code> (minimal output, pause on key beats) or <code>--narrated</code> (full explanatory output) flags.</p>
+      </div>
+
+      <!-- Flow 1 -->
+      <div class="flow-card">
+        <div class="flow-header">
+          <div class="flow-num">1</div>
+          <div class="flow-meta">
+            <h2>Cooperative Governance</h2>
+            <span class="flow-coop">Brightworks Collective</span>
+          </div>
+          <span class="badge badge-green">~8 min</span>
+        </div>
+        <p>
+          A member proposes expanding the cooperative's digital services mandate. The full governance loop runs:
+          proposal submission, member voting, tally, and outcome — each step producing a verifiable receipt.
+        </p>
+        <div class="flow-proves">
+          <span class="flow-proves-label">Proves:</span>
+          <span class="tech-pill">Proposal lifecycle</span>
+          <span class="tech-pill">Democratic vote</span>
+          <span class="tech-pill">GovernanceReceipt</span>
+          <span class="tech-pill">decision_hash provenance</span>
+        </div>
+        <pre class="flow-cmd"><code>bash demo/scripts/flow-1-governance.sh [--present | --narrated]</code></pre>
+      </div>
+
+      <!-- Flow 2 -->
+      <div class="flow-card">
+        <div class="flow-header">
+          <div class="flow-num">2</div>
+          <div class="flow-meta">
+            <h2>Patronage Settlement</h2>
+            <span class="flow-coop">Brightworks Collective</span>
+          </div>
+          <span class="badge badge-green">~10 min</span>
+        </div>
+        <p>
+          After a governance decision, the cooperative distributes patronage dividends to members.
+          The settlement is anchored to the governance receipt via <code>decision_hash</code> — proving
+          the economic outcome flows directly from the democratic decision.
+        </p>
+        <div class="flow-proves">
+          <span class="flow-proves-label">Proves:</span>
+          <span class="tech-pill">Patronage allocation</span>
+          <span class="tech-pill">Settlement receipt</span>
+          <span class="tech-pill">Governance → ledger provenance</span>
+        </div>
+        <pre class="flow-cmd"><code>bash demo/scripts/flow-2-patronage.sh [--present | --narrated]</code></pre>
+      </div>
+
+      <!-- Flow 3 -->
+      <div class="flow-card">
+        <div class="flow-header">
+          <div class="flow-num">3</div>
+          <div class="flow-meta">
+            <h2>Clearinghouse &amp; Mutual Credit</h2>
+            <span class="flow-coop">Rochester Cooperative Clearinghouse</span>
+          </div>
+          <span class="badge badge-green">~8 min</span>
+        </div>
+        <p>
+          The clearinghouse cooperative records treasury activity across member organizations.
+          Mutual credit positions, ledger entries, and cross-cooperative clearing are demonstrated
+          without a central bank or settlement authority.
+        </p>
+        <div class="flow-proves">
+          <span class="flow-proves-label">Proves:</span>
+          <span class="tech-pill">Mutual credit ledger</span>
+          <span class="tech-pill">Cross-coop clearing</span>
+          <span class="tech-pill">Treasury position</span>
+        </div>
+        <pre class="flow-cmd"><code>bash demo/scripts/flow-3-clearinghouse.sh [--present | --narrated]</code></pre>
+      </div>
+
+      <!-- Flow 4 -->
+      <div class="flow-card">
+        <div class="flow-header">
+          <div class="flow-num">4</div>
+          <div class="flow-meta">
+            <h2>Regulatory Reporting</h2>
+            <span class="flow-coop">Harbor Freight Workers Cooperative</span>
+          </div>
+          <span class="badge badge-green">~8 min</span>
+        </div>
+        <p>
+          Harbor generates a signed compliance report over its transaction history.
+          The report is anchored to on-chain governance receipts, enabling third-party
+          verification without exposing internal financials.
+        </p>
+        <div class="flow-proves">
+          <span class="flow-proves-label">Proves:</span>
+          <span class="tech-pill">Report generation</span>
+          <span class="tech-pill">Transaction audit trail</span>
+          <span class="tech-pill">Signed governance anchor</span>
+        </div>
+        <pre class="flow-cmd"><code>bash demo/scripts/flow-4-reporting.sh [--present | --narrated]</code></pre>
+      </div>
+
+      <!-- Flow 5 -->
+      <div class="flow-card flow-card-compute">
+        <div class="flow-header">
+          <div class="flow-num flow-num-c">5</div>
+          <div class="flow-meta">
+            <h2>Commons Compute</h2>
+            <span class="flow-coop">Finger Lakes CDN</span>
+          </div>
+          <span class="badge badge-purple">~5 min</span>
+        </div>
+        <p>
+          Finger Lakes CDN submits a compute task to the commons pool. Two gates are enforced
+          before admission: a <code>compute:write</code> scope check on the capability token, and
+          a trust score check against the commons admission threshold (<code>MIN_TRUST_SUBMIT = 0.1</code>).
+          Both pass. The task enters the queue with a Blake3 content hash as its provenance anchor.
+        </p>
+        <div class="status-note">
+          <strong>Current K3s state:</strong> Tasks are admitted and queued (status: Pending).
+          Executor node registration and full task execution are Sprint 28 work.
+          This flow proves the admission gate, not end-to-end execution.
+        </div>
+        <div class="flow-proves">
+          <span class="flow-proves-label">Proves:</span>
+          <span class="tech-pill">Trust-gated admission</span>
+          <span class="tech-pill">compute:write scope</span>
+          <span class="tech-pill">Ledger position query</span>
+          <span class="tech-pill">Authorization boundary</span>
+        </div>
+        <pre class="flow-cmd"><code>bash demo/scripts/flow-5-compute.sh [--present | --narrated]</code></pre>
+      </div>
+
+      <!-- What comes next -->
+      <div class="next-section">
+        <h2>What Comes Next</h2>
+        <div class="next-grid">
+          <div class="next-item">
+            <span class="next-label">Sprint 28</span>
+            <p>Executor node registration, task lifecycle (Pending → Processing → Completed), settlement receipt generation with full provenance chain.</p>
+          </div>
+          <div class="next-item">
+            <span class="next-label">Mobile UX</span>
+            <p>Member-facing PWA for governance participation, patronage tracking, and cooperative membership management.</p>
+          </div>
+          <div class="next-item">
+            <span class="next-label">Federation Treaties</span>
+            <p>Formal inter-cooperative agreements with treaty-based governance and mutual credit clearing across organizations.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="doc-footer">
+        <a href="/docs" class="btn btn-ghost">← Back to Docs</a>
+        <a href="https://github.com/InterCooperative-Network/icn/tree/main/demo" target="_blank" class="btn btn-secondary">View Scripts on GitHub →</a>
+      </div>
+    </div>
+  </section>
+</Layout>
+
+<style>
+  .breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    font-size: 0.8125rem;
+    margin-bottom: var(--space-lg);
+    flex-wrap: wrap;
+  }
+
+  .breadcrumb a { color: var(--accent-teal); }
+  .breadcrumb-sep { color: var(--text-muted); }
+  .breadcrumb-current { color: var(--text-primary); }
+
+  .demo-header {
+    margin-bottom: var(--space-2xl);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+
+  .demo-header h1 { margin: 0; }
+
+  .lead {
+    font-size: 1.125rem;
+    color: var(--text-secondary);
+    margin: 0;
+    line-height: 1.7;
+  }
+
+  .prereq-box {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-left: 3px solid var(--accent-amber);
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg);
+    margin-bottom: var(--space-2xl);
+  }
+
+  .prereq-box h4 {
+    margin: 0 0 var(--space-sm);
+    color: var(--accent-amber);
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .prereq-box p {
+    margin: 0 0 var(--space-xs);
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+  }
+
+  .prereq-box p:last-child { margin-bottom: 0; }
+
+  .flow-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-xl);
+    padding: var(--space-xl);
+    margin-bottom: var(--space-xl);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+
+  .flow-card-compute {
+    border-color: rgba(167, 139, 250, 0.3);
+    background: linear-gradient(135deg, var(--bg-card), rgba(167, 139, 250, 0.04));
+  }
+
+  .flow-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    flex-wrap: wrap;
+  }
+
+  .flow-num {
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-md);
+    background: rgba(45, 212, 191, 0.12);
+    color: var(--accent-teal);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-heading);
+    font-weight: 800;
+    font-size: 1.25rem;
+    flex-shrink: 0;
+  }
+
+  .flow-num-c {
+    background: rgba(167, 139, 250, 0.12);
+    color: var(--accent-purple);
+  }
+
+  .flow-meta {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .flow-meta h2 {
+    margin: 0 0 2px;
+    font-size: 1.25rem;
+  }
+
+  .flow-coop {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+  }
+
+  .flow-card > p {
+    margin: 0;
+    color: var(--text-secondary);
+    line-height: 1.7;
+  }
+
+  .status-note {
+    background: rgba(167, 139, 250, 0.08);
+    border: 1px solid rgba(167, 139, 250, 0.2);
+    border-radius: var(--radius-md);
+    padding: var(--space-md);
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
+
+  .status-note strong { color: var(--accent-purple); }
+
+  .flow-proves {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    flex-wrap: wrap;
+  }
+
+  .flow-proves-label {
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .tech-pill {
+    font-size: 0.6875rem;
+    font-family: var(--font-mono);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: 999px;
+    padding: 0.2em 0.6em;
+    color: var(--text-muted);
+  }
+
+  .flow-cmd {
+    margin: 0;
+    background: var(--bg-code);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: var(--space-md) var(--space-lg);
+    font-size: 0.8125rem;
+    overflow-x: auto;
+  }
+
+  .next-section {
+    margin: var(--space-3xl) 0 var(--space-2xl);
+    padding-top: var(--space-2xl);
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .next-section h2 { margin-bottom: var(--space-xl); }
+
+  .next-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-lg);
+  }
+
+  .next-item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  .next-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--accent-teal);
+  }
+
+  .next-item p {
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
+
+  .doc-footer {
+    margin-top: var(--space-3xl);
+    padding-top: var(--space-xl);
+    border-top: 1px solid var(--border-subtle);
+    display: flex;
+    gap: var(--space-md);
+    flex-wrap: wrap;
+  }
+
+  @media (max-width: 768px) {
+    .flow-header { flex-direction: column; align-items: flex-start; }
+    .next-grid { grid-template-columns: 1fr; }
+  }
+</style>

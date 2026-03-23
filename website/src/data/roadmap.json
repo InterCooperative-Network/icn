@@ -1,7 +1,7 @@
 {
   "currentSprint": {
-    "number": 18,
-    "name": "IPv6 Connectivity: KnownPeer Endpoint Sets + Happy Eyeballs",
+    "number": 27,
+    "name": "K3s Demo Polish & Commons Compute",
     "status": "active"
   },
   "stages": [
@@ -11,26 +11,26 @@
       "badge": "badge-teal",
       "markerColor": "var(--accent-teal)",
       "title": "Institution-in-a-Box",
-      "description": "Charter templates, guided cooperative formation, membership onboarding, treasury ledger, and proposal-to-vote loop. The minimum viable institution.",
+      "description": "Charter templates, guided cooperative formation, membership onboarding, treasury ledger, and proposal-to-vote loop. The minimum viable institution. Live on K3s with five cooperatives running governance, patronage settlement, and financial reporting.",
       "status": "active"
     },
     {
       "id": "B",
-      "label": "Stage B",
+      "label": "Stage B — In Development",
       "badge": "badge-blue",
       "markerColor": "var(--accent-blue)",
       "title": "Federation Layer",
-      "description": "Inter-cooperative agreements with treaty-based governance, cross-group trust propagation, and federation clearing for mutual credit networks.",
-      "status": "planned"
+      "description": "Inter-cooperative trust and federated coordination live on K3s. Multiple cooperatives operate simultaneously with shared trust graphs, cross-coop governance receipts, and ledger integration. Formal treaty-based clearing and mutual credit settlement across organizations follow.",
+      "status": "in-progress"
     },
     {
       "id": "C",
-      "label": "Stage C",
+      "label": "Stage C — In Development",
       "badge": "badge-purple",
       "markerColor": "var(--accent-purple)",
       "title": "Compute Commons",
-      "description": "Shared compute resources contributed to a commons and allocated via cooperative fuel metering. Members contribute hardware; the network rewards them with cooperative capacity.",
-      "status": "planned"
+      "description": "Trust-gated compute task admission is live: trust score enforcement, compute:write scope authorization, and ledger position integration are proven on K3s. Task execution by registered executor nodes and settlement receipt generation follow in the next sprint.",
+      "status": "in-progress"
     },
     {
       "id": "D",

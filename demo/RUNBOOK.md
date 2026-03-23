@@ -164,52 +164,63 @@ rm -rf /tmp/icn-demo /tmp/icn-demo-*
 
 ---
 
-## K3s Cluster Demo (4-Flow Federation)
+## K3s Cluster Demo — Five-Flow Federation
 
-For the full 4-coop federation demo running on the homelab K3s cluster.
+Five cooperatives on the homelab K3s cluster (10.8.30.40–42).
 
-**Prerequisites:** `kubectl` configured (`~/.kube/config`, server `10.8.30.40`), Python 3 + `cryptography`, ports 18081–18084 free.
+**Prerequisites:** `kubectl` configured (`~/.kube/config`), access from icn-dev (10.8.30.45).
 
-### Port Mapping
+### Cooperative Registry
 
-| Namespace | Coop | Port |
-|-----------|------|------|
-| icn-coop-alpha | BrightWorks Cooperative | 18081 |
-| icn-coop-beta  | River City Tool Library | 18082 |
-| icn-coop-gamma | Harbor Homes Cooperative | 18083 |
-| icn-coop-delta | Finger Lakes CDN | 18084 |
+| Namespace | Cooperative | NodePort |
+|-----------|-------------|----------|
+| icn-coop-brightworks | Brightworks Collective | 30081 |
+| icn-coop-harbor | Harbor Freight Workers Cooperative | 30083 |
+| icn-coop-clearinghouse | Rochester Cooperative Clearinghouse | 30082 |
+| icn-coop-newengland | New England Mesh Network | 30084 |
+| icn-coop-delta | Finger Lakes CDN | 30085 |
 
-### Quick Start
+### Before Demo Day (run once per day)
 
 ```bash
 cd /home/ubuntu/projects/icn
 
-# Reseed canonical state (manages port-forwards automatically)
+# Reseed all federation state — seeds identity, trust, proposals, compute trust
 bash demo/scripts/reseed-federation-demo.sh
 
-# Full 19-step governance demo (proof included)
-python3 demo/scripts/demo-governance.py http://localhost:18081 --presenter
-
-# Four federation flows
-bash demo/scripts/flow-1-governance.sh --present    # Harbor Homes capital vote
-bash demo/scripts/flow-2-patronage.sh --present     # BrightWorks patronage distribution
-bash demo/scripts/flow-3-federation.sh --present    # Cross-coop federation agreement
-bash demo/scripts/flow-4-reporting.sh --present     # Funder-facing audit trail
+# Verify pods
+kubectl get pods -A | grep icn-coop | grep -v Running
+# (should print nothing — all pods Running)
 ```
 
-Reseed before each flow run — flows consume state that was seeded.
+### Five-Flow Sequence (recommended order)
+
+```bash
+# Governance + Settlement (Brightworks — run back to back)
+bash demo/scripts/flow-1-governance.sh --present
+bash demo/scripts/flow-2-patronage.sh --present
+
+# Clearinghouse mutual credit (Rochester)
+bash demo/scripts/flow-3-clearinghouse.sh --present
+
+# Regulatory reporting (Harbor)
+bash demo/scripts/flow-4-reporting.sh --present
+
+# Commons compute — strongest closer (Finger Lakes CDN)
+bash demo/scripts/flow-5-compute.sh --present
+```
+
+All flows support `--present` (pause-on-beat) or `--narrated` (full explanatory output).
 
 ### If Pods Have Restarted
 
-The `copy-keystore` init container runs automatically on every pod start. No manual keystore copy needed. Just reseed to restore in-memory state:
-
 ```bash
+# Keystore is restored automatically by init container on pod start.
+# Reseed to restore in-memory state (trust graph, governance proposals):
 bash demo/scripts/reseed-federation-demo.sh
 ```
 
 ### If the Binary Is Stale
-
-Build from pre-compiled binaries (`icn/target/release/icnd` must exist):
 
 ```bash
 # Build and push (from repo root)
@@ -217,24 +228,42 @@ TAG=$(date +%Y%m%d)
 docker build -f Dockerfile.fast -t 10.8.30.40:30500/icn:$TAG .
 docker push 10.8.30.40:30500/icn:$TAG
 
-# Roll out (imagePullPolicy: IfNotPresent — new tag required, not :latest)
-for ns_deploy in "icn-coop-alpha icn-alpha" "icn-coop-beta icn-beta" "icn-coop-gamma icn-gamma" "icn-coop-delta icn-delta"; do
-  ns=$(echo $ns_deploy | cut -d" " -f1); deploy=$(echo $ns_deploy | cut -d" " -f2)
-  kubectl set image deployment/$deploy icnd=10.8.30.40:30500/icn:$TAG -n $ns
+# Roll out
+for ns in icn-coop-brightworks icn-coop-harbor icn-coop-clearinghouse icn-coop-newengland icn-coop-delta; do
+  kubectl rollout restart deployment -n $ns
 done
-for ns in icn-coop-alpha icn-coop-beta icn-coop-gamma icn-coop-delta; do
+for ns in icn-coop-brightworks icn-coop-harbor icn-coop-clearinghouse icn-coop-newengland icn-coop-delta; do
   kubectl rollout status deployment -n $ns --timeout=120s
 done
 ```
 
-### Known Issues (non-blocking)
+### Known Issues
 
-- **#1334** — Flow 2 Step 11: `/v1/receipts/allocations` returns 400 (`missing decision_hash`). Settlement succeeds; only receipt chain query fails.
-- **#1335** — Flow 3: clearing agreement ID shown as `(failed)`. Both coops ratify; Flow 4 runs without the ID.
+None blocking as of Sprint 27. All Sprint 26 known issues (#1334 decision_hash gap,
+#1335 clearing agreement ID) are resolved.
 
 ### Verify Cluster Health
 
 ```bash
-kubectl get pods -A | grep icn-coop          # all 4 should be Running
-curl -s http://localhost:18081/v1/health      # requires port-forward active
+kubectl get pods -A | grep icn-coop     # all 5 namespaces should show Running
+# Gateway health check (requires port-forward or NodePort access):
+curl -s http://10.8.10.40:30081/v1/health | python3 -m json.tool
 ```
+
+### Flow 5 Compute Trust Note
+
+Compute trust lives in the daemon's in-memory `TrustGraph` and resets on pod restart.
+The reseed script re-seeds it via gRPC. If Flow 5 fails with trust score 0.0, run:
+
+```bash
+kubectl exec -n icn-coop-delta deploy/icn-delta -- \
+  icnctl --endpoint "[::1]:5655" trust add \
+  did:icn:zE5E8bz7XrJGr6WozTbUNfSN3he3sUqYaCo4jifFKi4Ln 0.85 \
+  --label "compute-demo"
+```
+
+### Current Limitations (Sprint 28 work)
+
+- **Flow 5 task execution**: compute tasks are admitted (trust gate proven) but remain `Pending`.
+  No executor node is registered in K3s. Executor wiring is Sprint 28 scope.
+- **Settlement receipts from compute**: requires task completion; Sprint 28 dependency.
