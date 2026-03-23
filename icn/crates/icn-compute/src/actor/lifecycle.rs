@@ -1224,7 +1224,8 @@ impl ComputeActor {
         // Applies only to Commons-scoped tasks; Local/Cell tasks are unaffected.
         // Enforcement is opt-in: if balance_callback is not configured, this gate
         // is skipped silently (e.g., during tests that only exercise scheduling logic).
-        // V1 floor: 1 credit. Dynamic per-task cost estimation is a future concern.
+        // Cost computed via cost::compute_credits_required(&task) — fuel_limit-based V1 formula.
+        // Governance-configurable divisor is a follow-on; see icn-compute/src/cost.rs.
         if task.scope == icn_kernel_api::ScopeLevel::Commons {
             if let Some(ref balance_cb) = self.balance_callback {
                 let balance = balance_cb(&task.submitter);
