@@ -68,9 +68,10 @@
     {
       "id": "s25-t6",
       "title": "PR → CI → merge",
-      "status": "waiting",
+      "status": "in_progress",
       "depends_on": ["s25-t4", "s25-t5"],
-      "notes": "Run /push skill. Verify fmt + clippy + test. Merge when green."
+      "pr": 1405,
+      "notes": "PR #1405 open. Waiting for CI. Merge when green."
     }
   ]
 }
