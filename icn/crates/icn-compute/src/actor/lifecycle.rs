@@ -49,6 +49,9 @@ async fn release_commons_reservation(
 /// Removes the hold from the kernel's ephemeral reservation index. The app-layer settlement
 /// callback (CommonsSettlementCallback) reconciles the reservation hold against the actual
 /// cost charged; this only removes the kernel's tracking entry.
+///
+/// Idempotent: if no reservation exists for `task_id`, this is a no-op (same guarantee
+/// as [`release_commons_reservation`]).
 async fn consume_commons_reservation(
     pending_reservations: &Arc<Mutex<HashMap<String, i64>>>,
     task_id: &str,
@@ -1299,7 +1302,11 @@ impl ComputeActor {
                             .await;
                         }
                         None => {
-                            // Task metadata unavailable; still purge the ephemeral reservation.
+                            // Theoretically unreachable: mgr.fail() guards this flow via `?`,
+                            // so if fail() returned Ok, mgr.get() could not have been None
+                            // under the same lock. Kept as a defensive purge-without-callback
+                            // fallback; the `remove` is idempotent if the reservation was
+                            // never created.
                             pending_reservations.lock().await.remove(&task_id);
                         }
                     }
