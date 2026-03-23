@@ -137,8 +137,8 @@ fn test_insufficient_credits_rejected() {
 ///
 /// Proves the credit floor check added to handle_submit() in lifecycle.rs:
 /// - balance_callback returning 0 → InsufficientCommonsCredits for Commons-scoped tasks
-/// - balance_callback returning 1 → task accepted past the floor check
-/// - no balance_callback configured → gate skipped silently
+/// - balance_callback returning 1 → task submitted successfully (Ok)
+/// - no balance_callback configured → gate skipped silently (no credit rejection)
 #[tokio::test]
 async fn test_scheduling_enforces_credits() {
     use icn_compute::{
@@ -198,11 +198,11 @@ async fn test_scheduling_enforces_credits() {
         "expected InsufficientCommonsCredits, got: {result:?}"
     );
 
-    // --- Positive path: balance 1 → not rejected by the floor check ---
-    // The task will fail for other reasons (no executor capability for CCL without
-    // wasm / CCL executor configured), but it must NOT fail with InsufficientCommonsCredits.
+    // --- Positive path: balance 1 → task accepted (Ok) ---
+    // handle_submit() returns Ok(hash) once all gates pass. The task may not be
+    // *executed* (no CCL executor configured in this test actor), but submission succeeds.
     let sufficient_balance: BalanceCallback = Arc::new(|_| 1);
-    let mut actor2 = ComputeActor::new("did:icn:scheduler".into(), trust_cb);
+    let mut actor2 = ComputeActor::new("did:icn:scheduler".into(), trust_cb.clone());
     actor2.set_balance_callback(sufficient_balance);
     let handle2 = actor2.spawn();
 
@@ -211,11 +211,26 @@ async fn test_scheduling_enforces_credits() {
         .await;
 
     assert!(
+        result2.is_ok(),
+        "funded submitter must be accepted (Ok) at submit time; got: {result2:?}"
+    );
+
+    // --- No-callback path: enforcement skipped silently ---
+    // When balance_callback is not configured, the credit gate does not run.
+    // Commons-scoped tasks must not be rejected with InsufficientCommonsCredits.
+    let actor3 = ComputeActor::new("did:icn:scheduler".into(), trust_cb);
+    let handle3 = actor3.spawn();
+
+    let result3 = handle3
+        .submit(make_commons_task("did:icn:no-callback-submitter"))
+        .await;
+
+    assert!(
         !matches!(
-            result2,
+            result3,
             Err(ComputeError::InsufficientCommonsCredits { .. })
         ),
-        "funded submitter must not be rejected for insufficient credits; got: {result2:?}"
+        "no-callback actor must not reject with credit error; got: {result3:?}"
     );
 }
 
