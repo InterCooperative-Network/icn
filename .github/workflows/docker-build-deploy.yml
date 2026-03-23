@@ -46,6 +46,7 @@ jobs:
   test:
     name: Test
     runs-on: [self-hosted, homelab, k3s]
+    timeout-minutes: 45
     # Skip test on scheduled runs (cleanup only)
     if: github.event_name != 'schedule'
     steps:
