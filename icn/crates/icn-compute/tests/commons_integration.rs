@@ -719,9 +719,9 @@ async fn test_no_reserve_callback_is_backward_compatible() {
 
 /// Test: reservation is released when task times out via check_timeouts() sweep.
 ///
-/// Uses the test-only `trigger_timeout_sweep` command to avoid a 10-second background
-/// timer wait. The task is submitted with a near-future deadline; after sleeping past
-/// the deadline, the manual sweep marks the task failed and fires release_cb.
+/// Uses the test-only `trigger_timeout_sweep_for_test` command to avoid a 10-second
+/// background timer wait. The task is submitted with a near-future deadline; after
+/// sleeping past the deadline, the manual sweep marks the task failed and fires release_cb.
 #[tokio::test]
 async fn test_reservation_released_on_timeout() {
     use icn_compute::{BalanceCallback, CommonsReleaseCallback, CommonsReserveCallback};
@@ -764,7 +764,7 @@ async fn test_reservation_released_on_timeout() {
 
     // Phase 2c: trigger timeout sweep — should find the expired task and fire release_cb
     handle
-        .trigger_timeout_sweep()
+        .trigger_timeout_sweep_for_test()
         .await
         .expect("timeout sweep must not error");
 
@@ -789,5 +789,143 @@ async fn test_reservation_released_on_timeout() {
     assert!(
         captured[0].reserved_amount > 0,
         "release_cb reserved_amount must be positive"
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sprint 26: Race / idempotence tests (#1405 follow-up)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Test: release_cb fires exactly once when a commons task is explicitly cancelled.
+///
+/// Flow: submit → reservation created → cancel_task → release_cb fires once.
+/// This covers the cancel_task() termination path that was added in PR #1405.
+#[tokio::test]
+async fn test_reservation_released_on_cancel() {
+    use icn_compute::{BalanceCallback, CommonsReleaseCallback, CommonsReserveCallback};
+    use std::sync::Mutex;
+
+    let releases: Arc<Mutex<Vec<icn_compute::CommonsReleaseRequest>>> =
+        Arc::new(Mutex::new(vec![]));
+    let releases_cb = Arc::clone(&releases);
+
+    let trust_cb: TrustCallback = Arc::new(|_| 1.0);
+    let balance_cb: BalanceCallback = Arc::new(|_| 1_000_000);
+    let reserve_cb: CommonsReserveCallback = Arc::new(|_| Ok(()));
+    let release_cb: CommonsReleaseCallback =
+        Arc::new(move |req| releases_cb.lock().unwrap().push(req));
+
+    let mut actor = ComputeActor::new(RES_EXECUTOR_DID.into(), trust_cb);
+    actor.set_balance_callback(balance_cb);
+    actor.set_commons_reserve_callback(reserve_cb);
+    actor.set_commons_release_callback(release_cb);
+    let handle = actor.spawn();
+
+    // Submit creates the reservation.
+    let task_hash = handle
+        .submit(make_reservation_task("res-cancel-1", "{}"))
+        .await
+        .expect("submit must succeed");
+
+    // Cancel the task before any executor claims it.
+    handle
+        .cancel_task(&task_hash, RES_SUBMITTER_DID, "test cancel".to_string())
+        .await
+        .expect("cancel must succeed");
+
+    tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+    let captured = releases.lock().unwrap();
+    assert_eq!(
+        captured.len(),
+        1,
+        "release_cb must fire exactly once on cancel; got {} calls",
+        captured.len()
+    );
+    assert_eq!(
+        captured[0].consumer, RES_SUBMITTER_DID,
+        "release consumer must be the submitter"
+    );
+    assert_eq!(
+        captured[0].task_id, "res-cancel-1",
+        "release task_id must match the submitted task"
+    );
+    assert!(
+        captured[0].reserved_amount > 0,
+        "released amount must be positive"
+    );
+}
+
+/// Test: release_cb fires exactly once even when cancel is called twice (idempotence).
+///
+/// The first cancel removes the reservation from `pending_reservations` and fires the
+/// callback. The second cancel finds no entry in `pending_reservations` (HashMap::remove
+/// returns None) and therefore cannot fire the callback again — even if the task record
+/// still exists in a cancelled state.
+///
+/// This proves the idempotence guarantee at the kernel level: the HashMap::remove
+/// is the authoritative gate; there is no double-debit risk from repeated cancellation
+/// calls (e.g., local cancel racing with a gossip-cancel from a peer).
+#[tokio::test]
+async fn test_double_cancel_is_idempotent() {
+    use icn_compute::{BalanceCallback, CommonsReleaseCallback, CommonsReserveCallback};
+    use std::sync::Mutex;
+
+    let releases: Arc<Mutex<Vec<icn_compute::CommonsReleaseRequest>>> =
+        Arc::new(Mutex::new(vec![]));
+    let releases_cb = Arc::clone(&releases);
+
+    let trust_cb: TrustCallback = Arc::new(|_| 1.0);
+    let balance_cb: BalanceCallback = Arc::new(|_| 1_000_000);
+    let reserve_cb: CommonsReserveCallback = Arc::new(|_| Ok(()));
+    let release_cb: CommonsReleaseCallback =
+        Arc::new(move |req| releases_cb.lock().unwrap().push(req));
+
+    let mut actor = ComputeActor::new(RES_EXECUTOR_DID.into(), trust_cb);
+    actor.set_balance_callback(balance_cb);
+    actor.set_commons_reserve_callback(reserve_cb);
+    actor.set_commons_release_callback(release_cb);
+    let handle = actor.spawn();
+
+    let task_hash = handle
+        .submit(make_reservation_task("res-idempotent-1", "{}"))
+        .await
+        .expect("submit must succeed");
+
+    // First cancel: reservation removed from pending_reservations, release_cb fires.
+    handle
+        .cancel_task(&task_hash, RES_SUBMITTER_DID, "first cancel".to_string())
+        .await
+        .expect("first cancel must succeed");
+
+    tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+    // Verify first cancel fired exactly once.
+    {
+        let count = releases.lock().unwrap().len();
+        assert_eq!(count, 1, "release_cb must fire once after first cancel");
+    }
+
+    // Second cancel on the same hash: task record is gone (or already cancelled),
+    // so cancel_task() will return Err. Regardless, release_cb must NOT fire again —
+    // pending_reservations has no entry for this task_id.
+    let _second_result = handle
+        .cancel_task(
+            &task_hash,
+            RES_SUBMITTER_DID,
+            "duplicate cancel".to_string(),
+        )
+        .await;
+    // We tolerate Err here — the important invariant is callback fire count.
+
+    tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+    let captured = releases.lock().unwrap();
+    assert_eq!(
+        captured.len(),
+        1,
+        "release_cb must fire exactly once even after double cancel; got {} calls — \
+         HashMap::remove is the authoritative idempotence gate",
+        captured.len()
     );
 }
