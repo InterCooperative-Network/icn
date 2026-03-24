@@ -176,7 +176,7 @@ aside "The gateway enforces two gates before admission:"
 aside "  (a) compute:write scope in the bearer token"
 aside "  (b) submitter trust score >= MIN_TRUST_SUBMIT (0.1)"
 
-_CCL_CONTRACT='{\"name\":\"route-optimization-stub\",\"participants\":[],\"currency\":null,\"state_vars\":[],\"rules\":[{\"name\":\"main\",\"params\":[],\"requires\":[],\"body\":[{\"Return\":{\"value\":{\"Literal\":{\"String\":\"ok\"}}}}]}],\"triggers\":[]}'
+_CCL_CONTRACT='{\"name\":\"route-optimization-stub\",\"participants\":[\"'"$DELTA_DID"'\"],\"currency\":null,\"state_vars\":[],\"rules\":[{\"name\":\"main\",\"params\":[],\"requires\":[],\"body\":[{\"Return\":{\"value\":{\"Literal\":{\"String\":\"ok\"}}}}]}],\"triggers\":[]}'
 
 _TASK_BODY="{
   \"code_type\": \"ccl\",

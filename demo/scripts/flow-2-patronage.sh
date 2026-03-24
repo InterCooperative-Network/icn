@@ -143,6 +143,24 @@ for p in d.get('data', []):
 # ---------------------------------------------------------------------------
 # STEP 0: Setup
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# PRE-STEP: Reset ledger and patronage state for clean run
+# ---------------------------------------------------------------------------
+# The patronage ledger accumulates settlement entries across demo runs because
+# the gateway state is in-memory and persists within a session. The Q1 proposal
+# also accumulates stale closed proposals from prior runs.
+# reseed-federation-demo.sh is idempotent -- it closes stale Q1 proposals and
+# re-seeds a fresh Draft proposal, giving flow-2 a clean starting state.
+# ---------------------------------------------------------------------------
+narrate "Pre-step: Resetting BrightWorks demo state (patronage ledger + Q1 proposal)"
+aside "Closes stale Q1 proposals; re-seeds canonical Draft for this run"
+if bash "${SCRIPT_DIR}/reseed-federation-demo.sh" 2>&1 | grep -E "(RESULT|WARN|FAIL|===|Seeded|Skipped|Failed)" | head -20; then
+  result "State reset complete"
+else
+  warn "Reseed returned non-zero -- check output; proceeding anyway"
+fi
+echo ""
+
 narrate "Step 0: Starting BrightWorks gateway connection"
 _beat ""
 aside "BrightWorks Cooperative runs on icn-alpha (port 18081)"

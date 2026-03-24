@@ -132,6 +132,23 @@ _require_2xx() {
 # ---------------------------------------------------------------------------
 # STEP 0: Setup — authenticate all three nodes
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# PRE-STEP: Reseed federation state
+# ---------------------------------------------------------------------------
+# flow-3 creates governance proposals and federation registration records.
+# On a second run, prior-run proposals and coop registrations persist and
+# cause conflicts. reseed-federation-demo.sh is idempotent -- safe on first
+# run and cleans stale state from prior runs.
+# ---------------------------------------------------------------------------
+narrate "Pre-step: Reseeding federation demo state (idempotent)"
+aside "Clears stale proposals from prior runs; re-seeds coop records and governance domains"
+if bash "${SCRIPT_DIR}/reseed-federation-demo.sh" 2>&1 | grep -E "(RESULT|WARN|FAIL|===|Seeded|Skipped|Failed)" | head -20; then
+  result "Reseed complete"
+else
+  warn "Reseed returned non-zero -- proceeding anyway"
+fi
+echo ""
+
 narrate "Step 0: Connecting to all three federation nodes"
 _beat ""
 aside "River City (beta / 18082), BrightWorks (alpha / 18081), Finger Lakes CDN (delta / 18084)"
