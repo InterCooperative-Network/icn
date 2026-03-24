@@ -221,7 +221,7 @@ export function useBalance(client: ICNMobileClient, coopId: string, did: string)
   }, [client, coopId, did]);
 
   // Auto-refresh on payment events
-  useEvent(client, 'PaymentCreated', () => {
+  useEvent(client, 'SettlementCreated', () => {
     fetchRef.current();
   });
 
@@ -464,7 +464,7 @@ export function useTransactions(client: ICNMobileClient, coopId: string, limit =
   }, [isLoading, transactions.length, total]);
 
   // Auto-refresh on payment events
-  useEvent(client, 'PaymentCreated', () => {
+  useEvent(client, 'SettlementCreated', () => {
     fetchRef.current(true);
   });
 

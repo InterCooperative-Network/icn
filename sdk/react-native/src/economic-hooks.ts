@@ -1,7 +1,7 @@
 /**
  * Economic Feature Hooks for ICN React Native SDK
  *
- * React hooks for recurring payments, escrow, and budget management.
+ * React hooks for recurring settlements, escrow, and budget management.
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -58,7 +58,7 @@ export interface RecurringPayment {
 }
 
 /**
- * Create recurring payment request
+ * Create recurring settlement request
  */
 export interface CreateRecurringPaymentRequest {
   /** Cooperative ID (ledger namespace) */
@@ -250,12 +250,12 @@ export function createEconomicAPI(client: ICNMobileClient) {
 
     recurringPayments: {
       async list(): Promise<RecurringPayment[]> {
-        const response = await fetch(`${baseUrl}/v1/recurring-payments`, {
+        const response = await fetch(`${baseUrl}/v1/recurring-settlements`, {
           method: 'GET',
           headers: getAuthHeaders(),
         });
         if (!response.ok) {
-          throw new Error(`Failed to list recurring payments: ${await response.text()}`);
+          throw new Error(`Failed to list recurring settlements: ${await response.text()}`);
         }
         const result = await response.json();
         return result.payments || result;
@@ -263,66 +263,66 @@ export function createEconomicAPI(client: ICNMobileClient) {
 
       async get(id: string): Promise<RecurringPayment> {
         const response = await fetch(
-          `${baseUrl}/v1/recurring-payments/${encodeURIComponent(id)}`,
+          `${baseUrl}/v1/recurring-settlements/${encodeURIComponent(id)}`,
           {
             method: 'GET',
             headers: getAuthHeaders(),
           }
         );
         if (!response.ok) {
-          throw new Error(`Failed to get recurring payment: ${await response.text()}`);
+          throw new Error(`Failed to get recurring settlement: ${await response.text()}`);
         }
         return response.json();
       },
 
       async create(request: CreateRecurringPaymentRequest): Promise<RecurringPayment> {
-        const response = await fetch(`${baseUrl}/v1/recurring-payments`, {
+        const response = await fetch(`${baseUrl}/v1/recurring-settlements`, {
           method: 'POST',
           headers: getAuthHeaders(),
           body: JSON.stringify(request),
         });
         if (!response.ok) {
-          throw new Error(`Failed to create recurring payment: ${await response.text()}`);
+          throw new Error(`Failed to create recurring settlement: ${await response.text()}`);
         }
         return response.json();
       },
 
       async pause(id: string): Promise<void> {
         const response = await fetch(
-          `${baseUrl}/v1/recurring-payments/${encodeURIComponent(id)}/pause`,
+          `${baseUrl}/v1/recurring-settlements/${encodeURIComponent(id)}/pause`,
           {
             method: 'POST',
             headers: getAuthHeaders(),
           }
         );
         if (!response.ok) {
-          throw new Error(`Failed to pause recurring payment: ${await response.text()}`);
+          throw new Error(`Failed to pause recurring settlement: ${await response.text()}`);
         }
       },
 
       async resume(id: string): Promise<void> {
         const response = await fetch(
-          `${baseUrl}/v1/recurring-payments/${encodeURIComponent(id)}/resume`,
+          `${baseUrl}/v1/recurring-settlements/${encodeURIComponent(id)}/resume`,
           {
             method: 'POST',
             headers: getAuthHeaders(),
           }
         );
         if (!response.ok) {
-          throw new Error(`Failed to resume recurring payment: ${await response.text()}`);
+          throw new Error(`Failed to resume recurring settlement: ${await response.text()}`);
         }
       },
 
       async cancel(id: string): Promise<void> {
         const response = await fetch(
-          `${baseUrl}/v1/recurring-payments/${encodeURIComponent(id)}`,
+          `${baseUrl}/v1/recurring-settlements/${encodeURIComponent(id)}`,
           {
             method: 'DELETE',
             headers: getAuthHeaders(),
           }
         );
         if (!response.ok) {
-          throw new Error(`Failed to cancel recurring payment: ${await response.text()}`);
+          throw new Error(`Failed to cancel recurring settlement: ${await response.text()}`);
         }
       },
     },
@@ -480,7 +480,7 @@ export function createEconomicAPI(client: ICNMobileClient) {
 // ============================================================================
 
 /**
- * Hook for managing recurring payments
+ * Hook for managing recurring settlements
  *
  * @example
  * ```tsx

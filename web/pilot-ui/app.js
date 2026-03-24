@@ -2439,12 +2439,12 @@ function handleWebSocketMessage(message) {
 
 function handleWebSocketEvent(message) {
     // Handle different event types
-    if (message.PaymentCreated) {
-        console.log('Payment created:', message.PaymentCreated);
+    if (message.SettlementCreated) {
+        console.log('Settlement created:', message.SettlementCreated);
         // Reload transactions and balance
         loadTransactions();
         loadBalance();
-        showNotification('New payment recorded');
+        showNotification('New settlement recorded');
     }
 
     if (message.MemberAdded) {

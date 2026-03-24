@@ -2551,7 +2551,7 @@ export class ICNMobileClient extends ICNClient {
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(`Failed to list recurring payments: ${error}`);
+      throw new Error(`Failed to list recurring settlements: ${error}`);
     }
 
     return response.json();
@@ -2580,7 +2580,7 @@ export class ICNMobileClient extends ICNClient {
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(`Failed to create recurring payment: ${error}`);
+      throw new Error(`Failed to create recurring settlement: ${error}`);
     }
 
     return response.json();
@@ -2609,7 +2609,7 @@ export class ICNMobileClient extends ICNClient {
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(`Failed to ${action} recurring payment: ${error}`);
+      throw new Error(`Failed to ${action} recurring settlement: ${error}`);
     }
 
     return response.json();
