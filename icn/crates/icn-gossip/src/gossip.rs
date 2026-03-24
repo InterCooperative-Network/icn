@@ -3223,10 +3223,7 @@ mod tests {
         let owner = KeyPair::generate().unwrap().did().clone();
         let mut gossip = GossipActor::new(owner.clone(), create_test_oracle());
 
-        gossip.create_topic(Topic::new(
-            "test:fanout".to_string(),
-            AccessControl::Public,
-        ));
+        gossip.create_topic(Topic::new("test:fanout".to_string(), AccessControl::Public));
 
         // Two independent counters — one per callback registration
         let counter_a = Arc::new(Mutex::new(0u32));
@@ -3246,7 +3243,10 @@ mod tests {
             .subscribe("test:fanout", owner.clone())
             .await
             .unwrap();
-        gossip.publish("test:fanout", b"ping".to_vec()).await.unwrap();
+        gossip
+            .publish("test:fanout", b"ping".to_vec())
+            .await
+            .unwrap();
 
         assert_eq!(
             *counter_a.lock().unwrap(),

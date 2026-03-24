@@ -252,13 +252,15 @@ impl Executor for LocalExecutor {
                 // Parse CCL contract from JSON
                 let contract: icn_ccl::Contract = match serde_json::from_str(source) {
                     Ok(c) => c,
-                    Err(e) => return ExecutionOutcome::Failed(format!(
-                        "Invalid CCL contract: {e}. \
+                    Err(e) => {
+                        return ExecutionOutcome::Failed(format!(
+                            "Invalid CCL contract: {e}. \
                          The `code` field must be a JSON-serialized icn_ccl::Contract AST \
                          (not Lisp notation or source text). \
                          Example: {{\"name\":\"...\",\"participants\":[],\"currency\":null,\
                          \"state_vars\":[],\"rules\":[...],\"triggers\":[]}}"
-                    )),
+                        ))
+                    }
                 };
 
                 // Validate contract structure

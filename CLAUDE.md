@@ -807,3 +807,7 @@ Specialized agents in `.claude/agents/` auto-activate based on crate scope. Invo
 - "Test Coverage" at `pending / 0s` = queue-stalled, not running. Safe to `--admin` merge when all other required gates are green.
 - When merging multiple PRs in dependency order, expect compilation errors from struct field changes across crates — fix forward, don't over-investigate.
 - Prefer merge strategy over rebase for subtree commits (subtree squash commits do not rebase cleanly).
+- **Stacked PRs**: Before merging a PR that is the base branch of another open PR, retarget the stacked PR first:
+  `gh pr edit <stacked-pr-number> --base main`
+  If you forget, GitHub leaves the stacked PR open but its base is gone — it shows as open with a stale diff. Verify with `gh pr view <pr> --json baseRefName`.
+- **Branch cleanup**: `delete_branch_on_merge` is not enabled in repo settings (GitHub UI: Settings → General → Pull Requests). Until enabled, merged branches must be deleted manually or by Dependabot. Run `git fetch --prune` periodically to clean local refs.

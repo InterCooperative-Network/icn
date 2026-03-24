@@ -53,6 +53,12 @@ updates:
       - "sdk"
     commit-message:
       prefix: "deps(ts-sdk)"
+    # Block TypeScript major bumps until @typescript-eslint ships TS 6.0 support.
+    # @typescript-eslint/eslint-plugin@8.57.x requires peer typescript@">=4.8.4 <6.0.0".
+    # Revisit when typescript-eslint v9 (TS 6.0 support) is stable across the ecosystem.
+    ignore:
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
     groups:
       dev-dependencies:
         dependency-type: "development"
