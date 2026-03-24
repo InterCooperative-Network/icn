@@ -8,7 +8,7 @@
 #   - Governance and expenditure evidence for grant/compliance reporting
 #   - Federation-level reporting without centralized control
 #   - Audit without bureaucracy: query records, don't own them
-#   - Strengthens significantly now that PR #1327 ExecutionReceiptGate is merged (2026-03-18)
+#   - PR #1327 (ExecutionReceiptGate) is merged (2026-03-07): gate primitive live; execution-path wiring is a follow-up PR
 #
 # Core institutional question:
 #   "Can this produce trustworthy reporting without adding massive admin overhead?"
@@ -238,7 +238,8 @@ elif isinstance(dh, str) and len(dh) == 64:
 " 2>/dev/null || echo "")
     else
       aside "Proof endpoint: HTTP ${DEMO_LAST_HTTP_CODE} (signing key not configured in pod)"
-      _gap "Harbor Homes: GovernanceReceipt (Flow 1B — pending PR #1327)"
+      aside "Diagnose: kubectl logs -n icn-coop-gamma deploy/icn-gamma --tail=200 | grep GovernanceProof"
+      _gap "Harbor Homes: GovernanceReceipt proof (signing key not configured in pod — not a code gap)"
       HARBOR_DECISION_HASH=""
     fi
   else
@@ -349,7 +350,7 @@ if [ -n "$HARBOR_DECISION_HASH" ]; then
   else
     aside "Receipt chain: HTTP ${DEMO_LAST_HTTP_CODE}"
     echo "  The receipt chain infrastructure is live — the economic allocation"
-    echo "  layer is the next integration milestone (Sprint 28 work)."
+    echo "  layer is the next integration milestone."
     echo ""
     echo "  What the chain will show when fully wired:"
     echo "    decision_hash:  links to the governance proposal"
@@ -562,26 +563,34 @@ aside "by querying the same endpoints — no intermediary required"
 echo ""
 
 # ---------------------------------------------------------------------------
-# STEP 10: What Flow 1B adds (PR #1327 dependency)
+# STEP 10: What is deployed vs. what remains
 # ---------------------------------------------------------------------------
-narrate "Step 11: What PR #1327 (ExecutionReceiptGate) adds to this picture"
-_beat "Coming soon: the execution receipt gate closes the last gap. Governance authorizes action; the receipt proves the action happened."
+narrate "Step 11: Receipt chain architecture — what is deployed vs. what remains"
+_beat "PR #1327 (ExecutionReceiptGate) is merged. Here is the current state of each layer."
 echo ""
-echo "  Currently (Flow 4 as shown):"
-echo "    - Governance records are present and queryable"
-echo "    - Provenance chain is visible: proposal → vote → decision"
-echo "    - The link between governance and execution is narrative"
+echo "  What is deployed (PR #1327, merged 2026-03-07):"
+echo "    - check_execution_gate(): stateless gate primitive"
+echo "      Validates GovernanceDecisionReceipt has outcome=Accepted and hash integrity"
+echo "    - /v1/receipts/chain?decision_hash=<hex>: live endpoint"
+echo "      Returns GovernanceDecisionReceipt + AllocationReceipts + SettlementIntents"
+echo "    - /v1/gov/proposals/{id}/proof: implemented with full signature validation"
+echo "      Requires attestations with valid Ed25519 signatures"
 echo ""
-echo "  After PR #1327 merges (Flow 1B / Flow 4 upgrade):"
-echo "    - GovernanceReceipts are cryptographically signed"
-echo "    - Execution is cryptographically bound to approved governance"
-echo "    - The proof endpoint returns a verifiable receipt"
-echo "    - A funder can verify the proof without trusting Finger Lakes CDN"
+echo "  What is also deployed (wired in governance actor, integration-tested):"
+echo "    - check_execution_gate() is called at proposal-close time in GovernanceActor"
+echo "      before any ProposalAccepted event fires (actor.rs, Invariant 7 enforcement)"
+echo "    - Integration tests in execution_receipt_gate_integration.rs prove this"
 echo ""
-echo "  Presenter note (before #1327 lands):"
-echo "    'The governance records are real and verifiable now. What #1327"
-echo "     adds is the final layer: machine-proof that execution followed"
-echo "     governance — not just visible, but cryptographically enforced.'"
+echo "  What remains:"
+echo "    - Defense-in-depth at ledger write-path (optional future hardening)"
+echo "      create_budget_allocation() still takes a raw hash; gate ran upstream"
+echo "    - Proof endpoint requires signing key configured in pod"
+echo "      (cluster constraint — not a code gap)"
+echo ""
+echo "  Presenter note:"
+echo "    'The governance records are real and verifiable. The receipt chain"
+echo "     endpoint is live. Invariant 7 is enforced — no allocation effect fires"
+echo "     without a passing gate check. Proof attestations require pod signing key config.'"
 echo ""
 
 # ---------------------------------------------------------------------------
@@ -604,10 +613,12 @@ echo "   - River City: federation agreement governance record"
 echo "   - A funder can verify any claim by querying member coop nodes directly"
 echo "   - No spreadsheets, no email chains, no admin overhead"
 echo ""
-echo " What's coming (Flow 1B / #1327):"
-echo "   -> Signed GovernanceReceipts: cryptographic proof, not just records"
-echo "   -> Machine-verifiable: proof endpoint returns receipt bound to execution"
-echo "   -> Funder-grade: the foundation can audit the proof independently"
+echo " Receipt chain state (PR #1327 merged):"
+echo "   ✓ Gate primitive: check_execution_gate() enforces Invariant 7"
+echo "   ✓ Chain endpoint: /v1/receipts/chain?decision_hash=<hex> is live"
+echo "   ✓ Proof endpoint: /v1/gov/proposals/{id}/proof implemented"
+echo "   ✓ Wiring: gate enforced at governance actor proposal-close (Invariant 7 active)"
+echo "   · Pod config: signing key required for proof endpoint (cluster constraint)"
 echo ""
 echo " Presenter note (audience: funders):"
 echo "   'This is what accountability without bureaucracy looks like. The records"

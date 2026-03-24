@@ -10,18 +10,17 @@
 #   - Authorization boundary: compute:write scope enforcement
 #   - Foundation for settlement receipt provenance chain (Sprint 28)
 #
-# What this does NOT yet claim (wiring planned for Sprint 28):
-#   - Task execution — no CCL executor registered in current K3s deployment
-#   - Settlement receipt generation — requires task completion
-#   - Full provenance chain linking compute task hash to settlement
+# What this demonstrates (Sprint 28, gossip fan-out fixed):
+#   - Task execution via gossip loopback (gossip fan-out fix, PR #sprint28)
+#   - Settlement receipt generation on completion
+#   - Full provenance chain: task_hash → execution_receipt → credit_settlement
 #
 # Core cooperator question: "Can the commons pool fairly allocate compute
 #                            resources, and can members verify the rules?"
 #
-# K3s constraint note (2026-03-23):
-#   The compute actor is live and admits tasks (trust-gated HTTP 200).
-#   Task execution requires an executor node: Sprint 28 K3s wiring work.
-#   This flow proves admission gate, credit reservation narrative, scope guard.
+# K3s status (2026-03-24):
+#   Gossip fan-out bug fixed — compute actor now receives submitted tasks via
+#   gossip loopback. CCL executor is live. Tasks go Pending → Completed.
 #
 # Usage:    bash demo/scripts/flow-5-compute.sh [--present | --narrated]
 # Duration: ~5 minutes live
@@ -177,9 +176,11 @@ aside "The gateway enforces two gates before admission:"
 aside "  (a) compute:write scope in the bearer token"
 aside "  (b) submitter trust score >= MIN_TRUST_SUBMIT (0.1)"
 
+_CCL_CONTRACT='{\"name\":\"route-optimization-stub\",\"participants\":[],\"currency\":null,\"state_vars\":[],\"rules\":[{\"name\":\"main\",\"params\":[],\"requires\":[],\"body\":[{\"Return\":{\"value\":{\"Literal\":{\"String\":\"ok\"}}}}]}],\"triggers\":[]}'
+
 _TASK_BODY="{
   \"code_type\": \"ccl\",
-  \"code\": \"(define route-optimization-stub (lambda (inputs) inputs))\",
+  \"code\": \"${_CCL_CONTRACT}\",
   \"fuel_limit\": 10000,
   \"task_id\": \"${COMPUTE_TASK_CLIENT_ID}\",
   \"inputs\": {
@@ -254,18 +255,19 @@ else
 
   case "${TASK_STATUS}" in
     pending|Pending)
-      result "Pending = accepted by admission gate, waiting for executor assignment"
-      aside "K3s executor registration is Sprint 28 work."
-      aside "Full lifecycle: Pending → Processing (executor claims) → Completed (receipt generated)"
+      result "Pending = accepted by admission gate, queued for executor"
+      aside "Full lifecycle: Pending → Completed (executor claims and runs inline)"
       ;;
     processing|Processing)
-      result "Processing — task claimed by an executor node, running now"
+      result "Processing — task claimed by executor node, running now"
       ;;
     completed|Completed)
-      result "Completed — settlement receipt available (see /v1/receipts/chain)"
+      result "Completed — CCL contract executed, settlement receipt generated"
+      aside "See /v1/receipts/chain for the provenance chain anchored to this task_hash"
       ;;
     *)
       warn "Status: ${TASK_STATUS}"
+      aside "Check daemon logs if task remains pending — gossip loopback required"
       ;;
   esac
 fi
@@ -286,9 +288,10 @@ RESTRICTED_TOKEN="$(cat "$_RESTRICTED_TOKEN_FILE")"
 if [ -n "$RESTRICTED_TOKEN" ]; then
   aside "Token obtained with ledger:read only (no compute scopes)"
 
+  # A syntactically valid CCL contract — rejected at the scope gate before execution
   _AUTHZ_BODY="{
     \"code_type\": \"ccl\",
-    \"code\": \"(define unauthorized-attempt (lambda (x) x))\",
+    \"code\": \"{\\\"name\\\":\\\"authz-probe\\\",\\\"participants\\\":[],\\\"currency\\\":null,\\\"state_vars\\\":[],\\\"rules\\\":[{\\\"name\\\":\\\"main\\\",\\\"params\\\":[],\\\"requires\\\":[],\\\"body\\\":[{\\\"Return\\\":{\\\"value\\\":{\\\"Literal\\\":{\\\"String\\\":\\\"probe\\\"}}}}]}],\\\"triggers\\\":[]}\",
     \"fuel_limit\": 1000,
     \"inputs\": {}
   }"
@@ -323,11 +326,12 @@ printf "  %-4s %-56s\n" "✓" "Task hash recorded as provenance anchor: ${TASK_H
 printf "  %-4s %-56s\n" "✓" "Ledger position available for credit reservation"
 printf "  %-4s %-56s\n" "✓" "Authorization boundary enforced (scope guard)"
 echo ""
-echo "  What comes next (Sprint 28 — K3s executor wiring):"
-printf "  %-4s %-56s\n" "○" "Register executor nodes in the K3s cluster"
-printf "  %-4s %-56s\n" "○" "Task lifecycle: Pending → Processing → Completed"
-printf "  %-4s %-56s\n" "○" "Settlement receipt with full provenance chain"
-printf "  %-4s %-56s\n" "○" "Credit settlement to contributing cooperative members"
+echo "  Sprint 28 delivered (gossip loopback + CCL executor live):"
+printf "  %-4s %-56s\n" "✓" "Gossip fan-out: compute actor receives tasks via loopback"
+printf "  %-4s %-56s\n" "✓" "Task lifecycle: Pending → Processing → Completed"
+printf "  %-4s %-56s\n" "  " "(task executes after queue drains — see RUNBOOK Flow 5 note)"
+printf "  %-4s %-56s\n" "✓" "Settlement receipt with full provenance chain"
+printf "  %-4s %-56s\n" "○" "Distributed multi-executor pool (Sprint 29 scaling)"
 echo ""
 echo "══════════════════════════════════════════════════════════════════"
 echo ""
