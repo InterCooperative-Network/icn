@@ -18,7 +18,7 @@ env:
   GATE_RATCHET_PHASE_KERNEL_DEPS: blocking
   GATE_RATCHET_PHASE_FIREWALL_CONTRACT: blocking
   GATE_RATCHET_PHASE_COVERAGE: observational
-  GATE_RATCHET_PHASE_SDK_TESTS: warning
+  GATE_RATCHET_PHASE_SDK_TESTS: blocking
   GATE_RATCHET_PHASE_A11Y: warning
   GATE_RATCHET_PHASE_COMPLIANCE: warning
   # Scope controls for staged boundary enforcement
@@ -528,7 +528,6 @@ jobs:
   sdk:
     name: TypeScript SDK
     needs: [changes]
-    if: needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -536,24 +535,35 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      # Docs-only fast path — job must always run (not be skipped) so it
+      # satisfies branch protection required checks on docs-only PRs.
+      - name: Docs-only fast path
+        if: needs.changes.outputs.docs_only == 'true' && needs.changes.outputs.has_rust != 'true'
+        run: echo "Confirmed docs-only (no SDK files); skipping TypeScript SDK tests."
+
       - name: Free disk space
+        if: needs.changes.outputs.docs_only != 'true' || needs.changes.outputs.has_rust == 'true'
         uses: ./.github/actions/free-disk-space
 
       - uses: actions/setup-node@v6
+        if: needs.changes.outputs.docs_only != 'true' || needs.changes.outputs.has_rust == 'true'
         with:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: sdk/typescript/package-lock.json
 
       - name: Install dependencies
+        if: needs.changes.outputs.docs_only != 'true' || needs.changes.outputs.has_rust == 'true'
         run: npm ci
 
       - name: Build SDK
+        if: needs.changes.outputs.docs_only != 'true' || needs.changes.outputs.has_rust == 'true'
         run: npm run build
 
       - name: Run tests
+        if: needs.changes.outputs.docs_only != 'true' || needs.changes.outputs.has_rust == 'true'
+        # All SDK tests use mockFetch — no gateway required. Gate is blocking.
         run: npm test
-        continue-on-error: ${{ env.GATE_RATCHET_PHASE_SDK_TESTS != 'blocking' }}  # SDK tests may need gateway running
 
   web-ui:
     name: Web UI
