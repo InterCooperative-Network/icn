@@ -100,18 +100,14 @@ Graduation path: WARNING → BLOCKING → add to branch protection required chec
 
 Owner: @core-arch
 
-#### TypeScript SDK Tests (`GATE_RATCHET_PHASE_SDK_TESTS`)
-Current phase: WARNING (with `continue-on-error: true`)
+#### TypeScript SDK Tests (`GATE_RATCHET_PHASE_SDK_TESTS`) ✅ GRADUATED (2026-03-24)
+Phase advanced to BLOCKING. `continue-on-error` removed.
 
-**Blocker**: SDK tests comment notes "tests may need gateway running." Tests that require a live
-gateway cannot run deterministically in ephemeral CI runners.
+Investigation confirmed: the "tests may need gateway running" comment was incorrect. All 157 tests
+use injected `mockFetch` and have no real network dependency. Tests run in 6 seconds, fully
+isolated. Build + tests pass cleanly on Node 22.
 
-Graduation condition:
-- Separate gateway-dependent tests into a distinct test suite that is explicitly skipped in CI.
-- Remaining unit/mock tests run reliably in isolation (zero flakes over 5 consecutive runs).
-- Remove `continue-on-error` from the SDK job.
-
-Graduation path: WARNING → BLOCKING → add to branch protection required checks.
+Next step: add `TypeScript SDK` to branch protection required checks.
 
 Owner: @sdk
 
@@ -156,7 +152,7 @@ restart command.
 | `GATE_RATCHET_PHASE_KERNEL_DEPS` | `blocking` | Kernel Forbidden Dependencies |
 | `GATE_RATCHET_PHASE_FIREWALL_CONTRACT` | `blocking` | Firewall Contract Enforcement |
 | `GATE_RATCHET_PHASE_COMPLIANCE` | `warning` | Regulatory Compliance Linter |
-| `GATE_RATCHET_PHASE_SDK_TESTS` | `warning` | TypeScript SDK |
+| `GATE_RATCHET_PHASE_SDK_TESTS` | `blocking` | TypeScript SDK |
 | `GATE_RATCHET_PHASE_A11Y` | `warning` | Accessibility Tests |
 | `GATE_RATCHET_PHASE_COVERAGE` | `observational` | Test Coverage |
 
@@ -165,6 +161,9 @@ Branch protection required checks (must be updated separately when gates graduat
 
 Added to required checks (gap closed 2026-03-24):
 `Meaning Firewall Check`, `Kernel Forbidden Dependencies`, `Firewall Contract Enforcement`
+
+Blocking but not yet in required checks (next action):
+`TypeScript SDK`
 
 ## Notes
 

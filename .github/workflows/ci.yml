@@ -18,7 +18,7 @@ env:
   GATE_RATCHET_PHASE_KERNEL_DEPS: blocking
   GATE_RATCHET_PHASE_FIREWALL_CONTRACT: blocking
   GATE_RATCHET_PHASE_COVERAGE: observational
-  GATE_RATCHET_PHASE_SDK_TESTS: warning
+  GATE_RATCHET_PHASE_SDK_TESTS: blocking
   GATE_RATCHET_PHASE_A11Y: warning
   GATE_RATCHET_PHASE_COMPLIANCE: warning
   # Scope controls for staged boundary enforcement
@@ -553,7 +553,7 @@ jobs:
 
       - name: Run tests
         run: npm test
-        continue-on-error: ${{ env.GATE_RATCHET_PHASE_SDK_TESTS != 'blocking' }}  # SDK tests may need gateway running
+        # All SDK tests use mockFetch — no gateway required. Gate is blocking.
 
   web-ui:
     name: Web UI
