@@ -11,7 +11,8 @@
     "test:e2e:debug": "playwright test --debug",
     "test:a11y": "playwright test tests/e2e/accessibility.spec.js",
     "test:a11y:headed": "playwright test tests/e2e/accessibility.spec.js --headed",
-    "test:all": "npm run test && npm run test:e2e"
+    "test:all": "npm run test && npm run test:e2e",
+    "test:a11y:ci": "playwright test tests/e2e/accessibility.spec.js --project=chromium"
   },
   "keywords": [
     "timebank",
@@ -31,8 +32,12 @@
   },
   "jest": {
     "testEnvironment": "jsdom",
-    "setupFilesAfterEnv": ["<rootDir>/tests/setup.js"],
-    "testMatch": ["**/tests/**/*.test.js"],
+    "setupFilesAfterEnv": [
+      "<rootDir>/tests/setup.js"
+    ],
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ],
     "collectCoverageFrom": [
       "app.js",
       "!tests/**"
