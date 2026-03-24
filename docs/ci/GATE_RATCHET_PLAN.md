@@ -22,15 +22,36 @@ A check can graduate only if:
 2. The failure message includes a remediation pointer (doc, script, or command).
 3. Scope is explicit (what it checks, what it ignores).
 
+## Branch protection enforcement
+
+`GATE_RATCHET_PHASE_* = blocking` means the CI job exits 1 on violation. To be mechanically
+unbypassable, the job name must also appear in GitHub branch protection required status checks —
+a `--admin` merge can otherwise land a violation even when the job fails.
+
+Required checks (branch protection as of 2026-03-24):
+`Build Release`, `Test`, `Clippy`, `Format Check`,
+`Meaning Firewall Check`, `Kernel Forbidden Dependencies`, `Firewall Contract Enforcement`
+
+When a gate graduates to BLOCKING, add its job name to branch protection via the API:
+
+```bash
+gh api repos/InterCooperative-Network/icn/branches/main/protection \
+  --method PUT \
+  --field 'required_status_checks[contexts][]=<Job Name>' \
+  ... # preserve all other fields
+```
+
+This step is tracked as a distinct action for each gate in the Wave schedule above.
+
 ## Schedule
 
 Dates are "no later than." Advancing early is allowed if migration work is complete.
 
-### Wave 1 (by 2026-02-23): turn on visibility and ownership
+### Wave 1 (by 2026-02-23): turn on visibility and ownership ✅ COMPLETE
 
-- Meaning Firewall check: OBSERVATIONAL -> WARNING
-- Firewall contract enforcement: OBSERVATIONAL -> WARNING
-- Forbidden deps (targeted crates): OBSERVATIONAL -> WARNING
+- Meaning Firewall check: OBSERVATIONAL → WARNING ✅
+- Firewall contract enforcement: OBSERVATIONAL → WARNING ✅
+- Forbidden deps (targeted crates): OBSERVATIONAL → WARNING ✅
 - Coverage job: stays OBSERVATIONAL (report-only)
 
 Definition of done:
@@ -38,51 +59,117 @@ Definition of done:
 - CI prints a clear `WARNING:` line with a remediation link for each warning.
 - Owners are listed in this document.
 
-### Wave 2 (by 2026-03-09): enforce kernel boundary on the kernel
+### Wave 2 (by 2026-03-09): enforce kernel boundary on the kernel ✅ COMPLETE
 
 - Forbidden deps for `icn-core` and other designated kernel crates:
-  - WARNING -> BLOCKING
+  - WARNING → BLOCKING ✅ (2026-03-09)
 - Meaning Firewall check (kernel scope only):
-  - WARNING -> BLOCKING for listed crates/modules
+  - WARNING → BLOCKING ✅ (advanced 2026-03-24; 15 days after deadline, all violations resolved)
 - Firewall contract enforcement:
-  - stays WARNING unless false positives are eliminated
+  - stays WARNING unless false positives are eliminated (graduated in Wave 3)
 
 Definition of done:
 
 - PRs that violate forbidden deps in kernel crates fail.
 - Failure message includes exact dependency edge and a fix hint.
 
-### Wave 3 (by 2026-03-23): expand enforcement outward
+**Wave 2 fully complete** (2026-03-24): `Meaning Firewall Check` added to branch protection required checks.
+
+### Wave 3 (by 2026-03-23): expand enforcement outward ✅ COMPLETE
 
 - Extend forbidden deps BLOCKING scope to additional kernel-adjacent crates as declared.
 - Promote firewall contract enforcement to BLOCKING if stable.
+  - Advanced 2026-03-24 (1 day after deadline; passing consistently on main).
 
 Definition of done:
 
 - Kernel boundary invariants are mechanically enforced in CI.
+
+**Wave 3 fully complete** (2026-03-24): `Firewall Contract Enforcement` added to branch protection required checks.
+
+### Wave 4 (target: Q2 2026): graduate remaining advisory signals
+
+#### Regulatory Compliance Linter (`GATE_RATCHET_PHASE_COMPLIANCE`)
+Current phase: WARNING
+
+Graduation condition:
+- Zero compliance violations on main for 2+ consecutive sprints.
+- Script covers all new public-facing API surfaces added since linter was introduced.
+
+Graduation path: WARNING → BLOCKING → add to branch protection required checks.
+
+Owner: @core-arch
+
+#### TypeScript SDK Tests (`GATE_RATCHET_PHASE_SDK_TESTS`)
+Current phase: WARNING (with `continue-on-error: true`)
+
+**Blocker**: SDK tests comment notes "tests may need gateway running." Tests that require a live
+gateway cannot run deterministically in ephemeral CI runners.
+
+Graduation condition:
+- Separate gateway-dependent tests into a distinct test suite that is explicitly skipped in CI.
+- Remaining unit/mock tests run reliably in isolation (zero flakes over 5 consecutive runs).
+- Remove `continue-on-error` from the SDK job.
+
+Graduation path: WARNING → BLOCKING → add to branch protection required checks.
+
+Owner: @sdk
+
+#### Accessibility Tests (`GATE_RATCHET_PHASE_A11Y`)
+Current phase: WARNING (with `continue-on-error: true`)
+
+Graduation condition:
+- Zero accessibility violations in a full Playwright chromium run against a production build.
+- Passing consistently for 2+ sprints (no flakes).
+- Remove `continue-on-error` from the accessibility job.
+
+Graduation path: WARNING → BLOCKING → add to branch protection required checks.
+
+Owner: @frontend
+
+### Coverage (permanently observational)
+`GATE_RATCHET_PHASE_COVERAGE=observational`
+
+Coverage is a reporting signal, not a quality gate. Thresholds change as the codebase grows;
+enforcing a fixed threshold would create perverse incentives. Coverage stays OBSERVATIONAL
+permanently. Reports upload to Codecov for trend analysis only.
+
+Note: runs on a self-hosted `zentith` runner (`nohup` process in WSL2) that must be restarted
+manually after Windows reboots. If coverage goes dark, restart the runner. See MEMORY.md for
+restart command.
 
 ## Owners
 
 - Meaning Firewall: @core-arch
 - Forbidden deps: @core-arch
 - Firewall contracts: @security
+- Compliance linter: @core-arch
+- SDK tests: @sdk
+- Accessibility: @frontend
 - Coverage: @ci
 
-Replace with actual maintainers as needed.
+## Current ratchet defaults (as of 2026-03-24)
 
-## Current ratchet defaults (this repo)
+| Variable | Value | Job Name |
+|----------|-------|----------|
+| `GATE_RATCHET_PHASE_MEANING_FIREWALL` | `blocking` | Meaning Firewall Check |
+| `GATE_RATCHET_PHASE_KERNEL_DEPS` | `blocking` | Kernel Forbidden Dependencies |
+| `GATE_RATCHET_PHASE_FIREWALL_CONTRACT` | `blocking` | Firewall Contract Enforcement |
+| `GATE_RATCHET_PHASE_COMPLIANCE` | `warning` | Regulatory Compliance Linter |
+| `GATE_RATCHET_PHASE_SDK_TESTS` | `warning` | TypeScript SDK |
+| `GATE_RATCHET_PHASE_A11Y` | `warning` | Accessibility Tests |
+| `GATE_RATCHET_PHASE_COVERAGE` | `observational` | Test Coverage |
 
-- `GATE_RATCHET_PHASE_MEANING_FIREWALL=warning`
-- `GATE_RATCHET_PHASE_KERNEL_DEPS=blocking`
-- `GATE_RATCHET_PHASE_FIREWALL_CONTRACT=warning`
-- `GATE_RATCHET_PHASE_COVERAGE=observational`
-- `GATE_RATCHET_PHASE_SDK_TESTS=warning`
-- `GATE_RATCHET_PHASE_A11Y=warning`
-- `GATE_RATCHET_KERNEL_DEPS_SCOPE=core-only`
+Branch protection required checks (must be updated separately when gates graduate):
+`Build Release`, `Test`, `Clippy`, `Format Check`
+
+Added to required checks (gap closed 2026-03-24):
+`Meaning Firewall Check`, `Kernel Forbidden Dependencies`, `Firewall Contract Enforcement`
 
 ## Notes
 
-Boundary Hardening prioritizes correctness over velocity. If a check stays WARNING for longer than two sprints, one of these is true:
+Boundary Hardening prioritizes correctness over velocity. If a check stays WARNING for longer than
+two sprints, one of these is true:
 
 - the migration is not real,
 - the scope is wrong, or
