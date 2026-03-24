@@ -41,7 +41,7 @@ The demo is split into four phases:
 - **Phase 1: Founding Assembly** — Alice, Bob, Carol form the cooperative as equal members. Alice is elected temporary coordinator (not a permanent admin role).
 - **Phase 2: Charter Ratification** — The first democratic act: all three members vote to ratify their own cooperative charter.
 - **Phase 3: Democratic Decision** — Bob (not the coordinator) proposes $12,000 for kitchen equipment. All three vote.
-- **Phase 4: Verification** — Carol (not the coordinator, not the proposer) closes the vote. Tally and cryptographic proof generated.
+- **Phase 4: Verification** — Carol (not the coordinator, not the proposer) closes the vote. Step 18: tally retrieved. Step 19: cryptographic proof generated (`GET /v1/gov/proposals/{id}/proof`).
 
 Press Enter between phases to control pacing.
 

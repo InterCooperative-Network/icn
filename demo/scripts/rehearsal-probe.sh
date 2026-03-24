@@ -296,10 +296,10 @@ fi
 # ── R3: Ledger payment payload ────────────────────────────────────────────────
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo " R3: Does POST /v1/ledger/{coop}/payment accept 'decision_id'?"
+echo " R3: Does POST /v1/ledger/{coop}/settle accept 'decision_id'?"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
-echo "  NOTE: Deployed binary (2bc85f83, 2026-02-23) uses /payment and 'currency' field."
+echo "  NOTE: Deployed binary (2bc85f83, 2026-02-23) uses /settle and .unit. field (renamed 2026-03-01)."
 echo "  Route renamed to /settle + 'unit' in source commit 439a8a2c (2026-03-01)."
 echo ""
 
@@ -310,19 +310,19 @@ if [ -z "$BRIGHTWORKS_TOKEN" ]; then
 else
   result "BrightWorks token obtained"
 
-  # Deployed API: RecordTransferRequest = {from, to, amount, currency, memo}
+  # Deployed API: RecordTransferRequest = {from, to, amount, unit, memo}
   # decision_id is NOT in the struct. Serde ignores unknown fields by default.
   # Use real DIDs (alpha→gamma) to reach actual validation (self-payment rejected).
   # If 2xx: transfer succeeded, decision_id silently ignored (can keep as no-op in flow-2)
   # If 400 mentioning decision_id: deny_unknown_fields IS set — field explicitly rejected
   # If 400 for self-payment/other: field was ignored, other validation failed
-  _do_probe_curl "${BRIGHTWORKS_URL}/v1/ledger/brightworks-cooperative/payment" POST \
+  _do_probe_curl "${BRIGHTWORKS_URL}/v1/ledger/brightworks-cooperative/settle" POST \
     "{\"from\":\"did:icn:zHdQuwTTniwcV4TT1ZcfXsVP7dCojE5czv7vUghmNSmgB\",\"to\":\"did:icn:zyWqWVqGERfRvUz4LVGd4coCZDuNhnufxRpNVTR1BBA7\",\"amount\":1,\"currency\":\"hours\",\"memo\":\"rehearsal-probe-r3\",\"decision_id\":\"00000000-0000-0000-0000-000000000000\"}" \
     "$BRIGHTWORKS_TOKEN"
   R3_HTTP="$PROBE_HTTP_CODE"
   R3_RAW="$(cat "$_RESP_FILE")"
 
-  echo "  Payment endpoint: ${BRIGHTWORKS_URL}/v1/ledger/brightworks-cooperative/payment"
+  echo "  Settle endpoint: ${BRIGHTWORKS_URL}/v1/ledger/brightworks-cooperative/settle"
   echo "  HTTP status:      $R3_HTTP"
   echo "  Raw response (always printed — read it):"
   echo "$R3_RAW" | python3 -m json.tool 2>/dev/null || echo "  $R3_RAW"
@@ -344,7 +344,7 @@ else
   elif [ "$R3_HTTP" = "404" ]; then
     # 404 = route not matched (actix http.route=default in logs)
     R3_STATUS=MISMATCH; R3_OBSERVED="404-wrong-route"
-    _probe_result MISMATCH "R3: 404 — /payment route not matched. Check binary version." \
+    _probe_result MISMATCH "R3: 404 — /settle route not matched. Check binary version." \
       "Binary may predate /payment route or route was registered differently."
   elif [ "$R3_HTTP" = "400" ]; then
     if [ -n "$R3_BODY_MENTIONS_AUTH" ]; then
@@ -539,7 +539,7 @@ printf "  %-5s  %-11s  %-32s  %s\n" "Probe" "Status" "Observed" "Meaning"
 printf "  %-5s  %-11s  %-32s  %s\n" "-----" "-----------" "--------------------------------" "----------------------------------------"
 printf "  %-5s  %-11s  %-32s  %s\n" "R1"  "${R1_STATUS}"  "${R1_OBSERVED_STATE}"              "Single-DID quorum → final state"
 printf "  %-5s  %-11s  %-32s  %s\n" "R2"  "${R2_STATUS}"  "${R2_OBSERVED_KEYS:-not-run}"      "Tally field names (pin flow-1 grep after)"
-printf "  %-5s  %-11s  %-32s  %s\n" "R3"  "${R3_STATUS}"  "${R3_OBSERVED}"                    "Payment (/payment+currency): decision_id silently dropped?"
+printf "  %-5s  %-11s  %-32s  %s\n" "R3"  "${R3_STATUS}"  "${R3_OBSERVED}"                    "Settle (/settle+unit): decision_id silently dropped?"
 printf "  %-5s  %-11s  %-32s  %s\n" "R4"  "${R4_STATUS}"  "${R4_OBSERVED}"                    "Unicode ↔ survives bash → API"
 printf "  %-5s  %-11s  %-32s  %s\n" "R5a" "${R5a_STATUS}" "${R5_OBSERVED}"                    "Federation endpoint: present?"
 printf "  %-5s  %-11s  %-32s  %s\n" "R5b" "${R5b_STATUS}" "(see R5 above)"                    "Federation module: initialized?"

@@ -569,6 +569,10 @@ economics:
     else:
         print(f"  ⚠ Proof not available (HTTP {status})")
         print(f"    {json.dumps(resp, indent=2)[:300]}")
+        if status == 404:
+            fail("Proof endpoint returned 404 — signing key may be unavailable (see RUNBOOK Proof Endpoint section)")
+        else:
+            fail(f"Proof endpoint returned HTTP {status} — demo cannot verify cryptographic receipt")
 
     # ── Summary Card ──────────────────────────────────────────────────────────
     print()
