@@ -22,19 +22,26 @@ A check can graduate only if:
 2. The failure message includes a remediation pointer (doc, script, or command).
 3. Scope is explicit (what it checks, what it ignores).
 
-## Branch protection enforcement gap
+## Branch protection enforcement
 
-**Critical**: `GATE_RATCHET_PHASE_* = blocking` means the CI job exits 1 on violation, but it
-does NOT mechanically block PR merges unless the job's name is also in GitHub branch protection's
-required status checks list.
+`GATE_RATCHET_PHASE_* = blocking` means the CI job exits 1 on violation. To be mechanically
+unbypassable, the job name must also appear in GitHub branch protection required status checks —
+a `--admin` merge can otherwise land a violation even when the job fails.
 
 Required checks (branch protection as of 2026-03-24):
-`Build Release`, `Test`, `Clippy`, `Format Check`
+`Build Release`, `Test`, `Clippy`, `Format Check`,
+`Meaning Firewall Check`, `Kernel Forbidden Dependencies`, `Firewall Contract Enforcement`
 
-When a gate graduates to BLOCKING, the next step is adding its job name to branch protection so
-that `--admin` bypass cannot silently land a violation. Required-check promotion must be done in
-the GitHub UI (Settings → Branches → Branch protection rules → Required status checks) or via the
-branch protection API. This is tracked as a distinct action for each gate below.
+When a gate graduates to BLOCKING, add its job name to branch protection via the API:
+
+```bash
+gh api repos/InterCooperative-Network/icn/branches/main/protection \
+  --method PUT \
+  --field 'required_status_checks[contexts][]=<Job Name>' \
+  ... # preserve all other fields
+```
+
+This step is tracked as a distinct action for each gate in the Wave schedule above.
 
 ## Schedule
 
@@ -66,7 +73,7 @@ Definition of done:
 - PRs that violate forbidden deps in kernel crates fail.
 - Failure message includes exact dependency edge and a fix hint.
 
-**Remaining Wave 2 action**: Add `Meaning Firewall Check` to branch protection required checks.
+**Wave 2 fully complete** (2026-03-24): `Meaning Firewall Check` added to branch protection required checks.
 
 ### Wave 3 (by 2026-03-23): expand enforcement outward ✅ COMPLETE
 
@@ -78,7 +85,7 @@ Definition of done:
 
 - Kernel boundary invariants are mechanically enforced in CI.
 
-**Remaining Wave 3 action**: Add `Firewall Contract Enforcement` to branch protection required checks.
+**Wave 3 fully complete** (2026-03-24): `Firewall Contract Enforcement` added to branch protection required checks.
 
 ### Wave 4 (target: Q2 2026): graduate remaining advisory signals
 
@@ -156,7 +163,7 @@ restart command.
 Branch protection required checks (must be updated separately when gates graduate):
 `Build Release`, `Test`, `Clippy`, `Format Check`
 
-Not yet added to required checks (gap — these block CI jobs but not PR merges via --admin):
+Added to required checks (gap closed 2026-03-24):
 `Meaning Firewall Check`, `Kernel Forbidden Dependencies`, `Firewall Contract Enforcement`
 
 ## Notes
