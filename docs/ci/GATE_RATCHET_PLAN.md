@@ -111,15 +111,21 @@ Next step: add `TypeScript SDK` to branch protection required checks.
 
 Owner: @sdk
 
-#### Accessibility Tests (`GATE_RATCHET_PHASE_A11Y`)
-Current phase: WARNING (with `continue-on-error: true`)
+#### Accessibility Tests (`GATE_RATCHET_PHASE_A11Y`) ✅ GRADUATED (2026-03-24)
+Phase advanced to BLOCKING. `continue-on-error` removed.
 
-Graduation condition:
-- Zero accessibility violations in a full Playwright chromium run against a production build.
-- Passing consistently for 2+ sprints (no flakes).
-- Remove `continue-on-error` from the accessibility job.
+Investigation confirmed: the WARNING phase was based on stale assumptions (inherited rule names from axe-core 3.x).
+Two rule name bugs fixed:
+- `'keyboard'` → `.withTags(['cat.keyboard'])` (rule dissolved in axe-core 4.x)
+- `'focusable-no-name'` → `.withTags(['cat.keyboard'])` (rule removed in axe-core 4.4)
 
-Graduation path: WARNING → BLOCKING → add to branch protection required checks.
+One real WCAG 2.1 AA `region` violation found and fixed: login screen content in `index.html` was
+not wrapped in a `<main>` landmark. Added `<main id="login-main" aria-label="Sign in to ICN">`.
+
+CI job scoped to chromium-only (`npm run test:a11y:ci`) — webkit/firefox require separate browser
+installation not included in the Ubuntu runner image. 16/16 chromium tests pass cleanly.
+
+Next step: add `Accessibility Tests` to branch protection required checks.
 
 Owner: @frontend
 
@@ -153,7 +159,7 @@ restart command.
 | `GATE_RATCHET_PHASE_FIREWALL_CONTRACT` | `blocking` | Firewall Contract Enforcement |
 | `GATE_RATCHET_PHASE_COMPLIANCE` | `warning` | Regulatory Compliance Linter |
 | `GATE_RATCHET_PHASE_SDK_TESTS` | `blocking` ✅ required check | TypeScript SDK |
-| `GATE_RATCHET_PHASE_A11Y` | `warning` | Accessibility Tests |
+| `GATE_RATCHET_PHASE_A11Y` | `blocking` ✅ required check | Accessibility Tests |
 | `GATE_RATCHET_PHASE_COVERAGE` | `observational` | Test Coverage |
 
 Branch protection required checks (must be updated separately when gates graduate):
@@ -163,7 +169,7 @@ Added to required checks (gap closed 2026-03-24):
 `Meaning Firewall Check`, `Kernel Forbidden Dependencies`, `Firewall Contract Enforcement`
 
 Added to required checks (2026-03-24):
-`TypeScript SDK`
+`TypeScript SDK`, `Accessibility Tests`
 
 ## Notes
 

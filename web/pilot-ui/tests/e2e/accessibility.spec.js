@@ -123,8 +123,9 @@ test.describe('Accessibility - Keyboard Navigation', () => {
   });
 
   test('all interactive elements are keyboard accessible', async ({ page }) => {
+    // Use tag-based selector — 'keyboard' was dissolved in axe-core 4.x
     const results = await new AxeBuilder({ page })
-      .withRules(['keyboard'])
+      .withTags(['cat.keyboard'])
       .analyze();
 
     expect(results.violations, 'Keyboard accessibility issues found').toHaveLength(0);
@@ -175,9 +176,9 @@ test.describe('Accessibility - Keyboard Navigation', () => {
   });
 
   test('focus is visible on interactive elements', async ({ page }) => {
-    // Test that focusable elements have accessible names
+    // 'focusable-no-name' was removed in axe-core 4.4; use tag-based check
     const results = await new AxeBuilder({ page })
-      .withRules(['focusable-no-name'])
+      .withTags(['cat.keyboard'])
       .analyze();
 
     // Log any focus-related issues as warnings
