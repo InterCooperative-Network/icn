@@ -152,7 +152,7 @@ restart command.
 | `GATE_RATCHET_PHASE_KERNEL_DEPS` | `blocking` | Kernel Forbidden Dependencies |
 | `GATE_RATCHET_PHASE_FIREWALL_CONTRACT` | `blocking` | Firewall Contract Enforcement |
 | `GATE_RATCHET_PHASE_COMPLIANCE` | `warning` | Regulatory Compliance Linter |
-| `GATE_RATCHET_PHASE_SDK_TESTS` | `blocking` | TypeScript SDK |
+| `GATE_RATCHET_PHASE_SDK_TESTS` | `blocking` ✅ required check | TypeScript SDK |
 | `GATE_RATCHET_PHASE_A11Y` | `warning` | Accessibility Tests |
 | `GATE_RATCHET_PHASE_COVERAGE` | `observational` | Test Coverage |
 
@@ -162,7 +162,7 @@ Branch protection required checks (must be updated separately when gates graduat
 Added to required checks (gap closed 2026-03-24):
 `Meaning Firewall Check`, `Kernel Forbidden Dependencies`, `Firewall Contract Enforcement`
 
-Blocking but not yet in required checks (next action):
+Added to required checks (2026-03-24):
 `TypeScript SDK`
 
 ## Notes
