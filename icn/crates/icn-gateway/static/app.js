@@ -548,7 +548,7 @@ async function login() {
         await apiRequest('GET', '/health');
 
         // Fetch balance to verify auth
-        await apiRequest('GET', `/ledger/${state.coopId}/balance/${encodeURIComponent(state.did)}`);
+        await apiRequest('GET', `/ledger/${state.coopId}/position/${encodeURIComponent(state.did)}`);
 
         // Set token expiry (default 24 hours from now)
         state.tokenExpiry = Date.now() + (24 * 60 * 60 * 1000);
@@ -649,7 +649,7 @@ async function loadBalance() {
     try {
         const response = await apiRequest(
             'GET',
-            `/ledger/${state.coopId}/balance/${encodeURIComponent(state.did)}`
+            `/ledger/${state.coopId}/position/${encodeURIComponent(state.did)}`
         );
 
         // API returns { did: "...", balances: { "hours": 10, ... } }
@@ -2313,7 +2313,7 @@ function initializeTheme() {
     const themeIcon = themeToggle.querySelector('.theme-icon');
 
     // Check for saved theme preference or default to light mode
-    const savedTheme = localStorage.getItem('icn-theme') || 'light';
+    const savedTheme = localStorage.getItem('icn-theme') || 'dark';
     const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
     const theme = savedTheme === 'auto' ? (prefersDark ? 'dark' : 'light') : savedTheme;
 

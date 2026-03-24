@@ -5178,3 +5178,446 @@ footer .sync-status.error {
     background: var(--success);
     color: white;
 }
+
+/* ============================================================================
+   ICN Timebank — Visual Redesign Override (Mar 2026)
+   Replaces the muddy hybrid light/dark with a clean, opinionated dark theme.
+   Append to end of style.css.
+   ============================================================================ */
+
+/* Force true dark everywhere — no more light gray body on dark cards */
+:root,
+[data-theme="dark"] {
+    --primary:        #34d399;   /* Cooperative green — ownership, growth */
+    --primary-dark:   #10b981;
+    --primary-light:  #6ee7b7;
+    --success:        #4ade80;
+    --danger:         #f87171;
+    --warning:        #fbbf24;
+    --info:           #60a5fa;
+
+    --bg-body:        #0d1117;   /* Deep GitHub dark */
+    --bg-primary:     #161b22;   /* Card surface */
+    --bg-secondary:   #21262d;   /* Elevated card / input */
+    --bg-tertiary:    #0d1117;   /* Page background */
+    --bg-hover:       #30363d;
+
+    --text-primary:   #e6edf3;
+    --text-secondary: #8b949e;
+    --text-tertiary:  #6e7681;
+
+    --border-color:   #30363d;
+    --border-hover:   #484f58;
+
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.5);
+    --shadow-lg: 0 8px 24px rgba(0,0,0,0.6);
+
+    --focus-ring: 0 0 0 3px rgba(52, 211, 153, 0.35);
+}
+
+/* Page body */
+body {
+    background: var(--bg-body);
+    color: var(--text-primary);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* Login screen — centered, clean */
+.login-card {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 2.5rem;
+    box-shadow: var(--shadow-lg);
+    max-width: 420px;
+    margin: 80px auto;
+}
+
+.login-card h1 {
+    color: var(--primary);
+    font-size: 1.75rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+
+.login-card .subtitle {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+/* Header — gradient brand bar */
+header {
+    background: linear-gradient(135deg, #0d1117 0%, #161b22 100%);
+    border-bottom: 1px solid var(--border-color);
+    padding: 0.75rem 1.5rem;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(8px);
+}
+
+.header-left h1 {
+    color: var(--primary);
+    font-weight: 700;
+    font-size: 1.2rem;
+    letter-spacing: -0.02em;
+}
+
+.coop-badge {
+    background: rgba(52, 211, 153, 0.12);
+    color: var(--primary);
+    border: 1px solid rgba(52, 211, 153, 0.25);
+    border-radius: 6px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.2rem 0.6rem;
+    margin-left: 0.5rem;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.token-info {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    border-radius: 6px;
+    font-size: 0.75rem;
+    padding: 0.3rem 0.7rem;
+}
+
+.user-info {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+/* Logout button */
+.btn-logout, button[id="logout-btn"] {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    border-radius: 6px;
+    padding: 0.35rem 0.9rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.btn-logout:hover, button[id="logout-btn"]:hover {
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
+/* Navigation */
+nav {
+    background: var(--bg-primary);
+    border-bottom: 1px solid var(--border-color);
+    padding: 0.5rem 1.5rem;
+    gap: 0.25rem;
+}
+
+.nav-btn {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 0.45rem 1rem;
+    border-radius: 6px;
+    transition: all 0.15s;
+    border: none;
+    background: transparent;
+}
+
+.nav-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.nav-btn.active {
+    background: rgba(52, 211, 153, 0.15);
+    color: var(--primary);
+    font-weight: 600;
+}
+
+/* Main content area — wider, less cramped */
+main {
+    max-width: 960px;
+    padding: 1.5rem 2rem;
+}
+
+/* Cards */
+.card {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 1.25rem 1.5rem;
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 1rem;
+    transition: border-color 0.2s;
+}
+
+.card:hover {
+    border-color: var(--border-hover);
+}
+
+.card h2 {
+    color: var(--text-primary);
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+/* Stat cards */
+.stat-card {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 1.25rem;
+    text-align: center;
+    transition: border-color 0.2s, transform 0.15s;
+}
+
+.stat-card:hover {
+    border-color: rgba(52, 211, 153, 0.3);
+    transform: translateY(-1px);
+}
+
+.stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--primary);
+    letter-spacing: -0.03em;
+}
+
+.stat-label {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 0.25rem;
+}
+
+/* Inputs */
+input, select, textarea {
+    background: var(--bg-secondary) !important;
+    border: 1px solid var(--border-color) !important;
+    color: var(--text-primary) !important;
+    border-radius: 6px;
+    font-size: 0.9rem;
+}
+
+input:focus, select:focus, textarea:focus {
+    border-color: var(--primary) !important;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.2) !important;
+}
+
+input::placeholder, textarea::placeholder {
+    color: var(--text-tertiary) !important;
+}
+
+/* Buttons */
+.btn-primary, button[type="submit"].btn {
+    background: var(--primary) !important;
+    color: #0d1117 !important;
+    font-weight: 600;
+    border: none;
+    border-radius: 7px;
+    padding: 0.6rem 1.25rem;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.btn-primary:hover {
+    background: var(--primary-dark) !important;
+    transform: translateY(-1px);
+}
+
+.btn-secondary {
+    background: var(--bg-secondary) !important;
+    border: 1px solid var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+
+/* Status dot */
+.status-dot {
+    background: var(--primary);
+    box-shadow: 0 0 6px var(--primary);
+}
+
+#connection-status {
+    color: var(--primary);
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+/* Proposals */
+.proposal-card, .decision-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 0.75rem;
+    transition: border-color 0.15s;
+}
+
+.proposal-card:hover {
+    border-color: rgba(52, 211, 153, 0.3);
+}
+
+/* Member list */
+.member-item {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.role-badge, .badge {
+    background: rgba(52, 211, 153, 0.12);
+    color: var(--primary);
+    border: 1px solid rgba(52, 211, 153, 0.25);
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.15rem 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Table styling */
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th {
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.6rem 1rem;
+    border-bottom: 1px solid var(--border-color);
+    text-align: left;
+}
+
+td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+}
+
+tr:hover td {
+    background: var(--bg-hover);
+}
+
+/* Scrollbar — thin and dark */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-body); }
+::-webkit-scrollbar-thumb { background: var(--border-hover); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-tertiary); }
+
+/* Economic Health panel */
+.econ-metric-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+/* Toast notifications */
+.toast {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-left: 3px solid var(--primary);
+    border-radius: 8px;
+    box-shadow: var(--shadow-lg);
+    color: var(--text-primary);
+}
+
+/* Modal */
+.modal-header {
+    background: var(--bg-primary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.modal-content, .modal-body {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+}
+
+/* Balance over time chart background */
+#balance-chart {
+    border-radius: 8px;
+}
+
+/* Connect button on login */
+#login-btn {
+    background: var(--primary) !important;
+    color: #0d1117 !important;
+    font-weight: 700;
+    width: 100%;
+    padding: 0.75rem;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 0.5rem;
+}
+
+#login-btn:hover {
+    background: var(--primary-dark) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(52, 211, 153, 0.3);
+}
+
+/* QR / Join buttons on login */
+#show-qr-login-btn, #show-join-btn {
+    background: var(--bg-secondary) !important;
+    border: 1px solid var(--border-color) !important;
+    color: var(--text-secondary) !important;
+    border-radius: 8px;
+    width: 100%;
+    padding: 0.6rem;
+    font-size: 0.85rem;
+}
+
+/* Dividers on login */
+.login-divider {
+    color: var(--text-tertiary);
+    font-size: 0.8rem;
+    text-align: center;
+    margin: 0.5rem 0;
+}
+
+/* Error messages */
+.error-message {
+    color: var(--danger) !important;
+    font-size: 0.85rem;
+    margin-top: 0.5rem;
+}
+
+/* Form labels */
+label, .form-group label {
+    color: var(--text-secondary) !important;
+    font-size: 0.82rem;
+    font-weight: 500;
+    margin-bottom: 0.3rem;
+    display: block;
+}
+
+/* Send Hours form */
+#send-hours-form .form-group select,
+#send-hours-form .form-group input {
+    background: var(--bg-secondary) !important;
+}
