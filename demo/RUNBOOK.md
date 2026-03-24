@@ -226,7 +226,7 @@ bash demo/scripts/reseed-federation-demo.sh
 ```bash
 # Build and push (from repo root)
 TAG=$(date +%Y%m%d)
-docker build -f Dockerfile.fast -t 10.8.30.40:30500/icn:$TAG .
+docker build -f deploy/Dockerfile.icnd-fast -t 10.8.30.40:30500/icn:$TAG .
 docker push 10.8.30.40:30500/icn:$TAG
 
 # Roll out
