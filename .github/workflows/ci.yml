@@ -85,22 +85,19 @@ jobs:
 
   fmt:
     name: Format Check
-    needs: [changes]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
 
-      - name: Docs-only fast path
-        if: needs.changes.outputs.docs_only == 'true'
-        run: echo "Docs-only PR; skipping rustfmt check."
-
-      - uses: dtolnay/rust-toolchain@stable
-        if: needs.changes.outputs.docs_only != 'true'
+      # Pin to the project toolchain so rustfmt rules stay stable.
+      # Using @stable here causes drift every 6-week Rust release cycle.
+      # Format Check always runs — the docs_only fast path previously caused
+      # silent format regressions to land on main undetected (sprint-28 incident).
+      - uses: dtolnay/rust-toolchain@1.88.0
         with:
           components: rustfmt
 
       - name: Check formatting
-        if: needs.changes.outputs.docs_only != 'true'
         run: cargo fmt --all --check
         working-directory: ./icn
 
