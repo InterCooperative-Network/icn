@@ -855,7 +855,7 @@ export class ICNClient {
    * ```
    */
   async crossPay(coopId: string, req: CrossPaymentRequest): Promise<CrossPaymentResponse> {
-    return this.post<CrossPaymentResponse>(`/ledger/${coopId}/payment/convert`, req);
+    return this.post<CrossPaymentResponse>(`/ledger/${coopId}/settle/convert`, req);
   }
 
   /**
@@ -905,7 +905,7 @@ export class ICNClient {
    * ```
    */
   async getCrossPaymentQuote(coopId: string, req: CrossPaymentQuoteRequest): Promise<CrossPaymentQuote> {
-    return this.post<CrossPaymentQuote>(`/ledger/${coopId}/payment/convert/quote`, req);
+    return this.post<CrossPaymentQuote>(`/ledger/${coopId}/settle/convert/quote`, req);
   }
 
   /**
@@ -2107,21 +2107,21 @@ export class ICNClient {
    * console.log(`${results.succeeded} succeeded, ${results.failed} failed`);
    * ```
    */
-  async batchSettle(coopId: string, payments: SettlementRequest[]): Promise<{
+  async batchSettle(coopId: string, settlements: SettlementRequest[]): Promise<{
     succeeded: number;
     failed: number;
-    results: Array<{ success: boolean; payment?: SettlementResponse; error?: string }>;
+    results: Array<{ success: boolean; settlement?: SettlementResponse; error?: string }>;
   }> {
     const results = await Promise.allSettled(
-      payments.map(payment => this.settle(coopId, payment))
+      settlements.map(settlement => this.settle(coopId, settlement))
     );
 
     return {
       succeeded: results.filter(r => r.status === 'fulfilled').length,
       failed: results.filter(r => r.status === 'rejected').length,
-      results: results.map(r => 
-        r.status === 'fulfilled' 
-          ? { success: true, payment: r.value }
+      results: results.map(r =>
+        r.status === 'fulfilled'
+          ? { success: true, settlement: r.value }
           : { success: false, error: (r.reason as Error).message }
       ),
     };

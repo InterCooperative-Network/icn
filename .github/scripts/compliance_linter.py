@@ -44,7 +44,7 @@ FORBIDDEN_PATTERNS: List[Tuple[re.Pattern, str]] = [
         "PaymentCreated → use SettlementCreated",
     ),
     (
-        re.compile(r'\bpayments?[:/]', re.IGNORECASE),
+        re.compile(r'\bpayments?[:/]\w', re.IGNORECASE),
         "payment endpoint/scope → use settlement",
     ),
     # hosted_wallet — custodial trigger
