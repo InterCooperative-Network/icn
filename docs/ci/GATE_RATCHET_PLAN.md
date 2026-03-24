@@ -1,4 +1,4 @@
-# CI Gate Ratchet Plan (Q1 2026)
+, # CI Gate Ratchet Plan (Q1 2026)
 
 ## Purpose
 
@@ -89,12 +89,11 @@ Definition of done:
 
 ### Wave 4 (target: Q2 2026): graduate remaining advisory signals
 
-#### Regulatory Compliance Linter (`GATE_RATCHET_PHASE_COMPLIANCE`)
-Current phase: WARNING
+#### Regulatory Compliance Linter (`GATE_RATCHET_PHASE_COMPLIANCE`) GRADUATED (2026-03-24)
+Phase: BLOCKING (graduated 2026-03-24)
 
-Graduation condition:
-- Zero compliance violations on main for 2+ consecutive sprints.
-- Script covers all new public-facing API surfaces added since linter was introduced.
+Graduation confirmed: zero compliance violations on main for 2+ consecutive sprints.
+Linter covers all public-facing API surfaces.
 
 Graduation path: WARNING → BLOCKING → add to branch protection required checks.
 
@@ -157,7 +156,7 @@ restart command.
 | `GATE_RATCHET_PHASE_MEANING_FIREWALL` | `blocking` | Meaning Firewall Check |
 | `GATE_RATCHET_PHASE_KERNEL_DEPS` | `blocking` | Kernel Forbidden Dependencies |
 | `GATE_RATCHET_PHASE_FIREWALL_CONTRACT` | `blocking` | Firewall Contract Enforcement |
-| `GATE_RATCHET_PHASE_COMPLIANCE` | `warning` | Regulatory Compliance Linter |
+| `GATE_RATCHET_PHASE_COMPLIANCE` | `blocking` GRADUATED | Regulatory Compliance Linter |
 | `GATE_RATCHET_PHASE_SDK_TESTS` | `blocking` ✅ required check | TypeScript SDK |
 | `GATE_RATCHET_PHASE_A11Y` | `blocking` ✅ required check | Accessibility Tests |
 | `GATE_RATCHET_PHASE_COVERAGE` | `observational` | Test Coverage |
@@ -169,7 +168,7 @@ Added to required checks (gap closed 2026-03-24):
 `Meaning Firewall Check`, `Kernel Forbidden Dependencies`, `Firewall Contract Enforcement`
 
 Added to required checks (2026-03-24):
-`TypeScript SDK`, `Accessibility Tests`
+`TypeScript SDK`, `Accessibility Tests`, `Regulatory Compliance Linter`
 
 ## Notes
 

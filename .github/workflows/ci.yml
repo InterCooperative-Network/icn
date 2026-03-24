@@ -20,7 +20,7 @@ env:
   GATE_RATCHET_PHASE_COVERAGE: observational
   GATE_RATCHET_PHASE_SDK_TESTS: blocking
   GATE_RATCHET_PHASE_A11Y: blocking
-  GATE_RATCHET_PHASE_COMPLIANCE: warning
+  GATE_RATCHET_PHASE_COMPLIANCE: blocking
   # Scope controls for staged boundary enforcement
   GATE_RATCHET_KERNEL_DEPS_SCOPE: core-only
 
