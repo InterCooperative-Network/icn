@@ -39,12 +39,12 @@
 
 ---
 
-## Beat: Step 4 — Task status: Pending
-**Say**: "The task is Pending — meaning it's been accepted into the pool and is waiting for an executor node to claim it. Think of it like a job board: the task is posted, qualified executors will pick it up. In this cluster, we haven't wired the executor nodes yet — that's next sprint."
-**Point to**: The status: pending in the output
-**If asked "Why is it stuck pending?"**: "We proved the admission layer — that's what this flow demonstrates. The executor layer is being wired into this cluster in Sprint 28. Right now we're showing that the coordination substrate works: trust gates, scope enforcement, task queuing. The execution layer drops in on top."
-**If asked "When will it complete?"**: "Once executor nodes are registered in the cluster, this task — or tasks like it — will transition to Processing and then Completed within seconds. The settlement receipt is generated on completion and anchored to the task hash we just saw."
-**If asked "Is there a timeout?"**: "Tasks can be cancelled. See the cancel endpoint in the API. The fuel limit also functions as an execution bound — if an executor would need more than the declared fuel to run the task, it won't claim it."
+## Beat: Step 4 — Task status
+**Say**: "The task is in the pool. Depending on the cluster state, you'll see Pending, Claimed, or Completed. Each stage means: Pending — admitted and queued; Claimed — an executor picked it up and it's running; Completed — CCL executed, settlement receipt generated."
+**Point to**: The status in the output
+**If asked "What is the executor?"**: "The executor node picks up the task from the gossip pool and runs the CCL contract. Sprint 28 fixed the gossip fan-out — the compute actor now receives submitted tasks via loopback. The full path from admission through settlement receipt is live."
+**If asked "What does the settlement receipt contain?"**: "The task hash, execution hash, and credit settlement — a full provenance chain you can query at /v1/receipts/chain?decision_hash=<hex>. That's the link between 'we ran compute work' and 'we earned commons credits.'"
+**If asked "Is there a timeout?"**: "Tasks can be cancelled. The fuel limit is also an execution bound — if an executor would need more than the declared fuel, it won't claim the task."
 
 ---
 
@@ -57,13 +57,21 @@
 ---
 
 ## Beat: Summary
-**Say**: "What we just showed: a cooperative submitted real compute work to a commons pool. The trust graph admitted it. The ledger tracked the credit reservation. The scope system enforced the authorization boundary. All without a central platform, all verifiable by any member. The task is queued — executor wiring completes the story next sprint."
+**Say**: "What we just showed: a cooperative submitted real compute work to a commons pool. The trust graph admitted it. The ledger tracked the credit reservation. The scope system enforced the authorization boundary. All without a central platform, all verifiable by any member. The task is queued, dispatched via gossip loopback, and executes — the full path from admission through settlement receipt is live."
 **If asked "What does this cost the cooperative?"**: "Nothing to run their own node. The mutual credit system pays contributors in the network's own credit unit — not dollars. The goal is to make compute a cooperative commons: the more you contribute, the more you can use."
 **If asked "How is this different from renting cloud compute?"**: "You own it. The rules are set by the cooperative, not a vendor. There's no profit extraction — the system settles among members. And when you leave, you take your node and your trust history with you."
 
 ---
 
 ## Trouble Scenarios
+
+**Task status shows `pending` after submission (executor claimed a different task)**:
+The compute gossip store is sled-backed and accumulates tasks from previous demo runs.
+The executor processes one task per gossip notification — it claimed an older stale task first.
+Your demo task will eventually execute as older tasks drain (one per ~11s anti-entropy cycle).
+To verify the executor is live: `kubectl logs -n icn-coop-delta deploy/icn-delta --tail=50 | grep 'Claimed and executing'`
+To check task status manually: `curl -H "Authorization: Bearer $TOKEN" http://localhost:18084/v1/compute/status/$TASK_HASH`
+To present: *"The task is admitted and queued. In production without prior demo state, you'd see it complete within seconds."*
 
 **Compute submit returns HTTP 500 "Internal server error"**:
 Trust score is 0.0. The trust seed in Step 0 failed or the pod was restarted. Re-run the trust seed command:

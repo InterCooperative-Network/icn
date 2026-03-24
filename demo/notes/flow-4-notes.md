@@ -83,10 +83,11 @@
 
 ---
 
-## Beat: Step 11 — ExecutionReceiptGate (coming soon)
-**Say**: "The last piece: when a cooperative takes an action — signs a contract, makes a payment — the execution receipt will close the loop between 'we voted to do this' and 'we actually did it.' That feature is in development now."
-**Point to**: The gap callout
-**If asked "When will it be ready?"**: "It's the next milestone. Today you're seeing the governance and ledger layer — the execution receipt gate connects them to real-world actions."
+## Beat: Step 11 — ExecutionReceiptGate (shipped)
+**Say**: "This is the receipt chain architecture. The execution gate was wired in PR #1327 (merged March 2026): every resource allocation must trace to an Accepted governance decision. The gate runs at proposal close — if the vote didn't pass, the allocation path is blocked. What you're seeing now is the receipt chain query: governance receipt, allocation receipts, settlement intents, all linked."
+**Point to**: The receipt chain output
+**If asked "What is the gate?"**: "It's a stateless check that runs when a proposal closes. It verifies the vote outcome is Accepted and the decision hash is internally consistent. If either fails, no ProposalAccepted event fires and no allocation can execute."
+**If asked "What is not yet wired?"**: "Cryptographic proof attestation requires the pod's signing key to be configured. If the proof endpoint returns 404, check the startup logs for 'GovernanceProof signing key unavailable' — that's a pod configuration gap, not a code gap. The governance gate itself runs regardless."
 
 ---
 

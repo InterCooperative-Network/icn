@@ -200,6 +200,13 @@ npm run dev  # python3 -m http.server 8080
   - If shared state is unavoidable: use `tokio::sync`; don't hold locks across `.await`.
 - **Serialization/API**: use `serde`; for JSON structs prefer `#[serde(rename_all = "camelCase")]`.
 - **Clippy**: workspace thresholds are tuned in `icn/clippy.toml`; prefer refactors over broad `#[allow]`.
+- **Callback ownership model** — mandatory review heuristic:
+  - `Option<Arc<dyn Fn(...)>>` (single-slot) is correct when there is **one owner**: one transport layer, one trust oracle, one ledger. Use `set_*_callback`.
+  - `Vec<Arc<dyn Fn(...)>>` (fan-out) is required when **multiple independent subsystems** may each legitimately register on the same event surface. Use `add_*_callback`.
+  - The bug class is not "single callback bad." It is **single callback + contested ownership = dangerous**. A second subsystem calling `set_*_callback` silently drops the first handler. No error, no warning — just a broken routing path.
+  - **Audit question**: can two independently-reasonable subsystems each believe they own this surface? If yes, the surface needs fan-out semantics.
+  - Known multi-subscriber surface: `GossipActor::notification_callbacks` — lifecycle dispatcher, governance, and steward all register independently. Use `add_notification_callback`, never `set_notification_callback` (deprecated since 0.1.0, see issue #1416).
+  - Known single-owner surfaces (correct as-is): `send_callback` (network transport), `trust_callback` / `balance_callback` (service lookups), `event_callback` (gateway WebSocket broadcaster).
 
 ### TypeScript (SDKs)
 

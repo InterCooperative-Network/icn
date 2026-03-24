@@ -237,7 +237,7 @@ impl TestNode {
                     });
                 },
             );
-            gossip_guard.set_notification_callback(callback);
+            gossip_guard.add_notification_callback(callback);
         }
 
         // Set up network message handler with shutdown handling

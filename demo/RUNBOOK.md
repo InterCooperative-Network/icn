@@ -172,13 +172,14 @@ Five cooperatives on the homelab K3s cluster (10.8.30.40–42).
 
 ### Cooperative Registry
 
-| Namespace | Cooperative | NodePort |
-|-----------|-------------|----------|
-| icn-coop-brightworks | Brightworks Collective | 30081 |
-| icn-coop-harbor | Harbor Freight Workers Cooperative | 30083 |
-| icn-coop-clearinghouse | Rochester Cooperative Clearinghouse | 30082 |
-| icn-coop-newengland | New England Mesh Network | 30084 |
-| icn-coop-delta | Finger Lakes CDN | 30085 |
+| Namespace | Cooperative | gRPC NodePort |
+|-----------|-------------|---------------|
+| icn-coop-alpha | BrightWorks Collective | 30651 |
+| icn-coop-beta | River City Tool Library | 30658 |
+| icn-coop-gamma | Harbor Homes | 30649 |
+| icn-coop-delta | Finger Lakes CDN | 30655 |
+
+HTTP gateways are accessed via `kubectl port-forward` (scripts call `demo_ports_up` automatically). No HTTP NodePorts are required.
 
 ### Before Demo Day (run once per day)
 
@@ -200,8 +201,8 @@ kubectl get pods -A | grep icn-coop | grep -v Running
 bash demo/scripts/flow-1-governance.sh --present
 bash demo/scripts/flow-2-patronage.sh --present
 
-# Clearinghouse mutual credit (Rochester)
-bash demo/scripts/flow-3-clearinghouse.sh --present
+# Federation agreement (River City, BrightWorks, Finger Lakes)
+bash demo/scripts/flow-3-federation.sh --present
 
 # Regulatory reporting (Harbor)
 bash demo/scripts/flow-4-reporting.sh --present
@@ -225,35 +226,81 @@ bash demo/scripts/reseed-federation-demo.sh
 ```bash
 # Build and push (from repo root)
 TAG=$(date +%Y%m%d)
-docker build -f Dockerfile.fast -t 10.8.30.40:30500/icn:$TAG .
+docker build -f deploy/Dockerfile.icnd-fast -t 10.8.30.40:30500/icn:$TAG .
 docker push 10.8.30.40:30500/icn:$TAG
 
 # Roll out
-for ns in icn-coop-brightworks icn-coop-harbor icn-coop-clearinghouse icn-coop-newengland icn-coop-delta; do
+for ns in icn-coop-alpha icn-coop-beta icn-coop-gamma icn-coop-delta; do
   kubectl rollout restart deployment -n $ns
 done
-for ns in icn-coop-brightworks icn-coop-harbor icn-coop-clearinghouse icn-coop-newengland icn-coop-delta; do
+for ns in icn-coop-alpha icn-coop-beta icn-coop-gamma icn-coop-delta; do
   kubectl rollout status deployment -n $ns --timeout=120s
 done
 ```
 
 ### Known Issues
 
-None blocking as of Sprint 27. All Sprint 26 known issues (#1334 decision_hash gap,
+None blocking as of Sprint 28. All Sprint 26 known issues (#1334 decision_hash gap,
 #1335 clearing agreement ID) are resolved.
+
+### Proof Endpoint — Signing Key Dependency
+
+`GET /v1/gov/proposals/{id}/proof` requires the node to have generated a
+`GovernanceProofV2` at proposal-close time. This only happens when the governance
+actor was initialized with a signing key.
+
+**Dependency chain:**
+1. Node starts with a software-backed keystore (Age-encrypted, unlocked at startup)
+2. `identity_bundle.keypair()` succeeds → signing key extracted
+3. At proposal close, node signs a `GovernanceDecisionReceipt` → proof stored
+4. Proof endpoint returns the attestation
+
+**If proof endpoint returns 404:**
+Check startup logs for:
+```
+WARN GovernanceProof signing key unavailable — proposals will close and execute without cryptographic attestations.
+```
+If present, the keystore was hardware-backed or not fully unlocked at start time.
+The governance gate and allocation path still work correctly without signing; only
+proof attestations are affected.
+
+**Note:** Governance gate (Invariant 7) runs regardless of signing key state — allocation
+effects are blocked or allowed based on vote outcome, not proof availability.
 
 ### Verify Cluster Health
 
 ```bash
-kubectl get pods -A | grep icn-coop     # all 5 namespaces should show Running
-# Gateway health check (requires port-forward or NodePort access):
-curl -s http://10.8.10.40:30081/v1/health | python3 -m json.tool
+kubectl get pods -A | grep icn-coop     # all 4 namespaces should show Running
+# Gateway health check (runs curl inside the pod — no port-forward needed):
+kubectl exec -n icn-coop-gamma deploy/icn-gamma -- curl -s localhost:8080/v1/health | python3 -m json.tool
 ```
 
 ### Flow 5 Compute Trust Note
 
 Compute trust lives in the daemon's in-memory `TrustGraph` and resets on pod restart.
 The reseed script re-seeds it via gRPC. If Flow 5 fails with trust score 0.0, run:
+
+### Flow 5 Compute Queue Accumulation
+
+The compute gossip store (`compute:submit` topic) is sled-backed and **persists across pod
+restarts**. Each demo run adds one task entry. After several runs, the queue accumulates
+stale entries and the executor processes them in order — so the demo task may show `Pending`
+during the status check while older tasks drain ahead of it.
+
+**This is expected behavior.** The executor IS live; it just claimed an earlier task first.
+
+To observe your demo task actually completing, wait 15–30 seconds after submission:
+```bash
+# Check status manually after submission (replace HASH with the task_hash from Step 2):
+curl -s -H "Authorization: Bearer $TOKEN" \
+  http://localhost:18084/v1/compute/status/$TASK_HASH | python3 -m json.tool
+```
+
+To present cleanly without a stale queue: cancel stale tasks by hash before the demo, or
+accept that `Pending` is a valid demo state — the admission gate passed, the executor is
+live, and the architecture claim is true. Describe it to the audience as:
+*"The task is admitted and queued. In a production environment without prior demo state,
+you'd see it move to Completed within seconds."*
 
 ```bash
 kubectl exec -n icn-coop-delta deploy/icn-delta -- \
@@ -262,8 +309,12 @@ kubectl exec -n icn-coop-delta deploy/icn-delta -- \
   --label "compute-demo"
 ```
 
-### Current Limitations (Sprint 28 work)
+### Current State (Sprint 28 complete)
 
-- **Flow 5 task execution**: compute tasks are admitted (trust gate proven) but remain `Pending`.
-  No executor node is registered in K3s. Executor wiring is Sprint 28 scope.
-- **Settlement receipts from compute**: requires task completion; Sprint 28 dependency.
+- **Flow 5 task execution**: Gossip fan-out bug fixed in Sprint 28. The compute actor now
+  receives submitted tasks via gossip loopback and the CCL executor is live. Tasks move
+  `Pending → Processing → Completed` in the K3s cluster. Admission gate and execution path
+  are both real.
+- **Settlement receipts from compute**: Generated on task completion. Full provenance chain
+  `task_hash → execution_receipt → credit_settlement` is anchored. Expanding to distributed
+  multi-executor nodes is the next scaling step.

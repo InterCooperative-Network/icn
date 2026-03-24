@@ -300,7 +300,13 @@ impl Executor for WasmExecutor {
                 // Delegate CCL execution to the CCL interpreter (same as LocalExecutor)
                 let contract: icn_ccl::Contract = match serde_json::from_str(source) {
                     Ok(c) => c,
-                    Err(e) => return ExecutionOutcome::Failed(format!("Invalid CCL JSON: {e}")),
+                    Err(e) => return ExecutionOutcome::Failed(format!(
+                        "Invalid CCL contract: {e}. \
+                         The `code` field must be a JSON-serialized icn_ccl::Contract AST \
+                         (not Lisp notation or source text). \
+                         Example: {{\"name\":\"...\",\"participants\":[],\"currency\":null,\
+                         \"state_vars\":[],\"rules\":[...],\"triggers\":[]}}"
+                    )),
                 };
 
                 if let Err(e) = contract.validate() {

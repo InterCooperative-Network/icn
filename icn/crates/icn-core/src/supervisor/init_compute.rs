@@ -301,6 +301,33 @@ pub fn create_locality_callback(
 
 /// Subscribe to compute-related gossip topics
 pub async fn subscribe_compute_topics(gossip: &mut icn_gossip::GossipActor, did: &Did) {
+    // Topics must be explicitly created before subscribe/publish will work.
+    // Access controls mirror the compute actor's trust thresholds so the gossip
+    // ACL and the executor trust gate are consistent.
+    let compute_topics = [
+        (
+            icn_compute::TOPIC_SUBMIT,
+            icn_gossip::AccessControl::MinTrustScore(icn_compute::MIN_TRUST_SUBMIT),
+        ),
+        (
+            icn_compute::TOPIC_CLAIM,
+            icn_gossip::AccessControl::MinTrustScore(icn_compute::MIN_TRUST_EXECUTE),
+        ),
+        (
+            icn_compute::TOPIC_RESULT,
+            icn_gossip::AccessControl::MinTrustScore(icn_compute::MIN_TRUST_SUBMIT),
+        ),
+        (
+            icn_compute::TOPIC_CANCEL,
+            icn_gossip::AccessControl::MinTrustScore(icn_compute::MIN_TRUST_SUBMIT),
+        ),
+    ];
+
+    for (name, acl) in &compute_topics {
+        gossip.create_topic(icn_gossip::Topic::new((*name).to_string(), acl.clone()));
+        info!("Created compute gossip topic: {}", name);
+    }
+
     for topic in &[
         icn_compute::TOPIC_SUBMIT,
         icn_compute::TOPIC_CLAIM,

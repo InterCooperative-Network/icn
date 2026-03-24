@@ -606,11 +606,28 @@ async fn spawn_actors_with_identity(
 
     // Protocol parameter store was extracted from BootstrapHandles above.
 
-    // Extract signing key for GovernanceProof generation
-    let governance_signing_key = identity_bundle.keypair().ok().map(|kp| {
-        let bytes = kp.to_signing_key_bytes();
-        Arc::new(ed25519_dalek::SigningKey::from_bytes(&bytes))
-    });
+    // Extract signing key for GovernanceProof generation.
+    // If keypair() returns Err (hardware-backed key or locked keystore), signing
+    // falls back to None: proposals still close and allocate correctly (the
+    // governance gate enforces Invariant 7 regardless), but proof attestations
+    // won't be generated and /v1/gov/proposals/{id}/proof will return 404.
+    let governance_signing_key = match identity_bundle.keypair() {
+        Ok(kp) => {
+            let bytes = kp.to_signing_key_bytes();
+            info!("GovernanceProof signing enabled — proposals will produce cryptographic attestations");
+            Some(Arc::new(ed25519_dalek::SigningKey::from_bytes(&bytes)))
+        }
+        Err(e) => {
+            warn!(
+                error = %e,
+                "GovernanceProof signing key unavailable — proposals will close and execute \
+                 without cryptographic attestations. \
+                 Proof endpoint (/v1/gov/proposals/<id>/proof) will return 404. \
+                 To enable: ensure keystore is software-backed and unlocked at startup."
+            );
+            None
+        }
+    };
 
     // Initialize governance services
     let governance_services = super::init_governance::init_governance_services(
@@ -1166,7 +1183,7 @@ async fn configure_gossip_actor(
         },
     );
 
-    gossip.set_notification_callback(notification_callback);
+    gossip.add_notification_callback(notification_callback);
 
     // Set up peer sampling callback
     let network_handle_for_sampling = network_handle.clone();

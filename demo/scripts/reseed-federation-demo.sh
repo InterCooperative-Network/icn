@@ -568,7 +568,7 @@ seed_fingerlakes_compute() {
     _count_seeded
   else
     warn "  Compute trust seed failed — Flow 5 may reject task submission"
-    warn "  Retry: kubectl exec -n icn-coop-delta deploy/icn-delta -- icnctl --endpoint $_DELTA_GRPC_INTERNAL trust add $DELTA_DID 0.85"
+    warn "  Retry: kubectl exec -n \"$FINGERLAKES_NS\" deploy/icn-delta -- icnctl --endpoint $_DELTA_GRPC_INTERNAL trust add $DELTA_DID 0.85"
     _count_failed
   fi
 }

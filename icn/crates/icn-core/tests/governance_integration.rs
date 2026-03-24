@@ -101,7 +101,7 @@ impl TestNode {
 
         {
             let mut gossip = gossip_handle.write().await;
-            gossip.set_notification_callback(Arc::new(move |topic, entry, _subscriber_did| {
+            gossip.add_notification_callback(Arc::new(move |topic, entry, _subscriber_did| {
                 if topic != GOVERNANCE_TOPIC {
                     return;
                 }

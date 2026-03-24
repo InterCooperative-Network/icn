@@ -122,11 +122,14 @@ impl GossipActor {
             bail!("Not authorized to subscribe to topic: {topic}");
         }
 
-        // Check per-peer subscription limit (blindly enforced from policy constraints)
+        // Check per-peer subscription limit (blindly enforced from policy constraints).
+        // The local node's own DID is exempt: it must be able to subscribe to all
+        // topics it creates regardless of its trust score at startup.
         let peer_topics = self.get_subscriptions(&subscriber);
         let peer_limit = limits.max_subscriptions;
+        let is_own_did = subscriber == self.own_did;
 
-        if peer_topics.len() as u32 >= peer_limit {
+        if !is_own_did && peer_topics.len() as u32 >= peer_limit {
             // Record misbehavior violation
             if let Some(ref detector) = self.misbehavior_detector {
                 use sha2::{Digest, Sha256};

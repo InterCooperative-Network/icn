@@ -1,0 +1,18 @@
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY icn/target/release/icnd /usr/local/bin/
+COPY icn/target/release/icnctl /usr/local/bin/
+RUN mkdir -p /root/.icn
+
+EXPOSE 8080 9090
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8080/v1/health || exit 1
+
+ENTRYPOINT ["icnd"]
+CMD ["--config", "/root/.icn/icn.toml"]

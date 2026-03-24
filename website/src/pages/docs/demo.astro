@@ -143,9 +143,9 @@ import Layout from '../../layouts/Layout.astro';
           Both pass. The task enters the queue with a Blake3 content hash as its provenance anchor.
         </p>
         <div class="status-note">
-          <strong>Current K3s state:</strong> Tasks are admitted and queued (status: Pending).
-          Executor node registration and full task execution are Sprint 28 work.
-          This flow proves the admission gate, not end-to-end execution.
+          <strong>Sprint 28 complete:</strong> Gossip fan-out fix enables task dispatch via
+          loopback. CCL executor is live. Tasks move Pending → Completed. Settlement receipts
+          with full provenance chain are generated on completion.
         </div>
         <div class="flow-proves">
           <span class="flow-proves-label">Proves:</span>
@@ -162,8 +162,8 @@ import Layout from '../../layouts/Layout.astro';
         <h2>What Comes Next</h2>
         <div class="next-grid">
           <div class="next-item">
-            <span class="next-label">Sprint 28</span>
-            <p>Executor node registration, task lifecycle (Pending → Processing → Completed), settlement receipt generation with full provenance chain.</p>
+            <span class="next-label">Distributed Execution</span>
+            <p>Multi-executor node pool scaling across K3s cluster. Tasks already execute via gossip loopback; this expands to parallel execution across cooperative-contributed nodes.</p>
           </div>
           <div class="next-item">
             <span class="next-label">Mobile UX</span>
