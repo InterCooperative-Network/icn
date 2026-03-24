@@ -101,7 +101,7 @@ jobs:
       # Using @stable here causes drift every 6-week Rust release cycle.
       # Format Check always runs — the docs_only fast path previously caused
       # silent format regressions to land on main undetected (sprint-28 incident).
-      - uses: dtolnay/rust-toolchain@1.88.0
+      - uses: dtolnay/rust-toolchain@1.100.0
         with:
           components: rustfmt
 
@@ -310,7 +310,7 @@ jobs:
 
       # Pin to project toolchain — clippy lints evolve with every stable release.
       # Floating @stable would cause lint failures/false-passes on the 6-week cycle.
-      - uses: dtolnay/rust-toolchain@1.88.0
+      - uses: dtolnay/rust-toolchain@1.100.0
         if: needs.changes.outputs.docs_only != 'true' || needs.changes.outputs.has_rust == 'true'
         with:
           components: clippy
@@ -350,7 +350,7 @@ jobs:
         if: needs.changes.outputs.docs_only != 'true' || needs.changes.outputs.has_rust == 'true'
         uses: ./.github/actions/install-build-tools
 
-      - uses: dtolnay/rust-toolchain@1.88.0
+      - uses: dtolnay/rust-toolchain@1.100.0
         if: needs.changes.outputs.docs_only != 'true' || needs.changes.outputs.has_rust == 'true'
 
       - uses: Swatinem/rust-cache@v2
@@ -500,7 +500,7 @@ jobs:
         if: needs.changes.outputs.docs_only != 'true' || needs.changes.outputs.has_rust == 'true'
         uses: ./.github/actions/install-build-tools
 
-      - uses: dtolnay/rust-toolchain@1.88.0
+      - uses: dtolnay/rust-toolchain@1.100.0
         if: needs.changes.outputs.docs_only != 'true' || needs.changes.outputs.has_rust == 'true'
 
       - uses: Swatinem/rust-cache@v2
