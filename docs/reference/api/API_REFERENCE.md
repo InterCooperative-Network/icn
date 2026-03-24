@@ -178,20 +178,24 @@ curl -X POST \
 
 ### Submit a Compute Task
 
+CCL contracts are AST-first: the `code` field must be a JSON-serialized `icn_ccl::Contract`
+struct, not Lisp notation or source text. ICN has no CCL text parser.
+
 ```bash
 curl -X POST \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "contract_id": "data-analysis-v1",
-    "function": "analyze_sales",
-    "args": {
+    "code_type": "ccl",
+    "code": "{\"name\":\"stub\",\"participants\":[],\"currency\":null,\"state_vars\":[],\"rules\":[{\"name\":\"main\",\"params\":[],\"requires\":[],\"body\":[{\"Return\":{\"value\":{\"Literal\":{\"String\":\"ok\"}}}}]}],\"triggers\":[]}",
+    "inputs": {
       "month": "2025-12",
       "region": "west"
     },
-    "min_trust": 0.5
+    "fuel_limit": 10000,
+    "priority": "normal"
   }' \
-  http://localhost:8080/compute/tasks
+  http://localhost:8080/v1/compute/submit
 ```
 
 ### Cast a Vote

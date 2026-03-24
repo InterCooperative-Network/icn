@@ -96,7 +96,7 @@ impl TestNode {
                     }
                 },
             );
-            gossip.set_notification_callback(callback);
+            gossip.add_notification_callback(callback);
         }
 
         // Create incoming message handler

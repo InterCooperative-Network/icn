@@ -1052,7 +1052,7 @@ impl GovernanceActor {
 
         {
             let mut g = gossip.write().await;
-            g.set_notification_callback(Arc::new(move |topic, entry, _subscriber_did| {
+            g.add_notification_callback(Arc::new(move |topic, entry, _subscriber_did| {
                 // Accept local governance topic and any federation governance topic
                 // (federation topics have format "federation:governance:<fed_id>")
                 let is_federation_gov = topic == icn_federation::TOPIC_FEDERATION_GOVERNANCE
@@ -1731,6 +1731,10 @@ impl GovernanceActor {
 
                     Some(serialized)
                 } else {
+                    tracing::debug!(
+                        proposal_id = %proposal_id.0,
+                        "GovernanceProof skipped — no signing key configured on this node"
+                    );
                     None
                 };
 

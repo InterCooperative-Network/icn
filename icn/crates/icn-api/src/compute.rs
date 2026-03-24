@@ -217,6 +217,10 @@ impl ComputeService {
 #[derive(Debug, Clone)]
 pub struct SubmitTaskParams {
     pub task_id: String,
+    /// CCL contract for `code_type: Ccl` — must be a JSON-serialized `icn_ccl::Contract` AST.
+    ///
+    /// ICN's CCL is AST-first. There is no source-text or Lisp parser.
+    /// Pass the contract object serialized as a JSON string, not Lisp notation.
     pub code: Option<String>,
     /// WASM module as base64-encoded bytes (WasmInline path)
     pub wasm_bytes: Option<String>,

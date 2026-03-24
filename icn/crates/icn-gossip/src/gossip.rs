@@ -97,8 +97,12 @@ pub struct GossipActor {
     /// Send message callback (optional, for sending responses)
     pub(crate) send_callback: Option<SendMessageCallback>,
 
-    /// Entry notification callback (optional, for notifying subscribers)
-    notification_callback: Option<EntryNotificationCallback>,
+    /// Entry notification callbacks — multi-subscriber fan-out surface.
+    ///
+    /// All registered callbacks fire for every stored entry. Subsystems register
+    /// via [`GossipActor::add_notification_callback`] and filter by topic internally.
+    /// There is no single owner of this surface; it is explicitly multi-participant.
+    notification_callbacks: Vec<EntryNotificationCallback>,
 
     /// Peer sampling callback (optional, for scope-aware peer selection)
     peer_sampling: Option<PeerSamplingCallback>,
@@ -174,7 +178,7 @@ impl GossipActor {
             subscriptions: HashMap::new(),
             oracle,
             send_callback: None,
-            notification_callback: None,
+            notification_callbacks: Vec::new(),
             peer_sampling: None,
             storage_proof_callback: None,
             storage_not_found_callback: None,
@@ -277,9 +281,59 @@ impl GossipActor {
         self.keypair = Some(keypair);
     }
 
-    /// Set the entry notification callback for notifying subscribers
+    /// Register the entry notification callback, replacing any previously registered ones.
+    ///
+    /// # Deprecation
+    ///
+    /// This method carries "single-owner" semantics: it replaces the entire callback
+    /// vec with a new one-element vec. That is safe only when the caller is certain it
+    /// owns the notification surface exclusively. In practice, ICN has multiple legitimate
+    /// subsystems that must each receive gossip notifications — the lifecycle dispatcher,
+    /// governance, steward — so replace-semantics is the wrong default.
+    ///
+    /// The failure mode: subsystem B calls `set_notification_callback` after subsystem A
+    /// has already registered. A's handler silently disappears. Topics A handled no longer
+    /// fire. This is how the gossip→compute routing bug manifested in Sprint 28.
+    ///
+    /// Prefer [`add_notification_callback`] for all new code. Use this method only in
+    /// tests that construct a fresh `GossipActor` and need exactly one handler.
+    ///
+    /// [`add_notification_callback`]: GossipActor::add_notification_callback
+    #[deprecated(
+        since = "0.1.0",
+        note = "Use add_notification_callback instead. set_notification_callback replaces all \
+                existing handlers; in multi-subsystem contexts this silently drops prior \
+                registrations. See issue #1416."
+    )]
     pub fn set_notification_callback(&mut self, callback: EntryNotificationCallback) {
-        self.notification_callback = Some(callback);
+        self.notification_callbacks = vec![callback];
+    }
+
+    /// Register a notification callback alongside any already-registered ones.
+    ///
+    /// This is the canonical registration path for the gossip notification surface.
+    ///
+    /// When a gossip entry is stored, **all** registered callbacks fire in registration
+    /// order. Topic filtering is the caller's responsibility — callbacks that don't
+    /// handle a given topic should early-return rather than doing work.
+    ///
+    /// # Ownership model
+    ///
+    /// The notification surface is **multi-subscriber by design**: the lifecycle
+    /// dispatcher, governance actor, and steward all register independently. There is no
+    /// single owner. Using [`set_notification_callback`] in this context would drop
+    /// whichever handler registered first.
+    ///
+    /// # Authoring callbacks
+    ///
+    /// - Early-return for irrelevant topics (don't block the fan-out chain).
+    /// - Never panic — a panic inside a callback kills the entire fan-out for that entry.
+    /// - Spawn async work with `tokio::spawn` rather than `.await`ing inline (callbacks
+    ///   are synchronous).
+    ///
+    /// [`set_notification_callback`]: GossipActor::set_notification_callback
+    pub fn add_notification_callback(&mut self, callback: EntryNotificationCallback) {
+        self.notification_callbacks.push(callback);
     }
 
     /// Set the peer sampling callback for scope-aware peer selection
@@ -1004,15 +1058,17 @@ impl GossipActor {
         // Merge vector clock
         self.clock.merge(&entry.clock);
 
-        // Notify subscribers about the new entry
-        if let Some(callback) = &self.notification_callback {
+        // Notify subscribers about the new entry (fan-out to all registered callbacks)
+        if !self.notification_callbacks.is_empty() {
             if let Some(subscribers) = self.subscriptions.get(topic) {
                 for subscriber in subscribers {
                     debug!(
                         "Notifying subscriber {} about new entry in topic {}",
                         subscriber, topic
                     );
-                    callback(topic.clone(), entry.clone(), subscriber.clone());
+                    for callback in &self.notification_callbacks {
+                        callback(topic.clone(), entry.clone(), subscriber.clone());
+                    }
                 }
             }
         }
@@ -2140,7 +2196,7 @@ mod tests {
             let mut notifs = notifications_clone.lock().unwrap();
             notifs.push((topic, entry.hash, subscriber));
         });
-        gossip.set_notification_callback(callback);
+        gossip.add_notification_callback(callback);
 
         // Subscribe both users to the topic
         gossip
@@ -2230,7 +2286,7 @@ mod tests {
             let mut count = count_clone.lock().unwrap();
             *count += 1;
         });
-        gossip.set_notification_callback(callback);
+        gossip.add_notification_callback(callback);
 
         // Publish without any subscribers
         gossip
@@ -2275,7 +2331,7 @@ mod tests {
             let mut notifs = notifications_clone.lock().unwrap();
             notifs.push((topic, entry.hash, sub_did));
         });
-        gossip.set_notification_callback(callback);
+        gossip.add_notification_callback(callback);
 
         // Create an entry as if it came from the network via Response message
         let data = b"Entry from network".to_vec();
@@ -3152,6 +3208,114 @@ mod tests {
         assert!(
             result.is_ok(),
             "Publishing to explicitly created topic should succeed"
+        );
+    }
+
+    /// Regression test: both callbacks registered via add_notification_callback must fire.
+    ///
+    /// Before the fan-out fix, GossipActor had a single `Option<EntryNotificationCallback>` slot.
+    /// Any call to `set_notification_callback` silently replaced the previous handler, so a
+    /// subsystem that registered second (e.g. governance) would drop the primary handler.
+    #[tokio::test]
+    async fn test_multiple_notification_callbacks_all_fire() {
+        use std::sync::Mutex;
+
+        let owner = KeyPair::generate().unwrap().did().clone();
+        let mut gossip = GossipActor::new(owner.clone(), create_test_oracle());
+
+        gossip.create_topic(Topic::new(
+            "test:fanout".to_string(),
+            AccessControl::Public,
+        ));
+
+        // Two independent counters — one per callback registration
+        let counter_a = Arc::new(Mutex::new(0u32));
+        let counter_b = Arc::new(Mutex::new(0u32));
+
+        let ca = counter_a.clone();
+        gossip.add_notification_callback(Arc::new(move |_topic, _entry, _sub| {
+            *ca.lock().unwrap() += 1;
+        }));
+
+        let cb = counter_b.clone();
+        gossip.add_notification_callback(Arc::new(move |_topic, _entry, _sub| {
+            *cb.lock().unwrap() += 1;
+        }));
+
+        gossip
+            .subscribe("test:fanout", owner.clone())
+            .await
+            .unwrap();
+        gossip.publish("test:fanout", b"ping".to_vec()).await.unwrap();
+
+        assert_eq!(
+            *counter_a.lock().unwrap(),
+            1,
+            "first callback must fire exactly once"
+        );
+        assert_eq!(
+            *counter_b.lock().unwrap(),
+            1,
+            "second callback must fire exactly once"
+        );
+    }
+
+    /// Regression test: a subsystem-scoped callback registered via add_notification_callback
+    /// must not suppress the primary lifecycle callback registered via set_notification_callback.
+    ///
+    /// This is the exact failure mode that broke compute task delivery: governance called
+    /// set_notification_callback after the lifecycle handler was registered, replacing it with a
+    /// callback that returned early for non-governance topics.
+    ///
+    /// `set_notification_callback` is deprecated but intentionally used here to test that its
+    /// semantics (replace-then-append) still work correctly for backward compatibility.
+    #[allow(deprecated)]
+    #[tokio::test]
+    async fn test_subsystem_callback_does_not_suppress_primary_handler() {
+        use std::sync::Mutex;
+
+        let owner = KeyPair::generate().unwrap().did().clone();
+        let mut gossip = GossipActor::new(owner.clone(), create_test_oracle());
+
+        gossip.create_topic(Topic::new(
+            "compute:submit".to_string(),
+            AccessControl::Public,
+        ));
+
+        // Primary lifecycle handler fires for all topics
+        let primary_fired = Arc::new(Mutex::new(false));
+        let pf = primary_fired.clone();
+        gossip.set_notification_callback(Arc::new(move |_topic, _entry, _sub| {
+            *pf.lock().unwrap() = true;
+        }));
+
+        // Governance-style subsystem handler: early-return for non-governance topics.
+        // Uses add_notification_callback — must NOT replace the primary handler.
+        let subsystem_fired = Arc::new(Mutex::new(false));
+        let sf = subsystem_fired.clone();
+        gossip.add_notification_callback(Arc::new(move |topic, _entry, _sub| {
+            if topic != "governance:proposals" {
+                return; // silently ignore non-governance topics (governance's real pattern)
+            }
+            *sf.lock().unwrap() = true;
+        }));
+
+        gossip
+            .subscribe("compute:submit", owner.clone())
+            .await
+            .unwrap();
+        gossip
+            .publish("compute:submit", b"task".to_vec())
+            .await
+            .unwrap();
+
+        assert!(
+            *primary_fired.lock().unwrap(),
+            "primary lifecycle handler must fire even when a subsystem callback is also registered"
+        );
+        assert!(
+            !*subsystem_fired.lock().unwrap(),
+            "governance-scoped handler must not fire for compute topics"
         );
     }
 }

@@ -689,34 +689,65 @@ components:
 
     ComputeTaskRequest:
       type: object
-      required: [contract_id, function, args]
+      required: [code_type]
       properties:
-        contract_id:
+        task_id:
           type: string
-        function:
+          description: Client-assigned task ID (auto-generated if omitted)
+        code_type:
           type: string
-        args:
+          enum: [ccl, wasm]
+          default: ccl
+          description: >
+            Execution environment. `ccl` runs a Cooperative Contract Language contract;
+            `wasm` runs a WebAssembly module.
+        code:
+          type: string
+          description: >
+            CCL contract for `code_type: "ccl"`. Must be a JSON-serialized
+            `icn_ccl::Contract` AST — not Lisp notation or source text.
+            ICN's CCL has no text parser; the contract object serialized as JSON is the wire format.
+
+            Minimal example (inline JSON string):
+            {"name":"stub","participants":[],"currency":null,"state_vars":[],
+            "rules":[{"name":"main","params":[],"requires":[],
+            "body":[{"Return":{"value":{"Literal":{"String":"ok"}}}}]}],"triggers":[]}
+        wasm_bytes:
+          type: string
+          format: byte
+          description: WASM module as base64-encoded bytes (for code_type wasm, inline path)
+        wasm_hash:
+          type: string
+          description: >
+            64-hex-char Blake3 hash of a previously deployed WASM module
+            (for code_type wasm, deploy-once reference path)
+        inputs:
           type: object
           additionalProperties: true
-        min_trust:
-          type: number
-          format: float
-          minimum: 0.0
-          maximum: 1.0
-          default: 0.3
+          description: Input arguments passed to the contract's main rule
+        fuel_limit:
+          type: integer
+          default: 10000
+          description: Execution fuel cap (prevents runaway contracts)
+        priority:
+          type: string
+          enum: [low, normal, high, critical]
+          default: normal
+        deadline_ms:
+          type: integer
+          description: Deadline as milliseconds from now (optional)
 
     ComputeTask:
       type: object
       properties:
-        id:
+        task_id:
           type: string
-        contract_id:
+        task_hash:
           type: string
-        function:
-          type: string
+          description: Blake3 hash of the task (provenance anchor)
         status:
           type: string
-          enum: [pending, running, completed, failed]
+          enum: [pending, processing, completed, failed, cancelled]
         result:
           type: object
           additionalProperties: true

@@ -93,7 +93,7 @@ fn setup_steward_notification_callback(
     gossip_handle: &mut icn_gossip::GossipActor,
     steward_handle_holder: StewardHandleHolder,
 ) {
-    gossip_handle.set_notification_callback(Arc::new(move |topic, entry, _subscriber_did| {
+    gossip_handle.add_notification_callback(Arc::new(move |topic, entry, _subscriber_did| {
         // Only process steward topics
         if !topic.starts_with("steward:") {
             return;

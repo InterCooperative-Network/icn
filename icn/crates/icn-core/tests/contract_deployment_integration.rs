@@ -261,7 +261,7 @@ impl TestNode {
                 },
             );
 
-            gossip.set_notification_callback(notification_callback);
+            gossip.add_notification_callback(notification_callback);
 
             // Create and subscribe to contracts:deploy topic
             use icn_gossip::{AccessControl, Topic};

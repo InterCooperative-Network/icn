@@ -78,7 +78,7 @@ impl TestNode {
                     });
                 },
             );
-            gossip.set_notification_callback(callback);
+            gossip.add_notification_callback(callback);
         }
 
         info!("Gossip actor spawned with notification tracking");

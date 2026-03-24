@@ -304,7 +304,7 @@ impl RecoveryTestNode {
 
         {
             let mut gossip = gossip_handle.write().await;
-            gossip.set_notification_callback(notification_callback);
+            gossip.add_notification_callback(notification_callback);
         }
 
         // Spawn network actor

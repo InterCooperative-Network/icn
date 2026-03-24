@@ -76,7 +76,7 @@ impl TestNode {
                     });
                 },
             );
-            g.set_notification_callback(cb);
+            g.add_notification_callback(cb);
 
             // Install send callback that captures outbound messages
             let send_cb = Arc::new(

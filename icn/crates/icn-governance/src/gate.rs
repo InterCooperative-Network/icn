@@ -55,11 +55,18 @@ pub enum GateError {
 /// lacked quorum, and `Err(GateError::DecisionHashInvalid)` if the receipt's
 /// internal hash is inconsistent.
 ///
-/// # TODO
+/// # Enforcement Status
 ///
-/// Wire this call into the ledger allocation write-path before creating any
-/// budget allocation entry (e.g. `icn_ledger::BudgetAllocator`).  Until that
-/// integration lands, Invariant 7 is defined but not enforced on the hot path.
+/// This gate is wired into the [`GovernanceActor`] proposal-closing path — no
+/// `ProposalAccepted` event fires without passing this gate (see
+/// `apps/governance/src/actor.rs`, "Invariant 7: gate all Accepted decisions").
+/// Integration tests in `icn-core/tests/execution_receipt_gate_integration.rs`
+/// prove the wiring.
+///
+/// Optional future hardening: wire an additional call at the
+/// `icn_ledger::create_budget_allocation` call-site (defense-in-depth).
+/// Currently `create_budget_allocation` accepts a raw hash because the gate
+/// already ran upstream; a ledger-level check is not required for correctness.
 pub fn check_execution_gate(receipt: &GovernanceDecisionReceipt) -> Result<(), GateError> {
     if receipt.outcome != ProofOutcome::Accepted {
         return Err(GateError::OutcomeNotAccepted {

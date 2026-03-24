@@ -14,7 +14,18 @@ use crate::middleware::{get_claims, require_scope};
 #[derive(Debug, Clone, serde::Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum CodeType {
-    /// CCL contract (default)
+    /// Cooperative Contract Language — `code` must be a JSON-serialized `icn_ccl::Contract` AST.
+    ///
+    /// ICN's CCL is AST-first: there is no source-text parser. The `code` field must contain
+    /// the full contract object serialized as a JSON string, not Lisp/source notation.
+    ///
+    /// Minimal example:
+    /// ```json
+    /// {"name":"my-contract","participants":[],"currency":null,"state_vars":[],
+    ///  "rules":[{"name":"main","params":[],"requires":[],
+    ///            "body":[{"Return":{"value":{"Literal":{"String":"ok"}}}}]}],
+    ///  "triggers":[]}
+    /// ```
     #[default]
     Ccl,
     /// WebAssembly module
@@ -47,7 +58,12 @@ pub struct SubmitTaskRequest {
     /// Task ID (auto-generated if not provided)
     #[serde(default)]
     pub task_id: Option<String>,
-    /// CCL contract JSON (for code_type: ccl)
+    /// CCL contract for `code_type: "ccl"`.
+    ///
+    /// Must be a **JSON-serialized `icn_ccl::Contract` AST** — not Lisp notation or source text.
+    /// ICN's CCL has no text parser; the contract object serialized as JSON is the wire format.
+    ///
+    /// See the `CodeType::Ccl` variant for a minimal example.
     #[serde(default)]
     pub code: Option<String>,
     /// WASM bytecode as base64 (for code_type: wasm)
