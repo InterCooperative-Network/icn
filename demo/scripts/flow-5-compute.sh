@@ -137,7 +137,7 @@ if kubectl exec -n "$FINGERLAKES_NS" deploy/icn-delta -- \
   aside "0.85 >> 0.1 admission threshold — Finger Lakes CDN qualifies for commons compute"
 else
   fail "gRPC trust seed failed — is the Delta pod healthy?"
-  fail "  kubectl exec -n icn-coop-delta deploy/icn-delta -- icnctl --endpoint '$DELTA_GRPC_INTERNAL' trust add $DELTA_DID 0.85"
+  fail "  kubectl exec -n \"$FINGERLAKES_NS\" deploy/icn-delta -- icnctl --endpoint '$DELTA_GRPC_INTERNAL' trust add $DELTA_DID 0.85"
   exit 1
 fi
 
@@ -258,12 +258,12 @@ else
       result "Pending = accepted by admission gate, queued for executor"
       aside "Full lifecycle: Pending → Completed (executor claims and runs inline)"
       ;;
-    processing|Processing)
-      result "Processing — task claimed by executor node, running now"
+    claimed|Claimed)
+      result "Claimed — executor node has picked up the task, running now"
       ;;
     completed|Completed)
       result "Completed — CCL contract executed, settlement receipt generated"
-      aside "See /v1/receipts/chain for the provenance chain anchored to this task_hash"
+      aside "See /v1/receipts/chain?decision_hash=<hex> for the provenance chain (keyed by governance decision hash)"
       ;;
     *)
       warn "Status: ${TASK_STATUS}"
@@ -272,7 +272,7 @@ else
   esac
 fi
 
-_beat "When an executor node claims this task, it transitions to Processing. On completion, a settlement receipt is generated — signed, hashed, and anchored to the task_hash we just saw. That receipt is the proof of compute commons participation."
+_beat "When an executor node claims this task, it transitions to Claimed. On completion, a settlement receipt is generated — signed, hashed, and anchored to the task_hash we just saw. That receipt is the proof of compute commons participation."
 
 # ===========================================================================
 # Step 5 — Authorization boundary: scope enforcement demo

@@ -7,15 +7,12 @@ RUN apt-get update && apt-get install -y \
 
 COPY icn/target/release/icnd /usr/local/bin/
 COPY icn/target/release/icnctl /usr/local/bin/
-COPY deploy/devnet/entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
-
 RUN mkdir -p /root/.icn
 
-EXPOSE 8000 9000
+EXPOSE 8080 9090
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:8000/v1/health || exit 1
+    CMD curl -f http://localhost:8080/v1/health || exit 1
 
 ENTRYPOINT ["icnd"]
 CMD ["--config", "/root/.icn/icn.toml"]

@@ -8,7 +8,7 @@
 #   - Governance and expenditure evidence for grant/compliance reporting
 #   - Federation-level reporting without centralized control
 #   - Audit without bureaucracy: query records, don't own them
-#   - PR #1327 (ExecutionReceiptGate) is merged (2026-03-07): gate primitive live; execution-path wiring is a follow-up PR
+#   - PR #1327 (ExecutionReceiptGate) is merged (2026-03-07): gate is fully wired — no ProposalAccepted fires without passing it
 #
 # Core institutional question:
 #   "Can this produce trustworthy reporting without adding massive admin overhead?"

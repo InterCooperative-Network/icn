@@ -689,7 +689,6 @@ components:
 
     ComputeTaskRequest:
       type: object
-      required: [code_type]
       properties:
         task_id:
           type: string
@@ -747,7 +746,7 @@ components:
           description: Blake3 hash of the task (provenance anchor)
         status:
           type: string
-          enum: [pending, processing, completed, failed, cancelled]
+          enum: [pending, claimed, completed, failed, cancelled]
         result:
           type: object
           additionalProperties: true

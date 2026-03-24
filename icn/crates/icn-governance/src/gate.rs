@@ -59,7 +59,7 @@ pub enum GateError {
 ///
 /// This gate is wired into the [`GovernanceActor`] proposal-closing path — no
 /// `ProposalAccepted` event fires without passing this gate (see
-/// `apps/governance/src/actor.rs`, "Invariant 7: gate all Accepted decisions").
+/// `icn/apps/governance/src/actor.rs`, "Invariant 7: gate all Accepted decisions").
 /// Integration tests in `icn-core/tests/execution_receipt_gate_integration.rs`
 /// prove the wiring.
 ///

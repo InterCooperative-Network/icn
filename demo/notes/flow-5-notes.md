@@ -40,10 +40,10 @@
 ---
 
 ## Beat: Step 4 — Task status
-**Say**: "The task is in the pool. Depending on the cluster state, you'll see Pending, Processing, or Completed. Each stage means: Pending — admitted and queued; Processing — an executor claimed it and it's running; Completed — CCL executed, settlement receipt generated."
+**Say**: "The task is in the pool. Depending on the cluster state, you'll see Pending, Claimed, or Completed. Each stage means: Pending — admitted and queued; Claimed — an executor picked it up and it's running; Completed — CCL executed, settlement receipt generated."
 **Point to**: The status in the output
 **If asked "What is the executor?"**: "The executor node picks up the task from the gossip pool and runs the CCL contract. Sprint 28 fixed the gossip fan-out — the compute actor now receives submitted tasks via loopback. The full path from admission through settlement receipt is live."
-**If asked "What does the settlement receipt contain?"**: "The task hash, execution hash, and credit settlement — a full provenance chain you can query at /v1/receipts/chain?task_hash=<hash>. That's the link between 'we ran compute work' and 'we earned commons credits.'"
+**If asked "What does the settlement receipt contain?"**: "The task hash, execution hash, and credit settlement — a full provenance chain you can query at /v1/receipts/chain?decision_hash=<hex>. That's the link between 'we ran compute work' and 'we earned commons credits.'"
 **If asked "Is there a timeout?"**: "Tasks can be cancelled. The fuel limit is also an execution bound — if an executor would need more than the declared fuel, it won't claim the task."
 
 ---
