@@ -89,6 +89,7 @@ async fn test_escrow_lifecycle() {
                 alice.did(), // Payer
                 escrow.amount,
                 escrow.currency.clone(),
+                None,
             )
             .await;
         assert!(res.is_ok());

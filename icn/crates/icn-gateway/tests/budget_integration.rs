@@ -51,7 +51,7 @@ async fn test_budget_enforcement() {
 
     // 2. Make Payment (50) -> Success
     let res = ledger_mgr
-        .create_settlement(&coop_id, alice.did(), bob.did(), 50, currency.clone())
+        .create_settlement(&coop_id, alice.did(), bob.did(), 50, currency.clone(), None)
         .await;
     assert!(res.is_ok());
 
@@ -61,7 +61,7 @@ async fn test_budget_enforcement() {
 
     // 3. Make Payment (60) -> Fail (Total 110 > 100)
     let res_fail = ledger_mgr
-        .create_settlement(&coop_id, alice.did(), bob.did(), 60, currency.clone())
+        .create_settlement(&coop_id, alice.did(), bob.did(), 60, currency.clone(), None)
         .await;
 
     assert!(res_fail.is_err());
@@ -76,7 +76,7 @@ async fn test_budget_enforcement() {
 
     // 4. Make Payment (50) -> Success (Total 100 == 100)
     let res_success = ledger_mgr
-        .create_settlement(&coop_id, alice.did(), bob.did(), 50, currency.clone())
+        .create_settlement(&coop_id, alice.did(), bob.did(), 50, currency.clone(), None)
         .await;
     assert!(res_success.is_ok());
 
@@ -91,7 +91,7 @@ async fn test_budget_enforcement() {
 
     // 5. Make Payment (1) -> Fail (Status is Exceeded or Limit hit)
     let res_fail_2 = ledger_mgr
-        .create_settlement(&coop_id, alice.did(), bob.did(), 1, currency.clone())
+        .create_settlement(&coop_id, alice.did(), bob.did(), 1, currency.clone(), None)
         .await;
     assert!(res_fail_2.is_err());
 }

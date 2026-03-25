@@ -119,7 +119,17 @@ impl LedgerManager {
         self.budget_store = Some(budget_store);
     }
 
-    /// Create a settlement transaction
+    /// Create a settlement transaction.
+    ///
+    /// `auth_proof` should be supplied by direct-member HTTP paths.
+    /// It is the HMAC-SHA256 JWT signature segment from the Authorization header,
+    /// formatted as `"jwt-sig:<base64url-segment>"`.  This creates a durable,
+    /// node-verifiable cryptographic reference that links the journal entry to
+    /// the specific auth token that authorized the action (INV-1).
+    ///
+    /// Callers without an HTTP context (escrow release, recurring settlements)
+    /// pass `None`; the entry is still recorded as `DirectMember` with an
+    /// explicit `"system-executed"` marker that signals no per-request proof.
     pub async fn create_settlement(
         &self,
         coop_id: &CoopId,
@@ -127,6 +137,7 @@ impl LedgerManager {
         to: &Did,
         amount: i64,
         currency: String,
+        auth_proof: Option<String>,
     ) -> Result<String> {
         // Enforce budget limits if store is available
         if let Some(store) = &self.budget_store {
@@ -145,15 +156,20 @@ impl LedgerManager {
 
         let ledger_arc = self.get_ledger(coop_id).await?;
 
-        // Build the journal entry
-        // INV-1: Use DirectMember provenance for member-authorized settlements.
-        // The from DID is verified via JWT authentication before this point.
-        // The signature field records the authorization method.
-        // TODO(hardening): wire actual Ed25519 signature from client request body.
+        // Build the journal entry with INV-1 provenance.
+        //
+        // When auth_proof is Some("jwt-sig:<seg>"): the third JWT segment is the
+        // HMAC-SHA256 of "{header}.{payload}" — a real cryptographic authorization
+        // fingerprint that ties this entry to a specific, verified auth token.
+        //
+        // When auth_proof is None (escrow, recurring, system paths): record
+        // "system-executed" to make clear this entry has no per-request proof,
+        // rather than falsely claiming "jwt-authenticated".
+        let proof = auth_proof.unwrap_or_else(|| "system-executed".to_string());
         let entry = JournalEntryBuilder::new(from.clone())
             .debit(from.clone(), currency.clone(), amount)
             .credit(to.clone(), currency.clone(), amount)
-            .with_direct_member_provenance(from.clone(), "jwt-authenticated")
+            .with_direct_member_provenance(from.clone(), proof)
             .build()
             .map_err(GatewayError::SubstrateError)?;
 
@@ -608,6 +624,7 @@ mod tests {
                 bob.did(),
                 10,
                 "hours".to_string(),
+                None,
             )
             .await
             .unwrap();
@@ -640,6 +657,7 @@ mod tests {
             bob.did(),
             10,
             "hours".to_string(),
+            None,
         )
         .await
         .unwrap();
@@ -663,6 +681,7 @@ mod tests {
             bob.did(),
             10,
             "hours".to_string(),
+            None,
         )
         .await
         .unwrap();
@@ -695,5 +714,91 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(empty_page.len(), 0); // Offset beyond available entries
+    }
+
+    // INV-1: Journal entries must carry the JWT signature segment when the
+    // settlement is created via an HTTP request path.
+    #[tokio::test]
+    async fn test_inv1_direct_member_provenance_carries_jwt_sig() {
+        use icn_ledger::types::ProvenanceRef;
+
+        let mgr = LedgerManager::new();
+        let alice = IdentityBundle::generate().unwrap();
+        let bob = IdentityBundle::generate().unwrap();
+
+        // Simulate what the HTTP handler passes: the third JWT segment formatted
+        // as "jwt-sig:<base64url-segment>".
+        let fake_jwt_sig = "jwt-sig:aHR0cHM6Ly9leGFtcGxlLmNvbQ".to_string();
+
+        mgr.create_settlement(
+            &"test-coop".to_string(),
+            alice.did(),
+            bob.did(),
+            10,
+            "hours".to_string(),
+            Some(fake_jwt_sig.clone()),
+        )
+        .await
+        .unwrap();
+
+        let entries = mgr
+            .get_history(&"test-coop".to_string(), None, 0, 100)
+            .await
+            .unwrap();
+
+        assert_eq!(entries.len(), 1);
+        match &entries[0].provenance {
+            ProvenanceRef::DirectMember { did, signature } => {
+                assert_eq!(did, alice.did(), "provenance DID must be the sender");
+                assert_eq!(
+                    signature, &fake_jwt_sig,
+                    "INV-1: journal entry must store the JWT sig segment verbatim"
+                );
+            }
+            other => panic!("Expected DirectMember provenance, got: {other:?}"),
+        }
+    }
+
+    // INV-1 (negative): System-executed paths must record "system-executed",
+    // never the misleading "jwt-authenticated" string.
+    #[tokio::test]
+    async fn test_inv1_system_path_records_system_executed_not_jwt_authenticated() {
+        use icn_ledger::types::ProvenanceRef;
+
+        let mgr = LedgerManager::new();
+        let alice = IdentityBundle::generate().unwrap();
+        let bob = IdentityBundle::generate().unwrap();
+
+        // Escrow and recurring settlement callers pass None.
+        mgr.create_settlement(
+            &"test-coop".to_string(),
+            alice.did(),
+            bob.did(),
+            10,
+            "hours".to_string(),
+            None,
+        )
+        .await
+        .unwrap();
+
+        let entries = mgr
+            .get_history(&"test-coop".to_string(), None, 0, 100)
+            .await
+            .unwrap();
+
+        assert_eq!(entries.len(), 1);
+        match &entries[0].provenance {
+            ProvenanceRef::DirectMember { signature, .. } => {
+                assert_eq!(
+                    signature, "system-executed",
+                    "INV-1: system paths must not falsely claim jwt-authenticated"
+                );
+                assert_ne!(
+                    signature, "jwt-authenticated",
+                    "INV-1: the old static placeholder must never appear"
+                );
+            }
+            other => panic!("Expected DirectMember provenance, got: {other:?}"),
+        }
     }
 }

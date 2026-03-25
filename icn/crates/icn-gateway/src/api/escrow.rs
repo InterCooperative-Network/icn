@@ -207,6 +207,7 @@ pub async fn release_escrow(
                 &from_did, // Payer (credited/loses credits)
                 escrow.amount,
                 escrow.currency.clone(),
+                None, // system-executed path: no per-request JWT proof
             )
             .await
         {

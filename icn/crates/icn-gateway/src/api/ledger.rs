@@ -118,8 +118,27 @@ pub async fn create_settlement(
     let trust_score = trust_mgr.compute_trust_score_for_velocity(&from).await;
     velocity_limiter.check_and_record(&req.from, trust_score)?;
 
+    // INV-1: Extract the JWT signature segment from the Authorization header.
+    // The third JWT segment is HMAC-SHA256("{header}.{payload}", jwt_secret) —
+    // a node-verifiable fingerprint that ties this journal entry to the specific
+    // auth token that authorized the action.
+    let auth_proof = http_req
+        .headers()
+        .get("authorization")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.strip_prefix("Bearer "))
+        .and_then(|token| token.splitn(3, '.').nth(2))
+        .map(|sig| format!("jwt-sig:{sig}"));
+
     let hash = ledger_mgr
-        .create_settlement(&coop_id, &from, &to, req.amount, req.unit.clone())
+        .create_settlement(
+            &coop_id,
+            &from,
+            &to,
+            req.amount,
+            req.unit.clone(),
+            auth_proof,
+        )
         .await?;
 
     // Record spending in budget tracker
@@ -765,6 +784,7 @@ mod tests {
                 bob.did(),
                 10,
                 "hours".to_string(),
+                None,
             )
             .await
             .unwrap();
@@ -1045,6 +1065,7 @@ mod tests {
                 bob.did(),
                 50,
                 "hours".to_string(),
+                None,
             )
             .await
             .unwrap();
