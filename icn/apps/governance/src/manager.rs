@@ -786,16 +786,49 @@ impl GovernanceManager {
             vec![]
         };
 
-        // Chain is complete when:
-        // - governance receipt exists AND
-        // - either there are allocations (economic proposal) OR
-        //   the proposal is non-economic (Text/Membership/etc — no allocation expected)
         let has_governance = governance_receipt.is_some();
         let has_allocations = !allocations.is_empty();
 
-        // Determine if this is an economic proposal by checking the stored receipt or proposal payload
-        let is_economic = has_allocations; // If allocations were created, it was economic
-        let chain_complete = has_governance && (is_economic == has_allocations);
+        // chain_complete requires correctly determining if this proposal type
+        // was expected to produce allocation receipts.
+        //
+        // Logic:
+        // - No governance receipt: always incomplete.
+        // - Rejected/NoQuorum: complete with just the governance receipt (no allocations expected).
+        // - Accepted + economic payload: complete iff allocations were stored.
+        // - Accepted + non-economic payload: complete (no allocations needed).
+        // - Accepted + unknown proposal (actor mode, no local state): conservative false.
+        let chain_complete = if let Some(ref receipt) = governance_receipt {
+            match receipt.outcome {
+                icn_governance::ProofOutcome::Rejected | icn_governance::ProofOutcome::NoQuorum => {
+                    true
+                }
+                icn_governance::ProofOutcome::Accepted => {
+                    // Look up the proposal to determine if it requires allocations.
+                    match self.get_proposal(proposal_id).await.ok().flatten() {
+                        Some(p) => {
+                            let is_economic_payload = matches!(
+                                p.payload,
+                                ProposalPayload::Budget { .. }
+                                    | ProposalPayload::Treasury { .. }
+                                    | ProposalPayload::Allocation { .. }
+                                    | ProposalPayload::SurplusAllocation { .. }
+                            );
+                            if is_economic_payload {
+                                has_allocations
+                            } else {
+                                true // non-economic proposals complete without allocations
+                            }
+                        }
+                        // Proposal not found (actor-backed mode, no local state):
+                        // fall back to presence of allocations as the completeness signal.
+                        None => has_governance && has_allocations,
+                    }
+                }
+            }
+        } else {
+            false
+        };
 
         Ok(ProvenanceChain {
             governance_receipt,
@@ -829,7 +862,7 @@ impl GovernanceManager {
                 let intent = SettlementIntent::new(
                     &proposal_id.0,
                     decision_hash,
-                    &domain_id.0,           // from: domain treasury
+                    &domain_id.0,          // from: domain treasury
                     recipient.to_string(), // to: recipient
                     *amount as u64,
                     currency,
@@ -2251,11 +2284,65 @@ mod tests {
             "INV-5: allocations must be present for Budget proposal"
         );
 
+        // Verify chain_complete is true for accepted Budget with allocations stored
+        assert!(
+            chain.chain_complete,
+            "INV-5: chain_complete must be true for accepted Budget with stored allocations"
+        );
+
         // Verify decision_hash binds governance to allocation
         let gov_hash = chain.governance_receipt.unwrap().decision_hash;
         assert_eq!(
             chain.allocations[0].decision_hash, gov_hash,
             "INV-5: allocation.decision_hash must equal governance.decision_hash"
+        );
+    }
+
+    /// INV-5 TEST: chain_complete is correct for accepted Text proposal (no allocations expected).
+    #[tokio::test]
+    async fn test_inv5_chain_complete_text_proposal() {
+        let (mgr, domain_id, member_did) = make_manager_with_domain().await;
+        let backend = Arc::new(InMemoryReceiptBackend::new());
+        let mgr = mgr.with_receipt_store(backend.clone());
+
+        let proposal_id = mgr
+            .create_proposal(
+                ProposalId(format!("prop-{}", uuid::Uuid::new_v4())),
+                domain_id.clone(),
+                member_did.clone(),
+                "Text proposal".to_string(),
+                "No economic effect".to_string(),
+                ProposalPayload::Text {
+                    body: "Just a decision".to_string(),
+                },
+                ProposalScope::Local,
+            )
+            .await
+            .unwrap();
+
+        mgr.open_proposal(proposal_id.clone(), 86400).await.unwrap();
+        mgr.cast_vote(
+            proposal_id.clone(),
+            member_did.clone(),
+            VoteChoice::For,
+            None,
+        )
+        .await
+        .unwrap();
+        mgr.close_proposal(proposal_id.clone()).await.unwrap();
+
+        let chain = mgr.get_chain(&proposal_id).await.unwrap();
+        assert!(
+            chain.governance_receipt.is_some(),
+            "INV-5: governance_receipt must exist"
+        );
+        assert!(
+            chain.allocations.is_empty(),
+            "INV-5: Text proposal has no allocations"
+        );
+        assert!(
+            chain.chain_complete,
+            "INV-5: chain_complete must be true for accepted Text proposal (no allocations needed)"
         );
     }
 }
