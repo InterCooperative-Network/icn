@@ -19,7 +19,7 @@ use icn_http_kit::{
 };
 use icn_identity::Did;
 
-use super::configure::GovernanceContext;
+use super::configure::{GovernanceContext, GovernanceEffect};
 use super::models::*;
 use super::validation as val;
 use crate::events::GovernanceEventEmitter;
@@ -1025,6 +1025,29 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
                 hook(charter_id.clone(), charter_yaml.clone());
             }
         }
+
+        // General acceptance hook: translate to GovernanceEffect here so the
+        // gateway never needs to import icn_governance types (meaning-firewall).
+        if let Some(hook) = &ctx.on_proposal_accepted {
+            let effect = match &proposal.payload {
+                icn_governance::ProposalPayload::FreezeMember {
+                    member,
+                    reason,
+                    duration_seconds,
+                } => GovernanceEffect::FreezeMember {
+                    proposal_id: proposal.id.0.clone(),
+                    domain_id: proposal.domain_id.0.clone(),
+                    member: member.clone(),
+                    reason: reason.clone(),
+                    duration_seconds: *duration_seconds,
+                },
+                _ => GovernanceEffect::Unhandled {
+                    proposal_id: proposal.id.0.clone(),
+                    payload_type: proposal.payload.type_name().to_owned(),
+                },
+            };
+            hook(effect);
+        }
     }
 
     ctx.emitter
@@ -2015,4 +2038,226 @@ pub async fn create_update_federation_policy_proposal<
         fed_proposal,
     )
     .await
+}
+
+// ============================================================================
+// Tests — governance → execution bridge
+// ============================================================================
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod tests {
+    use std::sync::{Arc, Mutex};
+
+    use actix_web::dev::Service as _;
+    use actix_web::{test, web, App, HttpMessage};
+    use icn_governance::{
+        GovernanceDomainId, GovernanceParams, MembershipConfig, MembershipSource, ProposalId,
+        ProposalPayload, ProposalScope, VoteChoice,
+    };
+    use icn_http_kit::auth::BasicClaims;
+    use icn_identity::Did;
+
+    use super::*;
+    use crate::events::NoopEventEmitter;
+    use crate::http::configure::{GovernanceContext, GovernanceEffect, ProposalAcceptedHook};
+    use crate::manager::GovernanceManager;
+
+    fn test_did(seed: u8) -> Did {
+        Did::from_anchor_id(&[seed; 32])
+    }
+
+    /// Build a test app that injects the given claims into every request
+    /// extension — bypasses JWT validation without touching production code.
+    macro_rules! test_app {
+        ($ctx:expr, $caller_did:expr) => {{
+            let ctx_data = web::Data::new($ctx);
+            let caller_did_str = $caller_did.to_string();
+            test::init_service(
+                App::new()
+                    .app_data(ctx_data)
+                    .wrap_fn(move |req, srv| {
+                        req.extensions_mut().insert(BasicClaims {
+                            sub: caller_did_str.clone(),
+                            scope: Some("governance:write".to_string()),
+                        });
+                        srv.call(req)
+                    })
+                    .route(
+                        "/proposals/{proposal_id}/close",
+                        web::post().to(close_proposal::<NoopEventEmitter>),
+                    ),
+            )
+            .await
+        }};
+    }
+
+    /// Helper: create domain + FreezeMember proposal and open it, returning
+    /// `(manager, proposal_id)`.
+    async fn setup_freeze_proposal(
+        coop_id: &str,
+        member_did: Did,
+        target_did: Did,
+        params: GovernanceParams,
+    ) -> (Arc<GovernanceManager>, ProposalId) {
+        let mgr = Arc::new(GovernanceManager::new());
+        let domain_id = GovernanceDomainId(coop_id.to_string());
+
+        mgr.create_domain(
+            domain_id.clone(),
+            format!("{coop_id} coop"),
+            "cooperative_default".to_string(),
+            params,
+            MembershipConfig {
+                source: MembershipSource::StaticList(vec![member_did.clone()]),
+            },
+        )
+        .await
+        .unwrap();
+
+        let proposal_id = ProposalId("freeze-proposal-1".to_string());
+        mgr.create_proposal(
+            proposal_id.clone(),
+            domain_id.clone(),
+            member_did,
+            "Freeze disruptive member".to_string(),
+            "Emergency action — account compromise suspected".to_string(),
+            ProposalPayload::FreezeMember {
+                member: target_did,
+                reason: "account compromise suspected".to_string(),
+                duration_seconds: Some(604_800),
+            },
+            ProposalScope::Local,
+        )
+        .await
+        .unwrap();
+
+        mgr.open_proposal(proposal_id.clone(), 86_400)
+            .await
+            .unwrap();
+        (mgr, proposal_id)
+    }
+
+    /// Proves: when `close_proposal` finalises a `FreezeMember` proposal as
+    /// `Accepted`, the `on_proposal_accepted` hook fires and delivers the
+    /// correct member DID, reason, and duration.
+    ///
+    /// Uses actix-web's test runtime so the actual HTTP handler executes,
+    /// including auth extraction, domain-membership guard, and hook dispatch.
+    #[tokio::test]
+    async fn hook_fires_with_correct_payload_on_acceptance() {
+        let captured: Arc<Mutex<Vec<GovernanceEffect>>> = Arc::new(Mutex::new(Vec::new()));
+        let captured_clone = captured.clone();
+
+        let hook: ProposalAcceptedHook = Arc::new(move |effect| {
+            captured_clone.lock().unwrap().push(effect);
+        });
+
+        let member_did = test_did(1);
+        let target_did = test_did(2);
+
+        // GovernanceParams(quorum=0, approval=0) → any close is Accepted
+        let (mgr, proposal_id) = setup_freeze_proposal(
+            "alpha",
+            member_did.clone(),
+            target_did.clone(),
+            GovernanceParams::new(0, 0, 86_400),
+        )
+        .await;
+
+        let ctx = GovernanceContext {
+            manager: mgr,
+            emitter: NoopEventEmitter,
+            on_charter_accepted: None,
+            on_proposal_accepted: Some(hook),
+        };
+
+        let app = test_app!(ctx, member_did);
+
+        let req = test::TestRequest::post()
+            .uri(&format!("/proposals/{}/close", proposal_id.0))
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+
+        assert_eq!(
+            resp.status().as_u16(),
+            200,
+            "close_proposal should return 200 OK"
+        );
+
+        let captured = captured.lock().unwrap();
+        assert_eq!(
+            captured.len(),
+            1,
+            "hook must fire exactly once on acceptance"
+        );
+
+        match &captured[0] {
+            GovernanceEffect::FreezeMember {
+                member,
+                reason,
+                duration_seconds,
+                ..
+            } => {
+                assert_eq!(member, &target_did, "hook must receive correct target DID");
+                assert_eq!(reason, "account compromise suspected");
+                assert_eq!(*duration_seconds, Some(604_800));
+            }
+            other => panic!("expected GovernanceEffect::FreezeMember, got {other:?}"),
+        }
+    }
+
+    /// Proves: hook is NOT fired when the proposal closes as `Rejected`.
+    ///
+    /// GovernanceParams(quorum=0, approval=100) with a vote AGAINST → Rejected.
+    #[tokio::test]
+    async fn hook_not_fired_on_rejection() {
+        let fired = Arc::new(Mutex::new(false));
+        let fired_clone = fired.clone();
+
+        let hook: ProposalAcceptedHook = Arc::new(move |_| {
+            *fired_clone.lock().unwrap() = true;
+        });
+
+        let member_did = test_did(3);
+        let target_did = test_did(4);
+
+        // approval=100 and one "Against" vote → Rejected
+        let (mgr, proposal_id) = setup_freeze_proposal(
+            "beta",
+            member_did.clone(),
+            target_did,
+            GovernanceParams::new(0, 100, 86_400),
+        )
+        .await;
+
+        mgr.cast_vote(
+            proposal_id.clone(),
+            member_did.clone(),
+            VoteChoice::Against,
+            None,
+        )
+        .await
+        .unwrap();
+
+        let ctx = GovernanceContext {
+            manager: mgr,
+            emitter: NoopEventEmitter,
+            on_charter_accepted: None,
+            on_proposal_accepted: Some(hook),
+        };
+
+        let app = test_app!(ctx, member_did);
+
+        let req = test::TestRequest::post()
+            .uri(&format!("/proposals/{}/close", proposal_id.0))
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+
+        assert_eq!(resp.status().as_u16(), 200);
+        assert!(
+            !*fired.lock().unwrap(),
+            "hook must NOT fire when proposal is rejected"
+        );
+    }
 }

@@ -14,6 +14,7 @@
 use std::sync::Arc;
 
 use actix_web::web;
+use icn_identity::Did;
 
 use crate::events::GovernanceEventEmitter;
 use crate::manager::GovernanceManager;
@@ -29,6 +30,37 @@ use super::handlers;
 /// should log warnings internally rather than panicking.
 pub type CharterAcceptedHook = Arc<dyn Fn(String, String) + Send + Sync>;
 
+/// A translated governance acceptance ready for kernel dispatch.
+///
+/// Built by the governance app from an accepted `Proposal`. The gateway
+/// receives this type without importing any `icn_governance` domain types,
+/// satisfying the meaning-firewall boundary.
+#[derive(Debug, Clone)]
+pub enum GovernanceEffect {
+    /// A member should be frozen in the cooperative's ledger.
+    FreezeMember {
+        proposal_id: String,
+        domain_id: String,
+        member: Did,
+        reason: String,
+        duration_seconds: Option<u64>,
+    },
+    /// Accepted but no gateway execution handler is wired for this payload type.
+    Unhandled {
+        proposal_id: String,
+        payload_type: String,
+    },
+}
+
+/// Callback invoked when any proposal is accepted, receiving a translated effect.
+///
+/// Called after the charter-specific hook. The governance app translates
+/// the accepted `Proposal` into a `GovernanceEffect` before invoking this hook,
+/// so the gateway never needs to import `icn_governance` domain types.
+///
+/// Errors are non-fatal. Implementations should log internally and not panic.
+pub type ProposalAcceptedHook = Arc<dyn Fn(GovernanceEffect) + Send + Sync>;
+
 /// Shared application context for governance HTTP handlers.
 ///
 /// Stored as `web::Data<GovernanceContext<E>>`. Using a single struct keeps
@@ -39,6 +71,11 @@ pub struct GovernanceContext<E> {
     pub emitter: E,
     /// Optional hook called when a `Charter` proposal is accepted.
     pub on_charter_accepted: Option<CharterAcceptedHook>,
+    /// Optional hook called when any proposal is accepted.
+    ///
+    /// Receives the full accepted proposal so the gateway can dispatch to
+    /// the appropriate subsystem by payload type.
+    pub on_proposal_accepted: Option<ProposalAcceptedHook>,
 }
 
 /// Register all governance routes on `cfg`.
