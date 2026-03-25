@@ -14,6 +14,7 @@
 use std::sync::Arc;
 
 use actix_web::web;
+use icn_identity::Did;
 
 use crate::events::GovernanceEventEmitter;
 use crate::manager::GovernanceManager;
@@ -29,14 +30,36 @@ use super::handlers;
 /// should log warnings internally rather than panicking.
 pub type CharterAcceptedHook = Arc<dyn Fn(String, String) + Send + Sync>;
 
-/// Callback invoked when any proposal is accepted, receiving the full proposal.
+/// A translated governance acceptance ready for kernel dispatch.
 ///
-/// Called after the charter-specific hook. The gateway dispatches to the
-/// appropriate subsystem based on `proposal.payload` — keeping the governance
-/// app ignorant of ledger, membership, or other domain internals.
+/// Built by the governance app from an accepted `Proposal`. The gateway
+/// receives this type without importing any `icn_governance` domain types,
+/// satisfying the meaning-firewall boundary.
+#[derive(Debug, Clone)]
+pub enum GovernanceEffect {
+    /// A member should be frozen in the cooperative's ledger.
+    FreezeMember {
+        proposal_id: String,
+        domain_id: String,
+        member: Did,
+        reason: String,
+        duration_seconds: Option<u64>,
+    },
+    /// Accepted but no gateway execution handler is wired for this payload type.
+    Unhandled {
+        proposal_id: String,
+        payload_type: String,
+    },
+}
+
+/// Callback invoked when any proposal is accepted, receiving a translated effect.
+///
+/// Called after the charter-specific hook. The governance app translates
+/// the accepted `Proposal` into a `GovernanceEffect` before invoking this hook,
+/// so the gateway never needs to import `icn_governance` domain types.
 ///
 /// Errors are non-fatal. Implementations should log internally and not panic.
-pub type ProposalAcceptedHook = Arc<dyn Fn(icn_governance::Proposal) + Send + Sync>;
+pub type ProposalAcceptedHook = Arc<dyn Fn(GovernanceEffect) + Send + Sync>;
 
 /// Shared application context for governance HTTP handlers.
 ///

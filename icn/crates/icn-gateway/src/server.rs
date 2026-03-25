@@ -824,22 +824,19 @@ impl GatewayServer {
         //   (other types) → no-op until wired
         let ledger_mgr_for_gov = ledger_manager.clone();
         let on_proposal_accepted: icn_governance_actor::http::configure::ProposalAcceptedHook =
-            std::sync::Arc::new(move |proposal: icn_governance::Proposal| {
-                match &proposal.payload {
-                    icn_governance::ProposalPayload::FreezeMember {
+            std::sync::Arc::new(move |effect| {
+                use icn_governance_actor::http::configure::GovernanceEffect;
+                match effect {
+                    GovernanceEffect::FreezeMember {
+                        proposal_id,
+                        domain_id,
                         member,
                         reason,
                         duration_seconds,
                     } => {
                         let ledger_mgr = ledger_mgr_for_gov.clone();
-                        let member = member.clone();
-                        let reason = reason.clone();
-                        let duration_seconds = *duration_seconds;
-                        let proposal_id = proposal.id.0.clone();
-                        // domain_id is the cooperative's ID on this node (by convention)
-                        let coop_id = proposal.domain_id.0.clone();
                         tokio::spawn(async move {
-                            match ledger_mgr.get_ledger(&coop_id).await {
+                            match ledger_mgr.get_ledger(&domain_id).await {
                                 Ok(ledger_arc) => {
                                     let mut ledger = ledger_arc.write().await;
                                     ledger.freeze_member_with_metadata(
@@ -852,7 +849,7 @@ impl GatewayServer {
                                 }
                                 Err(e) => {
                                     tracing::warn!(
-                                        coop_id = %coop_id,
+                                        coop_id = %domain_id,
                                         error = %e,
                                         "FreezeMember governance effect: ledger not found for domain"
                                     );
@@ -860,12 +857,13 @@ impl GatewayServer {
                             }
                         });
                     }
-                    _ => {
-                        // Other payload types not yet wired to execution.
-                        // Log at trace level — future tranches will add arms here.
+                    GovernanceEffect::Unhandled {
+                        proposal_id,
+                        payload_type,
+                    } => {
                         tracing::trace!(
-                            proposal_id = %proposal.id.0,
-                            payload_type = %proposal.payload.type_name(),
+                            proposal_id = %proposal_id,
+                            payload_type = %payload_type,
                             "Proposal accepted; no execution handler wired for this payload type"
                         );
                     }

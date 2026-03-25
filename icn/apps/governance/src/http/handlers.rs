@@ -19,7 +19,7 @@ use icn_http_kit::{
 };
 use icn_identity::Did;
 
-use super::configure::GovernanceContext;
+use super::configure::{GovernanceContext, GovernanceEffect};
 use super::models::*;
 use super::validation as val;
 use crate::events::GovernanceEventEmitter;
@@ -1026,10 +1026,27 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
             }
         }
 
-        // General acceptance hook: the gateway dispatches to the appropriate
-        // subsystem (ledger freeze, membership change, etc.) based on payload type.
+        // General acceptance hook: translate to GovernanceEffect here so the
+        // gateway never needs to import icn_governance types (meaning-firewall).
         if let Some(hook) = &ctx.on_proposal_accepted {
-            hook(proposal.clone());
+            let effect = match &proposal.payload {
+                icn_governance::ProposalPayload::FreezeMember {
+                    member,
+                    reason,
+                    duration_seconds,
+                } => GovernanceEffect::FreezeMember {
+                    proposal_id: proposal.id.0.clone(),
+                    domain_id: proposal.domain_id.0.clone(),
+                    member: member.clone(),
+                    reason: reason.clone(),
+                    duration_seconds: *duration_seconds,
+                },
+                _ => GovernanceEffect::Unhandled {
+                    proposal_id: proposal.id.0.clone(),
+                    payload_type: proposal.payload.type_name().to_owned(),
+                },
+            };
+            hook(effect);
         }
     }
 
@@ -2043,7 +2060,7 @@ mod tests {
 
     use super::*;
     use crate::events::NoopEventEmitter;
-    use crate::http::configure::{GovernanceContext, ProposalAcceptedHook};
+    use crate::http::configure::{GovernanceContext, GovernanceEffect, ProposalAcceptedHook};
     use crate::manager::GovernanceManager;
 
     fn test_did(seed: u8) -> Did {
@@ -2129,11 +2146,11 @@ mod tests {
     /// including auth extraction, domain-membership guard, and hook dispatch.
     #[tokio::test]
     async fn hook_fires_with_correct_payload_on_acceptance() {
-        let captured: Arc<Mutex<Vec<icn_governance::Proposal>>> = Arc::new(Mutex::new(Vec::new()));
+        let captured: Arc<Mutex<Vec<GovernanceEffect>>> = Arc::new(Mutex::new(Vec::new()));
         let captured_clone = captured.clone();
 
-        let hook: ProposalAcceptedHook = Arc::new(move |p| {
-            captured_clone.lock().unwrap().push(p);
+        let hook: ProposalAcceptedHook = Arc::new(move |effect| {
+            captured_clone.lock().unwrap().push(effect);
         });
 
         let member_did = test_did(1);
@@ -2175,17 +2192,18 @@ mod tests {
             "hook must fire exactly once on acceptance"
         );
 
-        match &captured[0].payload {
-            ProposalPayload::FreezeMember {
+        match &captured[0] {
+            GovernanceEffect::FreezeMember {
                 member,
                 reason,
                 duration_seconds,
+                ..
             } => {
                 assert_eq!(member, &target_did, "hook must receive correct target DID");
                 assert_eq!(reason, "account compromise suspected");
                 assert_eq!(*duration_seconds, Some(604_800));
             }
-            other => panic!("expected FreezeMember payload, got {other:?}"),
+            other => panic!("expected GovernanceEffect::FreezeMember, got {other:?}"),
         }
     }
 
