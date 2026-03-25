@@ -42,8 +42,8 @@
     {
       "id": "s26-t3",
       "title": "Resolve fix/demo-path-bugs branch: 7 dirty files from route rename (/payment+currency -> /settle+unit)",
-      "status": "in-progress",
-      "pr": null,
+      "status": "in-review",
+      "pr": 1433,
       "assignee": "matt",
       "epic": "demo"
     },
@@ -58,7 +58,7 @@
     {
       "id": "s26-t5",
       "title": "Unblock CI: main branch CI run stuck in queued state",
-      "status": "blocked",
+      "status": "done",
       "pr": null,
       "assignee": null,
       "epic": "devops"
