@@ -1118,6 +1118,31 @@ pub async fn get_vote_tally<E: GovernanceEventEmitter + Clone + 'static>(
     }))
 }
 
+/// GET /gov/proposals/{proposal_id}/chain — Get the full provenance chain for a proposal.
+///
+/// Returns the governance decision receipt and any linked allocation receipts,
+/// enabling independent verification of the governance→economics binding (INV-5).
+///
+/// Response includes:
+/// - `governance_receipt`: The decision receipt (present if proposal is closed)
+/// - `allocations`: AllocationReceipts created when the proposal was accepted
+/// - `chain_complete`: Whether the chain is complete for this proposal type
+///
+/// A `chain_complete: false` response means the system cannot answer
+/// "what economic effect did this decision have?" — a provenance gap.
+pub async fn get_chain<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    proposal_id: web::Path<String>,
+) -> Result<HttpResponse, ApiError> {
+    require_scope::<BasicClaims>(&http_req, "governance:read")?;
+
+    let id = ProposalId(proposal_id.into_inner());
+    let chain = ctx.manager.get_chain(&id).await.map_err(anyhow_to_api)?;
+
+    Ok(HttpResponse::Ok().json(chain))
+}
+
 /// GET /gov/proposals/{proposal_id}/proof — Get cryptographic proof of proposal outcome.
 pub async fn get_proof<E: GovernanceEventEmitter + Clone + 'static>(
     ctx: web::Data<GovernanceContext<E>>,

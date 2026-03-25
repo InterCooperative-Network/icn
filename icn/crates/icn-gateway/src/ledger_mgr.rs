@@ -146,10 +146,14 @@ impl LedgerManager {
         let ledger_arc = self.get_ledger(coop_id).await?;
 
         // Build the journal entry
+        // INV-1: Use DirectMember provenance for member-authorized settlements.
+        // The from DID is verified via JWT authentication before this point.
+        // The signature field records the authorization method.
+        // TODO(hardening): wire actual Ed25519 signature from client request body.
         let entry = JournalEntryBuilder::new(from.clone())
             .debit(from.clone(), currency.clone(), amount)
             .credit(to.clone(), currency.clone(), amount)
-            .with_system_provenance("direct settlement")
+            .with_direct_member_provenance(from.clone(), "jwt-authenticated")
             .build()
             .map_err(GatewayError::SubstrateError)?;
 
