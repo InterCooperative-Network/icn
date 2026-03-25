@@ -121,15 +121,17 @@ impl LedgerManager {
 
     /// Create a settlement transaction.
     ///
-    /// `auth_proof` should be supplied by direct-member HTTP paths.
-    /// It is the HMAC-SHA256 JWT signature segment from the Authorization header,
-    /// formatted as `"jwt-sig:<base64url-segment>"`.  This creates a durable,
-    /// node-verifiable cryptographic reference that links the journal entry to
-    /// the specific auth token that authorized the action (INV-1).
+    /// `auth_proof` encodes the authorization context for the stored `DirectMember`
+    /// provenance entry.  Three values are meaningful:
     ///
-    /// Callers without an HTTP context (escrow release, recurring settlements)
-    /// pass `None`; the entry is still recorded as `DirectMember` with an
-    /// explicit `"system-executed"` marker that signals no per-request proof.
+    /// - `Some("jwt-sig:<seg>")` — HTTP direct-member path, usable Authorization header.
+    ///   The third JWT segment is HMAC-SHA256("{header}.{payload}", jwt_secret), a
+    ///   node-verifiable fingerprint tying this entry to a specific auth token (INV-1).
+    /// - `Some("http-auth-missing")` — HTTP direct-member path, Authorization header
+    ///   absent or unparseable.  Distinguishes "proof was expected but unavailable"
+    ///   from true system execution for audit/compliance purposes.
+    /// - `None` — non-HTTP/system paths (escrow release, recurring settlements).
+    ///   Stored as `"system-executed"` to signal no per-request proof was ever expected.
     pub async fn create_settlement(
         &self,
         coop_id: &CoopId,
@@ -158,13 +160,10 @@ impl LedgerManager {
 
         // Build the journal entry with INV-1 provenance.
         //
-        // When auth_proof is Some("jwt-sig:<seg>"): the third JWT segment is the
-        // HMAC-SHA256 of "{header}.{payload}" — a real cryptographic authorization
-        // fingerprint that ties this entry to a specific, verified auth token.
-        //
-        // When auth_proof is None (escrow, recurring, system paths): record
-        // "system-executed" to make clear this entry has no per-request proof,
-        // rather than falsely claiming "jwt-authenticated".
+        // Three stored values (see create_settlement doc):
+        //   "jwt-sig:<seg>"     — HTTP path, usable Authorization header
+        //   "http-auth-missing" — HTTP path, Authorization header absent/unparseable
+        //   "system-executed"   — non-HTTP system paths (escrow, recurring)
         let proof = auth_proof.unwrap_or_else(|| "system-executed".to_string());
         let entry = JournalEntryBuilder::new(from.clone())
             .debit(from.clone(), currency.clone(), amount)

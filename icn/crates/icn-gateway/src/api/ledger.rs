@@ -122,13 +122,19 @@ pub async fn create_settlement(
     // The third JWT segment is HMAC-SHA256("{header}.{payload}", jwt_secret) —
     // a node-verifiable fingerprint that ties this journal entry to the specific
     // auth token that authorized the action.
+    //
+    // We always pass Some(...) from the HTTP path so that create_settlement can
+    // distinguish "HTTP request with usable proof" from "true system-executed path".
+    // When the header is absent or unparseable, we store "http-auth-missing" rather
+    // than "system-executed", preserving the semantic distinction for auditors.
     let auth_proof = http_req
         .headers()
         .get("authorization")
         .and_then(|v| v.to_str().ok())
         .and_then(|s| s.strip_prefix("Bearer "))
         .and_then(|token| token.splitn(3, '.').nth(2))
-        .map(|sig| format!("jwt-sig:{sig}"));
+        .map(|sig| format!("jwt-sig:{sig}"))
+        .unwrap_or_else(|| "http-auth-missing".to_string());
 
     let hash = ledger_mgr
         .create_settlement(
@@ -137,7 +143,7 @@ pub async fn create_settlement(
             &to,
             req.amount,
             req.unit.clone(),
-            auth_proof,
+            Some(auth_proof),
         )
         .await?;
 
@@ -1657,9 +1663,10 @@ mod tests {
 
     // INV-1 boundary: a request without a usable Authorization header must NOT
     // produce a "jwt-sig:*" provenance entry.  The handler must degrade honestly
-    // to "system-executed" rather than storing a false verified-auth claim.
+    // to "http-auth-missing" — distinct from "system-executed" (which is reserved
+    // for non-HTTP/system callers that never had an auth context).
     #[actix_web::test]
-    async fn test_inv1_missing_bearer_sig_stores_system_executed_not_jwt_sig() {
+    async fn test_inv1_missing_bearer_sig_stores_http_auth_missing() {
         use icn_ledger::types::ProvenanceRef;
 
         let ledger_mgr = Arc::new(LedgerManager::new());
@@ -1704,7 +1711,8 @@ mod tests {
             exp: 9_999_999_999,
         };
 
-        // No Authorization header — the extraction path must return None → "system-executed".
+        // No Authorization header — the extraction path must store "http-auth-missing",
+        // NOT "system-executed" (which is reserved for true non-HTTP system paths).
         let req = test::TestRequest::post()
             .uri("/ledger/test-coop/settle")
             .set_json(&req_body)
@@ -1726,12 +1734,16 @@ mod tests {
         match &entries[0].provenance {
             ProvenanceRef::DirectMember { auth_proof, .. } => {
                 assert_eq!(
-                    auth_proof, "system-executed",
-                    "INV-1: missing Authorization must not produce jwt-sig provenance"
+                    auth_proof, "http-auth-missing",
+                    "INV-1: missing Authorization on HTTP path must store http-auth-missing, not system-executed"
                 );
                 assert!(
                     !auth_proof.starts_with("jwt-sig:"),
                     "INV-1: no Authorization header must never produce jwt-sig:* provenance"
+                );
+                assert_ne!(
+                    auth_proof, "system-executed",
+                    "INV-1: http-auth-missing must not collapse into system-executed"
                 );
             }
             other => panic!("expected DirectMember provenance, got: {other:?}"),
