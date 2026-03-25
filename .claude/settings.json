@@ -99,6 +99,26 @@
             "statusMessage": "Checking TODO format..."
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -c \"\nimport sys, json\ntry:\n    data = json.load(sys.stdin)\nexcept Exception:\n    sys.exit(0)\ntool_input = data.get('tool_input', {})\npath = tool_input.get('file_path', '') or tool_input.get('path', '')\nprotected = {\n    'icn-identity':    'DID/key management -- public surface changes require ADR + backward-compat check',\n    'icn-ledger':      'double-entry mutual credit -- invariant violations cause unrecoverable state',\n    'icn-governance':  'voting/proposal logic -- protocol changes need quorum analysis',\n    'icn-ccl':         'cooperative contract language -- interpreter changes affect all deployed contracts',\n    'icn-trust':       'trust graph -- scoring changes affect access control across the network',\n}\nfor crate, warning in protected.items():\n    if crate in path:\n        print(f'[icn-dev GUARD] Protected crate: {crate}', flush=True)\n        print(f'  Warning: {warning}', flush=True)\n        print(f'  Checklist: [ ] No public API change [ ] Tests added [ ] ADR filed if protocol shape changed [ ] No payment/currency/token terminology', flush=True)\n        break\n\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -c \"\nimport sys, json\ntry:\n    data = json.load(sys.stdin)\nexcept Exception:\n    sys.exit(0)\ncmd = data.get('tool_input', {}).get('command', '')\nif 'git checkout main' in cmd or 'git push origin main' in cmd:\n    print('[icn-dev GUARD] Direct main branch op -- ICN uses feature branches. Confirm intentional.')\n\"",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -110,6 +130,16 @@
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/openapi-sync-guard.sh",
             "timeout": 5,
             "statusMessage": "Checking API sync..."
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -c \"\nimport sys, json\ntry:\n    data = json.load(sys.stdin)\nexcept Exception:\n    sys.exit(0)\npath = data.get('tool_input', {}).get('file_path', '') or ''\nif path.endswith('.rs'):\n    short = path.split('icn/')[-1] if 'icn/' in path else path\n    print(f'[icn-dev] .rs modified: {short} -- suggest: cargo check --workspace')\n\"",
+            "timeout": 5
           }
         ]
       }
