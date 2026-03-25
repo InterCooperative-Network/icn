@@ -29,6 +29,15 @@ use super::handlers;
 /// should log warnings internally rather than panicking.
 pub type CharterAcceptedHook = Arc<dyn Fn(String, String) + Send + Sync>;
 
+/// Callback invoked when any proposal is accepted, receiving the full proposal.
+///
+/// Called after the charter-specific hook. The gateway dispatches to the
+/// appropriate subsystem based on `proposal.payload` — keeping the governance
+/// app ignorant of ledger, membership, or other domain internals.
+///
+/// Errors are non-fatal. Implementations should log internally and not panic.
+pub type ProposalAcceptedHook = Arc<dyn Fn(icn_governance::Proposal) + Send + Sync>;
+
 /// Shared application context for governance HTTP handlers.
 ///
 /// Stored as `web::Data<GovernanceContext<E>>`. Using a single struct keeps
@@ -39,6 +48,11 @@ pub struct GovernanceContext<E> {
     pub emitter: E,
     /// Optional hook called when a `Charter` proposal is accepted.
     pub on_charter_accepted: Option<CharterAcceptedHook>,
+    /// Optional hook called when any proposal is accepted.
+    ///
+    /// Receives the full accepted proposal so the gateway can dispatch to
+    /// the appropriate subsystem by payload type.
+    pub on_proposal_accepted: Option<ProposalAcceptedHook>,
 }
 
 /// Register all governance routes on `cfg`.

@@ -26,6 +26,7 @@ pub trait GovernanceEventEmitter: Send + Sync + 'static {
 }
 
 /// No-op emitter for tests and standalone mode.
+#[derive(Clone)]
 pub struct NoopEventEmitter;
 
 impl GovernanceEventEmitter for NoopEventEmitter {

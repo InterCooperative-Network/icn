@@ -817,10 +817,66 @@ impl GatewayServer {
         //
         // If a charter_accepted_hook is provided (wired from icnd via init_gateway),
         // it is called when a Charter proposal closes with Accepted.
+        //
+        // on_proposal_accepted is built inline and dispatches to the appropriate
+        // subsystem based on payload type:
+        //   FreezeMember  → ledger.freeze_member_with_metadata() on domain ledger
+        //   (other types) → no-op until wired
+        let ledger_mgr_for_gov = ledger_manager.clone();
+        let on_proposal_accepted: icn_governance_actor::http::configure::ProposalAcceptedHook =
+            std::sync::Arc::new(move |proposal: icn_governance::Proposal| {
+                match &proposal.payload {
+                    icn_governance::ProposalPayload::FreezeMember {
+                        member,
+                        reason,
+                        duration_seconds,
+                    } => {
+                        let ledger_mgr = ledger_mgr_for_gov.clone();
+                        let member = member.clone();
+                        let reason = reason.clone();
+                        let duration_seconds = *duration_seconds;
+                        let proposal_id = proposal.id.0.clone();
+                        // domain_id is the cooperative's ID on this node (by convention)
+                        let coop_id = proposal.domain_id.0.clone();
+                        tokio::spawn(async move {
+                            match ledger_mgr.get_ledger(&coop_id).await {
+                                Ok(ledger_arc) => {
+                                    let mut ledger = ledger_arc.write().await;
+                                    ledger.freeze_member_with_metadata(
+                                        member,
+                                        reason,
+                                        duration_seconds,
+                                        Some(proposal_id),
+                                        None,
+                                    );
+                                }
+                                Err(e) => {
+                                    tracing::warn!(
+                                        coop_id = %coop_id,
+                                        error = %e,
+                                        "FreezeMember governance effect: ledger not found for domain"
+                                    );
+                                }
+                            }
+                        });
+                    }
+                    _ => {
+                        // Other payload types not yet wired to execution.
+                        // Log at trace level — future tranches will add arms here.
+                        tracing::trace!(
+                            proposal_id = %proposal.id.0,
+                            payload_type = %proposal.payload.type_name(),
+                            "Proposal accepted; no execution handler wired for this payload type"
+                        );
+                    }
+                }
+            });
+
         let gov_ctx = GovernanceContext {
             manager: governance_manager.clone(),
             emitter: GatewayEventAdapter::new(event_broadcaster.clone()),
             on_charter_accepted: self.charter_accepted_hook,
+            on_proposal_accepted: Some(on_proposal_accepted),
         };
 
         // Create rate limiter with configured or default config
