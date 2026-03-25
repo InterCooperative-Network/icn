@@ -748,10 +748,10 @@ mod tests {
 
         assert_eq!(entries.len(), 1);
         match &entries[0].provenance {
-            ProvenanceRef::DirectMember { did, signature } => {
+            ProvenanceRef::DirectMember { did, auth_proof } => {
                 assert_eq!(did, alice.did(), "provenance DID must be the sender");
                 assert_eq!(
-                    signature, &fake_jwt_sig,
+                    auth_proof, &fake_jwt_sig,
                     "INV-1: journal entry must store the JWT sig segment verbatim"
                 );
             }
@@ -788,13 +788,13 @@ mod tests {
 
         assert_eq!(entries.len(), 1);
         match &entries[0].provenance {
-            ProvenanceRef::DirectMember { signature, .. } => {
+            ProvenanceRef::DirectMember { auth_proof, .. } => {
                 assert_eq!(
-                    signature, "system-executed",
+                    auth_proof, "system-executed",
                     "INV-1: system paths must not falsely claim jwt-authenticated"
                 );
                 assert_ne!(
-                    signature, "jwt-authenticated",
+                    auth_proof, "jwt-authenticated",
                     "INV-1: the old static placeholder must never appear"
                 );
             }

@@ -1644,10 +1644,10 @@ mod tests {
 
         assert_eq!(entries.len(), 1, "exactly one journal entry must exist");
         match &entries[0].provenance {
-            ProvenanceRef::DirectMember { did, signature } => {
+            ProvenanceRef::DirectMember { did, auth_proof } => {
                 assert_eq!(did, alice.did(), "provenance DID must be the sender");
                 assert_eq!(
-                    signature, "jwt-sig:fakesig",
+                    auth_proof, "jwt-sig:fakesig",
                     "INV-1: HTTP handler must carry JWT third segment into stored provenance"
                 );
             }
@@ -1724,13 +1724,13 @@ mod tests {
 
         assert_eq!(entries.len(), 1);
         match &entries[0].provenance {
-            ProvenanceRef::DirectMember { signature, .. } => {
+            ProvenanceRef::DirectMember { auth_proof, .. } => {
                 assert_eq!(
-                    signature, "system-executed",
+                    auth_proof, "system-executed",
                     "INV-1: missing Authorization must not produce jwt-sig provenance"
                 );
                 assert!(
-                    !signature.starts_with("jwt-sig:"),
+                    !auth_proof.starts_with("jwt-sig:"),
                     "INV-1: no Authorization header must never produce jwt-sig:* provenance"
                 );
             }

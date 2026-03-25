@@ -66,8 +66,8 @@
     {
       "id": "s26-t6",
       "title": "Governance→economics provenance hardening (INV-2/5/6): chain endpoint, allocation receipts, /health/full, 4 regression tests",
-      "status": "in-progress",
-      "pr": null,
+      "status": "in-review",
+      "pr": 1434,
       "assignee": "matt",
       "epic": "arch-invariants"
     }

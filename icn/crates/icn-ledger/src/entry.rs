@@ -95,14 +95,21 @@ impl JournalEntryBuilder {
     /// formal governance proposal — e.g., a member-to-member credit grant.
     ///
     /// # Arguments
-    /// * `did`       - DID of the authorizing member
-    /// * `signature` - Ed25519 signature of the entry by the member's key.
-    ///   A `DirectMember` entry without a signature has no verifiable
-    ///   authorization, so the signature is required.
-    pub fn with_direct_member_provenance(mut self, did: Did, signature: impl Into<String>) -> Self {
+    /// * `did`        - DID of the authorizing member
+    /// * `auth_proof` - Stored authorization evidence for this action.
+    ///   On the HTTP direct-member path, pass `"jwt-sig:<segment>"` where
+    ///   `<segment>` is the HMAC-SHA256 third segment of the JWT from the
+    ///   `Authorization` header.  For system-executed paths (escrow, recurring
+    ///   settlements), pass `"system-executed"`.
+    ///   This is NOT an Ed25519 signature over entry content (see issue #1435).
+    pub fn with_direct_member_provenance(
+        mut self,
+        did: Did,
+        auth_proof: impl Into<String>,
+    ) -> Self {
         self.provenance = Some(ProvenanceRef::DirectMember {
             did,
-            signature: signature.into(),
+            auth_proof: auth_proof.into(),
         });
         self
     }
@@ -411,33 +418,76 @@ mod tests {
         assert_eq!(de.provenance, entry.provenance);
     }
 
-    /// Test that DirectMember provenance round-trips correctly.
+    /// Test that DirectMember provenance round-trips correctly with the new
+    /// `auth_proof` field name.
     #[test]
     fn test_direct_member_provenance_roundtrip() {
         let keypair = KeyPair::generate().unwrap();
         let alice = keypair.did().clone();
         let bob = KeyPair::generate().unwrap().did().clone();
 
-        let sig = "ed25519:abcdef1234567890";
+        let proof = "jwt-sig:aHR0cHM6Ly9leGFtcGxlLmNvbQ";
 
         let entry = JournalEntryBuilder::new(alice.clone())
             .debit(alice.clone(), "hours".to_string(), 3)
             .credit(bob.clone(), "hours".to_string(), 3)
-            .with_direct_member_provenance(alice.clone(), sig)
+            .with_direct_member_provenance(alice.clone(), proof)
             .build()
             .expect("direct member provenance entry should build");
 
         match &entry.provenance {
-            ProvenanceRef::DirectMember { did, signature } => {
+            ProvenanceRef::DirectMember { did, auth_proof } => {
                 assert_eq!(did, &alice);
-                assert_eq!(signature, sig);
+                assert_eq!(auth_proof, proof);
             }
             other => panic!("Expected DirectMember, got {other:?}"),
         }
 
+        // New entries serialize with "auth_proof" key.
         let json = serde_json::to_string(&entry).unwrap();
-        assert!(json.contains(sig), "JSON should contain signature");
+        assert!(
+            json.contains("\"auth_proof\""),
+            "new entries must serialize with auth_proof key, got: {json}"
+        );
+        assert!(json.contains(proof), "JSON must contain the proof value");
         let de: JournalEntry = serde_json::from_str(&json).unwrap();
         assert_eq!(de.provenance, entry.provenance);
+    }
+
+    /// Backward-compatibility: on-disk Sled data written before the rename
+    /// used `"signature"` as the JSON key.  The serde alias must still
+    /// deserialize those entries without error.
+    #[test]
+    fn test_direct_member_provenance_backward_compat_signature_alias() {
+        let keypair = KeyPair::generate().unwrap();
+        let alice = keypair.did().clone();
+
+        // Simulate a pre-rename journal entry where the field was `"signature"`.
+        let old_json = format!(
+            r#"{{
+                "timestamp": 1000000000,
+                "author": {did_json},
+                "contract_ref": null,
+                "accounts": [],
+                "parents": [],
+                "signature": null,
+                "nonce": null,
+                "provenance": {{"DirectMember": {{"did": {did_json}, "signature": "jwt-sig:oldsig"}}}}
+            }}"#,
+            did_json = serde_json::to_string(&alice).unwrap()
+        );
+
+        let entry: JournalEntry =
+            serde_json::from_str(&old_json).expect("old signature key must deserialize via alias");
+
+        match &entry.provenance {
+            ProvenanceRef::DirectMember { auth_proof, .. } => {
+                assert_eq!(
+                    auth_proof, "jwt-sig:oldsig",
+                    "backward-compat alias must preserve the stored value"
+                );
+            }
+            other => panic!("Expected DirectMember, got {other:?}"),
+        }
     }
 }
