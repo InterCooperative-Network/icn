@@ -96,6 +96,10 @@ where
             web::resource("/proposals/{proposal_id}/proof")
                 .route(web::get().to(handlers::get_proof::<E>)),
         )
+        .service(
+            web::resource("/proposals/{proposal_id}/chain")
+                .route(web::get().to(handlers::get_chain::<E>)),
+        )
         // ── Discussion endpoints ─────────────────────────────────────────
         .service(
             web::resource("/proposals/{proposal_id}/discussion")

@@ -328,6 +328,7 @@ pub async fn execute_due_settlements(
                 &from_did,
                 payment.amount,
                 payment.currency.clone(),
+                None, // system-executed path: no per-request JWT proof
             )
             .await
         {

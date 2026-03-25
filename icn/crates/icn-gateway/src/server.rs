@@ -1134,6 +1134,7 @@ impl GatewayServer {
                         .service(api::health::ready)
                         .service(api::health::health)
                         .service(api::health::health_detailed)
+                        .service(api::health::health_full)
                         .service(api::auth::challenge)
                         .service(api::auth::verify)
                         .service(api::websocket::websocket)

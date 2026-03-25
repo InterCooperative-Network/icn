@@ -374,6 +374,25 @@ impl GovernanceReceiptBackend for ReceiptStore {
     ) -> Result<Option<GovernanceDecisionReceipt>, String> {
         self.get_governance_by_proposal(proposal_id)
     }
+
+    fn put_allocation(&self, receipt: &AllocationReceipt) -> Result<Hash, String> {
+        self.put_allocation(receipt)
+    }
+
+    fn get_governance_by_decision(
+        &self,
+        decision_hash: &Hash,
+    ) -> Result<Option<GovernanceDecisionReceipt>, String> {
+        let results = self.list_governance_by_decision(decision_hash)?;
+        Ok(results.into_iter().next())
+    }
+
+    fn list_allocations_by_decision(
+        &self,
+        decision_hash: &Hash,
+    ) -> Result<Vec<AllocationReceipt>, String> {
+        self.list_allocations_by_decision(decision_hash)
+    }
 }
 
 #[cfg(test)]

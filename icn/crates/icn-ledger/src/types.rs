@@ -55,8 +55,26 @@ pub enum ProvenanceRef {
     /// Entry was created directly by a member (not via governance).
     ///
     /// `did` identifies the authorizing member.
-    /// `signature` is their Ed25519 signature over the entry content.
-    DirectMember { did: Did, signature: String },
+    ///
+    /// `auth_proof` carries stored authorization evidence for this action.
+    /// The format depends on the call path:
+    /// - `"jwt-sig:<base64url-segment>"` — the HMAC-SHA256 third segment of
+    ///   the JWT that authorized the HTTP request (verifiable by the issuing
+    ///   node using `jwt_secret`; not publicly verifiable without the secret)
+    /// - `"system-executed"` — entry created by a system path (escrow release,
+    ///   recurring settlement) with no per-request HTTP auth context
+    ///
+    /// This field is NOT an Ed25519 signature over the entry content.
+    /// For content-bound asymmetric signing, see issue #1435.
+    DirectMember {
+        did: Did,
+        /// Stored authorization evidence. See variant doc for format variants.
+        ///
+        /// Serde alias `"signature"` preserves backward compatibility with
+        /// existing on-disk Sled data written before this field was renamed.
+        #[serde(alias = "signature")]
+        auth_proof: String,
+    },
 
     /// Entry was created by the system (FX transfer, DID migration, mint, etc.).
     ///

@@ -119,7 +119,19 @@ impl LedgerManager {
         self.budget_store = Some(budget_store);
     }
 
-    /// Create a settlement transaction
+    /// Create a settlement transaction.
+    ///
+    /// `auth_proof` encodes the authorization context for the stored `DirectMember`
+    /// provenance entry.  Three values are meaningful:
+    ///
+    /// - `Some("jwt-sig:<seg>")` — HTTP direct-member path, usable Authorization header.
+    ///   The third JWT segment is HMAC-SHA256("{header}.{payload}", jwt_secret), a
+    ///   node-verifiable fingerprint tying this entry to a specific auth token (INV-1).
+    /// - `Some("http-auth-missing")` — HTTP direct-member path, Authorization header
+    ///   absent or unparseable.  Distinguishes "proof was expected but unavailable"
+    ///   from true system execution for audit/compliance purposes.
+    /// - `None` — non-HTTP/system paths (escrow release, recurring settlements).
+    ///   Stored as `"system-executed"` to signal no per-request proof was ever expected.
     pub async fn create_settlement(
         &self,
         coop_id: &CoopId,
@@ -127,6 +139,7 @@ impl LedgerManager {
         to: &Did,
         amount: i64,
         currency: String,
+        auth_proof: Option<String>,
     ) -> Result<String> {
         // Enforce budget limits if store is available
         if let Some(store) = &self.budget_store {
@@ -145,11 +158,17 @@ impl LedgerManager {
 
         let ledger_arc = self.get_ledger(coop_id).await?;
 
-        // Build the journal entry
+        // Build the journal entry with INV-1 provenance.
+        //
+        // Three stored values (see create_settlement doc):
+        //   "jwt-sig:<seg>"     — HTTP path, usable Authorization header
+        //   "http-auth-missing" — HTTP path, Authorization header absent/unparseable
+        //   "system-executed"   — non-HTTP system paths (escrow, recurring)
+        let proof = auth_proof.unwrap_or_else(|| "system-executed".to_string());
         let entry = JournalEntryBuilder::new(from.clone())
             .debit(from.clone(), currency.clone(), amount)
             .credit(to.clone(), currency.clone(), amount)
-            .with_system_provenance("direct settlement")
+            .with_direct_member_provenance(from.clone(), proof)
             .build()
             .map_err(GatewayError::SubstrateError)?;
 
@@ -604,6 +623,7 @@ mod tests {
                 bob.did(),
                 10,
                 "hours".to_string(),
+                None,
             )
             .await
             .unwrap();
@@ -636,6 +656,7 @@ mod tests {
             bob.did(),
             10,
             "hours".to_string(),
+            None,
         )
         .await
         .unwrap();
@@ -659,6 +680,7 @@ mod tests {
             bob.did(),
             10,
             "hours".to_string(),
+            None,
         )
         .await
         .unwrap();
@@ -691,5 +713,91 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(empty_page.len(), 0); // Offset beyond available entries
+    }
+
+    // INV-1: Journal entries must carry the JWT signature segment when the
+    // settlement is created via an HTTP request path.
+    #[tokio::test]
+    async fn test_inv1_direct_member_provenance_carries_jwt_sig() {
+        use icn_ledger::types::ProvenanceRef;
+
+        let mgr = LedgerManager::new();
+        let alice = IdentityBundle::generate().unwrap();
+        let bob = IdentityBundle::generate().unwrap();
+
+        // Simulate what the HTTP handler passes: the third JWT segment formatted
+        // as "jwt-sig:<base64url-segment>".
+        let fake_jwt_sig = "jwt-sig:aHR0cHM6Ly9leGFtcGxlLmNvbQ".to_string();
+
+        mgr.create_settlement(
+            &"test-coop".to_string(),
+            alice.did(),
+            bob.did(),
+            10,
+            "hours".to_string(),
+            Some(fake_jwt_sig.clone()),
+        )
+        .await
+        .unwrap();
+
+        let entries = mgr
+            .get_history(&"test-coop".to_string(), None, 0, 100)
+            .await
+            .unwrap();
+
+        assert_eq!(entries.len(), 1);
+        match &entries[0].provenance {
+            ProvenanceRef::DirectMember { did, auth_proof } => {
+                assert_eq!(did, alice.did(), "provenance DID must be the sender");
+                assert_eq!(
+                    auth_proof, &fake_jwt_sig,
+                    "INV-1: journal entry must store the JWT sig segment verbatim"
+                );
+            }
+            other => panic!("Expected DirectMember provenance, got: {other:?}"),
+        }
+    }
+
+    // INV-1 (negative): System-executed paths must record "system-executed",
+    // never the misleading "jwt-authenticated" string.
+    #[tokio::test]
+    async fn test_inv1_system_path_records_system_executed_not_jwt_authenticated() {
+        use icn_ledger::types::ProvenanceRef;
+
+        let mgr = LedgerManager::new();
+        let alice = IdentityBundle::generate().unwrap();
+        let bob = IdentityBundle::generate().unwrap();
+
+        // Escrow and recurring settlement callers pass None.
+        mgr.create_settlement(
+            &"test-coop".to_string(),
+            alice.did(),
+            bob.did(),
+            10,
+            "hours".to_string(),
+            None,
+        )
+        .await
+        .unwrap();
+
+        let entries = mgr
+            .get_history(&"test-coop".to_string(), None, 0, 100)
+            .await
+            .unwrap();
+
+        assert_eq!(entries.len(), 1);
+        match &entries[0].provenance {
+            ProvenanceRef::DirectMember { auth_proof, .. } => {
+                assert_eq!(
+                    auth_proof, "system-executed",
+                    "INV-1: system paths must not falsely claim jwt-authenticated"
+                );
+                assert_ne!(
+                    auth_proof, "jwt-authenticated",
+                    "INV-1: the old static placeholder must never appear"
+                );
+            }
+            other => panic!("Expected DirectMember provenance, got: {other:?}"),
+        }
     }
 }
