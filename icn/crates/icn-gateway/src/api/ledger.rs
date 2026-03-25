@@ -1561,4 +1561,180 @@ mod tests {
             "Error code should be FX_NOT_CONFIGURED"
         );
     }
+
+    // INV-1 HTTP-level proof: the actix handler must extract the JWT third segment
+    // from the Authorization header and store it as "jwt-sig:<seg>" in the journal
+    // entry's DirectMember provenance.
+    //
+    // This is the proof boundary above the manager-level test in ledger_mgr.rs:
+    // it exercises the actual header extraction path in the HTTP handler, not just
+    // the manager's storage semantics.
+    //
+    // Auth bypass: TokenClaims injected directly into request extensions (the
+    // middleware reads from extensions, not from the Authorization header). The
+    // Authorization header is present only for the INV-1 extraction path.
+    #[actix_web::test]
+    async fn test_inv1_http_settlement_stores_jwt_sig_in_provenance() {
+        use icn_ledger::types::ProvenanceRef;
+
+        let ledger_mgr = Arc::new(LedgerManager::new());
+        let db = sled::Config::new().temporary(true).open().unwrap();
+        let budget_store = BudgetStore::new(db);
+        let velocity_limiter = VelocityLimiter::default();
+        let trust_mgr = Arc::new(TrustManager::new());
+        let store = Arc::new(crate::notifications::NotificationStore::new(
+            sled::Config::new().temporary(true).open().unwrap(),
+        ));
+        let notification_service =
+            Arc::new(crate::notifications::NotificationService::new(store, None));
+        let event_broadcaster = Arc::new(EventBroadcaster::new());
+        let alice = IdentityBundle::generate().unwrap();
+        let bob = IdentityBundle::generate().unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(ledger_mgr.clone()))
+                .app_data(web::Data::new(budget_store.clone()))
+                .app_data(web::Data::new(velocity_limiter.clone()))
+                .app_data(web::Data::new(trust_mgr.clone()))
+                .app_data(web::Data::new(notification_service.clone()))
+                .app_data(web::Data::new(event_broadcaster.clone()))
+                .service(web::scope("/ledger").service(create_settlement)),
+        )
+        .await;
+
+        let req_body = RecordTransferRequest {
+            from: alice.did().to_string(),
+            to: bob.did().to_string(),
+            amount: 10,
+            unit: "hours".to_string(),
+            memo: None,
+        };
+
+        // Inject claims for auth bypass; include Authorization header with a synthetic
+        // JWT-shaped token so the extraction path fires.
+        // The third segment ("fakesig") is what must appear in stored provenance.
+        let claims = TokenClaims {
+            sub: alice.did().to_string(),
+            iat: 1_000_000_000,
+            coop_id: "test-coop".to_string(),
+            scopes: vec!["ledger:write".to_string()],
+            exp: 9_999_999_999,
+        };
+
+        let req = test::TestRequest::post()
+            .uri("/ledger/test-coop/settle")
+            .insert_header(("Authorization", "Bearer hdr.payload.fakesig"))
+            .set_json(&req_body)
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert!(
+            resp.status().is_success(),
+            "settlement must succeed: {:?}",
+            resp.status()
+        );
+
+        // Storage-truth check: read back via get_history and inspect the provenance field.
+        let entries = ledger_mgr
+            .get_history(&"test-coop".to_string(), None, 0, 100)
+            .await
+            .unwrap();
+
+        assert_eq!(entries.len(), 1, "exactly one journal entry must exist");
+        match &entries[0].provenance {
+            ProvenanceRef::DirectMember { did, signature } => {
+                assert_eq!(did, alice.did(), "provenance DID must be the sender");
+                assert_eq!(
+                    signature, "jwt-sig:fakesig",
+                    "INV-1: HTTP handler must carry JWT third segment into stored provenance"
+                );
+            }
+            other => panic!("expected DirectMember provenance, got: {other:?}"),
+        }
+    }
+
+    // INV-1 boundary: a request without a usable Authorization header must NOT
+    // produce a "jwt-sig:*" provenance entry.  The handler must degrade honestly
+    // to "system-executed" rather than storing a false verified-auth claim.
+    #[actix_web::test]
+    async fn test_inv1_missing_bearer_sig_stores_system_executed_not_jwt_sig() {
+        use icn_ledger::types::ProvenanceRef;
+
+        let ledger_mgr = Arc::new(LedgerManager::new());
+        let db = sled::Config::new().temporary(true).open().unwrap();
+        let budget_store = BudgetStore::new(db);
+        let velocity_limiter = VelocityLimiter::default();
+        let trust_mgr = Arc::new(TrustManager::new());
+        let store = Arc::new(crate::notifications::NotificationStore::new(
+            sled::Config::new().temporary(true).open().unwrap(),
+        ));
+        let notification_service =
+            Arc::new(crate::notifications::NotificationService::new(store, None));
+        let event_broadcaster = Arc::new(EventBroadcaster::new());
+        let alice = IdentityBundle::generate().unwrap();
+        let bob = IdentityBundle::generate().unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(ledger_mgr.clone()))
+                .app_data(web::Data::new(budget_store.clone()))
+                .app_data(web::Data::new(velocity_limiter.clone()))
+                .app_data(web::Data::new(trust_mgr.clone()))
+                .app_data(web::Data::new(notification_service.clone()))
+                .app_data(web::Data::new(event_broadcaster.clone()))
+                .service(web::scope("/ledger").service(create_settlement)),
+        )
+        .await;
+
+        let req_body = RecordTransferRequest {
+            from: alice.did().to_string(),
+            to: bob.did().to_string(),
+            amount: 10,
+            unit: "hours".to_string(),
+            memo: None,
+        };
+
+        let claims = TokenClaims {
+            sub: alice.did().to_string(),
+            iat: 1_000_000_000,
+            coop_id: "test-coop".to_string(),
+            scopes: vec!["ledger:write".to_string()],
+            exp: 9_999_999_999,
+        };
+
+        // No Authorization header — the extraction path must return None → "system-executed".
+        let req = test::TestRequest::post()
+            .uri("/ledger/test-coop/settle")
+            .set_json(&req_body)
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert!(
+            resp.status().is_success(),
+            "settlement must succeed even without Authorization header"
+        );
+
+        let entries = ledger_mgr
+            .get_history(&"test-coop".to_string(), None, 0, 100)
+            .await
+            .unwrap();
+
+        assert_eq!(entries.len(), 1);
+        match &entries[0].provenance {
+            ProvenanceRef::DirectMember { signature, .. } => {
+                assert_eq!(
+                    signature, "system-executed",
+                    "INV-1: missing Authorization must not produce jwt-sig provenance"
+                );
+                assert!(
+                    !signature.starts_with("jwt-sig:"),
+                    "INV-1: no Authorization header must never produce jwt-sig:* provenance"
+                );
+            }
+            other => panic!("expected DirectMember provenance, got: {other:?}"),
+        }
+    }
 }
