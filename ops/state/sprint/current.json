@@ -4,7 +4,9 @@
   "governing_rule": "A task is only done when repo state, board state, and narrative state agree.",
   "start_date": "2026-03-23",
   "status": "active",
-  "spine": ["#1406"],
+  "spine": [
+    "#1406"
+  ],
   "shipped": [
     "#1406 — refactor(compute): extract reservation helpers + idempotence tests (PR #1406)"
   ],
@@ -20,5 +22,46 @@
     ],
     "notes": "Fix pass extended reservation lifecycle coverage to all task termination paths: on_task_cancelled, cancel_task, complete_task_result (quorum path), on_task_result legacy inline path, WasmRef early exits, and check_timeouts for pending (never-claimed) tasks. Timeout path structural fix: task_scope_map only covers claimed tasks; added direct scope lookup from TaskManager for pending tasks. 6th test added: test_reservation_released_on_timeout. TriggerTimeoutSweep test hook added to ComputeHandle."
   },
-  "tasks": []
+  "tasks": [
+    {
+      "id": "s26-t1",
+      "title": "Migrate CI coverage to llvm-cov on Zentith self-hosted runner",
+      "status": "in-progress",
+      "pr": null,
+      "assignee": "matt",
+      "epic": "devops"
+    },
+    {
+      "id": "s26-t2",
+      "title": "Review dependabot PR #1422: bump dtolnay/rust-toolchain from 1.88.0 to 1.100.0",
+      "status": "blocked",
+      "pr": 1422,
+      "assignee": null,
+      "epic": "deps"
+    },
+    {
+      "id": "s26-t3",
+      "title": "Resolve fix/demo-path-bugs branch: 7 dirty files from route rename (/payment+currency -> /settle+unit)",
+      "status": "in-review",
+      "pr": 1433,
+      "assignee": "matt",
+      "epic": "demo"
+    },
+    {
+      "id": "s26-t4",
+      "title": "Complete Claude agent definition rewrite (.claude/agents/icn-architect.md)",
+      "status": "in-progress",
+      "pr": null,
+      "assignee": "matt",
+      "epic": "workflow"
+    },
+    {
+      "id": "s26-t5",
+      "title": "Unblock CI: main branch CI run stuck in queued state",
+      "status": "done",
+      "pr": null,
+      "assignee": null,
+      "epic": "devops"
+    }
+  ]
 }

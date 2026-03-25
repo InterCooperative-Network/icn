@@ -154,7 +154,10 @@ for p in d.get('data', []):
 # ---------------------------------------------------------------------------
 narrate "Pre-step: Resetting BrightWorks demo state (patronage ledger + Q1 proposal)"
 aside "Closes stale Q1 proposals; re-seeds canonical Draft for this run"
-if bash "${SCRIPT_DIR}/reseed-federation-demo.sh" 2>&1 | grep -E "(RESULT|WARN|FAIL|===|Seeded|Skipped|Failed)" | head -20; then
+_reseed_out=$(bash "${SCRIPT_DIR}/reseed-federation-demo.sh" 2>&1)
+_reseed_rc=$?
+echo "$_reseed_out" | grep -E "(RESULT|WARN|FAIL|===|Seeded|Skipped|Failed)" | head -20
+if [ "$_reseed_rc" -eq 0 ]; then
   result "State reset complete"
 else
   warn "Reseed returned non-zero -- check output; proceeding anyway"

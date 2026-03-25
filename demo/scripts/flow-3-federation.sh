@@ -142,7 +142,10 @@ _require_2xx() {
 # ---------------------------------------------------------------------------
 narrate "Pre-step: Reseeding federation demo state (idempotent)"
 aside "Clears stale proposals from prior runs; re-seeds coop records and governance domains"
-if bash "${SCRIPT_DIR}/reseed-federation-demo.sh" 2>&1 | grep -E "(RESULT|WARN|FAIL|===|Seeded|Skipped|Failed)" | head -20; then
+_reseed_out=$(bash "${SCRIPT_DIR}/reseed-federation-demo.sh" 2>&1)
+_reseed_rc=$?
+echo "$_reseed_out" | grep -E "(RESULT|WARN|FAIL|===|Seeded|Skipped|Failed)" | head -20
+if [ "$_reseed_rc" -eq 0 ]; then
   result "Reseed complete"
 else
   warn "Reseed returned non-zero -- proceeding anyway"
