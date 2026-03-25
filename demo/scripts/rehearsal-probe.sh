@@ -317,7 +317,7 @@ else
   # If 400 mentioning decision_id: deny_unknown_fields IS set — field explicitly rejected
   # If 400 for self-payment/other: field was ignored, other validation failed
   _do_probe_curl "${BRIGHTWORKS_URL}/v1/ledger/brightworks-cooperative/settle" POST \
-    "{\"from\":\"did:icn:zHdQuwTTniwcV4TT1ZcfXsVP7dCojE5czv7vUghmNSmgB\",\"to\":\"did:icn:zyWqWVqGERfRvUz4LVGd4coCZDuNhnufxRpNVTR1BBA7\",\"amount\":1,\"currency\":\"hours\",\"memo\":\"rehearsal-probe-r3\",\"decision_id\":\"00000000-0000-0000-0000-000000000000\"}" \
+    "{\"from\":\"did:icn:zHdQuwTTniwcV4TT1ZcfXsVP7dCojE5czv7vUghmNSmgB\",\"to\":\"did:icn:zyWqWVqGERfRvUz4LVGd4coCZDuNhnufxRpNVTR1BBA7\",\"amount\":1,\"unit\":\"hours\",\"memo\":\"rehearsal-probe-r3\",\"decision_id\":\"00000000-0000-0000-0000-000000000000\"}" \
     "$BRIGHTWORKS_TOKEN"
   R3_HTTP="$PROBE_HTTP_CODE"
   R3_RAW="$(cat "$_RESP_FILE")"
@@ -345,7 +345,7 @@ else
     # 404 = route not matched (actix http.route=default in logs)
     R3_STATUS=MISMATCH; R3_OBSERVED="404-wrong-route"
     _probe_result MISMATCH "R3: 404 — /settle route not matched. Check binary version." \
-      "Binary may predate /payment route or route was registered differently."
+      "Binary may predate the /settle route and still expose /payment instead, or the route was registered differently."
   elif [ "$R3_HTTP" = "400" ]; then
     if [ -n "$R3_BODY_MENTIONS_AUTH" ]; then
       R3_STATUS=UNCLEAR; R3_OBSERVED="400-auth (scope issue)"

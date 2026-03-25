@@ -35,7 +35,7 @@ Every ICN request passes through three questions:
 
 ## Project State (load on every ICN session)
 
-### Current Sprint: Sprint 19 — Pilot Genesis
+### Current Sprint: Sprint 26 -- Pilot Genesis
 
 **Cluster:** 3/3 nodes Ready, K3s v1.34.4+k3s1, ~21-day uptime (as of Mar 21)
 
