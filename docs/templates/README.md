@@ -2,7 +2,7 @@
 
 Templates for consistent documentation across the ICN project.
 
-**Last Updated**: 2026-02-10
+**Last Updated**: 2026-03-26
 
 ## Overview
 
@@ -10,13 +10,28 @@ This directory contains templates for creating new documentation following ICN c
 
 ## Available Templates
 
-Templates should cover:
-- Architecture Decision Records (ADRs)
-- Feature design documents
-- Session summaries
-- Status reports
-- Security analyses
-- API documentation
+### Control-plane authoring (imported)
+
+Use these for durable decisions and specs (see also `docs/internal/documentation-control-system/`):
+
+| Template | Use |
+|----------|-----|
+| [adr-template.md](adr-template.md) | Architecture Decision Records |
+| [rfc-template.md](rfc-template.md) | Request for comments / design proposals |
+| [spec-template.md](spec-template.md) | Normative specifications |
+| [status-note-template.md](status-note-template.md) | Short status / checkpoint notes |
+
+**Specs for the doc system itself:** [../internal/documentation-control-system/00_CONTEXT_PACK_README.md](../internal/documentation-control-system/00_CONTEXT_PACK_README.md)
+
+### Project templates (existing)
+
+| Template | Use |
+|----------|-----|
+| [dev-journal.md](dev-journal.md) | Session / dev journal entries |
+| [supersession-template.md](supersession-template.md) | Marking superseded docs |
+| [BETA_FEEDBACK_TEMPLATE.md](BETA_FEEDBACK_TEMPLATE.md) | Beta feedback |
+
+Other areas (feature designs, security, API) should still follow [../guides/developer/DOCUMENTATION_STYLE.md](../guides/developer/DOCUMENTATION_STYLE.md).
 
 ## Using Templates
 

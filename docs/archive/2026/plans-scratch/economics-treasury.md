@@ -1,3 +1,5 @@
+<!-- Relocated from docs/plans/.scratch/ (tranche 3). -->
+
 # Economics / Treasury — Repo State & Gap Analysis
 
 > Generated 2026-02-14 by economics analyst agent

@@ -15,7 +15,7 @@ Deployment guides and operational procedures:
 
 - **Current Deployment**: [HOMELAB_DEPLOYMENT.md](deployment/HOMELAB_DEPLOYMENT.md)
 - **Monitoring**: See deployment guide for Prometheus/Grafana setup
-- **Runbooks**: [../ops/runbooks/](../ops/runbooks/) - Operational runbooks
+- **Runbooks**: [../guides/operations/runbooks/](../guides/operations/runbooks/) — operational runbooks (stub: [../ops/runbooks/README.md](../ops/runbooks/README.md))
 
 ## Related Documentation
 

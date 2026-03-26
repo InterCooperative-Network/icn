@@ -11,6 +11,7 @@ Canonical index of all ICN documentation, organized by category.
 - [Operations](#operations)
 - [Reference](#reference)
 - [Security](#security)
+- [Status](#status)
 - [Strategy](#strategy)
 
 ---
@@ -875,6 +876,12 @@ Workshop on governance and contract language
 
 **For:** `developers` | **Updated:** 2026-03-10
 
+### 📝 **Living** [Ops runbooks relocated (stub)](/docs/ops/runbooks/README.md)
+
+Runbooks moved to docs/guides/operations/runbooks/ (tranche 3); use that path for updates
+
+**For:** `operators` | **Updated:** 2026-03-26
+
 ### 📋 **Draft** [Pilot Proposal Template](/docs/pilots/pilot-proposal-template.md)
 
 Template for approaching potential pilot communities
@@ -920,6 +927,48 @@ Monitoring configuration for Phase 0 pilot
 
 **For:** `operators` | **Updated:** 2026-03-10
 
+### 📝 **Living** [Emergency Node Restart](/docs/guides/operations/runbooks/01-emergency-restart.md)
+
+Runbook for emergency node restart procedures
+
+**For:** `operators` | **Updated:** 2026-03-10
+
+### 📝 **Living** [Data Recovery Procedure](/docs/guides/operations/runbooks/02-data-recovery.md)
+
+Runbook for node data recovery from backup
+
+**For:** `operators` | **Updated:** 2026-03-10
+
+### 📝 **Living** [Version Upgrade Procedure](/docs/guides/operations/runbooks/03-version-upgrade.md)
+
+Runbook for upgrading daemon to new version
+
+**For:** `operators` | **Updated:** 2026-03-10
+
+### 📝 **Living** [Security Incident Response](/docs/guides/operations/runbooks/04-security-incident.md)
+
+Runbook for security incident response
+
+**For:** `operators`, `security` | **Updated:** 2026-03-10
+
+### 📝 **Living** [Troubleshooting Guide](/docs/guides/operations/runbooks/05-troubleshooting.md)
+
+Common issues and solutions for node operations
+
+**For:** `operators` | **Updated:** 2026-03-10
+
+### 📝 **Living** [Secrets Rotation Procedure](/docs/guides/operations/runbooks/06-secrets-rotation.md)
+
+Runbook for rotating cryptographic secrets
+
+**For:** `operators`, `security` | **Updated:** 2026-03-10
+
+### 📝 **Living** [Pilot Vertical Slice Smoke](/docs/guides/operations/runbooks/07-pilot-vertical-slice-smoke.md)
+
+Runbook for pilot deployment verification
+
+**For:** `operators` | **Updated:** 2026-03-10
+
 ### 🔒 **Canonical** [Operations Directory README](/docs/operations/README.md)
 
 Navigation for operations and deployment documentation
@@ -941,48 +990,6 @@ Configuration for distributed tracing and observability
 ### 📋 **Draft** [Incident Response Plan](/docs/operations/deployment/incident-response.md)
 
 Procedures for responding to production incidents
-
-**For:** `operators` | **Updated:** 2026-03-10
-
-### 📝 **Living** [Emergency Node Restart](/docs/ops/runbooks/01-emergency-restart.md)
-
-Runbook for emergency node restart procedures
-
-**For:** `operators` | **Updated:** 2026-03-10
-
-### 📝 **Living** [Data Recovery Procedure](/docs/ops/runbooks/02-data-recovery.md)
-
-Runbook for node data recovery from backup
-
-**For:** `operators` | **Updated:** 2026-03-10
-
-### 📝 **Living** [Version Upgrade Procedure](/docs/ops/runbooks/03-version-upgrade.md)
-
-Runbook for upgrading daemon to new version
-
-**For:** `operators` | **Updated:** 2026-03-10
-
-### 📝 **Living** [Security Incident Response](/docs/ops/runbooks/04-security-incident.md)
-
-Runbook for security incident response
-
-**For:** `operators`, `security` | **Updated:** 2026-03-10
-
-### 📝 **Living** [Troubleshooting Guide](/docs/ops/runbooks/05-troubleshooting.md)
-
-Common issues and solutions for node operations
-
-**For:** `operators` | **Updated:** 2026-03-10
-
-### 📝 **Living** [Secrets Rotation Procedure](/docs/ops/runbooks/06-secrets-rotation.md)
-
-Runbook for rotating cryptographic secrets
-
-**For:** `operators`, `security` | **Updated:** 2026-03-10
-
-### 📝 **Living** [Pilot Vertical Slice Smoke](/docs/ops/runbooks/07-pilot-vertical-slice-smoke.md)
-
-Runbook for pilot deployment verification
 
 **For:** `operators` | **Updated:** 2026-03-10
 
@@ -1018,6 +1025,18 @@ Community guidelines and expected behavior for contributors
 Main project README with overview, quick start, and CI/CD status badge
 
 **For:** `contributors`, `public` | **Updated:** 2026-03-10
+
+### 🔒 **Canonical** [ICN Documentation Control System](/docs/DOCUMENTATION_CONTROL_SYSTEM.md)
+
+Normative development control plane: discovery vs delivery, artifact routing, and documentation governance
+
+**For:** `contributors`, `agents` | **Updated:** 2026-03-26
+
+### 📝 **Living** [ICN Document Registry (human summary)](/docs/DOCUMENT_REGISTRY.md)
+
+Auto-generated summary companion to registry.toml; run doc_control_check.py to refresh
+
+**For:** `contributors`, `agents` | **Updated:** 2026-03-26
 
 ### 📝 **Living** [ICN Golden Development Prompt](/docs/GOLDEN_PROMPT.md)
 
@@ -1127,11 +1146,23 @@ Reference document with ICN terminology and definitions
 
 **For:** `all` | **Updated:** 2026-03-10
 
+### 🔒 **Canonical** [ICN Operations Runbooks](/docs/guides/operations/runbooks/README.md)
+
+Navigation guide for production runbooks
+
+**For:** `operators` | **Updated:** 2026-03-26
+
 ### 🔒 **Canonical** [Internal Documentation](/docs/internal/README.md)
 
 Internal-only documentation for team coordination
 
 **For:** `team` | **Updated:** 2026-03-10
+
+### 📝 **Living** [Imported documentation control context pack (readme)](/docs/internal/documentation-control-system/00_CONTEXT_PACK_README.md)
+
+Index and provenance for bundled control-system specs and templates source pack
+
+**For:** `contributors`, `agents` | **Updated:** 2026-03-26
 
 ### 📋 **Draft** [ICN Legal Considerations](/docs/internal/legal-considerations.md)
 
@@ -1168,12 +1199,6 @@ Template for creating onboarding modules
 Quick reference for recurring code patterns in ICN
 
 **For:** `developers` | **Updated:** 2026-03-10
-
-### 🔒 **Canonical** [ICN Operations Runbooks](/docs/ops/runbooks/README.md)
-
-Navigation guide for production runbooks
-
-**For:** `operators` | **Updated:** 2026-03-10
 
 ### 🔒 **Canonical** [Performance Documentation](/docs/performance/README.md)
 
@@ -1371,7 +1396,22 @@ Comprehensive threat model covering attack vectors, adversary capabilities, and 
 **For:** `security`, `architects` | **Updated:** 2026-03-15
 
 
+## Status
+
+### 📝 **Living** [ICN State (living doc)](/docs/STATE.md)
+
+Living snapshot of repo layout, decisions, constraints, and current engineering status
+
+**For:** `developers`, `agents` | **Updated:** 2026-03-18
+
+
 ## Strategy
+
+### 📋 **Draft** [Documentation namespace resolution plan](/docs/planning/documentation-namespace-resolution.md)
+
+Plans vs planning, ops vs operations; no moves executed here
+
+**For:** `contributors` | **Updated:** 2026-03-26
 
 ### 📋 **Draft** [SDIS Complete Build Plan](/docs/sdis/SDIS_BUILD_PLAN.md)
 
@@ -1480,9 +1520,9 @@ Assessment of pilot readiness and gaps
 
 ## Summary
 
-**Total documents:** 240
+**Total documents:** 246
 
 **By status:**
-- Canonical: 38
-- Draft: 47
-- Living: 155
+- Canonical: 39
+- Draft: 48
+- Living: 159

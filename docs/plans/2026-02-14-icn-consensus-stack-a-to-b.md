@@ -882,12 +882,12 @@ Detailed per-subsystem analysis (177KB total):
 
 | Agent | File | Size | Key Finding |
 |-------|------|------|-------------|
-| Constitution / Rights | `docs/plans/.scratch/constitution-rights.md` | 29KB | Personhood/membership enforced; scope invisible; dual capability enums |
-| Governance / Receipts | `docs/plans/.scratch/governance-receipts.md` | 35KB | Chain 60% in daemon, 30% in standalone; AllocationReceipt bypassed |
-| Economics / Treasury | `docs/plans/.scratch/economics-treasury.md` | 27KB | Types 90%, execution 60%; treasury-coop gap; commons clearing stubbed |
-| CCL + Disputes | `docs/plans/.scratch/ccl-disputes.md` | 30KB | CCL = engine + schema (unlinked); 4 dispute systems, no unification |
-| Human Interface | `docs/plans/.scratch/human-interface.md` | 31KB | Auth requires CLI; no scope; CoopWallet doesn't exist; 12 tabs, 0 scope-aware |
-| Security / Ops | `docs/plans/.scratch/security-ops.md` | 25KB | LAN-only; NAT code exists unwired; QR spoofable; 3-layer security sound |
+| Constitution / Rights | `docs/archive/2026/plans-scratch/constitution-rights.md` | 29KB | Personhood/membership enforced; scope invisible; dual capability enums |
+| Governance / Receipts | `docs/archive/2026/plans-scratch/governance-receipts.md` | 35KB | Chain 60% in daemon, 30% in standalone; AllocationReceipt bypassed |
+| Economics / Treasury | `docs/archive/2026/plans-scratch/economics-treasury.md` | 27KB | Types 90%, execution 60%; treasury-coop gap; commons clearing stubbed |
+| CCL + Disputes | `docs/archive/2026/plans-scratch/ccl-disputes.md` | 30KB | CCL = engine + schema (unlinked); 4 dispute systems, no unification |
+| Human Interface | `docs/archive/2026/plans-scratch/human-interface.md` | 31KB | Auth requires CLI; no scope; CoopWallet doesn't exist; 12 tabs, 0 scope-aware |
+| Security / Ops | `docs/archive/2026/plans-scratch/security-ops.md` | 25KB | LAN-only; NAT code exists unwired; QR spoofable; 3-layer security sound |
 
 ---
 

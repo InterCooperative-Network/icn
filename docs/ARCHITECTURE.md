@@ -1,3 +1,9 @@
+---
+Status: normative
+Canonical: yes
+Last Reviewed: 2026-03-26
+---
+
 # ICN Architecture Reference
 
 <!-- truth: normative -->
