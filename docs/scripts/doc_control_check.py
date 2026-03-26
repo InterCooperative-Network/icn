@@ -662,9 +662,6 @@ def main() -> int:
 
     # Canonical doc headers
     canon_paths = control.get("canonical_doc_paths", [])
-    required_keys = control.get(
-        "required_header_keys", ["Status", "Canonical", "Last Reviewed"]
-    )
     for cpath in canon_paths:
         f = repo / cpath
         if not f.is_file():
@@ -672,7 +669,6 @@ def main() -> int:
             continue
         text = file_texts.get(cpath) or f.read_text(encoding="utf-8", errors="replace")
         meta = parse_header_metadata(text)
-        norm_keys = {k.lower().replace(" ", "_") for k in required_keys}
         if "status" not in meta:
             errors.append(f"{cpath}: missing Status in YAML/HTML header block")
         elif meta["status"] not in TRUTH_CLASSES:

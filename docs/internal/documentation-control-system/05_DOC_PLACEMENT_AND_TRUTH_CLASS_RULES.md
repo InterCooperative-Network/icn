@@ -44,12 +44,10 @@ Each important doc should declare something like:
 
 ```yaml
 ---
-title: "Document Title"
-truth_class: normative
-role: architecture
-status: active
-canonical: true
-last_reviewed: 2026-03-25
+Status: normative
+Canonical: yes
+Last Reviewed: 2026-03-25
+Role: architecture
 ---
 ```
 

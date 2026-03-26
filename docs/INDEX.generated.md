@@ -1146,9 +1146,9 @@ Reference document with ICN terminology and definitions
 
 **For:** `all` | **Updated:** 2026-03-10
 
-### 🔒 **Canonical** [ICN Operations Runbooks](/docs/guides/operations/runbooks/README.md)
+### 📝 **Living** [ICN Operations Runbooks](/docs/guides/operations/runbooks/README.md)
 
-Navigation guide for production runbooks
+Navigation guide for production runbooks (domain hub; not control-plane canonical)
 
 **For:** `operators` | **Updated:** 2026-03-26
 
@@ -1523,6 +1523,6 @@ Assessment of pilot readiness and gaps
 **Total documents:** 246
 
 **By status:**
-- Canonical: 39
+- Canonical: 38
 - Draft: 48
-- Living: 159
+- Living: 160
