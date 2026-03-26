@@ -300,6 +300,24 @@ impl KernelGovernanceExecutor {
                 }
             }
 
+            // Surplus distribution: multi-recipient settlement is not implemented in the kernel
+            // treasury → ledger bridge (single `TreasuryEntryRequest` per operation). Do not map
+            // through `treasury_effect_to_operation` placeholder (that path could report success
+            // with no ledger mutation when `decision_hash` is absent).
+            TreasuryEffect::DistributeSurplus { .. } => {
+                warn!(
+                    "DistributeSurplus received: multi-recipient surplus settlement is not implemented in the kernel executor; no ledger mutation"
+                );
+                Ok(EffectResult {
+                    effect_id: decision_receipt_id.to_string(),
+                    success: false,
+                    message: "DistributeSurplus: multi-recipient surplus distribution is not implemented in the kernel treasury executor (no balances changed)".to_string(),
+                    state_change_hash: None,
+                    ledger_entry_id: None,
+                    not_executed: true,
+                })
+            }
+
             // Path 3: All other treasury effects → direct delegation
             _ => {
                 let operation = treasury_effect_to_operation(&treasury_effect);
@@ -784,16 +802,13 @@ impl TreasuryExecutor for KernelTreasuryExecutor {
             }
         }
 
-        // Ledger is configured but the operation lacks a decision_hash (cannot attach provenance).
-        Ok(ExecutionOutcome::Success {
+        // Ledger is configured but the operation lacks governance provenance. Pilot settlement
+        // requires decision_hash on ledger entries; this is deferrable (not a hard ledger error),
+        // distinct from the "no ledger service" case above.
+        Ok(ExecutionOutcome::Deferred {
             receipt_id: receipt_id.clone(),
-            effects: vec![format!(
-                "{:?} {} {} from treasury {} (no decision_hash; ledger entry skipped)",
-                operation.operation_type,
-                operation.amount,
-                operation.currency,
-                operation.treasury_id
-            )],
+            reason: "Treasury operation lacks decision_hash; governed settlement deferred until provenance is present"
+                .to_string(),
         })
     }
 
@@ -1918,6 +1933,66 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_treasury_executor_defers_without_decision_hash_when_ledger_configured() {
+        struct StubLedger {
+            oracle: Arc<dyn icn_kernel_api::authz::PolicyOracle>,
+        }
+        impl icn_kernel_api::LedgerService for StubLedger {
+            fn oracle(&self) -> Arc<dyn icn_kernel_api::authz::PolicyOracle> {
+                self.oracle.clone()
+            }
+            fn balance(&self, _account: &icn_kernel_api::Did, _currency: &str) -> i64 {
+                0
+            }
+            fn credit_limit(&self, _account: &icn_kernel_api::Did, _currency: &str) -> i64 {
+                0
+            }
+            fn record_event(&self, _event: icn_kernel_api::LedgerEvent) {}
+            fn submit_treasury_entry(
+                &self,
+                _entry: icn_kernel_api::TreasuryEntryRequest,
+            ) -> Result<icn_kernel_api::TreasuryEntryResult, String> {
+                panic!("submit_treasury_entry must not be called when decision_hash is missing");
+            }
+            fn get_treasury_nonce(&self, _treasury_id: &str) -> Result<u64, String> {
+                Ok(0)
+            }
+        }
+
+        let oracle = Arc::new(icn_kernel_api::authz::AllowAllOracle::wildcard());
+        let ledger: Arc<dyn icn_kernel_api::LedgerService> = Arc::new(StubLedger {
+            oracle: oracle.clone(),
+        });
+        let executor = KernelTreasuryExecutor::with_ledger(ledger);
+        let receipt_id = DecisionReceiptId::new("test-receipt-provenance-defer");
+        let operation = TreasuryOperation {
+            treasury_id: "treasury-1".to_string(),
+            operation_type: TreasuryOperationType::Spend,
+            amount: 100,
+            currency: "HOURS".to_string(),
+            recipient: Some("did:icn:recipient".to_string()),
+            memo: "Test payment".to_string(),
+            expected_nonce: Some(0),
+            decision_hash: None,
+        };
+
+        let result = executor
+            .execute_treasury_operation(&receipt_id, operation)
+            .await;
+        assert!(result.is_ok());
+
+        match result.unwrap() {
+            ExecutionOutcome::Deferred { reason, .. } => {
+                assert!(
+                    reason.contains("decision_hash"),
+                    "expected defer reason to mention decision_hash, got {reason}"
+                );
+            }
+            other => panic!("Expected Deferred without decision_hash, got {:?}", other),
+        }
+    }
+
+    #[tokio::test]
     async fn test_protocol_executor_apply_change() {
         let store = Arc::new(MockParamStore::new());
         // Pre-set the parameter to match old_value (7200 as integer)
@@ -2264,6 +2339,44 @@ mod tests {
                 .message
                 .contains("SDIS effect not implemented in kernel executor"),
             "Failure message should explain missing kernel implementation: {}",
+            effect_result.message
+        );
+    }
+
+    #[tokio::test]
+    async fn test_distribute_surplus_reports_not_executed_without_ledger_smear() {
+        use icn_kernel_api::effects::{KernelEffect, TreasuryEffect};
+
+        let store = Arc::new(MockParamStore::new());
+        let executor = KernelGovernanceExecutor::new(store);
+        let receipt_id = "test-surplus-receipt";
+
+        let effect = KernelEffect::Treasury(TreasuryEffect::DistributeSurplus {
+            treasury_did: "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9".to_string(),
+            total_amount: 100,
+            currency: "HOURS".to_string(),
+            distributions: vec![(
+                "did:icn:zGyGKxMyg1p9SsHfm15MkNUu1u9TN2JtTspcdmrtGUdse".to_string(),
+                100,
+            )],
+            decision_receipt_id: receipt_id.to_string(),
+            decision_hash: "hash-surplus-test".to_string(),
+        });
+
+        let result = executor.execute_effect(effect, receipt_id).await;
+        assert!(result.is_ok());
+        let effect_result = result.unwrap();
+        assert!(
+            !effect_result.success,
+            "DistributeSurplus must not report success without real multi-recipient settlement"
+        );
+        assert!(
+            effect_result.not_executed,
+            "DistributeSurplus should be structurally not executed until ledger support exists"
+        );
+        assert!(
+            effect_result.message.contains("DistributeSurplus"),
+            "message should name the effect: {}",
             effect_result.message
         );
     }

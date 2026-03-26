@@ -1229,19 +1229,17 @@ mod tests {
 
     #[tokio::test]
     async fn test_deferred_treasury_outcome_persists_not_executed() {
-        let (executor, exec_store) = make_test_executor();
+        // Ledger is wired (production-shaped); `TreasuryEffect::Allocate` maps to a
+        // `TreasuryOperation` without `decision_hash`, so `KernelTreasuryExecutor` returns
+        // `ExecutionOutcome::Deferred` — not the "no ledger" branch.
+        let (executor, exec_store) = make_test_executor_with_stub_ledger();
 
         let decision_hash = "sha256:deferred-proof-1";
-        let effects = vec![KernelEffect::Treasury(TreasuryEffect::Spend {
+        let effects = vec![KernelEffect::Treasury(TreasuryEffect::Allocate {
             treasury_did: "did:icn:treasury".to_string(),
-            recipient_did: "did:icn:alice".to_string(),
+            budget_id: "budget-defer-proof".to_string(),
             amount: 100,
             currency: "HOURS".to_string(),
-            memo: "deferred proof".to_string(),
-            budget_id: None,
-            expected_nonce: 0,
-            decision_receipt_id: "receipt-defer-1".to_string(),
-            decision_hash: decision_hash.to_string(),
         })];
 
         let results = executor
@@ -1260,6 +1258,11 @@ mod tests {
         assert!(
             results[0].message.contains("Deferred:"),
             "expected Deferred prefix in message, got {:?}",
+            results[0].message
+        );
+        assert!(
+            results[0].message.contains("decision_hash"),
+            "expected production defer path (missing provenance), got {:?}",
             results[0].message
         );
 

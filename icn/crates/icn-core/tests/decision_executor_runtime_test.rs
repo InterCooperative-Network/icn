@@ -21,7 +21,11 @@ use icn_kernel_api::budget::{BudgetRecord, BudgetStore};
 use icn_kernel_api::effects::{KernelEffect, TreasuryEffect};
 use icn_kernel_api::execution::{ExecutionRecord, ExecutionStatus, ExecutionStore};
 use icn_kernel_api::protocol_params::StubParamStore;
-use icn_kernel_api::AllowAllOracle;
+use icn_kernel_api::services::LedgerEvent;
+use icn_kernel_api::{
+    AllowAllOracle, Did as LedgerDid, LedgerService, PolicyOracle, TreasuryEntryRequest,
+    TreasuryEntryResult,
+};
 use icn_ledger::types::{ContentHash, ProvenanceRef};
 use icn_ledger::Ledger;
 use icn_store::SledStore;
@@ -903,13 +907,47 @@ fn test_treasury_spend_payload_translation_produces_treasury_spend_effect() {
     }
 }
 
-/// `KernelTreasuryExecutor` without a ledger returns `ExecutionOutcome::Deferred`; that maps to
-/// `not_executed` and durable `ExecutionStatus::NotExecuted` (Sled reopen).
+/// Production-shaped path: ledger is wired (as in `lifecycle`); `TreasuryEffect::Allocate` maps to
+/// a `TreasuryOperation` without `decision_hash`, so `KernelTreasuryExecutor` returns
+/// `ExecutionOutcome::Deferred` → `EffectResult.not_executed` → durable `NotExecuted` (Sled reopen).
 #[tokio::test(flavor = "multi_thread")]
 async fn test_deferred_outcome_sled_persists_not_executed() {
     use icn_core::supervisor::decision_executor::DecisionExecutor;
     use icn_core::supervisor::effect_dispatcher::EffectDispatcher;
     use icn_core::supervisor::governance_executor::KernelGovernanceExecutor;
+
+    struct LedgerWiredDeferTestStub {
+        oracle: Arc<dyn PolicyOracle>,
+    }
+
+    impl LedgerService for LedgerWiredDeferTestStub {
+        fn oracle(&self) -> Arc<dyn PolicyOracle> {
+            self.oracle.clone()
+        }
+
+        fn balance(&self, _account: &LedgerDid, _currency: &str) -> i64 {
+            0
+        }
+
+        fn credit_limit(&self, _account: &LedgerDid, _currency: &str) -> i64 {
+            0
+        }
+
+        fn record_event(&self, _event: LedgerEvent) {}
+
+        fn submit_treasury_entry(
+            &self,
+            _entry: TreasuryEntryRequest,
+        ) -> Result<TreasuryEntryResult, String> {
+            panic!(
+                "submit_treasury_entry must not run: missing decision_hash defers before ledger call"
+            );
+        }
+
+        fn get_treasury_nonce(&self, _treasury_id: &str) -> Result<u64, String> {
+            Ok(0)
+        }
+    }
 
     let tmp = TempDir::new().unwrap();
     let exec_store_path = tmp.path().join("exec-deferred");
@@ -919,20 +957,20 @@ async fn test_deferred_outcome_sled_persists_not_executed() {
     let decision_receipt_id = "receipt-sled-deferred-1";
     let proposal_id = "proposal-sled-deferred-1";
 
-    let effects = vec![KernelEffect::Treasury(TreasuryEffect::Spend {
+    let effects = vec![KernelEffect::Treasury(TreasuryEffect::Allocate {
         treasury_did: RT_TEST_TREASURY.to_string(),
-        recipient_did: RT_TEST_RECIPIENT.to_string(),
+        budget_id: "budget-sled-defer".to_string(),
         amount: 50,
         currency: "HOURS".to_string(),
-        memo: "sled deferred proof".to_string(),
-        budget_id: None,
-        expected_nonce: 0,
-        decision_receipt_id: decision_receipt_id.to_string(),
-        decision_hash: decision_hash.to_string(),
     })];
 
     {
-        let kernel_executor = KernelGovernanceExecutor::new(Arc::new(StubParamStore));
+        let oracle: Arc<dyn PolicyOracle> = Arc::new(AllowAllOracle::wildcard());
+        let ledger_service: Arc<dyn LedgerService> = Arc::new(LedgerWiredDeferTestStub {
+            oracle: oracle.clone(),
+        });
+        let kernel_executor = KernelGovernanceExecutor::new(Arc::new(StubParamStore))
+            .with_ledger_service(ledger_service);
         let dispatcher = Arc::new(EffectDispatcher::new(Arc::new(kernel_executor)));
         let exec_backend = Arc::new(SledStore::open(&exec_store_path).unwrap());
         let exec_store = Arc::new(SledExecutionStore::new(exec_backend));
@@ -947,6 +985,11 @@ async fn test_deferred_outcome_sled_persists_not_executed() {
         assert!(!results[0].success);
         assert!(results[0].not_executed);
         assert!(results[0].message.contains("Deferred:"));
+        assert!(
+            results[0].message.contains("decision_hash"),
+            "expected missing-provenance defer, got {:?}",
+            results[0].message
+        );
 
         let record = exec_store.get(decision_hash).unwrap().unwrap();
         assert_eq!(record.status, ExecutionStatus::NotExecuted);
