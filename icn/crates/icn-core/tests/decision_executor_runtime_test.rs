@@ -633,6 +633,7 @@ async fn test_withdraw_payload_restart_resume_single_mutation() {
 
     let decision_hash = "hash-withdraw-restart-1";
     let decision_receipt_id = "receipt-withdraw-restart-1";
+    let domain_id = "test-domain-withdraw-restart";
     let treasury_did_str = "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9";
     let treasury_did: Did = treasury_did_str.parse().unwrap();
     let recipient_did: Did = treasury_did_str.parse().unwrap();
@@ -649,7 +650,8 @@ async fn test_withdraw_payload_restart_resume_single_mutation() {
         },
     };
 
-    let effects = translate_payload_to_effects(&payload, decision_receipt_id, decision_hash);
+    let effects =
+        translate_payload_to_effects(&payload, decision_receipt_id, decision_hash, domain_id);
     assert_eq!(effects.len(), 1);
     match &effects[0] {
         KernelEffect::Treasury(TreasuryEffect::Spend {
@@ -712,7 +714,8 @@ async fn test_withdraw_payload_restart_resume_single_mutation() {
         entry_hash
     };
 
-    let replay_effects = translate_payload_to_effects(&payload, decision_receipt_id, decision_hash);
+    let replay_effects =
+        translate_payload_to_effects(&payload, decision_receipt_id, decision_hash, domain_id);
     let reopened_ledger_store = Arc::new(SledStore::open(&ledger_store_path).unwrap());
     let reopened_ledger = Ledger::new(reopened_ledger_store).unwrap();
     let reopened_ledger = Arc::new(tokio::sync::RwLock::new(reopened_ledger));
@@ -783,6 +786,7 @@ fn test_treasury_spend_payload_translation_produces_treasury_spend_effect() {
 
     let decision_receipt_id = "gov:test-domain:test-proposal:receipt";
     let decision_hash = "test-decision-hash";
+    let domain_id = "test-domain-for-treasury-spend";
     let treasury_did: Did = "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9"
         .parse()
         .unwrap();
@@ -801,7 +805,8 @@ fn test_treasury_spend_payload_translation_produces_treasury_spend_effect() {
         },
     };
 
-    let effects = translate_payload_to_effects(&payload, decision_receipt_id, decision_hash);
+    let effects =
+        translate_payload_to_effects(&payload, decision_receipt_id, decision_hash, domain_id);
     assert_eq!(effects.len(), 1);
     match &effects[0] {
         KernelEffect::Treasury(TreasuryEffect::Spend {
