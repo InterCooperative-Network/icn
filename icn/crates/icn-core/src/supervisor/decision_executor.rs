@@ -31,6 +31,18 @@
 //!       v
 //! [DecisionExecutor]  ←── record Confirmed / NotExecuted / Failed
 //! ```
+//!
+//! # Aggregation contract (per-effect vs aggregate)
+//!
+//! - Each [`EffectResult`] row: `success` means that effect applied its kernel work; `not_executed`
+//!   means the row is structurally non-executable (NoOp, Deferred, etc.) and is **not** a hard
+//!   failure. `is_hard_failure()` ≡ `!success && !not_executed`.
+//! - Persisted [`ExecutionRecord`] has a **single** [`ExecutionStatus`] for the whole decision:
+//!   - Any hard-failure row → `Failed` (`retries` incremented).
+//!   - Else if every row is `not_executed` (and non-empty) → `NotExecuted` (terminal, no retry bump).
+//!   - Else → `Confirmed` (includes **mixed** `success` + `not_executed` batches: intentional).
+//! - **NoOp-only** batches must **not** reach `Confirmed` via aggregation (they are all
+//!   `not_executed`).
 
 use std::sync::Arc;
 
@@ -492,7 +504,7 @@ impl DecisionExecutor {
         // 5. Check results and record outcome
         let hard_failure_messages: Vec<String> = results
             .iter()
-            .filter(|r| !r.success && !r.not_executed)
+            .filter(|r| r.is_hard_failure())
             .map(|r| r.message.clone())
             .collect();
 
@@ -709,13 +721,34 @@ fn extract_decision_hash(effects: &[KernelEffect]) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use icn_kernel_api::effects::{KernelEffect, TreasuryEffect};
+    use icn_kernel_api::effects::{EffectResult, KernelEffect, ResourceEffect, TreasuryEffect};
     use icn_kernel_api::escrow::{EscrowRecord, EscrowStatus, EscrowStore};
     use icn_kernel_api::execution::ExecutionRecord;
     use icn_kernel_api::services::{LedgerEvent, TreasuryEntryRequest, TreasuryEntryResult};
     use icn_kernel_api::{AllowAllOracle, Did, LedgerService, PolicyOracle};
     use std::collections::HashMap;
     use std::sync::RwLock;
+
+    /// Regression guard: per-effect row semantics the [`DecisionExecutor`] aggregation assumes.
+    fn assert_per_effect_row_contract(r: &EffectResult) {
+        assert!(
+            !(r.success && r.not_executed),
+            "per-effect contract: success and not_executed are mutually exclusive: {:?}",
+            r
+        );
+        if r.not_executed {
+            assert!(
+                r.ledger_entry_id.is_none(),
+                "per-effect contract: not_executed must not set ledger_entry_id: {:?}",
+                r
+            );
+            assert!(
+                r.state_change_hash.is_none(),
+                "per-effect contract: not_executed must not set state_change_hash: {:?}",
+                r
+            );
+        }
+    }
 
     /// In-memory execution store for testing.
     struct MemoryExecutionStore {
@@ -944,10 +977,17 @@ mod tests {
             results[0].message
         );
         assert!(results[0].not_executed);
+        assert_per_effect_row_contract(&results[0]);
 
         // Verify record was persisted as NotExecuted (terminal, not retryable failure)
         let record = store.get("hash-1").unwrap().unwrap();
         assert_eq!(record.status, ExecutionStatus::NotExecuted);
+        assert_ne!(
+            record.status,
+            ExecutionStatus::Confirmed,
+            "contract: NoOp-only batch must not aggregate to Confirmed"
+        );
+        assert!(record.is_terminal());
         assert_eq!(record.proposal_id, "proposal-1");
         assert!(record.finished_at.is_some());
         assert_eq!(record.retries, 0);
@@ -1065,6 +1105,7 @@ mod tests {
 
         assert_eq!(results.len(), 1);
         assert!(results[0].success);
+        assert_per_effect_row_contract(&results[0]);
 
         let record = store.get("sha256:treasury-hash-1").unwrap().unwrap();
         assert_eq!(record.status, ExecutionStatus::Confirmed);
@@ -1266,6 +1307,9 @@ mod tests {
         assert_eq!(results.len(), 2);
         assert!(results[0].not_executed && !results[0].success);
         assert!(results[1].success && !results[1].not_executed);
+        for r in &results {
+            assert_per_effect_row_contract(r);
+        }
 
         let record = store.get(decision_hash).unwrap().unwrap();
         assert_eq!(record.status, ExecutionStatus::Confirmed);
@@ -1309,6 +1353,7 @@ mod tests {
             "expected production defer path (missing provenance), got {:?}",
             results[0].message
         );
+        assert_per_effect_row_contract(&results[0]);
 
         let record = exec_store.get(decision_hash).unwrap().unwrap();
         assert_eq!(record.status, ExecutionStatus::NotExecuted);
@@ -1318,5 +1363,61 @@ mod tests {
             "persisted note should mention Deferred, got {:?}",
             record.error
         );
+    }
+
+    #[tokio::test]
+    async fn contract_noop_only_batch_never_aggregates_to_confirmed() {
+        let (executor, store) = make_test_executor();
+
+        let results = executor
+            .execute(
+                vec![KernelEffect::NoOp {
+                    reason: "contract".into(),
+                }],
+                "receipt-contract-noop",
+                "hash-contract-noop-only",
+                "proposal-contract-noop",
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 1);
+        assert_per_effect_row_contract(&results[0]);
+
+        let record = store.get("hash-contract-noop-only").unwrap().unwrap();
+        assert_eq!(record.status, ExecutionStatus::NotExecuted);
+        assert_ne!(
+            record.status,
+            ExecutionStatus::Confirmed,
+            "contract: NoOp-only batch must not aggregate to Confirmed"
+        );
+        assert!(record.is_terminal());
+        assert_eq!(record.retries, 0);
+    }
+
+    #[tokio::test]
+    async fn contract_hard_failure_row_aggregates_to_failed_and_increments_retries() {
+        let (executor, store) = make_test_executor();
+
+        let decision_hash = "sha256:contract-resource-hard-fail";
+        let effects = vec![KernelEffect::Resource(ResourceEffect::GrantAccess {
+            grantee_did: "did:icn:g".into(),
+            resource_type: "rt".into(),
+            access_model_hash: "mh".into(),
+        })];
+
+        let results = executor
+            .execute(effects, "receipt-rf", decision_hash, "proposal-rf")
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 1);
+        assert!(results[0].is_hard_failure());
+        assert_per_effect_row_contract(&results[0]);
+
+        let record = store.get(decision_hash).unwrap().unwrap();
+        assert_eq!(record.status, ExecutionStatus::Failed);
+        assert_eq!(record.retries, 1);
+        assert!(!record.is_terminal());
     }
 }

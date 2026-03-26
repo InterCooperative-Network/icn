@@ -101,6 +101,7 @@ impl EffectDispatcher {
                             "Effect execution returned failure"
                         );
                     }
+                    result.debug_assert_semantic_invariants();
                     results.push(result);
                 }
                 Err(e) => {
@@ -110,14 +111,16 @@ impl EffectDispatcher {
                         error = %e,
                         "Effect execution failed"
                     );
-                    results.push(EffectResult {
+                    let row = EffectResult {
                         effect_id: decision_receipt_id.to_string(),
                         success: false,
                         message: format!("Execution error: {}", e),
                         state_change_hash: None,
                         ledger_entry_id: None,
                         not_executed: false,
-                    });
+                    };
+                    row.debug_assert_semantic_invariants();
+                    results.push(row);
                 }
             }
         }
