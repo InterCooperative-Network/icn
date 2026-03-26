@@ -38,7 +38,7 @@ const LEDGER_ENTRY_MARKER: &str = "-> ledger entry ";
 /// execution capabilities. It holds references to the treasury and protocol
 /// executors which perform the actual operations.
 pub struct KernelGovernanceExecutor {
-    treasury: Arc<KernelTreasuryExecutor>,
+    treasury: Arc<dyn TreasuryExecutor>,
     protocol: Arc<KernelProtocolExecutor>,
     federation: Arc<KernelFederationExecutor>,
     control: Arc<KernelControlExecutor>,
@@ -55,8 +55,27 @@ impl KernelGovernanceExecutor {
     /// # Arguments
     /// * `protocol_param_store` - Store for protocol parameters (used by protocol executor)
     pub fn new(protocol_param_store: Arc<dyn ProtocolParameterStore>) -> Self {
+        let treasury: Arc<dyn TreasuryExecutor> = Arc::new(KernelTreasuryExecutor::new());
         Self {
-            treasury: Arc::new(KernelTreasuryExecutor::new()),
+            treasury,
+            protocol: Arc::new(KernelProtocolExecutor::new(protocol_param_store)),
+            federation: Arc::new(KernelFederationExecutor::new()),
+            control: Arc::new(KernelControlExecutor::new()),
+            membership: Arc::new(KernelMembershipExecutor::new()),
+            escrow_store: None,
+            budget_store: None,
+        }
+    }
+
+    /// Hidden hook for tests: inject a [`TreasuryExecutor`]. Production code must use [`Self::new`]
+    /// and configured services instead.
+    #[doc(hidden)]
+    pub fn with_treasury_executor_for_tests(
+        treasury: Arc<dyn TreasuryExecutor>,
+        protocol_param_store: Arc<dyn ProtocolParameterStore>,
+    ) -> Self {
+        Self {
+            treasury,
             protocol: Arc::new(KernelProtocolExecutor::new(protocol_param_store)),
             federation: Arc::new(KernelFederationExecutor::new()),
             control: Arc::new(KernelControlExecutor::new()),
@@ -74,7 +93,9 @@ impl KernelGovernanceExecutor {
 
     /// Set the ledger service for treasury operations.
     pub fn with_ledger_service(mut self, service: Arc<dyn icn_kernel_api::LedgerService>) -> Self {
-        self.treasury = Arc::new(KernelTreasuryExecutor::with_ledger(service));
+        let treasury: Arc<dyn TreasuryExecutor> =
+            Arc::new(KernelTreasuryExecutor::with_ledger(service));
+        self.treasury = treasury;
         self
     }
 
@@ -147,6 +168,7 @@ impl KernelGovernanceExecutor {
                                 ),
                                 state_change_hash: None,
                                 ledger_entry_id: None,
+                                not_executed: false,
                             });
                         }
                     }
@@ -205,6 +227,7 @@ impl KernelGovernanceExecutor {
                             message: "Budget store not configured".to_string(),
                             state_change_hash: None,
                             ledger_entry_id: None,
+                            not_executed: false,
                         });
                     }
                 };
@@ -218,6 +241,7 @@ impl KernelGovernanceExecutor {
                             message: format!("Budget {} not found", budget_id),
                             state_change_hash: None,
                             ledger_entry_id: None,
+                            not_executed: false,
                         });
                     }
                 };
@@ -240,6 +264,7 @@ impl KernelGovernanceExecutor {
                             ),
                             state_change_hash: None,
                             ledger_entry_id: None,
+                            not_executed: false,
                         });
                     }
                     Err(e) => {
@@ -254,6 +279,7 @@ impl KernelGovernanceExecutor {
                             message: e.to_string(),
                             state_change_hash: None,
                             ledger_entry_id: None,
+                            not_executed: false,
                         });
                     }
                 }
@@ -352,6 +378,7 @@ impl EffectExecutor for KernelGovernanceExecutor {
                             message: "Escrow store not configured".to_string(),
                             state_change_hash: None,
                             ledger_entry_id: None,
+                            not_executed: false,
                         });
                     }
                 };
@@ -370,6 +397,7 @@ impl EffectExecutor for KernelGovernanceExecutor {
                             message: format!("Escrow not found: {}", escrow_id),
                             state_change_hash: None,
                             ledger_entry_id: None,
+                            not_executed: false,
                         });
                     }
                 };
@@ -411,6 +439,7 @@ impl EffectExecutor for KernelGovernanceExecutor {
                             ),
                             state_change_hash: None,
                             ledger_entry_id: None,
+                            not_executed: false,
                         });
                     }
                     Err(EscrowReleaseError::AlreadyReleasedByOther {
@@ -431,6 +460,7 @@ impl EffectExecutor for KernelGovernanceExecutor {
                             ),
                             state_change_hash: None,
                             ledger_entry_id: None,
+                            not_executed: false,
                         });
                     }
                     Err(EscrowReleaseError::Cancelled) => {
@@ -444,6 +474,7 @@ impl EffectExecutor for KernelGovernanceExecutor {
                             message: format!("Escrow {} was cancelled", escrow_id),
                             state_change_hash: None,
                             ledger_entry_id: None,
+                            not_executed: false,
                         });
                     }
                     Err(EscrowReleaseError::Failed {
@@ -466,6 +497,7 @@ impl EffectExecutor for KernelGovernanceExecutor {
                             ),
                             state_change_hash: None,
                             ledger_entry_id: None,
+                            not_executed: false,
                         });
                     }
                 }
@@ -558,6 +590,7 @@ impl EffectExecutor for KernelGovernanceExecutor {
                         ),
                         state_change_hash: None,
                         ledger_entry_id: None,
+                        not_executed: false,
                     })
                 }
             }
@@ -573,13 +606,23 @@ impl EffectExecutor for KernelGovernanceExecutor {
                     decision_receipt_id,
                 ))
             }
-            KernelEffect::NoOp { reason } => Ok(EffectResult {
-                effect_id: decision_receipt_id.to_string(),
-                success: true,
-                message: format!("NoOp: {}", reason),
-                state_change_hash: None,
-                ledger_entry_id: None,
-            }),
+            KernelEffect::NoOp { reason } => {
+                info!(
+                    ?reason,
+                    "KernelEffect::NoOp: no executable effect (honest non-success)"
+                );
+                Ok(EffectResult {
+                    effect_id: decision_receipt_id.to_string(),
+                    success: false,
+                    message: format!(
+                        "NoOp: decision produced no executable kernel effect (not executed): {}",
+                        reason
+                    ),
+                    state_change_hash: None,
+                    ledger_entry_id: None,
+                    not_executed: true,
+                })
+            }
             KernelEffect::Control(control_effect) => {
                 // Execute control effect (veto, force close)
                 let outcome = self
@@ -603,39 +646,54 @@ impl EffectExecutor for KernelGovernanceExecutor {
                 ))
             }
             KernelEffect::Dispute(dispute_effect) => {
-                info!(?dispute_effect, "Executing dispute effect (placeholder)");
+                info!(
+                    ?dispute_effect,
+                    "Executing dispute effect (not implemented in kernel executor)"
+                );
                 Ok(EffectResult {
                     effect_id: decision_receipt_id.to_string(),
-                    success: true,
+                    success: false,
                     message: format!(
-                        "Dispute effect executed (placeholder): {:?}",
+                        "Dispute effect not implemented in kernel executor: {:?}",
                         dispute_effect
                     ),
                     state_change_hash: None,
                     ledger_entry_id: None,
+                    not_executed: false,
                 })
             }
             KernelEffect::Resource(resource_effect) => {
-                info!(?resource_effect, "Executing resource effect (placeholder)");
+                info!(
+                    ?resource_effect,
+                    "Executing resource effect (not implemented in kernel executor)"
+                );
                 Ok(EffectResult {
                     effect_id: decision_receipt_id.to_string(),
-                    success: true,
+                    success: false,
                     message: format!(
-                        "Resource effect executed (placeholder): {:?}",
+                        "Resource effect not implemented in kernel executor: {:?}",
                         resource_effect
                     ),
                     state_change_hash: None,
                     ledger_entry_id: None,
+                    not_executed: false,
                 })
             }
             KernelEffect::Sdis(sdis_effect) => {
-                info!(?sdis_effect, "Executing SDIS effect (placeholder)");
+                info!(
+                    ?sdis_effect,
+                    "Executing SDIS effect (not implemented in kernel executor)"
+                );
                 Ok(EffectResult {
                     effect_id: decision_receipt_id.to_string(),
-                    success: true,
-                    message: format!("SDIS effect executed (placeholder): {:?}", sdis_effect),
+                    success: false,
+                    message: format!(
+                        "SDIS effect not implemented in kernel executor: {:?}",
+                        sdis_effect
+                    ),
                     state_change_hash: None,
                     ledger_entry_id: None,
+                    not_executed: false,
                 })
             }
         }
@@ -1229,6 +1287,7 @@ fn execution_outcome_to_effect_result(outcome: ExecutionOutcome, effect_id: &str
                 message: effects.join("; "),
                 state_change_hash,
                 ledger_entry_id,
+                not_executed: false,
             }
         }
         ExecutionOutcome::Failed { reason, .. } => EffectResult {
@@ -1237,13 +1296,15 @@ fn execution_outcome_to_effect_result(outcome: ExecutionOutcome, effect_id: &str
             message: reason,
             state_change_hash: None,
             ledger_entry_id: None,
+            not_executed: false,
         },
         ExecutionOutcome::Deferred { reason, .. } => EffectResult {
             effect_id: effect_id.to_string(),
-            success: true,
+            success: false,
             message: format!("Deferred: {}", reason),
             state_change_hash: None,
             ledger_entry_id: None,
+            not_executed: true,
         },
     }
 }
@@ -2117,6 +2178,128 @@ mod tests {
         assert!(
             effect_result.message.contains("EventBus"),
             "Failure message should point to EventBus alternative: {}",
+            effect_result.message
+        );
+    }
+
+    #[tokio::test]
+    async fn test_dispute_effect_returns_explicit_failure() {
+        use icn_kernel_api::effects::{DisputeEffect, KernelEffect};
+
+        let store = Arc::new(MockParamStore::new());
+        let executor = KernelGovernanceExecutor::new(store);
+        let receipt_id = "test-dispute-receipt";
+
+        let effect = KernelEffect::Dispute(DisputeEffect::ResolveDispute {
+            dispute_id: "dispute-1".to_string(),
+            resolution_hash: "resolution-hash".to_string(),
+            compensations: vec![],
+        });
+
+        let result = executor.execute_effect(effect, receipt_id).await;
+        assert!(result.is_ok());
+
+        let effect_result = result.unwrap();
+        assert!(
+            !effect_result.success,
+            "Dispute effect must not report success when kernel executor has no implementation"
+        );
+        assert!(
+            effect_result
+                .message
+                .contains("Dispute effect not implemented in kernel executor"),
+            "Failure message should explain missing kernel implementation: {}",
+            effect_result.message
+        );
+    }
+
+    #[tokio::test]
+    async fn test_resource_effect_returns_explicit_failure() {
+        use icn_kernel_api::effects::{KernelEffect, ResourceEffect};
+
+        let store = Arc::new(MockParamStore::new());
+        let executor = KernelGovernanceExecutor::new(store);
+        let receipt_id = "test-resource-receipt";
+
+        let effect = KernelEffect::Resource(ResourceEffect::GrantAccess {
+            grantee_did: "did:icn:grantee".to_string(),
+            resource_type: "resource-type".to_string(),
+            access_model_hash: "model-hash".to_string(),
+        });
+
+        let result = executor.execute_effect(effect, receipt_id).await;
+        assert!(result.is_ok());
+
+        let effect_result = result.unwrap();
+        assert!(
+            !effect_result.success,
+            "Resource effect must not report success when kernel executor has no implementation"
+        );
+        assert!(
+            effect_result
+                .message
+                .contains("Resource effect not implemented in kernel executor"),
+            "Failure message should explain missing kernel implementation: {}",
+            effect_result.message
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sdis_effect_returns_explicit_failure() {
+        use icn_kernel_api::effects::{KernelEffect, SdisEffect};
+
+        let store = Arc::new(MockParamStore::new());
+        let executor = KernelGovernanceExecutor::new(store);
+        let receipt_id = "test-sdis-receipt";
+
+        let effect = KernelEffect::Sdis(SdisEffect::ApproveSteward {
+            steward_did: "did:icn:steward".to_string(),
+            capabilities_hash: "capabilities-hash".to_string(),
+        });
+
+        let result = executor.execute_effect(effect, receipt_id).await;
+        assert!(result.is_ok());
+
+        let effect_result = result.unwrap();
+        assert!(
+            !effect_result.success,
+            "SDIS effect must not report success when kernel executor has no implementation"
+        );
+        assert!(
+            effect_result
+                .message
+                .contains("SDIS effect not implemented in kernel executor"),
+            "Failure message should explain missing kernel implementation: {}",
+            effect_result.message
+        );
+    }
+
+    #[tokio::test]
+    async fn test_noop_reports_not_executed() {
+        use icn_kernel_api::effects::KernelEffect;
+
+        let store = Arc::new(MockParamStore::new());
+        let executor = KernelGovernanceExecutor::new(store);
+        let receipt_id = "test-noop-receipt";
+
+        let effect = KernelEffect::NoOp {
+            reason: "translation produced no executable effect".to_string(),
+        };
+
+        let result = executor.execute_effect(effect, receipt_id).await;
+        assert!(result.is_ok());
+
+        let effect_result = result.unwrap();
+        assert!(
+            !effect_result.success,
+            "NoOp must not report success when no kernel effect was executed"
+        );
+        assert!(effect_result.not_executed);
+        assert!(
+            effect_result
+                .message
+                .contains("no executable kernel effect (not executed)"),
+            "NoOp message should state not executed: {}",
             effect_result.message
         );
     }

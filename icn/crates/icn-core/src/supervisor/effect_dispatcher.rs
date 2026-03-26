@@ -116,6 +116,7 @@ impl EffectDispatcher {
                         message: format!("Execution error: {}", e),
                         state_change_hash: None,
                         ledger_entry_id: None,
+                        not_executed: false,
                     });
                 }
             }
