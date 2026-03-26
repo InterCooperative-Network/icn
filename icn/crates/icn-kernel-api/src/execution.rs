@@ -44,6 +44,24 @@ pub enum ExecutionStatus {
     PermanentlyFailed,
 }
 
+/// Canonical execution-truth summary for boundary surfaces.
+///
+/// This is the tranche-2 contract for exposing whether execution was complete,
+/// independent of aggregate status labels like [`ExecutionStatus::Confirmed`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct ExecutionTruthSummary {
+    /// Number of effect rows returned by dispatch.
+    pub total_effects: usize,
+    /// Number of effect rows that executed successfully.
+    pub executed_effects: usize,
+    /// Number of structurally non-executed rows (`not_executed = true`).
+    pub not_executed_effects: usize,
+    /// Number of hard-failure rows (`!success && !not_executed`).
+    pub hard_failed_effects: usize,
+    /// True only when all effect rows executed and none were skipped/failed.
+    pub execution_complete: bool,
+}
+
 /// Persistent record of a governance decision execution.
 ///
 /// Keyed by `decision_hash` in the execution store.
@@ -85,6 +103,13 @@ pub struct ExecutionRecord {
     /// Empty for pre-existing records that don't have effects stored.
     #[serde(default)]
     pub effects: Vec<KernelEffect>,
+
+    /// Canonical execution-truth summary for audit/API/CLI boundary surfaces.
+    ///
+    /// `None` means this record predates tranche-2 summary persistence and
+    /// consumers should use conservative fallback semantics.
+    #[serde(default)]
+    pub truth_summary: Option<ExecutionTruthSummary>,
 }
 
 impl ExecutionRecord {
@@ -112,6 +137,7 @@ impl ExecutionRecord {
             error: None,
             retries: 0,
             effects,
+            truth_summary: None,
         }
     }
 
@@ -184,6 +210,40 @@ impl ExecutionRecord {
                 | ExecutionStatus::NotExecuted
                 | ExecutionStatus::PermanentlyFailed
         )
+    }
+
+    /// Return execution-truth summary with a conservative fallback for legacy rows.
+    pub fn truth_summary_or_fallback(&self) -> ExecutionTruthSummary {
+        if let Some(summary) = &self.truth_summary {
+            return summary.clone();
+        }
+
+        // Legacy rows (pre-tranche-2) do not have canonical effect counters.
+        // Expose conservative values to avoid over-reporting completeness.
+        let total_effects = self.effects.len();
+        let not_executed_effects = if matches!(self.status, ExecutionStatus::NotExecuted) {
+            total_effects.max(1)
+        } else {
+            0
+        };
+        let hard_failed_effects = if matches!(
+            self.status,
+            ExecutionStatus::Failed | ExecutionStatus::PermanentlyFailed
+        ) {
+            1
+        } else {
+            0
+        };
+        let executed_effects = self.ledger_entry_ids.len().min(total_effects);
+        let execution_complete = false;
+
+        ExecutionTruthSummary {
+            total_effects,
+            executed_effects,
+            not_executed_effects,
+            hard_failed_effects,
+            execution_complete,
+        }
     }
 }
 
