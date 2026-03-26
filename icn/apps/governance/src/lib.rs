@@ -90,6 +90,8 @@ fn compute_decision_hash(decision_receipt_id: &str) -> String {
         .to_string()
 }
 
+const NON_EXECUTABLE_ACCEPTED_PREFIX: &str = "non-executable accepted proposal";
+
 /// Create an event subscription that routes proposals through the effect system.
 ///
 /// This subscription:
@@ -137,22 +139,41 @@ where
                         &decision_hash,
                         domain_id,
                     );
-
-                    if effects.is_empty() {
-                        debug!(
-                            proposal_id = %proposal_id,
-                            "Proposal produced no effects (likely Text or NoOp)"
-                        );
-                    } else {
-                        info!(
-                            proposal_id = %proposal_id,
-                            effect_count = effects.len(),
-                            "Routing proposal through effect path"
-                        );
+                    match effects {
+                        Ok(effects) => {
+                            if effects.is_empty() {
+                                debug!(
+                                    proposal_id = %proposal_id,
+                                    "Proposal produced no effects (unexpected empty translation)"
+                                );
+                            } else {
+                                info!(
+                                    proposal_id = %proposal_id,
+                                    effect_count = effects.len(),
+                                    "Routing proposal through effect path"
+                                );
+                            }
+                            effect_callback(effects, decision_receipt_id);
+                        }
+                        Err(e) => {
+                            // Explicit non-executable classification: keep terminal outcome
+                            // honest by dispatching a classified NoOp row.
+                            let reason = format!(
+                                "{NON_EXECUTABLE_ACCEPTED_PREFIX} [{}]: {}",
+                                e.kind, e.detail
+                            );
+                            error!(
+                                proposal_id = %proposal_id,
+                                domain_id = %domain_id,
+                                error = %e,
+                                "Accepted proposal is non-executable in current kernel path"
+                            );
+                            effect_callback(
+                                vec![KernelEffect::NoOp { reason }],
+                                decision_receipt_id,
+                            );
+                        }
                     }
-
-                    // Dispatch to effect executor
-                    effect_callback(effects, decision_receipt_id);
                 }
                 Err(e) => {
                     error!(
@@ -233,5 +254,56 @@ mod tests {
         );
 
         std::env::remove_var("ICN_USE_EFFECT_PATH");
+    }
+
+    #[test]
+    fn test_unsupported_accepted_payload_emits_classified_noop() {
+        let captured: CapturedEffects = Arc::new(Mutex::new(vec![]));
+        let sink = captured.clone();
+        let subscription = create_effect_subscription(move |effects, decision_receipt_id| {
+            sink.lock()
+                .expect("capture lock")
+                .push((effects, decision_receipt_id));
+        });
+
+        let payload = ProposalPayload::ShareRedemption {
+            member: "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9"
+                .parse()
+                .expect("valid did"),
+            share_ids: vec![],
+            payout_schedule: vec![],
+            reason: "unsupported in pilot path".to_string(),
+        };
+
+        let event = SystemEvent::ProposalAccepted {
+            proposal_id: "pr-unsupported-1".to_string(),
+            domain_id: "domain-pilot".to_string(),
+            payload: serde_json::to_value(payload).expect("serialize payload"),
+            decided_at: 1_700_000_001,
+        };
+
+        subscription(event);
+
+        let got = captured.lock().expect("capture lock");
+        assert_eq!(got.len(), 1, "effect callback should fire exactly once");
+        assert_eq!(got[0].1, "gov:domain-pilot:pr-unsupported-1:receipt");
+        assert_eq!(
+            got[0].0.len(),
+            1,
+            "classified fallback should be single effect"
+        );
+        match &got[0].0[0] {
+            KernelEffect::NoOp { reason } => {
+                assert!(
+                    reason.starts_with(NON_EXECUTABLE_ACCEPTED_PREFIX),
+                    "NoOp reason must be classified and stable, got: {reason}"
+                );
+                assert!(
+                    reason.contains("[payload]"),
+                    "NoOp reason must include error kind, got: {reason}"
+                );
+            }
+            other => panic!("expected classified NoOp fallback, got {other:?}"),
+        }
     }
 }

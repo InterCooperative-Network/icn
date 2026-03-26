@@ -7,6 +7,32 @@ use icn_kernel_api::effects::{
     ControlEffect, DisputeEffect, FederationEffect, KernelEffect, MembershipEffect, ProtocolEffect,
     ResourceEffect, SdisEffect, TreasuryEffect,
 };
+use std::fmt;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TranslationError {
+    pub kind: &'static str,
+    pub detail: String,
+}
+
+impl TranslationError {
+    fn unsupported(kind: &'static str, detail: impl Into<String>) -> Self {
+        Self {
+            kind,
+            detail: detail.into(),
+        }
+    }
+}
+
+impl fmt::Display for TranslationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} is not executable in current kernel path: {}",
+            self.kind, self.detail
+        )
+    }
+}
 
 /// Translate a governance proposal payload to kernel-safe effects.
 ///
@@ -25,7 +51,7 @@ pub fn translate_payload_to_effects(
     decision_receipt_id: &str,
     decision_hash: &str,
     domain_id: &str,
-) -> Vec<KernelEffect> {
+) -> Result<Vec<KernelEffect>, TranslationError> {
     match payload {
         // Treasury proposals
         ProposalPayload::Treasury { operation } => {
@@ -37,7 +63,7 @@ pub fn translate_payload_to_effects(
             currency,
             purpose,
             ..
-        } => vec![KernelEffect::Treasury(TreasuryEffect::CreateBudget {
+        } => Ok(vec![KernelEffect::Treasury(TreasuryEffect::CreateBudget {
             treasury_did: domain_id.to_string(),
             budget_id: format!("budget-{purpose}"),
             total_amount: *amount,
@@ -47,7 +73,7 @@ pub fn translate_payload_to_effects(
             validity_end: u64::MAX,
             decision_receipt_id: decision_receipt_id.to_string(),
             decision_hash: decision_hash.to_string(),
-        })],
+        })]),
 
         ProposalPayload::SurplusAllocation { allocation } => {
             let distributions = allocation
@@ -55,14 +81,16 @@ pub fn translate_payload_to_effects(
                 .iter()
                 .map(|(share_id, amount)| (share_id.0.clone(), *amount))
                 .collect();
-            vec![KernelEffect::Treasury(TreasuryEffect::DistributeSurplus {
-                treasury_did: domain_id.to_string(),
-                total_amount: allocation.total_surplus,
-                currency: allocation.currency.clone(),
-                distributions,
-                decision_receipt_id: decision_receipt_id.to_string(),
-                decision_hash: decision_hash.to_string(),
-            })]
+            Ok(vec![KernelEffect::Treasury(
+                TreasuryEffect::DistributeSurplus {
+                    treasury_did: domain_id.to_string(),
+                    total_amount: allocation.total_surplus,
+                    currency: allocation.currency.clone(),
+                    distributions,
+                    decision_receipt_id: decision_receipt_id.to_string(),
+                    decision_hash: decision_hash.to_string(),
+                },
+            )])
         }
 
         // Membership proposals
@@ -74,85 +102,85 @@ pub fn translate_payload_to_effects(
             member,
             reason,
             duration_seconds,
-        } => {
-            vec![KernelEffect::Membership(MembershipEffect::FreezeMember {
+        } => Ok(vec![KernelEffect::Membership(
+            MembershipEffect::FreezeMember {
                 entity_id: domain_id.to_string(),
                 member_did: member.to_string(),
                 reason: reason.clone(),
                 duration_secs: *duration_seconds,
-            })]
-        }
+            },
+        )]),
 
         ProposalPayload::UnfreezeMember { member, reason: _ } => {
-            vec![KernelEffect::Membership(MembershipEffect::UnfreezeMember {
-                entity_id: domain_id.to_string(),
-                member_did: member.to_string(),
-            })]
+            Ok(vec![KernelEffect::Membership(
+                MembershipEffect::UnfreezeMember {
+                    entity_id: domain_id.to_string(),
+                    member_did: member.to_string(),
+                },
+            )])
         }
 
         // Protocol proposals
-        ProposalPayload::ConfigChange { new_config } => {
-            vec![KernelEffect::Protocol(
-                ProtocolEffect::SetGovernanceConfig {
-                    domain_id: domain_id.to_string(),
-                    config_hash: blake3::hash(new_config.as_bytes()).to_hex().to_string(),
-                    config_json: new_config.clone(),
-                },
-            )]
-        }
+        ProposalPayload::ConfigChange { new_config } => Ok(vec![KernelEffect::Protocol(
+            ProtocolEffect::SetGovernanceConfig {
+                domain_id: domain_id.to_string(),
+                config_hash: blake3::hash(new_config.as_bytes()).to_hex().to_string(),
+                config_json: new_config.clone(),
+            },
+        )]),
 
         ProposalPayload::SchedulingPolicy {
             coop_id,
             policy_json,
-        } => {
-            vec![KernelEffect::Protocol(
-                ProtocolEffect::SetSchedulingPolicy {
-                    coop_id: coop_id.clone(),
-                    policy_hash: blake3::hash(policy_json.as_bytes()).to_hex().to_string(),
-                    policy_json: policy_json.clone(),
-                },
-            )]
-        }
+        } => Ok(vec![KernelEffect::Protocol(
+            ProtocolEffect::SetSchedulingPolicy {
+                coop_id: coop_id.clone(),
+                policy_hash: blake3::hash(policy_json.as_bytes()).to_hex().to_string(),
+                policy_json: policy_json.clone(),
+            },
+        )]),
 
         ProposalPayload::ProtocolUpgrade { version, .. } => {
-            vec![KernelEffect::Protocol(ProtocolEffect::Upgrade {
+            Ok(vec![KernelEffect::Protocol(ProtocolEffect::Upgrade {
                 version: version.to_string(),
                 upgrade_hash: String::new(),
                 activation_height: 0,
-            })]
+            })])
         }
 
         ProposalPayload::ProtocolChange { proposal } => {
-            vec![KernelEffect::Protocol(ProtocolEffect::SetParameter {
+            Ok(vec![KernelEffect::Protocol(ProtocolEffect::SetParameter {
                 parameter_name: proposal.parameter_id.clone(),
                 old_value_hash: String::new(), // Not carried by proposal payload
                 new_value_json: proposal.new_value.to_string(),
                 effective_at: proposal.effective_at.unwrap_or(0),
-            })]
+            })])
         }
 
         // Control proposals
         ProposalPayload::VetoProposal {
             target_proposal_id,
             reason,
-        } => vec![KernelEffect::Control(ControlEffect::VetoProposal {
+        } => Ok(vec![KernelEffect::Control(ControlEffect::VetoProposal {
             target_proposal_id: target_proposal_id.clone(),
             veto_reason: reason.clone(),
-        })],
+        })]),
 
         ProposalPayload::ForceCloseProposal {
             target_proposal_id,
             reason,
             ..
-        } => vec![KernelEffect::Control(ControlEffect::ForceCloseProposal {
-            target_proposal_id: target_proposal_id.clone(),
-            close_reason: reason.clone(),
-        })],
+        } => Ok(vec![KernelEffect::Control(
+            ControlEffect::ForceCloseProposal {
+                target_proposal_id: target_proposal_id.clone(),
+                close_reason: reason.clone(),
+            },
+        )]),
 
         ProposalPayload::Text { body } => {
-            vec![KernelEffect::Control(ControlEffect::TextResolution {
+            Ok(vec![KernelEffect::Control(ControlEffect::TextResolution {
                 resolution_hash: blake3::hash(body.as_bytes()).to_hex().to_string(),
-            })]
+            })])
         }
 
         // Dispute proposals
@@ -160,11 +188,11 @@ pub fn translate_payload_to_effects(
             target_hash,
             reason,
             affected_accounts: _,
-        } => vec![KernelEffect::Dispute(DisputeEffect::RollbackLedger {
+        } => Ok(vec![KernelEffect::Dispute(DisputeEffect::RollbackLedger {
             entry_ids: vec![target_hash.clone()],
             rollback_reason: reason.clone(),
             authorized_by: decision_receipt_id.to_string(),
-        })],
+        })]),
 
         ProposalPayload::DisputeResolution {
             dispute_entry_hash,
@@ -179,35 +207,34 @@ pub fn translate_payload_to_effects(
                 } => vec![(String::new(), *adjustment, currency.clone())],
                 _ => vec![],
             };
-            vec![KernelEffect::Dispute(DisputeEffect::ResolveDispute {
+            Ok(vec![KernelEffect::Dispute(DisputeEffect::ResolveDispute {
                 dispute_id: dispute_entry_hash.clone(),
                 resolution_hash: blake3::hash(reason.as_bytes()).to_hex().to_string(),
                 compensations,
-            })]
+            })])
         }
 
         // SDIS proposals
         ProposalPayload::Sdis { proposal } => match proposal {
             icn_governance::sdis::SdisProposal::AppointSteward { candidate, .. } => {
-                vec![KernelEffect::Sdis(SdisEffect::ApproveSteward {
+                Ok(vec![KernelEffect::Sdis(SdisEffect::ApproveSteward {
                     steward_did: candidate.to_string(),
                     capabilities_hash: String::new(),
-                })]
+                })])
             }
             icn_governance::sdis::SdisProposal::RemoveSteward {
                 steward, reason, ..
-            } => {
-                vec![KernelEffect::Sdis(SdisEffect::RevokeSteward {
-                    steward_did: steward.to_string(),
-                    reason: reason.clone(),
-                })]
-            }
-            _ => vec![KernelEffect::NoOp {
-                reason: format!(
+            } => Ok(vec![KernelEffect::Sdis(SdisEffect::RevokeSteward {
+                steward_did: steward.to_string(),
+                reason: reason.clone(),
+            })]),
+            _ => Err(TranslationError::unsupported(
+                "sdis",
+                format!(
                     "SDIS proposal type not yet translated: {:?}",
                     std::mem::discriminant(proposal)
                 ),
-            }],
+            )),
         },
 
         // Federation proposals
@@ -221,19 +248,19 @@ pub fn translate_payload_to_effects(
             reason: _,
         } => match action {
             icn_governance::ResourceAccessAction::Grant { model } => {
-                vec![KernelEffect::Resource(ResourceEffect::GrantAccess {
+                Ok(vec![KernelEffect::Resource(ResourceEffect::GrantAccess {
                     grantee_did: holder.to_string(),
                     resource_type: resource_id.clone(),
                     access_model_hash: blake3::hash(format!("{model:?}").as_bytes())
                         .to_hex()
                         .to_string(),
-                })]
+                })])
             }
             icn_governance::ResourceAccessAction::Revoke => {
-                vec![KernelEffect::Resource(ResourceEffect::RevokeAccess {
+                Ok(vec![KernelEffect::Resource(ResourceEffect::RevokeAccess {
                     grantee_did: holder.to_string(),
                     resource_type: resource_id.clone(),
-                })]
+                })])
             }
         },
 
@@ -274,16 +301,17 @@ pub fn translate_payload_to_effects(
                     currency: unit.clone(),
                 }));
             }
-            effects
+            Ok(effects)
         }
 
         // Fallback for unhandled types
-        _ => vec![KernelEffect::NoOp {
-            reason: format!(
+        _ => Err(TranslationError::unsupported(
+            "payload",
+            format!(
                 "Unhandled proposal type: {:?}",
                 std::mem::discriminant(payload)
             ),
-        }],
+        )),
     }
 }
 
@@ -292,7 +320,7 @@ fn translate_treasury_operation(
     operation: &icn_governance::TreasuryProposalOperation,
     decision_receipt_id: &str,
     decision_hash: &str,
-) -> Vec<KernelEffect> {
+) -> Result<Vec<KernelEffect>, TranslationError> {
     use icn_governance::TreasuryProposalOperation;
 
     match operation {
@@ -304,7 +332,7 @@ fn translate_treasury_operation(
             purpose,
             nonce,
             budget_id,
-        } => vec![KernelEffect::Treasury(TreasuryEffect::Spend {
+        } => Ok(vec![KernelEffect::Treasury(TreasuryEffect::Spend {
             treasury_did: treasury_did.to_string(),
             recipient_did: recipient.to_string(),
             amount: *amount,
@@ -314,7 +342,7 @@ fn translate_treasury_operation(
             expected_nonce: *nonce,
             decision_receipt_id: decision_receipt_id.to_string(),
             decision_hash: decision_hash.to_string(),
-        })],
+        })]),
 
         TreasuryProposalOperation::Spend {
             treasury_did,
@@ -323,7 +351,7 @@ fn translate_treasury_operation(
             currency,
             memo,
             nonce,
-        } => vec![KernelEffect::Treasury(TreasuryEffect::Spend {
+        } => Ok(vec![KernelEffect::Treasury(TreasuryEffect::Spend {
             treasury_did: treasury_did.to_string(),
             recipient_did: recipient.to_string(),
             amount: *amount,
@@ -333,7 +361,7 @@ fn translate_treasury_operation(
             expected_nonce: *nonce,
             decision_receipt_id: decision_receipt_id.to_string(),
             decision_hash: decision_hash.to_string(),
-        })],
+        })]),
 
         TreasuryProposalOperation::CreateBudget {
             treasury_did,
@@ -341,7 +369,7 @@ fn translate_treasury_operation(
             amount,
             currency,
             period_end,
-        } => vec![KernelEffect::Treasury(TreasuryEffect::CreateBudget {
+        } => Ok(vec![KernelEffect::Treasury(TreasuryEffect::CreateBudget {
             treasury_did: treasury_did.to_string(),
             budget_id: format!("budget-{purpose}"),
             total_amount: *amount,
@@ -351,15 +379,16 @@ fn translate_treasury_operation(
             validity_end: period_end.unwrap_or(u64::MAX),
             decision_receipt_id: decision_receipt_id.to_string(),
             decision_hash: decision_hash.to_string(),
-        })],
+        })]),
 
         // Fallback for other treasury operations
-        _ => vec![KernelEffect::NoOp {
-            reason: format!(
+        _ => Err(TranslationError::unsupported(
+            "treasury_operation",
+            format!(
                 "Treasury operation not yet translated: {:?}",
                 std::mem::discriminant(operation)
             ),
-        }],
+        )),
     }
 }
 
@@ -368,76 +397,77 @@ fn translate_membership_action(
     action: &icn_governance::MembershipAction,
     member: &icn_identity::Did,
     domain_id: &str,
-) -> Vec<KernelEffect> {
+) -> Result<Vec<KernelEffect>, TranslationError> {
     use icn_governance::MembershipAction;
 
     match action {
-        MembershipAction::Add => {
-            vec![KernelEffect::Membership(MembershipEffect::AddMember {
+        MembershipAction::Add => Ok(vec![KernelEffect::Membership(
+            MembershipEffect::AddMember {
                 entity_id: domain_id.to_string(),
                 member_did: member.to_string(),
                 role: String::new(),
                 tier: String::new(),
-            })]
-        }
-        MembershipAction::Remove => {
-            vec![KernelEffect::Membership(MembershipEffect::RemoveMember {
+            },
+        )]),
+        MembershipAction::Remove => Ok(vec![KernelEffect::Membership(
+            MembershipEffect::RemoveMember {
                 entity_id: domain_id.to_string(),
                 member_did: member.to_string(),
                 reason: String::new(),
-            })]
-        }
+            },
+        )]),
     }
 }
 
 /// Translate federation proposals to kernel effects
 fn translate_federation_proposal(
     proposal: &icn_governance::FederationProposal,
-) -> Vec<KernelEffect> {
+) -> Result<Vec<KernelEffect>, TranslationError> {
     use icn_governance::FederationProposal;
 
     match proposal {
         FederationProposal::JoinFederation { federation_id, .. } => {
-            vec![KernelEffect::Federation(FederationEffect::JoinFederation {
-                coop_did: String::new(),
-                federation_id: federation_id.clone(),
-            })]
+            Ok(vec![KernelEffect::Federation(
+                FederationEffect::JoinFederation {
+                    coop_did: String::new(),
+                    federation_id: federation_id.clone(),
+                },
+            )])
         }
         FederationProposal::LeaveFederation { federation_id, .. } => {
-            vec![KernelEffect::Federation(
+            Ok(vec![KernelEffect::Federation(
                 FederationEffect::LeaveFederation {
                     coop_did: String::new(),
                     federation_id: federation_id.clone(),
                 },
-            )]
+            )])
         }
         FederationProposal::EstablishClearing {
             partner_coop_did, ..
-        } => {
-            vec![KernelEffect::Federation(
-                FederationEffect::EstablishClearing {
-                    coop_a_did: String::new(),
-                    coop_b_did: partner_coop_did.to_string(),
-                    agreement_hash: String::new(),
-                },
-            )]
-        }
+        } => Ok(vec![KernelEffect::Federation(
+            FederationEffect::EstablishClearing {
+                coop_a_did: String::new(),
+                coop_b_did: partner_coop_did.to_string(),
+                agreement_hash: String::new(),
+            },
+        )]),
         FederationProposal::VouchForCooperative {
             target_coop_did, ..
-        } => {
-            vec![KernelEffect::Federation(FederationEffect::VouchForCoop {
+        } => Ok(vec![KernelEffect::Federation(
+            FederationEffect::VouchForCoop {
                 voucher_did: String::new(),
                 vouchee_did: target_coop_did.to_string(),
                 attestation_hash: String::new(),
-            })]
-        }
+            },
+        )]),
         // Fallback for other federation proposals
-        _ => vec![KernelEffect::NoOp {
-            reason: format!(
+        _ => Err(TranslationError::unsupported(
+            "federation_proposal",
+            format!(
                 "Federation proposal not yet translated: {:?}",
                 std::mem::discriminant(proposal)
             ),
-        }],
+        )),
     }
 }
 
@@ -476,7 +506,8 @@ mod tests {
             "receipt-123",
             "decision-hash-123",
             "domain-translation-test",
-        );
+        )
+        .expect("translation should succeed");
         assert_eq!(effects.len(), 1);
 
         match &effects[0] {
@@ -499,7 +530,7 @@ mod tests {
     }
 
     #[test]
-    fn test_translate_unhandled_payload_to_noop() {
+    fn test_translate_unhandled_payload_returns_explicit_error() {
         let payload = icn_governance::ProposalPayload::ShareRedemption {
             member: "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9"
                 .parse()
@@ -514,8 +545,8 @@ mod tests {
             "decision-hash-abc",
             "domain-translation-test",
         );
-        assert_eq!(effects.len(), 1);
-        assert!(matches!(effects[0], KernelEffect::NoOp { .. }));
+        let err = effects.expect_err("unsupported payload must be explicit");
+        assert_eq!(err.kind, "payload");
     }
 
     #[test]
@@ -572,7 +603,8 @@ mod tests {
                 "receipt-pilot",
                 "hash-pilot",
                 "domain-pilot",
-            );
+            )
+            .expect("pilot treasury payloads should translate");
             assert!(
                 !effects
                     .iter()
@@ -618,7 +650,8 @@ mod tests {
             "receipt-alloc-1",
             "decision-hash-alloc-1",
             "domain-alloc",
-        );
+        )
+        .expect("allocation should translate");
 
         // 1 CreateBudget + 2 Allocate = 3 effects total
         assert_eq!(effects.len(), 3, "expected 3 effects, got {effects:?}");
@@ -706,7 +739,8 @@ mod tests {
             "receipt-surplus-1",
             "hash-surplus-1",
             "domain-coop-x",
-        );
+        )
+        .expect("surplus allocation should translate");
         assert_eq!(effects.len(), 1);
         match &effects[0] {
             KernelEffect::Treasury(TreasuryEffect::DistributeSurplus {
