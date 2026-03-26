@@ -60,6 +60,8 @@ pub fn translate_payload_to_effects(
                 total_amount: allocation.total_surplus,
                 currency: allocation.currency.clone(),
                 distributions,
+                decision_receipt_id: decision_receipt_id.to_string(),
+                decision_hash: decision_hash.to_string(),
             })]
         }
 
@@ -675,5 +677,53 @@ mod tests {
                 .any(|e| matches!(e, KernelEffect::NoOp { .. })),
             "Allocation must not produce NoOp effects"
         );
+    }
+
+    #[test]
+    fn test_translate_surplus_allocation_carries_decision_provenance() {
+        let allocation = icn_ledger::SurplusAllocation {
+            id: "alloc-q1".to_string(),
+            cooperative_id: "coop-x".to_string(),
+            total_surplus: 500,
+            period: "2025-Q1".to_string(),
+            share_unit_value: 2.5,
+            total_labor_days: 100,
+            allocations: vec![
+                (icn_ledger::ShareId::new("share-a"), 300),
+                (icn_ledger::ShareId::new("share-b"), 200),
+            ],
+            proposal_id: "prop-1".to_string(),
+            allocated_at: 0,
+            currency: "HOURS".to_string(),
+        };
+        let payload = icn_governance::ProposalPayload::SurplusAllocation { allocation };
+        let effects = translate_payload_to_effects(
+            &payload,
+            "receipt-surplus-1",
+            "hash-surplus-1",
+            "domain-coop-x",
+        );
+        assert_eq!(effects.len(), 1);
+        match &effects[0] {
+            KernelEffect::Treasury(TreasuryEffect::DistributeSurplus {
+                treasury_did,
+                total_amount,
+                currency,
+                distributions,
+                decision_receipt_id,
+                decision_hash,
+            }) => {
+                assert_eq!(treasury_did, "domain-coop-x");
+                assert_eq!(*total_amount, 500);
+                assert_eq!(currency, "HOURS");
+                assert_eq!(
+                    distributions,
+                    &vec![("share-a".to_string(), 300), ("share-b".to_string(), 200)]
+                );
+                assert_eq!(decision_receipt_id, "receipt-surplus-1");
+                assert_eq!(decision_hash, "hash-surplus-1");
+            }
+            other => panic!("expected DistributeSurplus effect, got {other:?}"),
+        }
     }
 }
