@@ -733,7 +733,8 @@ async fn test_withdraw_payload_restart_resume_single_mutation() {
     };
 
     let effects =
-        translate_payload_to_effects(&payload, decision_receipt_id, decision_hash, domain_id);
+        translate_payload_to_effects(&payload, decision_receipt_id, decision_hash, domain_id)
+            .expect("withdraw payload should translate");
     assert_eq!(effects.len(), 1);
     match &effects[0] {
         KernelEffect::Treasury(TreasuryEffect::Spend {
@@ -797,7 +798,8 @@ async fn test_withdraw_payload_restart_resume_single_mutation() {
     };
 
     let replay_effects =
-        translate_payload_to_effects(&payload, decision_receipt_id, decision_hash, domain_id);
+        translate_payload_to_effects(&payload, decision_receipt_id, decision_hash, domain_id)
+            .expect("withdraw replay payload should translate");
     let reopened_ledger_store = Arc::new(SledStore::open(&ledger_store_path).unwrap());
     let reopened_ledger = Ledger::new(reopened_ledger_store).unwrap();
     let reopened_ledger = Arc::new(tokio::sync::RwLock::new(reopened_ledger));
@@ -888,7 +890,8 @@ fn test_treasury_spend_payload_translation_produces_treasury_spend_effect() {
     };
 
     let effects =
-        translate_payload_to_effects(&payload, decision_receipt_id, decision_hash, domain_id);
+        translate_payload_to_effects(&payload, decision_receipt_id, decision_hash, domain_id)
+            .expect("treasury spend payload should translate");
     assert_eq!(effects.len(), 1);
     match &effects[0] {
         KernelEffect::Treasury(TreasuryEffect::Spend {

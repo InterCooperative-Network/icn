@@ -509,6 +509,8 @@ impl DecisionExecutor {
             .collect();
 
         let all_non_executable = !results.is_empty() && results.iter().all(|r| r.not_executed);
+        let mixed_non_executable =
+            results.iter().any(|r| r.success) && results.iter().any(|r| r.not_executed);
 
         if !hard_failure_messages.is_empty() {
             let error_msg = hard_failure_messages.join("; ");
@@ -554,6 +556,24 @@ impl DecisionExecutor {
                 .filter_map(|r| r.state_change_hash.clone())
                 .collect();
             record.mark_confirmed(ledger_entry_ids, state_change_hashes);
+            if mixed_non_executable {
+                let mixed_count = results.iter().filter(|r| r.not_executed).count();
+                let total = results.len();
+                let note = format!(
+                    "Confirmed with partial execution: {mixed_count}/{total} effect(s) were not executed"
+                );
+                record.error = Some(note.clone());
+                warn!(
+                    decision_hash = %decision_hash,
+                    receipt_id = %decision_receipt_id,
+                    mixed_not_executed = mixed_count,
+                    total_effects = total,
+                    note = %note,
+                    "Decision confirmed with mixed executable/non-executable effect rows"
+                );
+            } else {
+                record.error = None;
+            }
             self.store.put(&record)?;
 
             info!(
@@ -1313,6 +1333,14 @@ mod tests {
 
         let record = store.get(decision_hash).unwrap().unwrap();
         assert_eq!(record.status, ExecutionStatus::Confirmed);
+        assert!(
+            record
+                .error
+                .as_deref()
+                .unwrap_or_default()
+                .contains("partial execution"),
+            "mixed execution should preserve explicit partial note in record.error"
+        );
     }
 
     #[tokio::test]

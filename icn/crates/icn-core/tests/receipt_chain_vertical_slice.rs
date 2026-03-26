@@ -205,7 +205,8 @@ async fn test_allocation_receipt_chain_end_to_end() -> Result<()> {
         "receipt-vertical-slice",
         "decision-hash-vertical-slice",
         event_domain_id.as_str(),
-    );
+    )
+    .expect("allocation payload should translate into executable kernel effects");
 
     // 1 CreateBudget + 2 Allocate = 3 effects
     assert_eq!(
