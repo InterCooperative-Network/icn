@@ -17,9 +17,16 @@ use icn_kernel_api::escrow::{EscrowRecord, EscrowStatus, EscrowStore};
 use icn_kernel_api::execution::{ExecutionRecord, ExecutionStatus, ExecutionStore};
 use icn_kernel_api::protocol_params::*;
 
+use icn_core::services::LedgerServiceImpl;
 use icn_core::supervisor::decision_executor::DecisionExecutor;
 use icn_core::supervisor::effect_dispatcher::EffectDispatcher;
 use icn_core::supervisor::governance_executor::KernelGovernanceExecutor;
+use icn_identity::Did;
+use icn_kernel_api::AllowAllOracle;
+use icn_ledger::Ledger;
+use icn_store::SledStore;
+use tempfile::TempDir;
+use tokio::sync::RwLock as TokioRwLock;
 
 // =============================================================================
 // In-memory test doubles
@@ -131,25 +138,45 @@ impl ExecutionStore for MemoryExecutionStore {
 // Test helpers
 // =============================================================================
 
-/// Build a test executor with a shared escrow store.
+/// Treasury DID on ReleaseEscrow effects in this module (valid multibase).
+const ESCROW_TEST_TREASURY_DID: &str = "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9";
+const ESCROW_BENEFICIARY_ALICE: &str = "did:icn:zGyGKxMyg1p9SsHfm15MkNUu1u9TN2JtTspcdmrtGUdse";
+const ESCROW_BENEFICIARY_BOB: &str = "did:icn:z9hSR6S7WPtxmTojgo6GG3k4yDPecgJY292j7xrsUGWBu";
+const ESCROW_BENEFICIARY_CAROL: &str = "did:icn:zEdmxWPmx2WH6WgFfTdu9xfkYf3k1g5wD1zccTVySEEh1";
+const ESCROW_BENEFICIARY_DAVE: &str = "did:icn:z3b5C8qPPH1U8t8jxS7UB2A1mvz5Z5dNLEcEtW3VQ8Zba";
+
+/// Build a test executor with a shared escrow store and temp ledger for treasury release.
 fn make_executor(
     escrow_store: Arc<MemoryEscrowStore>,
-) -> (Arc<DecisionExecutor>, Arc<MemoryExecutionStore>) {
+) -> (Arc<DecisionExecutor>, Arc<MemoryExecutionStore>, TempDir) {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let ledger_path = tmp.path().join("ledger");
+    std::fs::create_dir_all(&ledger_path).unwrap();
+    let ledger_store = Arc::new(SledStore::open(&ledger_path).unwrap());
+    let ledger = Ledger::new(ledger_store).unwrap();
+    let ledger = Arc::new(TokioRwLock::new(ledger));
+    let treasury: Did = ESCROW_TEST_TREASURY_DID.parse().unwrap();
+    let ledger_service = Arc::new(LedgerServiceImpl::new(
+        ledger,
+        Arc::new(AllowAllOracle::wildcard()),
+        treasury,
+    ));
     let param_store = Arc::new(StubParamStore);
     let kernel_executor = KernelGovernanceExecutor::new(param_store)
-        .with_escrow_store(escrow_store as Arc<dyn EscrowStore>);
+        .with_escrow_store(escrow_store as Arc<dyn EscrowStore>)
+        .with_ledger_service(ledger_service);
     let dispatcher = Arc::new(EffectDispatcher::new(Arc::new(kernel_executor)));
     let exec_store = Arc::new(MemoryExecutionStore::new());
     let decision_executor = Arc::new(DecisionExecutor::new(dispatcher, exec_store.clone()));
-    (decision_executor, exec_store)
+    (decision_executor, exec_store, tmp)
 }
 
 /// Build a ReleaseEscrow effect.
 fn release_escrow_effect(escrow_id: &str, decision_hash: &str) -> Vec<KernelEffect> {
     vec![KernelEffect::Treasury(TreasuryEffect::ReleaseEscrow {
         escrow_id: escrow_id.to_string(),
-        treasury_did: "did:icn:treasury:coop-alpha".to_string(),
-        beneficiary_did: "did:icn:member:alice".to_string(),
+        treasury_did: ESCROW_TEST_TREASURY_DID.to_string(),
+        beneficiary_did: ESCROW_BENEFICIARY_ALICE.to_string(),
         amount: 5000,
         currency: "HOURS".to_string(),
         decision_receipt_id: format!("receipt-{}", decision_hash),
@@ -173,13 +200,13 @@ async fn test_replay_does_not_double_spend() {
     escrow_store.insert(EscrowRecord::new_locked(
         "esc-replay",
         "coop-alpha",
-        "did:icn:treasury:coop-alpha",
-        "did:icn:member:alice",
+        ESCROW_TEST_TREASURY_DID,
+        ESCROW_BENEFICIARY_ALICE,
         5000,
         "HOURS",
     ));
 
-    let (executor, exec_store) = make_executor(escrow_store.clone());
+    let (executor, exec_store, _tmp) = make_executor(escrow_store.clone());
 
     // First execution — should succeed
     let results = executor
@@ -257,14 +284,14 @@ async fn test_crash_recovery_no_double_spend() {
     escrow_store.insert(EscrowRecord::new_locked(
         "esc-crash",
         "coop-alpha",
-        "did:icn:treasury:coop-alpha",
-        "did:icn:member:bob",
+        ESCROW_TEST_TREASURY_DID,
+        ESCROW_BENEFICIARY_BOB,
         3000,
         "HOURS",
     ));
 
     // --- Phase 1: Normal execution succeeds ---
-    let (executor1, _exec_store1) = make_executor(escrow_store.clone());
+    let (executor1, _exec_store1, _tmp1) = make_executor(escrow_store.clone());
     let results = executor1
         .execute(
             release_escrow_effect("esc-crash", "hash-crash-1"),
@@ -284,7 +311,7 @@ async fn test_crash_recovery_no_double_spend() {
     // --- Phase 2: "Crash" — create fresh executor with same escrow store ---
     // The execution store is fresh (simulates lost state), but escrow store
     // retains the Released status (it's durable).
-    let (executor2, _exec_store2) = make_executor(escrow_store.clone());
+    let (executor2, _exec_store2, _tmp2) = make_executor(escrow_store.clone());
 
     // Replay the same decision on the "recovered" node.
     // Since execution store is fresh, the decision-level check won't find it.
@@ -324,13 +351,13 @@ async fn test_crash_recovery_no_double_spend() {
     escrow_store2.insert(EscrowRecord::new_locked(
         "esc-midcrash",
         "coop-alpha",
-        "did:icn:treasury:coop-alpha",
-        "did:icn:member:carol",
+        ESCROW_TEST_TREASURY_DID,
+        ESCROW_BENEFICIARY_CAROL,
         2000,
         "HOURS",
     ));
 
-    let (executor3, exec_store3) = make_executor(escrow_store2.clone());
+    let (executor3, exec_store3, _tmp3) = make_executor(escrow_store2.clone());
 
     // Manually insert an Executing record (simulates mid-flight crash)
     let mut crashed_record =
@@ -371,13 +398,13 @@ async fn test_conflicting_release_rejected() {
     escrow_store.insert(EscrowRecord::new_locked(
         "esc-conflict",
         "coop-alpha",
-        "did:icn:treasury:coop-alpha",
-        "did:icn:member:dave",
+        ESCROW_TEST_TREASURY_DID,
+        ESCROW_BENEFICIARY_DAVE,
         7000,
         "HOURS",
     ));
 
-    let (executor, exec_store) = make_executor(escrow_store.clone());
+    let (executor, exec_store, _tmp) = make_executor(escrow_store.clone());
 
     // Decision A releases the escrow
     let results_a = executor
@@ -455,7 +482,7 @@ async fn test_conflicting_release_rejected() {
 async fn test_release_nonexistent_escrow_fails() {
     let escrow_store = Arc::new(MemoryEscrowStore::new());
     // No escrow pre-loaded
-    let (executor, _) = make_executor(escrow_store);
+    let (executor, _, _tmp) = make_executor(escrow_store);
 
     let results = executor
         .execute(
@@ -480,15 +507,15 @@ async fn test_release_cancelled_escrow_fails() {
     let mut cancelled = EscrowRecord::new_locked(
         "esc-cancelled",
         "coop-alpha",
-        "did:icn:treasury:coop-alpha",
-        "did:icn:member:eve",
+        ESCROW_TEST_TREASURY_DID,
+        ESCROW_BENEFICIARY_ALICE,
         1000,
         "HOURS",
     );
     cancelled.status = EscrowStatus::Cancelled;
     escrow_store.insert(cancelled);
 
-    let (executor, _) = make_executor(escrow_store);
+    let (executor, _, _tmp) = make_executor(escrow_store);
 
     let results = executor
         .execute(

@@ -67,24 +67,6 @@ impl KernelGovernanceExecutor {
         }
     }
 
-    /// Hidden hook for tests: inject a [`TreasuryExecutor`]. Production code must use [`Self::new`]
-    /// and configured services instead.
-    #[doc(hidden)]
-    pub fn with_treasury_executor_for_tests(
-        treasury: Arc<dyn TreasuryExecutor>,
-        protocol_param_store: Arc<dyn ProtocolParameterStore>,
-    ) -> Self {
-        Self {
-            treasury,
-            protocol: Arc::new(KernelProtocolExecutor::new(protocol_param_store)),
-            federation: Arc::new(KernelFederationExecutor::new()),
-            control: Arc::new(KernelControlExecutor::new()),
-            membership: Arc::new(KernelMembershipExecutor::new()),
-            escrow_store: None,
-            budget_store: None,
-        }
-    }
-
     /// Set the control service for governance control operations.
     pub fn with_control_service(mut self, service: Arc<dyn ControlService>) -> Self {
         self.control = Arc::new(KernelControlExecutor::with_service(service));
@@ -142,7 +124,7 @@ impl KernelGovernanceExecutor {
         decision_receipt_id: &str,
     ) -> Result<EffectResult> {
         match &treasury_effect {
-            // Path 1: CreateBudget → persist BudgetRecord
+            // Path 1: CreateBudget → ledger entry first, then persist BudgetRecord on success
             TreasuryEffect::CreateBudget {
                 treasury_did,
                 budget_id,
@@ -172,39 +154,40 @@ impl KernelGovernanceExecutor {
                             });
                         }
                     }
-
-                    // Use treasury_did as scope_id (the treasury owns the budget)
-                    let record = BudgetRecord::new(
-                        budget_id.clone(),
-                        treasury_did.clone(),
-                        treasury_did.clone(),
-                        currency.clone(),
-                        *total_amount,
-                        decision_hash.clone(),
-                        std::time::SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH)
-                            .unwrap_or_default()
-                            .as_secs(),
-                    );
-                    budget_store.put(&record)?;
-                    info!(
-                        budget_id = %budget_id,
-                        total_limit = total_amount,
-                        currency = %currency,
-                        "Budget record created"
-                    );
                 }
 
-                // Also delegate to treasury executor for ledger entry
                 let operation = treasury_effect_to_operation(&treasury_effect);
                 let outcome = self
                     .treasury
                     .execute_treasury_operation(receipt_id, operation)
                     .await?;
-                Ok(execution_outcome_to_effect_result(
-                    outcome,
-                    decision_receipt_id,
-                ))
+                let result = execution_outcome_to_effect_result(outcome, decision_receipt_id);
+
+                if result.success {
+                    if let Some(ref budget_store) = self.budget_store {
+                        let record = BudgetRecord::new(
+                            budget_id.clone(),
+                            treasury_did.clone(),
+                            treasury_did.clone(),
+                            currency.clone(),
+                            *total_amount,
+                            decision_hash.clone(),
+                            std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .unwrap_or_default()
+                                .as_secs(),
+                        );
+                        budget_store.put(&record)?;
+                        info!(
+                            budget_id = %budget_id,
+                            total_limit = total_amount,
+                            currency = %currency,
+                            "Budget record created"
+                        );
+                    }
+                }
+
+                Ok(result)
             }
 
             // Path 2: Spend with budget_id → saga-enforced budget check
@@ -748,56 +731,64 @@ impl TreasuryExecutor for KernelTreasuryExecutor {
             "Executing treasury operation"
         );
 
-        // If we have a ledger service, submit the entry
-        if let Some(ledger) = &self.ledger {
-            if let Some(decision_hash) = &operation.decision_hash {
-                let request = icn_kernel_api::TreasuryEntryRequest {
-                    treasury_id: operation.treasury_id.clone(),
-                    operation_type: convert_operation_type(operation.operation_type),
-                    amount: operation.amount,
-                    currency: operation.currency.clone(),
-                    recipient: operation.recipient.clone(),
-                    memo: operation.memo.clone(),
-                    expected_nonce: operation.expected_nonce,
-                    decision_receipt_id: receipt_id.to_string(),
-                    decision_hash: decision_hash.clone(),
-                };
+        let ledger = match &self.ledger {
+            None => {
+                return Ok(ExecutionOutcome::Deferred {
+                    receipt_id: receipt_id.clone(),
+                    reason: "Treasury ledger service is not configured; settlement entry cannot be applied yet"
+                        .to_string(),
+                });
+            }
+            Some(l) => l,
+        };
 
-                match ledger.submit_treasury_entry(request) {
-                    Ok(result) => {
-                        tracing::info!(
-                            entry_hash = %result.entry_hash,
-                            decision_receipt_id = %result.decision_receipt_id,
-                            decision_hash = %result.decision_hash,
-                            "Treasury entry submitted to ledger"
-                        );
-                        return Ok(ExecutionOutcome::Success {
-                            receipt_id: receipt_id.clone(),
-                            effects: vec![format!(
-                                "{:?} {} {} from treasury {} -> state_hash={} {}{}",
-                                operation.operation_type,
-                                operation.amount,
-                                operation.currency,
-                                operation.treasury_id,
-                                result.entry_hash,
-                                LEDGER_ENTRY_MARKER,
-                                result.entry_hash
-                            )],
-                        });
-                    }
-                    Err(e) => {
-                        tracing::error!(error = %e, "Failed to submit treasury entry to ledger");
-                        return Err(anyhow::anyhow!("Ledger submission failed: {}", e));
-                    }
+        if let Some(decision_hash) = &operation.decision_hash {
+            let request = icn_kernel_api::TreasuryEntryRequest {
+                treasury_id: operation.treasury_id.clone(),
+                operation_type: convert_operation_type(operation.operation_type),
+                amount: operation.amount,
+                currency: operation.currency.clone(),
+                recipient: operation.recipient.clone(),
+                memo: operation.memo.clone(),
+                expected_nonce: operation.expected_nonce,
+                decision_receipt_id: receipt_id.to_string(),
+                decision_hash: decision_hash.clone(),
+            };
+
+            match ledger.submit_treasury_entry(request) {
+                Ok(result) => {
+                    tracing::info!(
+                        entry_hash = %result.entry_hash,
+                        decision_receipt_id = %result.decision_receipt_id,
+                        decision_hash = %result.decision_hash,
+                        "Treasury entry submitted to ledger"
+                    );
+                    return Ok(ExecutionOutcome::Success {
+                        receipt_id: receipt_id.clone(),
+                        effects: vec![format!(
+                            "{:?} {} {} from treasury {} -> state_hash={} {}{}",
+                            operation.operation_type,
+                            operation.amount,
+                            operation.currency,
+                            operation.treasury_id,
+                            result.entry_hash,
+                            LEDGER_ENTRY_MARKER,
+                            result.entry_hash
+                        )],
+                    });
+                }
+                Err(e) => {
+                    tracing::error!(error = %e, "Failed to submit treasury entry to ledger");
+                    return Err(anyhow::anyhow!("Ledger submission failed: {}", e));
                 }
             }
         }
 
-        // Fallback: placeholder behavior (no ledger configured)
+        // Ledger is configured but the operation lacks a decision_hash (cannot attach provenance).
         Ok(ExecutionOutcome::Success {
             receipt_id: receipt_id.clone(),
             effects: vec![format!(
-                "{:?} {} {} from treasury {} (placeholder - no ledger)",
+                "{:?} {} {} from treasury {} (no decision_hash; ledger entry skipped)",
                 operation.operation_type,
                 operation.amount,
                 operation.currency,
@@ -1896,7 +1887,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_treasury_executor_placeholder() {
+    async fn test_treasury_executor_defers_without_ledger() {
         let executor = KernelTreasuryExecutor::new();
         let receipt_id = DecisionReceiptId::new("test-receipt-1");
         let operation = TreasuryOperation {
@@ -1916,10 +1907,13 @@ mod tests {
         assert!(result.is_ok());
 
         match result.unwrap() {
-            ExecutionOutcome::Success { effects, .. } => {
-                assert!(!effects.is_empty());
+            ExecutionOutcome::Deferred { reason, .. } => {
+                assert!(
+                    reason.contains("ledger"),
+                    "expected defer reason to mention ledger, got {reason}"
+                );
             }
-            _ => panic!("Expected success outcome"),
+            other => panic!("Expected Deferred without ledger, got {:?}", other),
         }
     }
 

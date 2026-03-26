@@ -13,12 +13,27 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
+use icn_core::services::LedgerServiceImpl;
+use icn_identity::Did;
 use icn_kernel_api::budget::{BudgetRecord, BudgetStore};
 use icn_kernel_api::effects::{KernelEffect, TreasuryEffect};
 use icn_kernel_api::execution::{ExecutionRecord, ExecutionStatus, ExecutionStore};
 use icn_kernel_api::protocol_params::StubParamStore;
+use icn_kernel_api::AllowAllOracle;
+use icn_ledger::Ledger;
+use icn_store::SledStore;
+use tempfile::TempDir;
+use tokio::sync::RwLock as TokioRwLock;
 
 use anyhow::Result;
+
+// Valid `did:icn:z…` strings (LedgerServiceImpl parses treasury as icn_identity::Did).
+const TREASURY_OPS: &str = "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9";
+const TREASURY_CRASH: &str = "did:icn:z3b5C8qPPH1U8t8jxS7UB2A1mvz5Z5dNLEcEtW3VQ8Zba";
+const TREASURY_IDEM: &str = "did:icn:zEdmxWPmx2WH6WgFfTdu9xfkYf3k1g5wD1zccTVySEEh1";
+const RECIPIENT_ALICE: &str = "did:icn:zGyGKxMyg1p9SsHfm15MkNUu1u9TN2JtTspcdmrtGUdse";
+const RECIPIENT_BOB: &str = "did:icn:z9hSR6S7WPtxmTojgo6GG3k4yDPecgJY292j7xrsUGWBu";
+const RECIPIENT_CAROL: &str = "did:icn:zEdmxWPmx2WH6WgFfTdu9xfkYf3k1g5wD1zccTVySEEh1";
 
 // ============================================================================
 // Test infrastructure
@@ -117,17 +132,32 @@ impl BudgetStore for MemoryBudgetStore {
     }
 }
 
-/// Build a DecisionExecutor with budget store wired in.
+/// Build a DecisionExecutor with budget store and temp ledger (treasury DID must match effects).
 fn make_test_executor(
     budget_store: Arc<MemoryBudgetStore>,
+    ledger_treasury_did: &str,
 ) -> (
     Arc<icn_core::supervisor::decision_executor::DecisionExecutor>,
     Arc<MemoryExecutionStore>,
+    TempDir,
 ) {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let ledger_path = tmp.path().join("ledger");
+    std::fs::create_dir_all(&ledger_path).unwrap();
+    let ledger_store = Arc::new(SledStore::open(&ledger_path).unwrap());
+    let ledger = Ledger::new(ledger_store).unwrap();
+    let ledger = Arc::new(TokioRwLock::new(ledger));
+    let treasury: Did = ledger_treasury_did.parse().expect("treasury did");
+    let ledger_service = Arc::new(LedgerServiceImpl::new(
+        ledger,
+        Arc::new(AllowAllOracle::wildcard()),
+        treasury,
+    ));
     let param_store = Arc::new(StubParamStore);
     let kernel_executor = Arc::new(
         icn_core::supervisor::governance_executor::KernelGovernanceExecutor::new(param_store)
-            .with_budget_store(budget_store),
+            .with_budget_store(budget_store)
+            .with_ledger_service(ledger_service),
     );
     let dispatcher =
         Arc::new(icn_core::supervisor::effect_dispatcher::EffectDispatcher::new(kernel_executor));
@@ -140,7 +170,7 @@ fn make_test_executor(
         ),
     );
 
-    (decision_executor, exec_store)
+    (decision_executor, exec_store, tmp)
 }
 
 /// Helper: create a CreateBudget effect.
@@ -170,6 +200,7 @@ fn spend_from_budget_effect(
     recipient_did: &str,
     amount: i64,
     decision_hash: &str,
+    expected_nonce: u64,
 ) -> KernelEffect {
     KernelEffect::Treasury(TreasuryEffect::Spend {
         treasury_did: treasury_did.to_string(),
@@ -178,7 +209,7 @@ fn spend_from_budget_effect(
         currency: "HOURS".to_string(),
         memo: "Test spend".to_string(),
         budget_id: Some(budget_id.to_string()),
-        expected_nonce: 0,
+        expected_nonce,
         decision_receipt_id: format!("receipt:{}", decision_hash),
         decision_hash: decision_hash.to_string(),
     })
@@ -188,12 +219,11 @@ fn spend_from_budget_effect(
 // Test 1: Overspend Prevention
 // ============================================================================
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_budget_overspend_rejected() {
     let budget_store = Arc::new(MemoryBudgetStore::new());
-    let (executor, exec_store) = make_test_executor(budget_store.clone());
-
-    let treasury_did = "did:icn:treasury:ops";
+    let treasury_did = TREASURY_OPS;
+    let (executor, exec_store, _tmp) = make_test_executor(budget_store.clone(), treasury_did);
 
     // Step 1: Create budget with 1000 limit
     let create_effects = vec![create_budget_effect(
@@ -223,9 +253,10 @@ async fn test_budget_overspend_rejected() {
     let spend_ok = vec![spend_from_budget_effect(
         "budget-ops-2024",
         treasury_did,
-        "did:icn:alice",
+        RECIPIENT_ALICE,
         600,
         "hash:spend-600",
+        0,
     )];
     let results = executor
         .execute(
@@ -251,9 +282,10 @@ async fn test_budget_overspend_rejected() {
     let spend_over = vec![spend_from_budget_effect(
         "budget-ops-2024",
         treasury_did,
-        "did:icn:bob",
+        RECIPIENT_BOB,
         500,
         "hash:spend-over",
+        1,
     )];
     let results = executor
         .execute(
@@ -295,9 +327,10 @@ async fn test_budget_overspend_rejected() {
     let spend_exact = vec![spend_from_budget_effect(
         "budget-ops-2024",
         treasury_did,
-        "did:icn:carol",
+        RECIPIENT_CAROL,
         400,
         "hash:spend-exact",
+        1,
     )];
     let results = executor
         .execute(
@@ -323,12 +356,11 @@ async fn test_budget_overspend_rejected() {
 // Test 2: Replay Idempotency
 // ============================================================================
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_budget_spend_replay_idempotent() {
     let budget_store = Arc::new(MemoryBudgetStore::new());
-    let (executor, _exec_store) = make_test_executor(budget_store.clone());
-
-    let treasury_did = "did:icn:treasury:ops";
+    let treasury_did = TREASURY_OPS;
+    let (executor, _exec_store, _tmp) = make_test_executor(budget_store.clone(), treasury_did);
 
     // Step 1: Create budget
     let create_effects = vec![create_budget_effect(
@@ -351,9 +383,10 @@ async fn test_budget_spend_replay_idempotent() {
     let spend = vec![spend_from_budget_effect(
         "budget-replay",
         treasury_did,
-        "did:icn:alice",
+        RECIPIENT_ALICE,
         300,
         "hash:spend-300",
+        0,
     )];
     let results = executor
         .execute(
@@ -396,7 +429,7 @@ async fn test_budget_spend_replay_idempotent() {
 // Test 3: Crash Recovery (saga safety)
 // ============================================================================
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_budget_crash_recovery_saga_safe() {
     // This test verifies that if we crash between begin_spend and confirm_spend,
     // the budget stays with a pending_spend and can be retried.
@@ -405,8 +438,8 @@ async fn test_budget_crash_recovery_saga_safe() {
     // Manually create a budget with a pending spend (simulating crash state)
     let mut budget = BudgetRecord::new(
         "budget-crash".into(),
-        "did:icn:treasury:crash".into(),
-        "did:icn:treasury:crash".into(),
+        TREASURY_CRASH.into(),
+        TREASURY_CRASH.into(),
         "HOURS".into(),
         1000,
         "hash:create-crash".into(),
@@ -423,14 +456,15 @@ async fn test_budget_crash_recovery_saga_safe() {
     assert_eq!(crashed.spent_total, 0, "spent_total not yet incremented");
 
     // Now create executor and retry the spend
-    let (executor, _exec_store) = make_test_executor(budget_store.clone());
+    let (executor, _exec_store, _tmp) = make_test_executor(budget_store.clone(), TREASURY_CRASH);
 
     let retry_spend = vec![spend_from_budget_effect(
         "budget-crash",
-        "did:icn:treasury:crash",
-        "did:icn:alice",
+        TREASURY_CRASH,
+        RECIPIENT_ALICE,
         500,
         "hash:spend-crash",
+        0,
     )];
 
     let results = executor
@@ -464,14 +498,14 @@ async fn test_budget_crash_recovery_saga_safe() {
 // Test 4: CreateBudget idempotency
 // ============================================================================
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_create_budget_idempotent() {
     let budget_store = Arc::new(MemoryBudgetStore::new());
-    let (executor, _exec_store) = make_test_executor(budget_store.clone());
+    let (executor, _exec_store, _tmp) = make_test_executor(budget_store.clone(), TREASURY_IDEM);
 
     let create = vec![create_budget_effect(
         "budget-idem",
-        "did:icn:treasury",
+        TREASURY_IDEM,
         5000,
         "hash:create-idem",
     )];
@@ -513,15 +547,15 @@ async fn test_create_budget_idempotent() {
 // Test 5: Spend without budget (backward compatibility)
 // ============================================================================
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_spend_without_budget_passes_through() {
     let budget_store = Arc::new(MemoryBudgetStore::new());
-    let (executor, _exec_store) = make_test_executor(budget_store.clone());
+    let (executor, _exec_store, _tmp) = make_test_executor(budget_store.clone(), TREASURY_IDEM);
 
     // Spend with no budget_id — should pass through to treasury executor directly
     let spend = vec![KernelEffect::Treasury(TreasuryEffect::Spend {
-        treasury_did: "did:icn:treasury".to_string(),
-        recipient_did: "did:icn:alice".to_string(),
+        treasury_did: TREASURY_IDEM.to_string(),
+        recipient_did: RECIPIENT_ALICE.to_string(),
         amount: 1000,
         currency: "HOURS".to_string(),
         memo: "No budget".to_string(),
@@ -553,12 +587,11 @@ async fn test_spend_without_budget_passes_through() {
 // Test 6: Budget queryability
 // ============================================================================
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_budget_state_queryable() {
     let budget_store = Arc::new(MemoryBudgetStore::new());
-    let (executor, _exec_store) = make_test_executor(budget_store.clone());
-
-    let treasury_did = "did:icn:treasury:query";
+    let treasury_did = TREASURY_OPS;
+    let (executor, _exec_store, _tmp) = make_test_executor(budget_store.clone(), treasury_did);
 
     // Create two budgets for same scope
     executor
@@ -597,9 +630,10 @@ async fn test_budget_state_queryable() {
             vec![spend_from_budget_effect(
                 "budget-a",
                 treasury_did,
-                "did:icn:alice",
+                RECIPIENT_ALICE,
                 2000,
                 "hash:spend-a",
+                0,
             )],
             "receipt:spend-a",
             "hash:spend-a",

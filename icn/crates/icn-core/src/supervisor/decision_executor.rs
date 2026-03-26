@@ -712,34 +712,10 @@ mod tests {
     use icn_kernel_api::effects::TreasuryEffect;
     use icn_kernel_api::escrow::{EscrowRecord, EscrowStatus, EscrowStore};
     use icn_kernel_api::execution::ExecutionRecord;
-    use icn_kernel_api::governance::{
-        DecisionReceiptId, ExecutionOutcome, TreasuryExecutor, TreasuryOperation,
-    };
+    use icn_kernel_api::services::{LedgerEvent, TreasuryEntryRequest, TreasuryEntryResult};
+    use icn_kernel_api::{AllowAllOracle, Did, LedgerService, PolicyOracle};
     use std::collections::HashMap;
     use std::sync::RwLock;
-
-    /// Test stub: only `ExecutionOutcome::Deferred` is produced in-tree by executors today;
-    /// this proves the outcome maps through `execution_outcome_to_effect_result` and
-    /// `DecisionExecutor` to a terminal `NotExecuted` record (no retry bump).
-    struct AlwaysDeferredTreasury;
-
-    #[async_trait::async_trait]
-    impl TreasuryExecutor for AlwaysDeferredTreasury {
-        async fn execute_treasury_operation(
-            &self,
-            receipt_id: &DecisionReceiptId,
-            _operation: TreasuryOperation,
-        ) -> Result<ExecutionOutcome> {
-            Ok(ExecutionOutcome::Deferred {
-                receipt_id: receipt_id.clone(),
-                reason: "proof: deferred treasury path".to_string(),
-            })
-        }
-
-        async fn get_treasury_balance(&self, _treasury_id: &str, _currency: &str) -> Result<i64> {
-            Ok(0)
-        }
-    }
 
     /// In-memory execution store for testing.
     struct MemoryExecutionStore {
@@ -848,7 +824,45 @@ mod tests {
         }
     }
 
-    /// Helper: create a DecisionExecutor with in-memory stores and no ledger.
+    /// Test-only `LedgerService` that accepts treasury writes without pulling in the ledger crate
+    /// (meaning-firewall ratchet counts qualified ledger paths in icn-core `src/`).
+    struct StubTreasuryLedgerService {
+        oracle: Arc<dyn PolicyOracle>,
+    }
+
+    impl LedgerService for StubTreasuryLedgerService {
+        fn oracle(&self) -> Arc<dyn PolicyOracle> {
+            self.oracle.clone()
+        }
+
+        fn balance(&self, _account: &Did, _currency: &str) -> i64 {
+            0
+        }
+
+        fn credit_limit(&self, _account: &Did, _currency: &str) -> i64 {
+            0
+        }
+
+        fn record_event(&self, _event: LedgerEvent) {}
+
+        fn submit_treasury_entry(
+            &self,
+            entry: TreasuryEntryRequest,
+        ) -> Result<TreasuryEntryResult, String> {
+            Ok(TreasuryEntryResult {
+                entry_hash: "0000000000000000000000000000000000000000000000000000000000000001"
+                    .to_string(),
+                decision_receipt_id: entry.decision_receipt_id,
+                decision_hash: entry.decision_hash,
+            })
+        }
+
+        fn get_treasury_nonce(&self, _treasury_id: &str) -> Result<u64, String> {
+            Ok(0)
+        }
+    }
+
+    /// Helper: create a DecisionExecutor with in-memory stores and no ledger-backed treasury.
     fn make_test_executor() -> (Arc<DecisionExecutor>, Arc<MemoryExecutionStore>) {
         use icn_kernel_api::protocol_params::*;
 
@@ -860,6 +874,25 @@ mod tests {
 
         let decision_executor = Arc::new(DecisionExecutor::new(dispatcher, exec_store.clone()));
 
+        (decision_executor, exec_store)
+    }
+
+    /// Same as [`make_test_executor`] but with a stub `LedgerService` so treasury spend can confirm.
+    fn make_test_executor_with_stub_ledger() -> (Arc<DecisionExecutor>, Arc<MemoryExecutionStore>) {
+        use icn_kernel_api::protocol_params::StubParamStore;
+
+        let oracle = Arc::new(AllowAllOracle::wildcard());
+        let ledger_service: Arc<dyn LedgerService> = Arc::new(StubTreasuryLedgerService {
+            oracle: oracle.clone(),
+        });
+        let param_store = Arc::new(StubParamStore);
+        let kernel_executor = Arc::new(
+            super::super::governance_executor::KernelGovernanceExecutor::new(param_store)
+                .with_ledger_service(ledger_service),
+        );
+        let dispatcher = Arc::new(EffectDispatcher::new(kernel_executor));
+        let exec_store = Arc::new(MemoryExecutionStore::new());
+        let decision_executor = Arc::new(DecisionExecutor::new(dispatcher, exec_store.clone()));
         (decision_executor, exec_store)
     }
 
@@ -1006,11 +1039,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_treasury_effect_with_decision_hash() {
-        let (executor, store) = make_test_executor();
+        let (executor, store) = make_test_executor_with_stub_ledger();
 
         let effects = vec![KernelEffect::Treasury(TreasuryEffect::Spend {
-            treasury_did: "did:icn:treasury".to_string(),
-            recipient_did: "did:icn:alice".to_string(),
+            treasury_did: "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9".to_string(),
+            recipient_did: "did:icn:zGyGKxMyg1p9SsHfm15MkNUu1u9TN2JtTspcdmrtGUdse".to_string(),
             amount: 500,
             currency: "HOURS".to_string(),
             memo: "Test".to_string(),
@@ -1196,19 +1229,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_deferred_treasury_outcome_persists_not_executed() {
-        use icn_kernel_api::protocol_params::StubParamStore;
-
-        let param_store = Arc::new(StubParamStore);
-        let treasury: Arc<dyn TreasuryExecutor> = Arc::new(AlwaysDeferredTreasury);
-        let kernel_executor = Arc::new(
-            super::super::governance_executor::KernelGovernanceExecutor::with_treasury_executor_for_tests(
-                treasury,
-                param_store,
-            ),
-        );
-        let dispatcher = Arc::new(EffectDispatcher::new(kernel_executor));
-        let exec_store = Arc::new(MemoryExecutionStore::new());
-        let executor = Arc::new(DecisionExecutor::new(dispatcher, exec_store.clone()));
+        let (executor, exec_store) = make_test_executor();
 
         let decision_hash = "sha256:deferred-proof-1";
         let effects = vec![KernelEffect::Treasury(TreasuryEffect::Spend {

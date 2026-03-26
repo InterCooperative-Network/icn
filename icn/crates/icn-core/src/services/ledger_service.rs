@@ -16,6 +16,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use ed25519_dalek::SigningKey;
 use icn_kernel_api::services::{
     LedgerEvent, LedgerService, ResourceAccessInfo, RevokeResourceAccessRequest,
     TreasuryEntryRequest, TreasuryEntryResult, TreasuryOperationType,
@@ -24,6 +25,7 @@ use icn_kernel_api::types::Did;
 use icn_kernel_api::PolicyOracle;
 use icn_ledger::{entry::JournalEntryBuilder, types::ProvenanceRef, AccountDelta, Ledger};
 use icn_store::SledStore;
+use sha2::{Digest, Sha256};
 use tokio::sync::RwLock;
 use tracing::{debug, info};
 
@@ -37,6 +39,25 @@ const RECEIPT_INDEX_WAIT_MS: u64 = 20;
 struct ReceiptIndexRecord {
     entry_hash: String,
     decision_hash: String,
+}
+
+/// Deterministic synthetic DID for a budget liability line on the ledger.
+///
+/// Budget IDs from governance are opaque strings. We hash `(treasury, budget_key,
+/// currency)` to a 32-byte seed, clamp to an Ed25519 signing key, and derive the
+/// canonical `did:icn:z…` from the verifying key so ledger entry walks never hit
+/// invalid curve points.
+fn budget_liability_did(treasury_id: &str, budget_key: &str, currency: &str) -> icn_identity::Did {
+    let mut hasher = Sha256::new();
+    hasher.update(b"icn:budget:liability:v1\0");
+    hasher.update(treasury_id.as_bytes());
+    hasher.update(b"\0");
+    hasher.update(budget_key.as_bytes());
+    hasher.update(b"\0");
+    hasher.update(currency.as_bytes());
+    let seed: [u8; 32] = hasher.finalize().into();
+    let signing = SigningKey::from_bytes(&seed);
+    icn_identity::Did::from_public_key(&signing.verifying_key())
 }
 
 /// Concrete implementation of `LedgerService` backed by the mutual credit ledger.
@@ -133,11 +154,12 @@ impl LedgerServiceImpl {
                 ])
             }
             TreasuryOperationType::Allocate => {
-                // Budget allocation: debit main treasury, credit budget account
-                // For now, use treasury_id as the budget account
-                let budget_did: icn_identity::Did = format!("did:icn:budget:{}", req.treasury_id)
-                    .parse()
-                    .map_err(|e| format!("Invalid budget DID: {e}"))?;
+                // Budget allocation: debit main treasury, credit budget liability account.
+                // `recipient` carries the app budget identifier (see `treasury_effect_to_operation`).
+                let budget_key = req.recipient.as_ref().ok_or_else(|| {
+                    "Allocate operation requires budget identifier (recipient field)".to_string()
+                })?;
+                let budget_did = budget_liability_did(&req.treasury_id, budget_key, &req.currency);
 
                 Ok(vec![
                     AccountDelta::debit(
