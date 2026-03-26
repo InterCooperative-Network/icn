@@ -25,6 +25,8 @@ use crate::api::receipts::GovernanceReceiptResponse;
 use crate::error::{GatewayError, Result};
 use crate::middleware::{get_claims, require_scope};
 use crate::receipt_store::ReceiptStore;
+use icn_kernel_api::execution::{ExecutionRecord, ExecutionStatus};
+use icn_store::Store;
 
 // ============================================================================
 // Types (mirrors icn-governance-actor/src/registry/models.rs)
@@ -117,6 +119,9 @@ pub struct DecisionTrace {
     pub provenance_chain: Vec<String>,
     /// Resolution status for trace sections.
     pub resolution: TraceResolution,
+    /// Optional execution truth summary for this decision (if available).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub execution: Option<DecisionExecutionSummary>,
 }
 
 /// Tracks what portions of a trace are resolved vs unresolved.
@@ -131,6 +136,26 @@ pub struct TraceResolution {
     pub effect_resolved: bool,
     /// Whether the ledger entry was verified.
     pub ledger_entry_resolved: bool,
+}
+
+/// Execution truth summary for a decision registry trace.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DecisionExecutionSummary {
+    /// Whether an execution record exists for this decision.
+    pub execution_record_present: bool,
+    /// Current execution status, if present.
+    pub status: Option<ExecutionStatus>,
+    /// Total number of effects in the decision batch.
+    pub total_effects: usize,
+    /// Number of effects that executed successfully.
+    pub executed_effects: usize,
+    /// Number of effects that were structurally not executed.
+    pub not_executed_effects: usize,
+    /// Number of effects that hard failed.
+    pub hard_failed_effects: usize,
+    /// Whether execution is complete for this decision (no not_executed or hard_failed).
+    pub execution_complete: bool,
 }
 
 /// An effect triggered by a decision.
@@ -733,6 +758,7 @@ pub async fn get_decision_trace(
     http_req: HttpRequest,
     registry: web::Data<Arc<DecisionRegistry>>,
     receipt_store: Option<web::Data<Arc<ReceiptStore>>>,
+    execution_store: web::Data<Arc<dyn Store>>,
     path: web::Path<String>,
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "governance:read")?;
@@ -776,6 +802,22 @@ pub async fn get_decision_trace(
         ledger_entry_resolved: has_verified_ledger_entry, // Only true if we have the actual hash
     };
 
+    // Load execution truth summary.
+    let execution = match load_execution_truth_for_registry(
+        execution_store.get_ref().as_ref(),
+        &decision.decision_hash,
+    ) {
+        Ok(summary) => Some(summary),
+        Err(e) => {
+            tracing::warn!(
+                error = %e,
+                decision_hash = %decision.decision_hash,
+                "failed to load execution summary for decision trace"
+            );
+            None
+        }
+    };
+
     let trace = DecisionTrace {
         decision_hash: decision.decision_hash.clone(),
         parent_receipts: vec![], // TODO: populate from canonical receipt graph when available
@@ -784,6 +826,7 @@ pub async fn get_decision_trace(
         ledger_entry_hash: decision.ledger_entry_hash.clone(),
         provenance_chain: vec![decision.decision_receipt_id.clone()],
         resolution,
+        execution,
     };
 
     Ok(HttpResponse::Ok().json(trace))
@@ -852,6 +895,47 @@ fn lookup_governance_receipt(
     }
 }
 
+fn exec_key_for_decision_hash(decision_hash: &str) -> Vec<u8> {
+    let mut key = b"exec:".to_vec();
+    key.extend_from_slice(decision_hash.as_bytes());
+    key
+}
+
+fn load_execution_truth_for_registry(
+    store: &dyn Store,
+    decision_hash: &str,
+) -> std::result::Result<DecisionExecutionSummary, String> {
+    let value = store
+        .get(&exec_key_for_decision_hash(decision_hash))
+        .map_err(|e| format!("failed to read execution record: {e}"))?;
+
+    let Some(value) = value else {
+        return Ok(DecisionExecutionSummary {
+            execution_record_present: false,
+            status: None,
+            total_effects: 0,
+            executed_effects: 0,
+            not_executed_effects: 0,
+            hard_failed_effects: 0,
+            execution_complete: false,
+        });
+    };
+
+    let record: ExecutionRecord = serde_json::from_slice(&value)
+        .map_err(|e| format!("failed to decode execution record: {e}"))?;
+    let summary = record.truth_summary_or_fallback();
+
+    Ok(DecisionExecutionSummary {
+        execution_record_present: true,
+        status: Some(record.status),
+        total_effects: summary.total_effects,
+        executed_effects: summary.executed_effects,
+        not_executed_effects: summary.not_executed_effects,
+        hard_failed_effects: summary.hard_failed_effects,
+        execution_complete: summary.execution_complete,
+    })
+}
+
 // ============================================================================
 // Tests
 // ============================================================================
@@ -865,7 +949,9 @@ mod tests {
     use crate::receipt_store::ReceiptStore;
     use actix_web::{test as actix_test, App, HttpMessage};
     use icn_identity::KeyPair;
+    use icn_kernel_api::execution::{ExecutionRecord, ExecutionTruthSummary};
     use icn_ledger::entry::JournalEntryBuilder;
+    use icn_store::{SledStore, Store};
 
     fn create_test_registry() -> Arc<DecisionRegistry> {
         let registry = Arc::new(DecisionRegistry::new());
@@ -898,6 +984,10 @@ mod tests {
         registry.index_decision(decision).ok();
 
         registry
+    }
+
+    fn temp_exec_store() -> Arc<dyn Store> {
+        Arc::new(SledStore::temporary().expect("temp exec store"))
     }
 
     #[test]
@@ -1009,6 +1099,7 @@ mod tests {
                 effect_resolved: true,
                 ledger_entry_resolved: true,
             },
+            execution: None,
         };
 
         let json = serde_json::to_string(&trace).unwrap();
@@ -1038,6 +1129,7 @@ mod tests {
                 effect_resolved: false,
                 ledger_entry_resolved: false,
             },
+            execution: None,
         };
 
         let json = serde_json::to_string(&trace).unwrap();
@@ -1146,6 +1238,41 @@ mod tests {
         let json = serde_json::to_string(&resp).unwrap();
         assert!(json.contains("ledgerEntryHash"));
         assert!(json.contains("0xabcdef123456"));
+    }
+
+    #[test]
+    fn test_load_execution_truth_for_registry_reflects_partial_execution() {
+        let exec_store = temp_exec_store();
+        let decision_hash_hex = "abcd1234ef567890abcd1234ef567890abcd1234ef567890abcd1234ef567890";
+
+        let mut record = ExecutionRecord::new_pending(
+            decision_hash_hex.to_string(),
+            "p1".to_string(),
+            "r1",
+            vec![],
+        );
+        record.mark_confirmed(vec![], vec![]);
+        record.truth_summary = Some(ExecutionTruthSummary {
+            total_effects: 2,
+            executed_effects: 1,
+            not_executed_effects: 1,
+            hard_failed_effects: 0,
+            execution_complete: false,
+        });
+        exec_store
+            .put(
+                &super::exec_key_for_decision_hash(decision_hash_hex),
+                &serde_json::to_vec(&record).expect("serialize record"),
+            )
+            .expect("put execution record");
+
+        let summary =
+            load_execution_truth_for_registry(exec_store.as_ref(), decision_hash_hex).unwrap();
+        assert!(summary.execution_record_present);
+        assert_eq!(summary.total_effects, 2);
+        assert_eq!(summary.executed_effects, 1);
+        assert_eq!(summary.not_executed_effects, 1);
+        assert!(!summary.execution_complete);
     }
 
     #[actix_web::test]
