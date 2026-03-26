@@ -709,7 +709,7 @@ fn extract_decision_hash(effects: &[KernelEffect]) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use icn_kernel_api::effects::TreasuryEffect;
+    use icn_kernel_api::effects::{KernelEffect, TreasuryEffect};
     use icn_kernel_api::escrow::{EscrowRecord, EscrowStatus, EscrowStore};
     use icn_kernel_api::execution::ExecutionRecord;
     use icn_kernel_api::services::{LedgerEvent, TreasuryEntryRequest, TreasuryEntryResult};
@@ -1225,6 +1225,50 @@ mod tests {
             .as_deref()
             .unwrap_or_default()
             .contains("max retries exceeded"));
+    }
+
+    /// When at least one effect reports `success` and there are no hard failures
+    /// (`!success && !not_executed`), aggregation uses the `Confirmed` branch even if another
+    /// effect is `not_executed`. Per-effect results remain truthful; the persisted
+    /// [`ExecutionRecord`] does not encode per-effect outcomes.
+    #[tokio::test]
+    async fn test_aggregate_confirmed_when_mixed_success_and_not_executed() {
+        let (executor, store) = make_test_executor_with_stub_ledger();
+
+        let decision_hash = "sha256:mixed-aggregate-1";
+        let effects = vec![
+            KernelEffect::NoOp {
+                reason: "not executable".to_string(),
+            },
+            KernelEffect::Treasury(TreasuryEffect::Spend {
+                treasury_did: "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9".to_string(),
+                recipient_did: "did:icn:zGyGKxMyg1p9SsHfm15MkNUu1u9TN2JtTspcdmrtGUdse".to_string(),
+                amount: 10,
+                currency: "HOURS".to_string(),
+                memo: "mixed batch".to_string(),
+                budget_id: None,
+                expected_nonce: 0,
+                decision_receipt_id: "receipt-mixed-1".to_string(),
+                decision_hash: decision_hash.to_string(),
+            }),
+        ];
+
+        let results = executor
+            .execute(
+                effects,
+                "receipt-mixed-1",
+                decision_hash,
+                "proposal-mixed-1",
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 2);
+        assert!(results[0].not_executed && !results[0].success);
+        assert!(results[1].success && !results[1].not_executed);
+
+        let record = store.get(decision_hash).unwrap().unwrap();
+        assert_eq!(record.status, ExecutionStatus::Confirmed);
     }
 
     #[tokio::test]
