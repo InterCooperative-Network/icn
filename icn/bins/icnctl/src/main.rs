@@ -9996,11 +9996,8 @@ async fn handle_receipt_command(cmd: ReceiptCommands) -> Result<()> {
 
             let client = reqwest::Client::new();
 
-            // Query receipt chain
-            let chain_url = format!(
-                "{}/v1/receipts/chain?decision_hash={}",
-                gateway, decision_hash
-            );
+            // Query full receipt chain (governance + economic + execution truth)
+            let chain_url = format!("{}/v1/receipts/chain/{}", gateway, decision_hash);
             let chain_resp = client
                 .get(&chain_url)
                 .send()
@@ -10040,7 +10037,7 @@ async fn handle_receipt_command(cmd: ReceiptCommands) -> Result<()> {
             };
 
             if json {
-                // JSON output
+                // JSON output: include execution truth as returned by the gateway.
                 let mut output = chain_data.clone();
                 if let Some(ledger) = ledger_data {
                     output["ledgerEntries"] = ledger;
@@ -10050,6 +10047,55 @@ async fn handle_receipt_command(cmd: ReceiptCommands) -> Result<()> {
                 // Human-readable output
                 println!("Receipt Chain for Decision: {}...", &decision_hash[..16]);
                 println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+
+                // Execution truth (if present)
+                if let Some(exec) = chain_data.get("execution") {
+                    println!("Execution Truth");
+                    println!("----------------");
+                    let status = exec
+                        .get("status")
+                        .and_then(|s| s.as_str())
+                        .unwrap_or("unknown");
+                    let total = exec
+                        .get("totalEffects")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(0);
+                    let executed = exec
+                        .get("executedEffects")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(0);
+                    let not_executed = exec
+                        .get("notExecutedEffects")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(0);
+                    let hard_failed = exec
+                        .get("hardFailedEffects")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(0);
+                    let exec_complete = exec
+                        .get("executionComplete")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false);
+
+                    let structural_complete = chain_data
+                        .get("structuralComplete")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false);
+                    let chain_complete = chain_data
+                        .get("chainComplete")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false);
+
+                    println!("Status            : {status}");
+                    println!("Total effects     : {total}");
+                    println!("Executed          : {executed}");
+                    println!("Not executed      : {not_executed}");
+                    println!("Hard failed       : {hard_failed}");
+                    println!("Execution complete: {exec_complete}");
+                    println!("Structural complete: {structural_complete}");
+                    println!("Chain complete     : {chain_complete}");
+                    println!();
+                }
 
                 // Allocations
                 if let Some(allocations) = chain_data.get("allocations").and_then(|a| a.as_array())
