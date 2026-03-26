@@ -70,12 +70,16 @@ pub fn translate_payload_to_effects(
             translate_membership_action(action, member, domain_id)
         }
 
-        ProposalPayload::FreezeMember { member, reason, .. } => {
+        ProposalPayload::FreezeMember {
+            member,
+            reason,
+            duration_seconds,
+        } => {
             vec![KernelEffect::Membership(MembershipEffect::FreezeMember {
                 entity_id: domain_id.to_string(),
                 member_did: member.to_string(),
                 reason: reason.clone(),
-                duration_secs: None,
+                duration_secs: *duration_seconds,
             })]
         }
 

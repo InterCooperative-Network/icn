@@ -192,7 +192,7 @@ fn release_escrow_effect(escrow_id: &str, decision_hash: &str) -> Vec<KernelEffe
 /// exactly once — subsequent replays are idempotent at two levels:
 /// 1. Decision-level: ExecutionStore returns Confirmed → short-circuit
 /// 2. Domain-level: EscrowRecord.release() returns AlreadyReleasedSameDecision
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_replay_does_not_double_spend() {
     let escrow_store = Arc::new(MemoryEscrowStore::new());
 
@@ -276,7 +276,7 @@ async fn test_replay_does_not_double_spend() {
 ///
 /// Also tests the case where execution store shows Executing (crashed mid-flight):
 /// the executor should re-enter and the escrow domain check prevents double-spend.
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_crash_recovery_no_double_spend() {
     let escrow_store = Arc::new(MemoryEscrowStore::new());
 
@@ -390,7 +390,7 @@ async fn test_crash_recovery_no_double_spend() {
 
 /// Two different governance decisions try to release the same escrow.
 /// The first one succeeds. The second one is rejected with a conflict error.
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_conflicting_release_rejected() {
     let escrow_store = Arc::new(MemoryEscrowStore::new());
 
@@ -478,7 +478,7 @@ async fn test_conflicting_release_rejected() {
 // =============================================================================
 
 /// Releasing a nonexistent escrow should fail gracefully.
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_release_nonexistent_escrow_fails() {
     let escrow_store = Arc::new(MemoryEscrowStore::new());
     // No escrow pre-loaded
@@ -500,7 +500,7 @@ async fn test_release_nonexistent_escrow_fails() {
 }
 
 /// Releasing a cancelled escrow should fail.
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_release_cancelled_escrow_fails() {
     let escrow_store = Arc::new(MemoryEscrowStore::new());
 
