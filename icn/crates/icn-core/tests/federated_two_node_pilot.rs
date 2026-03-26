@@ -719,6 +719,7 @@ async fn test_two_node_effect_batch_determinism() -> Result<()> {
                             message: effects.join("; "),
                             state_change_hash: extract_state_hash_from_effects(&effects),
                             ledger_entry_id: None,
+                            not_executed: false,
                         }
                     }
                     _ => panic!("Batch effect failed on Node A"),
@@ -726,10 +727,14 @@ async fn test_two_node_effect_batch_determinism() -> Result<()> {
             }
             KernelEffect::NoOp { reason } => icn_kernel_api::effects::EffectResult {
                 effect_id: "batch_noop".to_string(),
-                success: true,
-                message: reason.clone(),
+                success: false,
+                message: format!(
+                    "NoOp: decision produced no executable kernel effect (not executed): {}",
+                    reason
+                ),
                 state_change_hash: None,
                 ledger_entry_id: None,
+                not_executed: true,
             },
             _ => panic!("Unexpected effect type in batch"),
         };
@@ -766,6 +771,7 @@ async fn test_two_node_effect_batch_determinism() -> Result<()> {
                             message: effects.join("; "),
                             state_change_hash: extract_state_hash_from_effects(&effects),
                             ledger_entry_id: None,
+                            not_executed: false,
                         }
                     }
                     _ => panic!("Batch effect failed on Node B"),
@@ -773,10 +779,14 @@ async fn test_two_node_effect_batch_determinism() -> Result<()> {
             }
             KernelEffect::NoOp { reason } => icn_kernel_api::effects::EffectResult {
                 effect_id: "batch_noop".to_string(),
-                success: true,
-                message: reason.clone(),
+                success: false,
+                message: format!(
+                    "NoOp: decision produced no executable kernel effect (not executed): {}",
+                    reason
+                ),
                 state_change_hash: None,
                 ledger_entry_id: None,
+                not_executed: true,
             },
             _ => panic!("Unexpected effect type in batch"),
         };

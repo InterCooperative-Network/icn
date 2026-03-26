@@ -359,13 +359,16 @@ async fn test_startup_recovery_retries_failed_decision() {
     let report = executor.recover_in_flight().await.unwrap();
 
     assert_eq!(
-        report.recovered_confirmed, 1,
-        "Should recover the failed decision on retry"
+        report.recovered_not_executed, 1,
+        "NoOp recovery should complete as structurally not executed"
     );
+    assert_eq!(report.recovered_confirmed, 0);
+    assert_eq!(report.recovered_failed, 0);
 
-    // Verify it's now Confirmed
+    // NoOp does not execute; terminal NotExecuted does not bump retries like mark_failed
     let after = exec_store.get("hash-fail-retry").unwrap().unwrap();
-    assert_eq!(after.status, ExecutionStatus::Confirmed);
+    assert_eq!(after.status, ExecutionStatus::NotExecuted);
+    assert_eq!(after.retries, 1);
 }
 
 /// Test 6: Retry counter accumulates across recovery attempts
@@ -474,12 +477,12 @@ async fn test_backpressure_no_deadlock() {
     // Wait for all to complete (with backpressure, some will queue)
     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
-    // Count confirmed records
-    let confirmed = exec_store
-        .list_by_status(ExecutionStatus::Confirmed)
+    // Count terminal not-executed records (NoOp is honest non-success, not Confirmed theater)
+    let not_executed = exec_store
+        .list_by_status(ExecutionStatus::NotExecuted)
         .unwrap();
     assert_eq!(
-        confirmed.len(),
+        not_executed.len(),
         32,
         "All 32 decisions should complete despite backpressure"
     );
@@ -823,4 +826,95 @@ fn test_treasury_spend_payload_translation_produces_treasury_spend_effect() {
         }
         other => panic!("expected Treasury Spend effect, got {other:?}"),
     }
+}
+
+/// `ExecutionOutcome::Deferred` → durable `NotExecuted` in Sled (re-open proves bytes on disk).
+///
+/// Production `KernelTreasuryExecutor` does not return `Deferred` today; this uses
+/// [`KernelGovernanceExecutor::with_treasury_executor_for_tests`] only to drive the real
+/// outcome mapping and `DecisionExecutor` aggregation.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_deferred_outcome_sled_persists_not_executed() {
+    use async_trait::async_trait;
+    use icn_core::supervisor::decision_executor::DecisionExecutor;
+    use icn_core::supervisor::effect_dispatcher::EffectDispatcher;
+    use icn_core::supervisor::governance_executor::KernelGovernanceExecutor;
+    use icn_kernel_api::governance::{
+        DecisionReceiptId, ExecutionOutcome, TreasuryExecutor, TreasuryOperation,
+    };
+
+    struct AlwaysDeferredTreasury;
+
+    #[async_trait]
+    impl TreasuryExecutor for AlwaysDeferredTreasury {
+        async fn execute_treasury_operation(
+            &self,
+            receipt_id: &DecisionReceiptId,
+            _operation: TreasuryOperation,
+        ) -> Result<ExecutionOutcome> {
+            Ok(ExecutionOutcome::Deferred {
+                receipt_id: receipt_id.clone(),
+                reason: "sled-proof: deferred treasury stub".to_string(),
+            })
+        }
+
+        async fn get_treasury_balance(&self, _treasury_id: &str, _currency: &str) -> Result<i64> {
+            Ok(0)
+        }
+    }
+
+    let tmp = TempDir::new().unwrap();
+    let exec_store_path = tmp.path().join("exec-deferred");
+    std::fs::create_dir_all(&exec_store_path).unwrap();
+
+    let decision_hash = "hash-sled-deferred-not-executed-1";
+    let decision_receipt_id = "receipt-sled-deferred-1";
+    let proposal_id = "proposal-sled-deferred-1";
+
+    let effects = vec![KernelEffect::Treasury(TreasuryEffect::Spend {
+        treasury_did: "did:icn:treasury".to_string(),
+        recipient_did: "did:icn:alice".to_string(),
+        amount: 50,
+        currency: "HOURS".to_string(),
+        memo: "sled deferred proof".to_string(),
+        budget_id: None,
+        expected_nonce: 0,
+        decision_receipt_id: decision_receipt_id.to_string(),
+        decision_hash: decision_hash.to_string(),
+    })];
+
+    {
+        let treasury: Arc<dyn TreasuryExecutor> = Arc::new(AlwaysDeferredTreasury);
+        let kernel_executor = KernelGovernanceExecutor::with_treasury_executor_for_tests(
+            treasury,
+            Arc::new(StubParamStore),
+        );
+        let dispatcher = Arc::new(EffectDispatcher::new(Arc::new(kernel_executor)));
+        let exec_backend = Arc::new(SledStore::open(&exec_store_path).unwrap());
+        let exec_store = Arc::new(SledExecutionStore::new(exec_backend));
+        let executor = DecisionExecutor::new(dispatcher, exec_store.clone());
+
+        let results = executor
+            .execute(effects, decision_receipt_id, decision_hash, proposal_id)
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 1);
+        assert!(!results[0].success);
+        assert!(results[0].not_executed);
+        assert!(results[0].message.contains("Deferred:"));
+
+        let record = exec_store.get(decision_hash).unwrap().unwrap();
+        assert_eq!(record.status, ExecutionStatus::NotExecuted);
+        assert_eq!(record.retries, 0);
+        assert_ne!(record.status, ExecutionStatus::Confirmed);
+        assert_ne!(record.status, ExecutionStatus::Failed);
+    }
+
+    let reopened = SledStore::open(&exec_store_path).unwrap();
+    let reopened_store = SledExecutionStore::new(Arc::new(reopened));
+    let reread = reopened_store.get(decision_hash).unwrap().unwrap();
+    assert_eq!(reread.status, ExecutionStatus::NotExecuted);
+    assert_eq!(reread.retries, 0);
+    assert!(reread.error.as_deref().unwrap_or("").contains("Deferred:"));
 }
