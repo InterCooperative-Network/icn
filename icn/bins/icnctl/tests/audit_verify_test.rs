@@ -6,8 +6,8 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use icn_gateway::api::receipts::{
-    AllocationReceiptResponse, GovernanceReceiptResponse, GovernanceVoteTallyResponse,
-    ReceiptChainResponse, SettlementIntentResponse,
+    AllocationReceiptResponse, DecisionExecutionTruthResponse, GovernanceReceiptResponse,
+    GovernanceVoteTallyResponse, ReceiptChainResponse, SettlementIntentResponse,
 };
 
 const DECISION_HASH: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
@@ -61,7 +61,18 @@ fn make_complete_chain() -> ReceiptChainResponse {
         governance: Some(make_governance()),
         allocations: vec![make_allocation(vec![intent_hash.clone()])],
         intents: vec![make_intent(&intent_hash)],
+        structural_complete: true,
+        execution_complete: true,
         chain_complete: true,
+        execution: DecisionExecutionTruthResponse {
+            execution_record_present: true,
+            status: None,
+            total_effects: 1,
+            executed_effects: 1,
+            not_executed_effects: 0,
+            hard_failed_effects: 0,
+            execution_complete: true,
+        },
     }
 }
 
@@ -151,10 +162,35 @@ fn verify_receipt_chain(
         String::new(),
     ));
 
-    // 8: Chain complete
+    // 8: Structural complete
     checks.push((
-        "Chain complete".to_string(),
-        chain.chain_complete,
+        "Structural chain complete".to_string(),
+        chain.structural_complete,
+        String::new(),
+    ));
+
+    // 9: Execution counters consistent
+    let execution_counts_consistent = chain.execution.total_effects
+        == chain.execution.executed_effects
+            + chain.execution.not_executed_effects
+            + chain.execution.hard_failed_effects;
+    checks.push((
+        "Execution counters consistent".to_string(),
+        execution_counts_consistent,
+        String::new(),
+    ));
+
+    // 10: Execution complete
+    checks.push((
+        "Execution complete".to_string(),
+        chain.execution_complete,
+        String::new(),
+    ));
+
+    // 11: Chain complete contract
+    checks.push((
+        "Chain complete contract".to_string(),
+        chain.chain_complete == (chain.structural_complete && chain.execution_complete),
         String::new(),
     ));
 
@@ -166,7 +202,7 @@ fn test_complete_chain_passes_all_checks() {
     let chain = make_complete_chain();
     let checks = verify_receipt_chain(&chain, DECISION_HASH);
 
-    assert_eq!(checks.len(), 8);
+    assert_eq!(checks.len(), 11);
     for (name, passed, _) in &checks {
         assert!(passed, "Check '{}' should pass on complete chain", name);
     }
@@ -180,12 +216,23 @@ fn test_missing_governance_fails() {
         governance: None,
         allocations: vec![make_allocation(vec![intent_hash.clone()])],
         intents: vec![make_intent(&intent_hash)],
+        structural_complete: false,
+        execution_complete: false,
         chain_complete: false,
+        execution: DecisionExecutionTruthResponse {
+            execution_record_present: false,
+            status: None,
+            total_effects: 0,
+            executed_effects: 0,
+            not_executed_effects: 0,
+            hard_failed_effects: 0,
+            execution_complete: false,
+        },
     };
     let checks = verify_receipt_chain(&chain, DECISION_HASH);
 
     assert!(!checks[0].1, "Governance check should fail");
-    assert!(!checks[7].1, "Chain complete should fail");
+    assert!(checks[10].1, "Chain complete contract should hold");
 }
 
 #[test]
@@ -209,7 +256,18 @@ fn test_orphaned_intent_detected() {
         governance: Some(make_governance()),
         allocations: vec![make_allocation(vec![intent_hash.clone()])],
         intents: vec![make_intent(&intent_hash), make_intent(&orphan_hash)],
+        structural_complete: true,
+        execution_complete: true,
         chain_complete: true,
+        execution: DecisionExecutionTruthResponse {
+            execution_record_present: true,
+            status: None,
+            total_effects: 1,
+            executed_effects: 1,
+            not_executed_effects: 0,
+            hard_failed_effects: 0,
+            execution_complete: true,
+        },
     };
     let checks = verify_receipt_chain(&chain, DECISION_HASH);
 
@@ -223,7 +281,18 @@ fn test_empty_chain_reports_missing() {
         governance: None,
         allocations: vec![],
         intents: vec![],
+        structural_complete: false,
+        execution_complete: false,
         chain_complete: false,
+        execution: DecisionExecutionTruthResponse {
+            execution_record_present: false,
+            status: None,
+            total_effects: 0,
+            executed_effects: 0,
+            not_executed_effects: 0,
+            hard_failed_effects: 0,
+            execution_complete: false,
+        },
     };
     let checks = verify_receipt_chain(&chain, DECISION_HASH);
 
@@ -235,7 +304,7 @@ fn test_empty_chain_reports_missing() {
     assert!(!checks[4].1, "Intents should fail");
     assert!(checks[5].1, "Intent provenance vacuously passes");
     assert!(checks[6].1, "Orphan check vacuously passes");
-    assert!(!checks[7].1, "Chain complete should fail");
+    assert!(checks[10].1, "Chain complete contract should hold");
 }
 
 #[test]

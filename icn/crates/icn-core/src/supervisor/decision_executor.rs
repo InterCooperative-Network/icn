@@ -52,7 +52,9 @@ use tracing::{debug, error, info, warn};
 
 use icn_kernel_api::effects::{EffectResult, KernelEffect};
 use icn_kernel_api::escrow::{EscrowStatus, EscrowStore};
-use icn_kernel_api::execution::{ExecutionRecord, ExecutionStatus, ExecutionStore};
+use icn_kernel_api::execution::{
+    ExecutionRecord, ExecutionStatus, ExecutionStore, ExecutionTruthSummary,
+};
 
 use super::effect_dispatcher::EffectDispatcher;
 
@@ -507,6 +509,22 @@ impl DecisionExecutor {
             .filter(|r| r.is_hard_failure())
             .map(|r| r.message.clone())
             .collect();
+
+        let total_effects = results.len();
+        let not_executed_effects = results.iter().filter(|r| r.not_executed).count();
+        let hard_failed_effects = results.iter().filter(|r| r.is_hard_failure()).count();
+        let executed_effects = total_effects
+            .saturating_sub(not_executed_effects)
+            .saturating_sub(hard_failed_effects);
+        let execution_complete =
+            total_effects > 0 && not_executed_effects == 0 && hard_failed_effects == 0;
+        record.truth_summary = Some(ExecutionTruthSummary {
+            total_effects,
+            executed_effects,
+            not_executed_effects,
+            hard_failed_effects,
+            execution_complete,
+        });
 
         let all_non_executable = !results.is_empty() && results.iter().all(|r| r.not_executed);
         let mixed_non_executable =

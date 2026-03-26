@@ -828,7 +828,18 @@ fn lookup_governance_receipt(
     };
 
     match store.get_governance(&hash) {
-        Ok(Some(receipt)) => Some(GovernanceReceiptResponse::from(&receipt)),
+        Ok(Some(receipt)) => Some(GovernanceReceiptResponse {
+            decision_hash: hex::encode(receipt.decision_hash),
+            proposal_id: receipt.proposal_id,
+            domain_id: receipt.domain_id,
+            outcome: format!("{:?}", receipt.outcome),
+            vote_tally: crate::api::receipts::GovernanceVoteTallyResponse {
+                for_votes: receipt.vote_tally.for_votes,
+                against_votes: receipt.vote_tally.against_votes,
+                abstain_votes: receipt.vote_tally.abstain_votes,
+            },
+            vote_hash: hex::encode(receipt.vote_hash),
+        }),
         Ok(None) => None,
         Err(e) => {
             tracing::warn!(

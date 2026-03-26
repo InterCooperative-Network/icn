@@ -19,6 +19,11 @@ pub struct ExecutionRecordResponse {
     pub decision_hash: String,
     pub proposal_id: String,
     pub status: ExecutionStatus,
+    pub total_effects: usize,
+    pub executed_effects: usize,
+    pub not_executed_effects: usize,
+    pub hard_failed_effects: usize,
+    pub execution_complete: bool,
     pub retries: u32,
     pub started_at: u64,
     pub finished_at: Option<u64>,
@@ -27,10 +32,16 @@ pub struct ExecutionRecordResponse {
 
 impl From<ExecutionRecord> for ExecutionRecordResponse {
     fn from(record: ExecutionRecord) -> Self {
+        let summary = record.truth_summary_or_fallback();
         Self {
             decision_hash: record.decision_hash,
             proposal_id: record.proposal_id,
             status: record.status,
+            total_effects: summary.total_effects,
+            executed_effects: summary.executed_effects,
+            not_executed_effects: summary.not_executed_effects,
+            hard_failed_effects: summary.hard_failed_effects,
+            execution_complete: summary.execution_complete,
             retries: record.retries,
             started_at: record.started_at,
             finished_at: record.finished_at,
@@ -147,6 +158,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
 mod tests {
     use super::*;
     use anyhow::Result;
+    use icn_kernel_api::execution::ExecutionTruthSummary;
 
     fn temp_store() -> Arc<dyn Store> {
         Arc::new(icn_store::SledStore::temporary().expect("temp store"))
@@ -203,5 +215,28 @@ mod tests {
         let store = temp_store();
         let result = get_execution_record(store.as_ref(), "missing").expect("query");
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn execution_response_exposes_truth_counters() {
+        let store = temp_store();
+        let mut record = ExecutionRecord::new_pending("h3", "p3", "r3", vec![]);
+        record.mark_confirmed(vec!["entry-1".to_string()], vec![]);
+        record.truth_summary = Some(ExecutionTruthSummary {
+            total_effects: 2,
+            executed_effects: 1,
+            not_executed_effects: 1,
+            hard_failed_effects: 0,
+            execution_complete: false,
+        });
+        put_record(store.as_ref(), &record).expect("put record");
+
+        let got = get_execution_record(store.as_ref(), "h3")
+            .expect("query")
+            .expect("record exists");
+        assert_eq!(got.total_effects, 2);
+        assert_eq!(got.executed_effects, 1);
+        assert_eq!(got.not_executed_effects, 1);
+        assert!(!got.execution_complete);
     }
 }

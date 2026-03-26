@@ -10298,18 +10298,128 @@ fn verify_receipt_chain(
         },
     });
 
-    // Check 8: Chain completeness (server-computed)
+    // Check 8: Structural completeness
     checks.push(AuditCheck {
-        name: "Chain complete".to_string(),
-        passed: chain.chain_complete,
-        detail: if chain.chain_complete {
-            "All chain links present".to_string()
+        name: "Structural chain complete".to_string(),
+        passed: chain.structural_complete,
+        detail: if chain.structural_complete {
+            "All required receipt links present".to_string()
         } else {
-            "Chain has missing links".to_string()
+            "Missing receipt links in structural chain".to_string()
+        },
+    });
+
+    // Check 9: Execution summary arithmetic consistency.
+    let execution_counts_consistent = chain.execution.total_effects
+        == chain.execution.executed_effects
+            + chain.execution.not_executed_effects
+            + chain.execution.hard_failed_effects;
+    checks.push(AuditCheck {
+        name: "Execution counters consistent".to_string(),
+        passed: execution_counts_consistent,
+        detail: format!(
+            "total={} executed={} not_executed={} hard_failed={}",
+            chain.execution.total_effects,
+            chain.execution.executed_effects,
+            chain.execution.not_executed_effects,
+            chain.execution.hard_failed_effects
+        ),
+    });
+
+    // Check 10: Execution completeness (semantic truth gate)
+    checks.push(AuditCheck {
+        name: "Execution complete".to_string(),
+        passed: chain.execution_complete,
+        detail: if chain.execution.execution_record_present {
+            format!(
+                "status={:?}, complete={}, not_executed={}, hard_failed={}",
+                chain.execution.status,
+                chain.execution.execution_complete,
+                chain.execution.not_executed_effects,
+                chain.execution.hard_failed_effects
+            )
+        } else {
+            "No execution record present for decision".to_string()
+        },
+    });
+
+    // Check 11: Overall chain completeness contract.
+    checks.push(AuditCheck {
+        name: "Chain complete contract".to_string(),
+        passed: chain.chain_complete == (chain.structural_complete && chain.execution_complete),
+        detail: if chain.chain_complete {
+            "chain_complete=true (structural + execution complete)".to_string()
+        } else {
+            "chain_complete=false (structural and/or execution incomplete)".to_string()
         },
     });
 
     checks
+}
+
+#[cfg(test)]
+mod audit_verify_tests {
+    use super::verify_receipt_chain;
+    use icn_gateway::api::receipts::{
+        DecisionExecutionTruthResponse, GovernanceReceiptResponse, GovernanceVoteTallyResponse,
+        ReceiptChainResponse,
+    };
+
+    fn sample_chain(execution_complete: bool, not_executed: usize) -> ReceiptChainResponse {
+        ReceiptChainResponse {
+            decision_hash: "a".repeat(64),
+            governance: Some(GovernanceReceiptResponse {
+                decision_hash: "a".repeat(64),
+                proposal_id: "prop-1".to_string(),
+                domain_id: "domain-1".to_string(),
+                outcome: "Accepted".to_string(),
+                vote_tally: GovernanceVoteTallyResponse {
+                    for_votes: 3,
+                    against_votes: 0,
+                    abstain_votes: 0,
+                },
+                vote_hash: "b".repeat(64),
+            }),
+            allocations: vec![],
+            intents: vec![],
+            structural_complete: true,
+            execution_complete,
+            chain_complete: execution_complete,
+            execution: DecisionExecutionTruthResponse {
+                execution_record_present: true,
+                status: None,
+                total_effects: 1,
+                executed_effects: 1usize.saturating_sub(not_executed),
+                not_executed_effects: not_executed,
+                hard_failed_effects: 0,
+                execution_complete,
+            },
+        }
+    }
+
+    #[test]
+    fn partial_execution_fails_verification_checks() {
+        let chain = sample_chain(false, 1);
+        let checks = verify_receipt_chain(&chain, &"a".repeat(64));
+        assert!(
+            checks
+                .iter()
+                .any(|c| c.name == "Execution complete" && !c.passed),
+            "partial execution must fail execution-complete check"
+        );
+    }
+
+    #[test]
+    fn full_execution_passes_execution_check() {
+        let chain = sample_chain(true, 0);
+        let checks = verify_receipt_chain(&chain, &"a".repeat(64));
+        assert!(
+            checks
+                .iter()
+                .any(|c| c.name == "Execution complete" && c.passed),
+            "full execution must pass execution-complete check"
+        );
+    }
 }
 
 /// Handle audit commands — verify receipt chain integrity.
