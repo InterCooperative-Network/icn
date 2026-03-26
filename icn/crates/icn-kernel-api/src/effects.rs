@@ -367,6 +367,12 @@ pub struct EffectResult {
     /// Present for treasury effects that append a journal entry.
     #[serde(default)]
     pub ledger_entry_id: Option<String>,
+    /// True when the effect was not applied by design (NoOp, deferred handoff, etc.).
+    ///
+    /// When set, [`success`](Self::success) is false and this is **not** a retryable
+    /// execution failure at the decision level.
+    #[serde(default)]
+    pub not_executed: bool,
 }
 
 // =============================================================================
@@ -583,6 +589,7 @@ mod tests {
                 message: "Budget created successfully".into(),
                 state_change_hash: Some("statehash123".into()),
                 ledger_entry_id: Some("entry-123".into()),
+                not_executed: false,
             },
             EffectResult {
                 effect_id: "eff-2".into(),
@@ -590,6 +597,7 @@ mod tests {
                 message: "Insufficient funds".into(),
                 state_change_hash: None,
                 ledger_entry_id: None,
+                not_executed: false,
             },
         ];
 
