@@ -8,6 +8,7 @@
 //! 4. Backpressure doesn't deadlock
 
 use std::collections::HashMap;
+use std::path::Path;
 use std::sync::{Arc, RwLock};
 
 use anyhow::Result;
@@ -15,15 +16,25 @@ use icn_core::services::LedgerServiceImpl;
 use icn_core::supervisor::execution_store::SledExecutionStore;
 use icn_governance::{ProposalPayload, TreasuryProposalOperation};
 use icn_governance_actor::translate_payload_to_effects;
+use icn_identity::Did;
 use icn_kernel_api::budget::{BudgetRecord, BudgetStore};
 use icn_kernel_api::effects::{KernelEffect, TreasuryEffect};
 use icn_kernel_api::execution::{ExecutionRecord, ExecutionStatus, ExecutionStore};
 use icn_kernel_api::protocol_params::StubParamStore;
-use icn_kernel_api::AllowAllOracle;
+use icn_kernel_api::services::LedgerEvent;
+use icn_kernel_api::{
+    AllowAllOracle, Did as LedgerDid, LedgerService, PolicyOracle, TreasuryEntryRequest,
+    TreasuryEntryResult,
+};
 use icn_ledger::types::{ContentHash, ProvenanceRef};
 use icn_ledger::Ledger;
 use icn_store::SledStore;
 use tempfile::TempDir;
+use tokio::sync::RwLock as TokioRwLock;
+
+/// Valid multibase DIDs for ledger-backed treasury tests.
+const RT_TEST_TREASURY: &str = "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9";
+const RT_TEST_RECIPIENT: &str = "did:icn:zGyGKxMyg1p9SsHfm15MkNUu1u9TN2JtTspcdmrtGUdse";
 
 // ---------------------------------------------------------------------------
 // In-memory stores for testing
@@ -173,10 +184,73 @@ fn make_executor() -> (
     (executor, exec_store)
 }
 
+/// DecisionExecutor with treasury backed by a temp Sled ledger (`spend_effect` uses [`RT_TEST_TREASURY`]).
+fn make_executor_with_ledger(
+    ledger_data_dir: &Path,
+) -> (
+    Arc<icn_core::supervisor::decision_executor::DecisionExecutor>,
+    Arc<MemoryExecutionStore>,
+) {
+    use icn_core::supervisor::decision_executor::DecisionExecutor;
+    use icn_core::supervisor::effect_dispatcher::EffectDispatcher;
+    use icn_core::supervisor::governance_executor::KernelGovernanceExecutor;
+
+    let ledger_path = ledger_data_dir.join("ledger");
+    std::fs::create_dir_all(&ledger_path).unwrap();
+    let ledger_store = Arc::new(SledStore::open(&ledger_path).unwrap());
+    let ledger = Ledger::new(ledger_store).unwrap();
+    let ledger = Arc::new(TokioRwLock::new(ledger));
+    let treasury_did: Did = RT_TEST_TREASURY.parse().unwrap();
+    let ledger_service = Arc::new(LedgerServiceImpl::new(
+        ledger,
+        Arc::new(AllowAllOracle::wildcard()),
+        treasury_did,
+    ));
+    let kernel_executor =
+        KernelGovernanceExecutor::new(Arc::new(StubParamStore)).with_ledger_service(ledger_service);
+
+    let dispatcher = Arc::new(EffectDispatcher::new(Arc::new(kernel_executor)));
+    let exec_store = Arc::new(MemoryExecutionStore::new());
+    let executor = Arc::new(DecisionExecutor::new(dispatcher, exec_store.clone()));
+    (executor, exec_store)
+}
+
+fn make_executor_with_budget_and_ledger(
+    budget_store: Arc<dyn BudgetStore>,
+    ledger_data_dir: &Path,
+) -> (
+    Arc<icn_core::supervisor::decision_executor::DecisionExecutor>,
+    Arc<MemoryExecutionStore>,
+) {
+    use icn_core::supervisor::decision_executor::DecisionExecutor;
+    use icn_core::supervisor::effect_dispatcher::EffectDispatcher;
+    use icn_core::supervisor::governance_executor::KernelGovernanceExecutor;
+
+    let ledger_path = ledger_data_dir.join("ledger");
+    std::fs::create_dir_all(&ledger_path).unwrap();
+    let ledger_store = Arc::new(SledStore::open(&ledger_path).unwrap());
+    let ledger = Ledger::new(ledger_store).unwrap();
+    let ledger = Arc::new(TokioRwLock::new(ledger));
+    let treasury_did: Did = RT_TEST_TREASURY.parse().unwrap();
+    let ledger_service = Arc::new(LedgerServiceImpl::new(
+        ledger,
+        Arc::new(AllowAllOracle::wildcard()),
+        treasury_did,
+    ));
+    let kernel_executor = KernelGovernanceExecutor::new(Arc::new(StubParamStore))
+        .with_budget_store(budget_store)
+        .with_ledger_service(ledger_service);
+
+    let dispatcher = Arc::new(EffectDispatcher::new(Arc::new(kernel_executor)));
+    let exec_store = Arc::new(MemoryExecutionStore::new());
+    let executor = Arc::new(DecisionExecutor::new(dispatcher, exec_store.clone()));
+    (executor, exec_store)
+}
+
 fn spend_effect(decision_hash: &str) -> Vec<KernelEffect> {
     vec![KernelEffect::Treasury(TreasuryEffect::Spend {
-        treasury_did: "did:icn:treasury".to_string(),
-        recipient_did: "did:icn:recipient".to_string(),
+        treasury_did: RT_TEST_TREASURY.to_string(),
+        recipient_did: RT_TEST_RECIPIENT.to_string(),
         amount: 100,
         currency: "HOURS".to_string(),
         memo: "Test spend".to_string(),
@@ -189,8 +263,8 @@ fn spend_effect(decision_hash: &str) -> Vec<KernelEffect> {
 
 fn budget_spend_effect(decision_hash: &str, budget_id: &str, amount: i64) -> Vec<KernelEffect> {
     vec![KernelEffect::Treasury(TreasuryEffect::Spend {
-        treasury_did: "did:icn:treasury".to_string(),
-        recipient_did: "did:icn:recipient".to_string(),
+        treasury_did: RT_TEST_TREASURY.to_string(),
+        recipient_did: RT_TEST_RECIPIENT.to_string(),
         amount,
         currency: "HOURS".to_string(),
         memo: "Budget spend".to_string(),
@@ -203,7 +277,7 @@ fn budget_spend_effect(decision_hash: &str, budget_id: &str, amount: i64) -> Vec
 
 fn create_budget_effect(decision_hash: &str, budget_id: &str, limit: i64) -> Vec<KernelEffect> {
     vec![KernelEffect::Treasury(TreasuryEffect::CreateBudget {
-        treasury_did: "did:icn:treasury".to_string(),
+        treasury_did: RT_TEST_TREASURY.to_string(),
         budget_id: budget_id.to_string(),
         total_amount: limit,
         currency: "HOURS".to_string(),
@@ -232,11 +306,12 @@ fn content_hash_from_hex(hash_hex: &str) -> Result<ContentHash> {
 /// This simulates what happens in the real runtime: the governance app
 /// emits effects, the callback fires, and the DecisionExecutor processes
 /// them asynchronously.
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_callback_auto_executes_decision() {
     use icn_core::supervisor::decision_executor::create_decision_executor_callback;
 
-    let (executor, exec_store) = make_executor();
+    let tmp = TempDir::new().unwrap();
+    let (executor, exec_store) = make_executor_with_ledger(tmp.path());
     let callback = create_decision_executor_callback(executor);
 
     // Simulate governance app emitting effects
@@ -258,11 +333,12 @@ async fn test_callback_auto_executes_decision() {
 
 /// Test 2: Calling the callback twice with the same decision_hash
 /// does not double-execute.
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_callback_idempotent_no_double_execute() {
     use icn_core::supervisor::decision_executor::create_decision_executor_callback;
 
-    let (executor, exec_store) = make_executor();
+    let tmp = TempDir::new().unwrap();
+    let (executor, exec_store) = make_executor_with_ledger(tmp.path());
     let callback = create_decision_executor_callback(executor);
 
     // First execution
@@ -283,9 +359,10 @@ async fn test_callback_idempotent_no_double_execute() {
 }
 
 /// Test 3: Startup recovery picks up an Executing record and completes it.
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_startup_recovery_completes_executing_decision() {
-    let (executor, exec_store) = make_executor();
+    let tmp = TempDir::new().unwrap();
+    let (executor, exec_store) = make_executor_with_ledger(tmp.path());
 
     // Pre-seed an Executing record (simulates crash mid-execution)
     let effects = spend_effect("hash-crash-1");
@@ -359,13 +436,16 @@ async fn test_startup_recovery_retries_failed_decision() {
     let report = executor.recover_in_flight().await.unwrap();
 
     assert_eq!(
-        report.recovered_confirmed, 1,
-        "Should recover the failed decision on retry"
+        report.recovered_not_executed, 1,
+        "NoOp recovery should complete as structurally not executed"
     );
+    assert_eq!(report.recovered_confirmed, 0);
+    assert_eq!(report.recovered_failed, 0);
 
-    // Verify it's now Confirmed
+    // NoOp does not execute; terminal NotExecuted does not bump retries like mark_failed
     let after = exec_store.get("hash-fail-retry").unwrap().unwrap();
-    assert_eq!(after.status, ExecutionStatus::Confirmed);
+    assert_eq!(after.status, ExecutionStatus::NotExecuted);
+    assert_eq!(after.retries, 1);
 }
 
 /// Test 6: Retry counter accumulates across recovery attempts
@@ -416,12 +496,14 @@ async fn test_retry_accumulation_and_max_retries() {
 
 /// Test 7 (was 6): Full end-to-end: create budget → spend against it → auto-execute.
 /// This proves the complete pipeline works through the callback.
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_callback_e2e_budget_create_and_spend() {
     use icn_core::supervisor::decision_executor::create_decision_executor_callback;
 
     let budget_store = Arc::new(MemoryBudgetStore::new());
-    let (executor, exec_store) = make_executor_with_budget(budget_store.clone());
+    let tmp = TempDir::new().unwrap();
+    let (executor, exec_store) =
+        make_executor_with_budget_and_ledger(budget_store.clone(), tmp.path());
     let callback = create_decision_executor_callback(executor);
 
     // Step 1: Create a budget via callback
@@ -474,12 +556,12 @@ async fn test_backpressure_no_deadlock() {
     // Wait for all to complete (with backpressure, some will queue)
     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
-    // Count confirmed records
-    let confirmed = exec_store
-        .list_by_status(ExecutionStatus::Confirmed)
+    // Count terminal not-executed records (NoOp is honest non-success, not Confirmed theater)
+    let not_executed = exec_store
+        .list_by_status(ExecutionStatus::NotExecuted)
         .unwrap();
     assert_eq!(
-        confirmed.len(),
+        not_executed.len(),
         32,
         "All 32 decisions should complete despite backpressure"
     );
@@ -633,6 +715,7 @@ async fn test_withdraw_payload_restart_resume_single_mutation() {
 
     let decision_hash = "hash-withdraw-restart-1";
     let decision_receipt_id = "receipt-withdraw-restart-1";
+    let domain_id = "test-domain-withdraw-restart";
     let treasury_did_str = "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9";
     let treasury_did: Did = treasury_did_str.parse().unwrap();
     let recipient_did: Did = treasury_did_str.parse().unwrap();
@@ -649,7 +732,8 @@ async fn test_withdraw_payload_restart_resume_single_mutation() {
         },
     };
 
-    let effects = translate_payload_to_effects(&payload, decision_receipt_id, decision_hash);
+    let effects =
+        translate_payload_to_effects(&payload, decision_receipt_id, decision_hash, domain_id);
     assert_eq!(effects.len(), 1);
     match &effects[0] {
         KernelEffect::Treasury(TreasuryEffect::Spend {
@@ -712,7 +796,8 @@ async fn test_withdraw_payload_restart_resume_single_mutation() {
         entry_hash
     };
 
-    let replay_effects = translate_payload_to_effects(&payload, decision_receipt_id, decision_hash);
+    let replay_effects =
+        translate_payload_to_effects(&payload, decision_receipt_id, decision_hash, domain_id);
     let reopened_ledger_store = Arc::new(SledStore::open(&ledger_store_path).unwrap());
     let reopened_ledger = Ledger::new(reopened_ledger_store).unwrap();
     let reopened_ledger = Arc::new(tokio::sync::RwLock::new(reopened_ledger));
@@ -783,6 +868,7 @@ fn test_treasury_spend_payload_translation_produces_treasury_spend_effect() {
 
     let decision_receipt_id = "gov:test-domain:test-proposal:receipt";
     let decision_hash = "test-decision-hash";
+    let domain_id = "test-domain-for-treasury-spend";
     let treasury_did: Did = "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9"
         .parse()
         .unwrap();
@@ -801,7 +887,8 @@ fn test_treasury_spend_payload_translation_produces_treasury_spend_effect() {
         },
     };
 
-    let effects = translate_payload_to_effects(&payload, decision_receipt_id, decision_hash);
+    let effects =
+        translate_payload_to_effects(&payload, decision_receipt_id, decision_hash, domain_id);
     assert_eq!(effects.len(), 1);
     match &effects[0] {
         KernelEffect::Treasury(TreasuryEffect::Spend {
@@ -818,4 +905,103 @@ fn test_treasury_spend_payload_translation_produces_treasury_spend_effect() {
         }
         other => panic!("expected Treasury Spend effect, got {other:?}"),
     }
+}
+
+/// Production-shaped path: ledger is wired (as in `lifecycle`); `TreasuryEffect::Allocate` maps to
+/// a `TreasuryOperation` without `decision_hash`, so `KernelTreasuryExecutor` returns
+/// `ExecutionOutcome::Deferred` → `EffectResult.not_executed` → durable `NotExecuted` (Sled reopen).
+#[tokio::test(flavor = "multi_thread")]
+async fn test_deferred_outcome_sled_persists_not_executed() {
+    use icn_core::supervisor::decision_executor::DecisionExecutor;
+    use icn_core::supervisor::effect_dispatcher::EffectDispatcher;
+    use icn_core::supervisor::governance_executor::KernelGovernanceExecutor;
+
+    struct LedgerWiredDeferTestStub {
+        oracle: Arc<dyn PolicyOracle>,
+    }
+
+    impl LedgerService for LedgerWiredDeferTestStub {
+        fn oracle(&self) -> Arc<dyn PolicyOracle> {
+            self.oracle.clone()
+        }
+
+        fn balance(&self, _account: &LedgerDid, _currency: &str) -> i64 {
+            0
+        }
+
+        fn credit_limit(&self, _account: &LedgerDid, _currency: &str) -> i64 {
+            0
+        }
+
+        fn record_event(&self, _event: LedgerEvent) {}
+
+        fn submit_treasury_entry(
+            &self,
+            _entry: TreasuryEntryRequest,
+        ) -> Result<TreasuryEntryResult, String> {
+            panic!(
+                "submit_treasury_entry must not run: missing decision_hash defers before ledger call"
+            );
+        }
+
+        fn get_treasury_nonce(&self, _treasury_id: &str) -> Result<u64, String> {
+            Ok(0)
+        }
+    }
+
+    let tmp = TempDir::new().unwrap();
+    let exec_store_path = tmp.path().join("exec-deferred");
+    std::fs::create_dir_all(&exec_store_path).unwrap();
+
+    let decision_hash = "hash-sled-deferred-not-executed-1";
+    let decision_receipt_id = "receipt-sled-deferred-1";
+    let proposal_id = "proposal-sled-deferred-1";
+
+    let effects = vec![KernelEffect::Treasury(TreasuryEffect::Allocate {
+        treasury_did: RT_TEST_TREASURY.to_string(),
+        budget_id: "budget-sled-defer".to_string(),
+        amount: 50,
+        currency: "HOURS".to_string(),
+    })];
+
+    {
+        let oracle: Arc<dyn PolicyOracle> = Arc::new(AllowAllOracle::wildcard());
+        let ledger_service: Arc<dyn LedgerService> = Arc::new(LedgerWiredDeferTestStub {
+            oracle: oracle.clone(),
+        });
+        let kernel_executor = KernelGovernanceExecutor::new(Arc::new(StubParamStore))
+            .with_ledger_service(ledger_service);
+        let dispatcher = Arc::new(EffectDispatcher::new(Arc::new(kernel_executor)));
+        let exec_backend = Arc::new(SledStore::open(&exec_store_path).unwrap());
+        let exec_store = Arc::new(SledExecutionStore::new(exec_backend));
+        let executor = DecisionExecutor::new(dispatcher, exec_store.clone());
+
+        let results = executor
+            .execute(effects, decision_receipt_id, decision_hash, proposal_id)
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 1);
+        assert!(!results[0].success);
+        assert!(results[0].not_executed);
+        assert!(results[0].message.contains("Deferred:"));
+        assert!(
+            results[0].message.contains("decision_hash"),
+            "expected missing-provenance defer, got {:?}",
+            results[0].message
+        );
+
+        let record = exec_store.get(decision_hash).unwrap().unwrap();
+        assert_eq!(record.status, ExecutionStatus::NotExecuted);
+        assert_eq!(record.retries, 0);
+        assert_ne!(record.status, ExecutionStatus::Confirmed);
+        assert_ne!(record.status, ExecutionStatus::Failed);
+    }
+
+    let reopened = SledStore::open(&exec_store_path).unwrap();
+    let reopened_store = SledExecutionStore::new(Arc::new(reopened));
+    let reread = reopened_store.get(decision_hash).unwrap().unwrap();
+    assert_eq!(reread.status, ExecutionStatus::NotExecuted);
+    assert_eq!(reread.retries, 0);
+    assert!(reread.error.as_deref().unwrap_or("").contains("Deferred:"));
 }

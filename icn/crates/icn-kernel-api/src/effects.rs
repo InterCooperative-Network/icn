@@ -115,6 +115,12 @@ pub enum TreasuryEffect {
         currency: String,
         /// List of (member_did, share_amount) pairs
         distributions: Vec<(String, i64)>,
+        /// Governance decision receipt (pilot provenance; default for older serialized effects).
+        #[serde(default)]
+        decision_receipt_id: String,
+        /// Canonical decision hash (pilot provenance; default for older serialized effects).
+        #[serde(default)]
+        decision_hash: String,
     },
     /// Share redemption payout
     RedeemShares {
@@ -367,6 +373,50 @@ pub struct EffectResult {
     /// Present for treasury effects that append a journal entry.
     #[serde(default)]
     pub ledger_entry_id: Option<String>,
+    /// True when the effect was not applied by design (NoOp, deferred handoff, etc.).
+    ///
+    /// When set, [`success`](Self::success) is false and this is **not** a retryable
+    /// execution failure at the decision level.
+    #[serde(default)]
+    pub not_executed: bool,
+}
+
+impl EffectResult {
+    /// Retryable / hard failure at the effect row: execution did not succeed and this row is
+    /// **not** classified as structurally non-executable (`not_executed`).
+    #[inline]
+    pub fn is_hard_failure(&self) -> bool {
+        !self.success && !self.not_executed
+    }
+
+    /// Structural non-execution (NoOp, deferred treasury handoff, etc.): not a hard failure.
+    #[inline]
+    pub fn is_structurally_not_executed(&self) -> bool {
+        self.not_executed
+    }
+
+    /// Debug-only contract: `success` and `not_executed` are mutually exclusive; `not_executed`
+    /// rows must not carry attributed ledger or state-change side channels.
+    #[inline]
+    pub fn debug_assert_semantic_invariants(&self) {
+        debug_assert!(
+            !(self.success && self.not_executed),
+            "EffectResult: success and not_executed are mutually exclusive (effect_id={})",
+            self.effect_id
+        );
+        if self.not_executed {
+            debug_assert!(
+                self.ledger_entry_id.is_none(),
+                "EffectResult: not_executed rows must not set ledger_entry_id (effect_id={})",
+                self.effect_id
+            );
+            debug_assert!(
+                self.state_change_hash.is_none(),
+                "EffectResult: not_executed rows must not set state_change_hash (effect_id={})",
+                self.effect_id
+            );
+        }
+    }
 }
 
 // =============================================================================
@@ -376,6 +426,67 @@ pub struct EffectResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn contract_effect_result_classifier_matches_decision_executor_aggregation() {
+        let hard = EffectResult {
+            effect_id: "e1".into(),
+            success: false,
+            message: "err".into(),
+            state_change_hash: None,
+            ledger_entry_id: None,
+            not_executed: false,
+        };
+        assert!(hard.is_hard_failure());
+        assert!(!hard.is_structurally_not_executed());
+
+        let nx = EffectResult {
+            effect_id: "e2".into(),
+            success: false,
+            message: "noop".into(),
+            state_change_hash: None,
+            ledger_entry_id: None,
+            not_executed: true,
+        };
+        assert!(!nx.is_hard_failure());
+        assert!(nx.is_structurally_not_executed());
+
+        let ok = EffectResult {
+            effect_id: "e3".into(),
+            success: true,
+            message: "ok".into(),
+            state_change_hash: Some("h".into()),
+            ledger_entry_id: Some("L1".into()),
+            not_executed: false,
+        };
+        assert!(!ok.is_hard_failure());
+        assert!(!ok.is_structurally_not_executed());
+    }
+
+    #[test]
+    fn contract_effect_result_debug_invariants_hold_for_coherent_rows() {
+        let rows = [
+            EffectResult {
+                effect_id: "a".into(),
+                success: false,
+                message: "d".into(),
+                state_change_hash: None,
+                ledger_entry_id: None,
+                not_executed: true,
+            },
+            EffectResult {
+                effect_id: "b".into(),
+                success: true,
+                message: "s".into(),
+                state_change_hash: Some("x".into()),
+                ledger_entry_id: None,
+                not_executed: false,
+            },
+        ];
+        for r in &rows {
+            r.debug_assert_semantic_invariants();
+        }
+    }
 
     #[test]
     fn test_treasury_effect_serde() {
@@ -517,6 +628,8 @@ mod tests {
                     ("did:icn:bob".into(), 4000),
                     ("did:icn:carol".into(), 3000),
                 ],
+                decision_receipt_id: "receipt-surplus".into(),
+                decision_hash: "hash-surplus".into(),
             }),
             KernelEffect::Membership(MembershipEffect::AddMember {
                 entity_id: "coop-1".into(),
@@ -583,6 +696,7 @@ mod tests {
                 message: "Budget created successfully".into(),
                 state_change_hash: Some("statehash123".into()),
                 ledger_entry_id: Some("entry-123".into()),
+                not_executed: false,
             },
             EffectResult {
                 effect_id: "eff-2".into(),
@@ -590,6 +704,7 @@ mod tests {
                 message: "Insufficient funds".into(),
                 state_change_hash: None,
                 ledger_entry_id: None,
+                not_executed: false,
             },
         ];
 
@@ -643,6 +758,8 @@ mod tests {
                 total_amount: 1000,
                 currency: "USD".into(),
                 distributions: vec![("did:icn:m1".into(), 500), ("did:icn:m2".into(), 500)],
+                decision_receipt_id: "r1".into(),
+                decision_hash: "h1".into(),
             },
             TreasuryEffect::RedeemShares {
                 treasury_did: "did:icn:t1".into(),

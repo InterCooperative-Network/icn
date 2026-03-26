@@ -749,6 +749,7 @@ async fn spawn_actors_with_identity(
                 if report.total() > 0 {
                     info!(
                         confirmed = report.recovered_confirmed,
+                        not_executed = report.recovered_not_executed,
                         failed = report.recovered_failed,
                         skipped = report.skipped_no_effects + report.skipped_max_retries,
                         "Startup recovery: processed {} in-flight decisions",

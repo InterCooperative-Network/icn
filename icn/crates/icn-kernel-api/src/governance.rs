@@ -222,6 +222,14 @@ impl EffectExecutor for DefaultEffectExecutor {
         let receipt_id = DecisionReceiptId::new(decision_receipt_id);
 
         match effect {
+            KernelEffect::Treasury(TreasuryEffect::DistributeSurplus { .. }) => Ok(EffectResult {
+                effect_id: decision_receipt_id.to_string(),
+                success: false,
+                message: "DistributeSurplus: multi-recipient surplus distribution is not implemented in DefaultEffectExecutor (no balances changed)".to_string(),
+                state_change_hash: None,
+                ledger_entry_id: None,
+                not_executed: true,
+            }),
             KernelEffect::Treasury(treasury_effect) => {
                 // Convert TreasuryEffect to TreasuryOperation
                 let operation = treasury_effect_to_operation(&treasury_effect);
@@ -252,15 +260,20 @@ impl EffectExecutor for DefaultEffectExecutor {
                         message: "Protocol effect applied".to_string(),
                         state_change_hash: None,
                         ledger_entry_id: None,
+                        not_executed: false,
                     })
                 }
             }
             KernelEffect::NoOp { reason } => Ok(EffectResult {
                 effect_id: decision_receipt_id.to_string(),
-                success: true,
-                message: format!("NoOp: {}", reason),
+                success: false,
+                message: format!(
+                    "NoOp: decision produced no executable kernel effect (not executed): {}",
+                    reason
+                ),
                 state_change_hash: None,
                 ledger_entry_id: None,
+                not_executed: true,
             }),
             // For other effect types, return success placeholder
             _ => Ok(EffectResult {
@@ -269,6 +282,7 @@ impl EffectExecutor for DefaultEffectExecutor {
                 message: "Effect type not yet implemented".to_string(),
                 state_change_hash: None,
                 ledger_entry_id: None,
+                not_executed: false,
             }),
         }
     }
@@ -365,6 +379,18 @@ pub fn treasury_effect_to_operation(effect: &TreasuryEffect) -> TreasuryOperatio
             expected_nonce: None,
             decision_hash: Some(decision_hash.clone()),
         },
+        // Not executed via `TreasuryOperation` / `submit_treasury_entry` today (multi-recipient).
+        // `KernelGovernanceExecutor::execute_treasury_with_budget` handles this explicitly.
+        TreasuryEffect::DistributeSurplus { .. } => TreasuryOperation {
+            treasury_id: String::new(),
+            operation_type: TreasuryOperationType::Reserve,
+            amount: 0,
+            currency: "UNKNOWN".to_string(),
+            recipient: None,
+            memo: "DistributeSurplus: unmapped to single TreasuryOperation".to_string(),
+            expected_nonce: None,
+            decision_hash: None,
+        },
         // Other treasury effects mapped to basic operations
         _ => TreasuryOperation {
             treasury_id: String::new(),
@@ -418,6 +444,7 @@ fn execution_outcome_to_effect_result(outcome: ExecutionOutcome, effect_id: &str
             message: effects.join("; "),
             state_change_hash: None,
             ledger_entry_id: None,
+            not_executed: false,
         },
         ExecutionOutcome::Failed { reason, .. } => EffectResult {
             effect_id: effect_id.to_string(),
@@ -425,13 +452,15 @@ fn execution_outcome_to_effect_result(outcome: ExecutionOutcome, effect_id: &str
             message: reason,
             state_change_hash: None,
             ledger_entry_id: None,
+            not_executed: false,
         },
         ExecutionOutcome::Deferred { reason, .. } => EffectResult {
             effect_id: effect_id.to_string(),
-            success: true,
+            success: false,
             message: format!("Deferred: {}", reason),
             state_change_hash: None,
             ledger_entry_id: None,
+            not_executed: true,
         },
     }
 }

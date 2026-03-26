@@ -67,5 +67,8 @@ serde_json = "1.0"
 # Logging
 tracing = "0.1"
 
+[dev-dependencies]
+icn-ledger = { path = "../../crates/icn-ledger" }
+
 [lints]
 workspace = true

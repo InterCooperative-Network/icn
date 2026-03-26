@@ -101,6 +101,7 @@ impl EffectDispatcher {
                             "Effect execution returned failure"
                         );
                     }
+                    result.debug_assert_semantic_invariants();
                     results.push(result);
                 }
                 Err(e) => {
@@ -110,13 +111,16 @@ impl EffectDispatcher {
                         error = %e,
                         "Effect execution failed"
                     );
-                    results.push(EffectResult {
+                    let row = EffectResult {
                         effect_id: decision_receipt_id.to_string(),
                         success: false,
                         message: format!("Execution error: {}", e),
                         state_change_hash: None,
                         ledger_entry_id: None,
-                    });
+                        not_executed: false,
+                    };
+                    row.debug_assert_semantic_invariants();
+                    results.push(row);
                 }
             }
         }
@@ -218,8 +222,56 @@ mod tests {
         ParameterChange, ParameterScope, ParameterValidationError, ParameterValue, PendingChangeId,
         PendingParameterChange, ProtocolParameter, ProtocolParameterStore,
     };
+    use icn_kernel_api::services::{LedgerEvent, TreasuryEntryRequest, TreasuryEntryResult};
+    use icn_kernel_api::{AllowAllOracle, Did, LedgerService, PolicyOracle};
     use std::collections::HashMap;
     use std::sync::RwLock;
+
+    /// Test-only `LedgerService` without the ledger domain crate (meaning-firewall ratchet on `src/`).
+    struct StubTreasuryLedgerService {
+        oracle: Arc<dyn PolicyOracle>,
+    }
+
+    impl LedgerService for StubTreasuryLedgerService {
+        fn oracle(&self) -> Arc<dyn PolicyOracle> {
+            self.oracle.clone()
+        }
+
+        fn balance(&self, _account: &Did, _currency: &str) -> i64 {
+            0
+        }
+
+        fn credit_limit(&self, _account: &Did, _currency: &str) -> i64 {
+            0
+        }
+
+        fn record_event(&self, _event: LedgerEvent) {}
+
+        fn submit_treasury_entry(
+            &self,
+            entry: TreasuryEntryRequest,
+        ) -> Result<TreasuryEntryResult, String> {
+            Ok(TreasuryEntryResult {
+                entry_hash: "0000000000000000000000000000000000000000000000000000000000000001"
+                    .to_string(),
+                decision_receipt_id: entry.decision_receipt_id,
+                decision_hash: entry.decision_hash,
+            })
+        }
+
+        fn get_treasury_nonce(&self, _treasury_id: &str) -> Result<u64, String> {
+            Ok(0)
+        }
+    }
+
+    fn governance_executor_with_stub_ledger() -> Arc<KernelGovernanceExecutor> {
+        let oracle = Arc::new(AllowAllOracle::wildcard());
+        let ledger_service: Arc<dyn LedgerService> = Arc::new(StubTreasuryLedgerService {
+            oracle: oracle.clone(),
+        });
+        let param_store = Arc::new(MockParamStore::new());
+        Arc::new(KernelGovernanceExecutor::new(param_store).with_ledger_service(ledger_service))
+    }
 
     /// Mock parameter store for testing
     struct MockParamStore {
@@ -375,15 +427,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_effect_dispatcher_treasury_spend() {
-        // Create executor with mock protocol store
-        let param_store = Arc::new(MockParamStore::new());
-        let executor = Arc::new(KernelGovernanceExecutor::new(param_store));
+        let executor = governance_executor_with_stub_ledger();
         let dispatcher = EffectDispatcher::new(executor);
 
         // Create a treasury spend effect directly (translation happens in app layer)
         let effects = vec![KernelEffect::Treasury(TreasuryEffect::Spend {
-            treasury_did: "did:icn:treasury123".to_string(),
-            recipient_did: "did:icn:recipient456".to_string(),
+            treasury_did: "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9".to_string(),
+            recipient_did: "did:icn:zGyGKxMyg1p9SsHfm15MkNUu1u9TN2JtTspcdmrtGUdse".to_string(),
             amount: 1000,
             currency: "ICN".to_string(),
             memo: "Test payment".to_string(),
@@ -574,23 +624,13 @@ mod tests {
     /// 3. Execution succeeds with appropriate result message
     /// 4. effect_id in result matches decision_receipt_id (provenance linkage)
     ///
-    /// NOTE: This test uses a placeholder treasury executor that logs but doesn't
-    /// write to the ledger. The full provenance chain (decision → effect → ledger
-    /// entry with decision_hash) is proven separately:
-    /// - icn-ledger/src/entry.rs: test_entry_with_decision_provenance
-    /// - JournalEntry now carries decision_receipt_id + decision_hash
-    ///
-    /// TODO: When treasury executor is wired to real ledger, add assertion:
-    /// ```ignore
-    /// let ledger_entry = ledger.get_entry(result.ledger_entry_id).await?;
-    /// assert_eq!(ledger_entry.decision_receipt_id, Some(decision_receipt_id));
-    /// assert_eq!(ledger_entry.decision_hash, Some(decision_hash));
-    /// ```
+    /// Treasury spend runs against a stub `LedgerService` so the path is exercised without
+    /// `icn-ledger` in icn-core `src/` (integration tests use a real ledger).
     #[tokio::test]
     async fn test_treasury_spend_end_to_end_provenance() {
         // Known test values
-        let treasury_did = "did:icn:treasury:coop-alpha-main";
-        let recipient_did = "did:icn:member:alice-dev-fund";
+        let treasury_did = "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9";
+        let recipient_did = "did:icn:zGyGKxMyg1p9SsHfm15MkNUu1u9TN2JtTspcdmrtGUdse";
         let amount: i64 = 2500;
         let currency = "HOURS";
         let decision_receipt_id = "gov:proposal:2024-001:receipt:abc123";
@@ -611,9 +651,8 @@ mod tests {
         // Step 2: Wrap in KernelEffect::Treasury
         let kernel_effect = KernelEffect::Treasury(treasury_effect);
 
-        // Step 3: Create an EffectDispatcher with a KernelGovernanceExecutor
-        let param_store = Arc::new(MockParamStore::new());
-        let executor = Arc::new(KernelGovernanceExecutor::new(param_store));
+        // Step 3: Create an EffectDispatcher with stub ledger-backed treasury
+        let executor = governance_executor_with_stub_ledger();
         let dispatcher = EffectDispatcher::new(executor);
 
         // Step 4: Execute effects with the decision_receipt_id

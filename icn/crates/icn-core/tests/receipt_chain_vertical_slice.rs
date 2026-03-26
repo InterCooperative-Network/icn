@@ -178,7 +178,7 @@ async fn test_allocation_receipt_chain_end_to_end() -> Result<()> {
         accepted.len()
     );
 
-    let (_event_proposal_id, _event_domain_id, event_payload) = &accepted[0];
+    let (_event_proposal_id, event_domain_id, event_payload) = &accepted[0];
 
     // Step 4: Deserialize the event payload back to ProposalPayload
     let payload: ProposalPayload =
@@ -204,6 +204,7 @@ async fn test_allocation_receipt_chain_end_to_end() -> Result<()> {
         &payload,
         "receipt-vertical-slice",
         "decision-hash-vertical-slice",
+        event_domain_id.as_str(),
     );
 
     // 1 CreateBudget + 2 Allocate = 3 effects

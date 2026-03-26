@@ -14,6 +14,7 @@
 //!
 //! ```text
 //! Pending → Executing → Confirmed
+//!                    ↘ NotExecuted (terminal: nothing executable applied)
 //!                    ↘ Failed → (retry) → Executing
 //!                              ↘ PermanentlyFailed
 //! ```
@@ -32,6 +33,11 @@ pub enum ExecutionStatus {
     Executing,
     /// All effects applied successfully.
     Confirmed,
+    /// No executable kernel work was applied (terminal, not a retryable failure).
+    ///
+    /// Distinct from [`Failed`]: the pipeline ran but there was nothing to apply
+    /// (e.g. `NoOp`, or outcomes mapped as structurally non-executed).
+    NotExecuted,
     /// Execution failed (retryable).
     Failed,
     /// Exhausted retries or non-recoverable error.
@@ -131,6 +137,20 @@ impl ExecutionRecord {
         );
     }
 
+    /// Terminal completion: execution ran but no kernel effect was applied.
+    ///
+    /// Does not increment `retries` (this is not a hard failure).
+    pub fn mark_not_executed(&mut self, note: impl Into<String>) {
+        self.status = ExecutionStatus::NotExecuted;
+        self.error = Some(note.into());
+        self.finished_at = Some(
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0),
+        );
+    }
+
     /// Transition to Failed with error.
     pub fn mark_failed(&mut self, error: impl Into<String>) {
         self.status = ExecutionStatus::Failed;
@@ -160,7 +180,9 @@ impl ExecutionRecord {
     pub fn is_terminal(&self) -> bool {
         matches!(
             self.status,
-            ExecutionStatus::Confirmed | ExecutionStatus::PermanentlyFailed
+            ExecutionStatus::Confirmed
+                | ExecutionStatus::NotExecuted
+                | ExecutionStatus::PermanentlyFailed
         )
     }
 }
@@ -226,6 +248,19 @@ mod tests {
     }
 
     #[test]
+    fn test_execution_record_not_executed_is_terminal_without_retry_bump() {
+        let mut record =
+            ExecutionRecord::new_pending("nx-hash", "proposal-nx", "receipt-nx", vec![]);
+        record.mark_executing();
+        assert_eq!(record.retries, 0);
+        record.mark_not_executed("nothing to apply");
+        assert_eq!(record.status, ExecutionStatus::NotExecuted);
+        assert!(record.is_terminal());
+        assert_eq!(record.retries, 0);
+        assert!(record.error.as_deref().is_some());
+    }
+
+    #[test]
     fn test_execution_status_serde() {
         let status = ExecutionStatus::Confirmed;
         let json = serde_json::to_string(&status).unwrap();
@@ -233,6 +268,12 @@ mod tests {
 
         let parsed: ExecutionStatus = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed, ExecutionStatus::Confirmed);
+
+        let nx = ExecutionStatus::NotExecuted;
+        let nx_json = serde_json::to_string(&nx).unwrap();
+        assert_eq!(nx_json, "\"not_executed\"");
+        let nx_parsed: ExecutionStatus = serde_json::from_str(&nx_json).unwrap();
+        assert_eq!(nx_parsed, ExecutionStatus::NotExecuted);
     }
 
     #[test]

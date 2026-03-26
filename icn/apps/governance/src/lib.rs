@@ -135,6 +135,7 @@ where
                         &proposal_payload,
                         &decision_receipt_id,
                         &decision_hash,
+                        domain_id,
                     );
 
                     if effects.is_empty() {

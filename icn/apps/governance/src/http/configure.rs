@@ -73,8 +73,8 @@ pub struct GovernanceContext<E> {
     pub on_charter_accepted: Option<CharterAcceptedHook>,
     /// Optional hook called when any proposal is accepted.
     ///
-    /// Receives the full accepted proposal so the gateway can dispatch to
-    /// the appropriate subsystem by payload type.
+    /// Receives the translated [`GovernanceEffect`] for the accepted proposal,
+    /// allowing gateway dispatch without importing governance domain types.
     pub on_proposal_accepted: Option<ProposalAcceptedHook>,
 }
 

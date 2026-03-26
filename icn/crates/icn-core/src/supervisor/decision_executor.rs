@@ -3,14 +3,16 @@
 //! The `DecisionExecutor` sits between the governance event subscription and the
 //! `EffectDispatcher`. It provides:
 //!
-//! 1. **Idempotency**: If a decision_hash has already been executed (status = Confirmed),
-//!    the executor returns early. This prevents double-execution from replayed events.
+//! 1. **Idempotency**: If a decision_hash has already reached a terminal status
+//!    ([`ExecutionStatus::Confirmed`], [`ExecutionStatus::NotExecuted`],
+//!    [`ExecutionStatus::PermanentlyFailed`]), the executor returns early.
+//!    This prevents double-execution from replayed events.
 //!
 //! 2. **Execution logging**: Every decision's execution status is persisted to sled.
 //!    This survives restarts and enables audit.
 //!
 //! 3. **Saga-ready structure**: The `ExecutionRecord` status machine
-//!    (Pending → Executing → Confirmed/Failed) is the foundation for future
+//!    (Pending → Executing → Confirmed / NotExecuted / Failed) is the foundation for future
 //!    saga patterns (retry, compensation, dead-letter routing).
 //!
 //! # Architecture
@@ -27,8 +29,20 @@
 //! [EffectDispatcher]  ←── existing execution path
 //!       |
 //!       v
-//! [DecisionExecutor]  ←── record Confirmed/Failed
+//! [DecisionExecutor]  ←── record Confirmed / NotExecuted / Failed
 //! ```
+//!
+//! # Aggregation contract (per-effect vs aggregate)
+//!
+//! - Each [`EffectResult`] row: `success` means that effect applied its kernel work; `not_executed`
+//!   means the row is structurally non-executable (NoOp, Deferred, etc.) and is **not** a hard
+//!   failure. `is_hard_failure()` ≡ `!success && !not_executed`.
+//! - Persisted [`ExecutionRecord`] has a **single** [`ExecutionStatus`] for the whole decision:
+//!   - Any hard-failure row → `Failed` (`retries` incremented).
+//!   - Else if every row is `not_executed` (and non-empty) → `NotExecuted` (terminal, no retry bump).
+//!   - Else → `Confirmed` (includes **mixed** `success` + `not_executed` batches: intentional).
+//! - **NoOp-only** batches must **not** reach `Confirmed` via aggregation (they are all
+//!   `not_executed`).
 
 use std::sync::Arc;
 
@@ -109,6 +123,10 @@ impl DecisionExecutor {
                         .get(&ExecutionStatus::PermanentlyFailed)
                         .copied()
                         .unwrap_or(0),
+                    not_executed = counts
+                        .get(&ExecutionStatus::NotExecuted)
+                        .copied()
+                        .unwrap_or(0),
                     "Recovery scan starting — execution store status distribution"
                 );
             }
@@ -181,20 +199,32 @@ impl DecisionExecutor {
                 .execute(effects, &receipt_id, &decision_hash, &proposal_id)
                 .await
             {
-                Ok(results) => {
-                    let all_success = results.iter().all(|r| r.success);
-                    if all_success {
-                        info!(
-                            decision_hash = %decision_hash,
-                            "Recovered decision: confirmed"
-                        );
-                        report.recovered_confirmed += 1;
-                    } else {
-                        warn!(
-                            decision_hash = %decision_hash,
-                            "Recovered decision: some effects failed"
-                        );
-                        report.recovered_failed += 1;
+                Ok(_results) => {
+                    if let Some(rec) = self.store.get(&decision_hash)? {
+                        match rec.status {
+                            ExecutionStatus::Confirmed => {
+                                info!(
+                                    decision_hash = %decision_hash,
+                                    "Recovered decision: confirmed"
+                                );
+                                report.recovered_confirmed += 1;
+                            }
+                            ExecutionStatus::NotExecuted => {
+                                info!(
+                                    decision_hash = %decision_hash,
+                                    "Recovered decision: not executed (terminal)"
+                                );
+                                report.recovered_not_executed += 1;
+                            }
+                            ExecutionStatus::Failed => {
+                                warn!(
+                                    decision_hash = %decision_hash,
+                                    "Recovered decision: some effects failed"
+                                );
+                                report.recovered_failed += 1;
+                            }
+                            _ => {}
+                        }
                     }
                 }
                 Err(e) => {
@@ -210,6 +240,7 @@ impl DecisionExecutor {
 
         info!(
             confirmed = report.recovered_confirmed,
+            not_executed = report.recovered_not_executed,
             failed = report.recovered_failed,
             skipped_no_effects = report.skipped_no_effects,
             skipped_max_retries = report.skipped_max_retries,
@@ -236,6 +267,7 @@ impl DecisionExecutor {
 
         let mut terminal = Vec::new();
         terminal.extend(self.store.list_by_status(ExecutionStatus::Confirmed)?);
+        terminal.extend(self.store.list_by_status(ExecutionStatus::NotExecuted)?);
         terminal.extend(
             self.store
                 .list_by_status(ExecutionStatus::PermanentlyFailed)?,
@@ -256,6 +288,7 @@ impl DecisionExecutor {
         // Re-query after age-based pruning and enforce count cap.
         let mut terminal_after = Vec::new();
         terminal_after.extend(self.store.list_by_status(ExecutionStatus::Confirmed)?);
+        terminal_after.extend(self.store.list_by_status(ExecutionStatus::NotExecuted)?);
         terminal_after.extend(
             self.store
                 .list_by_status(ExecutionStatus::PermanentlyFailed)?,
@@ -469,8 +502,49 @@ impl DecisionExecutor {
         };
 
         // 5. Check results and record outcome
-        let all_success = results.iter().all(|r| r.success);
-        if all_success {
+        let hard_failure_messages: Vec<String> = results
+            .iter()
+            .filter(|r| r.is_hard_failure())
+            .map(|r| r.message.clone())
+            .collect();
+
+        let all_non_executable = !results.is_empty() && results.iter().all(|r| r.not_executed);
+
+        if !hard_failure_messages.is_empty() {
+            let error_msg = hard_failure_messages.join("; ");
+
+            warn!(
+                decision_hash = %decision_hash,
+                receipt_id = %decision_receipt_id,
+                attempt = record.retries,
+                status_before = ?ExecutionStatus::Executing,
+                status_after = ?ExecutionStatus::Failed,
+                failures = ?hard_failure_messages,
+                "Decision state transition: Executing → Failed"
+            );
+
+            record.mark_failed(error_msg);
+            self.store.put(&record)?;
+        } else if all_non_executable {
+            let note = results
+                .iter()
+                .map(|r| r.message.as_str())
+                .collect::<Vec<_>>()
+                .join("; ");
+
+            info!(
+                decision_hash = %decision_hash,
+                receipt_id = %decision_receipt_id,
+                result_count = results.len(),
+                attempt = record.retries + 1,
+                status_before = ?ExecutionStatus::Executing,
+                status_after = ?ExecutionStatus::NotExecuted,
+                "Decision state transition: Executing → NotExecuted"
+            );
+
+            record.mark_not_executed(note);
+            self.store.put(&record)?;
+        } else {
             let ledger_entry_ids: Vec<String> = results
                 .iter()
                 .filter_map(|r| r.ledger_entry_id.clone())
@@ -491,26 +565,6 @@ impl DecisionExecutor {
                 status_after = ?ExecutionStatus::Confirmed,
                 "Decision state transition: Executing → Confirmed"
             );
-        } else {
-            let failures: Vec<String> = results
-                .iter()
-                .filter(|r| !r.success)
-                .map(|r| r.message.clone())
-                .collect();
-            let error_msg = failures.join("; ");
-
-            warn!(
-                decision_hash = %decision_hash,
-                receipt_id = %decision_receipt_id,
-                attempt = record.retries,
-                status_before = ?ExecutionStatus::Executing,
-                status_after = ?ExecutionStatus::Failed,
-                failures = ?failures,
-                "Decision state transition: Executing → Failed"
-            );
-
-            record.mark_failed(error_msg);
-            self.store.put(&record)?;
         }
 
         Ok(results)
@@ -532,6 +586,8 @@ impl DecisionExecutor {
 pub struct RecoveryReport {
     /// Decisions that were re-executed and confirmed.
     pub recovered_confirmed: usize,
+    /// Decisions that were re-executed and completed as structurally not executed.
+    pub recovered_not_executed: usize,
     /// Decisions that were re-executed but failed again.
     pub recovered_failed: usize,
     /// Decisions skipped because they have no stored effects (pre-upgrade records).
@@ -544,6 +600,7 @@ impl RecoveryReport {
     /// Total decisions processed during recovery.
     pub fn total(&self) -> usize {
         self.recovered_confirmed
+            + self.recovered_not_executed
             + self.recovered_failed
             + self.skipped_no_effects
             + self.skipped_max_retries
@@ -664,11 +721,34 @@ fn extract_decision_hash(effects: &[KernelEffect]) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use icn_kernel_api::effects::TreasuryEffect;
+    use icn_kernel_api::effects::{EffectResult, KernelEffect, ResourceEffect, TreasuryEffect};
     use icn_kernel_api::escrow::{EscrowRecord, EscrowStatus, EscrowStore};
     use icn_kernel_api::execution::ExecutionRecord;
+    use icn_kernel_api::services::{LedgerEvent, TreasuryEntryRequest, TreasuryEntryResult};
+    use icn_kernel_api::{AllowAllOracle, Did, LedgerService, PolicyOracle};
     use std::collections::HashMap;
     use std::sync::RwLock;
+
+    /// Regression guard: per-effect row semantics the [`DecisionExecutor`] aggregation assumes.
+    fn assert_per_effect_row_contract(r: &EffectResult) {
+        assert!(
+            !(r.success && r.not_executed),
+            "per-effect contract: success and not_executed are mutually exclusive: {:?}",
+            r
+        );
+        if r.not_executed {
+            assert!(
+                r.ledger_entry_id.is_none(),
+                "per-effect contract: not_executed must not set ledger_entry_id: {:?}",
+                r
+            );
+            assert!(
+                r.state_change_hash.is_none(),
+                "per-effect contract: not_executed must not set state_change_hash: {:?}",
+                r
+            );
+        }
+    }
 
     /// In-memory execution store for testing.
     struct MemoryExecutionStore {
@@ -777,7 +857,45 @@ mod tests {
         }
     }
 
-    /// Helper: create a DecisionExecutor with in-memory stores and no ledger.
+    /// Test-only `LedgerService` that accepts treasury writes without pulling in the ledger crate
+    /// (meaning-firewall ratchet counts qualified ledger paths in icn-core `src/`).
+    struct StubTreasuryLedgerService {
+        oracle: Arc<dyn PolicyOracle>,
+    }
+
+    impl LedgerService for StubTreasuryLedgerService {
+        fn oracle(&self) -> Arc<dyn PolicyOracle> {
+            self.oracle.clone()
+        }
+
+        fn balance(&self, _account: &Did, _currency: &str) -> i64 {
+            0
+        }
+
+        fn credit_limit(&self, _account: &Did, _currency: &str) -> i64 {
+            0
+        }
+
+        fn record_event(&self, _event: LedgerEvent) {}
+
+        fn submit_treasury_entry(
+            &self,
+            entry: TreasuryEntryRequest,
+        ) -> Result<TreasuryEntryResult, String> {
+            Ok(TreasuryEntryResult {
+                entry_hash: "0000000000000000000000000000000000000000000000000000000000000001"
+                    .to_string(),
+                decision_receipt_id: entry.decision_receipt_id,
+                decision_hash: entry.decision_hash,
+            })
+        }
+
+        fn get_treasury_nonce(&self, _treasury_id: &str) -> Result<u64, String> {
+            Ok(0)
+        }
+    }
+
+    /// Helper: create a DecisionExecutor with in-memory stores and no ledger-backed treasury.
     fn make_test_executor() -> (Arc<DecisionExecutor>, Arc<MemoryExecutionStore>) {
         use icn_kernel_api::protocol_params::*;
 
@@ -789,6 +907,25 @@ mod tests {
 
         let decision_executor = Arc::new(DecisionExecutor::new(dispatcher, exec_store.clone()));
 
+        (decision_executor, exec_store)
+    }
+
+    /// Same as [`make_test_executor`] but with a stub `LedgerService` so treasury spend can confirm.
+    fn make_test_executor_with_stub_ledger() -> (Arc<DecisionExecutor>, Arc<MemoryExecutionStore>) {
+        use icn_kernel_api::protocol_params::StubParamStore;
+
+        let oracle = Arc::new(AllowAllOracle::wildcard());
+        let ledger_service: Arc<dyn LedgerService> = Arc::new(StubTreasuryLedgerService {
+            oracle: oracle.clone(),
+        });
+        let param_store = Arc::new(StubParamStore);
+        let kernel_executor = Arc::new(
+            super::super::governance_executor::KernelGovernanceExecutor::new(param_store)
+                .with_ledger_service(ledger_service),
+        );
+        let dispatcher = Arc::new(EffectDispatcher::new(kernel_executor));
+        let exec_store = Arc::new(MemoryExecutionStore::new());
+        let decision_executor = Arc::new(DecisionExecutor::new(dispatcher, exec_store.clone()));
         (decision_executor, exec_store)
     }
 
@@ -828,30 +965,52 @@ mod tests {
             .unwrap();
 
         assert_eq!(results.len(), 1);
-        assert!(results[0].success);
+        assert!(
+            !results[0].success,
+            "NoOp must not report success when nothing was executed"
+        );
+        assert!(
+            results[0]
+                .message
+                .contains("no executable kernel effect (not executed)"),
+            "expected honest NoOp message, got {:?}",
+            results[0].message
+        );
+        assert!(results[0].not_executed);
+        assert_per_effect_row_contract(&results[0]);
 
-        // Verify record was persisted with Confirmed status
+        // Verify record was persisted as NotExecuted (terminal, not retryable failure)
         let record = store.get("hash-1").unwrap().unwrap();
-        assert_eq!(record.status, ExecutionStatus::Confirmed);
+        assert_eq!(record.status, ExecutionStatus::NotExecuted);
+        assert_ne!(
+            record.status,
+            ExecutionStatus::Confirmed,
+            "contract: NoOp-only batch must not aggregate to Confirmed"
+        );
+        assert!(record.is_terminal());
         assert_eq!(record.proposal_id, "proposal-1");
         assert!(record.finished_at.is_some());
+        assert_eq!(record.retries, 0);
     }
 
     #[tokio::test]
     async fn test_idempotency_skips_confirmed() {
         let (executor, store) = make_test_executor();
 
-        // First execution
-        let effects = vec![KernelEffect::NoOp {
-            reason: "first".to_string(),
-        }];
-        let results1 = executor
-            .execute(effects, "receipt-1", "hash-1", "proposal-1")
-            .await
-            .unwrap();
-        assert_eq!(results1.len(), 1);
+        // Terminal Confirmed records must not re-execute (idempotency).
+        // NoOp alone no longer reaches Confirmed, so seed Confirmed directly.
+        let mut record = ExecutionRecord::new_pending(
+            "hash-1",
+            "proposal-1",
+            "receipt-1",
+            vec![KernelEffect::NoOp {
+                reason: "seed".to_string(),
+            }],
+        );
+        record.mark_executing();
+        record.mark_confirmed(vec![], vec![]);
+        store.put(&record).unwrap();
 
-        // Second execution with same decision_hash — should be skipped
         let effects2 = vec![KernelEffect::NoOp {
             reason: "duplicate".to_string(),
         }];
@@ -861,10 +1020,9 @@ mod tests {
             .unwrap();
         assert!(
             results2.is_empty(),
-            "Duplicate execution should return empty"
+            "Duplicate execution should return empty when already Confirmed"
         );
 
-        // Status should still be Confirmed
         let record = store.get("hash-1").unwrap().unwrap();
         assert_eq!(record.status, ExecutionStatus::Confirmed);
     }
@@ -890,12 +1048,42 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_treasury_effect_with_decision_hash() {
+    async fn test_idempotency_skips_not_executed() {
         let (executor, store) = make_test_executor();
 
+        let mut record = ExecutionRecord::new_pending(
+            "hash-nx",
+            "p-nx",
+            "r-nx",
+            vec![KernelEffect::NoOp {
+                reason: "seed".to_string(),
+            }],
+        );
+        record.mark_executing();
+        record.mark_not_executed("seed terminal");
+        store.put(&record).unwrap();
+
+        let results = executor
+            .execute(
+                vec![KernelEffect::NoOp {
+                    reason: "replay".to_string(),
+                }],
+                "r-nx",
+                "hash-nx",
+                "p-nx",
+            )
+            .await
+            .unwrap();
+        assert!(results.is_empty(), "terminal NotExecuted must not re-run");
+    }
+
+    #[tokio::test]
+    async fn test_treasury_effect_with_decision_hash() {
+        let (executor, store) = make_test_executor_with_stub_ledger();
+
         let effects = vec![KernelEffect::Treasury(TreasuryEffect::Spend {
-            treasury_did: "did:icn:treasury".to_string(),
-            recipient_did: "did:icn:alice".to_string(),
+            treasury_did: "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9".to_string(),
+            recipient_did: "did:icn:zGyGKxMyg1p9SsHfm15MkNUu1u9TN2JtTspcdmrtGUdse".to_string(),
             amount: 500,
             currency: "HOURS".to_string(),
             memo: "Test".to_string(),
@@ -917,6 +1105,7 @@ mod tests {
 
         assert_eq!(results.len(), 1);
         assert!(results[0].success);
+        assert_per_effect_row_contract(&results[0]);
 
         let record = store.get("sha256:treasury-hash-1").unwrap().unwrap();
         assert_eq!(record.status, ExecutionStatus::Confirmed);
@@ -979,11 +1168,11 @@ mod tests {
             .await
             .unwrap();
 
-        // Both should be independently confirmed
+        // Both should be independently recorded as NotExecuted (NoOp is not execution)
         let a = store.get("hash-a").unwrap().unwrap();
         let b = store.get("hash-b").unwrap().unwrap();
-        assert_eq!(a.status, ExecutionStatus::Confirmed);
-        assert_eq!(b.status, ExecutionStatus::Confirmed);
+        assert_eq!(a.status, ExecutionStatus::NotExecuted);
+        assert_eq!(b.status, ExecutionStatus::NotExecuted);
         assert_ne!(a.proposal_id, b.proposal_id);
     }
 
@@ -1077,5 +1266,158 @@ mod tests {
             .as_deref()
             .unwrap_or_default()
             .contains("max retries exceeded"));
+    }
+
+    /// When at least one effect reports `success` and there are no hard failures
+    /// (`!success && !not_executed`), aggregation uses the `Confirmed` branch even if another
+    /// effect is `not_executed`. Per-effect results remain truthful; the persisted
+    /// [`ExecutionRecord`] does not encode per-effect outcomes.
+    #[tokio::test]
+    async fn test_aggregate_confirmed_when_mixed_success_and_not_executed() {
+        let (executor, store) = make_test_executor_with_stub_ledger();
+
+        let decision_hash = "sha256:mixed-aggregate-1";
+        let effects = vec![
+            KernelEffect::NoOp {
+                reason: "not executable".to_string(),
+            },
+            KernelEffect::Treasury(TreasuryEffect::Spend {
+                treasury_did: "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9".to_string(),
+                recipient_did: "did:icn:zGyGKxMyg1p9SsHfm15MkNUu1u9TN2JtTspcdmrtGUdse".to_string(),
+                amount: 10,
+                currency: "HOURS".to_string(),
+                memo: "mixed batch".to_string(),
+                budget_id: None,
+                expected_nonce: 0,
+                decision_receipt_id: "receipt-mixed-1".to_string(),
+                decision_hash: decision_hash.to_string(),
+            }),
+        ];
+
+        let results = executor
+            .execute(
+                effects,
+                "receipt-mixed-1",
+                decision_hash,
+                "proposal-mixed-1",
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 2);
+        assert!(results[0].not_executed && !results[0].success);
+        assert!(results[1].success && !results[1].not_executed);
+        for r in &results {
+            assert_per_effect_row_contract(r);
+        }
+
+        let record = store.get(decision_hash).unwrap().unwrap();
+        assert_eq!(record.status, ExecutionStatus::Confirmed);
+    }
+
+    #[tokio::test]
+    async fn test_deferred_treasury_outcome_persists_not_executed() {
+        // Ledger is wired (production-shaped); `TreasuryEffect::Allocate` maps to a
+        // `TreasuryOperation` without `decision_hash`, so `KernelTreasuryExecutor` returns
+        // `ExecutionOutcome::Deferred` — not the "no ledger" branch.
+        let (executor, exec_store) = make_test_executor_with_stub_ledger();
+
+        let decision_hash = "sha256:deferred-proof-1";
+        let effects = vec![KernelEffect::Treasury(TreasuryEffect::Allocate {
+            treasury_did: "did:icn:treasury".to_string(),
+            budget_id: "budget-defer-proof".to_string(),
+            amount: 100,
+            currency: "HOURS".to_string(),
+        })];
+
+        let results = executor
+            .execute(
+                effects,
+                "receipt-defer-1",
+                decision_hash,
+                "proposal-defer-1",
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 1);
+        assert!(!results[0].success);
+        assert!(results[0].not_executed);
+        assert!(
+            results[0].message.contains("Deferred:"),
+            "expected Deferred prefix in message, got {:?}",
+            results[0].message
+        );
+        assert!(
+            results[0].message.contains("decision_hash"),
+            "expected production defer path (missing provenance), got {:?}",
+            results[0].message
+        );
+        assert_per_effect_row_contract(&results[0]);
+
+        let record = exec_store.get(decision_hash).unwrap().unwrap();
+        assert_eq!(record.status, ExecutionStatus::NotExecuted);
+        assert_eq!(record.retries, 0);
+        assert!(
+            record.error.as_deref().unwrap_or("").contains("Deferred:"),
+            "persisted note should mention Deferred, got {:?}",
+            record.error
+        );
+    }
+
+    #[tokio::test]
+    async fn contract_noop_only_batch_never_aggregates_to_confirmed() {
+        let (executor, store) = make_test_executor();
+
+        let results = executor
+            .execute(
+                vec![KernelEffect::NoOp {
+                    reason: "contract".into(),
+                }],
+                "receipt-contract-noop",
+                "hash-contract-noop-only",
+                "proposal-contract-noop",
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 1);
+        assert_per_effect_row_contract(&results[0]);
+
+        let record = store.get("hash-contract-noop-only").unwrap().unwrap();
+        assert_eq!(record.status, ExecutionStatus::NotExecuted);
+        assert_ne!(
+            record.status,
+            ExecutionStatus::Confirmed,
+            "contract: NoOp-only batch must not aggregate to Confirmed"
+        );
+        assert!(record.is_terminal());
+        assert_eq!(record.retries, 0);
+    }
+
+    #[tokio::test]
+    async fn contract_hard_failure_row_aggregates_to_failed_and_increments_retries() {
+        let (executor, store) = make_test_executor();
+
+        let decision_hash = "sha256:contract-resource-hard-fail";
+        let effects = vec![KernelEffect::Resource(ResourceEffect::GrantAccess {
+            grantee_did: "did:icn:g".into(),
+            resource_type: "rt".into(),
+            access_model_hash: "mh".into(),
+        })];
+
+        let results = executor
+            .execute(effects, "receipt-rf", decision_hash, "proposal-rf")
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 1);
+        assert!(results[0].is_hard_failure());
+        assert_per_effect_row_contract(&results[0]);
+
+        let record = store.get(decision_hash).unwrap().unwrap();
+        assert_eq!(record.status, ExecutionStatus::Failed);
+        assert_eq!(record.retries, 1);
+        assert!(!record.is_terminal());
     }
 }

@@ -24,6 +24,7 @@ pub fn translate_payload_to_effects(
     payload: &ProposalPayload,
     decision_receipt_id: &str,
     decision_hash: &str,
+    domain_id: &str,
 ) -> Vec<KernelEffect> {
     match payload {
         // Treasury proposals
@@ -37,7 +38,7 @@ pub fn translate_payload_to_effects(
             purpose,
             ..
         } => vec![KernelEffect::Treasury(TreasuryEffect::CreateBudget {
-            treasury_did: String::new(), // Filled by context
+            treasury_did: domain_id.to_string(),
             budget_id: format!("budget-{purpose}"),
             total_amount: *amount,
             currency: currency.clone(),
@@ -55,30 +56,36 @@ pub fn translate_payload_to_effects(
                 .map(|(share_id, amount)| (share_id.0.clone(), *amount))
                 .collect();
             vec![KernelEffect::Treasury(TreasuryEffect::DistributeSurplus {
-                treasury_did: String::new(),
+                treasury_did: domain_id.to_string(),
                 total_amount: allocation.total_surplus,
                 currency: allocation.currency.clone(),
                 distributions,
+                decision_receipt_id: decision_receipt_id.to_string(),
+                decision_hash: decision_hash.to_string(),
             })]
         }
 
         // Membership proposals
         ProposalPayload::Membership { action, member } => {
-            translate_membership_action(action, member)
+            translate_membership_action(action, member, domain_id)
         }
 
-        ProposalPayload::FreezeMember { member, reason, .. } => {
+        ProposalPayload::FreezeMember {
+            member,
+            reason,
+            duration_seconds,
+        } => {
             vec![KernelEffect::Membership(MembershipEffect::FreezeMember {
-                entity_id: String::new(), // Filled by caller with context
+                entity_id: domain_id.to_string(),
                 member_did: member.to_string(),
                 reason: reason.clone(),
-                duration_secs: None,
+                duration_secs: *duration_seconds,
             })]
         }
 
         ProposalPayload::UnfreezeMember { member, reason: _ } => {
             vec![KernelEffect::Membership(MembershipEffect::UnfreezeMember {
-                entity_id: String::new(),
+                entity_id: domain_id.to_string(),
                 member_did: member.to_string(),
             })]
         }
@@ -87,7 +94,7 @@ pub fn translate_payload_to_effects(
         ProposalPayload::ConfigChange { new_config } => {
             vec![KernelEffect::Protocol(
                 ProtocolEffect::SetGovernanceConfig {
-                    domain_id: String::new(),
+                    domain_id: domain_id.to_string(),
                     config_hash: blake3::hash(new_config.as_bytes()).to_hex().to_string(),
                     config_json: new_config.clone(),
                 },
@@ -249,7 +256,7 @@ pub fn translate_payload_to_effects(
         } => {
             let budget_id = format!("alloc-{purpose}-{decision_receipt_id}");
             let mut effects = vec![KernelEffect::Treasury(TreasuryEffect::CreateBudget {
-                treasury_did: String::new(),
+                treasury_did: domain_id.to_string(),
                 budget_id: budget_id.clone(),
                 total_amount: *pool_amount,
                 currency: unit.clone(),
@@ -261,7 +268,7 @@ pub fn translate_payload_to_effects(
             })];
             for opt in options {
                 effects.push(KernelEffect::Treasury(TreasuryEffect::Allocate {
-                    treasury_did: String::new(),
+                    treasury_did: domain_id.to_string(),
                     budget_id: budget_id.clone(),
                     amount: opt.requested_amount,
                     currency: unit.clone(),
@@ -360,13 +367,14 @@ fn translate_treasury_operation(
 fn translate_membership_action(
     action: &icn_governance::MembershipAction,
     member: &icn_identity::Did,
+    domain_id: &str,
 ) -> Vec<KernelEffect> {
     use icn_governance::MembershipAction;
 
     match action {
         MembershipAction::Add => {
             vec![KernelEffect::Membership(MembershipEffect::AddMember {
-                entity_id: String::new(),
+                entity_id: domain_id.to_string(),
                 member_did: member.to_string(),
                 role: String::new(),
                 tier: String::new(),
@@ -374,7 +382,7 @@ fn translate_membership_action(
         }
         MembershipAction::Remove => {
             vec![KernelEffect::Membership(MembershipEffect::RemoveMember {
-                entity_id: String::new(),
+                entity_id: domain_id.to_string(),
                 member_did: member.to_string(),
                 reason: String::new(),
             })]
@@ -463,7 +471,12 @@ mod tests {
             },
         };
 
-        let effects = translate_payload_to_effects(&payload, "receipt-123", "decision-hash-123");
+        let effects = translate_payload_to_effects(
+            &payload,
+            "receipt-123",
+            "decision-hash-123",
+            "domain-translation-test",
+        );
         assert_eq!(effects.len(), 1);
 
         match &effects[0] {
@@ -495,7 +508,12 @@ mod tests {
             payout_schedule: vec![],
             reason: "voluntary departure".to_string(),
         };
-        let effects = translate_payload_to_effects(&payload, "receipt-abc", "decision-hash-abc");
+        let effects = translate_payload_to_effects(
+            &payload,
+            "receipt-abc",
+            "decision-hash-abc",
+            "domain-translation-test",
+        );
         assert_eq!(effects.len(), 1);
         assert!(matches!(effects[0], KernelEffect::NoOp { .. }));
     }
@@ -549,7 +567,12 @@ mod tests {
         ];
 
         for payload in pilot_cases {
-            let effects = translate_payload_to_effects(&payload, "receipt-pilot", "hash-pilot");
+            let effects = translate_payload_to_effects(
+                &payload,
+                "receipt-pilot",
+                "hash-pilot",
+                "domain-pilot",
+            );
             assert!(
                 !effects
                     .iter()
@@ -590,8 +613,12 @@ mod tests {
             purpose: "q1-budget".to_string(),
         };
 
-        let effects =
-            translate_payload_to_effects(&payload, "receipt-alloc-1", "decision-hash-alloc-1");
+        let effects = translate_payload_to_effects(
+            &payload,
+            "receipt-alloc-1",
+            "decision-hash-alloc-1",
+            "domain-alloc",
+        );
 
         // 1 CreateBudget + 2 Allocate = 3 effects total
         assert_eq!(effects.len(), 3, "expected 3 effects, got {effects:?}");
@@ -654,5 +681,53 @@ mod tests {
                 .any(|e| matches!(e, KernelEffect::NoOp { .. })),
             "Allocation must not produce NoOp effects"
         );
+    }
+
+    #[test]
+    fn test_translate_surplus_allocation_carries_decision_provenance() {
+        let allocation = icn_ledger::SurplusAllocation {
+            id: "alloc-q1".to_string(),
+            cooperative_id: "coop-x".to_string(),
+            total_surplus: 500,
+            period: "2025-Q1".to_string(),
+            share_unit_value: 2.5,
+            total_labor_days: 100,
+            allocations: vec![
+                (icn_ledger::ShareId::new("share-a"), 300),
+                (icn_ledger::ShareId::new("share-b"), 200),
+            ],
+            proposal_id: "prop-1".to_string(),
+            allocated_at: 0,
+            currency: "HOURS".to_string(),
+        };
+        let payload = icn_governance::ProposalPayload::SurplusAllocation { allocation };
+        let effects = translate_payload_to_effects(
+            &payload,
+            "receipt-surplus-1",
+            "hash-surplus-1",
+            "domain-coop-x",
+        );
+        assert_eq!(effects.len(), 1);
+        match &effects[0] {
+            KernelEffect::Treasury(TreasuryEffect::DistributeSurplus {
+                treasury_did,
+                total_amount,
+                currency,
+                distributions,
+                decision_receipt_id,
+                decision_hash,
+            }) => {
+                assert_eq!(treasury_did, "domain-coop-x");
+                assert_eq!(*total_amount, 500);
+                assert_eq!(currency, "HOURS");
+                assert_eq!(
+                    distributions,
+                    &vec![("share-a".to_string(), 300), ("share-b".to_string(), 200)]
+                );
+                assert_eq!(decision_receipt_id, "receipt-surplus-1");
+                assert_eq!(decision_hash, "hash-surplus-1");
+            }
+            other => panic!("expected DistributeSurplus effect, got {other:?}"),
+        }
     }
 }

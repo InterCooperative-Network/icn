@@ -3261,6 +3261,7 @@ dependencies = [
  "icn-http-kit",
  "icn-identity",
  "icn-kernel-api",
+ "icn-ledger",
  "icn-obs",
  "icn-store",
  "icn-time",
