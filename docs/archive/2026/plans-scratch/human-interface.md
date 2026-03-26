@@ -1,3 +1,5 @@
+<!-- Relocated from docs/plans/.scratch/ (tranche 3). -->
+
 # Human Interface — Repo State & Gap Analysis
 
 ## 1. Current State

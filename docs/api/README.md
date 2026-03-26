@@ -1,4 +1,4 @@
-# ICN Gateway API Reference
+# ICN Gateway API (OpenAPI directory)
 
 The ICN Gateway provides a REST and WebSocket API for cooperative applications.
 

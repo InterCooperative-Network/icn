@@ -1,3 +1,9 @@
+---
+Status: descriptive
+Canonical: yes
+Last Reviewed: 2026-03-26
+---
+
 # ICN State (living doc)
 
 ## Architecture notes

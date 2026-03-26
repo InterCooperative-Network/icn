@@ -1,4 +1,4 @@
-# ICN Gateway API Reference
+# ICN Gateway API (developer reference)
 
 Quick reference guide for the ICN Gateway REST API.
 

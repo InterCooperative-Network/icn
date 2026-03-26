@@ -1,3 +1,28 @@
+---
+Status: operational
+Canonical: yes
+Last Reviewed: 2026-03-26
+---
+
+## Where things live (control plane)
+
+| What | Where |
+|------|--------|
+| **Canonical entry docs** | [STATE.md](STATE.md) (living snapshot), [ARCHITECTURE.md](ARCHITECTURE.md) (system truth), [DOCUMENTATION_CONTROL_SYSTEM.md](DOCUMENTATION_CONTROL_SYSTEM.md) (doc/process policy), and this [INDEX.md](INDEX.md) (navigation). |
+| **Machine registry** | [`registry.toml`](registry.toml) — `[control]`, `[[doc_path_defaults]]`, `[docs."path"]` rows. |
+| **Human registry summary** | [DOCUMENT_REGISTRY.md](DOCUMENT_REGISTRY.md) — regenerate via `doc_control_check.py --write-document-registry`. |
+| **Validator** | [`scripts/doc_control_check.py`](scripts/doc_control_check.py) |
+| **Historical material** | [`archive/`](archive/) (by year); session-style content often still under `development/` until archived. |
+| **Supplemental `state/` tree** | [state/README.md](state/README.md) — not a substitute for root [STATE.md](STATE.md). |
+
+**Control-plane canonical (single definition):** Only the paths listed in `[control].canonical_doc_paths` in [`registry.toml`](registry.toml) are “canonical” for CI header checks. Other docs may use `canonical = "yes"` in a registry row for emphasis, but that does not add them to the control-plane set unless `canonical_doc_paths` is updated.
+
+**INDEX vs generated index:** This [`INDEX.md`](INDEX.md) is the **authoritative** hand-maintained navigation. [`INDEX.generated.md`](INDEX.generated.md) is **derived** (registry/corpus snapshot for drift detection in CI); if the generator disagrees with this file, reconcile here intentionally.
+
+**Canon vs history:** Prefer YAML on important docs: `Status:` (`normative` / `descriptive` / `operational` / `historical` / `draft`) and `Canonical: yes|no`. Do not treat undated snapshots or `archive/` neighbors as current truth without checking [STATE.md](STATE.md) and dates.
+
+**One-line check:** `python3 docs/scripts/doc_control_check.py --repo . --registry docs/registry.toml` (optional `--strict` before merge).
+
 # ICN Documentation Index
 
 Welcome to the ICN (Intercooperative Network) documentation! This index provides clear navigation to all documentation.
@@ -270,8 +295,8 @@ Contributor onboarding materials:
 - [README.md](operations/README.md) - Operations documentation
 - Monitoring, runbooks, and operational procedures
 
-**Ops Runbooks (`ops/runbooks/`):**
-- [README.md](ops/runbooks/README.md) - Runbook index
+**Ops runbooks (canonical: `guides/operations/runbooks/`):**
+- [Runbook index](guides/operations/runbooks/README.md) — compatibility stub: [ops/runbooks/README.md](ops/runbooks/README.md)
 - Incident response procedures
 
 ### Mobile & Observability

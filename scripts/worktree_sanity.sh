@@ -30,7 +30,7 @@ echo "remote: ${REMOTE}"
 echo "wt_dir: ${WT_DIR}"
 
 if [ -f "${ROOT}/scripts/pilot_chain_demo.sh" ] && [ -f "${ROOT}/scripts/pilot_smoke.sh" ]; then
-    echo "WARN: multiple pilot smoke scripts found; preferred entrypoint: scripts/pilot_chain_demo.sh (see docs/ops/runbooks/07-pilot-vertical-slice-smoke.md)"
+    echo "WARN: multiple pilot smoke scripts found; preferred entrypoint: scripts/pilot_chain_demo.sh (see docs/guides/operations/runbooks/07-pilot-vertical-slice-smoke.md)"
 fi
 
 if ! git -C "${ROOT}" remote get-url "${REMOTE}" >/dev/null 2>&1; then

@@ -1,3 +1,5 @@
+<!-- Relocated from docs/plans/.scratch/ (tranche 3). -->
+
 # Security / Ops / Resilience — Repo State & Gap Analysis
 
 > Compiled 2026-02-14 by Security/Ops/Resilience Analyst

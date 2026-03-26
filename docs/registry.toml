@@ -2,6 +2,524 @@
 # Machine-readable source of truth for all documentation
 # Categories: architecture, design, strategy, guide, reference, operations, security, archive
 # Statuses: canonical, living, draft, archived, superseded, missing
+#
+# Control plane: [control] + [[doc_path_defaults]] supply defaults; [docs."path"] overlays.
+# Human summary: DOCUMENT_REGISTRY.md (regenerate via doc_control_check.py).
+# Enforcement ladder (CI vs --strict vs warn-only): docs/DOCUMENTATION_MAINTENANCE.md § Documentation control plane.
+
+[control]
+schema_version = 1
+allowlisted_docs_subdirs = [
+  "adr", "ai", "api", "architecture", "archive", "ci", "crate-manifests", "demo", "deployment",
+  "design", "dev", "development", "examples", "features", "guides", "internal", "maintenance",
+  "manual", "migration-guides", "mobile", "observability", "onboarding", "operations", "ops",
+  "performance", "phases", "pilots", "planning", "plans", "reference", "scripts", "sdis",
+  "security", "spec", "sprints", "state", "status", "strategy", "summit", "superpowers",
+  "templates", "testing", "vision",
+]
+canonical_doc_paths = [
+  "docs/INDEX.md",
+  "docs/STATE.md",
+  "docs/ARCHITECTURE.md",
+  "docs/DOCUMENTATION_CONTROL_SYSTEM.md",
+]
+required_header_keys = ["Status", "Canonical", "Last Reviewed"]
+
+# Enforcement: warnings by default; use `doc_control_check.py --strict` to fail CI-style.
+[control.enforcement]
+stale_canonical_warning_days = 90
+warn_duplicate_h1_across_dirs = true
+fail_duplicate_h1_across_dirs = false
+warn_stale_canonical = true
+fail_stale_canonical = false
+warn_superseded_outside_archive = true
+fail_superseded_outside_archive = false
+warn_missing_explicit_registry = true
+fail_missing_explicit_registry = false
+# Registry rows pointing at missing files; broken superseded_by targets; YAML vs merged drift (non–control-plane docs).
+warn_orphan_registry_entry = true
+fail_orphan_registry_entry = false
+warn_broken_superseded_by = true
+fail_broken_superseded_by = false
+warn_yaml_registry_mismatch = true
+fail_yaml_registry_mismatch = false
+explicit_registry_warn_prefixes = [
+  "docs/plans/",
+  "docs/planning/",
+  "docs/onboarding/",
+]
+
+# Longest matching prefix wins (see docs/scripts/doc_control_check.py).
+
+[[doc_path_defaults]]
+prefix = "docs/internal/documentation-control-system/"
+truth_class = "normative"
+role = "internal"
+canonical = "no"
+freshness = "current"
+domain_tags = ["documentation-control"]
+recommended_action = "keep"
+last_reviewed = "2026-03-26"
+
+[[doc_path_defaults]]
+prefix = "docs/archive/"
+truth_class = "historical"
+role = "archive"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["archive"]
+recommended_action = "keep"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/superpowers/specs/"
+truth_class = "draft"
+role = "planning"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["superpowers", "spec"]
+recommended_action = "keep"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/superpowers/plans/"
+truth_class = "draft"
+role = "planning"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["superpowers", "plan"]
+recommended_action = "keep"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/spec/"
+truth_class = "normative"
+role = "spec"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["spec"]
+recommended_action = "keep"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/plans/"
+truth_class = "draft"
+role = "planning"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["planning"]
+recommended_action = "review"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/planning/"
+truth_class = "draft"
+role = "planning"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["planning"]
+recommended_action = "review"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/strategy/"
+truth_class = "descriptive"
+role = "strategy"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["strategy"]
+recommended_action = "keep"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/architecture/"
+truth_class = "descriptive"
+role = "architecture"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["architecture"]
+recommended_action = "keep"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/design/"
+truth_class = "descriptive"
+role = "design"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["design"]
+recommended_action = "keep"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/guides/"
+truth_class = "operational"
+role = "guide"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["guides"]
+recommended_action = "keep"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/reference/"
+truth_class = "descriptive"
+role = "reference"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["reference"]
+recommended_action = "keep"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/security/"
+truth_class = "descriptive"
+role = "reference"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["security"]
+recommended_action = "keep"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/sdis/"
+truth_class = "descriptive"
+role = "design"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["sdis"]
+recommended_action = "keep"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/status/"
+truth_class = "descriptive"
+role = "status"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["status"]
+recommended_action = "keep"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/state/"
+truth_class = "descriptive"
+role = "status"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["state"]
+recommended_action = "keep"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/development/"
+truth_class = "descriptive"
+role = "development_session"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["development"]
+recommended_action = "review"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/onboarding/"
+truth_class = "operational"
+role = "guide"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["onboarding"]
+recommended_action = "keep"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/sprints/"
+truth_class = "historical"
+role = "planning"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["sprints"]
+recommended_action = "archive"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/superpowers/"
+truth_class = "draft"
+role = "internal"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["superpowers"]
+recommended_action = "keep"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/ci/"
+truth_class = "operational"
+role = "reference"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["ci"]
+recommended_action = "keep"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/demo/"
+truth_class = "operational"
+role = "guide"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["demo"]
+recommended_action = "keep"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/deployment/"
+truth_class = "operational"
+role = "guide"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["deployment"]
+recommended_action = "keep"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/operations/"
+truth_class = "operational"
+role = "guide"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["operations"]
+recommended_action = "keep"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/ops/"
+truth_class = "operational"
+role = "guide"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["ops"]
+recommended_action = "keep"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/testing/"
+truth_class = "operational"
+role = "guide"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["testing"]
+recommended_action = "keep"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/templates/"
+truth_class = "normative"
+role = "template"
+canonical = "no"
+freshness = "current"
+domain_tags = ["templates"]
+recommended_action = "keep"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/vision/"
+truth_class = "descriptive"
+role = "strategy"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["vision"]
+recommended_action = "keep"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/mobile/"
+truth_class = "descriptive"
+role = "design"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["mobile"]
+recommended_action = "keep"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/migration-guides/"
+truth_class = "operational"
+role = "guide"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["migration"]
+recommended_action = "keep"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/adr/"
+truth_class = "normative"
+role = "architecture"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["adr"]
+recommended_action = "keep"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/api/"
+truth_class = "descriptive"
+role = "reference"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["api"]
+recommended_action = "keep"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/ai/"
+truth_class = "descriptive"
+role = "internal"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["ai"]
+recommended_action = "keep"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/crate-manifests/"
+truth_class = "descriptive"
+role = "reference"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["crates"]
+recommended_action = "keep"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/dev/"
+truth_class = "descriptive"
+role = "reference"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["dev"]
+recommended_action = "keep"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/examples/"
+truth_class = "operational"
+role = "guide"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["examples"]
+recommended_action = "keep"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/features/"
+truth_class = "descriptive"
+role = "design"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["features"]
+recommended_action = "keep"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/internal/"
+truth_class = "descriptive"
+role = "internal"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["internal"]
+recommended_action = "keep"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/maintenance/"
+truth_class = "operational"
+role = "reference"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["maintenance"]
+recommended_action = "keep"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/manual/"
+truth_class = "operational"
+role = "guide"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["manual"]
+recommended_action = "keep"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/observability/"
+truth_class = "operational"
+role = "reference"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["observability"]
+recommended_action = "keep"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/performance/"
+truth_class = "descriptive"
+role = "reference"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["performance"]
+recommended_action = "keep"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/phases/"
+truth_class = "historical"
+role = "planning"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["phases"]
+recommended_action = "archive"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/pilots/"
+truth_class = "operational"
+role = "guide"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["pilots"]
+recommended_action = "keep"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/summit/"
+truth_class = "descriptive"
+role = "strategy"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["summit"]
+recommended_action = "keep"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/scripts/"
+truth_class = "operational"
+role = "reference"
+canonical = "no"
+freshness = "current"
+domain_tags = ["tooling"]
+recommended_action = "keep"
+last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/"
+truth_class = "descriptive"
+role = "reference"
+canonical = "no"
+freshness = "unknown"
+domain_tags = ["docs-root"]
+recommended_action = "review"
+last_reviewed = "unknown"
 
 # ============================================================================
 # ROOT LEVEL DOCUMENTS
@@ -83,6 +601,13 @@ last_updated = "2026-03-21"
 owner = "matt"
 audiences = ["developers", "architects", "grant-reviewers"]
 sections = 20
+truth_class = "normative"
+role = "architecture"
+canonical = "yes"
+freshness = "current"
+domain_tags = ["architecture", "kernel"]
+recommended_action = "keep"
+last_reviewed = "2026-03-26"
 
 [docs."docs/INDEX.md"]
 category = "reference"
@@ -92,6 +617,93 @@ description = "Master navigation and directory of all documentation with cross-r
 last_updated = "2026-03-15"
 owner = "matt"
 audiences = ["all"]
+truth_class = "operational"
+role = "reference"
+canonical = "yes"
+freshness = "current"
+domain_tags = ["navigation", "index"]
+recommended_action = "keep"
+last_reviewed = "2026-03-26"
+
+[docs."docs/STATE.md"]
+category = "status"
+status = "living"
+title = "ICN State (living doc)"
+description = "Living snapshot of repo layout, decisions, constraints, and current engineering status"
+last_updated = "2026-03-18"
+owner = "matt"
+audiences = ["developers", "agents"]
+truth_class = "descriptive"
+role = "status"
+canonical = "yes"
+freshness = "current"
+domain_tags = ["status", "project"]
+recommended_action = "keep"
+last_reviewed = "2026-03-26"
+
+[docs."docs/DOCUMENTATION_CONTROL_SYSTEM.md"]
+category = "reference"
+status = "canonical"
+title = "ICN Documentation Control System"
+description = "Normative development control plane: discovery vs delivery, artifact routing, and documentation governance"
+last_updated = "2026-03-26"
+owner = "matt"
+audiences = ["contributors", "agents"]
+truth_class = "normative"
+role = "internal"
+canonical = "yes"
+freshness = "current"
+domain_tags = ["documentation-control", "process"]
+recommended_action = "keep"
+last_reviewed = "2026-03-26"
+
+[docs."docs/DOCUMENT_REGISTRY.md"]
+category = "reference"
+status = "living"
+title = "ICN Document Registry (human summary)"
+description = "Auto-generated summary companion to registry.toml; run doc_control_check.py to refresh"
+last_updated = "2026-03-26"
+owner = "matt"
+audiences = ["contributors", "agents"]
+truth_class = "descriptive"
+role = "reference"
+canonical = "no"
+freshness = "current"
+domain_tags = ["registry", "documentation-control"]
+recommended_action = "keep"
+last_reviewed = "2026-03-26"
+
+[docs."docs/planning/documentation-namespace-resolution.md"]
+category = "strategy"
+status = "draft"
+title = "Documentation namespace resolution plan"
+description = "Plans vs planning, ops vs operations; no moves executed here"
+last_updated = "2026-03-26"
+owner = "matt"
+audiences = ["contributors"]
+truth_class = "draft"
+role = "planning"
+canonical = "no"
+freshness = "current"
+domain_tags = ["documentation-control", "planning"]
+recommended_action = "keep"
+last_reviewed = "2026-03-26"
+
+[docs."docs/internal/documentation-control-system/00_CONTEXT_PACK_README.md"]
+category = "reference"
+status = "living"
+title = "Imported documentation control context pack (readme)"
+description = "Index and provenance for bundled control-system specs and templates source pack"
+last_updated = "2026-03-26"
+owner = "matt"
+audiences = ["contributors", "agents"]
+truth_class = "normative"
+role = "internal"
+canonical = "no"
+freshness = "current"
+domain_tags = ["documentation-control", "import"]
+recommended_action = "keep"
+last_reviewed = "2026-03-26"
 
 [docs."docs/README.md"]
 category = "reference"
@@ -1168,19 +1780,42 @@ owner = "matt"
 audiences = ["all"]
 
 # ============================================================================
-# OPERATIONS — Runbooks
+# OPERATIONS — Runbooks (canonical path: guides/operations/runbooks)
 # ============================================================================
 
-[docs."docs/ops/runbooks/README.md"]
+[docs."docs/guides/operations/runbooks/README.md"]
 category = "reference"
-status = "canonical"
+status = "living"
 title = "ICN Operations Runbooks"
-description = "Navigation guide for production runbooks"
-last_updated = "2026-03-10"
+description = "Navigation guide for production runbooks (domain hub; not control-plane canonical)"
+last_updated = "2026-03-26"
 owner = "matt"
 audiences = ["operators"]
+truth_class = "operational"
+role = "guide"
+canonical = "no"
+freshness = "current"
+domain_tags = ["operations", "runbooks"]
+recommended_action = "keep"
+last_reviewed = "2026-03-26"
 
-[docs."docs/ops/runbooks/01-emergency-restart.md"]
+[docs."docs/ops/runbooks/README.md"]
+category = "guide"
+status = "living"
+title = "Ops runbooks relocated (stub)"
+description = "Runbooks moved to docs/guides/operations/runbooks/ (tranche 3); use that path for updates"
+last_updated = "2026-03-26"
+owner = "matt"
+audiences = ["operators"]
+truth_class = "operational"
+role = "guide"
+canonical = "no"
+freshness = "current"
+domain_tags = ["operations", "redirect"]
+recommended_action = "keep"
+last_reviewed = "2026-03-26"
+
+[docs."docs/guides/operations/runbooks/01-emergency-restart.md"]
 category = "operations"
 status = "living"
 title = "Emergency Node Restart"
@@ -1189,7 +1824,7 @@ last_updated = "2026-03-10"
 owner = "matt"
 audiences = ["operators"]
 
-[docs."docs/ops/runbooks/02-data-recovery.md"]
+[docs."docs/guides/operations/runbooks/02-data-recovery.md"]
 category = "operations"
 status = "living"
 title = "Data Recovery Procedure"
@@ -1198,7 +1833,7 @@ last_updated = "2026-03-10"
 owner = "matt"
 audiences = ["operators"]
 
-[docs."docs/ops/runbooks/03-version-upgrade.md"]
+[docs."docs/guides/operations/runbooks/03-version-upgrade.md"]
 category = "operations"
 status = "living"
 title = "Version Upgrade Procedure"
@@ -1207,7 +1842,7 @@ last_updated = "2026-03-10"
 owner = "matt"
 audiences = ["operators"]
 
-[docs."docs/ops/runbooks/04-security-incident.md"]
+[docs."docs/guides/operations/runbooks/04-security-incident.md"]
 category = "operations"
 status = "living"
 title = "Security Incident Response"
@@ -1216,7 +1851,7 @@ last_updated = "2026-03-10"
 owner = "matt"
 audiences = ["operators", "security"]
 
-[docs."docs/ops/runbooks/05-troubleshooting.md"]
+[docs."docs/guides/operations/runbooks/05-troubleshooting.md"]
 category = "operations"
 status = "living"
 title = "Troubleshooting Guide"
@@ -1225,7 +1860,7 @@ last_updated = "2026-03-10"
 owner = "matt"
 audiences = ["operators"]
 
-[docs."docs/ops/runbooks/06-secrets-rotation.md"]
+[docs."docs/guides/operations/runbooks/06-secrets-rotation.md"]
 category = "operations"
 status = "living"
 title = "Secrets Rotation Procedure"
@@ -1234,7 +1869,7 @@ last_updated = "2026-03-10"
 owner = "matt"
 audiences = ["operators", "security"]
 
-[docs."docs/ops/runbooks/07-pilot-vertical-slice-smoke.md"]
+[docs."docs/guides/operations/runbooks/07-pilot-vertical-slice-smoke.md"]
 category = "operations"
 status = "living"
 title = "Pilot Vertical Slice Smoke"

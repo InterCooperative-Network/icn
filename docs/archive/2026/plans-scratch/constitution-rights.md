@@ -1,3 +1,5 @@
+<!-- Relocated from docs/plans/.scratch/ (tranche 3). -->
+
 # Constitution / Rights — Repo State & Gap Analysis
 
 ## 1. Current State

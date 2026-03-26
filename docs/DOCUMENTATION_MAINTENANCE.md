@@ -2,8 +2,38 @@
 
 This guide provides guidelines for maintaining ICN documentation structure and quality.
 
-**Last Updated**: 2026-02-10  
+**Last Updated**: 2026-03-26  
 **Version**: 1.0
+
+---
+
+## Documentation control plane (start here)
+
+This section is the **operational entry** for the doc system. Use it before adding or moving files.
+
+| Artifact | Role |
+|----------|------|
+| [`docs/DOCUMENTATION_CONTROL_SYSTEM.md`](DOCUMENTATION_CONTROL_SYSTEM.md) | Policy: discovery vs delivery, classification, where artifacts belong. |
+| [`docs/registry.toml`](registry.toml) | Machine source of truth: allowlists, prefix defaults, per-file overrides, enforcement toggles. |
+| [`docs/scripts/doc_control_check.py`](scripts/doc_control_check.py) | Validator (local + CI). |
+| [`docs/DOCUMENT_REGISTRY.md`](DOCUMENT_REGISTRY.md) | Human-oriented summary; regenerate with `--write-document-registry`. |
+
+**CI:** `.github/workflows/docs-freshness.yml` runs `doc_control_check.py` **without** `--strict` (Documentation Control Plane job). That is intentional until warning volume is low enough that promoting strict would not block routine doc edits.
+
+**Enforcement tiers**
+
+| Mode | Behavior |
+|------|----------|
+| Default (CI) | Hard errors: allowlist, merged `truth_class` / `role`, control-plane canonical doc headers and YAML/registry alignment for those paths only. Warnings (tagged, grouped in stderr): orphan `[docs."…"]` rows, broken `superseded_by` targets, duplicate H1 across directories, stale canonical `Last Reviewed`, superseded docs outside `docs/archive/`, YAML vs registry drift on non-canon docs (when YAML uses truth-class labels), missing explicit registry rows under `docs/plans/`, `docs/planning/`, `docs/onboarding/`. |
+| `--strict` | Same checks; **fails** on warnings that are marked strict-eligible (orphan registry rows, broken `superseded_by`, duplicate H1, stale canonical, superseded location). Stays **warn-only** for: missing explicit rows under high-churn prefixes, and YAML/registry drift on non–control-plane docs. Run locally before merge when you touch registry structure or canonical paths. |
+
+**When to make CI `--strict`:** After orphan and superseded-by warnings are routinely zero, and duplicate-H1 / stale-canonical noise is acceptable as merge blockers. Until then, treat strict mode as a pre-merge gate for maintainers, not as default CI.
+
+**Signal quality:** Validator stderr prints a **tag summary**, then **per-prefix counts** for `[explicit-registry]` (missing explicit rows under `explicit_registry_warn_prefixes`). Those rows are **intentional debt**: CI allows them; backfill explicit `[docs."…"]` when a doc’s classification should be reviewable in the registry.
+
+**Non–control-plane YAML drift:** If a file’s YAML `Status` is **not** a truth-class label (e.g. session labels like `complete`), the validator does not compare it to `truth_class` (avoids noise). `Canonical` and dated `Last Reviewed` are still compared when present.
+
+Regenerate the human registry summary: add `--write-document-registry docs/DOCUMENT_REGISTRY.md`.
 
 ---
 

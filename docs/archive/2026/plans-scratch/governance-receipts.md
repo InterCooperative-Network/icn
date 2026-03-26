@@ -1,3 +1,5 @@
+<!-- Relocated from docs/plans/.scratch/ (tranche 3). -->
+
 # Governance / Receipts — Repo State & Gap Analysis
 
 **Date**: 2026-02-14
