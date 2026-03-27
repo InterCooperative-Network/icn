@@ -50,7 +50,8 @@ impl From<ExecutionRecord> for ExecutionRecordResponse {
     }
 }
 
-fn key_for_decision_hash(decision_hash: &str) -> Vec<u8> {
+/// Key for execution records in the shared store (`exec:<decision_hash>` bytes).
+pub(crate) fn key_for_decision_hash(decision_hash: &str) -> Vec<u8> {
     let mut key = b"exec:".to_vec();
     key.extend_from_slice(decision_hash.as_bytes());
     key

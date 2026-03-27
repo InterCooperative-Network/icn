@@ -119,7 +119,7 @@ pub struct DecisionTrace {
     pub provenance_chain: Vec<String>,
     /// Resolution status for trace sections.
     pub resolution: TraceResolution,
-    /// Optional execution truth summary for this decision (if available).
+    /// Execution truth from the shared execution store, when a persisted record exists.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub execution: Option<DecisionExecutionSummary>,
 }
@@ -154,7 +154,7 @@ pub struct DecisionExecutionSummary {
     pub not_executed_effects: usize,
     /// Number of effects that hard failed.
     pub hard_failed_effects: usize,
-    /// Whether execution is complete for this decision (no not_executed or hard_failed).
+    /// True only when every effect row executed successfully (none skipped or hard-failed).
     pub execution_complete: bool,
 }
 
@@ -802,12 +802,13 @@ pub async fn get_decision_trace(
         ledger_entry_resolved: has_verified_ledger_entry, // Only true if we have the actual hash
     };
 
-    // Load execution truth summary.
+    // Load execution truth summary (omit field when no persisted execution record).
     let execution = match load_execution_truth_for_registry(
         execution_store.get_ref().as_ref(),
         &decision.decision_hash,
     ) {
-        Ok(summary) => Some(summary),
+        Ok(summary) if summary.execution_record_present => Some(summary),
+        Ok(_) => None,
         Err(e) => {
             tracing::warn!(
                 error = %e,
@@ -895,18 +896,12 @@ fn lookup_governance_receipt(
     }
 }
 
-fn exec_key_for_decision_hash(decision_hash: &str) -> Vec<u8> {
-    let mut key = b"exec:".to_vec();
-    key.extend_from_slice(decision_hash.as_bytes());
-    key
-}
-
 fn load_execution_truth_for_registry(
     store: &dyn Store,
     decision_hash: &str,
 ) -> std::result::Result<DecisionExecutionSummary, String> {
     let value = store
-        .get(&exec_key_for_decision_hash(decision_hash))
+        .get(&crate::api::execution::key_for_decision_hash(decision_hash))
         .map_err(|e| format!("failed to read execution record: {e}"))?;
 
     let Some(value) = value else {
@@ -1261,7 +1256,7 @@ mod tests {
         });
         exec_store
             .put(
-                &super::exec_key_for_decision_hash(decision_hash_hex),
+                &crate::api::execution::key_for_decision_hash(decision_hash_hex),
                 &serde_json::to_vec(&record).expect("serialize record"),
             )
             .expect("put execution record");
@@ -1273,6 +1268,65 @@ mod tests {
         assert_eq!(summary.executed_effects, 1);
         assert_eq!(summary.not_executed_effects, 1);
         assert!(!summary.execution_complete);
+    }
+
+    #[actix_web::test]
+    async fn test_decision_trace_endpoint_includes_execution_summary() {
+        let registry = create_test_registry();
+        let exec_store = temp_exec_store();
+        let decision_hash_hex = "hash-abc123";
+        let decision_receipt_id = "receipt-001";
+
+        let mut record = ExecutionRecord::new_pending(
+            decision_hash_hex.to_string(),
+            "p1".to_string(),
+            "r1",
+            vec![],
+        );
+        record.mark_confirmed(vec![], vec![]);
+        record.truth_summary = Some(ExecutionTruthSummary {
+            total_effects: 1,
+            executed_effects: 1,
+            not_executed_effects: 0,
+            hard_failed_effects: 0,
+            execution_complete: true,
+        });
+        exec_store
+            .put(
+                &crate::api::execution::key_for_decision_hash(decision_hash_hex),
+                &serde_json::to_vec(&record).expect("serialize record"),
+            )
+            .expect("put execution record");
+
+        let app = actix_test::init_service(
+            App::new()
+                .app_data(web::Data::new(registry.clone()))
+                .app_data(web::Data::new(
+                    exec_store.clone() as std::sync::Arc<dyn Store>
+                ))
+                .service(web::scope("/registry").configure(configure)),
+        )
+        .await;
+
+        let claims = TokenClaims {
+            sub: KeyPair::generate().unwrap().did().to_string(),
+            iat: 1_000_000_000,
+            coop_id: "did:icn:test123".to_string(),
+            scopes: vec!["governance:read".to_string()],
+            exp: 9_999_999_999,
+        };
+
+        let req = actix_test::TestRequest::get()
+            .uri(&format!("/registry/decisions/{decision_receipt_id}/trace"))
+            .to_request();
+        req.extensions_mut().insert(claims);
+        let trace: DecisionTrace = actix_test::call_and_read_body_json(&app, req).await;
+
+        let exec = trace.execution.expect("execution summary");
+        assert!(exec.execution_record_present);
+        assert_eq!(exec.total_effects, 1);
+        assert_eq!(exec.executed_effects, 1);
+        assert!(exec.execution_complete);
     }
 
     #[actix_web::test]
