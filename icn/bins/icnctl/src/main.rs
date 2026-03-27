@@ -10357,71 +10357,6 @@ fn verify_receipt_chain(
     checks
 }
 
-#[cfg(test)]
-mod audit_verify_tests {
-    use super::verify_receipt_chain;
-    use icn_gateway::api::receipts::{
-        DecisionExecutionTruthResponse, GovernanceReceiptResponse, GovernanceVoteTallyResponse,
-        ReceiptChainResponse,
-    };
-
-    fn sample_chain(execution_complete: bool, not_executed: usize) -> ReceiptChainResponse {
-        ReceiptChainResponse {
-            decision_hash: "a".repeat(64),
-            governance: Some(GovernanceReceiptResponse {
-                decision_hash: "a".repeat(64),
-                proposal_id: "prop-1".to_string(),
-                domain_id: "domain-1".to_string(),
-                outcome: "Accepted".to_string(),
-                vote_tally: GovernanceVoteTallyResponse {
-                    for_votes: 3,
-                    against_votes: 0,
-                    abstain_votes: 0,
-                },
-                vote_hash: "b".repeat(64),
-            }),
-            allocations: vec![],
-            intents: vec![],
-            structural_complete: true,
-            execution_complete,
-            chain_complete: execution_complete,
-            execution: DecisionExecutionTruthResponse {
-                execution_record_present: true,
-                status: None,
-                total_effects: 1,
-                executed_effects: 1usize.saturating_sub(not_executed),
-                not_executed_effects: not_executed,
-                hard_failed_effects: 0,
-                execution_complete,
-            },
-        }
-    }
-
-    #[test]
-    fn partial_execution_fails_verification_checks() {
-        let chain = sample_chain(false, 1);
-        let checks = verify_receipt_chain(&chain, &"a".repeat(64));
-        assert!(
-            checks
-                .iter()
-                .any(|c| c.name == "Execution complete" && !c.passed),
-            "partial execution must fail execution-complete check"
-        );
-    }
-
-    #[test]
-    fn full_execution_passes_execution_check() {
-        let chain = sample_chain(true, 0);
-        let checks = verify_receipt_chain(&chain, &"a".repeat(64));
-        assert!(
-            checks
-                .iter()
-                .any(|c| c.name == "Execution complete" && c.passed),
-            "full execution must pass execution-complete check"
-        );
-    }
-}
-
 /// Handle audit commands — verify receipt chain integrity.
 ///
 /// Fetches the full receipt chain from the gateway and runs typed verification
@@ -10695,5 +10630,70 @@ async fn handle_preflight_command(
     } else {
         println!("\n✗ Some preflight checks failed. Please address issues above.");
         bail!("Preflight checks failed");
+    }
+}
+
+#[cfg(test)]
+mod audit_verify_tests {
+    use super::verify_receipt_chain;
+    use icn_gateway::api::receipts::{
+        DecisionExecutionTruthResponse, GovernanceReceiptResponse, GovernanceVoteTallyResponse,
+        ReceiptChainResponse,
+    };
+
+    fn sample_chain(execution_complete: bool, not_executed: usize) -> ReceiptChainResponse {
+        ReceiptChainResponse {
+            decision_hash: "a".repeat(64),
+            governance: Some(GovernanceReceiptResponse {
+                decision_hash: "a".repeat(64),
+                proposal_id: "prop-1".to_string(),
+                domain_id: "domain-1".to_string(),
+                outcome: "Accepted".to_string(),
+                vote_tally: GovernanceVoteTallyResponse {
+                    for_votes: 3,
+                    against_votes: 0,
+                    abstain_votes: 0,
+                },
+                vote_hash: "b".repeat(64),
+            }),
+            allocations: vec![],
+            intents: vec![],
+            structural_complete: true,
+            execution_complete,
+            chain_complete: execution_complete,
+            execution: DecisionExecutionTruthResponse {
+                execution_record_present: true,
+                status: None,
+                total_effects: 1,
+                executed_effects: 1usize.saturating_sub(not_executed),
+                not_executed_effects: not_executed,
+                hard_failed_effects: 0,
+                execution_complete,
+            },
+        }
+    }
+
+    #[test]
+    fn partial_execution_fails_verification_checks() {
+        let chain = sample_chain(false, 1);
+        let checks = verify_receipt_chain(&chain, &"a".repeat(64));
+        assert!(
+            checks
+                .iter()
+                .any(|c| c.name == "Execution complete" && !c.passed),
+            "partial execution must fail execution-complete check"
+        );
+    }
+
+    #[test]
+    fn full_execution_passes_execution_check() {
+        let chain = sample_chain(true, 0);
+        let checks = verify_receipt_chain(&chain, &"a".repeat(64));
+        assert!(
+            checks
+                .iter()
+                .any(|c| c.name == "Execution complete" && c.passed),
+            "full execution must pass execution-complete check"
+        );
     }
 }

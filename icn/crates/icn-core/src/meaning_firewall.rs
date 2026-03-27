@@ -250,14 +250,14 @@ mod tests {
     /// - icn-net: CLEAN ✅
     /// - icn-gossip: CLEAN ✅
     /// - icn-ledger: CLEAN ✅
-    /// - icn-gateway: 11 (governance_dashboard, flow_c, steward extracted; commons/treasury/entity residue)
+    /// - icn-gateway: 10 (governance_dashboard, flow_c, steward extracted; commons/treasury/entity residue)
     #[test]
     fn strict_governance_import_violations() {
         let expected: &[(&str, usize)] = &[
             ("icn-net", 0),      // CLEAN ✅
             ("icn-gossip", 0),   // CLEAN ✅
             ("icn-ledger", 0),   // CLEAN ✅
-            ("icn-gateway", 11), // Sprint 14 easy sweep: governance_dashboard, flow_c, steward extracted
+            ("icn-gateway", 10), // Sprint 14 easy sweep: governance_dashboard, flow_c, steward extracted
         ];
 
         for &(crate_name, expected_count) in expected {
@@ -298,10 +298,10 @@ mod tests {
     /// - models.rs comment: CLEANED ✅ (was 1 ref)
     /// - receipt_store.rs test: CLEANED ✅ (was 1 ref)
     /// - commons_store.rs tests: consolidated ✅ (-2 refs)
-    /// - Hard residue: 17 (commons_mgr, commons_store, treasury, entity, receipts, constitutional)
+    /// - Hard residue: 16 (commons_mgr, commons_store, treasury, entity, receipts, constitutional)
     #[test]
     fn strict_gateway_governance_total_refs() {
-        let expected: usize = 17; // Sprint 14 easy sweep: -7 refs from 24
+        let expected: usize = 16; // Sprint 14 easy sweep: -7 refs from 24
         let actual = count_imports_in_crate("icn-gateway", "icn_governance::");
 
         assert!(
