@@ -185,6 +185,10 @@ enum Commands {
     #[command(subcommand)]
     Audit(AuditCommands),
 
+    /// Decision registry — list indexed decisions and inspect execution traces
+    #[command(subcommand)]
+    Registry(RegistryCommands),
+
     /// Pre-deployment health checks
     Preflight {
         /// Gateway endpoint to check (if running)
@@ -273,6 +277,42 @@ enum AuditCommands {
     Verify {
         /// Decision hash (64 hex characters)
         decision_hash: String,
+
+        /// Gateway API URL
+        #[arg(short, long, default_value = "http://localhost:8080")]
+        gateway: String,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum RegistryCommands {
+    /// List indexed decisions for a cooperative
+    List {
+        /// Cooperative ID to filter by
+        #[arg(short, long)]
+        coop_id: Option<String>,
+
+        /// Meeting ID to filter by
+        #[arg(short, long)]
+        meeting_id: Option<String>,
+
+        /// Gateway API URL
+        #[arg(short, long, default_value = "http://localhost:8080")]
+        gateway: String,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Show the full provenance trace for a decision (execution truth + parent receipts)
+    Trace {
+        /// Decision receipt ID (from the registry index)
+        receipt_id: String,
 
         /// Gateway API URL
         #[arg(short, long, default_value = "http://localhost:8080")]
@@ -2162,6 +2202,10 @@ async fn main() -> Result<()> {
 
         Commands::Audit(audit_cmd) => {
             handle_audit_command(audit_cmd).await?;
+        }
+
+        Commands::Registry(registry_cmd) => {
+            handle_registry_command(registry_cmd).await?;
         }
 
         Commands::Preflight {
@@ -10643,6 +10687,192 @@ async fn handle_preflight_command(
         println!("\n✗ Some preflight checks failed. Please address issues above.");
         bail!("Preflight checks failed");
     }
+}
+
+// ============================================================================
+// Registry commands
+// ============================================================================
+
+/// Handle registry commands — list decisions and inspect execution traces.
+async fn handle_registry_command(cmd: RegistryCommands) -> Result<()> {
+    match cmd {
+        RegistryCommands::List {
+            coop_id,
+            meeting_id,
+            gateway,
+            json,
+        } => {
+            let client = reqwest::Client::new();
+            let mut url = format!("{}/v1/registry/decisions", gateway);
+            let mut params: Vec<(&str, String)> = Vec::new();
+            if let Some(ref cid) = coop_id {
+                params.push(("coop_id", cid.clone()));
+            }
+            if let Some(ref mid) = meeting_id {
+                params.push(("meeting_id", mid.clone()));
+            }
+            if !params.is_empty() {
+                let qs = params
+                    .iter()
+                    .map(|(k, v)| format!("{}={}", k, v))
+                    .collect::<Vec<_>>()
+                    .join("&");
+                url = format!("{}?{}", url, qs);
+            }
+
+            let resp = client
+                .get(&url)
+                .send()
+                .await
+                .context("Failed to connect to gateway")?;
+
+            if !resp.status().is_success() {
+                bail!("Gateway returned error: {}", resp.status());
+            }
+
+            let body: serde_json::Value = resp.json().await.context("Failed to parse response")?;
+
+            if json {
+                println!("{}", serde_json::to_string_pretty(&body)?);
+                return Ok(());
+            }
+
+            let decisions = body["decisions"].as_array().cloned().unwrap_or_default();
+
+            if decisions.is_empty() {
+                println!("No decisions indexed.");
+                return Ok(());
+            }
+
+            println!(
+                "{:<44} {:<12} {:<10} Proposal",
+                "Receipt ID", "Coop", "Status"
+            );
+            println!("{}", "-".repeat(90));
+            for d in &decisions {
+                let receipt_id = d["decisionReceiptId"]
+                    .as_str()
+                    .unwrap_or("-")
+                    .get(..40)
+                    .unwrap_or(d["decisionReceiptId"].as_str().unwrap_or("-"));
+                let coop = d["coopId"].as_str().unwrap_or("-");
+                let status = d["status"].as_str().unwrap_or("-");
+                let proposal = d["proposalId"].as_str().unwrap_or("-");
+                println!(
+                    "{:<44} {:<12} {:<10} {}",
+                    receipt_id, coop, status, proposal
+                );
+            }
+            println!("\nTotal: {}", decisions.len());
+        }
+
+        RegistryCommands::Trace {
+            receipt_id,
+            gateway,
+            json,
+        } => {
+            let client = reqwest::Client::new();
+            let url = format!("{}/v1/registry/decisions/{}/trace", gateway, receipt_id);
+
+            let resp = client
+                .get(&url)
+                .send()
+                .await
+                .context("Failed to connect to gateway")?;
+
+            if !resp.status().is_success() {
+                if resp.status().as_u16() == 404 {
+                    bail!("Decision not found in registry: {}", receipt_id);
+                }
+                bail!("Gateway returned error: {}", resp.status());
+            }
+
+            let trace: serde_json::Value = resp
+                .json()
+                .await
+                .context("Failed to parse trace response")?;
+
+            if json {
+                println!("{}", serde_json::to_string_pretty(&trace)?);
+                return Ok(());
+            }
+
+            // Human-readable trace output
+            let decision_hash = trace["decisionHash"].as_str().unwrap_or("-");
+            println!("Decision Trace");
+            println!("═══════════════════════════════════════════════════════");
+            println!("  Decision hash : {}", decision_hash);
+
+            // Parent receipts
+            let parents = trace["parentReceipts"].as_array();
+            match parents {
+                Some(p) if !p.is_empty() => {
+                    println!("  Parent receipts ({}):", p.len());
+                    for r in p {
+                        println!("    \u{2022} {}", r.as_str().unwrap_or("-"));
+                    }
+                }
+                _ => println!("  Parent receipts : none"),
+            }
+
+            // Effects
+            let effects = trace["effects"].as_array();
+            match effects {
+                Some(e) if !e.is_empty() => {
+                    println!("  Effects ({}):", e.len());
+                    for effect in e {
+                        let kind = effect["effectType"].as_str().unwrap_or("?");
+                        let resolved = effect["resolved"].as_bool().unwrap_or(false);
+                        let marker = if resolved { "\u{2713}" } else { "\u{25cb}" };
+                        println!("    {} {}", marker, kind);
+                    }
+                }
+                _ => println!("  Effects : none"),
+            }
+
+            // Resolution status
+            let resolution = &trace["resolution"];
+            println!("  Resolution:");
+            for field in [
+                "decisionResolved",
+                "receiptResolved",
+                "effectResolved",
+                "ledgerEntryResolved",
+            ] {
+                let val = resolution[field].as_bool().unwrap_or(false);
+                println!(
+                    "    {} {}",
+                    if val { "\u{2713}" } else { "\u{25cb}" },
+                    field
+                );
+            }
+
+            // Execution truth
+            let exec = &trace["execution"];
+            if exec.is_null() {
+                println!("  Execution truth : no execution record");
+            } else {
+                let status = exec["status"].as_str().unwrap_or("unknown");
+                let total = exec["totalEffects"].as_u64().unwrap_or(0);
+                let executed = exec["executedEffects"].as_u64().unwrap_or(0);
+                let not_exec = exec["notExecutedEffects"].as_u64().unwrap_or(0);
+                let hard_failed = exec["hardFailedEffects"].as_u64().unwrap_or(0);
+                let complete = exec["executionComplete"].as_bool().unwrap_or(false);
+                println!("  Execution truth:");
+                println!("    Status        : {}", status);
+                println!("    Total effects : {}", total);
+                println!("    Executed      : {}", executed);
+                println!("    Not executed  : {}", not_exec);
+                println!("    Hard failed   : {}", hard_failed);
+                println!(
+                    "    Complete      : {}",
+                    if complete { "yes" } else { "no" }
+                );
+            }
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]

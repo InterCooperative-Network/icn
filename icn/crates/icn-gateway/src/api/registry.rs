@@ -26,6 +26,7 @@ use crate::error::{GatewayError, Result};
 use crate::middleware::{get_claims, require_scope};
 use crate::receipt_store::ReceiptStore;
 use icn_kernel_api::execution::{ExecutionRecord, ExecutionStatus};
+use icn_kernel_api::receipts::CanonicalReceipt;
 use icn_store::Store;
 
 // ============================================================================
@@ -819,9 +820,27 @@ pub async fn get_decision_trace(
         }
     };
 
+    // Populate parent_receipts from the canonical AllocationReceipt hashes for this decision.
+    // These are the economic receipts produced when the governance decision's effects were executed.
+    let parent_receipts = receipt_store
+        .as_ref()
+        .and_then(|store| {
+            parse_decision_hash_hex(&decision.decision_hash)
+                .ok()
+                .map(|hash| store.get_chain_by_decision(&hash))
+        })
+        .and_then(|result| result.ok())
+        .map(|(allocations, _intents)| {
+            allocations
+                .iter()
+                .map(|r| hex::encode(r.canonical_hash()))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+
     let trace = DecisionTrace {
         decision_hash: decision.decision_hash.clone(),
-        parent_receipts: vec![], // TODO: populate from canonical receipt graph when available
+        parent_receipts,
         effects,
         // Only include ledger_entry_hash if we have a verified one - never fabricate
         ledger_entry_hash: decision.ledger_entry_hash.clone(),
