@@ -6,8 +6,9 @@
 
 set -euo pipefail
 
-# Extract file path from tool input
-FILE_PATH="${TOOL_INPUT_FILE_PATH:-}"
+# Extract file path from tool input (stdin JSON)
+INPUT=$(cat)
+FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
 
 # Only trigger for gateway route files
 if [[ "$FILE_PATH" == *"icn-gateway/src/routes"* ]] || \
