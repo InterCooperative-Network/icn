@@ -10,6 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 4. **Port 8080.** Gateway binds 8080 (see `icn-core/src/config/gateway.rs`). Never assume 8000.
 5. **Preflight first.** Run `/icn-preflight` at session start. Check stale state before rewriting code.
 6. **Scope is law.** The user's request defines scope. Do not expand. Note adjacent concerns but do not act on them.
+7. **Hook pattern.** New hooks read tool input from stdin (`INPUT=$(cat)` + `jq`). Never use bare `TOOL_INPUT_*` env vars — see `.claude/hooks/HOOKS.md`.
 
 ## Project Overview
 
@@ -776,16 +777,27 @@ Do not jump to hardware/compiler blame without strong evidence.
 - Example:
   - `cargo test -p icn-core --test backup_restore_integration`
 
-## Domain Advisor Agents
+## Specialist Agents
 
 Specialized agents in `.claude/agents/` auto-activate based on crate scope. Invoke via the `Task` tool with `subagent_type` matching the agent name.
 
-| Agent | Auto-activates when working on... |
-|-------|----------------------------------|
-| `icn-economics-advisor` | `icn-ledger`, mutual credit, commons credits, settlement, `EarningTracker`, credit policy |
-| `icn-governance-advisor` | `icn-governance`, `icn-ccl`, `icn-community`, `icn-coop`, proposals, voting, CCL semantics |
-| `icn-identity-iam-advisor` | `icn-identity`, `icn-naming`, DIDs, keystore, key rotation, capability tokens, DID-TLS |
-| `icn-trust-federation-advisor` | `icn-trust`, `icn-federation`, `TrustPolicyOracle`, trust scores, federation treaties |
+| Agent | Use when... |
+|-------|------------|
+| `icn-architect` | Crate boundary decisions, cross-crate refactors, public API surface changes, kernel/app separation, threat modeling. NOT economics (use `icn-economist`), NOT ops (use `icn-ops`). |
+| `icn-code-reviewer` | Reviewing PRs, diffs, or staged changes with ICN invariants lens. High signal-to-noise — surfaces bugs, security issues, invariant violations. |
+| `icn-economics-advisor` | `icn-ledger`, `apps/ledger`, commons credit accounting, `JournalEntry` construction, settlement flows, `EarningTracker`, fork detection, credit policy. |
+| `icn-economist` | Ledger logic, CCL contracts, mutual credit invariants, treasury, mana/resource allocation, regulatory terminology compliance, Phase 1 payment→settlement renaming. |
+| `icn-gossip-net` | `icn-gossip`, `icn-net`, `icn-protocol`, message formats, topic subscriptions, anti-entropy, QUIC/TLS sessions, mDNS discovery, `SignedEnvelope` handling. |
+| `icn-governance-advisor` | `icn-governance`, `icn-ccl`, `icn-community`, `icn-coop`, `icn-entity`, `apps/governance`, proposals, voting, CCL semantics, threshold mechanics, civic engine rules. |
+| `icn-identity-iam-advisor` | `icn-identity`, `icn-naming`, `icn-entity`, DID lifecycle, keystore, key rotation, capability tokens, DID-TLS binding, bearer tokens, membership-gated access. |
+| `icn-invariants-guardian` | Reviewing proposed changes against the 5 ICN invariants and cross-doc consistency. Blocks changes that violate safety properties. Use before merging significant changes. |
+| `icn-mobile-advisor` | `sdk/react-native/`, mobile UX, CoopWallet app screens, mobile gateway API, offline-first patterns, mobile identity/signing, five-tab navigation. |
+| `icn-ops` | K3s cluster state, demo flow validation, CI/CD health, pod diagnostics, release readiness, pre-deployment checks. NOT protocol design (use `icn-architect`). |
+| `icn-planner` | Strategic planning with task breakdown, dependency analysis, risk assessment, merge ordering. Does NOT implement — plans only. |
+| `icn-rust-core` | Crate changes, daemon, kernel interfaces, actor runtime, storage, encoding, protocol, and core infrastructure implementation. |
+| `icn-security-reviewer` | Security-sensitive changes: cryptography, authentication, key handling, replay attacks, JWT, signed envelopes, rate limiting. |
+| `icn-test-generator` | Writing integration tests with `icn-testkit`, multi-node convergence scenarios, property-based tests, unit test scaffolding, `TestNode` helper pattern. |
+| `icn-trust-federation-advisor` | `icn-trust`, `icn-federation`, `TrustPolicyOracle`, trust score computation, trust-gated rate limiting, federated task placement, cross-coop coordination. |
 
 ## Multi-Agent Worktree Pattern
 - Give each agent an isolated worktree and branch.
