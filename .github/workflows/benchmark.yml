@@ -51,14 +51,15 @@ jobs:
         with:
           workspaces: "icn -> target"
           cache-on-failure: true
-          # Add unique suffix to avoid cache key conflicts when multiple runs occur simultaneously
+          # Stable key across main commits so builds reuse target/; lockfile hash still invalidates on dep changes.
           prefix-key: "v0-rust-benchmark"
-          shared-key: "${{ github.sha }}"
+          shared-key: "main-baseline"
 
       - name: Run benchmarks
-        run: cargo bench $BENCH_TARGETS -- --noplot --save-baseline main
+        # Match PR compare job sample size so baseline runs finish reliably after compile.
+        run: cargo bench $BENCH_TARGETS -- --noplot --save-baseline main --sample-size 20
         working-directory: ./icn
-        timeout-minutes: 45
+        timeout-minutes: 90
 
       - name: Upload benchmark results
         uses: actions/upload-artifact@v7
