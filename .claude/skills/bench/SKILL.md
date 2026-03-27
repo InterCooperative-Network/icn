@@ -10,24 +10,26 @@ Run criterion benchmarks for the specified crate, or all six targets.
 
 ## Benchmark targets
 
-| Crate | Bench file |
-|-------|-----------|
-| icn-ledger | ledger_bench |
-| icn-gossip | gossip_bench |
-| icn-trust | trust_bench |
-| icn-net | net_bench |
-| icn-compute | compute_bench |
-| icn-gateway | commons_bench |
+Pass the short name (without `icn-` prefix) as `$ARGUMENTS`, e.g. `gossip` for `icn-gossip`.
 
-All commands run from `icn/icn/` (the Cargo workspace root).
+| Short name | Full crate | Bench file |
+|-----------|-----------|-----------|
+| ledger | icn-ledger | ledger_bench |
+| gossip | icn-gossip | gossip_bench |
+| trust | icn-trust | trust_bench |
+| net | icn-net | net_bench |
+| compute | icn-compute | compute_bench |
+| gateway | icn-gateway | commons_bench |
+
+All commands run from the Rust workspace root (`icn/` within the monorepo).
 
 ## Steps
 
-1. Confirm working directory: `cd /home/ubuntu/projects/icn/icn`
+1. Confirm working directory: `cd "$CLAUDE_PROJECT_DIR/icn"`
 
-2. If `$ARGUMENTS` is a crate name (e.g. `gossip`), look up its bench file above and run:
+2. If `$ARGUMENTS` is a short crate name (e.g. `gossip`), look up its bench file above and run:
    ```bash
-   cargo bench -p icn-<crate> --bench <bench_file>
+   cargo bench -p icn-<short-name> --bench <bench_file>
    ```
    Example: `cargo bench -p icn-gossip --bench gossip_bench`
 

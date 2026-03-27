@@ -19,8 +19,14 @@ if [[ "$FILE_PATH" == *"icn/Cargo.toml" ]] && [[ "$FILE_PATH" != *"crates/"* ]] 
     exit 0
 fi
 
-# Check if the edit adds a new dependency line (version = "x.y")
-NEW_CONTENT=$(echo "$INPUT" | jq -r '.tool_input.new_string // .tool_input.content // empty' 2>/dev/null)
+# Check if the edit adds a new dependency line (version = "x.y").
+# Only inspect new_string (the edited snippet); do not fall back to content
+# (the full file for Write operations) — that triggers false positives on
+# every crate Cargo.toml write because [package] version = "..." always matches.
+NEW_CONTENT=$(echo "$INPUT" | jq -r '.tool_input.new_string // empty' 2>/dev/null)
+if [[ -z "$NEW_CONTENT" ]]; then
+    exit 0
+fi
 if echo "$NEW_CONTENT" | grep -qE 'version\s*=\s*"[0-9]'; then
     echo "Direct version specified in crate Cargo.toml. Prefer workspace dependencies:"
     echo "  1. Add to icn/Cargo.toml [workspace.dependencies]"
