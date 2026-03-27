@@ -9989,6 +9989,8 @@ async fn handle_receipt_command(cmd: ReceiptCommands) -> Result<()> {
             coop_id,
             json,
         } => {
+            use icn_gateway::api::receipts::ReceiptChainResponse;
+
             // Validate hash format
             if decision_hash.len() != 64 || !decision_hash.chars().all(|c| c.is_ascii_hexdigit()) {
                 bail!("Invalid decision hash: expected 64 hex characters");
@@ -9996,11 +9998,8 @@ async fn handle_receipt_command(cmd: ReceiptCommands) -> Result<()> {
 
             let client = reqwest::Client::new();
 
-            // Query receipt chain
-            let chain_url = format!(
-                "{}/v1/receipts/chain?decision_hash={}",
-                gateway, decision_hash
-            );
+            // Query full receipt chain (governance + economic + execution truth)
+            let chain_url = format!("{}/v1/receipts/chain/{}", gateway, decision_hash);
             let chain_resp = client
                 .get(&chain_url)
                 .send()
@@ -10018,7 +10017,7 @@ async fn handle_receipt_command(cmd: ReceiptCommands) -> Result<()> {
                 bail!("Gateway returned error: {}", chain_resp.status());
             }
 
-            let chain_data: serde_json::Value = chain_resp
+            let chain: ReceiptChainResponse = chain_resp
                 .json()
                 .await
                 .context("Failed to parse receipt chain response")?;
@@ -10040,8 +10039,9 @@ async fn handle_receipt_command(cmd: ReceiptCommands) -> Result<()> {
             };
 
             if json {
-                // JSON output
-                let mut output = chain_data.clone();
+                // JSON output: include execution truth as returned by the gateway.
+                let mut output = serde_json::to_value(&chain)
+                    .context("Failed to serialize receipt chain response")?;
                 if let Some(ledger) = ledger_data {
                     output["ledgerEntries"] = ledger;
                 }
@@ -10051,36 +10051,48 @@ async fn handle_receipt_command(cmd: ReceiptCommands) -> Result<()> {
                 println!("Receipt Chain for Decision: {}...", &decision_hash[..16]);
                 println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
+                // Execution truth (always present; `execution_record_present` reflects whether
+                // a persisted execution record exists in the gateway store).
+                let exec = &chain.execution;
+                println!("Execution Truth");
+                println!("----------------");
+                let status = exec
+                    .status
+                    .map(|s| format!("{s:?}"))
+                    .unwrap_or_else(|| "none".to_string());
+                println!("Record present      : {}", exec.execution_record_present);
+                println!("Status              : {status}");
+                println!("Total effects       : {}", exec.total_effects);
+                println!("Executed            : {}", exec.executed_effects);
+                println!("Not executed        : {}", exec.not_executed_effects);
+                println!("Hard failed         : {}", exec.hard_failed_effects);
+                println!("Execution complete: {}", exec.execution_complete);
+                println!("Structural complete : {}", chain.structural_complete);
+                println!("Chain complete      : {}", chain.chain_complete);
+                println!();
+
                 // Allocations
-                if let Some(allocations) = chain_data.get("allocations").and_then(|a| a.as_array())
-                {
-                    println!("Allocation Receipts: {}", allocations.len());
-                    for alloc in allocations {
-                        if let Some(hash) = alloc.get("canonicalHash").and_then(|h| h.as_str()) {
-                            println!("  • Canonical Hash: {}...", &hash[..hash.len().min(24)]);
-                        }
-                        if let Some(count) = alloc.get("intentCount").and_then(|c| c.as_u64()) {
-                            println!("    Intent Count: {}", count);
-                        }
-                        if let Some(scope) = alloc.get("scope").and_then(|s| s.as_str()) {
-                            println!("    Scope: {}", scope);
-                        }
+                if !chain.allocations.is_empty() {
+                    println!("Allocation Receipts: {}", chain.allocations.len());
+                    for alloc in &chain.allocations {
+                        let h = &alloc.canonical_hash;
+                        println!("  • Canonical Hash: {}...", &h[..h.len().min(24)]);
+                        println!("    Intent Count: {}", alloc.intent_count);
+                        println!("    Scope: {}", alloc.scope);
                     }
                     println!();
                 }
 
                 // Intents
-                if let Some(intents) = chain_data.get("intents").and_then(|i| i.as_array()) {
-                    println!("Settlement Intents: {}", intents.len());
-                    for intent in intents {
-                        if let Some(hash) = intent.get("canonicalHash").and_then(|h| h.as_str()) {
-                            println!("  • Canonical Hash: {}...", &hash[..hash.len().min(24)]);
-                        }
-                        let from = intent.get("from").and_then(|f| f.as_str()).unwrap_or("—");
-                        let to = intent.get("to").and_then(|t| t.as_str()).unwrap_or("—");
-                        let amount = intent.get("amount").and_then(|a| a.as_u64()).unwrap_or(0);
-                        let unit = intent.get("unit").and_then(|u| u.as_str()).unwrap_or("");
-                        println!("    {} → {} : {} {}", from, to, amount, unit);
+                if !chain.intents.is_empty() {
+                    println!("Settlement Intents: {}", chain.intents.len());
+                    for intent in &chain.intents {
+                        let h = &intent.canonical_hash;
+                        println!("  • Canonical Hash: {}...", &h[..h.len().min(24)]);
+                        println!(
+                            "    {} → {} : {} {}",
+                            intent.from, intent.to, intent.amount, intent.unit
+                        );
                     }
                     println!();
                 }
