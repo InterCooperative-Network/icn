@@ -48,7 +48,7 @@ fn main() {
     let sled_path = PathBuf::from(&args[2]);
 
     let rt = tokio::runtime::Builder::new_current_thread()
-        .enable_time()
+        .enable_all()
         .build()
         .expect("tokio runtime");
 
@@ -79,6 +79,14 @@ fn main() {
             }
         }
     });
+
+    // Explicitly drop the runtime before calling process::exit.
+    // This cancels any surviving tokio tasks and runs their Drop impls,
+    // releasing all Arc references (including to the sled store).
+    // Without this, std::process::exit() skips Rust destructors, meaning
+    // GovernanceActor / SledStore Drop might not run — only WAL recovery
+    // on next open would save us. With this, sled flushes deterministically.
+    drop(rt);
 
     std::process::exit(exit_code);
 }
@@ -282,6 +290,14 @@ async fn read_phase(
             return 1;
         }
     };
+
+    if domain.id.0 != domain_id.0 {
+        eprintln!(
+            "read: domain id mismatch: got '{}', expected '{}'",
+            domain.id.0, domain_id.0
+        );
+        return 1;
+    }
 
     if domain.name != "Cross-Process Test Domain" {
         eprintln!(

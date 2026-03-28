@@ -240,6 +240,22 @@ fn test_governance_cross_process_restart() {
         "write phase must print proposal_id to stdout"
     );
 
+    // Validate the proposal_id looks like a UUID (36 chars, 4 hyphens).
+    // If the write phase accidentally printed debug output or log lines instead
+    // of just the UUID, this catches it before Phase 2 gets a garbage ID.
+    assert_eq!(
+        proposal_id.len(),
+        36,
+        "proposal_id must be a 36-char UUID, got {:?}",
+        proposal_id
+    );
+    assert_eq!(
+        proposal_id.chars().filter(|c| *c == '-').count(),
+        4,
+        "proposal_id must contain 4 hyphens (UUID format), got {:?}",
+        proposal_id
+    );
+
     // ── Phase 2: read in a fresh subprocess ──────────────────────────────────
     let read_out = std::process::Command::new(env!("CARGO_BIN_EXE_governance_restart_helper"))
         .args(["read", db_path, domain_id, &proposal_id])
