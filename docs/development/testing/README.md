@@ -2,20 +2,48 @@
 
 This directory contains testing guides and plans for ICN.
 
-## Documents
+## Verification Pattern
 
-**Verification patterns:**
-- **[governance-proof-layers.md](governance-proof-layers.md)** — Four-layer proof stack for governance (HTTP lifecycle, sled write, same-runtime reopen, cross-process restart). The reference pattern for verifying any ICN subsystem.
-- **[ledger-proof-layers.md](ledger-proof-layers.md)** — Ledger proof stack (all 4 layers complete: direct sled write, store-backed write, service-layer reopen, cross-process restart).
-- **[gossip-proof-layers.md](gossip-proof-layers.md)** — Gossip proof stack (all 4 layers complete: direct struct, handle-backed, same-runtime drop+recreate, cross-process restart). Note: gossip uses JSON snapshot files, not sled.
+**[verification-pattern.md](verification-pattern.md)** — The canonical 4-layer verification pattern.
+Read this first before writing persistence tests for any subsystem.
+Defines what each layer proves, how to implement it, and what "verified" means.
+
+## Subsystem Proof Layers
+
+All three subsystems below have all 4 layers complete.
+
+**[governance-proof-layers.md](governance-proof-layers.md)**
+- Layer 1: HTTP lifecycle (actix-web integration test, real Ed25519 auth)
+- Layer 2: Actor-backed sled write (GovernanceActor + SledGovernanceStateStore)
+- Layer 3: Same-runtime close+reopen (GovernanceHandle::shutdown().await)
+- Layer 4: Cross-process restart (governance_restart_helper binary)
+
+**[ledger-proof-layers.md](ledger-proof-layers.md)**
+- Layer 1: Direct sled write (Ledger::new + append_entry)
+- Layer 2: Store-backed sled write (SledEscrowStore)
+- Layer 3: Service-layer same-runtime reopen (LedgerServiceImpl)
+- Layer 4: Cross-process restart (ledger_restart_helper binary)
+
+**[gossip-proof-layers.md](gossip-proof-layers.md)**
+- Layer 1: GossipActor snapshot persistence
+- Layer 2: GossipHandle (Arc<RwLock>) snapshot persistence
+- Layer 3: Same-runtime handle drop+recreate
+- Layer 4: Cross-process restart (gossip_restart_helper binary)
+- Note: gossip uses JSON snapshot files (icn-snapshot), not sled
+
+## Reusable Infrastructure
+
+**`crates/icn-testkit/src/subprocess.rs`** — `run_subprocess(binary, args)` helper.
+Use this in Layer 4 integration tests to spawn helper binaries and assert success
+with useful failure messages. See `verification-pattern.md` for usage example.
+
+## Other Testing Docs
 
 **From root:**
 - **TESTING_QUICKSTART.md** - Quick start guide for testing
 - **testing-rpc.md** - RPC testing guide
 - **INTERNAL_TESTING_PLAN.md** - Internal testing plan
 - **BETA_TESTING_GUIDE.md** - Beta testing guide
-
-**Existing testing docs:** (see directory listing)
 
 ## Related Documentation
 
