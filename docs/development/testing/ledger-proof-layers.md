@@ -1,12 +1,12 @@
 ---
-Status: layers 1-3 complete
+Status: layers 1-4 complete
 Canonical: no
 Last Reviewed: 2026-03-28
 ---
 
 # Ledger Proof Layers
 
-Ledger has Layers 1, 2, and 3 complete. Layer 4 (cross-process) remains.
+All four layers are complete. Ledger has full persistence proof parity with governance.
 
 ---
 
@@ -73,7 +73,7 @@ or background-task shutdown is needed — there is no scheduler task.
 
 **Run:**
 ```bash
-cargo test -p icn-core --test ledger_service_persistence
+cargo test -p icn-core --test ledger_service_persistence test_ledger_service_entry_survives_drop_and_reopen
 ```
 
 **What is asserted:**
@@ -85,7 +85,46 @@ cargo test -p icn-core --test ledger_service_persistence
 
 ---
 
-## Run Full Layer 1–3 Suite
+## Layer 4 — Cross-Process Restart Proof ✅
+
+**What it proves:** Ledger state written through `LedgerServiceImpl` in one OS process is
+readable in a completely fresh OS process. No shared memory. No shared runtime. True
+process-boundary restart.
+
+**Implementation:**
+- Helper binary: `crates/icn-core/src/bin/ledger_restart_helper.rs`
+  - `write <sled_path>` — constructs `LedgerServiceImpl`, writes one `JournalEntry`,
+    prints entry hash (hex) to stdout, exits 0.
+  - `read <sled_path> <entry_hash_hex>` — opens fresh `Ledger::new`, reads by hash,
+    asserts exact invariants, exits 0.
+- Integration test: `crates/icn-core/tests/ledger_service_persistence.rs` →
+  `test_ledger_service_entry_survives_cross_process_restart`
+
+**Runtime note:** Unlike the governance helper (`new_current_thread()`),
+`ledger_restart_helper` uses `new_multi_thread()` because `submit_treasury_entry` calls
+`tokio::task::block_in_place` internally.
+
+**No shutdown protocol needed:** Ledger has no background scheduler task. Dropping
+`Arc<RwLock<Ledger>>` and `Arc<SledStore>` is sufficient; sled flushes on `drop(rt)`.
+
+**Artifact:** `crates/icn-core/tests/ledger_service_persistence.rs` →
+`test_ledger_service_entry_survives_cross_process_restart`
+
+**Run:**
+```bash
+cargo test -p icn-core --test ledger_service_persistence test_ledger_service_entry_survives_cross_process_restart
+```
+
+**What is asserted (in read subprocess):**
+- `count_entries() == 1` — exactly one entry survived the OS process boundary
+- `get_entry(hash)` returns Some(entry) — readable by the exact hash from write process
+- `entry.accounts.len() == 2` — both account deltas survived
+- `ProvenanceRef::Governance { receipt_id }` matches hardcoded constant — exact provenance
+  round-trip through an OS process boundary
+
+---
+
+## Run Full Layer 1–4 Suite
 
 ```bash
 cargo test -p icn-ledger --test ledger_persistence
@@ -97,26 +136,11 @@ cargo test -p icn-core --test ledger_service_persistence
 
 ## What Is NOT Proven
 
-| Gap | Why it matters | Next layer target |
-|-----|---------------|-------------------|
-| Cross-process restart | Only same-runtime drop proven | Layer 4 |
+| Gap | Why it matters | Status |
+|-----|---------------|--------|
 | Receipt-index idempotency across restart | Receipt index is a separate sled store — proven separately in `test_submit_treasury_entry_idempotency_survives_restart` | Already covered |
 | Balance cache rebuild correctness | Separate correctness concern, not persistence | Dedicated test |
 | Gossip sync across restart | Callbacks not exercised | Multi-node integration test |
-
----
-
-## Next Layer: Layer 4 — Cross-Process Restart Proof
-
-**Target:** Prove that ledger state written in one OS process is readable in a fresh OS process.
-
-**Pattern:** Follow governance Layer 4 exactly:
-- Add `src/bin/ledger_restart_helper.rs` to `crates/icn-core` (or `apps/ledger`)
-- Write mode: open sled, construct `LedgerServiceImpl`, call `submit_treasury_entry`, print entry hash, exit
-- Read mode: open same sled path, construct fresh `Ledger::new`, call `get_entry(hash)`, exit 0 if found
-- Integration test: `cargo test -p icn-core --test ledger_service_persistence` (or a new file) spawns write subprocess, reads stdout hash, spawns read subprocess
-
-**Key difference from governance:** No `GovernanceHandle::shutdown()` needed — just `drop(rt)` before `process::exit` (as in `governance_restart_helper.rs`). The `Ledger`'s sled store flushes when its `Arc` drops.
 
 ---
 
@@ -127,6 +151,6 @@ cargo test -p icn-core --test ledger_service_persistence
 | 1 — Direct struct sled write | ✅ (implicit in persistence_proof) | ✅ `ledger_persistence.rs` |
 | 2 — Store/service-backed sled write | ✅ `persistence_proof.rs` write phase | ✅ `actor_persistence_proof.rs` |
 | 3 — Same-runtime close+reopen | ✅ `persistence_proof.rs` Phase 2 | ✅ `ledger_service_persistence.rs` |
-| 4 — Cross-process restart | ✅ `governance_restart_helper` binary | ⏳ not yet |
+| 4 — Cross-process restart | ✅ `governance_restart_helper` binary | ✅ `ledger_restart_helper` binary |
 
-See `governance-proof-layers.md` for the full governance pattern and Layer 4 implementation guide.
+See `governance-proof-layers.md` for the full governance pattern reference.

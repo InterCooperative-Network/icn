@@ -1,32 +1,25 @@
-//! Ledger service persistence proof — Layer 3.
+//! Ledger service persistence proofs — Layers 3 and 4.
 //!
-//! ## What is proven
+//! ## Layer 3 — same-runtime drop-and-reopen
 //!
 //! State written through `LedgerServiceImpl::submit_treasury_entry()` — the
 //! canonical production service layer that wraps `Arc<RwLock<Ledger>>` — survives
 //! a same-runtime drop-and-reopen boundary.
 //!
-//! This is the closest ledger analog to governance Layer 3 (same-runtime
-//! close+reopen), adapted for ledger's architecture: no background Tokio task,
-//! no JoinHandle needed. The proof is that dropping ALL clones of
+//! No background Tokio task, no JoinHandle needed. Dropping ALL clones of
 //! `Arc<RwLock<Ledger>>` releases the sled file lock, and a fresh `Ledger::new`
 //! on the same path reads back the written entry from sled.
 //!
-//! ## The proof
+//! ## Layer 4 — cross-process restart
 //!
-//! 1. Open a real sled path, construct `Arc<RwLock<Ledger>>` + `LedgerServiceImpl`.
-//! 2. Call `submit_treasury_entry()` — writes a `JournalEntry` through the service.
-//! 3. Drop the service, the `Arc<RwLock<Ledger>>`, and the `Arc<SledStore>`.
-//! 4. Open a fresh `Ledger::new(SledStore::open(same_path))`.
-//! 5. Assert `count_entries() == 1` — entry came from sled, not in-memory state.
-//! 6. Parse the entry hash from the service result, call `get_entry()`, assert
-//!    exact field values (author DID, account count, provenance receipt id).
-//! 7. Assert the reopened ledger accepts a second direct append — writable, not
-//!    opened read-only.
+//! State written in one OS process is readable in a fresh OS process. Uses the
+//! `ledger_restart_helper` binary (same package) via `std::process::Command`.
+//! The write subprocess writes through `LedgerServiceImpl`, prints the entry hash
+//! to stdout, and exits. The read subprocess opens fresh sled, reads back the entry
+//! by hash through `Ledger::new`, and asserts exact field values.
 //!
 //! ## What is NOT proven
 //!
-//! - Cross-process restart: requires subprocess (see governance Layer 4 pattern).
 //! - Receipt-index idempotency across restart: the receipt index store is separate
 //!   from the main ledger store. See `test_submit_treasury_entry_idempotency_survives_restart`
 //!   in `ledger_service.rs` for that proof.
@@ -174,5 +167,73 @@ async fn test_ledger_service_entry_survives_drop_and_reopen() {
         ledger2.count_entries().expect("Phase3: count_entries"),
         2,
         "entry count must be 2 after second write"
+    );
+}
+
+/// Layer 4 — cross-process restart proof.
+///
+/// Spawns two OS processes via `ledger_restart_helper`:
+/// - Write process: opens sled, writes one `JournalEntry` through
+///   `LedgerServiceImpl`, prints the entry hash (hex) to stdout, exits.
+/// - Read process: opens the same sled path fresh, reads back the entry by
+///   hash through `Ledger::new`, asserts count == 1, account deltas == 2,
+///   and exact provenance receipt_id. Exits 0 on success.
+///
+/// This is a synchronous test — no Tokio runtime in the test thread. The
+/// subprocesses each manage their own runtimes independently.
+///
+/// `CARGO_BIN_EXE_ledger_restart_helper` is set by Cargo when building test
+/// binaries in the same package, giving the absolute path to the compiled
+/// helper binary.
+#[test]
+fn test_ledger_service_entry_survives_cross_process_restart() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let db_path = tmp.path().to_str().expect("db_path to str");
+
+    let helper = env!("CARGO_BIN_EXE_ledger_restart_helper");
+
+    // ── Phase 1: write subprocess ─────────────────────────────────────────────
+    let write_out = std::process::Command::new(helper)
+        .args(["write", db_path])
+        .output()
+        .expect("failed to spawn write subprocess");
+
+    assert!(
+        write_out.status.success(),
+        "write subprocess failed (exit {:?}):\nstdout: {}\nstderr: {}",
+        write_out.status.code(),
+        String::from_utf8_lossy(&write_out.stdout),
+        String::from_utf8_lossy(&write_out.stderr),
+    );
+
+    let entry_hash_hex = String::from_utf8(write_out.stdout)
+        .expect("write stdout must be valid UTF-8")
+        .trim()
+        .to_string();
+
+    // Validate the hash looks like a 32-byte hex string before handing it to
+    // the read subprocess. Catches accidental log output in stdout early.
+    assert_eq!(
+        entry_hash_hex.len(),
+        64,
+        "entry_hash must be 64 hex chars (32 bytes), got: {entry_hash_hex:?}"
+    );
+    assert!(
+        entry_hash_hex.chars().all(|c| c.is_ascii_hexdigit()),
+        "entry_hash must be lowercase hex, got: {entry_hash_hex:?}"
+    );
+
+    // ── Phase 2: read subprocess (fresh OS process, no shared memory) ─────────
+    let read_out = std::process::Command::new(helper)
+        .args(["read", db_path, &entry_hash_hex])
+        .output()
+        .expect("failed to spawn read subprocess");
+
+    assert!(
+        read_out.status.success(),
+        "read subprocess failed (exit {:?}):\nstdout: {}\nstderr: {}",
+        read_out.status.code(),
+        String::from_utf8_lossy(&read_out.stdout),
+        String::from_utf8_lossy(&read_out.stderr),
     );
 }
