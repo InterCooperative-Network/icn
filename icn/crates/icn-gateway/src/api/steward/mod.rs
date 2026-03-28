@@ -7,6 +7,7 @@
 //! - Bond management
 
 use actix_web::{get, post, put, web, HttpRequest, HttpResponse};
+use hex;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use utoipa::ToSchema;
@@ -14,13 +15,54 @@ use utoipa::ToSchema;
 use crate::commons_mgr::{steward_to_detail, steward_to_summary, CommonsManager};
 use crate::error::{GatewayError, Result};
 use crate::middleware::get_claims;
-use icn_identity::Did;
+use icn_identity::{Did, JurisdictionId, MembershipCapability};
 
 // ============================================================================
 // Response/Request DTOs
 // ============================================================================
 
 pub use crate::models::{StewardDetailResponse, StewardSummaryResponse};
+
+// ============================================================================
+// Authority Helpers
+// ============================================================================
+
+/// Verify that `caller_did` holds the `HoldOffice` capability in `jurisdiction`.
+///
+/// Mirrors the pattern used in membership handlers. Returns
+/// `Err(GatewayError::AuthorizationFailed)` when the caller is not a holder or
+/// lacks the required capability.
+async fn require_jurisdiction_authority(
+    commons_manager: &CommonsManager,
+    caller_did: &Did,
+    jurisdiction: &JurisdictionId,
+) -> Result<()> {
+    let caller_holder = commons_manager
+        .get_holder_by_did(caller_did)
+        .await
+        .map_err(|e| GatewayError::InternalError(e.to_string()))?
+        .ok_or_else(|| {
+            GatewayError::AuthorizationFailed("Caller is not a commons holder".to_string())
+        })?;
+
+    let holder_id_hex = hex::encode(caller_holder.holder_id);
+    let has_authority = commons_manager
+        .member_has_capability(
+            &holder_id_hex,
+            jurisdiction,
+            MembershipCapability::HoldOffice,
+        )
+        .await
+        .unwrap_or(false);
+
+    if !has_authority {
+        return Err(GatewayError::AuthorizationFailed(format!(
+            "Caller does not hold office in '{jurisdiction}' (HoldOffice capability required)"
+        )));
+    }
+
+    Ok(())
+}
 
 /// Register steward request
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -216,17 +258,37 @@ pub async fn update_steward_status(
     body: web::Json<UpdateStatusRequest>,
     commons_manager: web::Data<Arc<CommonsManager>>,
 ) -> Result<HttpResponse> {
-    let _claims = get_claims(&http_req)
+    let claims = get_claims(&http_req)
         .ok_or_else(|| GatewayError::AuthenticationFailed("Authentication required".to_string()))?;
+
+    let caller_did: Did = claims
+        .sub
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
 
     let steward_id = path.into_inner();
 
-    // Verify steward exists
-    let _steward = commons_manager
+    // Verify steward exists and resolve their jurisdiction for authority check
+    let steward = commons_manager
         .get_steward(&steward_id)
         .await
         .map_err(|e| GatewayError::InternalError(e.to_string()))?
         .ok_or_else(|| GatewayError::NotFound("Steward not found".to_string()))?;
+
+    // Require caller to hold office in the steward's jurisdiction
+    let jurisdiction_id = steward
+        .jurisdiction
+        .as_ref()
+        .map(|j| JurisdictionId(j.clone()))
+        .ok_or_else(|| {
+            GatewayError::BadRequest(
+                "Steward has no jurisdiction; cannot determine authority scope".to_string(),
+            )
+        })?;
+
+    require_jurisdiction_authority(&commons_manager, &caller_did, &jurisdiction_id).await?;
+
+    let _steward = steward;
 
     match body.status.to_lowercase().as_str() {
         "suspend" | "suspended" => {
@@ -342,17 +404,34 @@ pub async fn extend_steward_term(
     body: web::Json<ExtendTermRequest>,
     commons_manager: web::Data<Arc<CommonsManager>>,
 ) -> Result<HttpResponse> {
-    let _claims = get_claims(&http_req)
+    let claims = get_claims(&http_req)
         .ok_or_else(|| GatewayError::AuthenticationFailed("Authentication required".to_string()))?;
+
+    let caller_did: Did = claims
+        .sub
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
 
     let steward_id = path.into_inner();
 
-    // Verify steward exists
+    // Verify steward exists and resolve jurisdiction for authority check
     let steward = commons_manager
         .get_steward(&steward_id)
         .await
         .map_err(|e| GatewayError::InternalError(e.to_string()))?
         .ok_or_else(|| GatewayError::NotFound("Steward not found".to_string()))?;
+
+    let jurisdiction_id = steward
+        .jurisdiction
+        .as_ref()
+        .map(|j| JurisdictionId(j.clone()))
+        .ok_or_else(|| {
+            GatewayError::BadRequest(
+                "Steward has no jurisdiction; cannot determine authority scope".to_string(),
+            )
+        })?;
+
+    require_jurisdiction_authority(&commons_manager, &caller_did, &jurisdiction_id).await?;
 
     // Calculate new term end
     let additional_secs = body.additional_days * 24 * 60 * 60;
@@ -386,7 +465,10 @@ pub async fn extend_steward_term(
 // Bond Management Endpoints
 // ============================================================================
 
-/// POST /v1/steward/{id}/bond/add - Add to steward's bond
+/// POST /v1/steward/{id}/bond/add - Add to steward's bond (self-service)
+///
+/// Only the steward's own holder may add to their bond. Increasing a bond is a
+/// self-service economic commitment — governance (HoldOffice) is not required.
 #[post("/{steward_id}/bond/add")]
 pub async fn add_bond(
     http_req: HttpRequest,
@@ -394,17 +476,30 @@ pub async fn add_bond(
     body: web::Json<BondOperationRequest>,
     commons_manager: web::Data<Arc<CommonsManager>>,
 ) -> Result<HttpResponse> {
-    let _claims = get_claims(&http_req)
+    let claims = get_claims(&http_req)
         .ok_or_else(|| GatewayError::AuthenticationFailed("Authentication required".to_string()))?;
+
+    let caller_did: Did = claims
+        .sub
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
 
     let steward_id = path.into_inner();
 
-    // Verify steward exists
-    let _steward = commons_manager
+    // Verify steward exists and enforce self-service: caller must be this steward
+    let steward = commons_manager
         .get_steward(&steward_id)
         .await
         .map_err(|e| GatewayError::InternalError(e.to_string()))?
         .ok_or_else(|| GatewayError::NotFound("Steward not found".to_string()))?;
+
+    if steward.holder_did != caller_did && steward.steward_did != caller_did {
+        return Err(GatewayError::AuthorizationFailed(
+            "Can only add bond to your own stewardship".to_string(),
+        ));
+    }
+
+    let _steward = steward;
 
     commons_manager
         .add_steward_bond(&steward_id, body.amount)
@@ -508,17 +603,38 @@ pub async fn slash_bond(
 // Attestation Tracking Endpoints
 // ============================================================================
 
-/// POST /v1/steward/{id}/attestation - Record an attestation issued
+/// POST /v1/steward/{id}/attestation - Record an attestation issued (self-service)
+///
+/// A steward calls this to log that they issued an attestation. Only the
+/// steward's own DID may record this — it is a self-report of work performed.
 #[post("/{steward_id}/attestation")]
 pub async fn record_attestation(
     http_req: HttpRequest,
     path: web::Path<String>,
     commons_manager: web::Data<Arc<CommonsManager>>,
 ) -> Result<HttpResponse> {
-    let _claims = get_claims(&http_req)
+    let claims = get_claims(&http_req)
         .ok_or_else(|| GatewayError::AuthenticationFailed("Authentication required".to_string()))?;
 
+    let caller_did: Did = claims
+        .sub
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
+
     let steward_id = path.into_inner();
+
+    // Self-service: only the steward may record their own attestation
+    let steward = commons_manager
+        .get_steward(&steward_id)
+        .await
+        .map_err(|e| GatewayError::InternalError(e.to_string()))?
+        .ok_or_else(|| GatewayError::NotFound("Steward not found".to_string()))?;
+
+    if steward.steward_did != caller_did && steward.holder_did != caller_did {
+        return Err(GatewayError::AuthorizationFailed(
+            "Can only record attestations for your own stewardship".to_string(),
+        ));
+    }
 
     commons_manager
         .record_steward_attestation(&steward_id)
@@ -572,16 +688,44 @@ pub async fn record_dispute(
 }
 
 /// POST /v1/steward/{id}/dispute-won - Record a dispute won by the steward
+///
+/// Recording a dispute outcome that positively affects a steward's reputation
+/// is a governance action. Requires the caller to hold office in the steward's
+/// jurisdiction to prevent reputation inflation by the steward themselves.
 #[post("/{steward_id}/dispute-won")]
 pub async fn record_dispute_won(
     http_req: HttpRequest,
     path: web::Path<String>,
     commons_manager: web::Data<Arc<CommonsManager>>,
 ) -> Result<HttpResponse> {
-    let _claims = get_claims(&http_req)
+    let claims = get_claims(&http_req)
         .ok_or_else(|| GatewayError::AuthenticationFailed("Authentication required".to_string()))?;
 
+    let caller_did: Did = claims
+        .sub
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
+
     let steward_id = path.into_inner();
+
+    // Resolve steward and their jurisdiction for authority check
+    let steward = commons_manager
+        .get_steward(&steward_id)
+        .await
+        .map_err(|e| GatewayError::InternalError(e.to_string()))?
+        .ok_or_else(|| GatewayError::NotFound("Steward not found".to_string()))?;
+
+    let jurisdiction_id = steward
+        .jurisdiction
+        .as_ref()
+        .map(|j| JurisdictionId(j.clone()))
+        .ok_or_else(|| {
+            GatewayError::BadRequest(
+                "Steward has no jurisdiction; cannot determine authority scope".to_string(),
+            )
+        })?;
+
+    require_jurisdiction_authority(&commons_manager, &caller_did, &jurisdiction_id).await?;
 
     commons_manager
         .record_steward_dispute_won(&steward_id)
