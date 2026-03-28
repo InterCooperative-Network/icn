@@ -304,6 +304,10 @@ enum RegistryCommands {
         #[arg(short, long, default_value = "http://localhost:8080")]
         gateway: String,
 
+        /// Bearer token for authentication (defaults to ICN_TOKEN env var)
+        #[arg(short, long)]
+        token: Option<String>,
+
         /// Output as JSON
         #[arg(long)]
         json: bool,
@@ -317,6 +321,10 @@ enum RegistryCommands {
         /// Gateway API URL
         #[arg(short, long, default_value = "http://localhost:8080")]
         gateway: String,
+
+        /// Bearer token for authentication (defaults to ICN_TOKEN env var)
+        #[arg(short, long)]
+        token: Option<String>,
 
         /// Output as JSON
         #[arg(long)]
@@ -10700,8 +10708,13 @@ async fn handle_registry_command(cmd: RegistryCommands) -> Result<()> {
             coop_id,
             meeting_id,
             gateway,
+            token,
             json,
         } => {
+            let token = token
+                .or_else(|| std::env::var("ICN_TOKEN").ok())
+                .context("No token provided. Use --token or set ICN_TOKEN env var.")?;
+
             let client = reqwest::Client::new();
             let mut url = format!("{}/v1/registry/decisions", gateway);
             let mut params: Vec<(&str, String)> = Vec::new();
@@ -10722,6 +10735,7 @@ async fn handle_registry_command(cmd: RegistryCommands) -> Result<()> {
 
             let resp = client
                 .get(&url)
+                .bearer_auth(&token)
                 .send()
                 .await
                 .context("Failed to connect to gateway")?;
@@ -10737,17 +10751,15 @@ async fn handle_registry_command(cmd: RegistryCommands) -> Result<()> {
                 return Ok(());
             }
 
-            let decisions = body["decisions"].as_array().cloned().unwrap_or_default();
+            // ListDecisionsResponse serializes as { "data": [...], "pagination": {...} }
+            let decisions = body["data"].as_array().cloned().unwrap_or_default();
 
             if decisions.is_empty() {
                 println!("No decisions indexed.");
                 return Ok(());
             }
 
-            println!(
-                "{:<44} {:<12} {:<10} Proposal",
-                "Receipt ID", "Coop", "Status"
-            );
+            println!("{:<44} {:<12} {:<10} Title", "Receipt ID", "Coop", "Status");
             println!("{}", "-".repeat(90));
             for d in &decisions {
                 let receipt_id = d["decisionReceiptId"]
@@ -10757,11 +10769,8 @@ async fn handle_registry_command(cmd: RegistryCommands) -> Result<()> {
                     .unwrap_or(d["decisionReceiptId"].as_str().unwrap_or("-"));
                 let coop = d["coopId"].as_str().unwrap_or("-");
                 let status = d["status"].as_str().unwrap_or("-");
-                let proposal = d["proposalId"].as_str().unwrap_or("-");
-                println!(
-                    "{:<44} {:<12} {:<10} {}",
-                    receipt_id, coop, status, proposal
-                );
+                let title = d["title"].as_str().unwrap_or("-");
+                println!("{:<44} {:<12} {:<10} {}", receipt_id, coop, status, title);
             }
             println!("\nTotal: {}", decisions.len());
         }
@@ -10769,13 +10778,19 @@ async fn handle_registry_command(cmd: RegistryCommands) -> Result<()> {
         RegistryCommands::Trace {
             receipt_id,
             gateway,
+            token,
             json,
         } => {
+            let token = token
+                .or_else(|| std::env::var("ICN_TOKEN").ok())
+                .context("No token provided. Use --token or set ICN_TOKEN env var.")?;
+
             let client = reqwest::Client::new();
             let url = format!("{}/v1/registry/decisions/{}/trace", gateway, receipt_id);
 
             let resp = client
                 .get(&url)
+                .bearer_auth(&token)
                 .send()
                 .await
                 .context("Failed to connect to gateway")?;
@@ -10821,7 +10836,8 @@ async fn handle_registry_command(cmd: RegistryCommands) -> Result<()> {
                 Some(e) if !e.is_empty() => {
                     println!("  Effects ({}):", e.len());
                     for effect in e {
-                        let kind = effect["effectType"].as_str().unwrap_or("?");
+                        // DecisionEffect.effect_type has #[serde(rename = "type")]
+                        let kind = effect["type"].as_str().unwrap_or("?");
                         let resolved = effect["resolved"].as_bool().unwrap_or(false);
                         let marker = if resolved { "\u{2713}" } else { "\u{25cb}" };
                         println!("    {} {}", marker, kind);
