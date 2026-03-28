@@ -220,3 +220,107 @@ async fn test_gossip_handle_state_survives_snapshot_restore() {
         "vector clock for own_did must be 1 after one publish via handle, got: {clock_val}"
     );
 }
+
+/// Layer 3 — Same-runtime handle drop + fresh handle restore proof.
+///
+/// Proves that gossip coordination state (vector clock, topic metadata,
+/// subscriptions) survives a same-runtime lifecycle boundary:
+///
+/// 1. Mutate state through a `GossipHandle`.
+/// 2. Export and persist snapshot.
+/// 3. **Drop all Arc refs to the original handle** — actor memory fully
+///    reclaimed.  No in-memory continuity; the snapshot on disk is the only
+///    bridge.
+/// 4. In the **same Tokio runtime**, create a brand-new `GossipHandle` via
+///    `GossipActor::spawn()`.
+/// 5. Restore state into the fresh handle exactly as the supervisor does at
+///    boot (`restore_gossip_snapshot` → `gossip_handle.write().await.restore_state()`).
+/// 6. Assert exact invariants through the fresh handle's read lock.
+///
+/// This is the real supervisor lifecycle: the daemon shuts down, the handle
+/// drops, and at restart a fresh handle is created and restored from snapshot
+/// before accepting any new work.
+#[tokio::test]
+async fn test_gossip_handle_survives_same_runtime_drop_and_recreate() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let data_dir = tmp.path().to_path_buf();
+
+    let own_kp = KeyPair::generate().expect("own KeyPair");
+    let own_did = own_kp.did().clone();
+
+    let subscriber_kp = KeyPair::generate().expect("subscriber KeyPair");
+    let subscriber_did = subscriber_kp.did().clone();
+
+    // ── Phase 1: mutate through handle, export, persist, DROP handle ─────────
+    {
+        let handle: GossipHandle = GossipActor::spawn(own_did.clone(), None);
+
+        {
+            let mut g = handle.write().await;
+            g.create_topic(Topic::new(PROOF_TOPIC.to_string(), AccessControl::Public));
+            g.publish(PROOF_TOPIC, b"layer-3-proof-payload".to_vec())
+                .await
+                .expect("Phase1: publish");
+            g.subscribe(PROOF_TOPIC, subscriber_did.clone())
+                .await
+                .expect("Phase1: subscribe");
+            // write guard drops here
+        }
+
+        // Export via read lock — same path as supervisor shutdown.rs.
+        let gossip_state = handle.read().await.export_state();
+
+        // Persist to disk.
+        let mut snapshot = StateSnapshot::new();
+        snapshot.gossip_state = Some(gossip_state);
+        save_snapshot(&snapshot, &data_dir).expect("Phase1: save_snapshot");
+
+        // handle drops at end of this block — all Arc refs released.
+        // Actor memory is fully reclaimed; snapshot on disk is the only bridge.
+    }
+
+    // ── Boundary: load snapshot from disk only (no in-memory remnant) ────────
+    let snapshot = load_snapshot(&data_dir)
+        .expect("Phase2: load_snapshot")
+        .expect("snapshot must be present after save");
+    let restored_state = snapshot
+        .gossip_state
+        .expect("gossip_state must be present in loaded snapshot");
+
+    // ── Phase 2: brand-new handle in the SAME Tokio runtime ──────────────────
+    // GossipActor::spawn() creates a completely empty actor with no prior state.
+    let handle2: GossipHandle = GossipActor::spawn(own_did.clone(), None);
+
+    // Restore via write lock — the exact path used by restore_gossip_snapshot
+    // in supervisor/init_gossip.rs.
+    handle2
+        .write()
+        .await
+        .restore_state(restored_state)
+        .expect("Phase2: restore_state");
+
+    // ── Exact assertions through the fresh handle's read lock ─────────────────
+
+    let g = handle2.read().await;
+
+    // 1. Topic name survives the full lifecycle boundary.
+    let topics = g.get_topics();
+    assert!(
+        topics.contains(&PROOF_TOPIC.to_string()),
+        "topic {PROOF_TOPIC:?} must survive same-runtime drop+recreate, got: {topics:?}"
+    );
+
+    // 2. Subscriber DID survives in the topic's subscription list.
+    let subscribers = g.get_subscribers(PROOF_TOPIC);
+    assert!(
+        subscribers.iter().any(|d| d == &subscriber_did),
+        "subscriber DID must survive same-runtime drop+recreate, got: {subscribers:?}"
+    );
+
+    // 3. Vector clock entry for own_did survives with exact count.
+    let clock_val = g.get_clock().get(&own_did);
+    assert_eq!(
+        clock_val, 1,
+        "vector clock for own_did must be 1 after same-runtime restore, got: {clock_val}"
+    );
+}

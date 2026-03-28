@@ -1,5 +1,5 @@
 ---
-Status: layers 1-2 complete
+Status: layers 1-3 complete
 Canonical: no
 Last Reviewed: 2026-03-28
 ---
@@ -83,11 +83,52 @@ cargo test -p icn-gossip --test gossip_persistence
 
 ---
 
+---
+
+## Layer 3 — Same-Runtime Handle Drop + Recreate Proof ✅
+
+**What it proves:** Gossip coordination state (vector clock, topic metadata,
+subscriptions) survives a same-runtime lifecycle boundary: the original
+`GossipHandle` is fully dropped (all `Arc` refs released, actor memory
+reclaimed), the snapshot on disk is the only bridge, and a brand-new
+`GossipHandle` created in the same Tokio runtime restores exact state.
+
+This is the real daemon restart cycle: shutdown drops the handle, a fresh
+`GossipActor::spawn()` is created at next boot, and `restore_gossip_snapshot`
+calls `gossip_handle.write().await.restore_state()` before accepting work.
+
+**What is NOT proven by this layer:**
+- Entry durability: entries are intentionally not persisted — not a gap
+- Cross-process memory isolation: requires subprocess (Layer 4)
+
+**Artifact:** `crates/icn-gossip/tests/gossip_persistence.rs` →
+`test_gossip_handle_survives_same_runtime_drop_and_recreate`
+
+**Run:**
+```bash
+cargo test -p icn-gossip --test gossip_persistence
+```
+
+**Lifecycle boundary exercised:**
+1. `GossipHandle` mutated and exported (production path)
+2. `save_snapshot()` persists to disk
+3. All `Arc` refs dropped — actor memory reclaimed
+4. `load_snapshot()` reads from disk (no in-memory remnant)
+5. `GossipActor::spawn()` creates a completely empty fresh actor
+6. `handle2.write().await.restore_state()` — exact supervisor boot path
+7. Assertions via `handle2.read().await` — no hidden continuity
+
+**What is asserted:**
+- Topic name survives the lifecycle boundary
+- Subscriber DID survives
+- Vector clock count is exactly preserved
+
+---
+
 ## What Is NOT Proven
 
 | Gap | Why it matters | Next layer target |
 |-----|---------------|-------------------|
-| Same-runtime close+reopen via `GossipHandle` | Handle drop + re-create not yet proven | Layer 3 |
 | Cross-process restart | Only same-process proven | Layer 4 |
 | Gossip entry re-gossip after restart | Entries intentionally not persisted | Multi-node integration test |
 | Anti-entropy resync after restart | Requires multi-node test | Multi-node integration test |
@@ -95,14 +136,16 @@ cargo test -p icn-gossip --test gossip_persistence
 
 ---
 
-## Next Layer: Layer 3 — Same-Runtime Close+Reopen
+## Next Layer: Layer 4 — Cross-Process Restart
 
-**Target:** Prove that a `GossipHandle` can be dropped, a new
-`GossipActor::spawn()` can be created in the same Tokio runtime, snapshot
-loaded, and `restore_state()` called — without exiting the process.
+**Target:** Prove that gossip coordination state written in one OS process is
+readable in a completely fresh OS process. No shared memory. No shared
+runtime.
 
-**Pattern:** Mirror governance Layer 3 — drop all Arc references to the
-handle, reload snapshot, restore into a fresh handle in the same test runtime.
+**Pattern:** Create a helper binary (or use subprocess spawning directly in
+the test) that writes state in process A and reads + asserts in process B.
+Note: unlike ledger/governance, no sled file lock needs releasing — just the
+JSON snapshot file on disk.
 
 ---
 
@@ -112,5 +155,5 @@ handle, reload snapshot, restore into a fresh handle in the same test runtime.
 |-------|-----------|--------|--------|
 | 1 — Direct struct write + reopen | ✅ | ✅ | ✅ `gossip_persistence.rs` |
 | 2 — Actor/handle-backed path | ✅ | ✅ | ✅ `gossip_persistence.rs` |
-| 3 — Same-runtime close+reopen | ✅ | ✅ | ⏳ |
+| 3 — Same-runtime close+reopen | ✅ | ✅ | ✅ `gossip_persistence.rs` |
 | 4 — Cross-process restart | ✅ | ✅ | ⏳ |
