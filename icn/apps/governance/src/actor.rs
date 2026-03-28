@@ -235,9 +235,47 @@ pub struct GovernanceHandle {
     entity_registry: Option<Arc<dyn icn_entity::EntityRegistry>>,
     /// Optional kernel governance executor for delegated proposal execution
     executor: Option<Arc<dyn icn_kernel_api::governance::GovernanceExecutor>>,
+    /// Shutdown signal for the background scheduler task.
+    /// All clones share the same Arc so `shutdown()` works from any clone.
+    /// Wrapped in Option so the signal is sent exactly once.
+    scheduler_shutdown: Arc<std::sync::Mutex<Option<tokio::sync::oneshot::Sender<()>>>>,
+    /// JoinHandle for the background scheduler task.
+    /// Stored so `shutdown()` can await task completion deterministically instead
+    /// of relying on a fixed sleep. Taken (set to None) on first shutdown call.
+    scheduler_task: Arc<std::sync::Mutex<Option<tokio::task::JoinHandle<()>>>>,
 }
 
 impl GovernanceHandle {
+    /// Signal the background scheduler task to exit and wait for it to complete.
+    ///
+    /// Sends the shutdown signal and awaits the task's `JoinHandle`, giving a
+    /// deterministic guarantee that the task has fully exited and dropped all its
+    /// Arc references (including to the sled store) by the time this returns.
+    ///
+    /// This allows the sled database to be cleanly closed and reopened within the
+    /// same process — enabling true same-runtime restart proofs in tests.
+    ///
+    /// Idempotent: subsequent calls are no-ops (JoinHandle is taken on first call).
+    pub async fn shutdown(&self) {
+        // 1. Send the shutdown signal.
+        if let Ok(mut guard) = self.scheduler_shutdown.lock() {
+            if let Some(tx) = guard.take() {
+                let _ = tx.send(());
+            }
+        }
+        // 2. Take the JoinHandle outside the lock (never hold a sync mutex across .await).
+        let task = self
+            .scheduler_task
+            .lock()
+            .ok()
+            .and_then(|mut g| g.take());
+        // 3. Await task completion. When this returns, handle_clone inside the task
+        //    has been dropped, releasing all captured Arc references.
+        if let Some(t) = task {
+            let _ = t.await;
+        }
+    }
+
     /// Submit a command to the governance actor
     pub async fn submit(&self, cmd: GovernanceCommand) -> Result<()> {
         self.inner.write().await.handle(cmd).await
@@ -1085,6 +1123,7 @@ impl GovernanceActor {
         // Create unified event scheduler and cancellation channel
         let event_scheduler = Arc::new(RwLock::new(BinaryHeap::new()));
         let (cancel_tx, mut cancel_rx) = mpsc::unbounded_channel();
+        let (shutdown_tx, mut shutdown_rx) = tokio::sync::oneshot::channel::<()>();
 
         let actor = GovernanceActor {
             did: did.clone(),
@@ -1100,20 +1139,32 @@ impl GovernanceActor {
             executor: None,
         };
 
+        // Slot for the scheduler task JoinHandle; filled in after spawn.
+        // The Arc is shared with the handle so shutdown() can await it.
+        let scheduler_task_slot: Arc<std::sync::Mutex<Option<tokio::task::JoinHandle<()>>>> =
+            Arc::new(std::sync::Mutex::new(None));
+
         let handle = GovernanceHandle {
             inner: Arc::new(RwLock::new(actor)),
             protocol_params: None,
             entity_registry: None,
             executor: None,
+            scheduler_shutdown: Arc::new(std::sync::Mutex::new(Some(shutdown_tx))),
+            scheduler_task: scheduler_task_slot.clone(),
         };
 
         // Spawn background timer task for scheduled governance events
         let handle_clone = handle.clone();
         let scheduler_clone = event_scheduler.clone();
-        tokio::spawn(async move {
+        let scheduler_join = tokio::spawn(async move {
             let mut interval = tokio::time::interval(SCHEDULER_INTERVAL);
             loop {
                 tokio::select! {
+                    biased;
+                    _ = &mut shutdown_rx => {
+                        info!("Governance scheduler shutting down");
+                        break;
+                    }
                     _ = interval.tick() => {
                         // Check for expired events
                         let now = Instant::now();
@@ -1169,6 +1220,11 @@ impl GovernanceActor {
                 }
             }
         });
+
+        // Store the JoinHandle so shutdown() can await task completion.
+        if let Ok(mut slot) = scheduler_task_slot.lock() {
+            *slot = Some(scheduler_join);
+        }
 
         info!(
             "✓ Governance scheduler started (checking every {}s)",

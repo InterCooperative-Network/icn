@@ -3268,6 +3268,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sled",
+ "tempfile",
  "tokio",
  "tracing",
  "utoipa",

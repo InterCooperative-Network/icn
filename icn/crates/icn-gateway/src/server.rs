@@ -689,6 +689,15 @@ impl GatewayServer {
             crate::service_discovery_mgr::start_expiry_task(service_discovery_manager.clone(), 300);
 
         let federation_manager = Arc::new(FederationManager::new());
+        // TODO: wire CommonsManager to a daemon handle (CommonsHandle) for cross-restart
+        // persistence. Currently all commons/personhood/charter/enrollment state is
+        // in-memory only and will be lost on process restart.
+        // See GovernanceManager::with_handle() for the pattern to follow.
+        warn!(
+            "CommonsManager running in-memory-only mode: \
+             commons/personhood/charter/enrollment state will NOT survive process restart. \
+             Wire a CommonsHandle for production use."
+        );
         let commons_manager = Arc::new(CommonsManager::new());
 
         // Setup agreement manager if provided (for inter-cooperative agreements)
