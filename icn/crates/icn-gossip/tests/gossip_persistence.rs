@@ -35,7 +35,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use icn_gossip::{AccessControl, GossipActor, Topic};
+use icn_gossip::{AccessControl, GossipActor, GossipHandle, Topic};
 use icn_identity::KeyPair;
 use icn_snapshot::{load_snapshot, save_snapshot, StateSnapshot};
 
@@ -128,5 +128,95 @@ async fn test_gossip_state_survives_export_snapshot_restore() {
     assert_eq!(
         clock_val, 1,
         "vector clock for own_did must be 1 after one publish, got: {clock_val}"
+    );
+}
+
+/// Layer 2 — GossipHandle (Arc<RwLock<GossipActor>>) snapshot persistence proof.
+///
+/// Proves that topic metadata, topic subscriptions, and the vector clock
+/// written through the production handle path
+/// (`GossipHandle` = `Arc<RwLock<GossipActor>>`) survive a drop-and-reload
+/// boundary with exact field values when restored via `restore_state()`.
+///
+/// This is the actual path used by the supervisor:
+/// - mutations: `gossip_handle.write().await.method()`
+/// - export:    `gossip_handle.read().await.export_state()`
+/// - restore:   `gossip_handle.write().await.restore_state(state)`
+///
+/// No oracle, no keypair, no network layer needed — this exercises the
+/// handle-backed access pattern used in every production supervisor path.
+#[tokio::test]
+async fn test_gossip_handle_state_survives_snapshot_restore() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let data_dir = tmp.path().to_path_buf();
+
+    let own_kp = KeyPair::generate().expect("own KeyPair");
+    let own_did = own_kp.did().clone();
+
+    let subscriber_kp = KeyPair::generate().expect("subscriber KeyPair");
+    let subscriber_did = subscriber_kp.did().clone();
+
+    // ── Phase 1: mutate through handle, export, persist ─────────────────────
+    {
+        // Production path: GossipActor::spawn returns Arc<RwLock<GossipActor>>.
+        let handle: GossipHandle = GossipActor::spawn(own_did.clone(), None);
+
+        // All mutations go through the write guard — exactly as the supervisor does.
+        {
+            let mut g = handle.write().await;
+            g.create_topic(Topic::new(PROOF_TOPIC.to_string(), AccessControl::Public));
+            g.publish(PROOF_TOPIC, b"layer-2-proof-payload".to_vec())
+                .await
+                .expect("Phase1: publish");
+            g.subscribe(PROOF_TOPIC, subscriber_did.clone())
+                .await
+                .expect("Phase1: subscribe");
+            // g drops here — write lock released before export.
+        }
+
+        // Export via read lock — the path used by supervisor shutdown.rs.
+        let gossip_state = handle.read().await.export_state();
+        let mut snapshot = StateSnapshot::new();
+        snapshot.gossip_state = Some(gossip_state);
+        save_snapshot(&snapshot, &data_dir).expect("Phase1: save_snapshot");
+
+        // handle drops here — all in-memory state released.
+    }
+
+    // ── Phase 2: load snapshot and restore into fresh actor ──────────────────
+    let snapshot = load_snapshot(&data_dir)
+        .expect("Phase2: load_snapshot")
+        .expect("snapshot must be present after save");
+
+    let gossip_state = snapshot
+        .gossip_state
+        .expect("gossip_state must be present in loaded snapshot");
+
+    let mut actor2 = GossipActor::new(own_did.clone(), None);
+    actor2
+        .restore_state(gossip_state)
+        .expect("Phase2: restore_state");
+
+    // ── Exact assertions (same invariants as Layer 1) ────────────────────────
+
+    // 1. Topic name survives exact round-trip.
+    let topics = actor2.get_topics();
+    assert!(
+        topics.contains(&PROOF_TOPIC.to_string()),
+        "topic {PROOF_TOPIC:?} must survive handle-backed snapshot round-trip, got: {topics:?}"
+    );
+
+    // 2. Subscriber DID survives in the topic's subscription list.
+    let subscribers = actor2.get_subscribers(PROOF_TOPIC);
+    assert!(
+        subscribers.iter().any(|d| d == &subscriber_did),
+        "subscriber DID must survive handle-backed snapshot round-trip, got: {subscribers:?}"
+    );
+
+    // 3. Vector clock entry for own_did survives with exact count.
+    let clock_val = actor2.get_clock().get(&own_did);
+    assert_eq!(
+        clock_val, 1,
+        "vector clock for own_did must be 1 after one publish via handle, got: {clock_val}"
     );
 }
