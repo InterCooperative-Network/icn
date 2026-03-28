@@ -2860,6 +2860,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "icn-commons"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "hex",
+ "icn-governance",
+ "icn-identity",
+ "icn-obs",
+ "icn-time",
+ "lru",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+ "sha2",
+ "sled",
+ "tempfile",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "icn-community"
 version = "0.1.0"
 dependencies = [
@@ -3134,6 +3155,7 @@ dependencies = [
  "hex",
  "icn-api",
  "icn-ccl",
+ "icn-commons",
  "icn-community",
  "icn-compute",
  "icn-coop",

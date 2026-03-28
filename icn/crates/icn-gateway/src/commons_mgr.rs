@@ -1,800 +1,295 @@
 //! Commons Manager for Gateway API
 //!
-//! Provides Commons Evolution operations for the gateway API:
-//! - PersonhoodAnchor management (Layer 0)
-//! - CommonsHolderRecord management (Layer 1)
-//! - Charter management (Layer 2)
-//! - Affiliation/membership management
+//! Thin gateway facade that delegates all substrate operations through
+//! [`CommonsHandle`] (defined in `icn-commons`).
+//!
+//! Gateway-local concerns (enrollment sessions, governance DTOs) remain here.
 
-use anyhow::{bail, Context, Result};
+use anyhow::Result;
+use hex;
+use icn_commons::CommonsHandle;
 use icn_governance::{
     Amendment, AmendmentChange, AmendmentId, AmendmentStatus, Appeal, AppealEvidence, AppealId,
-    AppealOutcome, AppealResponse, AppealStatus, Charter, CharterStatus, OrgType, Ratification,
-    StewardRecord, StewardStatus,
+    AppealOutcome, AppealResponse, AppealStatus, Charter, CharterStatus, FounderSignature, OrgType,
+    Ratification, StewardRecord, StewardStatus,
 };
 use icn_identity::{
-    Affiliation, Anchor, AnchorStatus, CommonsHolderRecord, CommonsRevocationReason, Did,
-    EnrollmentPathway, HolderStatus, JurisdictionId, MembershipCapability, MembershipStatus,
-    POPAttestation, POPLevel, POPMethod, PersonhoodAnchor, RevocationRecord, RevocationRegistry,
-    RevocationScope, RevocationType,
+    Affiliation, AnchorStatus, CommonsHolderRecord, CommonsRevocationReason, Did, HolderStatus,
+    JurisdictionId, MembershipCapability, MembershipStatus, POPAttestation, PersonhoodAnchor,
+    RevocationRecord, RevocationScope, RevocationType,
 };
-use sha2::{Digest, Sha256};
-use std::sync::Arc;
-use tracing::{info, warn};
+use std::{collections::HashMap, sync::Arc};
+use tokio::sync::RwLock;
 
-use crate::commons_store::{
-    CommonsStore, CommonsStoreBackend, InMemoryCommonsStore, SledCommonsStore,
-};
 use crate::models::{
     AmendmentsBreakdown, AppealsBreakdown, GovernanceActivityEvent, GovernanceDashboard,
     StewardDetailResponse, StewardSummaryResponse,
 };
 
-/// Commons Manager for gateway API
-///
-/// Uses CommonsStore for persistent/in-memory storage of:
-/// - PersonhoodAnchors (Layer 0)
-/// - CommonsHolderRecords (Layer 1)
-/// - Charters (Layer 2)
-/// - StewardRecords, Amendments, Appeals
-///
-/// RevocationRegistry is kept separate for now.
-pub struct CommonsManager<S: CommonsStoreBackend = Arc<dyn CommonsStoreBackend>> {
-    /// Storage backend
-    store: CommonsStore<S>,
+// ============================================================================
+// CommonsManager struct
+// ============================================================================
 
-    /// Revocation registry (kept separate from main store)
-    revocations: RevocationRegistry,
+/// Thin gateway facade for commons operations.
+///
+/// All substrate operations (anchors, holders, charters, stewards, amendments,
+/// appeals, revocations, membership, affiliations) are delegated to the
+/// [`CommonsHandle`] from `icn-commons`. Enrollment sessions are managed
+/// in-memory as a gateway-local concern (not persisted via the substrate).
+pub struct CommonsManager {
+    handle: CommonsHandle,
+    /// Gateway-local: enrollment sessions (in-memory; not substrate state).
+    enrollment_sessions:
+        Arc<RwLock<HashMap<String, crate::api::sdis::simple_enrollment::EnrollmentSession>>>,
 }
 
-impl CommonsManager<Arc<dyn CommonsStoreBackend>> {
-    /// Create a new commons manager with in-memory storage (testing / no data_dir configured)
+impl CommonsManager {
+    /// Create with an in-memory handle (testing / no data_dir configured).
     pub fn new() -> Self {
-        let backend: Arc<dyn CommonsStoreBackend> = Arc::new(InMemoryCommonsStore::new());
-        Self::with_store(Arc::new(backend))
-    }
-
-    /// Create a new commons manager with persistent Sled storage
-    ///
-    /// Data will persist across gateway restarts at the given path.
-    pub fn with_sled_path(path: impl AsRef<std::path::Path>) -> Result<Self> {
-        let backend: Arc<dyn CommonsStoreBackend> =
-            Arc::new(SledCommonsStore::open(path).context("Failed to open commons sled store")?);
-        Ok(Self::with_store(Arc::new(backend)))
-    }
-
-    /// Create a new commons manager with a temporary Sled database
-    ///
-    /// Useful for testing persistent storage behavior without leaving files.
-    pub fn with_sled_temporary() -> Result<Self> {
-        let backend: Arc<dyn CommonsStoreBackend> = Arc::new(
-            SledCommonsStore::temporary()
-                .context("Failed to create temporary commons sled store")?,
-        );
-        Ok(Self::with_store(Arc::new(backend)))
-    }
-
-    /// Flush all pending writes to disk
-    pub fn flush(&self) -> Result<()> {
-        self.store.backend().flush()
-    }
-}
-
-impl<S: CommonsStoreBackend> CommonsManager<S> {
-    /// Create a new commons manager with a custom store backend
-    pub fn with_store(backend: Arc<S>) -> Self {
         CommonsManager {
-            store: CommonsStore::new(backend),
-            revocations: RevocationRegistry::new(),
+            handle: CommonsHandle::new_in_memory(),
+            enrollment_sessions: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
-    /// Get a reference to the underlying store
-    pub fn store(&self) -> &CommonsStore<S> {
-        &self.store
+    /// Create with a Sled-backed handle for durable persistence.
+    pub fn with_sled_path(path: impl AsRef<std::path::Path>) -> Result<Self> {
+        Ok(CommonsManager {
+            handle: CommonsHandle::with_sled_path(path)?,
+            enrollment_sessions: Arc::new(RwLock::new(HashMap::new())),
+        })
     }
 
-    // ========== PersonhoodAnchor Operations (Layer 0) ==========
+    /// Create with a temporary Sled-backed handle (persistence testing).
+    pub fn with_sled_temporary() -> Result<Self> {
+        Ok(CommonsManager {
+            handle: CommonsHandle::with_sled_temporary()?,
+            enrollment_sessions: Arc::new(RwLock::new(HashMap::new())),
+        })
+    }
 
-    /// Create a new PersonhoodAnchor from enrollment completion
-    ///
-    /// This creates a full PersonhoodAnchor with an underlying SDIS Anchor
-    /// and an initial POP attestation.
+    /// Create from an existing [`CommonsHandle`] (for sharing with actors).
+    pub fn with_handle(handle: CommonsHandle) -> Self {
+        CommonsManager {
+            handle,
+            enrollment_sessions: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    /// Flush pending writes to durable storage.
+    pub async fn flush(&self) -> Result<()> {
+        self.handle.flush().await
+    }
+}
+
+impl Default for CommonsManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ============================================================================
+// PersonhoodAnchor Operations (Layer 0)
+// ============================================================================
+
+impl CommonsManager {
+    /// Create a new PersonhoodAnchor from enrollment completion.
     pub async fn create_anchor_from_enrollment(
         &self,
         did: &Did,
         steward_did: Option<&Did>,
     ) -> Result<PersonhoodAnchor> {
-        // Generate pseudo-VUI from DID (in real SDIS, this comes from ceremony)
-        let mut hasher = Sha256::new();
-        hasher.update(b"gateway-enrollment-vui:");
-        hasher.update(did.as_str().as_bytes());
-        let vui_result = hasher.finalize();
-        let mut vui = [0u8; 32];
-        vui.copy_from_slice(&vui_result);
-
-        // Generate genesis random
-        let mut genesis = [0u8; 32];
-        use rand::RngCore;
-        rand::thread_rng().fill_bytes(&mut genesis);
-
-        // Create the underlying SDIS Anchor
-        let pathway = if let Some(did) = steward_did {
-            EnrollmentPathway::WebOfTrust {
-                vouchers: vec![did.clone()],
-                vouched_at: icn_time::current_timestamp_secs(),
-            }
-        } else {
-            EnrollmentPathway::Genesis {
-                reason: "Gateway enrollment".to_string(),
-            }
-        };
-
-        let sdis_anchor = Anchor::from_vui(&vui, pathway, &genesis);
-        let anchor_id_bytes = sdis_anchor.id;
-
-        // Create POP attestation
-        let (pop_method, pop_level, issuer) = if let Some(steward) = steward_did {
-            (
-                POPMethod::Sponsored {
-                    sponsor_did: steward.clone(),
-                },
-                POPLevel::Strong,
-                steward.clone(),
-            )
-        } else {
-            (
-                POPMethod::Genesis {
-                    reason: "Gateway enrollment".to_string(),
-                },
-                POPLevel::Weak,
-                did.clone(),
-            )
-        };
-
-        // SECURITY NOTE: Gateway cannot sign attestations (no private key access).
-        // This creates an UNSIGNED attestation suitable for development/testing only.
-        // Production requires client-side signing before submission.
-        // See: https://github.com/InterCooperative-Network/icn/issues/133
-        let attestation = POPAttestation::new(
-            &anchor_id_bytes,
-            issuer,
-            pop_method,
-            pop_level,
-            Vec::new(), // UNSIGNED - gateway lacks signing capability
-            None,       // No expiry
-        );
-        warn!(
-            "Created UNSIGNED attestation for anchor {} - requires client-side signing for production",
-            hex::encode(anchor_id_bytes)
-        );
-
-        // DEVELOPMENT ONLY: Derive a placeholder key from the DID.
-        // Production anchors must provide their actual Ed25519 public key.
-        // See: https://github.com/InterCooperative-Network/icn/issues/133
-        let mut key_hasher = Sha256::new();
-        key_hasher.update(b"gateway-dev-placeholder-key:");
-        key_hasher.update(did.as_str().as_bytes());
-        let key_result = key_hasher.finalize();
-        let mut current_key = [0u8; 32];
-        current_key.copy_from_slice(&key_result);
-        warn!(
-            "Using PLACEHOLDER key for anchor {} - production requires real public key",
-            hex::encode(anchor_id_bytes)
-        );
-
-        // Create PersonhoodAnchor
-        let anchor = PersonhoodAnchor::new(sdis_anchor, attestation, current_key);
-
-        // Check if anchor already exists
-        let anchor_id = hex::encode(anchor.id());
-        if self.store.get_anchor(&anchor_id)?.is_some() {
-            bail!("Anchor already exists: {anchor_id}");
-        }
-
-        // Store anchor
-        self.store.put_anchor(&anchor)?;
-
-        // Also index by the enrollment DID (which may differ from anchor's internal DID)
-        let did_str = did.to_string();
-        self.store.put_anchor_did_index(&did_str, &anchor_id)?;
-
-        // Record metrics
-        icn_obs::metrics::commons::anchor_created_inc();
-
-        // Audit log
-        info!(
-            target: "commons_audit",
-            action = "anchor_created",
-            anchor_id = %anchor_id,
-            did = %did_str,
-            steward_vouched = steward_did.is_some(),
-            "PersonhoodAnchor created"
-        );
-
-        Ok(anchor)
+        self.handle
+            .create_anchor_from_enrollment(did, steward_did)
+            .await
     }
 
-    /// Get a PersonhoodAnchor by ID
+    /// Get a PersonhoodAnchor by ID.
     pub async fn get_anchor(&self, anchor_id: &str) -> Result<Option<PersonhoodAnchor>> {
-        self.store.get_anchor(anchor_id)
+        self.handle.get_anchor(anchor_id).await
     }
 
-    /// Get a PersonhoodAnchor by DID
+    /// Get a PersonhoodAnchor by DID.
     pub async fn get_anchor_by_did(&self, did: &Did) -> Result<Option<PersonhoodAnchor>> {
-        let did_str = did.to_string();
-        self.store.get_anchor_by_did(&did_str)
+        self.handle.get_anchor_by_did(did).await
     }
 
-    /// Update anchor status
+    /// Update anchor status.
     pub async fn update_anchor_status(&self, anchor_id: &str, status: AnchorStatus) -> Result<()> {
-        let mut anchor = self
-            .store
-            .get_anchor(anchor_id)?
-            .ok_or_else(|| anyhow::anyhow!("Anchor not found: {anchor_id}"))?;
-
-        anchor.status = status.clone();
-        anchor.updated_at = icn_time::current_timestamp_secs();
-
-        self.store.put_anchor(&anchor)?;
-
-        // Record status change metrics
-        match &status {
-            AnchorStatus::Suspended { .. } => {
-                icn_obs::metrics::commons::anchor_suspended_inc("status_update");
-            }
-            AnchorStatus::Revoked { .. } => {
-                icn_obs::metrics::commons::anchor_revoked_inc("status_update");
-            }
-            _ => {}
-        }
-
-        // Audit log
-        info!(
-            target: "commons_audit",
-            action = "anchor_status_updated",
-            anchor_id = %anchor_id,
-            new_status = ?status,
-            "PersonhoodAnchor status updated"
-        );
-
-        Ok(())
+        self.handle.update_anchor_status(anchor_id, status).await
     }
 
-    /// Add an attestation to an anchor
+    /// Add an attestation to an anchor.
     pub async fn add_attestation(
         &self,
         anchor_id: &str,
         attestation: POPAttestation,
     ) -> Result<()> {
-        let mut anchor = self
-            .store
-            .get_anchor(anchor_id)?
-            .ok_or_else(|| anyhow::anyhow!("Anchor not found: {anchor_id}"))?;
-
-        let method_name = format!("{:?}", attestation.method);
-        anchor.add_attestation(attestation);
-        self.store.put_anchor(&anchor)?;
-
-        // Record verification metric
-        icn_obs::metrics::commons::anchor_verified_inc(&method_name);
-
-        // Audit log
-        info!(
-            target: "commons_audit",
-            action = "attestation_added",
-            anchor_id = %anchor_id,
-            method = %method_name,
-            "POP attestation added to anchor"
-        );
-
-        Ok(())
+        self.handle.add_attestation(anchor_id, attestation).await
     }
+}
 
-    // ========== CommonsHolderRecord Operations (Layer 1) ==========
+// ============================================================================
+// CommonsHolderRecord Operations (Layer 1)
+// ============================================================================
 
-    /// Create a CommonsHolderRecord from an anchor
+impl CommonsManager {
+    /// Create a CommonsHolderRecord from an anchor.
     pub async fn create_holder_from_anchor(
         &self,
         anchor_id: &str,
         did: &Did,
     ) -> Result<CommonsHolderRecord> {
-        self.create_holder_from_anchor_with_name(anchor_id, did, None)
-            .await
+        self.handle.create_holder_from_anchor(anchor_id, did).await
     }
 
-    /// Create a CommonsHolderRecord from an anchor with an optional display name
+    /// Create a CommonsHolderRecord from an anchor with an optional display name.
     pub async fn create_holder_from_anchor_with_name(
         &self,
         anchor_id: &str,
         did: &Did,
         display_name: Option<String>,
     ) -> Result<CommonsHolderRecord> {
-        // Verify anchor exists and get its POP level
-        let anchor = self
-            .get_anchor(anchor_id)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Anchor not found: {anchor_id}"))?;
-
-        // Convert anchor_id hex string to bytes
-        let anchor_bytes: [u8; 32] = hex::decode(anchor_id)?
-            .try_into()
-            .map_err(|_| anyhow::anyhow!("Invalid anchor_id length"))?;
-
-        // Get the POP level from the anchor (default to Weak if no attestations)
-        let pop_level = anchor.pop_level().unwrap_or(POPLevel::Weak);
-
-        // Create holder with baseline Commons Rights
-        let mut holder = CommonsHolderRecord::new(anchor_bytes, did.clone(), pop_level);
-
-        // Set display name if provided
-        if let Some(name) = display_name {
-            holder.display_name = Some(name);
-        }
-
-        // Check if holder already exists
-        let holder_id = hex::encode(holder.id());
-        if self.store.get_holder(&holder_id)?.is_some() {
-            bail!("Holder already exists: {holder_id}");
-        }
-
-        // Store holder (this also updates DID and anchor indexes)
-        self.store.put_holder(&holder)?;
-
-        // Record metrics
-        icn_obs::metrics::commons::holder_created_inc();
-
-        // Audit log
-        let did_str = did.to_string();
-        info!(
-            target: "commons_audit",
-            action = "holder_created",
-            holder_id = %holder_id,
-            anchor_id = %anchor_id,
-            did = %did_str,
-            pop_level = ?pop_level,
-            "CommonsHolderRecord created"
-        );
-
-        Ok(holder)
+        self.handle
+            .create_holder_from_anchor_with_name(anchor_id, did, display_name)
+            .await
     }
 
-    /// Get a CommonsHolderRecord by ID
+    /// Get a CommonsHolderRecord by ID.
     pub async fn get_holder(&self, holder_id: &str) -> Result<Option<CommonsHolderRecord>> {
-        self.store.get_holder(holder_id)
+        self.handle.get_holder(holder_id).await
     }
 
-    /// Get a CommonsHolderRecord by DID
+    /// Get a CommonsHolderRecord by DID.
     pub async fn get_holder_by_did(&self, did: &Did) -> Result<Option<CommonsHolderRecord>> {
-        let did_str = did.to_string();
-        self.store.get_holder_by_did(&did_str)
+        self.handle.get_holder_by_did(did).await
     }
 
     /// Update the display name for a holder identified by DID.
-    /// If no holder record exists yet, creates a minimal holder record directly.
     pub async fn update_display_name(&self, did: &Did, display_name: String) -> Result<()> {
-        let did_str = did.to_string();
-        if let Some(mut holder) = self.store.get_holder_by_did(&did_str)? {
-            holder.set_display_name(display_name);
-            self.store.put_holder(&holder)?;
-        } else {
-            // Create a minimal holder record directly (no anchor required).
-            // This is used for demo seeding where members don't go through
-            // full SDIS enrollment but still need display names.
-            let anchor_bytes: [u8; 32] = Sha256::digest(did_str.as_bytes()).into();
-            let mut holder = CommonsHolderRecord::new(anchor_bytes, did.clone(), POPLevel::Weak);
-            holder.set_display_name(display_name);
-            self.store.put_holder(&holder)?;
-        }
-        Ok(())
+        self.handle.update_display_name(did, display_name).await
     }
 
-    /// Get or create a CommonsHolderRecord (idempotent)
-    ///
-    /// This method provides create-or-get semantics for holders:
-    /// - If a holder already exists for this anchor, returns it
-    /// - If no holder exists, creates a new one
-    ///
-    /// This is critical for enrollment idempotency: calling this method
-    /// multiple times with the same anchor_id returns the same holder.
-    ///
-    /// # Arguments
-    /// * `anchor_id` - Hex-encoded anchor ID
-    /// * `did` - The DID for the holder
-    /// * `display_name` - Optional display name (only used if creating new)
-    ///
-    /// # Returns
-    /// The existing or newly created CommonsHolderRecord
+    /// Get or create a CommonsHolderRecord (idempotent).
     pub async fn get_or_create_holder(
         &self,
         anchor_id: &str,
         did: &Did,
         display_name: Option<String>,
     ) -> Result<CommonsHolderRecord> {
-        // First, try to find existing holder by anchor ID
-        if let Some(holder) = self.store.get_holder_by_anchor(anchor_id)? {
-            info!(
-                target: "commons_audit",
-                action = "holder_get_or_create_existing",
-                holder_id = %hex::encode(holder.id()),
-                anchor_id = %anchor_id,
-                "Returning existing holder for anchor"
-            );
-            return Ok(holder);
-        }
-
-        // No existing holder, create new one
-        // This delegates to create_holder_from_anchor_with_name which handles
-        // anchor validation, metrics, and audit logging
-        self.create_holder_from_anchor_with_name(anchor_id, did, display_name)
+        self.handle
+            .get_or_create_holder(anchor_id, did, display_name)
             .await
     }
 
-    /// Update holder status
+    /// Update holder status.
     pub async fn update_holder_status(&self, holder_id: &str, status: HolderStatus) -> Result<()> {
-        let mut holder = self
-            .store
-            .get_holder(holder_id)?
-            .ok_or_else(|| anyhow::anyhow!("Holder not found: {holder_id}"))?;
-
-        holder.status = status.clone();
-        holder.updated_at = icn_time::current_timestamp_secs();
-
-        self.store.put_holder(&holder)?;
-
-        // Record status change metric
-        icn_obs::metrics::commons::holder_status_changed_inc(&format!("{status:?}"));
-
-        // Audit log
-        info!(
-            target: "commons_audit",
-            action = "holder_status_updated",
-            holder_id = %holder_id,
-            new_status = ?status,
-            "CommonsHolderRecord status updated"
-        );
-
-        Ok(())
+        self.handle.update_holder_status(holder_id, status).await
     }
+}
 
-    // ========== Affiliation Operations ==========
+// ============================================================================
+// Affiliation Operations
+// ============================================================================
 
+impl CommonsManager {
     /// Add an affiliation (join jurisdiction).
-    ///
-    /// Sybil resistance: requires at least `POPLevel::Strong` to join.
     pub async fn join_jurisdiction(
         &self,
         holder_id: &str,
         jurisdiction: JurisdictionId,
         initial_capabilities: Vec<MembershipCapability>,
     ) -> Result<Affiliation> {
-        let mut holder = self
-            .store
-            .get_holder(holder_id)?
-            .ok_or_else(|| anyhow::anyhow!("Holder not found: {holder_id}"))?;
-
-        // Sybil gate: require at least Strong POP level
-        if holder.personhood_level < POPLevel::Strong {
-            bail!(
-                "Joining a jurisdiction requires at least Strong POP level (current: Weak). \
-                 Obtain additional attestations to upgrade."
-            );
-        }
-
-        // Check if already affiliated
-        if holder
-            .affiliations
-            .iter()
-            .any(|a| a.jurisdiction_id == jurisdiction)
-        {
-            bail!(
-                "Already affiliated with jurisdiction: {}",
-                jurisdiction.as_str()
-            );
-        }
-
-        // Create affiliation (starts as Candidate by default)
-        let now = icn_time::current_timestamp_secs();
-
-        let affiliation = Affiliation {
-            jurisdiction_id: jurisdiction.clone(),
-            membership_status: MembershipStatus::Candidate,
-            capabilities: initial_capabilities,
-            roles: Vec::new(),
-            joined_at: now,
-            expires_at: None,
-        };
-
-        holder.affiliations.push(affiliation.clone());
-        holder.updated_at = now;
-
-        self.store.put_holder(&holder)?;
-
-        // Record membership join metric
-        icn_obs::metrics::commons::membership_joined_inc(jurisdiction.as_str());
-
-        // Audit log
-        info!(
-            target: "commons_audit",
-            action = "membership_joined",
-            holder_id = %holder_id,
-            jurisdiction = %jurisdiction.as_str(),
-            capabilities_count = affiliation.capabilities.len(),
-            "Holder joined jurisdiction"
-        );
-
-        Ok(affiliation)
+        self.handle
+            .join_jurisdiction(holder_id, jurisdiction, initial_capabilities)
+            .await
     }
 
-    /// Leave a jurisdiction
+    /// Leave a jurisdiction.
     pub async fn leave_jurisdiction(
         &self,
         holder_id: &str,
         jurisdiction: &JurisdictionId,
     ) -> Result<()> {
-        let mut holder = self
-            .store
-            .get_holder(holder_id)?
-            .ok_or_else(|| anyhow::anyhow!("Holder not found: {holder_id}"))?;
-
-        // Find and update affiliation status to Exited
-        if let Some(affiliation) = holder
-            .affiliations
-            .iter_mut()
-            .find(|a| &a.jurisdiction_id == jurisdiction)
-        {
-            affiliation.membership_status = MembershipStatus::Exited;
-            holder.updated_at = icn_time::current_timestamp_secs();
-            self.store.put_holder(&holder)?;
-
-            // Record exit metric
-            icn_obs::metrics::commons::membership_exited_inc(jurisdiction.as_str());
-
-            // Audit log
-            info!(
-                target: "commons_audit",
-                action = "membership_exited",
-                holder_id = %holder_id,
-                jurisdiction = %jurisdiction.as_str(),
-                "Holder left jurisdiction"
-            );
-
-            Ok(())
-        } else {
-            bail!(
-                "Not affiliated with jurisdiction: {}",
-                jurisdiction.as_str()
-            )
-        }
+        self.handle
+            .leave_jurisdiction(holder_id, jurisdiction)
+            .await
     }
 
-    /// Update affiliation status (e.g., Candidate -> Member)
+    /// Update affiliation status.
     pub async fn update_affiliation_status(
         &self,
         holder_id: &str,
         jurisdiction: &JurisdictionId,
         status: MembershipStatus,
     ) -> Result<()> {
-        let mut holder = self
-            .store
-            .get_holder(holder_id)?
-            .ok_or_else(|| anyhow::anyhow!("Holder not found: {holder_id}"))?;
-
-        if let Some(affiliation) = holder
-            .affiliations
-            .iter_mut()
-            .find(|a| &a.jurisdiction_id == jurisdiction)
-        {
-            affiliation.membership_status = status;
-            holder.updated_at = icn_time::current_timestamp_secs();
-            self.store.put_holder(&holder)?;
-
-            // Record status-specific metrics
-            let jurisdiction_str = jurisdiction.as_str();
-            match status {
-                MembershipStatus::Suspended => {
-                    icn_obs::metrics::commons::membership_suspended_inc(jurisdiction_str);
-                }
-                MembershipStatus::Banned => {
-                    icn_obs::metrics::commons::membership_banned_inc(jurisdiction_str);
-                }
-                _ => {}
-            }
-
-            // Audit log
-            info!(
-                target: "commons_audit",
-                action = "membership_status_updated",
-                holder_id = %holder_id,
-                jurisdiction = %jurisdiction_str,
-                new_status = ?status,
-                "Membership status updated"
-            );
-
-            Ok(())
-        } else {
-            bail!(
-                "Not affiliated with jurisdiction: {}",
-                jurisdiction.as_str()
-            )
-        }
+        self.handle
+            .update_affiliation_status(holder_id, jurisdiction, status)
+            .await
     }
 
-    /// List affiliations for a holder
+    /// List affiliations for a holder.
     pub async fn list_affiliations(&self, holder_id: &str) -> Result<Vec<Affiliation>> {
-        let holder = self
-            .store
-            .get_holder(holder_id)?
-            .ok_or_else(|| anyhow::anyhow!("Holder not found: {holder_id}"))?;
-
-        Ok(holder.affiliations.clone())
+        self.handle.list_affiliations(holder_id).await
     }
+}
 
-    // ========== Charter Operations (Layer 2) ==========
+// ============================================================================
+// Charter Operations (Layer 2)
+// ============================================================================
 
-    /// Store a charter
+impl CommonsManager {
+    /// Store a charter.
     pub async fn store_charter(&self, charter: Charter) -> Result<()> {
-        let charter_id = charter.charter_id.to_hex();
-        let org_type = format!("{:?}", charter.org_type);
-
-        // Check if charter already exists
-        if self.store.get_charter(&charter_id)?.is_some() {
-            bail!("Charter already exists: {charter_id}");
-        }
-
-        // Store charter (this also updates the domain index)
-        self.store.put_charter(&charter)?;
-
-        // Record charter creation metric
-        icn_obs::metrics::commons::charter_created_inc(&org_type);
-
-        // Audit log
-        info!(
-            target: "commons_audit",
-            action = "charter_created",
-            charter_id = %charter_id,
-            org_type = %org_type,
-            domain_id = %charter.domain_id,
-            founders_count = charter.founders.len(),
-            "Charter created"
-        );
-
-        Ok(())
+        self.handle.store_charter(charter).await
     }
 
-    /// Get a charter by ID
+    /// Get a charter by ID.
     pub async fn get_charter(&self, charter_id: &str) -> Result<Option<Charter>> {
-        self.store.get_charter(charter_id)
+        self.handle.get_charter(charter_id).await
     }
 
-    /// Get a charter by domain ID
+    /// Get a charter by domain ID.
     pub async fn get_charter_by_domain(&self, domain_id: &str) -> Result<Option<Charter>> {
-        self.store.get_charter_by_domain(domain_id)
+        self.handle.get_charter_by_domain(domain_id).await
     }
 
-    /// List all charters with optional filters
+    /// List charters with optional filters.
     pub async fn list_charters(
         &self,
         org_type: Option<OrgType>,
         status: Option<CharterStatus>,
     ) -> Result<Vec<Charter>> {
-        let all_charters = self.store.list_charters()?;
-
-        let mut results: Vec<Charter> = all_charters
-            .into_iter()
-            .filter(|c| {
-                let type_match = org_type.as_ref().is_none_or(|t| c.org_type == *t);
-                let status_match = status.as_ref().is_none_or(|s| c.status == *s);
-                type_match && status_match
-            })
-            .collect();
-
-        // Sort by creation time, newest first
-        results.sort_by(|a, b| b.created_at.cmp(&a.created_at));
-
-        Ok(results)
+        self.handle.list_charters(org_type, status).await
     }
 
-    /// Add a founder signature to a charter
-    ///
-    /// Requirements:
-    /// - Charter must be in Draft status
-    /// - Signer must not have already signed
-    ///
-    /// Returns the updated charter with the new signature count
+    /// Add a charter signature.
     pub async fn add_charter_signature(
         &self,
         charter_id: &str,
-        signature: icn_governance::FounderSignature,
+        signature: FounderSignature,
     ) -> Result<Charter> {
-        let mut charter = self
-            .store
-            .get_charter(charter_id)?
-            .ok_or_else(|| anyhow::anyhow!("Charter not found: {charter_id}"))?;
-
-        // Validate charter is in Draft status
-        if !matches!(charter.status, CharterStatus::Draft) {
-            bail!(
-                "Cannot sign charter in status {:?}, must be Draft",
-                charter.status
-            );
-        }
-
-        // Check if already signed by this DID
-        if charter.founders.iter().any(|f| f.did == signature.did) {
-            bail!("Signer has already signed this charter");
-        }
-
-        // Add the signature
-        let signer_did = signature.did.to_string();
-        charter.add_founder(signature);
-
-        // Persist updated charter
-        self.store.put_charter(&charter)?;
-
-        // Audit log
-        info!(
-            target: "commons_audit",
-            action = "charter_signed",
-            charter_id = %charter_id,
-            signer = %signer_did,
-            total_founders = charter.founders.len(),
-            "Charter signed by founder"
-        );
-
-        Ok(charter)
+        self.handle
+            .add_charter_signature(charter_id, signature)
+            .await
     }
 
-    /// Update charter status
+    /// Update charter status.
     pub async fn update_charter_status(
         &self,
         charter_id: &str,
         status: CharterStatus,
     ) -> Result<()> {
-        let mut charter = self
-            .store
-            .get_charter(charter_id)?
-            .ok_or_else(|| anyhow::anyhow!("Charter not found: {charter_id}"))?;
-
-        charter.status = status.clone();
-        // Note: Charter doesn't have an updated_at field
-        // Status changes are tracked via amendments in production
-        self.store.put_charter(&charter)?;
-
-        // Record status-specific metrics
-        match &status {
-            CharterStatus::Active => {
-                icn_obs::metrics::commons::charter_activated_inc();
-            }
-            CharterStatus::Suspended { .. } => {
-                icn_obs::metrics::commons::charter_suspended_inc();
-            }
-            CharterStatus::Dissolved { .. } => {
-                icn_obs::metrics::commons::charter_dissolved_inc();
-            }
-            _ => {}
-        }
-
-        // Audit log
-        info!(
-            target: "commons_audit",
-            action = "charter_status_updated",
-            charter_id = %charter_id,
-            new_status = ?status,
-            "Charter status updated"
-        );
-
-        Ok(())
+        self.handle.update_charter_status(charter_id, status).await
     }
+}
 
-    // ========== Steward Operations ==========
+// ============================================================================
+// Steward Operations
+// ============================================================================
 
-    /// Register a new steward from a Commons Holder
-    ///
-    /// Requirements:
-    /// - Must be an active Commons Holder
-    /// - Must have at least Strong POP level
-    /// - Must have governance approval (proposal ID)
+impl CommonsManager {
+    /// Register a new steward.
     pub async fn register_steward(
         &self,
         holder_did: &Did,
@@ -805,386 +300,180 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
         jurisdiction: Option<String>,
         specializations: Vec<String>,
     ) -> Result<StewardRecord> {
-        // Verify holder exists and is active
-        let holder = self
-            .get_holder_by_did(holder_did)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Holder not found for DID: {holder_did}"))?;
-
-        if !holder.is_active() {
-            bail!("Holder is not active");
-        }
-
-        // Require at least Strong POP level to become a steward
-        if holder.personhood_level < POPLevel::Strong {
-            bail!("Steward requires at least Strong POP level");
-        }
-
-        // Check not already a steward
-        if self.get_steward_by_did(steward_did).await?.is_some() {
-            bail!("Already registered as steward");
-        }
-
-        // Calculate term
-        let now = icn_time::current_timestamp_secs();
-        let term_end = now + (term_duration_days * 24 * 60 * 60);
-
-        // Create steward record
-        let mut steward = StewardRecord::new(
-            steward_did.clone(),
-            holder_did.clone(),
-            now,
-            term_end,
-            bond_amount,
-            governance_approval,
-        );
-
-        // Set optional fields
-        if let Some(ref j) = jurisdiction {
-            steward.jurisdiction = Some(j.clone());
-        }
-        for spec in specializations {
-            steward.add_specialization(spec);
-        }
-
-        // Store
-        self.store_steward(steward.clone()).await?;
-
-        // Audit log
-        info!(
-            target: "commons_audit",
-            action = "steward_registered",
-            steward_id = %steward.steward_id.to_hex(),
-            steward_did = %steward_did.to_string(),
-            holder_did = %holder_did.to_string(),
-            jurisdiction = ?jurisdiction,
-            bond_amount = bond_amount,
-            "Steward registered"
-        );
-
-        Ok(steward)
+        self.handle
+            .register_steward(
+                holder_did,
+                steward_did,
+                term_duration_days,
+                bond_amount,
+                governance_approval,
+                jurisdiction,
+                specializations,
+            )
+            .await
     }
 
-    /// Store a steward record
+    /// Store a steward record.
     pub async fn store_steward(&self, steward: StewardRecord) -> Result<()> {
-        let steward_id = steward.steward_id.to_hex();
-
-        // Check if steward already exists
-        if self.store.get_steward(&steward_id)?.is_some() {
-            bail!("Steward already exists: {steward_id}");
-        }
-
-        // Store steward (this also updates the DID index)
-        self.store.put_steward(&steward)?;
-        Ok(())
+        self.handle.store_steward(steward).await
     }
 
-    /// Get a steward by ID
+    /// Get a steward by ID.
     pub async fn get_steward(&self, steward_id: &str) -> Result<Option<StewardRecord>> {
-        self.store.get_steward(steward_id)
+        self.handle.get_steward(steward_id).await
     }
 
-    /// Get a steward by DID
+    /// Get a steward by DID.
     pub async fn get_steward_by_did(&self, did: &Did) -> Result<Option<StewardRecord>> {
-        let did_str = did.to_string();
-        self.store.get_steward_by_did(&did_str)
+        self.handle.get_steward_by_did(did).await
     }
 
-    /// List all stewards with optional filters
+    /// List stewards with optional filters.
     pub async fn list_stewards(
         &self,
         active_only: bool,
         jurisdiction: Option<&str>,
     ) -> Result<Vec<StewardRecord>> {
-        let all_stewards = self.store.list_stewards()?;
-
-        let mut results: Vec<StewardRecord> = all_stewards
-            .into_iter()
-            .filter(|s| {
-                let active_match = !active_only || s.is_active();
-                let jurisdiction_match =
-                    jurisdiction.is_none() || s.jurisdiction.as_deref() == jurisdiction;
-                active_match && jurisdiction_match
-            })
-            .collect();
-
-        // Sort by reputation score, highest first
-        results.sort_by(|a, b| {
-            b.reputation_score
-                .partial_cmp(&a.reputation_score)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
-
-        Ok(results)
+        self.handle.list_stewards(active_only, jurisdiction).await
     }
 
-    /// List stewards who can issue attestations
+    /// List active attesters.
     pub async fn list_attesters(&self) -> Result<Vec<StewardRecord>> {
-        let all_stewards = self.store.list_stewards()?;
-        let attesters: Vec<StewardRecord> = all_stewards
-            .into_iter()
-            .filter(|s| s.can_attest())
-            .collect();
-        Ok(attesters)
+        self.handle.list_attesters().await
     }
 
-    /// Check if a DID belongs to an active steward
+    /// Check if a DID is an active steward.
     pub async fn is_active_steward(&self, did: &Did) -> Result<bool> {
-        if let Some(steward) = self.get_steward_by_did(did).await? {
-            Ok(steward.is_active() && steward.can_attest())
-        } else {
-            Ok(false)
-        }
+        self.handle.is_active_steward(did).await
     }
 
-    /// Suspend a steward
+    /// Suspend a steward.
     pub async fn suspend_steward(&self, steward_id: &str, reason: String) -> Result<()> {
-        let mut steward = self
-            .store
-            .get_steward(steward_id)?
-            .ok_or_else(|| anyhow::anyhow!("Steward not found: {steward_id}"))?;
-
-        steward.suspend(reason.clone());
-        self.store.put_steward(&steward)?;
-
-        // Audit log
-        warn!(
-            target: "commons_audit",
-            action = "steward_suspended",
-            steward_id = %steward_id,
-            reason = %reason,
-            "Steward suspended"
-        );
-
-        Ok(())
+        self.handle.suspend_steward(steward_id, reason).await
     }
 
-    /// Reinstate a suspended steward
+    /// Reinstate a suspended steward.
     pub async fn reinstate_steward(&self, steward_id: &str) -> Result<bool> {
-        let mut steward = self
-            .store
-            .get_steward(steward_id)?
-            .ok_or_else(|| anyhow::anyhow!("Steward not found: {steward_id}"))?;
-
-        let result = steward.reinstate();
-        self.store.put_steward(&steward)?;
-
-        // Audit log
-        if result {
-            info!(
-                target: "commons_audit",
-                action = "steward_reinstated",
-                steward_id = %steward_id,
-                "Steward reinstated"
-            );
-        }
-
-        Ok(result)
+        self.handle.reinstate_steward(steward_id).await
     }
 
-    /// Retire a steward
+    /// Retire a steward.
     pub async fn retire_steward(&self, steward_id: &str) -> Result<()> {
-        let mut steward = self
-            .store
-            .get_steward(steward_id)?
-            .ok_or_else(|| anyhow::anyhow!("Steward not found: {steward_id}"))?;
-
-        steward.retire();
-        self.store.put_steward(&steward)?;
-
-        // Audit log
-        info!(
-            target: "commons_audit",
-            action = "steward_retired",
-            steward_id = %steward_id,
-            "Steward retired"
-        );
-
-        Ok(())
+        self.handle.retire_steward(steward_id).await
     }
 
-    /// Revoke a steward for cause
+    /// Revoke a steward.
     pub async fn revoke_steward(
         &self,
         steward_id: &str,
         reason: String,
         evidence: Vec<[u8; 32]>,
     ) -> Result<()> {
-        let mut steward = self
-            .store
-            .get_steward(steward_id)?
-            .ok_or_else(|| anyhow::anyhow!("Steward not found: {steward_id}"))?;
-
-        steward.revoke(reason.clone(), evidence.clone());
-        self.store.put_steward(&steward)?;
-
-        // Audit log
-        warn!(
-            target: "commons_audit",
-            action = "steward_revoked",
-            steward_id = %steward_id,
-            reason = %reason,
-            evidence_count = evidence.len(),
-            "Steward revoked for cause"
-        );
-
-        Ok(())
+        self.handle
+            .revoke_steward(steward_id, reason, evidence)
+            .await
     }
 
-    /// Record an attestation issued by a steward
+    /// Record a steward attestation event.
     pub async fn record_steward_attestation(&self, steward_id: &str) -> Result<()> {
-        let mut steward = self
-            .store
-            .get_steward(steward_id)?
-            .ok_or_else(|| anyhow::anyhow!("Steward not found: {steward_id}"))?;
-
-        steward.record_attestation();
-        self.store.put_steward(&steward)?;
-        Ok(())
+        self.handle.record_steward_attestation(steward_id).await
     }
 
-    /// Record a dispute against a steward's attestation
+    /// Record a dispute against a steward.
     pub async fn record_steward_dispute(&self, steward_id: &str) -> Result<()> {
-        let mut steward = self
-            .store
-            .get_steward(steward_id)?
-            .ok_or_else(|| anyhow::anyhow!("Steward not found: {steward_id}"))?;
-
-        steward.record_dispute();
-        self.store.put_steward(&steward)?;
-        Ok(())
+        self.handle.record_steward_dispute(steward_id).await
     }
 
-    /// Record a dispute won by a steward
+    /// Record a dispute won by a steward.
     pub async fn record_steward_dispute_won(&self, steward_id: &str) -> Result<()> {
-        let mut steward = self
-            .store
-            .get_steward(steward_id)?
-            .ok_or_else(|| anyhow::anyhow!("Steward not found: {steward_id}"))?;
-
-        steward.record_dispute_won();
-        self.store.put_steward(&steward)?;
-        Ok(())
+        self.handle.record_steward_dispute_won(steward_id).await
     }
 
-    /// Extend a steward's term
+    /// Extend a steward's term.
     pub async fn extend_steward_term(&self, steward_id: &str, new_term_end: u64) -> Result<()> {
-        let mut steward = self
-            .store
-            .get_steward(steward_id)?
-            .ok_or_else(|| anyhow::anyhow!("Steward not found: {steward_id}"))?;
-
-        steward.extend_term(new_term_end);
-        self.store.put_steward(&steward)?;
-        Ok(())
+        self.handle
+            .extend_steward_term(steward_id, new_term_end)
+            .await
     }
 
-    /// Add to a steward's bond
+    /// Add bond to a steward.
     pub async fn add_steward_bond(&self, steward_id: &str, amount: u64) -> Result<()> {
-        let mut steward = self
-            .store
-            .get_steward(steward_id)?
-            .ok_or_else(|| anyhow::anyhow!("Steward not found: {steward_id}"))?;
-
-        steward.add_bond(amount);
-        self.store.put_steward(&steward)?;
-        Ok(())
+        self.handle.add_steward_bond(steward_id, amount).await
     }
 
-    /// Slash a steward's bond
+    /// Slash a steward's bond.
     pub async fn slash_steward_bond(&self, steward_id: &str, amount: u64) -> Result<u64> {
-        let mut steward = self
-            .store
-            .get_steward(steward_id)?
-            .ok_or_else(|| anyhow::anyhow!("Steward not found: {steward_id}"))?;
-
-        let result = steward.slash_bond(amount);
-        self.store.put_steward(&steward)?;
-        Ok(result)
+        self.handle.slash_steward_bond(steward_id, amount).await
     }
+}
 
-    // ========== Revocation Operations ==========
+// ============================================================================
+// Revocation Operations
+// ============================================================================
 
-    /// Add a revocation record
+impl CommonsManager {
+    /// Add a revocation record.
     pub async fn add_revocation(&self, record: RevocationRecord) -> Result<()> {
-        self.revocations
-            .add(record)
-            .map_err(|e| anyhow::anyhow!("Failed to add revocation: {e}"))
+        self.handle.add_revocation(record).await
     }
 
-    /// Check if a target is revoked
+    /// Check revocation status for a target.
     pub async fn check_revocation(&self, target_id: &str) -> icn_identity::RevocationCheck {
-        self.revocations.check(target_id)
+        self.handle.check_revocation(target_id).await
     }
 
-    /// Check if a target is revoked at a specific scope
+    /// Check revocation status at a given scope.
     pub async fn check_revocation_at_scope(
         &self,
         target_id: &str,
         scope: &RevocationScope,
     ) -> icn_identity::RevocationCheck {
-        self.revocations.check_at_scope(target_id, scope)
+        self.handle
+            .check_revocation_at_scope(target_id, scope)
+            .await
     }
 
-    /// Get a revocation record by ID
+    /// Get a revocation record.
     pub async fn get_revocation(&self, revocation_id: &str) -> Option<RevocationRecord> {
-        self.revocations.get(revocation_id)
+        self.handle.get_revocation(revocation_id).await
     }
 
-    /// List all revocations for a target
+    /// List revocations for a target.
     pub async fn list_revocations_for_target(&self, target_id: &str) -> Vec<RevocationRecord> {
-        self.revocations.list_for_target(target_id)
+        self.handle.list_revocations_for_target(target_id).await
     }
 
-    /// List all revocations by type
+    /// List revocations by type.
     pub async fn list_revocations_by_type(
         &self,
-        target_type: RevocationType,
+        revocation_type: RevocationType,
     ) -> Vec<RevocationRecord> {
-        self.revocations.list_by_type(target_type)
+        self.handle.list_revocations_by_type(revocation_type).await
     }
 
-    /// List all pending appeals
+    /// List revocations with pending appeals.
     pub async fn list_pending_appeals(&self) -> Vec<RevocationRecord> {
-        self.revocations.list_pending_appeals()
+        self.handle.list_pending_appeals().await
     }
 
-    /// File an appeal for a revocation
+    /// File an appeal for a revocation.
     pub async fn file_appeal(&self, revocation_id: &str, reason: String) -> Result<()> {
-        let mut record = self
-            .revocations
-            .get(revocation_id)
-            .ok_or_else(|| anyhow::anyhow!("Revocation not found"))?;
-
-        if !record.file_appeal(reason) {
-            bail!("Cannot file appeal - appeal window closed or already appealed");
-        }
-
-        self.revocations
-            .update(record)
-            .map_err(|e| anyhow::anyhow!("Failed to update revocation: {e}"))
+        self.handle.file_appeal(revocation_id, reason).await
     }
 
-    /// Resolve an appeal
+    /// Resolve an appeal.
     pub async fn resolve_appeal(
         &self,
         revocation_id: &str,
         upheld: bool,
         resolution_notes: String,
     ) -> Result<()> {
-        let mut record = self
-            .revocations
-            .get(revocation_id)
-            .ok_or_else(|| anyhow::anyhow!("Revocation not found"))?;
-
-        record.resolve_appeal(upheld, resolution_notes);
-
-        self.revocations
-            .update(record)
-            .map_err(|e| anyhow::anyhow!("Failed to update revocation: {e}"))
+        self.handle
+            .resolve_appeal(revocation_id, upheld, resolution_notes)
+            .await
     }
 
-    /// Revoke a membership with proper due process
+    /// Revoke a member's access.
     pub async fn revoke_membership(
         &self,
         holder_id: &str,
@@ -1193,43 +482,18 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
         reason: CommonsRevocationReason,
         appeal_window_days: u64,
     ) -> Result<RevocationRecord> {
-        // Verify holder exists
-        let mut holder = self
-            .get_holder(holder_id)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Holder not found"))?;
-
-        // Verify has affiliation with jurisdiction
-        let affiliation = holder.get_affiliation_mut(jurisdiction_id).ok_or_else(|| {
-            anyhow::anyhow!("Holder not affiliated with jurisdiction: {jurisdiction_id}")
-        })?;
-
-        // Create revocation record
-        let target_id = format!("{holder_id}:{jurisdiction_id}");
-        let record = RevocationRecord::new(
-            RevocationType::Membership,
-            target_id,
-            RevocationScope::Jurisdiction {
-                jurisdiction_id: jurisdiction_id.clone(),
-            },
-            authority,
-            reason,
-            appeal_window_days,
-        );
-
-        // Add to registry
-        self.add_revocation(record.clone()).await?;
-
-        // Update affiliation status (but allow appeal)
-        affiliation.suspend();
-
-        // Update holder via store
-        self.store.put_holder(&holder)?;
-
-        Ok(record)
+        self.handle
+            .revoke_membership(
+                holder_id,
+                jurisdiction_id,
+                authority,
+                reason,
+                appeal_window_days,
+            )
+            .await
     }
 
-    /// Ban a member immediately (severe violations)
+    /// Ban a member entirely (immediate, severe violations).
     pub async fn ban_member(
         &self,
         holder_id: &str,
@@ -1237,866 +501,325 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
         authority: Did,
         reason: CommonsRevocationReason,
     ) -> Result<RevocationRecord> {
-        // Verify holder exists
-        let mut holder = self
-            .get_holder(holder_id)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Holder not found"))?;
-
-        // Verify has affiliation
-        let affiliation = holder.get_affiliation_mut(jurisdiction_id).ok_or_else(|| {
-            anyhow::anyhow!("Holder not affiliated with jurisdiction: {jurisdiction_id}")
-        })?;
-
-        // Create immediate revocation
-        let target_id = format!("{holder_id}:{jurisdiction_id}");
-        let record = RevocationRecord::immediate(
-            RevocationType::Membership,
-            target_id,
-            RevocationScope::Jurisdiction {
-                jurisdiction_id: jurisdiction_id.clone(),
-            },
-            authority,
-            reason,
-        );
-
-        // Add to registry
-        self.add_revocation(record.clone()).await?;
-
-        // Ban the member
-        affiliation.ban();
-
-        // Update holder via store
-        self.store.put_holder(&holder)?;
-
-        Ok(record)
+        self.handle
+            .ban_member(holder_id, jurisdiction_id, authority, reason)
+            .await
     }
 
-    /// Check if a member is revoked in a jurisdiction
-    pub async fn is_member_revoked(
-        &self,
-        holder_id: &str,
-        jurisdiction_id: &JurisdictionId,
-    ) -> bool {
-        let target_id = format!("{holder_id}:{jurisdiction_id}");
-        self.revocations
-            .is_revoked_in_jurisdiction(&target_id, jurisdiction_id)
+    /// Check if a member is revoked.
+    pub async fn is_member_revoked(&self, holder_id: &str, jurisdiction: &JurisdictionId) -> bool {
+        self.handle.is_member_revoked(holder_id, jurisdiction).await
     }
+}
 
-    // ========== Membership Management Operations ==========
+// ============================================================================
+// Membership Management Operations
+// ============================================================================
 
+impl CommonsManager {
     /// Apply for membership in a jurisdiction.
-    ///
-    /// Sybil resistance: requires at least `POPLevel::Strong` to apply.
-    /// This prevents an attacker from creating many `Weak`-level identities
-    /// to flood jurisdiction membership rolls.
     pub async fn apply_for_membership(
         &self,
         holder_id: &str,
-        jurisdiction_id: JurisdictionId,
-        capabilities_requested: Vec<MembershipCapability>,
+        jurisdiction: JurisdictionId,
+        initial_capabilities: Vec<MembershipCapability>,
     ) -> Result<Affiliation> {
-        // Verify holder exists and is active
-        let mut holder = self
-            .get_holder(holder_id)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Holder not found"))?;
-
-        if !holder.is_active() {
-            bail!("Holder is not active");
-        }
-
-        // Sybil gate: require at least Strong POP level for membership
-        if holder.personhood_level < POPLevel::Strong {
-            bail!(
-                "Membership requires at least Strong POP level (current: Weak). \
-                 Obtain additional attestations to upgrade."
-            );
-        }
-
-        // Check not already affiliated
-        if holder.is_affiliated(&jurisdiction_id) {
-            bail!("Already affiliated with jurisdiction: {jurisdiction_id}");
-        }
-
-        // Check not revoked from this jurisdiction
-        if self.is_member_revoked(holder_id, &jurisdiction_id).await {
-            bail!("Previously banned from jurisdiction: {jurisdiction_id}");
-        }
-
-        // Create affiliation as candidate
-        let mut affiliation = Affiliation::new(jurisdiction_id.clone());
-        // Store requested capabilities for review
-        for cap in capabilities_requested {
-            affiliation.add_capability(cap);
-        }
-
-        // Add to holder
-        holder.add_affiliation(affiliation.clone());
-
-        // Update storage via store
-        self.store.put_holder(&holder)?;
-
-        Ok(affiliation)
+        self.handle
+            .apply_for_membership(holder_id, jurisdiction, initial_capabilities)
+            .await
     }
 
-    /// Approve a membership application (moves from Candidate to Provisional)
+    /// Approve membership.
     pub async fn approve_membership(
         &self,
         holder_id: &str,
-        jurisdiction_id: &JurisdictionId,
+        jurisdiction: &JurisdictionId,
     ) -> Result<()> {
-        let mut holder = self
-            .get_holder(holder_id)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Holder not found"))?;
-
-        let affiliation = holder.get_affiliation_mut(jurisdiction_id).ok_or_else(|| {
-            anyhow::anyhow!("Holder not affiliated with jurisdiction: {jurisdiction_id}")
-        })?;
-
-        if affiliation.membership_status != MembershipStatus::Candidate {
-            bail!(
-                "Can only approve candidates, current status: {}",
-                affiliation.membership_status
-            );
-        }
-
-        affiliation.approve();
-
-        self.store.put_holder(&holder)?;
-
-        // Record approval metric
-        icn_obs::metrics::commons::membership_approved_inc(jurisdiction_id.as_str());
-
-        // Audit log
-        info!(
-            target: "commons_audit",
-            action = "membership_approved",
-            holder_id = %holder_id,
-            jurisdiction = %jurisdiction_id.as_str(),
-            "Membership application approved"
-        );
-
-        Ok(())
+        self.handle
+            .approve_membership(holder_id, jurisdiction)
+            .await
     }
 
-    /// Promote a member from Provisional to full Member
+    /// Promote a member from Provisional to full Member.
     pub async fn promote_member(
         &self,
         holder_id: &str,
         jurisdiction_id: &JurisdictionId,
     ) -> Result<()> {
-        let mut holder = self
-            .get_holder(holder_id)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Holder not found"))?;
-
-        let affiliation = holder.get_affiliation_mut(jurisdiction_id).ok_or_else(|| {
-            anyhow::anyhow!("Holder not affiliated with jurisdiction: {jurisdiction_id}")
-        })?;
-
-        if affiliation.membership_status != MembershipStatus::Provisional {
-            bail!(
-                "Can only promote provisional members, current status: {}",
-                affiliation.membership_status
-            );
-        }
-
-        affiliation.promote();
-
-        self.store.put_holder(&holder)?;
-
-        // Record promotion metric
-        icn_obs::metrics::commons::membership_promoted_inc(jurisdiction_id.as_str());
-
-        // Audit log
-        info!(
-            target: "commons_audit",
-            action = "membership_promoted",
-            holder_id = %holder_id,
-            jurisdiction = %jurisdiction_id.as_str(),
-            "Member promoted to full membership"
-        );
-
-        Ok(())
+        self.handle.promote_member(holder_id, jurisdiction_id).await
     }
 
-    /// Suspend a member
+    /// Suspend a member.
     pub async fn suspend_member(
         &self,
         holder_id: &str,
         jurisdiction_id: &JurisdictionId,
     ) -> Result<()> {
-        let mut holder = self
-            .get_holder(holder_id)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Holder not found"))?;
-
-        let affiliation = holder.get_affiliation_mut(jurisdiction_id).ok_or_else(|| {
-            anyhow::anyhow!("Holder not affiliated with jurisdiction: {jurisdiction_id}")
-        })?;
-
-        affiliation.suspend();
-
-        self.store.put_holder(&holder)?;
-
-        // Audit log
-        warn!(
-            target: "commons_audit",
-            action = "member_suspended",
-            holder_id = %holder_id,
-            jurisdiction = %jurisdiction_id.as_str(),
-            "Member suspended"
-        );
-
-        Ok(())
+        self.handle.suspend_member(holder_id, jurisdiction_id).await
     }
 
-    /// Reinstate a suspended member
+    /// Reinstate a suspended member.
     pub async fn reinstate_member(
         &self,
         holder_id: &str,
-        jurisdiction_id: &JurisdictionId,
+        jurisdiction: &JurisdictionId,
     ) -> Result<()> {
-        let mut holder = self
-            .get_holder(holder_id)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Holder not found"))?;
-
-        let affiliation = holder.get_affiliation_mut(jurisdiction_id).ok_or_else(|| {
-            anyhow::anyhow!("Holder not affiliated with jurisdiction: {jurisdiction_id}")
-        })?;
-
-        if affiliation.membership_status != MembershipStatus::Suspended {
-            bail!("Member is not suspended");
-        }
-
-        // Reinstate to Member status
-        affiliation.membership_status = MembershipStatus::Member;
-
-        self.store.put_holder(&holder)?;
-
-        // Audit log
-        info!(
-            target: "commons_audit",
-            action = "member_reinstated",
-            holder_id = %holder_id,
-            jurisdiction = %jurisdiction_id.as_str(),
-            "Member reinstated"
-        );
-
-        Ok(())
+        self.handle.reinstate_member(holder_id, jurisdiction).await
     }
 
-    /// Grant a capability to a member
+    /// Grant a capability to a member.
     pub async fn grant_capability(
         &self,
         holder_id: &str,
-        jurisdiction_id: &JurisdictionId,
+        jurisdiction: &JurisdictionId,
         capability: MembershipCapability,
     ) -> Result<()> {
-        let mut holder = self
-            .get_holder(holder_id)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Holder not found"))?;
-
-        let affiliation = holder.get_affiliation_mut(jurisdiction_id).ok_or_else(|| {
-            anyhow::anyhow!("Holder not affiliated with jurisdiction: {jurisdiction_id}")
-        })?;
-
-        if !affiliation.is_active() {
-            bail!("Member is not active");
-        }
-
-        affiliation.add_capability(capability);
-
-        self.store.put_holder(&holder)?;
-
-        Ok(())
+        self.handle
+            .grant_capability(holder_id, jurisdiction, capability)
+            .await
     }
 
-    /// Revoke a capability from a member
+    /// Revoke a capability from a member.
     pub async fn revoke_capability(
         &self,
         holder_id: &str,
-        jurisdiction_id: &JurisdictionId,
+        jurisdiction: &JurisdictionId,
         capability: MembershipCapability,
     ) -> Result<()> {
-        let mut holder = self
-            .get_holder(holder_id)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Holder not found"))?;
-
-        let affiliation = holder.get_affiliation_mut(jurisdiction_id).ok_or_else(|| {
-            anyhow::anyhow!("Holder not affiliated with jurisdiction: {jurisdiction_id}")
-        })?;
-
-        affiliation.remove_capability(capability);
-
-        self.store.put_holder(&holder)?;
-
-        Ok(())
+        self.handle
+            .revoke_capability(holder_id, jurisdiction, capability)
+            .await
     }
 
-    /// Add a role to a member
+    /// Add a role to a member.
     pub async fn add_member_role(
         &self,
         holder_id: &str,
-        jurisdiction_id: &JurisdictionId,
+        jurisdiction: &JurisdictionId,
         role: String,
     ) -> Result<()> {
-        let mut holder = self
-            .get_holder(holder_id)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Holder not found"))?;
-
-        let affiliation = holder.get_affiliation_mut(jurisdiction_id).ok_or_else(|| {
-            anyhow::anyhow!("Holder not affiliated with jurisdiction: {jurisdiction_id}")
-        })?;
-
-        if !affiliation.roles.contains(&role) {
-            affiliation.roles.push(role);
-        }
-
-        self.store.put_holder(&holder)?;
-
-        Ok(())
+        self.handle
+            .add_member_role(holder_id, jurisdiction, role)
+            .await
     }
 
-    /// Remove a role from a member
+    /// Remove a role from a member.
     pub async fn remove_member_role(
         &self,
         holder_id: &str,
-        jurisdiction_id: &JurisdictionId,
+        jurisdiction: &JurisdictionId,
         role: &str,
     ) -> Result<()> {
-        let mut holder = self
-            .get_holder(holder_id)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Holder not found"))?;
-
-        let affiliation = holder.get_affiliation_mut(jurisdiction_id).ok_or_else(|| {
-            anyhow::anyhow!("Holder not affiliated with jurisdiction: {jurisdiction_id}")
-        })?;
-
-        affiliation.roles.retain(|r| r != role);
-
-        self.store.put_holder(&holder)?;
-
-        Ok(())
+        self.handle
+            .remove_member_role(holder_id, jurisdiction, role)
+            .await
     }
 
-    /// Check if a member has a specific capability
+    /// Check if a member has a capability.
     pub async fn member_has_capability(
         &self,
         holder_id: &str,
-        jurisdiction_id: &JurisdictionId,
+        jurisdiction: &JurisdictionId,
         capability: MembershipCapability,
     ) -> Result<bool> {
-        let holder = self
-            .get_holder(holder_id)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Holder not found"))?;
-
-        let affiliation = holder.get_affiliation(jurisdiction_id).ok_or_else(|| {
-            anyhow::anyhow!("Holder not affiliated with jurisdiction: {jurisdiction_id}")
-        })?;
-
-        Ok(affiliation.is_active() && affiliation.has_capability(capability))
+        self.handle
+            .member_has_capability(holder_id, jurisdiction, capability)
+            .await
     }
 
-    /// List members of a jurisdiction by status
+    /// List members by status.
     pub async fn list_members_by_status(
         &self,
-        jurisdiction_id: &JurisdictionId,
+        jurisdiction: &JurisdictionId,
         status: Option<MembershipStatus>,
     ) -> Vec<(String, Affiliation)> {
-        let holders = match self.store.list_holders() {
-            Ok(h) => h,
-            Err(_) => return Vec::new(),
-        };
-
-        let mut results = Vec::new();
-        for holder in holders {
-            let holder_id = hex::encode(holder.id());
-            if let Some(affiliation) = holder.get_affiliation(jurisdiction_id) {
-                if status.is_none() || Some(affiliation.membership_status) == status {
-                    results.push((holder_id, affiliation.clone()));
-                }
-            }
-        }
-
-        results
+        self.handle
+            .list_members_by_status(jurisdiction, status)
+            .await
     }
+}
 
-    // ========== Amendment Operations (v0.6.0 Constitutional Governance) ==========
+// ============================================================================
+// Amendment Operations (v0.6.0 Constitutional Governance)
+// ============================================================================
 
-    /// Store an amendment
+impl CommonsManager {
+    /// Store an amendment.
     pub async fn store_amendment(&self, amendment: Amendment) -> Result<()> {
-        let amendment_id = amendment.id.to_hex();
-        let proposer = amendment.proposer.to_string();
-
-        self.store.put_amendment(&amendment)?;
-
-        // Audit log
-        info!(
-            target: "commons_audit",
-            action = "amendment_created",
-            amendment_id = %amendment_id,
-            proposer = %proposer,
-            scope = %format!("{}", amendment.scope),
-            amendment_type = %format!("{}", amendment.amendment_type),
-            "Amendment created"
-        );
-
-        Ok(())
+        self.handle.store_amendment(amendment).await
     }
 
-    /// Add a change to a draft amendment
-    ///
-    /// Requirements:
-    /// - Amendment must exist
-    /// - Amendment must be in Draft status
-    /// - Caller should be the proposer (validation done at API layer)
+    /// Add a change to an amendment.
     pub async fn add_amendment_change(
         &self,
         amendment_id: &str,
         change: AmendmentChange,
     ) -> Result<Amendment> {
-        let mut amendment = self
-            .store
-            .get_amendment(amendment_id)?
-            .ok_or_else(|| anyhow::anyhow!("Amendment not found: {amendment_id}"))?;
-
-        // Validate amendment is in Draft status
-        if !matches!(amendment.status, AmendmentStatus::Draft) {
-            bail!(
-                "Cannot add changes to amendment in status {:?}, must be Draft",
-                amendment.status
-            );
-        }
-
-        // Add the change
-        let change_desc = change.description.clone();
-        amendment.add_change(change);
-
-        // Persist updated amendment
-        self.store.put_amendment(&amendment)?;
-
-        // Audit log
-        info!(
-            target: "commons_audit",
-            action = "amendment_change_added",
-            amendment_id = %amendment_id,
-            change = %change_desc,
-            total_changes = amendment.changes.len(),
-            "Change added to amendment"
-        );
-
-        Ok(amendment)
+        self.handle.add_amendment_change(amendment_id, change).await
     }
 
-    /// Get an amendment by ID
+    /// Get an amendment by ID.
     pub async fn get_amendment(&self, id: &AmendmentId) -> Result<Option<Amendment>> {
-        let id_hex = id.to_hex();
-        self.store.get_amendment(&id_hex)
+        self.handle.get_amendment(id).await
     }
 
-    /// List amendments with optional filters
+    /// List amendments with optional filters.
     pub async fn list_amendments(
         &self,
         status: Option<&str>,
         scope: Option<&str>,
         amendment_type: Option<&str>,
     ) -> Result<Vec<Amendment>> {
-        let mut results = self.store.list_amendments()?;
-
-        // Filter by status
-        if let Some(s) = status {
-            let s_lower = s.to_lowercase();
-            results.retain(|a| format!("{:?}", a.status).to_lowercase().contains(&s_lower));
-        }
-
-        // Filter by scope
-        if let Some(s) = scope {
-            let s_lower = s.to_lowercase();
-            results.retain(|a| format!("{}", a.scope).to_lowercase().contains(&s_lower));
-        }
-
-        // Filter by type
-        if let Some(t) = amendment_type {
-            let t_lower = t.to_lowercase();
-            results.retain(|a| {
-                format!("{}", a.amendment_type)
-                    .to_lowercase()
-                    .contains(&t_lower)
-            });
-        }
-
-        // Sort by created_at descending
-        results.sort_by(|a, b| b.created_at.cmp(&a.created_at));
-
-        Ok(results)
+        self.handle
+            .list_amendments(status, scope, amendment_type)
+            .await
     }
 
-    /// Submit an amendment for review
+    /// Submit an amendment for review.
     pub async fn submit_amendment(&self, id: &AmendmentId, caller: &Did) -> Result<Amendment> {
-        let id_hex = id.to_hex();
-        let mut amendment = self
-            .store
-            .get_amendment(&id_hex)?
-            .ok_or_else(|| anyhow::anyhow!("Amendment not found"))?;
-
-        // Only proposer can submit
-        if amendment.proposer != *caller {
-            bail!("Only proposer can submit amendment");
-        }
-
-        amendment.submit().map_err(|e| anyhow::anyhow!(e))?;
-        self.store.put_amendment(&amendment)?;
-
-        // Audit log
-        info!(
-            target: "commons_audit",
-            action = "amendment_submitted",
-            amendment_id = %id_hex,
-            caller = %caller.to_string(),
-            "Amendment submitted for review"
-        );
-
-        Ok(amendment)
+        self.handle.submit_amendment(id, caller).await
     }
 
-    /// Open voting on an amendment (skipping review for simple cases)
-    pub async fn open_amendment_voting(
-        &self,
-        id: &AmendmentId,
-        _caller: &Did,
-    ) -> Result<Amendment> {
-        let id_hex = id.to_hex();
-        let mut amendment = self
-            .store
-            .get_amendment(&id_hex)?
-            .ok_or_else(|| anyhow::anyhow!("Amendment not found"))?;
-
-        // If still in submitted state, begin review first (auto-skip if review_period is 0)
-        if matches!(amendment.status, AmendmentStatus::Submitted { .. }) {
-            amendment.begin_review().map_err(|e| anyhow::anyhow!(e))?;
-        }
-
-        amendment.open_voting().map_err(|e| anyhow::anyhow!(e))?;
-        self.store.put_amendment(&amendment)?;
-
-        // Audit log
-        info!(
-            target: "commons_audit",
-            action = "amendment_voting_opened",
-            amendment_id = %id_hex,
-            "Amendment voting period opened"
-        );
-
-        Ok(amendment)
+    /// Open voting on an amendment.
+    pub async fn open_amendment_voting(&self, id: &AmendmentId, caller: &Did) -> Result<Amendment> {
+        self.handle.open_amendment_voting(id, caller).await
     }
 
-    /// Add a ratification to an amendment
+    /// Add a ratification to an amendment.
     pub async fn add_amendment_ratification(
         &self,
         id: &AmendmentId,
         ratification: Ratification,
     ) -> Result<Amendment> {
-        let id_hex = id.to_hex();
-        let mut amendment = self
-            .store
-            .get_amendment(&id_hex)?
-            .ok_or_else(|| anyhow::anyhow!("Amendment not found"))?;
-
-        let ratifier = ratification.authority_did.to_string();
-        amendment
-            .add_ratification(ratification)
-            .map_err(|e| anyhow::anyhow!(e))?;
-
-        // Check if ratification requirements are now met
-        let result = amendment.check_ratification();
-        let was_ratified = matches!(result, icn_governance::RatificationResult::Approved { .. });
-        if was_ratified {
-            let _ = amendment.ratify();
-        }
-
-        self.store.put_amendment(&amendment)?;
-
-        // Audit log
-        info!(
-            target: "commons_audit",
-            action = "amendment_ratification_added",
-            amendment_id = %id_hex,
-            ratifier = %ratifier,
-            total_ratifications = amendment.ratifications.len(),
-            amendment_ratified = was_ratified,
-            "Amendment ratification added"
-        );
-
-        Ok(amendment)
+        self.handle
+            .add_amendment_ratification(id, ratification)
+            .await
     }
 
-    /// Withdraw an amendment
+    /// Withdraw an amendment.
     pub async fn withdraw_amendment(
         &self,
         id: &AmendmentId,
         caller: &Did,
         reason: String,
     ) -> Result<Amendment> {
-        let id_hex = id.to_hex();
-        let mut amendment = self
-            .store
-            .get_amendment(&id_hex)?
-            .ok_or_else(|| anyhow::anyhow!("Amendment not found"))?;
-
-        // Only proposer can withdraw
-        if amendment.proposer != *caller {
-            bail!("Only proposer can withdraw amendment");
-        }
-
-        amendment
-            .withdraw(reason.clone())
-            .map_err(|e| anyhow::anyhow!(e))?;
-        self.store.put_amendment(&amendment)?;
-
-        // Audit log
-        info!(
-            target: "commons_audit",
-            action = "amendment_withdrawn",
-            amendment_id = %id_hex,
-            caller = %caller.to_string(),
-            reason = %reason,
-            "Amendment withdrawn"
-        );
-
-        Ok(amendment)
+        self.handle.withdraw_amendment(id, caller, reason).await
     }
+}
 
-    // ========== Appeal Operations (v0.6.0 Constitutional Governance) ==========
+// ============================================================================
+// Appeal Operations (v0.6.0 Constitutional Governance)
+// ============================================================================
 
-    /// Store an appeal
+impl CommonsManager {
+    /// Store an appeal.
     pub async fn store_appeal(&self, appeal: Appeal) -> Result<()> {
-        let appeal_id = appeal.id.to_hex();
-        let appellant = appeal.appellant.to_string();
-
-        self.store.put_appeal(&appeal)?;
-
-        // Audit log
-        info!(
-            target: "commons_audit",
-            action = "appeal_created",
-            appeal_id = %appeal_id,
-            appellant = %appellant,
-            scope = %format!("{}", appeal.scope),
-            "Appeal created"
-        );
-
-        Ok(())
+        self.handle.store_appeal(appeal).await
     }
 
-    /// Get an appeal by ID
+    /// Get an appeal by ID.
     pub async fn get_appeal(&self, id: &AppealId) -> Result<Option<Appeal>> {
-        let id_hex = id.to_hex();
-        self.store.get_appeal(&id_hex)
+        self.handle.get_appeal(id).await
     }
 
-    /// List appeals with optional filters
+    /// List appeals with optional filters.
     pub async fn list_appeals(
         &self,
         status: Option<&str>,
         scope: Option<&str>,
         appellant: Option<&str>,
     ) -> Result<Vec<Appeal>> {
-        let mut results = self.store.list_appeals()?;
-
-        // Filter by status
-        if let Some(s) = status {
-            let s_lower = s.to_lowercase();
-            results.retain(|a| format!("{:?}", a.status).to_lowercase().contains(&s_lower));
-        }
-
-        // Filter by scope
-        if let Some(s) = scope {
-            let s_lower = s.to_lowercase();
-            results.retain(|a| format!("{}", a.scope).to_lowercase().contains(&s_lower));
-        }
-
-        // Filter by appellant
-        if let Some(a) = appellant {
-            results.retain(|appeal| appeal.appellant.to_string() == a);
-        }
-
-        // Sort by created_at descending
-        results.sort_by(|a, b| b.created_at.cmp(&a.created_at));
-
-        Ok(results)
+        self.handle.list_appeals(status, scope, appellant).await
     }
 
-    /// Add evidence to an appeal
+    /// Add evidence to an appeal.
     pub async fn add_appeal_evidence(
         &self,
         id: &AppealId,
         evidence: AppealEvidence,
     ) -> Result<Appeal> {
-        let id_hex = id.to_hex();
-        let mut appeal = self
-            .store
-            .get_appeal(&id_hex)?
-            .ok_or_else(|| anyhow::anyhow!("Appeal not found"))?;
-
-        appeal
-            .add_evidence(evidence)
-            .map_err(|e| anyhow::anyhow!(e))?;
-        self.store.put_appeal(&appeal)?;
-        Ok(appeal)
+        self.handle.add_appeal_evidence(id, evidence).await
     }
 
-    /// Add response to an appeal
+    /// Add a response to an appeal.
     pub async fn add_appeal_response(
         &self,
         id: &AppealId,
         response: AppealResponse,
     ) -> Result<Appeal> {
-        let id_hex = id.to_hex();
-        let mut appeal = self
-            .store
-            .get_appeal(&id_hex)?
-            .ok_or_else(|| anyhow::anyhow!("Appeal not found"))?;
-
-        appeal
-            .add_response(response)
-            .map_err(|e| anyhow::anyhow!(e))?;
-        self.store.put_appeal(&appeal)?;
-        Ok(appeal)
+        self.handle.add_appeal_response(id, response).await
     }
 
-    /// Begin review of an appeal
+    /// Begin review of an appeal.
     pub async fn begin_appeal_review(&self, id: &AppealId) -> Result<Appeal> {
-        let id_hex = id.to_hex();
-        let mut appeal = self
-            .store
-            .get_appeal(&id_hex)?
-            .ok_or_else(|| anyhow::anyhow!("Appeal not found"))?;
-
-        appeal.begin_review().map_err(|e| anyhow::anyhow!(e))?;
-        self.store.put_appeal(&appeal)?;
-
-        // Audit log
-        info!(
-            target: "commons_audit",
-            action = "appeal_review_started",
-            appeal_id = %id_hex,
-            "Appeal review started"
-        );
-
-        Ok(appeal)
+        self.handle.begin_appeal_review(id).await
     }
 
-    /// Resolve a constitutional appeal with outcome
+    /// Resolve a constitutional appeal.
     pub async fn resolve_constitutional_appeal(
         &self,
         id: &AppealId,
         outcome: AppealOutcome,
     ) -> Result<Appeal> {
-        let id_hex = id.to_hex();
-        let mut appeal = self
-            .store
-            .get_appeal(&id_hex)?
-            .ok_or_else(|| anyhow::anyhow!("Appeal not found"))?;
-
-        let outcome_str = format!("{outcome:?}");
-        appeal.resolve(outcome).map_err(|e| anyhow::anyhow!(e))?;
-        self.store.put_appeal(&appeal)?;
-
-        // Audit log
-        info!(
-            target: "commons_audit",
-            action = "appeal_resolved",
-            appeal_id = %id_hex,
-            outcome = %outcome_str,
-            "Constitutional appeal resolved"
-        );
-
-        Ok(appeal)
+        self.handle.resolve_constitutional_appeal(id, outcome).await
     }
 
-    /// Withdraw an appeal
+    /// Withdraw an appeal.
     pub async fn withdraw_appeal(
         &self,
         id: &AppealId,
         caller: &Did,
         reason: Option<String>,
     ) -> Result<Appeal> {
-        let id_hex = id.to_hex();
-        let mut appeal = self
-            .store
-            .get_appeal(&id_hex)?
-            .ok_or_else(|| anyhow::anyhow!("Appeal not found"))?;
-
-        // Only appellant can withdraw
-        if appeal.appellant != *caller {
-            bail!("Only appellant can withdraw appeal");
-        }
-
-        appeal
-            .withdraw(reason.clone())
-            .map_err(|e| anyhow::anyhow!(e))?;
-        self.store.put_appeal(&appeal)?;
-
-        // Audit log
-        info!(
-            target: "commons_audit",
-            action = "appeal_withdrawn",
-            appeal_id = %id_hex,
-            caller = %caller.to_string(),
-            reason = ?reason,
-            "Appeal withdrawn"
-        );
-
-        Ok(appeal)
+        self.handle.withdraw_appeal(id, caller, reason).await
     }
+}
 
-    // ========================================================================
-    // Enrollment Session Operations
-    // ========================================================================
+// ============================================================================
+// Enrollment Session Operations (gateway-local, in-memory)
+// ============================================================================
 
-    /// Store an enrollment session
+impl CommonsManager {
+    /// Store an enrollment session.
     pub async fn put_enrollment_session(
         &self,
         id: &str,
         session: &crate::api::sdis::simple_enrollment::EnrollmentSession,
     ) -> Result<()> {
-        self.store.put_enrollment_session(id, session)?;
+        self.enrollment_sessions
+            .write()
+            .await
+            .insert(id.to_string(), session.clone());
         Ok(())
     }
 
-    /// Get an enrollment session by ID
+    /// Get an enrollment session by ID.
     pub async fn get_enrollment_session(
         &self,
         id: &str,
     ) -> Result<Option<crate::api::sdis::simple_enrollment::EnrollmentSession>> {
-        self.store.get_enrollment_session(id)
+        Ok(self.enrollment_sessions.read().await.get(id).cloned())
     }
 
-    /// Update an enrollment session
+    /// Update an enrollment session.
     pub async fn update_enrollment_session(
         &self,
         id: &str,
         session: &crate::api::sdis::simple_enrollment::EnrollmentSession,
     ) -> Result<()> {
-        self.store.update_enrollment_session(id, session)?;
+        self.enrollment_sessions
+            .write()
+            .await
+            .insert(id.to_string(), session.clone());
         Ok(())
     }
 
-    /// Delete an enrollment session
+    /// Delete an enrollment session.
     pub async fn delete_enrollment_session(&self, id: &str) -> Result<bool> {
-        self.store.delete_enrollment_session(id)
+        Ok(self.enrollment_sessions.write().await.remove(id).is_some())
     }
 
-    /// List all enrollment sessions
+    /// List all enrollment sessions.
     pub async fn list_enrollment_sessions(
         &self,
     ) -> Result<
@@ -2105,9 +828,21 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
             crate::api::sdis::simple_enrollment::EnrollmentSession,
         )>,
     > {
-        self.store.list_enrollment_sessions()
+        Ok(self
+            .enrollment_sessions
+            .read()
+            .await
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect())
     }
+}
 
+// ============================================================================
+// Governance Dashboard (gateway-local DTO)
+// ============================================================================
+
+impl CommonsManager {
     /// Build a governance dashboard from stored amendments and appeals.
     ///
     /// Returns a gateway-level DTO so callers don't need icn_governance types.
@@ -2221,11 +956,9 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
     }
 }
 
-impl Default for CommonsManager<Arc<dyn CommonsStoreBackend>> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+// ============================================================================
+// Steward DTO Helpers (gateway-local free functions)
+// ============================================================================
 
 /// Convert a `StewardRecord` to a gateway-local summary DTO.
 pub fn steward_to_summary(s: &StewardRecord) -> StewardSummaryResponse {
@@ -2276,9 +1009,14 @@ fn format_steward_status(s: &StewardStatus) -> String {
     }
 }
 
+// ============================================================================
+// Tests
+// ============================================================================
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use icn_identity::POPLevel;
 
     fn test_did() -> Did {
         Did::from_anchor_id(&[42u8; 32])
@@ -2327,7 +1065,6 @@ mod tests {
         let did = test_did();
         let steward = steward_did();
 
-        // Use steward enrollment to get Strong POP level (required for join)
         let anchor = mgr
             .create_anchor_from_enrollment(&did, Some(&steward))
             .await
@@ -2342,23 +1079,19 @@ mod tests {
 
         let jurisdiction = JurisdictionId::new("coop:test-coop");
 
-        // Join
         let affiliation = mgr
             .join_jurisdiction(&holder_id, jurisdiction.clone(), vec![])
             .await
             .unwrap();
         assert_eq!(affiliation.membership_status, MembershipStatus::Candidate);
 
-        // Verify affiliation exists
         let affiliations = mgr.list_affiliations(&holder_id).await.unwrap();
         assert_eq!(affiliations.len(), 1);
 
-        // Leave
         mgr.leave_jurisdiction(&holder_id, &jurisdiction)
             .await
             .unwrap();
 
-        // Verify status is Exited
         let affiliations = mgr.list_affiliations(&holder_id).await.unwrap();
         assert_eq!(affiliations[0].membership_status, MembershipStatus::Exited);
     }
@@ -2375,7 +1108,6 @@ mod tests {
             .await
             .unwrap();
 
-        // Lookup by DID
         let found_anchor = mgr.get_anchor_by_did(&did).await.unwrap();
         assert!(found_anchor.is_some());
 

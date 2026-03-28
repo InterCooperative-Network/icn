@@ -853,9 +853,19 @@ pub async fn add_amendment_change(
     let id_hex = id.into_inner();
 
     // Verify caller is proposer (get amendment first)
+    let id_bytes = hex::decode(&id_hex)
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid amendment ID hex: {e}")))?;
+    if id_bytes.len() != 32 {
+        return Err(GatewayError::BadRequest(
+            "Amendment ID must be 32 bytes".to_string(),
+        ));
+    }
+    let mut amendment_id_arr = [0u8; 32];
+    amendment_id_arr.copy_from_slice(&id_bytes);
+    let amendment_id_for_lookup = AmendmentId::new(amendment_id_arr);
     let existing = commons_mgr
-        .store()
-        .get_amendment(&id_hex)?
+        .get_amendment(&amendment_id_for_lookup)
+        .await?
         .ok_or_else(|| GatewayError::NotFound("Amendment not found".to_string()))?;
 
     if existing.proposer != caller {

@@ -107,24 +107,12 @@ impl EnrollmentStore {
 
     /// Create store with persistence to CommonsManager
     pub fn with_persistence(commons_manager: Arc<crate::commons_mgr::CommonsManager>) -> Self {
-        // Load existing sessions from persistent storage
-        let sessions = commons_manager
-            .store()
-            .list_enrollment_sessions()
-            .unwrap_or_default();
-
-        let mut map = std::collections::HashMap::new();
-        for (id, session) in sessions {
-            map.insert(id, session);
-        }
-
-        tracing::info!(
-            "Loaded {} enrollment sessions from persistent storage",
-            map.len()
-        );
+        // Enrollment sessions are in-memory only (CommonsManager gateway-local concern).
+        // There is no persistent store to load from on startup.
+        tracing::info!("Enrollment session store initialised (in-memory, 0 sessions loaded)");
 
         Self {
-            enrollments: RwLock::new(map),
+            enrollments: RwLock::new(std::collections::HashMap::new()),
             commons_manager: Some(commons_manager),
         }
     }

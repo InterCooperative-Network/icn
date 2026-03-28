@@ -93,6 +93,7 @@ icn-crypto-pq = { path = "../icn-crypto-pq" }
 icn-coop = { path = "../icn-coop", features = ["utoipa"] }
 icn-community = { path = "../icn-community" }
 icn-api = { path = "../icn-api" }
+icn-commons = { path = "../icn-commons" }
 
 # Caching
 lru = "0.16"
