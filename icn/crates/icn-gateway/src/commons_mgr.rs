@@ -843,15 +843,33 @@ impl CommonsManager {
 // ============================================================================
 
 impl CommonsManager {
-    /// Build a governance dashboard from stored amendments and appeals.
+    /// Build a governance dashboard scoped to a specific charter's domain.
+    ///
+    /// Looks up the charter by `charter_id`, derives its `domain_id`, then fetches
+    /// only amendments and appeals whose scope is `Jurisdiction { domain_id }` — exact
+    /// match, no substring. This prevents cross-domain contamination in multi-coop nodes.
     ///
     /// Returns a gateway-level DTO so callers don't need icn_governance types.
     pub async fn build_governance_dashboard(
         &self,
         charter_id: &str,
     ) -> Result<GovernanceDashboard> {
-        let amendments = self.list_amendments(None, None, None).await?;
-        let appeals = self.list_appeals(None, None, None).await?;
+        // Derive domain_id from the charter so that dashboard data is scoped correctly.
+        let domain_id: Option<String> = self
+            .get_charter(charter_id)
+            .await?
+            .map(|c| c.domain_id.clone());
+
+        let amendments = if let Some(ref d) = domain_id {
+            self.handle.list_amendments_by_domain(d).await?
+        } else {
+            self.list_amendments(None, None, None).await?
+        };
+        let appeals = if let Some(ref d) = domain_id {
+            self.handle.list_appeals_by_domain(d).await?
+        } else {
+            self.list_appeals(None, None, None).await?
+        };
 
         let mut ab = AmendmentsBreakdown {
             draft: 0,

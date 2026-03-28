@@ -1712,6 +1712,34 @@ impl CommonsInner {
         Ok(results)
     }
 
+    /// List amendments scoped to a specific domain (exact match on `AmendmentScope::Jurisdiction`).
+    ///
+    /// Only returns amendments whose scope is `Jurisdiction { domain_id }` with an
+    /// exact-string match on `domain_id`. Network- and Federation-scoped amendments are
+    /// excluded. This prevents the cross-contamination where a domain-ID prefix match
+    /// ("coop:alpha") would also return records for "coop:alpha-test".
+    pub async fn list_amendments_by_domain(&self, domain_id: &str) -> Result<Vec<Amendment>> {
+        let mut results = self.store.list_amendments()?;
+        results.retain(|a| {
+            matches!(&a.scope, icn_governance::AmendmentScope::Jurisdiction { domain_id: d } if d == domain_id)
+        });
+        results.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        Ok(results)
+    }
+
+    /// List appeals scoped to a specific domain (exact match on `AppealScope::Jurisdiction`).
+    ///
+    /// Mirrors `list_amendments_by_domain` — only `Jurisdiction { domain_id }` variants
+    /// with exact-string match are returned.
+    pub async fn list_appeals_by_domain(&self, domain_id: &str) -> Result<Vec<Appeal>> {
+        let mut results = self.store.list_appeals()?;
+        results.retain(|a| {
+            matches!(&a.scope, icn_governance::AppealScope::Jurisdiction { domain_id: d } if d == domain_id)
+        });
+        results.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        Ok(results)
+    }
+
     /// Submit an amendment for review
     pub async fn submit_amendment(&self, id: &AmendmentId, caller: &Did) -> Result<Amendment> {
         let id_hex = id.to_hex();

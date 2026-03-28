@@ -775,6 +775,30 @@ impl CommonsHandle {
 // ============================================================================
 
 impl CommonsHandle {
+    /// List amendments scoped to a specific domain (exact jurisdiction match).
+    pub async fn list_amendments_by_domain(
+        &self,
+        domain_id: &str,
+    ) -> Result<Vec<icn_governance::Amendment>> {
+        self.inner
+            .read()
+            .await
+            .list_amendments_by_domain(domain_id)
+            .await
+    }
+
+    /// List appeals scoped to a specific domain (exact jurisdiction match).
+    pub async fn list_appeals_by_domain(
+        &self,
+        domain_id: &str,
+    ) -> Result<Vec<icn_governance::Appeal>> {
+        self.inner
+            .read()
+            .await
+            .list_appeals_by_domain(domain_id)
+            .await
+    }
+
     /// Store an amendment.
     pub async fn store_amendment(&self, amendment: Amendment) -> Result<()> {
         self.inner.write().await.store_amendment(amendment).await
