@@ -18,7 +18,7 @@ use ed25519_dalek::SigningKey;
 use icn_commons::CommonsHandle;
 use icn_governance::{
     Amendment, AmendmentScope, AmendmentType, Appeal, AppealGrounds, AppealRemedy, AppealScope,
-    AppealType,
+    AppealType, Charter, GovernanceConfig, OrgType,
 };
 use icn_identity::Did;
 
@@ -27,12 +27,39 @@ fn test_did(seed: u8) -> Did {
     Did::from_public_key(&signing_key.verifying_key())
 }
 
+/// Ensure a charter exists for `domain_id`. Idempotent: if one already exists,
+/// the second call is skipped.  Required because write-side scope enforcement
+/// now rejects jurisdiction-scoped records that reference chartless domains.
+async fn ensure_charter(handle: &CommonsHandle, domain_id: &str) {
+    if handle
+        .get_charter_by_domain(domain_id)
+        .await
+        .expect("get_charter_by_domain")
+        .is_some()
+    {
+        return; // already exists
+    }
+    let charter = Charter::new(
+        OrgType::Cooperative,
+        domain_id.to_string(),
+        format!("Test Coop for {domain_id}"),
+        GovernanceConfig::cooperative_default(),
+        Default::default(),
+        Default::default(),
+    );
+    handle
+        .store_charter(charter)
+        .await
+        .expect("store charter for domain");
+}
+
 async fn store_jurisdiction_amendment(
     handle: &CommonsHandle,
     proposer: &Did,
     domain_id: &str,
     title: &str,
 ) {
+    ensure_charter(handle, domain_id).await;
     let amendment = Amendment::new(
         AmendmentType::Policy,
         AmendmentScope::Jurisdiction {
@@ -63,6 +90,7 @@ async fn store_network_amendment(handle: &CommonsHandle, proposer: &Did) {
 }
 
 async fn store_jurisdiction_appeal(handle: &CommonsHandle, appellant: &Did, domain_id: &str) {
+    ensure_charter(handle, domain_id).await;
     let appeal = Appeal::new(
         AppealType::MembershipDenial {
             jurisdiction_id: domain_id.to_string(),

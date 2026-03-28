@@ -605,14 +605,35 @@ impl CommonsInner {
 
     // ========== Charter Operations (Layer 2) ==========
 
-    /// Store a charter
+    /// Store a charter.
+    ///
+    /// # Invariants enforced
+    ///
+    /// - **Charter ID uniqueness**: a charter with the same `charter_id` may not be stored twice.
+    /// - **Domain uniqueness**: each `domain_id` may have at most one charter. Storing a second
+    ///   charter for the same domain would make domain-scoped queries ambiguous.
     pub async fn store_charter(&self, charter: Charter) -> Result<()> {
         let charter_id = charter.charter_id.to_hex();
         let org_type = format!("{:?}", charter.org_type);
 
-        // Check if charter already exists
+        // Check if charter already exists by ID
         if self.store.get_charter(&charter_id)?.is_some() {
             bail!("Charter already exists: {charter_id}");
+        }
+
+        // Enforce domain uniqueness: one charter per domain_id.
+        // Without this check two charters could share a domain_id, making
+        // get_charter_by_domain and all domain-scoped queries undefined.
+        if self
+            .store
+            .get_charter_by_domain(&charter.domain_id)?
+            .is_some()
+        {
+            bail!(
+                "A charter already exists for domain '{}'. \
+                 Each domain may have at most one charter.",
+                charter.domain_id
+            );
         }
 
         // Store charter (this also updates the domain index)
@@ -812,8 +833,17 @@ impl CommonsInner {
             governance_approval,
         );
 
-        // Set optional fields
+        // Set optional fields.
+        // If a jurisdiction is specified, validate it corresponds to an existing charter domain
+        // so stewards cannot be bound to phantom jurisdictions.
         if let Some(ref j) = jurisdiction {
+            if self.store.get_charter_by_domain(j)?.is_none() {
+                bail!(
+                    "Steward jurisdiction '{}' does not correspond to any known charter domain. \
+                     Create the charter for this domain before assigning stewards to it.",
+                    j
+                );
+            }
             steward.jurisdiction = Some(j.clone());
         }
         for spec in specializations {
@@ -1605,10 +1635,58 @@ impl CommonsInner {
 
     // ========== Amendment Operations (v0.6.0 Constitutional Governance) ==========
 
-    /// Store an amendment
+    /// Store an amendment.
+    ///
+    /// # Invariants enforced
+    ///
+    /// - **Jurisdiction scope references an existing domain**: if the amendment's scope is
+    ///   `Jurisdiction { domain_id }`, a charter with that `domain_id` must already exist.
+    ///   This prevents phantom-domain amendments that can never be queried correctly.
+    ///
+    /// - **charter_id/scope coherence**: if a `charter_id` is also provided, the charter it
+    ///   identifies must have a `domain_id` that matches the amendment's `scope.domain_id`.
+    ///   Cross-domain scope (amendment claiming to belong to charter A but scoped to domain B)
+    ///   is rejected.
     pub async fn store_amendment(&self, amendment: Amendment) -> Result<()> {
         let amendment_id = amendment.id.to_hex();
         let proposer = amendment.proposer.to_string();
+
+        // Enforce scope coherence for jurisdiction-scoped amendments.
+        if let icn_governance::AmendmentScope::Jurisdiction { domain_id } = &amendment.scope {
+            // The domain must correspond to an existing charter.
+            if self.store.get_charter_by_domain(domain_id)?.is_none() {
+                bail!(
+                    "Amendment scope references unknown domain '{}'. \
+                     Create a charter for this domain first.",
+                    domain_id
+                );
+            }
+
+            // If a charter_id is supplied, its domain must match the scope's domain.
+            if let Some(cid_bytes) = amendment.charter_id {
+                let cid_hex = hex::encode(cid_bytes);
+                match self.store.get_charter(&cid_hex)? {
+                    Some(charter) if charter.domain_id == *domain_id => {
+                        // Consistent — domain matches scope.
+                    }
+                    Some(charter) => {
+                        bail!(
+                            "Amendment charter_id '{}' belongs to domain '{}' but amendment scope \
+                             specifies domain '{}'. Cross-domain scope is forbidden.",
+                            cid_hex,
+                            charter.domain_id,
+                            domain_id
+                        );
+                    }
+                    None => {
+                        bail!(
+                            "Amendment references charter '{}' which does not exist.",
+                            cid_hex
+                        );
+                    }
+                }
+            }
+        }
 
         self.store.put_amendment(&amendment)?;
 
@@ -1879,9 +1957,28 @@ impl CommonsInner {
     // ========== Appeal Operations (v0.6.0 Constitutional Governance) ==========
 
     /// Store an appeal
+    /// Store an appeal.
+    ///
+    /// # Invariants enforced
+    ///
+    /// - **Jurisdiction scope references an existing domain**: if the appeal's scope is
+    ///   `Jurisdiction { domain_id }`, a charter with that `domain_id` must already exist.
+    ///   This mirrors the same invariant on amendments and ensures appeals can only be filed
+    ///   against real governance domains.
     pub async fn store_appeal(&self, appeal: Appeal) -> Result<()> {
         let appeal_id = appeal.id.to_hex();
         let appellant = appeal.appellant.to_string();
+
+        // Enforce scope coherence for jurisdiction-scoped appeals.
+        if let icn_governance::AppealScope::Jurisdiction { domain_id } = &appeal.scope {
+            if self.store.get_charter_by_domain(domain_id)?.is_none() {
+                bail!(
+                    "Appeal scope references unknown domain '{}'. \
+                     Create a charter for this domain first.",
+                    domain_id
+                );
+            }
+        }
 
         self.store.put_appeal(&appeal)?;
 
