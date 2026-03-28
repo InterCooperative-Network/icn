@@ -105,10 +105,14 @@ impl EnrollmentStore {
         }
     }
 
-    /// Create store with persistence to CommonsManager
-    pub fn with_persistence(commons_manager: Arc<crate::commons_mgr::CommonsManager>) -> Self {
-        // Enrollment sessions are in-memory only (CommonsManager gateway-local concern).
-        // There is no persistent store to load from on startup.
+    /// Create store wired to a CommonsManager for write-through of completed enrollment results.
+    ///
+    /// Enrollment sessions themselves are in-memory only — they are short-lived workflow state
+    /// that does not survive a gateway restart, which is intentional. The CommonsManager is
+    /// used to persist the final enrollment outcome (anchor / holder records) once a ceremony
+    /// completes, not the session itself.
+    pub fn with_commons_manager(commons_manager: Arc<crate::commons_mgr::CommonsManager>) -> Self {
+        // No sessions to load on startup — they are ephemeral in-memory state.
         tracing::info!("Enrollment session store initialised (in-memory, 0 sessions loaded)");
 
         Self {

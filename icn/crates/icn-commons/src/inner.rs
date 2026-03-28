@@ -9,9 +9,10 @@
 //! - Revocation operations
 //! - Amendment operations
 //! - Appeal operations
-//! - Enrollment session operations
 //!
-//! Gateway-local DTO methods (e.g. `build_governance_dashboard`) are intentionally absent.
+//! Enrollment session handling and gateway-local DTO methods
+//! (e.g. `build_governance_dashboard`) are intentionally kept in the gateway layer,
+//! not in CommonsInner.
 
 use anyhow::{bail, Result};
 use icn_governance::{
@@ -51,7 +52,7 @@ impl CommonsInner {
     /// Create a new CommonsInner with the given backend
     pub fn new(backend: Arc<dyn CommonsStoreBackend>) -> Self {
         CommonsInner {
-            store: CommonsStore::new(Arc::new(backend)),
+            store: CommonsStore::new(backend),
             revocations: RevocationRegistry::new(),
         }
     }

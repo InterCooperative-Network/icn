@@ -199,7 +199,8 @@ impl CommonsStoreBackend for InMemoryCommonsStore {
 
 /// Sled-based persistent store implementation
 ///
-/// Enable with the `sled-storage` feature flag.
+/// Sled is an unconditional dependency of `icn-commons`. No feature flag is
+/// required to use this backend.
 pub struct SledCommonsStore {
     db: sled::Db,
 }
@@ -290,9 +291,15 @@ impl Default for CacheConfig {
     }
 }
 
-/// High-level Commons storage with caching
+/// High-level Commons storage with caching.
+///
+/// `S` is the storage backend. When used from `CommonsInner`, `S` is
+/// `Arc<dyn CommonsStoreBackend>` (a single Arc wrapping the backend). The
+/// backend is stored as `S` directly — not wrapped in an additional `Arc` —
+/// so callers that already pass an `Arc` do not end up with a nested
+/// `Arc<Arc<...>>`.
 pub struct CommonsStore<S: CommonsStoreBackend> {
-    store: Arc<S>,
+    store: S,
     // Caches for frequently accessed records
     anchor_cache: RwLock<LruCache<String, PersonhoodAnchor>>,
     holder_cache: RwLock<LruCache<String, CommonsHolderRecord>>,
@@ -303,13 +310,16 @@ pub struct CommonsStore<S: CommonsStoreBackend> {
 }
 
 impl<S: CommonsStoreBackend> CommonsStore<S> {
-    /// Create a new CommonsStore with default cache sizes
-    pub fn new(store: Arc<S>) -> Self {
+    /// Create a new CommonsStore with default cache sizes.
+    ///
+    /// Pass the backend directly. If the backend is already an `Arc<B>`,
+    /// pass the `Arc` — it will not be double-wrapped.
+    pub fn new(store: S) -> Self {
         Self::with_config(store, CacheConfig::default())
     }
 
     /// Create with custom cache configuration
-    pub fn with_config(store: Arc<S>, config: CacheConfig) -> Self {
+    pub fn with_config(store: S, config: CacheConfig) -> Self {
         // Helper to ensure cache size is at least 1
         // SAFETY: .max(1) ensures the value is always non-zero
         #[allow(clippy::unwrap_used)]
@@ -329,7 +339,7 @@ impl<S: CommonsStoreBackend> CommonsStore<S> {
     }
 
     /// Get reference to underlying backend
-    pub fn backend(&self) -> &Arc<S> {
+    pub fn backend(&self) -> &S {
         &self.store
     }
 

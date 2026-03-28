@@ -773,9 +773,9 @@ impl GatewayServer {
 
         // Create SDIS state for identity verification
         let sdis_state = Arc::new(crate::api::sdis::SdisState::new());
-        // Create enrollment store with persistence to CommonsManager
+        // Create enrollment store wired to CommonsManager for write-through of completed enrollments
         let enrollment_store = Arc::new(
-            crate::api::sdis::simple_enrollment::EnrollmentStore::with_persistence(
+            crate::api::sdis::simple_enrollment::EnrollmentStore::with_commons_manager(
                 commons_manager.clone(),
             ),
         );
