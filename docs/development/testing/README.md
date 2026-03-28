@@ -7,7 +7,7 @@ This directory contains testing guides and plans for ICN.
 **Verification patterns:**
 - **[governance-proof-layers.md](governance-proof-layers.md)** — Four-layer proof stack for governance (HTTP lifecycle, sled write, same-runtime reopen, cross-process restart). The reference pattern for verifying any ICN subsystem.
 - **[ledger-proof-layers.md](ledger-proof-layers.md)** — Ledger proof stack (all 4 layers complete: direct sled write, store-backed write, service-layer reopen, cross-process restart).
-- **[gossip-proof-layers.md](gossip-proof-layers.md)** — Gossip proof stack (Layers 1–3 complete: direct struct, handle-backed, same-runtime drop+recreate). Layer 4 pending. Note: gossip uses JSON snapshot files, not sled.
+- **[gossip-proof-layers.md](gossip-proof-layers.md)** — Gossip proof stack (all 4 layers complete: direct struct, handle-backed, same-runtime drop+recreate, cross-process restart). Note: gossip uses JSON snapshot files, not sled.
 
 **From root:**
 - **TESTING_QUICKSTART.md** - Quick start guide for testing

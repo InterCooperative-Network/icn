@@ -32,6 +32,10 @@ icn-store.workspace = true
 criterion = "0.5"
 tempfile = "3"
 
+[[bin]]
+name = "gossip_restart_helper"
+path = "src/bin/gossip_restart_helper.rs"
+
 [[bench]]
 name = "gossip_bench"
 harness = false

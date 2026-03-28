@@ -1,4 +1,4 @@
-//! Gossip state persistence proof — Layer 1.
+//! Gossip state persistence proof — Layers 1–4.
 //!
 //! ## Architecture note: gossip persistence is NOT sled-based
 //!
@@ -322,5 +322,76 @@ async fn test_gossip_handle_survives_same_runtime_drop_and_recreate() {
     assert_eq!(
         clock_val, 1,
         "vector clock for own_did must be 1 after same-runtime restore, got: {clock_val}"
+    );
+}
+
+/// Layer 4 — Cross-process gossip snapshot persistence proof.
+///
+/// Proves that gossip coordination state (vector clock, topic metadata,
+/// subscriptions) written in one OS process is readable in a completely
+/// fresh OS process. No shared memory. No shared runtime. True process-
+/// boundary restart.
+///
+/// Implementation:
+/// - Helper binary: `crates/icn-gossip/src/bin/gossip_restart_helper.rs`
+///   - `write <data_dir>` — builds coordination state through GossipHandle,
+///     persists snapshot, prints "own_did,subscriber_did" to stdout, exits 0.
+///   - `read <data_dir> <own_did> <subscriber_did>` — loads snapshot, restores
+///     into fresh GossipActor, asserts exact invariants, exits 0 or 1.
+///
+/// Architecture note: gossip uses JSON snapshot files (not sled). No file
+/// lock release is needed between processes — the snapshot is written
+/// atomically and closed on drop.
+#[test]
+fn test_gossip_state_survives_cross_process_restart() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let data_dir = tmp.path().to_str().expect("data_dir to str");
+    let helper = env!("CARGO_BIN_EXE_gossip_restart_helper");
+
+    // ── Write subprocess: build + persist gossip coordination state ───────────
+    let write_out = std::process::Command::new(helper)
+        .args(["write", data_dir])
+        .output()
+        .expect("failed to spawn write subprocess");
+
+    assert!(
+        write_out.status.success(),
+        "write subprocess failed (exit {:?}):\nstdout: {}\nstderr: {}",
+        write_out.status.code(),
+        String::from_utf8_lossy(&write_out.stdout),
+        String::from_utf8_lossy(&write_out.stderr)
+    );
+
+    // Write subprocess prints "own_did,subscriber_did" on one line.
+    let stdout = String::from_utf8(write_out.stdout)
+        .expect("write stdout must be valid UTF-8")
+        .trim()
+        .to_string();
+
+    let (own_did_str, subscriber_did_str) = stdout
+        .split_once(',')
+        .expect("write stdout must be 'own_did,subscriber_did'");
+
+    assert!(
+        own_did_str.starts_with("did:icn:"),
+        "own_did must be a valid DID, got: {own_did_str:?}"
+    );
+    assert!(
+        subscriber_did_str.starts_with("did:icn:"),
+        "subscriber_did must be a valid DID, got: {subscriber_did_str:?}"
+    );
+
+    // ── Read subprocess: fresh process, no shared memory ─────────────────────
+    let read_out = std::process::Command::new(helper)
+        .args(["read", data_dir, own_did_str, subscriber_did_str])
+        .output()
+        .expect("failed to spawn read subprocess");
+
+    assert!(
+        read_out.status.success(),
+        "read subprocess failed (exit {:?}):\nstdout: {}\nstderr: {}",
+        read_out.status.code(),
+        String::from_utf8_lossy(&read_out.stdout),
+        String::from_utf8_lossy(&read_out.stderr)
     );
 }

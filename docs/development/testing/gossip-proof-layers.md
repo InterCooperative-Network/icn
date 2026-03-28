@@ -1,5 +1,5 @@
 ---
-Status: layers 1-3 complete
+Status: layers 1-4 complete
 Canonical: no
 Last Reviewed: 2026-03-28
 ---
@@ -125,27 +125,65 @@ cargo test -p icn-gossip --test gossip_persistence
 
 ---
 
-## What Is NOT Proven
+---
 
-| Gap | Why it matters | Next layer target |
-|-----|---------------|-------------------|
-| Cross-process restart | Only same-process proven | Layer 4 |
-| Gossip entry re-gossip after restart | Entries intentionally not persisted | Multi-node integration test |
+## Layer 4 — Cross-Process Restart Proof ✅
+
+**What it proves:** Gossip coordination state (vector clock, topic metadata,
+subscriptions) written through `GossipHandle` in one OS process is readable
+in a completely fresh OS process. No shared memory. No shared runtime. True
+process-boundary restart.
+
+**Persistence scope confirmed:** Coordination state persists (clock,
+topics, subscriptions). Gossip entries do NOT persist — by design, they are
+re-fetched from peers via anti-entropy after restart.
+
+**Implementation:**
+- Helper binary: `crates/icn-gossip/src/bin/gossip_restart_helper.rs`
+  - `write <data_dir>` — builds state through `GossipHandle`, persists
+    snapshot, prints `own_did,subscriber_did` to stdout, exits 0.
+  - `read <data_dir> <own_did> <subscriber_did>` — loads snapshot, restores
+    into fresh `GossipActor`, asserts exact invariants, exits 0 or 1.
+- Integration test: `crates/icn-gossip/tests/gossip_persistence.rs` →
+  `test_gossip_state_survives_cross_process_restart`
+
+**Key difference from ledger/governance restart helpers:**
+- No sled file lock to release — JSON snapshot is written atomically, closed
+  on drop. No sled between processes.
+- `new_current_thread()` runtime sufficient — gossip has no `block_in_place`.
+
+**Artifact:** `crates/icn-gossip/tests/gossip_persistence.rs` →
+`test_gossip_state_survives_cross_process_restart`
+
+**Run:**
+```bash
+cargo test -p icn-gossip --test gossip_persistence
+```
+
+**What is asserted (in read subprocess):**
+- Topic name `"layer-4-cross-process-proof"` survives the OS process boundary
+- Subscriber DID (passed from write subprocess via stdout) survives
+- Vector clock for `own_did` is exactly 1 after one publish
+
+---
+
+## What Is NOT Proven (by design)
+
+| Gap | Why it matters | Status |
+|-----|---------------|--------|
+| Gossip entry re-gossip after restart | Entries intentionally not persisted | By design — anti-entropy handles this |
 | Anti-entropy resync after restart | Requires multi-node test | Multi-node integration test |
 | Snapshot checksum corruption detection | Already tested in `icn-snapshot` unit tests | Already covered |
 
 ---
 
-## Next Layer: Layer 4 — Cross-Process Restart
+## Run Full Layer 1–4 Suite
 
-**Target:** Prove that gossip coordination state written in one OS process is
-readable in a completely fresh OS process. No shared memory. No shared
-runtime.
+```bash
+cargo test -p icn-gossip --test gossip_persistence
+```
 
-**Pattern:** Create a helper binary (or use subprocess spawning directly in
-the test) that writes state in process A and reads + asserts in process B.
-Note: unlike ledger/governance, no sled file lock needs releasing — just the
-JSON snapshot file on disk.
+All four proof layers are in a single test file. All use the same `icn-snapshot` JSON mechanism.
 
 ---
 
@@ -156,4 +194,6 @@ JSON snapshot file on disk.
 | 1 — Direct struct write + reopen | ✅ | ✅ | ✅ `gossip_persistence.rs` |
 | 2 — Actor/handle-backed path | ✅ | ✅ | ✅ `gossip_persistence.rs` |
 | 3 — Same-runtime close+reopen | ✅ | ✅ | ✅ `gossip_persistence.rs` |
-| 4 — Cross-process restart | ✅ | ✅ | ⏳ |
+| 4 — Cross-process restart | ✅ | ✅ | ✅ `gossip_persistence.rs` |
+
+Gossip is now fully verified across all four proof layers. Governance and ledger have full parity.
