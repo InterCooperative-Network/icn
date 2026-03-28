@@ -10,7 +10,7 @@ Defines what each layer proves, how to implement it, and what "verified" means.
 
 ## Subsystem Proof Layers
 
-Three subsystems have all 4 layers complete. Trust is at Layer 1.
+All four subsystems have all 4 layers complete.
 
 **[governance-proof-layers.md](governance-proof-layers.md)**
 - Layer 1: HTTP lifecycle (actix-web integration test, real Ed25519 auth)
@@ -31,11 +31,11 @@ Three subsystems have all 4 layers complete. Trust is at Layer 1.
 - Layer 4: Cross-process restart (gossip_restart_helper binary)
 - Note: gossip uses JSON snapshot files (icn-snapshot), not sled
 
-**[trust-proof-layers.md](trust-proof-layers.md)** — Layers 1–3 complete; Layer 4 pending
+**[trust-proof-layers.md](trust-proof-layers.md)** — All 4 layers complete
 - Layer 1 ✅: TrustEdge survives SledStore drop-and-reopen (direct path)
 - Layer 2 ✅: TrustGraphFacade path + graph-type prefix isolation proven
 - Layer 3 ✅: Same-runtime facade drop + recreate (no shutdown protocol needed)
-- Layer 4 ⏳: Cross-process restart
+- Layer 4 ✅: Cross-process restart (trust_restart_helper binary)
 
 ## Reusable Infrastructure
 

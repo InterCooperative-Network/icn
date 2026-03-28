@@ -1,4 +1,4 @@
-//! Trust graph persistence proof — Layers 1, 2, and 3.
+//! Trust graph persistence proof — Layers 1, 2, 3, and 4.
 //!
 //! ## Architecture note
 //!
@@ -42,9 +42,17 @@
 //! Trust has no background scheduler — dropping the `Arc` is the full shutdown.
 //! No `shutdown().await` or `JoinHandle` is needed.
 //!
+//! ## Layer 4 — what it proves
+//!
+//! Trust state written through `TrustGraphFacade` in one OS process is
+//! readable in a completely fresh OS process. No shared memory, no shared
+//! sled handle, no Arc continuity. The sled file on disk is the only bridge.
+//!
+//! Uses `crates/icn-trust/src/bin/trust_restart_helper.rs` (write + read modes)
+//! and `icn_testkit::subprocess::run_subprocess` for the subprocess invocation.
+//!
 //! ## What is NOT proven
 //!
-//! - Cross-process restart (Layer 4)
 //! - Evidence fields (additional invariants for future layers)
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
@@ -53,6 +61,9 @@ use icn_identity::KeyPair;
 use icn_store::SledStore;
 use icn_trust::{TrustEdge, TrustGraph, TrustGraphFacade, TrustGraphType, TrustScore};
 use std::sync::Arc;
+
+// Layer 4 only
+use icn_testkit::subprocess::run_subprocess;
 
 /// Layer 1 — TrustGraph direct sled write persistence proof.
 ///
@@ -296,5 +307,56 @@ fn test_trust_facade_survives_same_runtime_drop_and_recreate() {
     assert!(
         economic_result.is_none(),
         "Social edge must NOT appear in Economic graph after same-runtime recreate"
+    );
+}
+
+/// Layer 4 — Cross-process facade persistence proof.
+///
+/// Proves that a `TrustEdge` written through `TrustGraphFacade` in one OS
+/// process is readable by a completely fresh OS process. No shared memory,
+/// no shared sled handle, no Arc continuity across the process boundary.
+///
+/// Implementation:
+/// - `trust_restart_helper write <sled_path>` — builds a Social edge via
+///   `TrustGraphFacade`, persists to sled, prints "src_did,tgt_did,score"
+///   to stdout, exits 0.
+/// - `trust_restart_helper read <sled_path> <src_did> <tgt_did> <score>` —
+///   opens a fresh `SledStore`, constructs fresh `TrustGraphFacade`, reads
+///   the edge via `get_edge()`, asserts exact DID and score values, exits 0.
+///
+/// `icn_testkit::subprocess::run_subprocess` asserts exit 0 and returns
+/// trimmed stdout; on failure it panics with full stdout + stderr for
+/// immediate CI debuggability.
+#[test]
+fn test_trust_edge_survives_cross_process_restart() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let sled_path = tmp.path().to_str().expect("sled_path to str");
+    let helper = env!("CARGO_BIN_EXE_trust_restart_helper");
+
+    // ── Write subprocess: write edge, persist, print tokens ──────────────────
+    let write_stdout = run_subprocess(helper, &["write", sled_path]);
+
+    // stdout format: "src_did,tgt_did,score"
+    let parts: Vec<&str> = write_stdout.splitn(3, ',').collect();
+    assert_eq!(
+        parts.len(),
+        3,
+        "write stdout must be 'src_did,tgt_did,score', got: {write_stdout:?}"
+    );
+    let (src_did_str, tgt_did_str, score_str) = (parts[0], parts[1], parts[2]);
+
+    assert!(
+        src_did_str.starts_with("did:icn:"),
+        "src_did must be a valid DID, got: {src_did_str:?}"
+    );
+    assert!(
+        tgt_did_str.starts_with("did:icn:"),
+        "tgt_did must be a valid DID, got: {tgt_did_str:?}"
+    );
+
+    // ── Read subprocess: fresh process, no shared memory ─────────────────────
+    run_subprocess(
+        helper,
+        &["read", sled_path, src_did_str, tgt_did_str, score_str],
     );
 }

@@ -1,5 +1,5 @@
 ---
-Status: layers 1-3 complete
+Status: layers 1-4 complete
 Last Reviewed: 2026-03-28
 ---
 
@@ -121,11 +121,43 @@ cargo test -p icn-trust --test trust_persistence
 
 ---
 
+## Layer 4 — Cross-Process Restart Proof ✅
+
+**What it proves:** A `TrustEdge` written through `TrustGraphFacade` in one OS
+process is readable by a completely fresh OS process — no shared memory, no shared
+sled handle, no Arc continuity across the process boundary. The sled file on disk
+is the only bridge.
+
+**Implementation:**
+- Helper binary: `crates/icn-trust/src/bin/trust_restart_helper.rs`
+  - `write <sled_path>`: generates two KeyPairs, creates `TrustGraphFacade`,
+    calls `add_edge()`, prints `"src_did,tgt_did,score"` to stdout, exits 0.
+  - `read <sled_path> <src_did> <tgt_did> <score>`: opens fresh `SledStore`,
+    constructs fresh `TrustGraphFacade`, reads edge via `get_edge()`, asserts
+    exact DID and score values, exits 0 on success, 1 on failure.
+- Runtime: `new_current_thread()` — no `block_in_place` in trust path (unlike ledger).
+- `drop(rt)` before `process::exit()` — flushes sled WAL before exit.
+
+**Artifact:** `crates/icn-trust/tests/trust_persistence.rs` →
+`test_trust_edge_survives_cross_process_restart`
+
+**Run:**
+```bash
+cargo test -p icn-trust --test trust_persistence
+```
+
+**What is asserted:**
+- Write subprocess exits 0, prints `"src_did,tgt_did,score"`.
+- Source and target DIDs are valid `did:icn:` prefixed strings.
+- Read subprocess (fresh OS process, fresh sled, fresh facade) exits 0.
+- Inside read subprocess: source DID, target DID, and score match exactly.
+
+---
+
 ## What Is NOT Yet Proven
 
 | Gap | Layer | Next step |
 |-----|-------|-----------|
-| Cross-process restart | L4 | Helper binary + subprocess test |
 | Evidence fields survive round-trip | Future | Add `evidence: Vec<TrustEvidence>` assertions |
 
 ---
@@ -137,4 +169,4 @@ cargo test -p icn-trust --test trust_persistence
 | 1 — Direct persistence | ✅ | ✅ | ✅ | ✅ |
 | 2 — Production path | ✅ | ✅ | ✅ | ✅ |
 | 3 — Same-runtime lifecycle | ✅ | ✅ | ✅ | ✅ |
-| 4 — Cross-process restart | ✅ | ✅ | ✅ | ⏳ |
+| 4 — Cross-process restart | ✅ | ✅ | ✅ | ✅ |
