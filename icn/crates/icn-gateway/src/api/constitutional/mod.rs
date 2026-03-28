@@ -582,6 +582,48 @@ pub async fn create_amendment(
     let amendment_type = parse_amendment_type(&req.amendment_type)?;
     let scope = parse_amendment_scope(&req.scope_type, req.scope_id.as_deref())?;
 
+    // Validate charter_id consistency before consuming `scope` into Amendment::new.
+    //
+    // When a charter_id is supplied alongside a Jurisdiction scope, the charter
+    // must belong to exactly that domain.  Accepting a mismatched pair would make
+    // the amendment's provenance ambiguous and produce a confusing substrate-level
+    // error instead of a clear boundary-layer rejection.
+    let validated_charter_id: Option<[u8; 32]> = if let Some(charter_hex) = &req.charter_id {
+        let charter_bytes = hex::decode(charter_hex)
+            .map_err(|e| GatewayError::BadRequest(format!("Invalid charter_id hex: {e}")))?;
+        if charter_bytes.len() != 32 {
+            return Err(GatewayError::BadRequest(
+                "charter_id must be 32 bytes".to_string(),
+            ));
+        }
+        let mut charter_id_bytes = [0u8; 32];
+        charter_id_bytes.copy_from_slice(&charter_bytes);
+
+        if let AmendmentScope::Jurisdiction {
+            domain_id: ref scope_domain,
+        } = scope
+        {
+            let charter = commons_mgr
+                .get_charter(charter_hex)
+                .await
+                .map_err(|e| GatewayError::InternalError(e.to_string()))?
+                .ok_or_else(|| {
+                    GatewayError::BadRequest(format!("charter_id '{charter_hex}' does not exist"))
+                })?;
+            if charter.domain_id != *scope_domain {
+                return Err(GatewayError::BadRequest(format!(
+                    "charter_id belongs to domain '{}' but amendment scope specifies '{}'; \
+                     charter_id and scope_id must refer to the same domain",
+                    charter.domain_id, scope_domain,
+                )));
+            }
+        }
+
+        Some(charter_id_bytes)
+    } else {
+        None
+    };
+
     // Create amendment
     let mut amendment = Amendment::new(
         amendment_type,
@@ -590,20 +632,7 @@ pub async fn create_amendment(
         req.description.clone(),
         proposer,
     );
-
-    // Add charter ID if provided
-    if let Some(charter_hex) = &req.charter_id {
-        let charter_bytes = hex::decode(charter_hex)
-            .map_err(|e| GatewayError::BadRequest(format!("Invalid charter_id hex: {e}")))?;
-        if charter_bytes.len() != 32 {
-            return Err(GatewayError::BadRequest(
-                "charter_id must be 32 bytes".to_string(),
-            ));
-        }
-        let mut charter_id = [0u8; 32];
-        charter_id.copy_from_slice(&charter_bytes);
-        amendment.charter_id = Some(charter_id);
-    }
+    amendment.charter_id = validated_charter_id;
 
     // Add changes
     for change_req in &req.changes {
@@ -633,6 +662,10 @@ pub struct ListAmendmentsQuery {
     /// Filter by type
     #[serde(rename = "type")]
     pub amendment_type: Option<String>,
+    /// Restrict results to amendments scoped to this domain (exact match).
+    /// When supplied, only Jurisdiction-scoped amendments for this domain_id
+    /// are returned.  Prevents cross-domain data leakage in multi-coop nodes.
+    pub domain_id: Option<String>,
     /// Cursor for pagination
     pub cursor: Option<String>,
     /// Number of items per page (default: 20, max: 100)
@@ -662,13 +695,18 @@ pub async fn list_amendments(
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "constitutional:read")?;
 
-    let amendments = commons_mgr
-        .list_amendments(
-            query.status.as_deref(),
-            query.scope.as_deref(),
-            query.amendment_type.as_deref(),
-        )
-        .await?;
+    let amendments = if let Some(ref domain) = query.domain_id {
+        // Domain-scoped query: exact match, no cross-domain leakage.
+        commons_mgr.list_amendments_by_domain(domain).await?
+    } else {
+        commons_mgr
+            .list_amendments(
+                query.status.as_deref(),
+                query.scope.as_deref(),
+                query.amendment_type.as_deref(),
+            )
+            .await?
+    };
 
     // Convert to responses and sort by updated_at descending (most recent first)
     let mut responses: Vec<AmendmentResponse> =
@@ -1007,6 +1045,10 @@ pub struct ListAppealsQuery {
     pub scope: Option<String>,
     /// Filter by appellant
     pub appellant: Option<String>,
+    /// Restrict results to appeals scoped to this domain (exact match).
+    /// When supplied, only Jurisdiction-scoped appeals for this domain_id
+    /// are returned.  Prevents cross-domain data leakage in multi-coop nodes.
+    pub domain_id: Option<String>,
     /// Cursor for pagination
     pub cursor: Option<String>,
     /// Number of items per page (default: 20, max: 100)
@@ -1032,13 +1074,18 @@ pub async fn list_appeals(
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "constitutional:read")?;
 
-    let appeals = commons_mgr
-        .list_appeals(
-            query.status.as_deref(),
-            query.scope.as_deref(),
-            query.appellant.as_deref(),
-        )
-        .await?;
+    let appeals = if let Some(ref domain) = query.domain_id {
+        // Domain-scoped query: exact match, no cross-domain leakage.
+        commons_mgr.list_appeals_by_domain(domain).await?
+    } else {
+        commons_mgr
+            .list_appeals(
+                query.status.as_deref(),
+                query.scope.as_deref(),
+                query.appellant.as_deref(),
+            )
+            .await?
+    };
 
     // Convert to responses and sort by updated_at descending (most recent first)
     let mut responses: Vec<AppealResponse2> = appeals.iter().map(appeal_to_response).collect();

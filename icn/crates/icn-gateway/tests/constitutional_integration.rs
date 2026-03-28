@@ -19,6 +19,21 @@ use icn_governance::{
 use icn_identity::KeyPair;
 
 /// Helper to create a test charter and activate it
+/// Create and store a minimal charter for `domain_id`.  Required because
+/// write-side scope enforcement rejects jurisdiction-scoped records that
+/// reference chartless domains.
+async fn create_charter_for_domain(commons_mgr: &CommonsManager, domain_id: &str) {
+    let charter = Charter::new(
+        OrgType::Cooperative,
+        domain_id.to_string(),
+        format!("Test Coop for {domain_id}"),
+        GovernanceConfig::cooperative_default(),
+        MembershipPolicy::default(),
+        DisputePolicy::default(),
+    );
+    commons_mgr.store_charter(charter).await.unwrap();
+}
+
 async fn create_active_charter(commons_mgr: &CommonsManager) -> String {
     let mut charter = Charter::new(
         OrgType::Cooperative,
@@ -175,6 +190,7 @@ async fn test_amendment_full_lifecycle() {
 #[actix_web::test]
 async fn test_amendment_withdrawal() {
     let commons_mgr = CommonsManager::new();
+    create_charter_for_domain(&commons_mgr, "coop:test").await;
 
     let proposer = KeyPair::generate().unwrap();
     let proposer_did = proposer.did().clone();
@@ -222,6 +238,7 @@ async fn test_amendment_withdrawal() {
 #[actix_web::test]
 async fn test_amendment_withdrawal_requires_proposer() {
     let commons_mgr = CommonsManager::new();
+    create_charter_for_domain(&commons_mgr, "coop:test").await;
 
     let proposer = KeyPair::generate().unwrap();
     let other_user = KeyPair::generate().unwrap();
@@ -266,6 +283,7 @@ async fn test_amendment_withdrawal_requires_proposer() {
 #[actix_web::test]
 async fn test_appeal_full_lifecycle() {
     let commons_mgr = CommonsManager::new();
+    create_charter_for_domain(&commons_mgr, "coop:test").await;
 
     let appellant = KeyPair::generate().unwrap();
     let appellant_did = appellant.did().clone();
@@ -328,6 +346,7 @@ async fn test_appeal_full_lifecycle() {
 #[actix_web::test]
 async fn test_appeal_withdrawal() {
     let commons_mgr = CommonsManager::new();
+    create_charter_for_domain(&commons_mgr, "coop:test").await;
 
     let appellant = KeyPair::generate().unwrap();
     let appellant_did = appellant.did().clone();
@@ -371,6 +390,7 @@ async fn test_appeal_withdrawal() {
 #[actix_web::test]
 async fn test_appeal_withdrawal_requires_appellant() {
     let commons_mgr = CommonsManager::new();
+    create_charter_for_domain(&commons_mgr, "coop:test").await;
 
     let appellant = KeyPair::generate().unwrap();
     let other_user = KeyPair::generate().unwrap();
@@ -407,6 +427,7 @@ async fn test_appeal_withdrawal_requires_appellant() {
 #[actix_web::test]
 async fn test_list_amendments_by_status() {
     let commons_mgr = CommonsManager::new();
+    create_charter_for_domain(&commons_mgr, "coop:test").await;
 
     let proposer = KeyPair::generate().unwrap();
 
@@ -472,6 +493,8 @@ async fn test_list_amendments_by_status() {
 #[actix_web::test]
 async fn test_list_appeals_by_scope() {
     let commons_mgr = CommonsManager::new();
+    create_charter_for_domain(&commons_mgr, "coop:alpha").await;
+    create_charter_for_domain(&commons_mgr, "coop:beta").await;
 
     let user1 = KeyPair::generate().unwrap();
     let user2 = KeyPair::generate().unwrap();
@@ -534,6 +557,12 @@ async fn test_list_appeals_by_scope() {
 #[actix_web::test]
 async fn test_appeal_outcomes() {
     let commons_mgr = CommonsManager::new();
+
+    // Pre-create charters for each outcome domain used in the loop below.
+    let num_outcomes = 4; // matches outcomes.len() below
+    for i in 0..num_outcomes {
+        create_charter_for_domain(&commons_mgr, &format!("coop:outcome-test-{i}")).await;
+    }
 
     let outcomes = vec![
         AppealOutcome::Upheld {

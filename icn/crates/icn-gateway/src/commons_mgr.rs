@@ -675,6 +675,11 @@ impl CommonsManager {
             .await
     }
 
+    /// List amendments scoped to a single domain — exact match, no prefix bleed.
+    pub async fn list_amendments_by_domain(&self, domain_id: &str) -> Result<Vec<Amendment>> {
+        self.handle.list_amendments_by_domain(domain_id).await
+    }
+
     /// Submit an amendment for review.
     pub async fn submit_amendment(&self, id: &AmendmentId, caller: &Did) -> Result<Amendment> {
         self.handle.submit_amendment(id, caller).await
@@ -730,6 +735,11 @@ impl CommonsManager {
         appellant: Option<&str>,
     ) -> Result<Vec<Appeal>> {
         self.handle.list_appeals(status, scope, appellant).await
+    }
+
+    /// List appeals scoped to a single domain — exact match, no prefix bleed.
+    pub async fn list_appeals_by_domain(&self, domain_id: &str) -> Result<Vec<Appeal>> {
+        self.handle.list_appeals_by_domain(domain_id).await
     }
 
     /// Add evidence to an appeal.
@@ -854,22 +864,18 @@ impl CommonsManager {
         &self,
         charter_id: &str,
     ) -> Result<GovernanceDashboard> {
-        // Derive domain_id from the charter so that dashboard data is scoped correctly.
-        let domain_id: Option<String> = self
+        // Derive domain_id from the charter.  If the charter doesn't exist,
+        // return an error rather than falling back to a cross-domain "list all"
+        // query.  Silently widening scope on a missing charter would expose
+        // governance records from every domain to the caller.
+        let charter = self
             .get_charter(charter_id)
             .await?
-            .map(|c| c.domain_id.clone());
+            .ok_or_else(|| anyhow::anyhow!("Charter not found: {charter_id}"))?;
+        let domain_id = charter.domain_id.clone();
 
-        let amendments = if let Some(ref d) = domain_id {
-            self.handle.list_amendments_by_domain(d).await?
-        } else {
-            self.list_amendments(None, None, None).await?
-        };
-        let appeals = if let Some(ref d) = domain_id {
-            self.handle.list_appeals_by_domain(d).await?
-        } else {
-            self.list_appeals(None, None, None).await?
-        };
+        let amendments = self.handle.list_amendments_by_domain(&domain_id).await?;
+        let appeals = self.handle.list_appeals_by_domain(&domain_id).await?;
 
         let mut ab = AmendmentsBreakdown {
             draft: 0,
