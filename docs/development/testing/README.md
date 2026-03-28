@@ -31,10 +31,10 @@ Three subsystems have all 4 layers complete. Trust is at Layer 1.
 - Layer 4: Cross-process restart (gossip_restart_helper binary)
 - Note: gossip uses JSON snapshot files (icn-snapshot), not sled
 
-**[trust-proof-layers.md](trust-proof-layers.md)** — Layers 1–2 complete; Layers 3–4 pending
+**[trust-proof-layers.md](trust-proof-layers.md)** — Layers 1–3 complete; Layer 4 pending
 - Layer 1 ✅: TrustEdge survives SledStore drop-and-reopen (direct path)
 - Layer 2 ✅: TrustGraphFacade path + graph-type prefix isolation proven
-- Layer 3 ⏳: Same-runtime lifecycle
+- Layer 3 ✅: Same-runtime facade drop + recreate (no shutdown protocol needed)
 - Layer 4 ⏳: Cross-process restart
 
 ## Reusable Infrastructure

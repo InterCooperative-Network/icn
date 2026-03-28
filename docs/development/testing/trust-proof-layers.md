@@ -1,5 +1,5 @@
 ---
-Status: layers 1-2 complete
+Status: layers 1-3 complete
 Last Reviewed: 2026-03-28
 ---
 
@@ -92,11 +92,39 @@ cargo test -p icn-trust --test trust_persistence
 
 ---
 
+---
+
+## Layer 3 — Same-Runtime Facade Drop + Recreate Proof ✅
+
+**What it proves:** Trust state survives a same-runtime lifecycle boundary:
+the original `TrustGraphFacade` and `Arc<SledStore>` are fully dropped (all `Arc`
+refs released, sled file lock returned to the OS), and a brand-new
+`TrustGraphFacade` constructed in the same process restores exact state from disk.
+
+Trust has **no background scheduler and no `JoinHandle`** — dropping the `Arc`
+is the complete shutdown. No `shutdown().await` is needed (unlike governance).
+The sled file on disk is the sole bridge between Phase 1 and Phase 2.
+
+**Artifact:** `crates/icn-trust/tests/trust_persistence.rs` →
+`test_trust_facade_survives_same_runtime_drop_and_recreate`
+
+**Run:**
+```bash
+cargo test -p icn-trust --test trust_persistence
+```
+
+**What is asserted:**
+- Source DID survives the lifecycle boundary (exact match).
+- Target DID survives (exact match).
+- Score survives (exact, within f64 epsilon).
+- Graph-type isolation holds through the fresh facade (Social absent from Economic).
+
+---
+
 ## What Is NOT Yet Proven
 
 | Gap | Layer | Next step |
 |-----|-------|-----------|
-| Same-runtime lifecycle boundary | L3 | Drop facade, recreate, assert no data loss |
 | Cross-process restart | L4 | Helper binary + subprocess test |
 | Evidence fields survive round-trip | Future | Add `evidence: Vec<TrustEvidence>` assertions |
 
@@ -108,5 +136,5 @@ cargo test -p icn-trust --test trust_persistence
 |-------|-----------|--------|--------|-------|
 | 1 — Direct persistence | ✅ | ✅ | ✅ | ✅ |
 | 2 — Production path | ✅ | ✅ | ✅ | ✅ |
-| 3 — Same-runtime lifecycle | ✅ | ✅ | ✅ | ⏳ |
+| 3 — Same-runtime lifecycle | ✅ | ✅ | ✅ | ✅ |
 | 4 — Cross-process restart | ✅ | ✅ | ✅ | ⏳ |

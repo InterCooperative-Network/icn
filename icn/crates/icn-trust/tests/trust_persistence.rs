@@ -1,4 +1,4 @@
-//! Trust graph persistence proof — Layers 1 and 2.
+//! Trust graph persistence proof — Layers 1, 2, and 3.
 //!
 //! ## Architecture note
 //!
@@ -32,9 +32,18 @@
 //! - The prefixed key namespace (`trust/social/`) is correct end-to-end.
 //! - Graph-type isolation: a Social edge is NOT visible in the Economic namespace.
 //!
+//! ## Layer 3 — what it proves
+//!
+//! Same lifecycle boundary as Layer 2, but the original facade and store are
+//! fully dropped in a scoped block (all `Arc` refs released, sled file lock
+//! returned) before Phase 2 begins. Phase 2 runs in the same process with no
+//! shared memory. The disk is the only bridge.
+//!
+//! Trust has no background scheduler — dropping the `Arc` is the full shutdown.
+//! No `shutdown().await` or `JoinHandle` is needed.
+//!
 //! ## What is NOT proven
 //!
-//! - Same-runtime lifecycle boundary (Layer 3)
 //! - Cross-process restart (Layer 4)
 //! - Evidence fields (additional invariants for future layers)
 
@@ -201,5 +210,91 @@ fn test_trust_edge_survives_facade_sled_drop_and_reopen() {
     assert!(
         economic_result.is_none(),
         "Social edge must NOT appear in Economic graph (prefix isolation violated)"
+    );
+}
+
+/// Layer 3 — Same-runtime facade drop + fresh facade restore proof.
+///
+/// Proves that trust state survives a same-runtime lifecycle boundary:
+///
+/// 1. Write a Social trust edge through `TrustGraphFacade`.
+/// 2. Drop ALL references to the facade and store — `Arc` ref count reaches
+///    zero, sled file lock is returned to the OS, actor memory is reclaimed.
+///    The sled file on disk is the ONLY bridge.
+/// 3. In the SAME test process (no new OS process), open a fresh
+///    `SledStore::open()` and construct a brand-new `TrustGraphFacade`.
+/// 4. Read back the edge through the fresh facade and assert exact invariants.
+///
+/// Trust has no background scheduler and no `JoinHandle`. Dropping the `Arc`
+/// is the complete shutdown. This is simpler than governance Layer 3 but proves
+/// the same fundamental property: the disk artifact is self-sufficient.
+///
+/// The graph-type isolation invariant (Social absent from Economic) is
+/// re-asserted to confirm the fresh facade uses the same prefix logic.
+#[test]
+fn test_trust_facade_survives_same_runtime_drop_and_recreate() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let sled_path = tmp.path().join("trust-l3.sled");
+
+    let alice = KeyPair::generate().expect("alice KeyPair").did().clone();
+    let bob = KeyPair::generate().expect("bob KeyPair").did().clone();
+    let score_value = 0.55_f64;
+
+    // ── Phase 1: write through facade, then DROP all Arc refs ────────────────
+    {
+        let store = Arc::new(SledStore::open(&sled_path).expect("open sled"));
+        let mut facade = TrustGraphFacade::new(store, alice.clone());
+
+        facade
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                bob.clone(),
+                TrustScore::unchecked(score_value),
+            ))
+            .expect("facade.add_edge");
+
+        // facade and store drop here.
+        // Arc ref count → 0. Sled file lock released.
+        // No background task to await — dropping is the full shutdown.
+    }
+
+    // ── Boundary: disk is the only bridge ────────────────────────────────────
+    // No in-memory Arc, no live sled handle, no cached state.
+
+    // ── Phase 2: brand-new store + facade in the SAME process ────────────────
+    let store2 = Arc::new(SledStore::open(&sled_path).expect("reopen sled"));
+    let facade2 = TrustGraphFacade::new(store2, alice.clone());
+
+    let retrieved = facade2
+        .get_edge(&alice, &bob)
+        .expect("facade2.get_edge")
+        .expect("edge must survive same-runtime drop+recreate boundary");
+
+    // 1. Source DID survives the lifecycle boundary.
+    assert_eq!(
+        retrieved.source, alice,
+        "source DID must survive same-runtime drop+recreate"
+    );
+
+    // 2. Target DID survives.
+    assert_eq!(
+        retrieved.target, bob,
+        "target DID must survive same-runtime drop+recreate"
+    );
+
+    // 3. Score survives exact round-trip.
+    assert!(
+        (retrieved.score.value() - score_value).abs() < 1e-9,
+        "score must survive same-runtime drop+recreate: expected {score_value}, got {}",
+        retrieved.score.value()
+    );
+
+    // 4. Graph-type isolation holds through the fresh facade.
+    let economic_result = facade2
+        .get_edge_from(TrustGraphType::EconomicReliability, &alice, &bob)
+        .expect("get_edge_from economic");
+    assert!(
+        economic_result.is_none(),
+        "Social edge must NOT appear in Economic graph after same-runtime recreate"
     );
 }

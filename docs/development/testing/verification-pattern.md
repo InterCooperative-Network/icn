@@ -15,7 +15,7 @@ Any subsystem that writes persistent state should be verified at all four layers
 | Governance | ✅ | ✅ | ✅ | ✅ |
 | Ledger     | ✅ | ✅ | ✅ | ✅ |
 | Gossip     | ✅ | ✅ | ✅ | ✅ |
-| Trust      | ✅ | ✅ | ⏳ | ⏳ |
+| Trust      | ✅ | ✅ | ✅ | ⏳ |
 
 ---
 
