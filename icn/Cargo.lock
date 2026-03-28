@@ -2864,6 +2864,7 @@ name = "icn-commons"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "ed25519-dalek",
  "hex",
  "icn-governance",
  "icn-identity",
@@ -2992,6 +2993,7 @@ dependencies = [
  "futures",
  "hex",
  "icn-ccl",
+ "icn-commons",
  "icn-community",
  "icn-compute",
  "icn-coop",

@@ -122,6 +122,10 @@ pub struct GatewayServer {
     default_trust_score: Option<f64>,
     /// Hook called when a Charter proposal is accepted: deploys the document to the oracle.
     charter_accepted_hook: Option<icn_governance_actor::http::configure::CharterAcceptedHook>,
+    /// Optional pre-initialized CommonsHandle injected from the daemon/supervisor.
+    /// When provided, CommonsManager uses this shared handle instead of opening its own sled store.
+    /// This is the canonical path for preventing dual sled ownership over commons state.
+    commons_handle: Option<icn_commons::CommonsHandle>,
 }
 
 impl GatewayServer {
@@ -153,6 +157,7 @@ impl GatewayServer {
             audit_prune_config: None,
             default_trust_score: None,
             charter_accepted_hook: None,
+            commons_handle: None,
         }
     }
 
@@ -196,6 +201,7 @@ impl GatewayServer {
             audit_prune_config: None,
             default_trust_score: None,
             charter_accepted_hook: None,
+            commons_handle: None,
         }
     }
 
@@ -240,6 +246,7 @@ impl GatewayServer {
             audit_prune_config: None,
             default_trust_score: None,
             charter_accepted_hook: None,
+            commons_handle: None,
         }
     }
 
@@ -415,6 +422,16 @@ impl GatewayServer {
     /// When set, distributed compute can reference WASM modules by hash.
     pub fn with_wasm_registry(mut self, registry: Arc<icn_compute::WasmRegistry>) -> Self {
         self.wasm_registry_handle = Some(registry);
+        self
+    }
+
+    /// Set shared CommonsHandle from daemon/supervisor.
+    ///
+    /// When set, CommonsManager delegates all substrate commons operations to this
+    /// shared handle instead of opening its own sled store. This is the canonical
+    /// runtime path — it prevents dual sled ownership over the same commons data.
+    pub fn with_commons_handle(mut self, handle: icn_commons::CommonsHandle) -> Self {
+        self.commons_handle = Some(handle);
         self
     }
 
@@ -690,9 +707,18 @@ impl GatewayServer {
             crate::service_discovery_mgr::start_expiry_task(service_discovery_manager.clone(), 300);
 
         let federation_manager = Arc::new(FederationManager::new());
-        let commons_manager: Arc<CommonsManager> = if let Some(ref data_dir) = self.data_dir {
+        let commons_manager: Arc<CommonsManager> = if let Some(handle) = self.commons_handle {
+            // Canonical path: daemon injected a shared CommonsHandle.
+            // CommonsManager is a thin facade over this handle — no second sled store opened.
+            info!("CommonsManager: using shared CommonsHandle from daemon (actor-owned state)");
+            Arc::new(CommonsManager::with_handle(handle))
+        } else if let Some(ref data_dir) = self.data_dir {
+            // Fallback: no handle injected (gateway running standalone), open own sled store.
             let commons_path = data_dir.join("commons.sled");
-            info!("CommonsManager: opening sled store at {:?}", commons_path);
+            info!(
+                "CommonsManager: opening standalone sled store at {:?}",
+                commons_path
+            );
             Arc::new(
                 CommonsManager::with_sled_path(&commons_path)
                     .context("Failed to open commons sled store")?,

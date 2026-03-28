@@ -27,6 +27,10 @@ pub struct GatewayActorHandles {
     pub service_discovery_manager:
         Option<Arc<icn_gateway::service_discovery_mgr::ServiceDiscoveryManager>>,
     pub naming_service: Option<Arc<dyn icn_kernel_api::naming::NamingService>>,
+    /// Commons handle for substrate commons state (anchors, holders, charters, stewards, etc.)
+    /// When provided, the gateway's CommonsManager delegates to this shared handle instead of
+    /// opening its own sled store.
+    pub commons: Option<icn_commons::CommonsHandle>,
     /// Hook invoked when a Charter proposal is accepted.
     /// Type-erased so `icn-core` stays domain-agnostic.
     pub charter_accepted_hook: Option<Arc<dyn Fn(String, String) + Send + Sync>>,

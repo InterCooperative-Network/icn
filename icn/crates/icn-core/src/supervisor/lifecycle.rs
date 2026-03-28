@@ -103,6 +103,28 @@ pub async fn run_supervisor(
         spawn_without_identity(&config, &shutdown_tx, &mut background_tasks).await
     };
 
+    // Initialize commons handle — open once here so gateway and any future
+    // commons-aware actors all share a single sled-backed CommonsHandle.
+    // This prevents the dual-ownership problem where gateway would open its
+    // own sled store at the same path.
+    let commons_handle: Option<icn_commons::CommonsHandle> = {
+        let commons_path = config.data_dir.join("commons.sled");
+        match icn_commons::CommonsHandle::with_sled_path(&commons_path) {
+            Ok(handle) => {
+                info!("CommonsHandle opened at {:?}", commons_path);
+                Some(handle)
+            }
+            Err(e) => {
+                warn!(
+                    "CommonsHandle: failed to open sled store at {:?}: {}; \
+                     gateway will fall back to in-memory commons state",
+                    commons_path, e
+                );
+                None
+            }
+        }
+    };
+
     // Spawn Gateway API server if enabled
     super::init_gateway::spawn_gateway(
         &config.gateway,
@@ -122,6 +144,7 @@ pub async fn run_supervisor(
             agreement_manager: gateway_handles.agreement_manager,
             service_discovery_manager: gateway_handles.service_discovery_manager,
             naming_service: gateway_handles.naming_service,
+            commons: commons_handle,
             charter_accepted_hook: gateway_handles.charter_accepted_hook,
         },
     );
