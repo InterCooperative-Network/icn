@@ -69,6 +69,8 @@ tracing = "0.1"
 
 [dev-dependencies]
 icn-ledger = { path = "../../crates/icn-ledger" }
+tempfile = "3"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 
 [lints]
 workspace = true

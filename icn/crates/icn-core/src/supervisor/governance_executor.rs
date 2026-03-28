@@ -813,9 +813,23 @@ impl TreasuryExecutor for KernelTreasuryExecutor {
     }
 
     async fn get_treasury_balance(&self, treasury_id: &str, currency: &str) -> Result<i64> {
-        // TODO: Query actual treasury balance from ledger
-        tracing::debug!(treasury_id, currency, "Querying treasury balance");
-        Ok(0) // Placeholder
+        if let Some(ledger) = &self.ledger {
+            let did = treasury_id.to_string();
+            let balance = ledger.balance(&did, currency);
+            tracing::debug!(
+                treasury_id,
+                currency,
+                balance,
+                "Queried treasury balance from ledger"
+            );
+            return Ok(balance);
+        }
+        tracing::debug!(
+            treasury_id,
+            currency,
+            "Treasury balance query: no ledger wired, returning 0"
+        );
+        Ok(0)
     }
 }
 
@@ -2093,12 +2107,66 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_treasury_executor_get_balance() {
+    async fn test_treasury_executor_get_balance_no_ledger() {
+        // Without a ledger wired, the balance falls back to 0.
         let executor = KernelTreasuryExecutor::new();
-
         let result = executor.get_treasury_balance("treasury-1", "HOURS").await;
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), 0); // Placeholder returns 0
+        assert_eq!(result.unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_treasury_executor_get_balance_with_ledger() {
+        // With a ledger wired, balance is read from the ledger service.
+        struct FixedLedger {
+            oracle: Arc<dyn icn_kernel_api::authz::PolicyOracle>,
+        }
+        impl icn_kernel_api::LedgerService for FixedLedger {
+            fn oracle(&self) -> Arc<dyn icn_kernel_api::authz::PolicyOracle> {
+                self.oracle.clone()
+            }
+            fn balance(&self, _account: &icn_kernel_api::Did, currency: &str) -> i64 {
+                if currency == "HOURS" {
+                    42
+                } else {
+                    0
+                }
+            }
+            fn credit_limit(&self, _account: &icn_kernel_api::Did, _currency: &str) -> i64 {
+                100
+            }
+            fn record_event(&self, _event: icn_kernel_api::LedgerEvent) {}
+            fn submit_treasury_entry(
+                &self,
+                _entry: icn_kernel_api::TreasuryEntryRequest,
+            ) -> Result<icn_kernel_api::TreasuryEntryResult, String> {
+                panic!("not called in this test")
+            }
+            fn get_treasury_nonce(&self, _treasury_id: &str) -> Result<u64, String> {
+                Ok(0)
+            }
+        }
+
+        let oracle = Arc::new(icn_kernel_api::authz::AllowAllOracle::wildcard());
+        let ledger: Arc<dyn icn_kernel_api::LedgerService> = Arc::new(FixedLedger {
+            oracle: oracle.clone(),
+        });
+        let executor = KernelTreasuryExecutor::with_ledger(ledger);
+
+        let result = executor
+            .get_treasury_balance("did:icn:treasury-1", "HOURS")
+            .await;
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            42,
+            "Should return ledger balance when wired"
+        );
+
+        let result_other = executor
+            .get_treasury_balance("did:icn:treasury-1", "USD")
+            .await;
+        assert_eq!(result_other.unwrap(), 0, "Unknown currency returns 0");
     }
 
     #[test]

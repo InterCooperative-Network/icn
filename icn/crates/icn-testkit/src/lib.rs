@@ -45,6 +45,7 @@
 mod cluster;
 mod node;
 mod simulation;
+pub mod subprocess;
 mod util;
 
 pub use cluster::TestCluster;

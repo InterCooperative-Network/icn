@@ -3268,6 +3268,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sled",
+ "tempfile",
  "tokio",
  "tracing",
  "utoipa",
@@ -3398,6 +3399,7 @@ dependencies = [
  "icn-store",
  "serde_json",
  "sled",
+ "tempfile",
 ]
 
 [[package]]
@@ -3742,6 +3744,7 @@ dependencies = [
  "icn-identity",
  "icn-obs",
  "icn-store",
+ "icn-testkit",
  "icn-time",
  "lru",
  "multibase",
@@ -3752,6 +3755,7 @@ dependencies = [
  "sha2",
  "tempfile",
  "thiserror 2.0.18",
+ "tokio",
  "tracing",
 ]
 

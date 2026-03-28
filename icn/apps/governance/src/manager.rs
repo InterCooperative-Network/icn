@@ -357,7 +357,10 @@ impl GovernanceManager {
         };
 
         let config = GovernanceConfig::new(profile_id, membership, params);
-        let domain = GovernanceDomain::new(name, config);
+        // Use with_id so the domain's own `id` field matches the caller-supplied
+        // domain_id rather than generating a new UUID (which would make the map
+        // key and the domain's id field diverge).
+        let domain = GovernanceDomain::with_id(domain_id.clone(), name, config);
 
         let mut domains = self.domains.write().map_err(|e| {
             anyhow::anyhow!("Domains storage lock poisoned (concurrent panic?): {e}")

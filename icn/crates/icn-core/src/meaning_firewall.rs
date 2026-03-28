@@ -345,10 +345,13 @@ mod tests {
     ///
     /// Target state: 0 after ledger extraction completes (#914).
     ///
-    /// Current state (2026-02-15):
+    /// Current state (2026-03-28):
     /// - actors.rs: 3 refs — consolidated type aliases (LedgerHandle, DisputeManagerHandle, TreasuryManagerHandle)
     /// - services/ledger_service.rs: 1 ref — composition root for LedgerService
     /// - init_compute.rs: 1 ref — JournalEntryBuilder for payment settlement
+    /// - src/bin/ledger_restart_helper.rs: 1 ref — Layer 4 cross-process
+    ///   persistence proof helper; test infrastructure only, not wired into
+    ///   the daemon. Scanned here because src/bin/ is part of the crate source.
     ///
     /// All other refs removed: doc-comment cleanups, alias consolidation,
     /// lifecycle/init_rpc/init_notifications now import from actors.rs.
@@ -359,7 +362,8 @@ mod tests {
         // actors.rs defines consolidated type aliases (3 refs).
         // ledger_service.rs is the composition root (1 ref).
         // init_compute.rs uses JournalEntryBuilder for payment settlement (1 ref).
-        let expected: usize = 5;
+        // src/bin/ledger_restart_helper.rs is Layer 4 test infrastructure (1 ref).
+        let expected: usize = 6;
         let actual = count_imports_in_crate("icn-core", "icn_ledger::");
 
         assert!(

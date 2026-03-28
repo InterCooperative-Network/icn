@@ -22,10 +22,17 @@ lru.workspace = true
 bloomfilter = "1.0"
 ordered-float = "5.1"
 
+tokio.workspace = true
+
 [dev-dependencies]
 rand = "0.8"
 criterion = "0.5"
 tempfile = "3.24"
+icn-testkit.workspace = true
+
+[[bin]]
+name = "trust_restart_helper"
+path = "src/bin/trust_restart_helper.rs"
 
 [[bench]]
 name = "trust_bench"
