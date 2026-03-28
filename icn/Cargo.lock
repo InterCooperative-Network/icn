@@ -3399,6 +3399,7 @@ dependencies = [
  "icn-store",
  "serde_json",
  "sled",
+ "tempfile",
 ]
 
 [[package]]
