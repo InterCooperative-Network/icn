@@ -15,6 +15,7 @@ Any subsystem that writes persistent state should be verified at all four layers
 | Governance | ✅ | ✅ | ✅ | ✅ |
 | Ledger     | ✅ | ✅ | ✅ | ✅ |
 | Gossip     | ✅ | ✅ | ✅ | ✅ |
+| Trust      | ✅ | ⏳ | ⏳ | ⏳ |
 
 ---
 
@@ -267,3 +268,4 @@ Work in this order:
 | Governance | [governance-proof-layers.md](governance-proof-layers.md) | `apps/governance/tests/persistence_proof.rs`, `crates/icn-gateway/tests/governance_proof.rs` |
 | Ledger | [ledger-proof-layers.md](ledger-proof-layers.md) | `crates/icn-ledger/tests/ledger_persistence.rs`, `apps/ledger/tests/actor_persistence_proof.rs`, `crates/icn-core/tests/ledger_service_persistence.rs` |
 | Gossip | [gossip-proof-layers.md](gossip-proof-layers.md) | `crates/icn-gossip/tests/gossip_persistence.rs` |
+| Trust | [trust-proof-layers.md](trust-proof-layers.md) | `crates/icn-trust/tests/trust_persistence.rs` |
