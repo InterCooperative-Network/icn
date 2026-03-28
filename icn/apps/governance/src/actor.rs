@@ -264,11 +264,7 @@ impl GovernanceHandle {
             }
         }
         // 2. Take the JoinHandle outside the lock (never hold a sync mutex across .await).
-        let task = self
-            .scheduler_task
-            .lock()
-            .ok()
-            .and_then(|mut g| g.take());
+        let task = self.scheduler_task.lock().ok().and_then(|mut g| g.take());
         // 3. Await task completion. When this returns, handle_clone inside the task
         //    has been dropped, releasing all captured Arc references.
         if let Some(t) = task {

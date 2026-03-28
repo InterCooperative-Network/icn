@@ -44,9 +44,7 @@ use actix_web::{test, web, App};
 use actix_web_httpauth::middleware::HttpAuthentication;
 use icn_gateway::{api, auth::AuthManager, middleware::jwt_auth, rate_limit::IpRateLimiter};
 use icn_governance_actor::{
-    events::NoopEventEmitter,
-    http::configure::GovernanceContext,
-    manager::GovernanceManager,
+    events::NoopEventEmitter, http::configure::GovernanceContext, manager::GovernanceManager,
 };
 use icn_identity::IdentityBundle;
 use serde_json::{json, Value};
@@ -121,7 +119,11 @@ async fn test_governance_proposal_full_lifecycle_with_real_auth() {
         .as_str()
         .expect("challenge response must have nonce field")
         .to_string();
-    assert_eq!(nonce.len(), 64, "nonce must be 32 bytes hex-encoded (64 chars)");
+    assert_eq!(
+        nonce.len(),
+        64,
+        "nonce must be 32 bytes hex-encoded (64 chars)"
+    );
 
     // Sign nonce with real Ed25519 key
     let nonce_bytes = hex::decode(&nonce).expect("nonce must be valid hex");

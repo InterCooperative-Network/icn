@@ -39,12 +39,12 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
+use icn_gossip::{AccessControl, GossipActor, Topic};
 use icn_governance::{
     GovernanceDomainId, GovernanceOps, GovernanceParams, MembershipConfig, ProposalId,
     ProposalPayload, ProposalScope, ProposalState, StaticMembershipResolver, VoteChoice,
 };
 use icn_governance_actor::{actor::GovernanceActor, manager::GovernanceManager};
-use icn_gossip::{AccessControl, GossipActor, Topic};
 use icn_identity::IdentityBundle;
 use icn_store::SledStore;
 use std::sync::Arc;
@@ -81,20 +81,14 @@ async fn test_governance_restart_persistence() {
         let gossip = gossip_with_governance_topic(did.clone()).await;
         let resolver = Arc::new(StaticMembershipResolver::new());
 
-        let actor_handle = GovernanceActor::spawn(
-            did.clone(),
-            store.clone(),
-            gossip,
-            resolver,
-            None,
-            None,
-        )
-        .await
-        .expect("Phase1: GovernanceActor::spawn");
+        let actor_handle =
+            GovernanceActor::spawn(did.clone(), store.clone(), gossip, resolver, None, None)
+                .await
+                .expect("Phase1: GovernanceActor::spawn");
 
         let shutdown_handle = actor_handle.clone();
         let manager = GovernanceManager::with_handle(
-            Arc::new(actor_handle) as Arc<dyn GovernanceOps + Send + Sync>,
+            Arc::new(actor_handle) as Arc<dyn GovernanceOps + Send + Sync>
         );
 
         manager
@@ -171,7 +165,7 @@ async fn test_governance_restart_persistence() {
 
     let shutdown2 = actor_handle2.clone();
     let manager2 = GovernanceManager::with_handle(
-        Arc::new(actor_handle2) as Arc<dyn GovernanceOps + Send + Sync>,
+        Arc::new(actor_handle2) as Arc<dyn GovernanceOps + Send + Sync>
     );
 
     let domain = manager2

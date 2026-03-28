@@ -24,12 +24,14 @@
 //!
 //! They deliberately do NOT use direct sled or store inspection.
 
+#![allow(clippy::expect_used, clippy::unwrap_used)]
+
+use icn_gossip::{AccessControl, GossipActor};
 use icn_governance::{
     GovernanceDomainId, GovernanceOps, GovernanceParams, MembershipConfig, ProposalId,
     ProposalPayload, ProposalScope, ProposalState, StaticMembershipResolver, VoteChoice,
 };
 use icn_governance_actor::{actor::GovernanceActor, manager::GovernanceManager};
-use icn_gossip::{AccessControl, GossipActor};
 use icn_identity::IdentityBundle;
 use icn_store::SledStore;
 use std::path::PathBuf;
@@ -123,26 +125,18 @@ async fn write_phase(sled_path: &PathBuf, domain_id: GovernanceDomainId) -> i32 
     let gossip = setup_gossip(did.clone()).await;
     let resolver = Arc::new(StaticMembershipResolver::new());
 
-    let actor_handle = match GovernanceActor::spawn(
-        did.clone(),
-        store,
-        gossip,
-        resolver,
-        None,
-        None,
-    )
-    .await
-    {
-        Ok(h) => h,
-        Err(e) => {
-            eprintln!("write: GovernanceActor::spawn failed: {e}");
-            return 1;
-        }
-    };
+    let actor_handle =
+        match GovernanceActor::spawn(did.clone(), store, gossip, resolver, None, None).await {
+            Ok(h) => h,
+            Err(e) => {
+                eprintln!("write: GovernanceActor::spawn failed: {e}");
+                return 1;
+            }
+        };
 
     let shutdown_handle = actor_handle.clone();
     let manager = GovernanceManager::with_handle(
-        Arc::new(actor_handle) as Arc<dyn GovernanceOps + Send + Sync>,
+        Arc::new(actor_handle) as Arc<dyn GovernanceOps + Send + Sync>
     );
 
     // Create domain with sole member = our DID (ensures voting thresholds are met).
@@ -253,15 +247,7 @@ async fn read_phase(
     let gossip = setup_gossip(did.clone()).await;
     let resolver = Arc::new(StaticMembershipResolver::new());
 
-    let actor_handle = match GovernanceActor::spawn(
-        did,
-        store,
-        gossip,
-        resolver,
-        None,
-        None,
-    )
-    .await
+    let actor_handle = match GovernanceActor::spawn(did, store, gossip, resolver, None, None).await
     {
         Ok(h) => h,
         Err(e) => {
@@ -272,17 +258,14 @@ async fn read_phase(
 
     let shutdown_handle = actor_handle.clone();
     let manager = GovernanceManager::with_handle(
-        Arc::new(actor_handle) as Arc<dyn GovernanceOps + Send + Sync>,
+        Arc::new(actor_handle) as Arc<dyn GovernanceOps + Send + Sync>
     );
 
     // Read domain through manager.
     let domain = match manager.get_domain(&domain_id).await {
         Ok(Some(d)) => d,
         Ok(None) => {
-            eprintln!(
-                "read: domain '{}' not found after restart",
-                domain_id.0
-            );
+            eprintln!("read: domain '{}' not found after restart", domain_id.0);
             return 1;
         }
         Err(e) => {
@@ -311,10 +294,7 @@ async fn read_phase(
     let proposal = match manager.get_proposal(&proposal_id).await {
         Ok(Some(p)) => p,
         Ok(None) => {
-            eprintln!(
-                "read: proposal '{}' not found after restart",
-                proposal_id.0
-            );
+            eprintln!("read: proposal '{}' not found after restart", proposal_id.0);
             return 1;
         }
         Err(e) => {
