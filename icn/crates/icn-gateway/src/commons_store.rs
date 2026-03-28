@@ -70,6 +70,31 @@ pub trait CommonsStoreBackend: Send + Sync {
     fn exists(&self, key: &[u8]) -> Result<bool> {
         Ok(self.get(key)?.is_some())
     }
+
+    /// Flush pending writes to durable storage. Default is a no-op for in-memory backends.
+    fn flush(&self) -> Result<()> {
+        Ok(())
+    }
+}
+
+/// Allow `Arc<dyn CommonsStoreBackend>` to be used as a backend directly.
+/// This enables type-erased `CommonsManager` construction without changing handler signatures.
+impl CommonsStoreBackend for Arc<dyn CommonsStoreBackend> {
+    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
+        self.as_ref().get(key)
+    }
+    fn put(&self, key: &[u8], value: &[u8]) -> Result<()> {
+        self.as_ref().put(key, value)
+    }
+    fn delete(&self, key: &[u8]) -> Result<()> {
+        self.as_ref().delete(key)
+    }
+    fn scan(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
+        self.as_ref().scan(prefix)
+    }
+    fn flush(&self) -> Result<()> {
+        self.as_ref().flush()
+    }
 }
 
 // ============================================================================
@@ -230,6 +255,11 @@ impl CommonsStoreBackend for SledCommonsStore {
             results.push((k.to_vec(), v.to_vec()));
         }
         Ok(results)
+    }
+
+    fn flush(&self) -> Result<()> {
+        self.db.flush().context("Failed to flush Sled database")?;
+        Ok(())
     }
 }
 

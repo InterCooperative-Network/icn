@@ -406,3 +406,111 @@ async fn test_anchor_status_updates() {
     let found = commons_mgr.get_anchor(&anchor_id).await.unwrap().unwrap();
     assert!(matches!(found.status, AnchorStatus::Active));
 }
+
+// ============================================================================
+// Layer 1 — Sled persistence proof tests (drop-and-reopen)
+// ============================================================================
+
+/// Prove that PersonhoodAnchor survives a CommonsManager drop-and-reopen boundary.
+#[actix_web::test]
+async fn test_commons_anchor_survives_sled_drop_and_reopen() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let sled_path = tmp.path().join("commons.sled");
+
+    let keypair = icn_identity::KeyPair::generate().unwrap();
+    let did = keypair.did().clone();
+
+    // Phase 1: write
+    let anchor_id = {
+        let mgr = CommonsManager::with_sled_path(&sled_path).expect("open sled");
+        let anchor = mgr.create_anchor_from_enrollment(&did, None).await.unwrap();
+        hex::encode(anchor.id())
+        // mgr drops here — sled lock released
+    };
+
+    // Phase 2: reopen fresh instance
+    let mgr2 = CommonsManager::with_sled_path(&sled_path).expect("reopen sled");
+    let found = mgr2.get_anchor(&anchor_id).await.unwrap();
+    assert!(
+        found.is_some(),
+        "PersonhoodAnchor must survive sled drop-and-reopen"
+    );
+    // Verify the DID-to-anchor index also survived
+    let by_did = mgr2.get_anchor_by_did(&did).await.unwrap();
+    assert!(
+        by_did.is_some(),
+        "DID index must survive sled drop-and-reopen"
+    );
+}
+
+/// Prove that Charter survives a CommonsManager drop-and-reopen boundary.
+#[actix_web::test]
+async fn test_commons_charter_survives_sled_drop_and_reopen() {
+    use icn_governance::{Charter, DisputePolicy, GovernanceConfig, MembershipPolicy, OrgType};
+
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let sled_path = tmp.path().join("commons.sled");
+
+    // Phase 1: write
+    let charter_id = {
+        let mgr = CommonsManager::with_sled_path(&sled_path).expect("open sled");
+        let charter = Charter::new(
+            OrgType::Cooperative,
+            "coop:persist-test".to_string(),
+            "Persistence Test Coop".to_string(),
+            GovernanceConfig::cooperative_default(),
+            MembershipPolicy::default(),
+            DisputePolicy::default(),
+        );
+        let id = charter.charter_id.to_hex();
+        mgr.store_charter(charter).await.unwrap();
+        id
+        // mgr drops here
+    };
+
+    // Phase 2: reopen fresh instance
+    let mgr2 = CommonsManager::with_sled_path(&sled_path).expect("reopen sled");
+    let found = mgr2.get_charter(&charter_id).await.unwrap();
+    assert!(found.is_some(), "Charter must survive sled drop-and-reopen");
+    assert_eq!(
+        found.unwrap().name,
+        "Persistence Test Coop",
+        "name must survive round-trip"
+    );
+}
+
+/// Prove that CommonsHolderRecord survives a CommonsManager drop-and-reopen boundary.
+#[actix_web::test]
+async fn test_commons_holder_survives_sled_drop_and_reopen() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let sled_path = tmp.path().join("commons.sled");
+
+    let keypair = icn_identity::KeyPair::generate().unwrap();
+    let did = keypair.did().clone();
+
+    // Phase 1: write anchor + holder
+    let holder_id = {
+        let mgr = CommonsManager::with_sled_path(&sled_path).expect("open sled");
+        let anchor = mgr.create_anchor_from_enrollment(&did, None).await.unwrap();
+        let anchor_id = hex::encode(anchor.id());
+        let holder = mgr
+            .create_holder_from_anchor(&anchor_id, &did)
+            .await
+            .unwrap();
+        hex::encode(holder.id())
+        // mgr drops here
+    };
+
+    // Phase 2: reopen fresh instance
+    let mgr2 = CommonsManager::with_sled_path(&sled_path).expect("reopen sled");
+    let found = mgr2.get_holder(&holder_id).await.unwrap();
+    assert!(
+        found.is_some(),
+        "CommonsHolderRecord must survive sled drop-and-reopen"
+    );
+    let found_holder = found.unwrap();
+    assert_eq!(
+        found_holder.holder_did, did,
+        "holder_did must survive round-trip"
+    );
+}

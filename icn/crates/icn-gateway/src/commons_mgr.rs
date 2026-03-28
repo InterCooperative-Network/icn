@@ -6,7 +6,7 @@
 //! - Charter management (Layer 2)
 //! - Affiliation/membership management
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use icn_governance::{
     Amendment, AmendmentChange, AmendmentId, AmendmentStatus, Appeal, AppealEvidence, AppealId,
     AppealOutcome, AppealResponse, AppealStatus, Charter, CharterStatus, OrgType, Ratification,
@@ -22,7 +22,9 @@ use sha2::{Digest, Sha256};
 use std::sync::Arc;
 use tracing::{info, warn};
 
-use crate::commons_store::{CommonsStore, CommonsStoreBackend, InMemoryCommonsStore};
+use crate::commons_store::{
+    CommonsStore, CommonsStoreBackend, InMemoryCommonsStore, SledCommonsStore,
+};
 use crate::models::{
     AmendmentsBreakdown, AppealsBreakdown, GovernanceActivityEvent, GovernanceDashboard,
     StewardDetailResponse, StewardSummaryResponse,
@@ -37,7 +39,7 @@ use crate::models::{
 /// - StewardRecords, Amendments, Appeals
 ///
 /// RevocationRegistry is kept separate for now.
-pub struct CommonsManager<S: CommonsStoreBackend = InMemoryCommonsStore> {
+pub struct CommonsManager<S: CommonsStoreBackend = Arc<dyn CommonsStoreBackend>> {
     /// Storage backend
     store: CommonsStore<S>,
 
@@ -45,31 +47,31 @@ pub struct CommonsManager<S: CommonsStoreBackend = InMemoryCommonsStore> {
     revocations: RevocationRegistry,
 }
 
-impl CommonsManager<InMemoryCommonsStore> {
-    /// Create a new commons manager with in-memory storage
+impl CommonsManager<Arc<dyn CommonsStoreBackend>> {
+    /// Create a new commons manager with in-memory storage (testing / no data_dir configured)
     pub fn new() -> Self {
-        let backend = Arc::new(InMemoryCommonsStore::new());
-        Self::with_store(backend)
+        let backend: Arc<dyn CommonsStoreBackend> = Arc::new(InMemoryCommonsStore::new());
+        Self::with_store(Arc::new(backend))
     }
-}
 
-use crate::commons_store::SledCommonsStore;
-
-impl CommonsManager<SledCommonsStore> {
     /// Create a new commons manager with persistent Sled storage
     ///
     /// Data will persist across gateway restarts at the given path.
     pub fn with_sled_path(path: impl AsRef<std::path::Path>) -> Result<Self> {
-        let backend = Arc::new(SledCommonsStore::open(path)?);
-        Ok(Self::with_store(backend))
+        let backend: Arc<dyn CommonsStoreBackend> =
+            Arc::new(SledCommonsStore::open(path).context("Failed to open commons sled store")?);
+        Ok(Self::with_store(Arc::new(backend)))
     }
 
     /// Create a new commons manager with a temporary Sled database
     ///
     /// Useful for testing persistent storage behavior without leaving files.
     pub fn with_sled_temporary() -> Result<Self> {
-        let backend = Arc::new(SledCommonsStore::temporary()?);
-        Ok(Self::with_store(backend))
+        let backend: Arc<dyn CommonsStoreBackend> = Arc::new(
+            SledCommonsStore::temporary()
+                .context("Failed to create temporary commons sled store")?,
+        );
+        Ok(Self::with_store(Arc::new(backend)))
     }
 
     /// Flush all pending writes to disk
@@ -2219,7 +2221,7 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
     }
 }
 
-impl Default for CommonsManager<InMemoryCommonsStore> {
+impl Default for CommonsManager<Arc<dyn CommonsStoreBackend>> {
     fn default() -> Self {
         Self::new()
     }

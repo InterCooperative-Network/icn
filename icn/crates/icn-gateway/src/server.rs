@@ -39,6 +39,7 @@ use crate::rate_limit::{
 use crate::security::{configure_cors, SecurityConfig, SecurityHeaders};
 use crate::treasury_mgr::{GatewayTreasuryManager, LedgerHandle, TreasuryHandle};
 use crate::trust_mgr::TrustManager;
+use anyhow::Context;
 use icn_compute::ComputeHandle;
 use icn_governance_actor::http::configure as configure_governance;
 use icn_governance_actor::http::configure::GovernanceContext;
@@ -689,16 +690,20 @@ impl GatewayServer {
             crate::service_discovery_mgr::start_expiry_task(service_discovery_manager.clone(), 300);
 
         let federation_manager = Arc::new(FederationManager::new());
-        // TODO: wire CommonsManager to a daemon handle (CommonsHandle) for cross-restart
-        // persistence. Currently all commons/personhood/charter/enrollment state is
-        // in-memory only and will be lost on process restart.
-        // See GovernanceManager::with_handle() for the pattern to follow.
-        warn!(
-            "CommonsManager running in-memory-only mode: \
-             commons/personhood/charter/enrollment state will NOT survive process restart. \
-             Wire a CommonsHandle for production use."
-        );
-        let commons_manager = Arc::new(CommonsManager::new());
+        let commons_manager: Arc<CommonsManager> = if let Some(ref data_dir) = self.data_dir {
+            let commons_path = data_dir.join("commons.sled");
+            info!("CommonsManager: opening sled store at {:?}", commons_path);
+            Arc::new(
+                CommonsManager::with_sled_path(&commons_path)
+                    .context("Failed to open commons sled store")?,
+            )
+        } else {
+            warn!(
+                "CommonsManager: no data_dir configured, running in-memory only — \
+                 commons/personhood/charter/enrollment state will NOT survive process restart"
+            );
+            Arc::new(CommonsManager::new())
+        };
 
         // Setup agreement manager if provided (for inter-cooperative agreements)
         let agreement_manager: Option<icn_federation::agreement::AgreementManagerHandle> =
