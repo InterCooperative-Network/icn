@@ -1,5 +1,5 @@
 ---
-Status: layer 1 complete
+Status: layers 1-2 complete
 Last Reviewed: 2026-03-28
 ---
 
@@ -55,28 +55,50 @@ The `is_expired()` check in `get_edge()` is a no-op for these edges.
 
 ---
 
+---
+
+## Layer 2 — Facade-backed Sled Write Proof ✅
+
+**What it proves:** A `TrustEdge` written through the full production abstraction
+stack (`TrustGraphFacade` → `MultiTrustGraph` → `TypedTrustGraph` →
+`TrustGraph::new_with_prefix(store, did, "trust/social")`) survives a sled
+drop-and-reopen boundary with exact field values.
+
+Also proves **graph-type namespace isolation**: a Social edge is not retrievable
+via the Economic graph prefix (`trust/economic/...`), confirming that the three
+typed graphs are truly isolated in sled storage.
+
+**Write path confirmed:**
+```
+facade.add_edge(edge)                               // edge.graph_type == Social
+→ multi.add_edge_to(Social, edge)
+→ typed_graph.inner.add_edge(edge)
+→ store.put("trust/social/edges/{src}:{tgt}", json)
+```
+
+**Artifact:** `crates/icn-trust/tests/trust_persistence.rs` →
+`test_trust_edge_survives_facade_sled_drop_and_reopen`
+
+**Run:**
+```bash
+cargo test -p icn-trust --test trust_persistence
+```
+
+**What is asserted:**
+- Source DID survives the full facade round-trip (exact match).
+- Target DID survives exact round-trip.
+- Score survives exact round-trip (within f64 epsilon).
+- Social edge is absent from the Economic graph namespace (prefix isolation).
+
+---
+
 ## What Is NOT Yet Proven
 
 | Gap | Layer | Next step |
 |-----|-------|-----------|
-| Typed graph path (`trust/social`, `trust/economic`, `trust/technical`) | L2 | `TrustGraphFacade::add_edge()` write → drop → reopen → `get_edge_from()` |
-| Production handle path (`Arc<parking_lot::RwLock<TrustGraph>>` in supervisor) | L2 | Verify via supervisor's actual handle type |
-| Same-runtime lifecycle boundary | L3 | Drop handle, reopen, assert |
+| Same-runtime lifecycle boundary | L3 | Drop facade, recreate, assert no data loss |
 | Cross-process restart | L4 | Helper binary + subprocess test |
-| Evidence fields survive round-trip | L1 extension | Add `evidence: Vec<TrustEvidence>` to Layer 1 assertions |
-
----
-
-## Layer 2 — Next Step
-
-The production trust path uses `TrustGraphFacade` wrapping `MultiTrustGraph`
-wrapping three `TypedTrustGraph` instances, each with a prefixed `TrustGraph`.
-
-Layer 2 target: a `TrustEdge` written through `TrustGraphFacade::add_edge()`
-survives the same sled drop-and-reopen as Layer 1, proving the typed graph path
-(with storage prefix `"trust/social"`) writes to sled correctly.
-
-Artifact location: `crates/icn-trust/tests/trust_persistence.rs` (extend file).
+| Evidence fields survive round-trip | Future | Add `evidence: Vec<TrustEvidence>` assertions |
 
 ---
 
@@ -85,6 +107,6 @@ Artifact location: `crates/icn-trust/tests/trust_persistence.rs` (extend file).
 | Layer | Governance | Ledger | Gossip | Trust |
 |-------|-----------|--------|--------|-------|
 | 1 — Direct persistence | ✅ | ✅ | ✅ | ✅ |
-| 2 — Production path | ✅ | ✅ | ✅ | ⏳ |
+| 2 — Production path | ✅ | ✅ | ✅ | ✅ |
 | 3 — Same-runtime lifecycle | ✅ | ✅ | ✅ | ⏳ |
 | 4 — Cross-process restart | ✅ | ✅ | ✅ | ⏳ |
