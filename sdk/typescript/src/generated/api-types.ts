@@ -103,7 +103,6 @@ export interface components {
         };
         /** @description Apply for membership request */
         ApplyMembershipRequest: {
-            capabilities_requested?: string[];
             jurisdiction_id: string;
         };
         /** @description Ban member request */
