@@ -408,7 +408,7 @@ async fn test_anchor_status_updates() {
 }
 
 // ============================================================================
-// Layer 1 — Sled persistence proof tests (drop-and-reopen)
+// Layer 1 — Sled persistence proof tests (CommonsManager drop-and-reopen)
 // ============================================================================
 
 /// Prove that PersonhoodAnchor survives a CommonsManager drop-and-reopen boundary.
@@ -512,5 +512,105 @@ async fn test_commons_holder_survives_sled_drop_and_reopen() {
     assert_eq!(
         found_holder.holder_did, did,
         "holder_did must survive round-trip"
+    );
+}
+
+// ============================================================================
+// Layer 4 — Daemon restart simulation
+//
+// Proves that commons state written through the production daemon wiring
+// (`CommonsManager::with_handle(CommonsHandle::with_sled_path(...))`)
+// survives a full daemon shutdown + restart simulation: all manager and
+// handle references drop, then a fresh daemon path reopens the same data dir.
+//
+// This is the highest-fidelity same-process proof. It exercises the exact
+// code path that `icn-core/src/supervisor/lifecycle.rs` uses:
+//   CommonsHandle::with_sled_path(data_dir/commons.sled) → CommonsManager::with_handle(handle)
+//
+// What it proves:
+// - CommonsManager::with_handle() is a thin facade — writes go through to sled
+// - Dropping both CommonsManager and CommonsHandle releases the sled lock
+// - A fresh handle + manager pair recovers exactly the persisted state
+//
+// What it does NOT prove:
+// - Cross-process durability (see Layer 3 in icn-commons/tests/commons_persistence.rs)
+// ============================================================================
+
+/// Layer 4 — Daemon restart simulation: anchor + holder survive full production
+/// CommonsManager+CommonsHandle lifecycle boundary.
+#[actix_web::test]
+async fn test_l4_daemon_restart_simulation_anchor_and_holder() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let data_dir = tmp.path();
+    let commons_path = data_dir.join("commons.sled");
+
+    let keypair = KeyPair::generate().expect("KeyPair::generate");
+    let did = keypair.did().clone();
+
+    // ── Daemon startup + write ────────────────────────────────────────────────
+    // Mirrors lifecycle.rs: open CommonsHandle, inject into CommonsManager.
+    let (anchor_id, holder_id) = {
+        let handle =
+            icn_commons::CommonsHandle::with_sled_path(&commons_path).expect("open CommonsHandle");
+        let mgr = CommonsManager::with_handle(handle);
+        // Write anchor
+        let anchor = mgr
+            .create_anchor_from_enrollment(&did, None)
+            .await
+            .expect("create_anchor_from_enrollment");
+        let anchor_id = hex::encode(anchor.id());
+        // Write holder
+        let holder = mgr
+            .create_holder_from_anchor(&anchor_id, &did)
+            .await
+            .expect("create_holder_from_anchor");
+        let holder_id = hex::encode(holder.id());
+        // Flush before drop — simulates clean daemon shutdown
+        mgr.flush().await.expect("flush");
+        (anchor_id, holder_id)
+        // mgr drops here, then handle drops — sled lock released.
+        // This simulates the daemon exiting: all Arc refs go to zero.
+    };
+
+    // ── Daemon restart ────────────────────────────────────────────────────────
+    // Fresh CommonsHandle + CommonsManager from the same data_dir.
+    // No shared memory with the "previous daemon" — disk is the only bridge.
+    let handle2 =
+        icn_commons::CommonsHandle::with_sled_path(&commons_path).expect("reopen CommonsHandle");
+    let mgr2 = CommonsManager::with_handle(handle2);
+
+    // Assert 1: anchor present by ID after restart.
+    let found_anchor = mgr2
+        .get_anchor(&anchor_id)
+        .await
+        .expect("get_anchor after daemon restart");
+    assert!(
+        found_anchor.is_some(),
+        "PersonhoodAnchor must survive daemon restart simulation (Layer 4)"
+    );
+
+    // Assert 2: DID reverse-index survives restart.
+    let by_did = mgr2
+        .get_anchor_by_did(&did)
+        .await
+        .expect("get_anchor_by_did after daemon restart");
+    assert!(
+        by_did.is_some(),
+        "DID reverse-index must survive daemon restart simulation (Layer 4)"
+    );
+
+    // Assert 3: holder present by ID after restart.
+    let found_holder = mgr2
+        .get_holder(&holder_id)
+        .await
+        .expect("get_holder after daemon restart");
+    assert!(
+        found_holder.is_some(),
+        "CommonsHolderRecord must survive daemon restart simulation (Layer 4)"
+    );
+    assert_eq!(
+        found_holder.unwrap().holder_did,
+        did,
+        "holder_did must survive daemon restart round-trip (Layer 4)"
     );
 }
