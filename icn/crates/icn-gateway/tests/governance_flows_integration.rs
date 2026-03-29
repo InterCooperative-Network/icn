@@ -16,6 +16,20 @@ use icn_identity::{
     KeyPair,
 };
 
+/// Create a minimal charter for `domain_id`.  Required because write-side
+/// scope enforcement rejects jurisdiction-scoped records without a charter.
+async fn create_charter_for_domain(commons_mgr: &CommonsManager, domain_id: &str) {
+    let charter = Charter::new(
+        OrgType::Cooperative,
+        domain_id.to_string(),
+        format!("Test Coop for {domain_id}"),
+        GovernanceConfig::cooperative_default(),
+        MembershipPolicy::default(),
+        DisputePolicy::default(),
+    );
+    commons_mgr.store_charter(charter).await.unwrap();
+}
+
 /// Helper to create a FounderSignature
 fn create_founder_signature(did: icn_identity::Did, sig_byte: u8) -> FounderSignature {
     let now = std::time::SystemTime::now()
@@ -280,21 +294,13 @@ async fn test_e2e_coop_formation() {
     // 4. Founders join the coop as members
     let jurisdiction = JurisdictionId::new("coop:e2e-test-coop");
     for (_keypair, holder_id) in &founders {
+        // Join as candidate — no capabilities seeded at join time
         commons_mgr
-            .join_jurisdiction(
-                holder_id,
-                jurisdiction.clone(),
-                vec![
-                    MembershipCapability::Vote,
-                    MembershipCapability::Propose,
-                    MembershipCapability::Transact,
-                    MembershipCapability::HoldOffice,
-                ],
-            )
+            .join_jurisdiction(holder_id, jurisdiction.clone(), vec![])
             .await
             .unwrap();
 
-        // Auto-approve and promote founders
+        // Approve and promote: grants baseline capabilities (Vote, Propose, Transact)
         commons_mgr
             .approve_membership(holder_id, &jurisdiction)
             .await
@@ -304,9 +310,21 @@ async fn test_e2e_coop_formation() {
             .await
             .unwrap();
 
-        // Verify full member status
+        // Explicitly delegate elevated capability after membership is established
+        commons_mgr
+            .grant_capability(holder_id, &jurisdiction, MembershipCapability::HoldOffice)
+            .await
+            .unwrap();
+
+        // Verify full member status with explicit HoldOffice delegation
         let affiliations = commons_mgr.list_affiliations(holder_id).await.unwrap();
         assert_eq!(affiliations[0].membership_status, MembershipStatus::Member);
+        assert!(
+            affiliations[0]
+                .capabilities
+                .contains(&MembershipCapability::HoldOffice),
+            "founders must have HoldOffice after explicit delegation"
+        );
     }
 
     // 5. Enroll a new member (not a founder)
@@ -504,6 +522,7 @@ async fn test_amendment_add_change_flow() {
     };
 
     let commons_mgr = CommonsManager::new();
+    create_charter_for_domain(&commons_mgr, "coop:add-change-test").await;
 
     let proposer = KeyPair::generate().unwrap();
     let proposer_did = proposer.did().clone();
@@ -596,6 +615,7 @@ async fn test_amendment_add_change_fails_after_submit() {
     };
 
     let commons_mgr = CommonsManager::new();
+    create_charter_for_domain(&commons_mgr, "coop:submit-test").await;
 
     let proposer = KeyPair::generate().unwrap();
     let proposer_did = proposer.did().clone();

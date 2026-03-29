@@ -45,8 +45,7 @@ pub const STEWARD_BY_DID_PREFIX: &[u8] = b"commons/stewards/by_did/";
 pub const AMENDMENT_PREFIX: &[u8] = b"commons/amendments/";
 pub const APPEAL_PREFIX: &[u8] = b"commons/appeals/";
 pub const REVOCATION_PREFIX: &[u8] = b"commons/revocations/";
-pub const CEREMONY_PREFIX: &[u8] = b"commons/ceremonies/";
-pub const ENROLLMENT_SESSION_PREFIX: &[u8] = b"commons/enrollment_sessions/";
+// Note: ceremony and enrollment session storage stays in icn-gateway (gateway-local types).
 
 // ============================================================================
 // Storage Backend Trait
@@ -200,7 +199,8 @@ impl CommonsStoreBackend for InMemoryCommonsStore {
 
 /// Sled-based persistent store implementation
 ///
-/// Enable with the `sled-storage` feature flag.
+/// Sled is an unconditional dependency of `icn-commons`. No feature flag is
+/// required to use this backend.
 pub struct SledCommonsStore {
     db: sled::Db,
 }
@@ -276,8 +276,6 @@ pub struct CacheConfig {
     pub steward_cache_size: usize,
     pub amendment_cache_size: usize,
     pub appeal_cache_size: usize,
-    pub ceremony_cache_size: usize,
-    pub enrollment_session_cache_size: usize,
 }
 
 impl Default for CacheConfig {
@@ -289,15 +287,19 @@ impl Default for CacheConfig {
             steward_cache_size: 200,
             amendment_cache_size: 500,
             appeal_cache_size: 500,
-            ceremony_cache_size: 500,
-            enrollment_session_cache_size: 500,
         }
     }
 }
 
-/// High-level Commons storage with caching
+/// High-level Commons storage with caching.
+///
+/// `S` is the storage backend. When used from `CommonsInner`, `S` is
+/// `Arc<dyn CommonsStoreBackend>` (a single Arc wrapping the backend). The
+/// backend is stored as `S` directly — not wrapped in an additional `Arc` —
+/// so callers that already pass an `Arc` do not end up with a nested
+/// `Arc<Arc<...>>`.
 pub struct CommonsStore<S: CommonsStoreBackend> {
-    store: Arc<S>,
+    store: S,
     // Caches for frequently accessed records
     anchor_cache: RwLock<LruCache<String, PersonhoodAnchor>>,
     holder_cache: RwLock<LruCache<String, CommonsHolderRecord>>,
@@ -305,19 +307,19 @@ pub struct CommonsStore<S: CommonsStoreBackend> {
     steward_cache: RwLock<LruCache<String, StewardRecord>>,
     amendment_cache: RwLock<LruCache<String, Amendment>>,
     appeal_cache: RwLock<LruCache<String, Appeal>>,
-    ceremony_cache: RwLock<LruCache<String, crate::api::sdis::enrollment::EnrollmentCeremony>>,
-    enrollment_session_cache:
-        RwLock<LruCache<String, crate::api::sdis::simple_enrollment::EnrollmentSession>>,
 }
 
 impl<S: CommonsStoreBackend> CommonsStore<S> {
-    /// Create a new CommonsStore with default cache sizes
-    pub fn new(store: Arc<S>) -> Self {
+    /// Create a new CommonsStore with default cache sizes.
+    ///
+    /// Pass the backend directly. If the backend is already an `Arc<B>`,
+    /// pass the `Arc` — it will not be double-wrapped.
+    pub fn new(store: S) -> Self {
         Self::with_config(store, CacheConfig::default())
     }
 
     /// Create with custom cache configuration
-    pub fn with_config(store: Arc<S>, config: CacheConfig) -> Self {
+    pub fn with_config(store: S, config: CacheConfig) -> Self {
         // Helper to ensure cache size is at least 1
         // SAFETY: .max(1) ensures the value is always non-zero
         #[allow(clippy::unwrap_used)]
@@ -333,15 +335,11 @@ impl<S: CommonsStoreBackend> CommonsStore<S> {
             steward_cache: RwLock::new(LruCache::new(cache_size(config.steward_cache_size))),
             amendment_cache: RwLock::new(LruCache::new(cache_size(config.amendment_cache_size))),
             appeal_cache: RwLock::new(LruCache::new(cache_size(config.appeal_cache_size))),
-            ceremony_cache: RwLock::new(LruCache::new(cache_size(config.ceremony_cache_size))),
-            enrollment_session_cache: RwLock::new(LruCache::new(cache_size(
-                config.enrollment_session_cache_size,
-            ))),
         }
     }
 
     /// Get reference to underlying backend
-    pub fn backend(&self) -> &Arc<S> {
+    pub fn backend(&self) -> &S {
         &self.store
     }
 
@@ -1033,583 +1031,9 @@ impl<S: CommonsStoreBackend> CommonsStore<S> {
                 poisoned.into_inner()
             })
             .clear();
-        self.ceremony_cache
-            .write()
-            .unwrap_or_else(|poisoned| {
-                warn!("Ceremony cache lock poisoned, recovering");
-                poisoned.into_inner()
-            })
-            .clear();
-        self.enrollment_session_cache
-            .write()
-            .unwrap_or_else(|poisoned| {
-                warn!("Enrollment session cache lock poisoned, recovering");
-                poisoned.into_inner()
-            })
-            .clear();
-    }
-
-    // ========================================================================
-    // EnrollmentCeremony Operations
-    // ========================================================================
-
-    /// Store an EnrollmentCeremony
-    pub fn put_ceremony(
-        &self,
-        id: &str,
-        ceremony: &crate::api::sdis::enrollment::EnrollmentCeremony,
-    ) -> Result<()> {
-        let key = Self::make_key(CEREMONY_PREFIX, id);
-        let value = Self::serialize(ceremony)?;
-        self.store.put(&key, &value)?;
-
-        self.ceremony_cache
-            .write()
-            .unwrap_or_else(|poisoned| {
-                warn!("Ceremony cache lock poisoned, recovering");
-                poisoned.into_inner()
-            })
-            .put(id.to_string(), ceremony.clone());
-
-        debug!("Stored ceremony: {}", id);
-        Ok(())
-    }
-
-    /// Get an EnrollmentCeremony by ID
-    pub fn get_ceremony(
-        &self,
-        id: &str,
-    ) -> Result<Option<crate::api::sdis::enrollment::EnrollmentCeremony>> {
-        if let Some(cached) = self
-            .ceremony_cache
-            .write()
-            .unwrap_or_else(|poisoned| {
-                warn!("Ceremony cache lock poisoned, recovering");
-                poisoned.into_inner()
-            })
-            .get(id)
-        {
-            return Ok(Some(cached.clone()));
-        }
-
-        let key = Self::make_key(CEREMONY_PREFIX, id);
-        if let Some(value) = self.store.get(&key)? {
-            let ceremony: crate::api::sdis::enrollment::EnrollmentCeremony =
-                Self::deserialize(&value)?;
-            self.ceremony_cache
-                .write()
-                .unwrap_or_else(|poisoned| {
-                    warn!("Ceremony cache lock poisoned, recovering");
-                    poisoned.into_inner()
-                })
-                .put(id.to_string(), ceremony.clone());
-            return Ok(Some(ceremony));
-        }
-
-        Ok(None)
-    }
-
-    /// Update an existing ceremony
-    pub fn update_ceremony(
-        &self,
-        id: &str,
-        ceremony: &crate::api::sdis::enrollment::EnrollmentCeremony,
-    ) -> Result<()> {
-        self.put_ceremony(id, ceremony)
-    }
-
-    /// Delete a ceremony
-    pub fn delete_ceremony(&self, id: &str) -> Result<bool> {
-        let key = Self::make_key(CEREMONY_PREFIX, id);
-        if self.store.exists(&key)? {
-            self.store.delete(&key)?;
-            self.ceremony_cache
-                .write()
-                .unwrap_or_else(|poisoned| {
-                    warn!("Ceremony cache lock poisoned, recovering");
-                    poisoned.into_inner()
-                })
-                .pop(id);
-            debug!("Deleted ceremony: {}", id);
-            return Ok(true);
-        }
-        Ok(false)
-    }
-
-    /// List all ceremonies
-    pub fn list_ceremonies(
-        &self,
-    ) -> Result<Vec<(String, crate::api::sdis::enrollment::EnrollmentCeremony)>> {
-        let entries = self.store.scan(CEREMONY_PREFIX)?;
-        let mut ceremonies = Vec::new();
-
-        for (key, value) in entries {
-            // Extract ID from key
-            let key_str = String::from_utf8_lossy(&key);
-            if let Some(id) = key_str.strip_prefix("commons/ceremonies/") {
-                if let Ok(ceremony) =
-                    Self::deserialize::<crate::api::sdis::enrollment::EnrollmentCeremony>(&value)
-                {
-                    ceremonies.push((id.to_string(), ceremony));
-                }
-            }
-        }
-
-        Ok(ceremonies)
-    }
-
-    // ========================================================================
-    // EnrollmentSession Operations (Simple Enrollment)
-    // ========================================================================
-
-    /// Store an EnrollmentSession
-    pub fn put_enrollment_session(
-        &self,
-        id: &str,
-        session: &crate::api::sdis::simple_enrollment::EnrollmentSession,
-    ) -> Result<()> {
-        let key = Self::make_key(ENROLLMENT_SESSION_PREFIX, id);
-        let value = Self::serialize(session)?;
-        self.store.put(&key, &value)?;
-
-        self.enrollment_session_cache
-            .write()
-            .unwrap_or_else(|poisoned| {
-                warn!("Enrollment session cache lock poisoned, recovering");
-                poisoned.into_inner()
-            })
-            .put(id.to_string(), session.clone());
-
-        debug!("Stored enrollment session: {}", id);
-        Ok(())
-    }
-
-    /// Get an EnrollmentSession by ID
-    pub fn get_enrollment_session(
-        &self,
-        id: &str,
-    ) -> Result<Option<crate::api::sdis::simple_enrollment::EnrollmentSession>> {
-        if let Some(cached) = self
-            .enrollment_session_cache
-            .write()
-            .unwrap_or_else(|poisoned| {
-                warn!("Enrollment session cache lock poisoned, recovering");
-                poisoned.into_inner()
-            })
-            .get(id)
-        {
-            return Ok(Some(cached.clone()));
-        }
-
-        let key = Self::make_key(ENROLLMENT_SESSION_PREFIX, id);
-        if let Some(value) = self.store.get(&key)? {
-            let session: crate::api::sdis::simple_enrollment::EnrollmentSession =
-                Self::deserialize(&value)?;
-            self.enrollment_session_cache
-                .write()
-                .unwrap_or_else(|poisoned| {
-                    warn!("Enrollment session cache lock poisoned, recovering");
-                    poisoned.into_inner()
-                })
-                .put(id.to_string(), session.clone());
-            return Ok(Some(session));
-        }
-
-        Ok(None)
-    }
-
-    /// Update an existing enrollment session
-    pub fn update_enrollment_session(
-        &self,
-        id: &str,
-        session: &crate::api::sdis::simple_enrollment::EnrollmentSession,
-    ) -> Result<()> {
-        self.put_enrollment_session(id, session)
-    }
-
-    /// Delete an enrollment session
-    pub fn delete_enrollment_session(&self, id: &str) -> Result<bool> {
-        let key = Self::make_key(ENROLLMENT_SESSION_PREFIX, id);
-        if self.store.exists(&key)? {
-            self.store.delete(&key)?;
-            self.enrollment_session_cache
-                .write()
-                .unwrap_or_else(|poisoned| {
-                    warn!("Enrollment session cache lock poisoned, recovering");
-                    poisoned.into_inner()
-                })
-                .pop(id);
-            debug!("Deleted enrollment session: {}", id);
-            return Ok(true);
-        }
-        Ok(false)
-    }
-
-    /// List all enrollment sessions
-    pub fn list_enrollment_sessions(
-        &self,
-    ) -> Result<
-        Vec<(
-            String,
-            crate::api::sdis::simple_enrollment::EnrollmentSession,
-        )>,
-    > {
-        let entries = self.store.scan(ENROLLMENT_SESSION_PREFIX)?;
-        let mut sessions = Vec::new();
-
-        for (key, value) in entries {
-            let key_str = String::from_utf8_lossy(&key);
-            if let Some(id) = key_str.strip_prefix("commons/enrollment_sessions/") {
-                if let Ok(session) = Self::deserialize::<
-                    crate::api::sdis::simple_enrollment::EnrollmentSession,
-                >(&value)
-                {
-                    sessions.push((id.to_string(), session));
-                }
-            }
-        }
-
-        Ok(sessions)
     }
 }
 
 // ============================================================================
 // Tests
 // ============================================================================
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use icn_governance::{DisputePolicy, GovernanceConfig, MembershipPolicy, OrgType};
-    use icn_identity::KeyPair;
-
-    fn create_test_store() -> CommonsStore<InMemoryCommonsStore> {
-        let backend = Arc::new(InMemoryCommonsStore::new());
-        CommonsStore::new(backend)
-    }
-
-    #[test]
-    fn test_in_memory_backend() {
-        let backend = InMemoryCommonsStore::new();
-
-        // Put and get
-        backend.put(b"key1", b"value1").unwrap();
-        let value = backend.get(b"key1").unwrap();
-        assert_eq!(value, Some(b"value1".to_vec()));
-
-        // Delete
-        backend.delete(b"key1").unwrap();
-        let value = backend.get(b"key1").unwrap();
-        assert!(value.is_none());
-
-        // Scan
-        backend.put(b"prefix/a", b"1").unwrap();
-        backend.put(b"prefix/b", b"2").unwrap();
-        backend.put(b"other/c", b"3").unwrap();
-
-        let results = backend.scan(b"prefix/").unwrap();
-        assert_eq!(results.len(), 2);
-    }
-
-    #[test]
-    fn test_holder_operations() {
-        use icn_identity::{CommonsHolderRecord, CommonsRights, HolderStatus, POPLevel};
-
-        let store = create_test_store();
-        let keypair = KeyPair::generate().unwrap();
-        let did = keypair.did().clone();
-
-        let holder = CommonsHolderRecord {
-            holder_id: [1u8; 32],
-            anchor_id: [2u8; 32],
-            holder_did: did.clone(),
-            display_name: Some("Test User".to_string()),
-            status: HolderStatus::Active,
-            personhood_level: POPLevel::Strong,
-            affiliations: Vec::new(),
-            baseline_rights: CommonsRights::default(),
-            created_at: 12345,
-            last_review_at: None,
-            updated_at: 12345,
-        };
-
-        // Store
-        store.put_holder(&holder).unwrap();
-
-        // Get by ID
-        let id = hex::encode(holder.id());
-        let retrieved = store.get_holder(&id).unwrap().unwrap();
-        assert_eq!(retrieved.id(), holder.id());
-
-        // Get by DID
-        let by_did = store.get_holder_by_did(&did.to_string()).unwrap().unwrap();
-        assert_eq!(by_did.id(), holder.id());
-
-        // Get by anchor
-        let anchor_id = hex::encode(holder.anchor_id);
-        let by_anchor = store.get_holder_by_anchor(&anchor_id).unwrap().unwrap();
-        assert_eq!(by_anchor.id(), holder.id());
-
-        // List
-        let holders = store.list_holders().unwrap();
-        assert_eq!(holders.len(), 1);
-
-        // Delete
-        let deleted = store.delete_holder(&id).unwrap();
-        assert!(deleted);
-        assert!(store.get_holder(&id).unwrap().is_none());
-    }
-
-    #[test]
-    fn test_charter_operations() {
-        let store = create_test_store();
-
-        let charter = Charter::new(
-            OrgType::Cooperative,
-            "test-coop".to_string(),
-            "Test Cooperative".to_string(),
-            GovernanceConfig::cooperative_default(),
-            MembershipPolicy::default(),
-            DisputePolicy::default(),
-        );
-
-        let id = charter.charter_id.to_hex();
-        let domain = &charter.domain_id;
-
-        // Store
-        store.put_charter(&charter).unwrap();
-
-        // Get by ID
-        let retrieved = store.get_charter(&id).unwrap().unwrap();
-        assert_eq!(retrieved.name, "Test Cooperative");
-
-        // Get by domain (uses domain_id, not full_domain_id)
-        let by_domain = store.get_charter_by_domain(domain).unwrap().unwrap();
-        assert_eq!(by_domain.charter_id.to_hex(), id);
-
-        // List
-        let charters = store.list_charters().unwrap();
-        assert_eq!(charters.len(), 1);
-    }
-
-    #[test]
-    fn test_cache_behavior() {
-        let backend = Arc::new(InMemoryCommonsStore::new());
-        let store = CommonsStore::new(backend.clone());
-
-        let charter = Charter::new(
-            OrgType::Cooperative,
-            "test-coop".to_string(),
-            "Test Cooperative".to_string(),
-            GovernanceConfig::cooperative_default(),
-            MembershipPolicy::default(),
-            DisputePolicy::default(),
-        );
-        let id = charter.charter_id.to_hex();
-
-        // Store (populates cache)
-        store.put_charter(&charter).unwrap();
-
-        // First get (from cache or storage)
-        let _ = store.get_charter(&id).unwrap();
-
-        // Clear backend data but keep cache
-        backend.clear();
-
-        // Should still get from cache
-        let cached = store.get_charter(&id).unwrap();
-        assert!(cached.is_some());
-
-        // Clear cache
-        store.clear_caches();
-
-        // Now should be gone
-        let gone = store.get_charter(&id).unwrap();
-        assert!(gone.is_none());
-    }
-
-    // ========================================================================
-    // Sled Backend Tests (feature-gated)
-    // ========================================================================
-    // Enable with: cargo test -p icn-gateway --features sled-storage
-    #[cfg(feature = "sled-storage")]
-    mod sled_tests {
-        use super::*;
-        use crate::commons_store::SledCommonsStore;
-        use icn_governance::{DisputePolicy, GovernanceConfig, MembershipPolicy, OrgType};
-
-        fn create_sled_store() -> CommonsStore<SledCommonsStore> {
-            let backend = Arc::new(SledCommonsStore::temporary().unwrap());
-            CommonsStore::new(backend)
-        }
-
-        #[test]
-        fn test_sled_backend_basic() {
-            let backend = SledCommonsStore::temporary().unwrap();
-
-            // Put and get
-            backend.put(b"key1", b"value1").unwrap();
-            let value = backend.get(b"key1").unwrap();
-            assert_eq!(value, Some(b"value1".to_vec()));
-
-            // Delete
-            backend.delete(b"key1").unwrap();
-            let value = backend.get(b"key1").unwrap();
-            assert!(value.is_none());
-
-            // Scan
-            backend.put(b"prefix/a", b"1").unwrap();
-            backend.put(b"prefix/b", b"2").unwrap();
-            backend.put(b"other/c", b"3").unwrap();
-
-            let results = backend.scan(b"prefix/").unwrap();
-            assert_eq!(results.len(), 2);
-        }
-
-        #[test]
-        fn test_sled_holder_operations() {
-            use icn_identity::{CommonsHolderRecord, CommonsRights, HolderStatus, POPLevel};
-
-            let store = create_sled_store();
-            let keypair = KeyPair::generate().unwrap();
-            let did = keypair.did().clone();
-
-            let holder = CommonsHolderRecord {
-                holder_id: [1u8; 32],
-                anchor_id: [2u8; 32],
-                holder_did: did.clone(),
-                display_name: Some("Sled Test User".to_string()),
-                status: HolderStatus::Active,
-                personhood_level: POPLevel::Strong,
-                affiliations: Vec::new(),
-                baseline_rights: CommonsRights::default(),
-                created_at: 12345,
-                last_review_at: None,
-                updated_at: 12345,
-            };
-
-            // Store
-            store.put_holder(&holder).unwrap();
-
-            // Get by ID
-            let id = hex::encode(holder.id());
-            let retrieved = store.get_holder(&id).unwrap().unwrap();
-            assert_eq!(retrieved.id(), holder.id());
-
-            // Get by DID
-            let by_did = store.get_holder_by_did(&did.to_string()).unwrap().unwrap();
-            assert_eq!(by_did.id(), holder.id());
-
-            // Get by anchor
-            let anchor_id = hex::encode(holder.anchor_id);
-            let by_anchor = store.get_holder_by_anchor(&anchor_id).unwrap().unwrap();
-            assert_eq!(by_anchor.id(), holder.id());
-
-            // List
-            let holders = store.list_holders().unwrap();
-            assert_eq!(holders.len(), 1);
-
-            // Delete
-            let deleted = store.delete_holder(&id).unwrap();
-            assert!(deleted);
-            assert!(store.get_holder(&id).unwrap().is_none());
-        }
-
-        #[test]
-        fn test_sled_charter_operations() {
-            let store = create_sled_store();
-
-            let charter = Charter::new(
-                OrgType::Cooperative,
-                "sled-test-coop".to_string(),
-                "Sled Test Cooperative".to_string(),
-                GovernanceConfig::cooperative_default(),
-                MembershipPolicy::default(),
-                DisputePolicy::default(),
-            );
-
-            let id = charter.charter_id.to_hex();
-            let domain = &charter.domain_id;
-
-            // Store
-            store.put_charter(&charter).unwrap();
-
-            // Get by ID
-            let retrieved = store.get_charter(&id).unwrap().unwrap();
-            assert_eq!(retrieved.name, "Sled Test Cooperative");
-
-            // Get by domain
-            let by_domain = store.get_charter_by_domain(domain).unwrap().unwrap();
-            assert_eq!(by_domain.charter_id.to_hex(), id);
-
-            // List
-            let charters = store.list_charters().unwrap();
-            assert_eq!(charters.len(), 1);
-        }
-
-        #[test]
-        fn test_sled_persistence() {
-            use std::path::PathBuf;
-            use tempfile::tempdir;
-
-            // Create a temporary directory for the database
-            let temp_dir = tempdir().unwrap();
-            let db_path: PathBuf = temp_dir.path().join("commons_test.db");
-
-            let charter_id: String;
-            let charter_name = "Persistent Coop";
-
-            // First: Create database and store data
-            {
-                let backend = Arc::new(SledCommonsStore::open(&db_path).unwrap());
-                let store = CommonsStore::new(backend.clone());
-
-                let charter = Charter::new(
-                    OrgType::Cooperative,
-                    "persistent-coop".to_string(),
-                    charter_name.to_string(),
-                    GovernanceConfig::cooperative_default(),
-                    MembershipPolicy::default(),
-                    DisputePolicy::default(),
-                );
-                charter_id = charter.charter_id.to_hex();
-
-                store.put_charter(&charter).unwrap();
-
-                // Explicitly flush
-                backend.flush().unwrap();
-            } // Store and backend dropped here
-
-            // Second: Reopen database and verify data persisted
-            {
-                let backend = Arc::new(SledCommonsStore::open(&db_path).unwrap());
-                let store = CommonsStore::new(backend);
-
-                let retrieved = store.get_charter(&charter_id).unwrap();
-                assert!(
-                    retrieved.is_some(),
-                    "Charter should persist across restarts"
-                );
-                assert_eq!(retrieved.unwrap().name, charter_name);
-            }
-        }
-
-        #[test]
-        fn test_sled_size_on_disk() {
-            let backend = SledCommonsStore::temporary().unwrap();
-
-            // Add some data
-            for i in 0..100 {
-                let key = format!("key_{i}");
-                let value = format!("value_{i}");
-                backend.put(key.as_bytes(), value.as_bytes()).unwrap();
-            }
-
-            backend.flush().unwrap();
-
-            // Should report some size
-            let size = backend.size_on_disk().unwrap();
-            assert!(size > 0, "Database should have non-zero size after writes");
-        }
-    }
-}

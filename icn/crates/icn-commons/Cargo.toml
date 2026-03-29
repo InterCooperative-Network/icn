@@ -1,0 +1,32 @@
+[package]
+name = "icn-commons"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+sha2 = "0.10"
+tracing = "0.1"
+lru = "0.16"
+sled = { workspace = true }
+tokio = { version = "1", features = ["sync"] }
+hex = "0.4"
+rand = "0.8"
+serde_json = "1"
+
+icn-identity = { path = "../icn-identity" }
+icn-governance = { path = "../icn-governance" }
+icn-obs = { path = "../icn-obs" }
+icn-time = { path = "../icn-time" }
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { version = "1", features = ["full"] }
+hex = "0.4"
+ed25519-dalek.workspace = true

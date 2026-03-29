@@ -40,6 +40,7 @@ members = [
     "apps/membership",
     "apps/ledger",
     "crates/icn-http-kit",
+    "crates/icn-commons",
 ]
 
 [workspace.package]
@@ -148,6 +149,7 @@ icn-coop = { path = "crates/icn-coop" }
 icn-api = { path = "crates/icn-api" }
 icn-naming = { path = "crates/icn-naming" }
 icn-authz = { path = "crates/icn-authz" }
+icn-commons = { path = "crates/icn-commons" }
 
 [workspace.lints.clippy]
 # Error handling - warn for now, will be upgraded to deny after cleanup

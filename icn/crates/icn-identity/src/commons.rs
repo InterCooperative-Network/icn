@@ -415,7 +415,14 @@ impl Affiliation {
         }
     }
 
-    /// Create an affiliation with full member status
+    /// Create an affiliation with full member status and baseline member capabilities.
+    ///
+    /// Grants the same baseline capabilities as the enrollment flow's `promote()` transition:
+    /// `Vote`, `Propose`, and `Transact`.  `HoldOffice` is NOT granted — it must be
+    /// explicitly delegated by the jurisdiction.
+    ///
+    /// Intended for direct construction (seeding, testing).  The canonical path for
+    /// new members is the enrollment flow (`new` → `approve` → `promote`).
     pub fn as_member(jurisdiction_id: JurisdictionId) -> Self {
         let mut affiliation = Self::new(jurisdiction_id);
         affiliation.membership_status = MembershipStatus::Member;
@@ -469,10 +476,28 @@ impl Affiliation {
         }
     }
 
-    /// Promote from provisional to full member
+    /// Promote from provisional to full member.
+    ///
+    /// Sets `membership_status` to `Member` and ensures the baseline member capabilities
+    /// (`Vote`, `Propose`, `Transact`) are present.  Any capabilities already on the
+    /// affiliation are preserved; capabilities are added idempotently.
+    ///
+    /// `HoldOffice` is NOT granted here — it must be explicitly delegated by the
+    /// jurisdiction after promotion, preserving the distinction between ordinary
+    /// membership and governance office-holding.
     pub fn promote(&mut self) {
         if self.membership_status == MembershipStatus::Provisional {
             self.membership_status = MembershipStatus::Member;
+            // Grant baseline member capabilities, matching `as_member()`.
+            for cap in [
+                MembershipCapability::Vote,
+                MembershipCapability::Propose,
+                MembershipCapability::Transact,
+            ] {
+                if !self.capabilities.contains(&cap) {
+                    self.capabilities.push(cap);
+                }
+            }
         }
     }
 
@@ -801,21 +826,85 @@ mod tests {
 
         assert_eq!(affiliation.membership_status, MembershipStatus::Candidate);
         assert!(!affiliation.is_active());
+        assert!(affiliation.capabilities.is_empty());
 
-        // Approve to provisional
+        // Approve to provisional — no capabilities granted yet
         affiliation.approve();
         assert_eq!(affiliation.membership_status, MembershipStatus::Provisional);
         assert!(affiliation.is_active());
+        assert!(affiliation.capabilities.is_empty());
 
-        // Promote to full member
+        // Promote to full member — baseline capabilities are granted
         affiliation.promote();
         assert_eq!(affiliation.membership_status, MembershipStatus::Member);
         assert!(affiliation.is_active());
+        assert!(affiliation.has_capability(MembershipCapability::Vote));
+        assert!(affiliation.has_capability(MembershipCapability::Propose));
+        assert!(affiliation.has_capability(MembershipCapability::Transact));
+        // HoldOffice is NOT granted by promotion — requires explicit delegation
+        assert!(!affiliation.has_capability(MembershipCapability::HoldOffice));
 
         // Suspend
         affiliation.suspend();
         assert_eq!(affiliation.membership_status, MembershipStatus::Suspended);
         assert!(!affiliation.is_active());
+    }
+
+    #[test]
+    fn test_promotion_parity_with_as_member() {
+        // The enrollment path (new → approve → promote) must produce the same
+        // baseline capability set as the direct-construction path (as_member).
+        let coop = JurisdictionId::coop("parity-test");
+
+        let direct = Affiliation::as_member(coop.clone());
+
+        let mut enrolled = Affiliation::new(coop);
+        enrolled.approve();
+        enrolled.promote();
+
+        // Both paths must agree on status and baseline capabilities
+        assert_eq!(enrolled.membership_status, direct.membership_status);
+        assert_eq!(
+            enrolled.has_capability(MembershipCapability::Vote),
+            direct.has_capability(MembershipCapability::Vote)
+        );
+        assert_eq!(
+            enrolled.has_capability(MembershipCapability::Propose),
+            direct.has_capability(MembershipCapability::Propose)
+        );
+        assert_eq!(
+            enrolled.has_capability(MembershipCapability::Transact),
+            direct.has_capability(MembershipCapability::Transact)
+        );
+        // HoldOffice is absent in both — it is never granted by either constructor
+        assert!(!enrolled.has_capability(MembershipCapability::HoldOffice));
+        assert!(!direct.has_capability(MembershipCapability::HoldOffice));
+    }
+
+    #[test]
+    fn test_promote_is_idempotent_with_existing_capabilities() {
+        // If the affiliation already has some of the baseline caps (e.g. from a
+        // pre-approval capability request), promote must not duplicate them.
+        let coop = JurisdictionId::coop("idempotent-test");
+        let mut affiliation = Affiliation::new(coop);
+        // Simulate an applicant who self-requested Vote before approval
+        affiliation.add_capability(MembershipCapability::Vote);
+        affiliation.approve();
+        affiliation.promote();
+
+        let vote_count = affiliation
+            .capabilities
+            .iter()
+            .filter(|&&c| c == MembershipCapability::Vote)
+            .count();
+        assert_eq!(
+            vote_count, 1,
+            "Vote must appear exactly once after promotion"
+        );
+        // All three baseline caps present
+        assert!(affiliation.has_capability(MembershipCapability::Vote));
+        assert!(affiliation.has_capability(MembershipCapability::Propose));
+        assert!(affiliation.has_capability(MembershipCapability::Transact));
     }
 
     #[test]

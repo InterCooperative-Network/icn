@@ -218,16 +218,32 @@ pub async fn assign_reviewer(
     })))
 }
 
+/// Query parameters for the appeals dashboard
+#[derive(Debug, serde::Deserialize, ToSchema)]
+pub struct AppealsDashboardQuery {
+    /// Restrict the dashboard to appeals scoped to this domain (exact match).
+    /// When supplied, only Jurisdiction-scoped appeals for this domain_id are
+    /// included.  Omitting this returns all appeals (useful for network-wide
+    /// admin views, but callers should scope to their own domain in multi-coop
+    /// nodes).
+    pub domain_id: Option<String>,
+}
+
 /// GET /constitutional/appeals/dashboard - Appeals dashboard data
 #[get("/appeals/dashboard")]
 pub async fn get_appeals_dashboard(
     http_req: HttpRequest,
     commons_mgr: web::Data<Arc<CommonsManager>>,
+    query: web::Query<AppealsDashboardQuery>,
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "constitutional:read")?;
 
-    // Get all appeals
-    let all_appeals = commons_mgr.list_appeals(None, None, None).await?;
+    let all_appeals = if let Some(ref domain) = query.domain_id {
+        // Domain-scoped view: only jurisdiction appeals for this domain.
+        commons_mgr.list_appeals_by_domain(domain).await?
+    } else {
+        commons_mgr.list_appeals(None, None, None).await?
+    };
 
     let dashboard = build_dashboard(&all_appeals);
 

@@ -299,9 +299,13 @@ mod tests {
     /// - receipt_store.rs test: CLEANED ✅ (was 1 ref)
     /// - commons_store.rs tests: consolidated ✅ (-2 refs)
     /// - Hard residue: 16 (commons_mgr, commons_store, treasury, entity, receipts, constitutional)
+    ///
+    /// Current state (2026-03-28, Tranche 4 boundary-semantics):
+    /// - constitutional/mod.rs: charter/domain validation refactored ✅ (-2 refs)
+    /// - Hard residue: 14 (commons_mgr, commons_store, treasury, entity, receipts, constitutional)
     #[test]
     fn strict_gateway_governance_total_refs() {
-        let expected: usize = 16; // Sprint 14 easy sweep: -7 refs from 24
+        let expected: usize = 14; // Tranche 4 boundary-semantics: -2 refs from 16
         let actual = count_imports_in_crate("icn-gateway", "icn_governance::");
 
         assert!(

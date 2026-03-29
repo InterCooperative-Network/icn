@@ -15,9 +15,7 @@ use utoipa::ToSchema;
 use crate::commons_mgr::CommonsManager;
 use crate::error::{GatewayError, Result};
 use crate::middleware::get_claims;
-use icn_identity::{
-    Affiliation, CommonsHolderRecord, Did, JurisdictionId, MembershipCapability, MembershipStatus,
-};
+use icn_identity::{Affiliation, CommonsHolderRecord, Did, JurisdictionId, MembershipStatus};
 
 // ============================================================================
 // Response/Request DTOs
@@ -96,8 +94,6 @@ impl From<&Affiliation> for AffiliationResponse {
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct JoinJurisdictionRequest {
     pub jurisdiction_id: String,
-    #[serde(default)]
-    pub capabilities: Vec<String>,
 }
 
 /// Update affiliation status request
@@ -150,11 +146,17 @@ pub async fn get_commons_status(
 // ============================================================================
 
 /// GET /v1/commons/holder/{did} - Get holder by DID
+///
+/// Authentication required. Returns the holder record for the given DID.
 #[get("/holder/{did}")]
 pub async fn get_holder_by_did(
+    http_req: HttpRequest,
     path: web::Path<String>,
     commons_manager: web::Data<Arc<CommonsManager>>,
 ) -> Result<HttpResponse> {
+    let _claims = get_claims(&http_req)
+        .ok_or_else(|| GatewayError::AuthenticationFailed("Authentication required".to_string()))?;
+
     let did_str = path.into_inner();
     let did = did_str
         .parse::<Did>()
@@ -170,11 +172,17 @@ pub async fn get_holder_by_did(
 }
 
 /// GET /v1/commons/holder/id/{holder_id} - Get holder by ID
+///
+/// Authentication required. Returns the holder record for the given internal ID.
 #[get("/holder/id/{holder_id}")]
 pub async fn get_holder_by_id(
+    http_req: HttpRequest,
     path: web::Path<String>,
     commons_manager: web::Data<Arc<CommonsManager>>,
 ) -> Result<HttpResponse> {
+    let _claims = get_claims(&http_req)
+        .ok_or_else(|| GatewayError::AuthenticationFailed("Authentication required".to_string()))?;
+
     let holder_id = path.into_inner();
 
     let holder = commons_manager
@@ -204,15 +212,35 @@ fn holder_to_response(holder: &CommonsHolderRecord) -> HolderDetailResponse {
 // ============================================================================
 
 /// GET /v1/commons/holder/{did}/affiliations - List affiliations
+///
+/// Self-only: caller must be the holder being queried. A holder's full
+/// affiliation history is personal — it reveals which cooperatives and
+/// jurisdictions they belong to, their capabilities in each, and their
+/// membership timeline.
+///
+/// Use `GET /v1/membership/list/{jurisdiction}` to enumerate a
+/// jurisdiction's roster (requires member standing in that jurisdiction).
 #[get("/holder/{did}/affiliations")]
 pub async fn list_affiliations(
+    http_req: HttpRequest,
     path: web::Path<String>,
     commons_manager: web::Data<Arc<CommonsManager>>,
 ) -> Result<HttpResponse> {
+    let claims = get_claims(&http_req)
+        .ok_or_else(|| GatewayError::AuthenticationFailed("Authentication required".to_string()))?;
+
     let did_str = path.into_inner();
     let did = did_str
         .parse::<Did>()
         .map_err(|e| GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
+
+    // Self-only: affiliation history spans all jurisdictions and must not be
+    // enumerable by arbitrary callers.
+    if claims.sub != did.to_string() {
+        return Err(GatewayError::AuthorizationFailed(
+            "Can only list affiliations for your own identity".to_string(),
+        ));
+    }
 
     let holder = commons_manager
         .get_holder_by_did(&did)
@@ -258,15 +286,11 @@ pub async fn join_jurisdiction(
     let holder_id = hex::encode(holder.id());
     let jurisdiction = JurisdictionId::new(&body.jurisdiction_id);
 
-    // Parse capabilities
-    let capabilities: Vec<MembershipCapability> = body
-        .capabilities
-        .iter()
-        .filter_map(|c| parse_capability(c))
-        .collect();
-
+    // Capabilities are not accepted from the caller — they are jurisdiction-granted.
+    // System-initiated flows (e.g., SDIS enrollment) use the internal CommonsManager
+    // API directly with explicit initial_capabilities.
     let affiliation = commons_manager
-        .join_jurisdiction(&holder_id, jurisdiction, capabilities)
+        .join_jurisdiction(&holder_id, jurisdiction, vec![])
         .await?;
 
     Ok(HttpResponse::Created().json(AffiliationResponse::from(&affiliation)))
@@ -356,18 +380,6 @@ pub async fn leave_jurisdiction(
 // Helper Functions
 // ============================================================================
 
-fn parse_capability(s: &str) -> Option<MembershipCapability> {
-    match s.to_lowercase().as_str() {
-        "vote" => Some(MembershipCapability::Vote),
-        "propose" => Some(MembershipCapability::Propose),
-        "transact" => Some(MembershipCapability::Transact),
-        "holdoffice" | "hold_office" => Some(MembershipCapability::HoldOffice),
-        "accessprivate" | "access_private" => Some(MembershipCapability::AccessPrivate),
-        "sponsor" => Some(MembershipCapability::Sponsor),
-        _ => None,
-    }
-}
-
 fn parse_membership_status(s: &str) -> Option<MembershipStatus> {
     match s.to_lowercase().as_str() {
         "candidate" => Some(MembershipStatus::Candidate),
@@ -399,7 +411,8 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use actix_web::{test, App};
+    use crate::auth::TokenClaims;
+    use actix_web::{test, App, HttpMessage};
 
     #[actix_web::test]
     async fn test_get_holder_not_found() {
@@ -415,11 +428,22 @@ mod tests {
         let keypair = icn_identity::KeyPair::generate().unwrap();
         let did = keypair.did().to_string();
 
+        // Inject claims directly into request extensions — the canonical test bypass
+        // for handlers that call get_claims(). No holder exists for this DID, so the
+        // handler should return 404 after auth passes.
+        let claims = TokenClaims {
+            sub: did.clone(),
+            iat: 1_000_000_000,
+            exp: 9_999_999_999,
+            coop_id: "test-coop".to_string(),
+            scopes: vec![],
+        };
         let req = test::TestRequest::get()
             .uri(&format!("/v1/commons/holder/{did}"))
             .to_request();
-        let resp = test::call_service(&app, req).await;
+        req.extensions_mut().insert(claims);
 
+        let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), actix_web::http::StatusCode::NOT_FOUND);
     }
 }

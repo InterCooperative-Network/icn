@@ -5,8 +5,24 @@
 //! attestation tracking, and bond management.
 
 use icn_gateway::commons_mgr::CommonsManager;
-use icn_governance::StewardStatus;
+use icn_governance::{
+    Charter, DisputePolicy, GovernanceConfig, MembershipPolicy, OrgType, StewardStatus,
+};
 use icn_identity::{KeyPair, POPLevel};
+
+/// Create a minimal charter for `domain_id`.  Required because write-side scope
+/// enforcement rejects steward registrations with an unchartered jurisdiction.
+async fn create_charter_for_domain(commons_mgr: &CommonsManager, domain_id: &str) {
+    let charter = Charter::new(
+        OrgType::Cooperative,
+        domain_id.to_string(),
+        format!("Test Coop for {domain_id}"),
+        GovernanceConfig::cooperative_default(),
+        MembershipPolicy::default(),
+        DisputePolicy::default(),
+    );
+    commons_mgr.store_charter(charter).await.unwrap();
+}
 
 /// Helper to create a holder with Strong POP level (required for steward registration)
 async fn create_holder_with_strong_pop(
@@ -39,6 +55,7 @@ async fn create_holder_with_strong_pop(
 #[actix_web::test]
 async fn test_steward_registration() {
     let commons_mgr = CommonsManager::new();
+    create_charter_for_domain(&commons_mgr, "coop:test-coop").await;
 
     let member_keypair = KeyPair::generate().unwrap();
     let voucher_keypair = KeyPair::generate().unwrap();
@@ -464,6 +481,8 @@ async fn test_term_extension() {
 #[actix_web::test]
 async fn test_list_stewards() {
     let commons_mgr = CommonsManager::new();
+    create_charter_for_domain(&commons_mgr, "coop:alpha").await;
+    create_charter_for_domain(&commons_mgr, "coop:beta").await;
 
     // Create two stewards in different jurisdictions
     let member1 = KeyPair::generate().unwrap();
