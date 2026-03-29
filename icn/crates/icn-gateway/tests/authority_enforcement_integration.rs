@@ -1,7 +1,6 @@
 //! Authority enforcement integration tests.
 //!
-//! These tests prove the authority model implemented in Tranche 5 and cleaned up
-//! in Tranche 6:
+//! These tests prove the authority model implemented in Tranches 5–8:
 //!
 //! **Rule**: A caller may only perform membership/governance mutations on a
 //! cooperative/jurisdiction where they hold a delegated capability.  Holding
@@ -71,7 +70,7 @@ async fn create_holder(mgr: &CommonsManager) -> (Did, String) {
 /// Enroll `holder_id` in `domain_id` and approve + promote them to full Member.
 async fn enroll_member(mgr: &CommonsManager, holder_id: &str, domain_id: &str) {
     let jurisdiction = JurisdictionId::new(domain_id);
-    mgr.apply_for_membership(holder_id, jurisdiction.clone(), vec![])
+    mgr.apply_for_membership(holder_id, jurisdiction.clone())
         .await
         .unwrap();
     mgr.approve_membership(holder_id, &jurisdiction)
@@ -271,7 +270,7 @@ async fn office_holder_can_promote_member_in_own_domain() {
     // Target: enrolled but still Provisional (just approved, not yet promoted)
     let (_target_did, target_id) = create_holder(&mgr).await;
     let jurisdiction = JurisdictionId::new("coop:alpha");
-    mgr.apply_for_membership(&target_id, jurisdiction.clone(), vec![])
+    mgr.apply_for_membership(&target_id, jurisdiction.clone())
         .await
         .unwrap();
     mgr.approve_membership(&target_id, &jurisdiction)
@@ -454,5 +453,160 @@ async fn plain_member_without_hold_office_can_satisfy_dispute_standing() {
     assert!(
         !has_office,
         "Plain member must NOT have HoldOffice — dispute filing and governance mutations are separate authority levels"
+    );
+}
+
+// ─── Tranche 8: Enrollment capability-origin invariant ───────────────────────
+//
+// These tests prove that capabilities originate from jurisdictional delegation,
+// not from applicant self-assertion.  Applying for membership, having the
+// application approved, and being promoted to full member must not produce any
+// capabilities except the baseline granted by `promote()`.
+
+/// Application creates a Candidate with no capabilities, regardless of what
+/// the application request conceptually "expressed."
+#[actix_web::test]
+async fn application_creates_candidate_with_no_capabilities() {
+    let mgr = CommonsManager::new();
+    create_charter(&mgr, "coop:alpha").await;
+
+    let (_did, applicant_id) = create_holder(&mgr).await;
+    let jurisdiction = JurisdictionId::new("coop:alpha");
+
+    // apply_for_membership creates a Candidate with no capabilities
+    mgr.apply_for_membership(&applicant_id, jurisdiction.clone())
+        .await
+        .unwrap();
+
+    let holder = mgr.get_holder(&applicant_id).await.unwrap().unwrap();
+    let affil = holder
+        .get_affiliation(&jurisdiction)
+        .expect("must have affiliation after application");
+
+    assert_eq!(format!("{}", affil.membership_status), "Candidate");
+    assert!(
+        affil.capabilities.is_empty(),
+        "Candidate must have no capabilities at application time"
+    );
+}
+
+/// Approval alone does not grant any capabilities — affiliation moves to
+/// Provisional but capability set remains empty.
+#[actix_web::test]
+async fn approval_does_not_grant_capabilities() {
+    let mgr = CommonsManager::new();
+    create_charter(&mgr, "coop:alpha").await;
+
+    let (_did, applicant_id) = create_holder(&mgr).await;
+    let jurisdiction = JurisdictionId::new("coop:alpha");
+
+    mgr.apply_for_membership(&applicant_id, jurisdiction.clone())
+        .await
+        .unwrap();
+    mgr.approve_membership(&applicant_id, &jurisdiction)
+        .await
+        .unwrap();
+
+    let holder = mgr.get_holder(&applicant_id).await.unwrap().unwrap();
+    let affil = holder
+        .get_affiliation(&jurisdiction)
+        .expect("must have affiliation after approval");
+
+    assert_eq!(format!("{}", affil.membership_status), "Provisional");
+    assert!(
+        affil.capabilities.is_empty(),
+        "Provisional member must have no capabilities — only promotion grants baseline capabilities"
+    );
+}
+
+/// Promotion grants exactly the baseline member capabilities.
+/// `HoldOffice` is absent without explicit delegation.
+#[actix_web::test]
+async fn promotion_grants_only_baseline_capabilities() {
+    let mgr = CommonsManager::new();
+    create_charter(&mgr, "coop:alpha").await;
+
+    let (_did, applicant_id) = create_holder(&mgr).await;
+    enroll_member(&mgr, &applicant_id, "coop:alpha").await;
+
+    let jurisdiction = JurisdictionId::new("coop:alpha");
+    let holder = mgr.get_holder(&applicant_id).await.unwrap().unwrap();
+    let affil = holder
+        .get_affiliation(&jurisdiction)
+        .expect("must have affiliation after promotion");
+
+    assert_eq!(format!("{}", affil.membership_status), "Member");
+
+    // Baseline capabilities are present
+    assert!(
+        affil.has_capability(MembershipCapability::Vote),
+        "Promoted member must have Vote"
+    );
+    assert!(
+        affil.has_capability(MembershipCapability::Propose),
+        "Promoted member must have Propose"
+    );
+    assert!(
+        affil.has_capability(MembershipCapability::Transact),
+        "Promoted member must have Transact"
+    );
+
+    // HoldOffice is NOT present — it requires explicit jurisdictional delegation
+    assert!(
+        !affil.has_capability(MembershipCapability::HoldOffice),
+        "Promoted member must NOT have HoldOffice — requires explicit delegation"
+    );
+
+    // The capability count is exactly 3 — no extras snuck in
+    assert_eq!(
+        affil.capabilities.len(),
+        3,
+        "Promoted member must have exactly the 3 baseline capabilities"
+    );
+}
+
+/// `HoldOffice` can only be obtained through explicit delegation by a
+/// jurisdiction office-holder, not through the application/promotion flow.
+#[actix_web::test]
+async fn hold_office_requires_explicit_delegation_not_enrollment() {
+    let mgr = CommonsManager::new();
+    create_charter(&mgr, "coop:alpha").await;
+
+    let (_did, applicant_id) = create_holder(&mgr).await;
+    enroll_member(&mgr, &applicant_id, "coop:alpha").await;
+
+    let jurisdiction = JurisdictionId::new("coop:alpha");
+
+    // After enrollment the member does NOT have HoldOffice
+    let before = mgr
+        .member_has_capability(
+            &applicant_id,
+            &jurisdiction,
+            MembershipCapability::HoldOffice,
+        )
+        .await
+        .unwrap_or(false);
+    assert!(!before, "HoldOffice must be absent after enrollment");
+
+    // Only explicit grant by a jurisdiction office-holder adds HoldOffice
+    mgr.grant_capability(
+        &applicant_id,
+        &jurisdiction,
+        MembershipCapability::HoldOffice,
+    )
+    .await
+    .unwrap();
+
+    let after = mgr
+        .member_has_capability(
+            &applicant_id,
+            &jurisdiction,
+            MembershipCapability::HoldOffice,
+        )
+        .await
+        .unwrap_or(false);
+    assert!(
+        after,
+        "HoldOffice must be present after explicit delegation"
     );
 }

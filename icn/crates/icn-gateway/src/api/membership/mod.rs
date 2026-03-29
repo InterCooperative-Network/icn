@@ -30,8 +30,6 @@ use icn_identity::{
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct ApplyMembershipRequest {
     pub jurisdiction_id: String,
-    #[serde(default)]
-    pub capabilities_requested: Vec<String>,
 }
 
 /// Membership action request (approve, promote, suspend, etc.)
@@ -158,15 +156,8 @@ pub async fn apply_for_membership(
     let holder_id = hex::encode(holder.id());
     let jurisdiction_id = JurisdictionId::new(&body.jurisdiction_id);
 
-    // Parse requested capabilities
-    let capabilities: Vec<MembershipCapability> = body
-        .capabilities_requested
-        .iter()
-        .filter_map(|s| parse_capability(s))
-        .collect();
-
     let affiliation = commons_manager
-        .apply_for_membership(&holder_id, jurisdiction_id.clone(), capabilities)
+        .apply_for_membership(&holder_id, jurisdiction_id.clone())
         .await?;
 
     Ok(HttpResponse::Created().json(MemberResponse {

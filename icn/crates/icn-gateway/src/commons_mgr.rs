@@ -518,14 +518,17 @@ impl CommonsManager {
 
 impl CommonsManager {
     /// Apply for membership in a jurisdiction.
+    ///
+    /// No capabilities are granted at application time.  Baseline capabilities
+    /// are granted by `promote_member`; elevated capabilities must be explicitly
+    /// delegated via `grant_capability` by a jurisdiction office-holder.
     pub async fn apply_for_membership(
         &self,
         holder_id: &str,
         jurisdiction: JurisdictionId,
-        initial_capabilities: Vec<MembershipCapability>,
     ) -> Result<Affiliation> {
         self.handle
-            .apply_for_membership(holder_id, jurisdiction, initial_capabilities)
+            .apply_for_membership(holder_id, jurisdiction)
             .await
     }
 

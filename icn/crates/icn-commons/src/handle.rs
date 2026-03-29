@@ -621,16 +621,17 @@ impl CommonsHandle {
     /// Apply for membership in a jurisdiction.
     ///
     /// Sybil resistance: requires at least `POPLevel::Strong` to apply.
+    /// No capabilities are granted at application time; capabilities originate
+    /// from jurisdictional approval and delegation only.
     pub async fn apply_for_membership(
         &self,
         holder_id: &str,
         jurisdiction_id: JurisdictionId,
-        capabilities_requested: Vec<MembershipCapability>,
     ) -> Result<Affiliation> {
         self.inner
             .write()
             .await
-            .apply_for_membership(holder_id, jurisdiction_id, capabilities_requested)
+            .apply_for_membership(holder_id, jurisdiction_id)
             .await
     }
 

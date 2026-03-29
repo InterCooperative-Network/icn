@@ -15,9 +15,7 @@ use utoipa::ToSchema;
 use crate::commons_mgr::CommonsManager;
 use crate::error::{GatewayError, Result};
 use crate::middleware::get_claims;
-use icn_identity::{
-    Affiliation, CommonsHolderRecord, Did, JurisdictionId, MembershipCapability, MembershipStatus,
-};
+use icn_identity::{Affiliation, CommonsHolderRecord, Did, JurisdictionId, MembershipStatus};
 
 // ============================================================================
 // Response/Request DTOs
@@ -96,8 +94,6 @@ impl From<&Affiliation> for AffiliationResponse {
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct JoinJurisdictionRequest {
     pub jurisdiction_id: String,
-    #[serde(default)]
-    pub capabilities: Vec<String>,
 }
 
 /// Update affiliation status request
@@ -258,15 +254,11 @@ pub async fn join_jurisdiction(
     let holder_id = hex::encode(holder.id());
     let jurisdiction = JurisdictionId::new(&body.jurisdiction_id);
 
-    // Parse capabilities
-    let capabilities: Vec<MembershipCapability> = body
-        .capabilities
-        .iter()
-        .filter_map(|c| parse_capability(c))
-        .collect();
-
+    // Capabilities are not accepted from the caller — they are jurisdiction-granted.
+    // System-initiated flows (e.g., SDIS enrollment) use the internal CommonsManager
+    // API directly with explicit initial_capabilities.
     let affiliation = commons_manager
-        .join_jurisdiction(&holder_id, jurisdiction, capabilities)
+        .join_jurisdiction(&holder_id, jurisdiction, vec![])
         .await?;
 
     Ok(HttpResponse::Created().json(AffiliationResponse::from(&affiliation)))
@@ -355,18 +347,6 @@ pub async fn leave_jurisdiction(
 // ============================================================================
 // Helper Functions
 // ============================================================================
-
-fn parse_capability(s: &str) -> Option<MembershipCapability> {
-    match s.to_lowercase().as_str() {
-        "vote" => Some(MembershipCapability::Vote),
-        "propose" => Some(MembershipCapability::Propose),
-        "transact" => Some(MembershipCapability::Transact),
-        "holdoffice" | "hold_office" => Some(MembershipCapability::HoldOffice),
-        "accessprivate" | "access_private" => Some(MembershipCapability::AccessPrivate),
-        "sponsor" => Some(MembershipCapability::Sponsor),
-        _ => None,
-    }
-}
 
 fn parse_membership_status(s: &str) -> Option<MembershipStatus> {
     match s.to_lowercase().as_str() {

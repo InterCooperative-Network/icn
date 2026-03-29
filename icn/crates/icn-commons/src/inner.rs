@@ -1293,11 +1293,19 @@ impl CommonsInner {
     /// Sybil resistance: requires at least `POPLevel::Strong` to apply.
     /// This prevents an attacker from creating many `Weak`-level identities
     /// to flood jurisdiction membership rolls.
+    /// Submit a membership application for a jurisdiction.
+    ///
+    /// Creates a `Candidate` affiliation with no capabilities.  Capabilities are
+    /// jurisdiction-granted — they are never accepted from the applicant.  Baseline
+    /// member capabilities (`Vote`, `Propose`, `Transact`) are granted automatically
+    /// when the jurisdiction promotes the candidate to full `Member` via
+    /// `promote_member`.  Elevated capabilities (e.g., `HoldOffice`) must be
+    /// explicitly delegated through the `grant_capability` path after membership
+    /// is established.
     pub async fn apply_for_membership(
         &self,
         holder_id: &str,
         jurisdiction_id: JurisdictionId,
-        capabilities_requested: Vec<MembershipCapability>,
     ) -> Result<Affiliation> {
         // Verify holder exists and is active
         let mut holder = self
@@ -1327,12 +1335,8 @@ impl CommonsInner {
             bail!("Previously banned from jurisdiction: {jurisdiction_id}");
         }
 
-        // Create affiliation as candidate
-        let mut affiliation = Affiliation::new(jurisdiction_id.clone());
-        // Store requested capabilities for review
-        for cap in capabilities_requested {
-            affiliation.add_capability(cap);
-        }
+        // Create affiliation as candidate — no capabilities granted at application time.
+        let affiliation = Affiliation::new(jurisdiction_id.clone());
 
         // Add to holder
         holder.add_affiliation(affiliation.clone());
