@@ -411,8 +411,8 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use actix_web::{test, App, HttpMessage};
     use crate::auth::TokenClaims;
+    use actix_web::{test, App, HttpMessage};
 
     #[actix_web::test]
     async fn test_get_holder_not_found() {
