@@ -411,7 +411,8 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use actix_web::{test, App};
+    use actix_web::{test, App, HttpMessage};
+    use crate::auth::TokenClaims;
 
     #[actix_web::test]
     async fn test_get_holder_not_found() {
@@ -427,11 +428,22 @@ mod tests {
         let keypair = icn_identity::KeyPair::generate().unwrap();
         let did = keypair.did().to_string();
 
+        // Inject claims directly into request extensions — the canonical test bypass
+        // for handlers that call get_claims(). No holder exists for this DID, so the
+        // handler should return 404 after auth passes.
+        let claims = TokenClaims {
+            sub: did.clone(),
+            iat: 1_000_000_000,
+            exp: 9_999_999_999,
+            coop_id: "test-coop".to_string(),
+            scopes: vec![],
+        };
         let req = test::TestRequest::get()
             .uri(&format!("/v1/commons/holder/{did}"))
             .to_request();
-        let resp = test::call_service(&app, req).await;
+        req.extensions_mut().insert(claims);
 
+        let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), actix_web::http::StatusCode::NOT_FOUND);
     }
 }
