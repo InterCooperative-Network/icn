@@ -1,20 +1,22 @@
 //! Authority enforcement integration tests.
 //!
-//! These tests prove the authority model implemented in Tranche 5:
+//! These tests prove the authority model implemented in Tranche 5 and cleaned up
+//! in Tranche 6:
 //!
 //! **Rule**: A caller may only perform membership/governance mutations on a
-//! cooperative/jurisdiction they govern.  Holding office in `coop:alpha` does
-//! NOT confer authority over `coop:beta`.
+//! cooperative/jurisdiction where they hold a delegated capability.  Holding
+//! office in `coop:alpha` does NOT confer authority over `coop:beta`.
 //!
 //! Every test that exercises cross-domain rejection is marked with the pattern
-//! it closes: "coop:A admin cannot act on coop:B".
+//! it closes: "office-holder in coop:A cannot act on coop:B".
 //!
 //! ## What is tested
-//! - `member_has_capability` (the primitive that `require_jurisdiction_authority`
-//!   delegates to) enforces exact-domain isolation for `HoldOffice`.
-//! - A member with `HoldOffice` in domain A does NOT satisfy the check for
+//! - `member_has_capability` (the primitive that `require_office_in_jurisdiction`
+//!   and `require_membership_in_jurisdiction` delegate to) enforces exact-domain
+//!   isolation for `HoldOffice` and `Vote` respectively.
+//! - A member with `HoldOffice` in domain A does NOT satisfy the office check for
 //!   domain B (cross-domain isolation).
-//! - A member without `HoldOffice` in any domain cannot pass the check.
+//! - A member without `HoldOffice` in any domain cannot pass the office check.
 //! - The check returns `true` only for the exact jurisdiction the capability
 //!   was granted in.
 //! - Membership state mutations (promote, suspend, grant capability) succeed
@@ -22,8 +24,8 @@
 //!   who is only authorized in a different domain.
 //!
 //! ## Layer under test
-//! The `require_jurisdiction_authority` helper in the membership and steward
-//! handlers calls `CommonsManager::get_holder_by_did` and
+//! The `require_office_in_jurisdiction` and `require_membership_in_jurisdiction`
+//! helpers in `crate::authority` call `CommonsManager::get_holder_by_did` and
 //! `CommonsManager::member_has_capability`.  Both are tested here at the
 //! CommonsManager level, which is the substrate the handlers rely on.
 
@@ -90,7 +92,7 @@ async fn grant_hold_office(mgr: &CommonsManager, holder_id: &str, domain_id: &st
 
 /// Baseline: a holder with HoldOffice in their own domain satisfies the authority check.
 #[actix_web::test]
-async fn authority_check_passes_for_valid_jurisdiction_admin() {
+async fn authority_check_passes_for_jurisdiction_office_holder() {
     let mgr = CommonsManager::new();
     create_charter(&mgr, "coop:alpha").await;
 
@@ -191,7 +193,7 @@ async fn authority_check_cross_domain_rejected() {
 }
 
 /// Cross-domain isolation with explicit beta enrollment (no HoldOffice there):
-/// being a plain member of both coops does not grant admin rights in either.
+/// being a plain member of both coops does not grant HoldOffice authority in either.
 #[actix_web::test]
 async fn authority_check_membership_without_hold_office_cross_domain() {
     let mgr = CommonsManager::new();
@@ -254,10 +256,10 @@ async fn authority_check_revoked_capability_is_absent() {
     );
 }
 
-/// Mutation semantics: an authorized admin can promote a target member;
-/// the target's status changes as expected.
+/// Mutation semantics: an office-holder in a jurisdiction can promote a target
+/// member; the target's status changes as expected.
 #[actix_web::test]
-async fn authorized_admin_can_promote_member_in_own_domain() {
+async fn office_holder_can_promote_member_in_own_domain() {
     let mgr = CommonsManager::new();
     create_charter(&mgr, "coop:alpha").await;
 
@@ -301,14 +303,14 @@ async fn authorized_admin_can_promote_member_in_own_domain() {
     );
 }
 
-/// Cross-domain isolation for mutations: an admin in coop:alpha cannot
-/// meaningfully claim authority to act on coop:beta.
+/// Cross-domain isolation for mutations: an office-holder in coop:alpha cannot
+/// claim authority to act on coop:beta.
 ///
-/// This directly proves the `require_jurisdiction_authority` pre-condition:
+/// This directly proves the `require_office_in_jurisdiction` pre-condition:
 /// a caller from domain A will fail the HoldOffice check for domain B
 /// before the underlying mutation method is even invoked.
 #[actix_web::test]
-async fn cross_domain_admin_cannot_satisfy_authority_for_other_domain() {
+async fn cross_domain_office_holder_cannot_act_on_other_domain() {
     let mgr = CommonsManager::new();
     create_charter(&mgr, "coop:alpha").await;
     create_charter(&mgr, "coop:beta").await;
@@ -331,6 +333,126 @@ async fn cross_domain_admin_cannot_satisfy_authority_for_other_domain() {
 
     assert!(
         !has_beta_authority,
-        "coop:alpha admin must fail authority check for coop:beta — the handler rejects before mutation"
+        "coop:alpha office-holder must fail authority check for coop:beta — the handler rejects before mutation"
+    );
+}
+
+// ─── Dispute-Filing Authority Tests ─────────────────────────────────────────
+//
+// These tests cover the member-standing gate used by `record_dispute`.
+// Filing a dispute requires full `Member` status in the steward's jurisdiction,
+// NOT `HoldOffice`.  The gate checks membership status directly (not a
+// capability) because capabilities are not auto-granted during the enrollment
+// flow — status is the authoritative marker for full membership.
+
+/// A full member (Member status) in the steward's jurisdiction has
+/// member-standing and can satisfy the dispute-filing check.
+#[actix_web::test]
+async fn full_member_has_standing_to_file_dispute() {
+    let mgr = CommonsManager::new();
+    create_charter(&mgr, "coop:alpha").await;
+
+    let (_did, member_id) = create_holder(&mgr).await;
+    enroll_member(&mgr, &member_id, "coop:alpha").await;
+    // enroll_member applies + approves + promotes → status is Member
+
+    let holder = mgr.get_holder(&member_id).await.unwrap().unwrap();
+    let jurisdiction = JurisdictionId::new("coop:alpha");
+    let affiliation = holder
+        .get_affiliation(&jurisdiction)
+        .expect("must have affiliation");
+
+    assert_eq!(
+        format!("{}", affiliation.membership_status),
+        "Member",
+        "Full member must have Member status — required for dispute-filing standing"
+    );
+}
+
+/// An unenrolled outsider has no affiliation and must be rejected by the
+/// dispute-filing check.
+#[actix_web::test]
+async fn outsider_lacks_standing_to_file_dispute() {
+    let mgr = CommonsManager::new();
+    create_charter(&mgr, "coop:alpha").await;
+
+    let (_did, outsider_id) = create_holder(&mgr).await;
+    // outsider is never enrolled — no affiliation in any jurisdiction
+
+    let holder = mgr.get_holder(&outsider_id).await.unwrap().unwrap();
+    let jurisdiction = JurisdictionId::new("coop:alpha");
+    let affiliation = holder.get_affiliation(&jurisdiction);
+
+    assert!(
+        affiliation.is_none(),
+        "Unenrolled outsider must have no affiliation — cannot satisfy dispute-filing standing"
+    );
+}
+
+/// Cross-jurisdiction: Member status in coop:alpha does NOT confer standing in
+/// coop:beta.  A member of one cooperative cannot file disputes against stewards
+/// in another cooperative's jurisdiction.
+#[actix_web::test]
+async fn cross_domain_member_cannot_file_dispute_in_other_jurisdiction() {
+    let mgr = CommonsManager::new();
+    create_charter(&mgr, "coop:alpha").await;
+    create_charter(&mgr, "coop:beta").await;
+
+    let (_did, alpha_member_id) = create_holder(&mgr).await;
+    enroll_member(&mgr, &alpha_member_id, "coop:alpha").await;
+
+    let holder = mgr.get_holder(&alpha_member_id).await.unwrap().unwrap();
+    let alpha = JurisdictionId::new("coop:alpha");
+    let beta = JurisdictionId::new("coop:beta");
+
+    // Is a full member in alpha
+    let alpha_affiliation = holder
+        .get_affiliation(&alpha)
+        .expect("must have alpha affiliation");
+    assert_eq!(
+        format!("{}", alpha_affiliation.membership_status),
+        "Member",
+        "Precondition: must be a full member in own jurisdiction"
+    );
+
+    // Has no affiliation in beta at all
+    assert!(
+        holder.get_affiliation(&beta).is_none(),
+        "Member of coop:alpha must have no affiliation in coop:beta — cross-domain dispute standing is prohibited"
+    );
+}
+
+/// Dispute filing does NOT require HoldOffice — a plain member satisfies the
+/// standing check; `HoldOffice` is only required for governance mutations.
+#[actix_web::test]
+async fn plain_member_without_hold_office_can_satisfy_dispute_standing() {
+    let mgr = CommonsManager::new();
+    create_charter(&mgr, "coop:alpha").await;
+
+    let (_did, member_id) = create_holder(&mgr).await;
+    enroll_member(&mgr, &member_id, "coop:alpha").await;
+    // No HoldOffice granted — plain full member
+
+    let jurisdiction = JurisdictionId::new("coop:alpha");
+
+    // Has Member status (dispute standing)
+    let holder = mgr.get_holder(&member_id).await.unwrap().unwrap();
+    let affiliation = holder
+        .get_affiliation(&jurisdiction)
+        .expect("must have affiliation");
+    assert_eq!(
+        format!("{}", affiliation.membership_status),
+        "Member",
+        "Plain member must have Member status for dispute-filing standing"
+    );
+
+    // Does NOT have HoldOffice (governance gate requires explicit grant)
+    let has_office = mgr
+        .member_has_capability(&member_id, &jurisdiction, MembershipCapability::HoldOffice)
+        .await
+        .unwrap_or(false);
+    assert!(
+        !has_office,
+        "Plain member must NOT have HoldOffice — dispute filing and governance mutations are separate authority levels"
     );
 }

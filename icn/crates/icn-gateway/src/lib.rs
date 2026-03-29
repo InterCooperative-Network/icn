@@ -24,6 +24,7 @@ rust_i18n::i18n!("locales", fallback = "en");
 pub mod api;
 pub mod audit;
 pub mod auth;
+pub(crate) mod authority;
 pub mod commons_mgr;
 pub mod commons_store;
 pub mod community_mgr;

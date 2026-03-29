@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use utoipa::ToSchema;
 
+use crate::authority::require_office_in_jurisdiction;
 use crate::commons_mgr::CommonsManager;
 use crate::error::{GatewayError, Result};
 use crate::middleware::get_claims;
@@ -104,47 +105,6 @@ impl Cursored for MemberResponse {
     fn cursor_id(&self) -> &str {
         &self.holder_id
     }
-}
-
-// ============================================================================
-// Authority Helpers
-// ============================================================================
-
-/// Verify that `caller_did` holds the `HoldOffice` capability in `jurisdiction`.
-///
-/// This is the canonical authority gate for all membership admin operations.
-/// Returns `Err(GatewayError::AuthorizationFailed)` with a clear message when
-/// the caller is not a holder or lacks the required capability.
-async fn require_jurisdiction_authority(
-    commons_manager: &CommonsManager,
-    caller_did: &Did,
-    jurisdiction: &JurisdictionId,
-) -> Result<()> {
-    let caller_holder = commons_manager
-        .get_holder_by_did(caller_did)
-        .await
-        .map_err(|e| GatewayError::InternalError(e.to_string()))?
-        .ok_or_else(|| {
-            GatewayError::AuthorizationFailed("Caller is not a commons holder".to_string())
-        })?;
-
-    let holder_id_hex = hex::encode(caller_holder.holder_id);
-    let has_authority = commons_manager
-        .member_has_capability(
-            &holder_id_hex,
-            jurisdiction,
-            MembershipCapability::HoldOffice,
-        )
-        .await
-        .unwrap_or(false);
-
-    if !has_authority {
-        return Err(GatewayError::AuthorizationFailed(format!(
-            "Caller does not hold office in '{jurisdiction}' (HoldOffice capability required)"
-        )));
-    }
-
-    Ok(())
 }
 
 fn parse_capability(s: &str) -> Option<MembershipCapability> {
@@ -286,31 +246,7 @@ pub async fn approve_membership(
         .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
 
     let jurisdiction_id = JurisdictionId::new(&body.jurisdiction_id);
-
-    // Authorization: Caller must have HoldOffice capability in the jurisdiction
-    let caller_holder = commons_manager
-        .get_holder_by_did(&caller_did)
-        .await
-        .map_err(|e| GatewayError::InternalError(e.to_string()))?
-        .ok_or_else(|| {
-            GatewayError::AuthorizationFailed("Caller is not a commons holder".to_string())
-        })?;
-
-    let holder_id_hex = hex::encode(caller_holder.holder_id);
-    let has_authority = commons_manager
-        .member_has_capability(
-            &holder_id_hex,
-            &jurisdiction_id,
-            MembershipCapability::HoldOffice,
-        )
-        .await
-        .unwrap_or(false);
-
-    if !has_authority {
-        return Err(GatewayError::AuthorizationFailed(
-            "Caller does not have admin rights (HoldOffice capability required)".to_string(),
-        ));
-    }
+    require_office_in_jurisdiction(&commons_manager, &caller_did, &jurisdiction_id).await?;
 
     commons_manager
         .approve_membership(&body.holder_id, &jurisdiction_id)
@@ -340,7 +276,7 @@ pub async fn promote_member(
         .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
 
     let jurisdiction_id = JurisdictionId::new(&body.jurisdiction_id);
-    require_jurisdiction_authority(&commons_manager, &caller_did, &jurisdiction_id).await?;
+    require_office_in_jurisdiction(&commons_manager, &caller_did, &jurisdiction_id).await?;
 
     commons_manager
         .promote_member(&body.holder_id, &jurisdiction_id)
@@ -370,7 +306,7 @@ pub async fn suspend_member(
         .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
 
     let jurisdiction_id = JurisdictionId::new(&body.jurisdiction_id);
-    require_jurisdiction_authority(&commons_manager, &caller_did, &jurisdiction_id).await?;
+    require_office_in_jurisdiction(&commons_manager, &caller_did, &jurisdiction_id).await?;
 
     commons_manager
         .suspend_member(&body.holder_id, &jurisdiction_id)
@@ -400,7 +336,7 @@ pub async fn reinstate_member(
         .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
 
     let jurisdiction_id = JurisdictionId::new(&body.jurisdiction_id);
-    require_jurisdiction_authority(&commons_manager, &caller_did, &jurisdiction_id).await?;
+    require_office_in_jurisdiction(&commons_manager, &caller_did, &jurisdiction_id).await?;
 
     commons_manager
         .reinstate_member(&body.holder_id, &jurisdiction_id)
@@ -430,7 +366,7 @@ pub async fn ban_member(
         .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
 
     let jurisdiction_id = JurisdictionId::new(&body.jurisdiction_id);
-    require_jurisdiction_authority(&commons_manager, &authority, &jurisdiction_id).await?;
+    require_office_in_jurisdiction(&commons_manager, &authority, &jurisdiction_id).await?;
 
     let reason = if let Some(summary) = &body.evidence_summary {
         CommonsRevocationReason::PolicyViolation {
@@ -472,7 +408,7 @@ pub async fn revoke_membership(
         .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
 
     let jurisdiction_id = JurisdictionId::new(&body.jurisdiction_id);
-    require_jurisdiction_authority(&commons_manager, &authority, &jurisdiction_id).await?;
+    require_office_in_jurisdiction(&commons_manager, &authority, &jurisdiction_id).await?;
 
     let reason = if let Some(policy) = &body.policy_ref {
         CommonsRevocationReason::PolicyViolation {
@@ -525,7 +461,7 @@ pub async fn grant_capability(
         .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
 
     let jurisdiction_id = JurisdictionId::new(&body.jurisdiction_id);
-    require_jurisdiction_authority(&commons_manager, &caller_did, &jurisdiction_id).await?;
+    require_office_in_jurisdiction(&commons_manager, &caller_did, &jurisdiction_id).await?;
 
     let capability = parse_capability(&body.capability)
         .ok_or_else(|| GatewayError::BadRequest("Invalid capability".to_string()))?;
@@ -558,7 +494,7 @@ pub async fn revoke_capability(
         .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
 
     let jurisdiction_id = JurisdictionId::new(&body.jurisdiction_id);
-    require_jurisdiction_authority(&commons_manager, &caller_did, &jurisdiction_id).await?;
+    require_office_in_jurisdiction(&commons_manager, &caller_did, &jurisdiction_id).await?;
 
     let capability = parse_capability(&body.capability)
         .ok_or_else(|| GatewayError::BadRequest("Invalid capability".to_string()))?;
@@ -621,7 +557,7 @@ pub async fn add_role(
         .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
 
     let jurisdiction_id = JurisdictionId::new(&body.jurisdiction_id);
-    require_jurisdiction_authority(&commons_manager, &caller_did, &jurisdiction_id).await?;
+    require_office_in_jurisdiction(&commons_manager, &caller_did, &jurisdiction_id).await?;
 
     commons_manager
         .add_member_role(&body.holder_id, &jurisdiction_id, body.role.clone())
@@ -651,7 +587,7 @@ pub async fn remove_role(
         .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
 
     let jurisdiction_id = JurisdictionId::new(&body.jurisdiction_id);
-    require_jurisdiction_authority(&commons_manager, &caller_did, &jurisdiction_id).await?;
+    require_office_in_jurisdiction(&commons_manager, &caller_did, &jurisdiction_id).await?;
 
     commons_manager
         .remove_member_role(&body.holder_id, &jurisdiction_id, &body.role)

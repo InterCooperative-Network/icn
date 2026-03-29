@@ -12,57 +12,17 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use utoipa::ToSchema;
 
+use crate::authority::{require_membership_in_jurisdiction, require_office_in_jurisdiction};
 use crate::commons_mgr::{steward_to_detail, steward_to_summary, CommonsManager};
 use crate::error::{GatewayError, Result};
 use crate::middleware::get_claims;
-use icn_identity::{Did, JurisdictionId, MembershipCapability};
+use icn_identity::{Did, JurisdictionId};
 
 // ============================================================================
 // Response/Request DTOs
 // ============================================================================
 
 pub use crate::models::{StewardDetailResponse, StewardSummaryResponse};
-
-// ============================================================================
-// Authority Helpers
-// ============================================================================
-
-/// Verify that `caller_did` holds the `HoldOffice` capability in `jurisdiction`.
-///
-/// Mirrors the pattern used in membership handlers. Returns
-/// `Err(GatewayError::AuthorizationFailed)` when the caller is not a holder or
-/// lacks the required capability.
-async fn require_jurisdiction_authority(
-    commons_manager: &CommonsManager,
-    caller_did: &Did,
-    jurisdiction: &JurisdictionId,
-) -> Result<()> {
-    let caller_holder = commons_manager
-        .get_holder_by_did(caller_did)
-        .await
-        .map_err(|e| GatewayError::InternalError(e.to_string()))?
-        .ok_or_else(|| {
-            GatewayError::AuthorizationFailed("Caller is not a commons holder".to_string())
-        })?;
-
-    let holder_id_hex = hex::encode(caller_holder.holder_id);
-    let has_authority = commons_manager
-        .member_has_capability(
-            &holder_id_hex,
-            jurisdiction,
-            MembershipCapability::HoldOffice,
-        )
-        .await
-        .unwrap_or(false);
-
-    if !has_authority {
-        return Err(GatewayError::AuthorizationFailed(format!(
-            "Caller does not hold office in '{jurisdiction}' (HoldOffice capability required)"
-        )));
-    }
-
-    Ok(())
-}
 
 /// Register steward request
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -286,7 +246,7 @@ pub async fn update_steward_status(
             )
         })?;
 
-    require_jurisdiction_authority(&commons_manager, &caller_did, &jurisdiction_id).await?;
+    require_office_in_jurisdiction(&commons_manager, &caller_did, &jurisdiction_id).await?;
 
     let _steward = steward;
 
@@ -431,7 +391,7 @@ pub async fn extend_steward_term(
             )
         })?;
 
-    require_jurisdiction_authority(&commons_manager, &caller_did, &jurisdiction_id).await?;
+    require_office_in_jurisdiction(&commons_manager, &caller_did, &jurisdiction_id).await?;
 
     // Calculate new term end
     let additional_secs = body.additional_days * 24 * 60 * 60;
@@ -656,16 +616,47 @@ pub async fn record_attestation(
 }
 
 /// POST /v1/steward/{id}/dispute - Record a dispute against the steward
+///
+/// Dispute filing is a member-standing action: any full member of the steward's
+/// jurisdiction may report a concern, but unenrolled outsiders cannot inflate a
+/// steward's dispute count.  Requires `Vote` capability in the steward's
+/// jurisdiction — does NOT require `HoldOffice`.
 #[post("/{steward_id}/dispute")]
 pub async fn record_dispute(
     http_req: HttpRequest,
     path: web::Path<String>,
     commons_manager: web::Data<Arc<CommonsManager>>,
 ) -> Result<HttpResponse> {
-    let _claims = get_claims(&http_req)
+    let claims = get_claims(&http_req)
         .ok_or_else(|| GatewayError::AuthenticationFailed("Authentication required".to_string()))?;
 
+    let caller_did: Did = claims
+        .sub
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
+
     let steward_id = path.into_inner();
+
+    // Resolve jurisdiction from steward record before mutating
+    let steward = commons_manager
+        .get_steward(&steward_id)
+        .await
+        .map_err(|e| GatewayError::InternalError(e.to_string()))?
+        .ok_or_else(|| GatewayError::NotFound("Steward not found".to_string()))?;
+
+    let jurisdiction_id = steward
+        .jurisdiction
+        .as_ref()
+        .map(|j| JurisdictionId(j.clone()))
+        .ok_or_else(|| {
+            GatewayError::BadRequest(
+                "Steward has no jurisdiction; cannot verify member standing".to_string(),
+            )
+        })?;
+
+    // Require member-standing in the steward's jurisdiction (Vote capability).
+    // Outsiders cannot file disputes — only enrolled members with voting rights.
+    require_membership_in_jurisdiction(&commons_manager, &caller_did, &jurisdiction_id).await?;
 
     commons_manager
         .record_steward_dispute(&steward_id)
@@ -725,7 +716,7 @@ pub async fn record_dispute_won(
             )
         })?;
 
-    require_jurisdiction_authority(&commons_manager, &caller_did, &jurisdiction_id).await?;
+    require_office_in_jurisdiction(&commons_manager, &caller_did, &jurisdiction_id).await?;
 
     commons_manager
         .record_steward_dispute_won(&steward_id)
