@@ -146,11 +146,17 @@ pub async fn get_commons_status(
 // ============================================================================
 
 /// GET /v1/commons/holder/{did} - Get holder by DID
+///
+/// Authentication required. Returns the holder record for the given DID.
 #[get("/holder/{did}")]
 pub async fn get_holder_by_did(
+    http_req: HttpRequest,
     path: web::Path<String>,
     commons_manager: web::Data<Arc<CommonsManager>>,
 ) -> Result<HttpResponse> {
+    let _claims = get_claims(&http_req)
+        .ok_or_else(|| GatewayError::AuthenticationFailed("Authentication required".to_string()))?;
+
     let did_str = path.into_inner();
     let did = did_str
         .parse::<Did>()
@@ -166,11 +172,17 @@ pub async fn get_holder_by_did(
 }
 
 /// GET /v1/commons/holder/id/{holder_id} - Get holder by ID
+///
+/// Authentication required. Returns the holder record for the given internal ID.
 #[get("/holder/id/{holder_id}")]
 pub async fn get_holder_by_id(
+    http_req: HttpRequest,
     path: web::Path<String>,
     commons_manager: web::Data<Arc<CommonsManager>>,
 ) -> Result<HttpResponse> {
+    let _claims = get_claims(&http_req)
+        .ok_or_else(|| GatewayError::AuthenticationFailed("Authentication required".to_string()))?;
+
     let holder_id = path.into_inner();
 
     let holder = commons_manager
@@ -200,15 +212,35 @@ fn holder_to_response(holder: &CommonsHolderRecord) -> HolderDetailResponse {
 // ============================================================================
 
 /// GET /v1/commons/holder/{did}/affiliations - List affiliations
+///
+/// Self-only: caller must be the holder being queried. A holder's full
+/// affiliation history is personal — it reveals which cooperatives and
+/// jurisdictions they belong to, their capabilities in each, and their
+/// membership timeline.
+///
+/// Use `GET /v1/membership/list/{jurisdiction}` to enumerate a
+/// jurisdiction's roster (requires member standing in that jurisdiction).
 #[get("/holder/{did}/affiliations")]
 pub async fn list_affiliations(
+    http_req: HttpRequest,
     path: web::Path<String>,
     commons_manager: web::Data<Arc<CommonsManager>>,
 ) -> Result<HttpResponse> {
+    let claims = get_claims(&http_req)
+        .ok_or_else(|| GatewayError::AuthenticationFailed("Authentication required".to_string()))?;
+
     let did_str = path.into_inner();
     let did = did_str
         .parse::<Did>()
         .map_err(|e| GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
+
+    // Self-only: affiliation history spans all jurisdictions and must not be
+    // enumerable by arbitrary callers.
+    if claims.sub != did.to_string() {
+        return Err(GatewayError::AuthorizationFailed(
+            "Can only list affiliations for your own identity".to_string(),
+        ));
+    }
 
     let holder = commons_manager
         .get_holder_by_did(&did)

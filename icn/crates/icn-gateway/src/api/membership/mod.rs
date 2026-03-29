@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use utoipa::ToSchema;
 
-use crate::authority::require_office_in_jurisdiction;
+use crate::authority::{require_membership_in_jurisdiction, require_office_in_jurisdiction};
 use crate::commons_mgr::CommonsManager;
 use crate::error::{GatewayError, Result};
 use crate::middleware::get_claims;
@@ -615,10 +615,20 @@ pub async fn list_members(
     query: web::Query<ListMembersQuery>,
     commons_manager: web::Data<Arc<CommonsManager>>,
 ) -> Result<HttpResponse> {
-    let _claims = get_claims(&http_req)
+    let claims = get_claims(&http_req)
         .ok_or_else(|| GatewayError::AuthenticationFailed("Authentication required".to_string()))?;
 
     let jurisdiction_id = JurisdictionId::new(path.into_inner());
+
+    // Require the caller to be a full member of the jurisdiction whose roster
+    // they are requesting. Any authenticated user could otherwise enumerate the
+    // membership of any cooperative — including capabilities (HoldOffice etc.)
+    // for every member — without any standing in that cooperative.
+    let caller_did = claims
+        .sub
+        .parse::<Did>()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
+    require_membership_in_jurisdiction(&commons_manager, &caller_did, &jurisdiction_id).await?;
 
     let status_filter = query
         .status
