@@ -258,10 +258,6 @@ components:
       required:
       - jurisdiction_id
       properties:
-        capabilities_requested:
-          type: array
-          items:
-            type: string
         jurisdiction_id:
           type: string
     BanMemberRequest:
