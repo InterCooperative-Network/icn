@@ -1,6 +1,6 @@
 //! Authority enforcement integration tests.
 //!
-//! These tests prove the authority model implemented in Tranches 5–8:
+//! These tests prove the authority model implemented in Tranches 5–9:
 //!
 //! **Rule**: A caller may only perform membership/governance mutations on a
 //! cooperative/jurisdiction where they hold a delegated capability.  Holding
@@ -608,5 +608,83 @@ async fn hold_office_requires_explicit_delegation_not_enrollment() {
     assert!(
         after,
         "HoldOffice must be present after explicit delegation"
+    );
+}
+
+/// Tranche 9: join_jurisdiction rejects elevated capabilities at enrollment time.
+///
+/// `initial_capabilities` may only contain baseline capabilities (`Vote`,
+/// `Propose`, `Transact`). Attempting to seed an elevated capability
+/// (`HoldOffice`, `AccessPrivate`, `Sponsor`) via the enrollment path must
+/// return an error so that authority always flows from jurisdictional
+/// delegation, not from the caller's requested capabilities.
+#[actix_web::test]
+async fn join_jurisdiction_rejects_elevated_initial_capabilities() {
+    let mgr = CommonsManager::new();
+    create_charter(&mgr, "coop:guard-test").await;
+
+    let (_did, holder_id) = create_holder(&mgr).await;
+    let jurisdiction = JurisdictionId::new("coop:guard-test");
+
+    // Attempting to seed HoldOffice must fail at the inner guard
+    let result = mgr
+        .join_jurisdiction(
+            &holder_id,
+            jurisdiction.clone(),
+            vec![MembershipCapability::HoldOffice],
+        )
+        .await;
+    assert!(
+        result.is_err(),
+        "join_jurisdiction must reject HoldOffice in initial_capabilities"
+    );
+
+    // AccessPrivate is similarly rejected
+    let result = mgr
+        .join_jurisdiction(
+            &holder_id,
+            jurisdiction.clone(),
+            vec![MembershipCapability::AccessPrivate],
+        )
+        .await;
+    assert!(
+        result.is_err(),
+        "join_jurisdiction must reject AccessPrivate in initial_capabilities"
+    );
+
+    // Sponsor is similarly rejected
+    let result = mgr
+        .join_jurisdiction(
+            &holder_id,
+            jurisdiction.clone(),
+            vec![MembershipCapability::Sponsor],
+        )
+        .await;
+    assert!(
+        result.is_err(),
+        "join_jurisdiction must reject Sponsor in initial_capabilities"
+    );
+
+    // Baseline capabilities are accepted (none of these bailed → no affiliation recorded yet)
+    let result = mgr
+        .join_jurisdiction(
+            &holder_id,
+            jurisdiction.clone(),
+            vec![MembershipCapability::Vote, MembershipCapability::Transact],
+        )
+        .await;
+    assert!(
+        result.is_ok(),
+        "join_jurisdiction must accept baseline capabilities: {result:?}"
+    );
+
+    // Holder must not have HoldOffice after a baseline-seeded join
+    let has_hold_office = mgr
+        .member_has_capability(&holder_id, &jurisdiction, MembershipCapability::HoldOffice)
+        .await
+        .unwrap_or(false);
+    assert!(
+        !has_hold_office,
+        "HoldOffice must not be present after a baseline-seeded join"
     );
 }

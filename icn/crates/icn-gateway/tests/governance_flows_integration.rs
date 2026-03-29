@@ -294,21 +294,13 @@ async fn test_e2e_coop_formation() {
     // 4. Founders join the coop as members
     let jurisdiction = JurisdictionId::new("coop:e2e-test-coop");
     for (_keypair, holder_id) in &founders {
+        // Join as candidate — no capabilities seeded at join time
         commons_mgr
-            .join_jurisdiction(
-                holder_id,
-                jurisdiction.clone(),
-                vec![
-                    MembershipCapability::Vote,
-                    MembershipCapability::Propose,
-                    MembershipCapability::Transact,
-                    MembershipCapability::HoldOffice,
-                ],
-            )
+            .join_jurisdiction(holder_id, jurisdiction.clone(), vec![])
             .await
             .unwrap();
 
-        // Auto-approve and promote founders
+        // Approve and promote: grants baseline capabilities (Vote, Propose, Transact)
         commons_mgr
             .approve_membership(holder_id, &jurisdiction)
             .await
@@ -318,9 +310,21 @@ async fn test_e2e_coop_formation() {
             .await
             .unwrap();
 
-        // Verify full member status
+        // Explicitly delegate elevated capability after membership is established
+        commons_mgr
+            .grant_capability(holder_id, &jurisdiction, MembershipCapability::HoldOffice)
+            .await
+            .unwrap();
+
+        // Verify full member status with explicit HoldOffice delegation
         let affiliations = commons_mgr.list_affiliations(holder_id).await.unwrap();
         assert_eq!(affiliations[0].membership_status, MembershipStatus::Member);
+        assert!(
+            affiliations[0]
+                .capabilities
+                .contains(&MembershipCapability::HoldOffice),
+            "founders must have HoldOffice after explicit delegation"
+        );
     }
 
     // 5. Enroll a new member (not a founder)

@@ -435,6 +435,14 @@ impl CommonsInner {
     /// Add an affiliation (join jurisdiction).
     ///
     /// Sybil resistance: requires at least `POPLevel::Strong` to join.
+    ///
+    /// `initial_capabilities` may only contain baseline member capabilities
+    /// (`Vote`, `Propose`, `Transact`). Elevated capabilities (`HoldOffice`,
+    /// `AccessPrivate`, `Sponsor`) must be granted via
+    /// [`Self::grant_capability`] after membership is established. Attempting
+    /// to seed an elevated capability returns an error. This invariant ensures
+    /// that authority always flows from jurisdictional delegation, not from
+    /// the enrollment path.
     pub async fn join_jurisdiction(
         &self,
         holder_id: &str,
@@ -464,6 +472,21 @@ impl CommonsInner {
                 "Already affiliated with jurisdiction: {}",
                 jurisdiction.as_str()
             );
+        }
+
+        // Guard: only baseline capabilities may be seeded at join time.
+        // Elevated capabilities (HoldOffice, AccessPrivate, Sponsor) must be
+        // granted via grant_capability after membership is established.
+        for cap in &initial_capabilities {
+            match cap {
+                MembershipCapability::Vote
+                | MembershipCapability::Propose
+                | MembershipCapability::Transact => {}
+                _ => bail!(
+                    "Elevated capability `{cap}` cannot be seeded at join time; \
+                     grant it via `grant_capability` after membership is established"
+                ),
+            }
         }
 
         // Create affiliation (starts as Candidate by default)
