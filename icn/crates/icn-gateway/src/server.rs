@@ -859,10 +859,12 @@ impl GatewayServer {
         // it is called when a Charter proposal closes with Accepted.
         //
         // on_proposal_accepted is built inline and dispatches to the appropriate
-        // subsystem based on payload type:
-        //   FreezeMember  → ledger.freeze_member_with_metadata() on domain ledger
-        //                 → commons_manager.update_affiliation_status(Suspended) on holder
-        //   (other types) → no-op until wired
+        // subsystem based on payload type (the GovernanceEffect dispatch table):
+        //   FreezeMember    → ledger.freeze_member_with_metadata() + commons Suspended
+        //   UnfreezeMember  → ledger.unfreeze_member_with_metadata() + commons Member
+        //   AppointSteward  → commons.register_steward()
+        //   RevokeSteward   → commons.revoke_steward()
+        //   (other types)   → no-op until wired
         let ledger_mgr_for_gov = ledger_manager.clone();
         let commons_mgr_for_gov = commons_manager.clone();
         let on_proposal_accepted: icn_governance_actor::http::configure::ProposalAcceptedHook =
@@ -948,6 +950,173 @@ impl GatewayServer {
                                         error = %e,
                                         did = %member,
                                         "FreezeMember: commons holder lookup failed"
+                                    );
+                                }
+                            }
+                        });
+                    }
+                    GovernanceEffect::UnfreezeMember {
+                        proposal_id,
+                        domain_id,
+                        member,
+                        reason,
+                    } => {
+                        // Side-effect 1: unfreeze member in ledger journal.
+                        let ledger_mgr = ledger_mgr_for_gov.clone();
+                        let domain_id_for_ledger = domain_id.clone();
+                        let member_for_ledger = member.clone();
+                        let reason_for_ledger = reason.clone();
+                        let proposal_id_for_ledger = proposal_id.clone();
+                        tokio::spawn(async move {
+                            match ledger_mgr.get_ledger(&domain_id_for_ledger).await {
+                                Ok(ledger_arc) => {
+                                    let mut ledger = ledger_arc.write().await;
+                                    ledger.unfreeze_member_with_metadata(
+                                        &member_for_ledger,
+                                        reason_for_ledger,
+                                        Some(proposal_id_for_ledger),
+                                        None,
+                                    );
+                                }
+                                Err(e) => {
+                                    tracing::warn!(
+                                        coop_id = %domain_id_for_ledger,
+                                        error = %e,
+                                        "UnfreezeMember governance effect: ledger not found for domain"
+                                    );
+                                }
+                            }
+                        });
+
+                        // Side-effect 2: reinstate commons affiliation to Member standing.
+                        let commons_mgr = commons_mgr_for_gov.clone();
+                        tokio::spawn(async move {
+                            use icn_identity::{JurisdictionId, MembershipStatus};
+                            let jurisdiction = JurisdictionId::new(&domain_id);
+                            match commons_mgr.get_holder_by_did(&member).await {
+                                Ok(Some(holder)) => {
+                                    let holder_id = hex::encode(holder.id());
+                                    if let Err(e) = commons_mgr
+                                        .update_affiliation_status(
+                                            &holder_id,
+                                            &jurisdiction,
+                                            MembershipStatus::Member,
+                                        )
+                                        .await
+                                    {
+                                        tracing::warn!(
+                                            error = %e,
+                                            did = %member,
+                                            jurisdiction = %domain_id,
+                                            "UnfreezeMember: failed to reinstate commons affiliation"
+                                        );
+                                    } else {
+                                        tracing::info!(
+                                            did = %member,
+                                            jurisdiction = %domain_id,
+                                            "UnfreezeMember: commons affiliation reinstated to Member"
+                                        );
+                                    }
+                                }
+                                Ok(None) => {
+                                    tracing::debug!(
+                                        did = %member,
+                                        "UnfreezeMember: member has no commons holder record, skipping reinstatement"
+                                    );
+                                }
+                                Err(e) => {
+                                    tracing::warn!(
+                                        error = %e,
+                                        did = %member,
+                                        "UnfreezeMember: commons holder lookup failed"
+                                    );
+                                }
+                            }
+                        });
+                    }
+                    GovernanceEffect::AppointSteward {
+                        proposal_id,
+                        candidate,
+                        region: _,
+                        bond_amount,
+                        term_length_seconds,
+                    } => {
+                        // Register the candidate as a steward in commons.
+                        // Requires the candidate to already have a Commons Holder record
+                        // with Strong POP level — if not enrolled, this is a no-op with a warning.
+                        // Jurisdiction is not set here: steward-to-charter binding requires a
+                        // pre-existing charter domain and is handled via separate governance.
+                        let commons_mgr = commons_mgr_for_gov.clone();
+                        tokio::spawn(async move {
+                            let term_days = term_length_seconds / 86_400;
+                            let bond = bond_amount.max(0) as u64;
+                            match commons_mgr
+                                .register_steward(
+                                    &candidate,
+                                    &candidate,
+                                    term_days,
+                                    bond,
+                                    proposal_id,
+                                    None,
+                                    vec![],
+                                )
+                                .await
+                            {
+                                Ok(_) => {
+                                    tracing::info!(
+                                        did = %candidate,
+                                        "AppointSteward: steward registered in commons"
+                                    );
+                                }
+                                Err(e) => {
+                                    tracing::warn!(
+                                        error = %e,
+                                        did = %candidate,
+                                        "AppointSteward: failed to register steward"
+                                    );
+                                }
+                            }
+                        });
+                    }
+                    GovernanceEffect::RevokeSteward {
+                        proposal_id: _,
+                        steward,
+                        reason,
+                    } => {
+                        // Revoke the steward's appointment in commons.
+                        // If no steward record exists for this DID, this is a no-op.
+                        let commons_mgr = commons_mgr_for_gov.clone();
+                        tokio::spawn(async move {
+                            match commons_mgr.get_steward_by_did(&steward).await {
+                                Ok(Some(record)) => {
+                                    let steward_id = record.id().to_hex();
+                                    if let Err(e) = commons_mgr
+                                        .revoke_steward(&steward_id, reason, vec![])
+                                        .await
+                                    {
+                                        tracing::warn!(
+                                            error = %e,
+                                            did = %steward,
+                                            "RevokeSteward: failed to revoke steward"
+                                        );
+                                    } else {
+                                        tracing::info!(
+                                            did = %steward,
+                                            "RevokeSteward: steward revoked in commons"
+                                        );
+                                    }
+                                }
+                                Ok(None) => {
+                                    tracing::debug!(
+                                        did = %steward,
+                                        "RevokeSteward: no steward record found, skipping"
+                                    );
+                                }
+                                Err(e) => {
+                                    tracing::warn!(
+                                        error = %e,
+                                        did = %steward,
+                                        "RevokeSteward: steward lookup failed"
                                     );
                                 }
                             }
