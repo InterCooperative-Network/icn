@@ -1049,6 +1049,15 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
                         reason: reason.clone(),
                     }
                 }
+                // Charter acceptance: emit DeployCharter so the gateway registers
+                // the domain in the commons charter store. domain_id == charter_id
+                // per governance convention.
+                icn_governance::ProposalPayload::Charter { charter_id, .. } => {
+                    GovernanceEffect::DeployCharter {
+                        proposal_id: proposal.id.0.clone(),
+                        charter_id: charter_id.clone(),
+                    }
+                }
                 icn_governance::ProposalPayload::Sdis { proposal: ref sdis } => match sdis {
                     icn_governance::sdis::SdisProposal::AppointSteward {
                         candidate,
@@ -1058,6 +1067,7 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
                         ..
                     } => GovernanceEffect::AppointSteward {
                         proposal_id: proposal.id.0.clone(),
+                        domain_id: proposal.domain_id.0.clone(),
                         candidate: candidate.clone(),
                         region: region.clone(),
                         bond_amount: *bond_amount,

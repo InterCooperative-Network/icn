@@ -862,7 +862,8 @@ impl GatewayServer {
         // subsystem based on payload type (the GovernanceEffect dispatch table):
         //   FreezeMember    → ledger.freeze_member_with_metadata() + commons Suspended
         //   UnfreezeMember  → ledger.unfreeze_member_with_metadata() + commons Member
-        //   AppointSteward  → commons.register_steward()
+        //   DeployCharter   → commons.store_charter() (minimal stub, enables jurisdiction binding)
+        //   AppointSteward  → commons.register_steward(jurisdiction = domain_id)
         //   RevokeSteward   → commons.revoke_steward()
         //   (other types)   → no-op until wired
         let ledger_mgr_for_gov = ledger_manager.clone();
@@ -1034,18 +1035,68 @@ impl GatewayServer {
                             }
                         });
                     }
+                    GovernanceEffect::DeployCharter {
+                        proposal_id: _,
+                        charter_id,
+                    } => {
+                        // Register a minimal Charter record in commons so the domain is
+                        // known to the commons layer.  This is required before any
+                        // AppointSteward effect can bind a steward to this domain as a
+                        // jurisdiction.  If a charter already exists for this domain
+                        // (e.g. created via the HTTP charter API), this is a no-op.
+                        let commons_mgr = commons_mgr_for_gov.clone();
+                        tokio::spawn(async move {
+                            use icn_governance::{
+                                Charter, DisputePolicy, GovernanceConfig, MembershipPolicy, OrgType,
+                            };
+                            let charter = Charter::new(
+                                OrgType::Cooperative,
+                                charter_id.clone(),
+                                charter_id.clone(),
+                                GovernanceConfig::cooperative_default(),
+                                MembershipPolicy::default(),
+                                DisputePolicy::default(),
+                            );
+                            match commons_mgr.store_charter(charter).await {
+                                Ok(()) => {
+                                    tracing::info!(
+                                        domain = %charter_id,
+                                        "DeployCharter: commons charter registered for domain"
+                                    );
+                                }
+                                Err(e) => {
+                                    // "already exists" is acceptable (HTTP charter API may have
+                                    // pre-registered the domain); log other errors as warnings.
+                                    if e.to_string().contains("already exists") {
+                                        tracing::debug!(
+                                            domain = %charter_id,
+                                            "DeployCharter: commons charter already exists for domain, skipping"
+                                        );
+                                    } else {
+                                        tracing::warn!(
+                                            error = %e,
+                                            domain = %charter_id,
+                                            "DeployCharter: failed to register commons charter"
+                                        );
+                                    }
+                                }
+                            }
+                        });
+                    }
                     GovernanceEffect::AppointSteward {
                         proposal_id,
+                        domain_id,
                         candidate,
                         region: _,
                         bond_amount,
                         term_length_seconds,
                     } => {
-                        // Register the candidate as a steward in commons.
-                        // Requires the candidate to already have a Commons Holder record
-                        // with Strong POP level — if not enrolled, this is a no-op with a warning.
-                        // Jurisdiction is not set here: steward-to-charter binding requires a
-                        // pre-existing charter domain and is handled via separate governance.
+                        // Register the candidate as a steward in commons, scoped to the
+                        // governance domain that approved the appointment.  The domain must
+                        // have a ratified charter (via DeployCharter) for the jurisdiction
+                        // binding to succeed.
+                        // If the candidate has no Commons Holder record or the charter is not
+                        // yet registered, register_steward returns Err and we log a warning.
                         let commons_mgr = commons_mgr_for_gov.clone();
                         tokio::spawn(async move {
                             let term_days = term_length_seconds / 86_400;
@@ -1057,7 +1108,7 @@ impl GatewayServer {
                                     term_days,
                                     bond,
                                     proposal_id,
-                                    None,
+                                    Some(domain_id.clone()),
                                     vec![],
                                 )
                                 .await
@@ -1065,6 +1116,7 @@ impl GatewayServer {
                                 Ok(_) => {
                                     tracing::info!(
                                         did = %candidate,
+                                        jurisdiction = %domain_id,
                                         "AppointSteward: steward registered in commons"
                                     );
                                 }
@@ -1072,6 +1124,7 @@ impl GatewayServer {
                                     tracing::warn!(
                                         error = %e,
                                         did = %candidate,
+                                        jurisdiction = %domain_id,
                                         "AppointSteward: failed to register steward"
                                     );
                                 }
