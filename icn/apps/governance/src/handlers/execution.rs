@@ -271,7 +271,7 @@ pub fn translate_payload_to_effects(
         // The budget_id includes the decision_receipt_id to prevent collision across
         // allocation rounds with the same purpose string.
         //
-        // NOTE: treasury_did is String::new() — filled by caller context, same pattern
+        // NOTE: treasury_did is wired from domain_id (caller context), same pattern
         // as Budget and other treasury translations.
         ProposalPayload::Allocation {
             pool_amount,

@@ -99,6 +99,8 @@ pub enum TreasuryEffect {
         budget_id: String,
         /// DID of the member or entity receiving this allocation.
         /// Empty string indicates a general budget reservation without a specific recipient.
+        /// Carried as audit metadata; does NOT change the budget-liability ledger routing key.
+        #[serde(default)]
         recipient_did: String,
         amount: i64,
         currency: String,
@@ -841,5 +843,64 @@ mod tests {
         let id = DecisionReceiptId::new("gov:proposal:2024-pilot:receipt:test-001");
         assert_json_roundtrip(&id);
         assert_bincode_roundtrip(&id);
+    }
+
+    /// Backward compatibility: pre-existing persisted `TreasuryEffect::Allocate` JSON
+    /// that lacks `recipient_did` must deserialize correctly (defaulting to empty string).
+    /// This guards against breaking the Sled-persisted execution store on upgrade.
+    #[test]
+    fn test_allocate_deserializes_without_recipient_did() {
+        // TreasuryEffect uses #[serde(tag = "operation", rename_all = "snake_case")]
+        let legacy_json = r#"{
+            "operation": "allocate",
+            "treasury_did": "did:icn:treasury",
+            "budget_id": "budget-legacy-001",
+            "amount": 250,
+            "currency": "HOURS"
+        }"#;
+
+        let effect: TreasuryEffect = serde_json::from_str(legacy_json)
+            .expect("legacy Allocate without recipient_did must deserialize");
+
+        match effect {
+            TreasuryEffect::Allocate {
+                budget_id,
+                recipient_did,
+                amount,
+                ..
+            } => {
+                assert_eq!(budget_id, "budget-legacy-001");
+                assert_eq!(
+                    recipient_did, "",
+                    "missing field should default to empty string"
+                );
+                assert_eq!(amount, 250);
+            }
+            other => panic!("Expected Allocate, got {:?}", other),
+        }
+    }
+
+    /// Verify that `recipient_did` is carried in the TreasuryOperation memo,
+    /// not as the ledger routing key, when non-empty.
+    #[test]
+    fn test_allocate_to_operation_uses_budget_id_as_recipient_key() {
+        use crate::governance::treasury_effect_to_operation;
+        let effect = TreasuryEffect::Allocate {
+            treasury_did: "did:icn:treasury".into(),
+            budget_id: "budget-q1".into(),
+            recipient_did: "did:icn:alice".into(),
+            amount: 100,
+            currency: "HOURS".into(),
+        };
+        let op = treasury_effect_to_operation(&effect);
+        assert_eq!(
+            op.recipient.as_deref(),
+            Some("budget-q1"),
+            "Allocate must route by budget_id to preserve budget_liability_did accounting"
+        );
+        assert!(
+            op.memo.contains("did:icn:alice"),
+            "recipient_did should appear in memo for audit provenance"
+        );
     }
 }
