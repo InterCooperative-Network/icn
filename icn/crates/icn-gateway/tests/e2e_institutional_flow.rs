@@ -6,13 +6,15 @@
 //! A cooperative member is enrolled in CommonsManager (anchor → holder →
 //! affiliated with a jurisdiction). A FreezeMember governance proposal is
 //! submitted, opened, voted for, and closed via the live HTTP governance API.
-//! The `on_proposal_accepted` hook — the same hook wired in `server.rs` —
-//! fires both:
-//!   1. Ledger freeze (existing path, not asserted here)
-//!   2. Commons affiliation suspension (new path)
+//! The `on_proposal_accepted` hook fires and mutates commons affiliation to
+//! `MembershipStatus::Suspended`.
 //!
-//! After the proposal closes the test reads the member's affiliation status
-//! directly from the CommonsManager and asserts `MembershipStatus::Suspended`.
+//! The test wires a minimal `on_proposal_accepted` hook that performs only the
+//! commons affiliation update, mirroring the commons side-effect of the hook in
+//! `server.rs`. The ledger freeze side-effect used in production is intentionally
+//! excluded here: this test focuses solely on the commons affiliation suspension
+//! path, which is the novel seam being proved. The ledger freeze path has
+//! separate coverage in ledger tests.
 //!
 //! ## What this is NOT
 //!
@@ -135,7 +137,7 @@ async fn test_e2e_freeze_member_suspends_commons_affiliation() {
         );
     }
 
-    // ── Wire the same hook used in server.rs ─────────────────────────────────
+    // ── Wire the commons side-effect hook (mirrors server.rs commons path) ───
     let commons_mgr_for_hook = commons_mgr.clone();
     let on_proposal_accepted: ProposalAcceptedHook = Arc::new(move |effect| match effect {
         GovernanceEffect::FreezeMember {
@@ -290,24 +292,31 @@ async fn test_e2e_freeze_member_suspends_commons_affiliation() {
         final_state["state"]
     );
 
-    // ── Step 6: Yield to let the hook's tokio::spawn run ────────────────────
-    // The hook fires tokio::spawn — we must yield the executor so the spawned
-    // future can acquire the CommonsManager write lock and mutate affiliation.
-    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    // ── Step 6: Poll until the hook's tokio::spawn mutates affiliation ───────
+    // The hook fires tokio::spawn — we must wait for the spawned future to
+    // acquire the CommonsManager write lock and mutate affiliation. Poll with
+    // a bounded 5s timeout so the test is deterministic even on slow CI.
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
+    loop {
+        let affiliations = commons_mgr
+            .list_affiliations(&holder_id)
+            .await
+            .expect("list_affiliations after freeze");
+        let aff = affiliations
+            .iter()
+            .find(|a| a.jurisdiction_id == JurisdictionId::new(DOMAIN_ID))
+            .expect("affiliation must still exist after FreezeMember");
 
-    // ── Assert: target member's commons affiliation is now Suspended ─────────
-    let affiliations = commons_mgr
-        .list_affiliations(&holder_id)
-        .await
-        .expect("list_affiliations after freeze");
-    let aff = affiliations
-        .iter()
-        .find(|a| a.jurisdiction_id == JurisdictionId::new(DOMAIN_ID))
-        .expect("affiliation must still exist after FreezeMember");
-
-    assert_eq!(
-        aff.membership_status,
-        MembershipStatus::Suspended,
-        "commons affiliation must be Suspended after FreezeMember proposal accepted"
-    );
+        if aff.membership_status == MembershipStatus::Suspended {
+            break;
+        }
+        if tokio::time::Instant::now() >= deadline {
+            panic!(
+                "timed out waiting for commons affiliation to become Suspended \
+                 after FreezeMember proposal accepted; last seen status: {:?}",
+                aff.membership_status
+            );
+        }
+        tokio::task::yield_now().await;
+    }
 }
