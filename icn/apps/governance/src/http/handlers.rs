@@ -1134,6 +1134,29 @@ pub async fn cast_vote<E: GovernanceEventEmitter + Clone + 'static>(
     };
 
     let proposal_id = ProposalId(proposal_id.into_inner());
+
+    // Fetch the proposal first so we can extract its domain_id for the standing
+    // check. The domain is not available from the URL — it lives on the proposal.
+    // We 404 here (not after the vote) so a bad proposal_id gives the right status.
+    let proposal = ctx
+        .manager
+        .get_proposal(&proposal_id)
+        .await
+        .map_err(anyhow_to_api)?
+        .ok_or_else(|| err_not_found(format!("Proposal not found: {}", proposal_id.0)))?;
+
+    // Commons standing gate: voter must hold active Member standing in the
+    // proposal's domain jurisdiction, same rule as proposal submission.
+    if let Some(ref checker) = ctx.member_checker {
+        if !checker(voter_did.clone(), proposal.domain_id.0.clone()).await {
+            return Err(err_forbidden(format!(
+                "voter {} does not have active Member standing in domain {}; \
+                 join the jurisdiction before voting",
+                voter_did, proposal.domain_id.0
+            )));
+        }
+    }
+
     ctx.manager
         .cast_vote(
             proposal_id.clone(),
@@ -1144,6 +1167,7 @@ pub async fn cast_vote<E: GovernanceEventEmitter + Clone + 'static>(
         .await
         .map_err(anyhow_to_api)?;
 
+    // Re-fetch so the response reflects the vote just cast (tally updated).
     let proposal = ctx
         .manager
         .get_proposal(&proposal_id)
