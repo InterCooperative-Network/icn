@@ -300,6 +300,7 @@ pub fn translate_payload_to_effects(
                     recipient_did: opt.recipient.to_string(),
                     amount: opt.requested_amount,
                     currency: unit.clone(),
+                    decision_hash: decision_hash.to_string(),
                 }));
             }
             Ok(effects)
