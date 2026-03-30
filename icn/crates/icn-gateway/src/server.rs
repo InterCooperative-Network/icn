@@ -861,8 +861,10 @@ impl GatewayServer {
         // on_proposal_accepted is built inline and dispatches to the appropriate
         // subsystem based on payload type:
         //   FreezeMember  → ledger.freeze_member_with_metadata() on domain ledger
+        //                 → commons_manager.update_affiliation_status(Suspended) on holder
         //   (other types) → no-op until wired
         let ledger_mgr_for_gov = ledger_manager.clone();
+        let commons_mgr_for_gov = commons_manager.clone();
         let on_proposal_accepted: icn_governance_actor::http::configure::ProposalAcceptedHook =
             std::sync::Arc::new(move |effect| {
                 use icn_governance_actor::http::configure::GovernanceEffect;
@@ -874,24 +876,78 @@ impl GatewayServer {
                         reason,
                         duration_seconds,
                     } => {
+                        // Side-effect 1: freeze member in ledger journal.
                         let ledger_mgr = ledger_mgr_for_gov.clone();
+                        let domain_id_for_ledger = domain_id.clone();
+                        let member_for_ledger = member.clone();
+                        let reason_for_ledger = reason.clone();
+                        let proposal_id_for_ledger = proposal_id.clone();
                         tokio::spawn(async move {
-                            match ledger_mgr.get_ledger(&domain_id).await {
+                            match ledger_mgr.get_ledger(&domain_id_for_ledger).await {
                                 Ok(ledger_arc) => {
                                     let mut ledger = ledger_arc.write().await;
                                     ledger.freeze_member_with_metadata(
-                                        member,
-                                        reason,
+                                        member_for_ledger,
+                                        reason_for_ledger,
                                         duration_seconds,
-                                        Some(proposal_id),
+                                        Some(proposal_id_for_ledger),
                                         None,
                                     );
                                 }
                                 Err(e) => {
                                     tracing::warn!(
-                                        coop_id = %domain_id,
+                                        coop_id = %domain_id_for_ledger,
                                         error = %e,
                                         "FreezeMember governance effect: ledger not found for domain"
+                                    );
+                                }
+                            }
+                        });
+
+                        // Side-effect 2: suspend commons affiliation for the frozen member.
+                        // If the member has no commons holder record (not enrolled), this
+                        // is a no-op — commons enrollment is not required for governance.
+                        let commons_mgr = commons_mgr_for_gov.clone();
+                        tokio::spawn(async move {
+                            use icn_identity::{JurisdictionId, MembershipStatus};
+                            let jurisdiction = JurisdictionId::new(&domain_id);
+                            match commons_mgr.get_holder_by_did(&member).await {
+                                Ok(Some(holder)) => {
+                                    let holder_id = hex::encode(holder.id());
+                                    if let Err(e) = commons_mgr
+                                        .update_affiliation_status(
+                                            &holder_id,
+                                            &jurisdiction,
+                                            MembershipStatus::Suspended,
+                                        )
+                                        .await
+                                    {
+                                        tracing::warn!(
+                                            error = %e,
+                                            did = %member,
+                                            jurisdiction = %domain_id,
+                                            "FreezeMember: failed to suspend commons affiliation"
+                                        );
+                                    } else {
+                                        tracing::info!(
+                                            did = %member,
+                                            jurisdiction = %domain_id,
+                                            "FreezeMember: commons affiliation suspended"
+                                        );
+                                    }
+                                }
+                                Ok(None) => {
+                                    // Member not enrolled in commons — acceptable, no-op.
+                                    tracing::debug!(
+                                        did = %member,
+                                        "FreezeMember: member has no commons holder record, skipping suspension"
+                                    );
+                                }
+                                Err(e) => {
+                                    tracing::warn!(
+                                        error = %e,
+                                        did = %member,
+                                        "FreezeMember: commons holder lookup failed"
                                     );
                                 }
                             }
