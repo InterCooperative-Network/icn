@@ -627,11 +627,14 @@ impl GovernanceManager {
         proposal_id: ProposalId,
         eligible_voters: &HashSet<Did>,
     ) -> Result<()> {
-        anyhow::ensure!(
-            self.governance_handle.is_none(),
-            "close_proposal_filtered is not supported with GovernanceHandle backend; \
-             perform standing revalidation at the application layer before delegating"
-        );
+        if let Some(ref handle) = self.governance_handle {
+            // Delegate to the handle, which propagates the eligibility filter through
+            // GovernanceCommand::CloseProposal { eligible_voters: Some(...) } so the
+            // actor applies it before tallying. This is the production path.
+            return handle
+                .close_proposal_filtered(proposal_id, eligible_voters)
+                .await;
+        }
         self.close_proposal_inner(proposal_id, Some(eligible_voters))
     }
 

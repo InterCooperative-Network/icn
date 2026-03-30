@@ -108,6 +108,24 @@ pub trait GovernanceOps: Send + Sync {
     /// Close a proposal and evaluate the outcome
     async fn close_proposal(&self, proposal_id: ProposalId) -> Result<()>;
 
+    /// Close a proposal counting only votes from currently-eligible members.
+    ///
+    /// Called by the HTTP handler after revalidating voter commons standing at close
+    /// time. Votes from members who lost standing after casting are excluded from the
+    /// effective tally — standing must hold at resolution, not just at cast time.
+    ///
+    /// The default implementation ignores the eligibility filter and falls back to
+    /// `close_proposal`. Backends that support per-vote filtering (e.g.,
+    /// `GovernanceActor`) should override this method.
+    async fn close_proposal_filtered(
+        &self,
+        proposal_id: ProposalId,
+        eligible_voters: &std::collections::HashSet<Did>,
+    ) -> Result<()> {
+        let _ = eligible_voters;
+        self.close_proposal(proposal_id).await
+    }
+
     /// Add or remove a member from a governance domain
     ///
     /// Only works for domains with static-list membership. For trust-based
