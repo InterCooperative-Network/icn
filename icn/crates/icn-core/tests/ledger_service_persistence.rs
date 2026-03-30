@@ -84,6 +84,7 @@ async fn test_ledger_service_entry_survives_drop_and_reopen() {
             expected_nonce: Some(0),
             decision_receipt_id: "proof:receipt:layer3:001".to_string(),
             decision_hash: "proof-decision-hash-layer3".to_string(),
+            distributions: Vec::new(),
         };
 
         let result = service

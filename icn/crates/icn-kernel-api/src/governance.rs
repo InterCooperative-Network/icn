@@ -57,6 +57,13 @@ pub struct TreasuryOperation {
     pub expected_nonce: Option<u64>,
     /// Canonical decision hash for provenance (cross-node anchor)
     pub decision_hash: Option<String>,
+    /// Per-recipient distribution amounts (DistributeSurplus only).
+    ///
+    /// Each entry is `(member_did, amount)`. All distributions land in a single journal entry
+    /// to preserve the one-receipt-one-entry idempotency invariant.
+    /// Empty for all other operation types.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub distributions: Vec<(String, i64)>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -66,6 +73,9 @@ pub enum TreasuryOperationType {
     Allocate,
     Reserve,
     Release,
+    /// Fan-out surplus settlement: N debits from treasury, N credits to member DIDs.
+    /// The `distributions` field on `TreasuryOperation` carries the per-recipient amounts.
+    DistributeSurplus,
 }
 
 /// Protocol parameter change request
@@ -316,6 +326,7 @@ pub fn treasury_effect_to_operation(effect: &TreasuryEffect) -> TreasuryOperatio
             memo: memo.clone(),
             expected_nonce: Some(*expected_nonce),
             decision_hash: Some(decision_hash.clone()),
+            distributions: Vec::new(),
         },
         TreasuryEffect::CreateBudget {
             treasury_did,
@@ -334,6 +345,7 @@ pub fn treasury_effect_to_operation(effect: &TreasuryEffect) -> TreasuryOperatio
             memo: name.clone(),
             expected_nonce: None,
             decision_hash: Some(decision_hash.clone()),
+            distributions: Vec::new(),
         },
         TreasuryEffect::Allocate {
             treasury_did,
@@ -363,6 +375,7 @@ pub fn treasury_effect_to_operation(effect: &TreasuryEffect) -> TreasuryOperatio
             } else {
                 Some(decision_hash.clone())
             },
+            distributions: Vec::new(),
         },
         TreasuryEffect::Transfer {
             from_did,
@@ -384,6 +397,7 @@ pub fn treasury_effect_to_operation(effect: &TreasuryEffect) -> TreasuryOperatio
             } else {
                 Some(decision_hash.clone())
             },
+            distributions: Vec::new(),
         },
         TreasuryEffect::ReleaseEscrow {
             treasury_did,
@@ -402,18 +416,32 @@ pub fn treasury_effect_to_operation(effect: &TreasuryEffect) -> TreasuryOperatio
             memo: format!("Escrow release: {}", escrow_id),
             expected_nonce: None,
             decision_hash: Some(decision_hash.clone()),
+            distributions: Vec::new(),
         },
-        // Not executed via `TreasuryOperation` / `submit_treasury_entry` today (multi-recipient).
-        // `KernelGovernanceExecutor::execute_treasury_with_budget` handles this explicitly.
-        TreasuryEffect::DistributeSurplus { .. } => TreasuryOperation {
-            treasury_id: String::new(),
-            operation_type: TreasuryOperationType::Reserve,
-            amount: 0,
-            currency: "UNKNOWN".to_string(),
+        TreasuryEffect::DistributeSurplus {
+            treasury_did,
+            total_amount,
+            currency,
+            distributions,
+            decision_receipt_id: _,
+            decision_hash,
+        } => TreasuryOperation {
+            treasury_id: treasury_did.clone(),
+            operation_type: TreasuryOperationType::DistributeSurplus,
+            amount: *total_amount,
+            currency: currency.clone(),
             recipient: None,
-            memo: "DistributeSurplus: unmapped to single TreasuryOperation".to_string(),
+            memo: format!("Surplus distribution: {} recipients", distributions.len()),
             expected_nonce: None,
-            decision_hash: None,
+            decision_hash: if decision_hash.is_empty() {
+                None
+            } else {
+                Some(decision_hash.clone())
+            },
+            distributions: distributions
+                .iter()
+                .map(|(did, amt)| (did.clone(), *amt))
+                .collect(),
         },
         // Other treasury effects mapped to basic operations
         _ => TreasuryOperation {
@@ -425,6 +453,7 @@ pub fn treasury_effect_to_operation(effect: &TreasuryEffect) -> TreasuryOperatio
             memo: "Unmapped treasury effect".to_string(),
             expected_nonce: None,
             decision_hash: None,
+            distributions: Vec::new(),
         },
     }
 }
@@ -576,6 +605,7 @@ mod tests {
             memo: "Equipment purchase".to_string(),
             expected_nonce: Some(7),
             decision_hash: Some("sha256:abc123".to_string()),
+            distributions: Vec::new(),
         };
         let json = serde_json::to_string(&op).unwrap();
         let parsed: TreasuryOperation = serde_json::from_str(&json).unwrap();
