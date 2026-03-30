@@ -1677,8 +1677,9 @@ impl GovernanceActor {
                     tally.add_vote(v);
                 }
 
-                // Resolve eligible membership
-                let eligible_count = self.resolver.member_count(&domain)?;
+                // Resolve eligible membership (list needed for delegation resolution)
+                let eligible_members = self.resolver.resolve_members(&domain)?;
+                let eligible_count = eligible_members.len();
 
                 // Edge case: cannot evaluate proposal with zero eligible voters
                 // This prevents division issues and ensures meaningful quorum calculation
@@ -1688,6 +1689,18 @@ impl GovernanceActor {
                         proposal.domain_id.0
                     ));
                 }
+
+                // Close-time liquid democracy: expand delegated votes for non-voters.
+                // For each eligible member who did NOT vote directly, resolve their
+                // delegation chain. If the terminal delegate voted, attribute their
+                // choice to the absent member. Direct votes always take precedence.
+                self.apply_delegation_to_tally(
+                    &votes,
+                    &eligible_members,
+                    &proposal.domain_id,
+                    &proposal_id,
+                    &mut tally,
+                );
 
                 // Get proposal-type-specific thresholds (Issue #477)
                 // Emergency proposals (freeze, veto, rollback) require higher quorum/approval
@@ -2582,6 +2595,122 @@ impl GovernanceActor {
         }
 
         Ok(delegations)
+    }
+
+    /// Resolve the delegation chain for a voter at a specific proposal, returning the
+    /// final effective voter DID.
+    ///
+    /// Follows active (non-expired, non-revoked) delegations matching the proposal's
+    /// domain or a blanket scope. Returns `voter` unchanged if no active delegation exists.
+    /// Stops at `MAX_DELEGATION_DEPTH` to prevent runaway chains (cycles are guaranteed
+    /// impossible by creation-time cycle detection, but the depth cap is a safety net).
+    ///
+    /// This mirrors `DelegationManager::resolve_delegate` but reads directly from the
+    /// Sled store instead of an in-memory manager.
+    fn resolve_delegate_from_store(
+        &self,
+        voter: &Did,
+        domain_id: &icn_governance::GovernanceDomainId,
+        proposal_id: &ProposalId,
+    ) -> Did {
+        let now = icn_time::current_timestamp_secs();
+        let mut current = voter.clone();
+        let mut visited = std::collections::HashSet::new();
+
+        for _ in 0..Self::MAX_DELEGATION_DEPTH {
+            visited.insert(current.clone());
+
+            // Load active delegations from current node, pick the most specific scope match
+            let delegations = match self.list_delegations_from(&current) {
+                Ok(d) => d,
+                Err(_) => break, // storage error → stop resolving, return best-so-far
+            };
+
+            let next = delegations
+                .into_iter()
+                .filter(|d| d.revoked_at.is_none() && d.is_active(now))
+                .filter_map(|d| {
+                    // Score by specificity: proposal-scope > domain-scope > blanket
+                    match &d.scope {
+                        icn_governance::DelegationScope::Proposal(pid) if pid == proposal_id => {
+                            Some((3u8, d.delegate))
+                        }
+                        icn_governance::DelegationScope::Domain(did) if did == domain_id => {
+                            Some((2, d.delegate))
+                        }
+                        icn_governance::DelegationScope::Blanket => Some((1, d.delegate)),
+                        _ => None,
+                    }
+                })
+                .max_by_key(|(score, _)| *score)
+                .map(|(_, delegate)| delegate);
+
+            match next {
+                Some(d) if !visited.contains(&d) => current = d,
+                _ => break,
+            }
+        }
+
+        current
+    }
+
+    /// Apply delegation to a raw vote tally, expanding delegated votes for non-voters.
+    ///
+    /// For each eligible member who did NOT vote directly, resolves their delegation
+    /// chain. If the final delegate DID voted, the non-voter's vote is attributed to
+    /// the delegate's choice (liquid democracy: absent members' weight flows to
+    /// whomever they trusted).
+    ///
+    /// Direct voters always override delegation — a member who voted directly is
+    /// never replaced by a delegated vote, regardless of what delegation records exist.
+    fn apply_delegation_to_tally(
+        &self,
+        votes: &[Vote],
+        eligible_members: &[Did],
+        domain_id: &icn_governance::GovernanceDomainId,
+        proposal_id: &ProposalId,
+        tally: &mut VoteTally,
+    ) {
+        // Build a fast lookup of who voted directly
+        let direct_voters: std::collections::HashSet<&Did> =
+            votes.iter().map(|v| &v.voter).collect();
+        let vote_by_did: std::collections::HashMap<&Did, &Vote> =
+            votes.iter().map(|v| (&v.voter, v)).collect();
+
+        let mut delegated = 0usize;
+        for member in eligible_members {
+            if direct_voters.contains(member) {
+                continue; // voted directly — no delegation needed
+            }
+
+            let delegate = self.resolve_delegate_from_store(member, domain_id, proposal_id);
+            if &delegate == member {
+                continue; // no active delegation
+            }
+
+            if let Some(delegate_vote) = vote_by_did.get(&delegate) {
+                // Create a synthetic vote for the delegating member using the delegate's choice.
+                let delegated_vote =
+                    Vote::new(proposal_id.clone(), member.clone(), delegate_vote.choice);
+                tally.add_vote(&delegated_vote);
+                delegated += 1;
+                tracing::debug!(
+                    member = %member,
+                    delegate = %delegate,
+                    choice = ?delegate_vote.choice,
+                    "Delegation applied: member's vote resolved through delegate"
+                );
+            }
+        }
+
+        if delegated > 0 {
+            tracing::info!(
+                proposal_id = %proposal_id.0,
+                delegated_votes = delegated,
+                "Close-time delegation resolution: {} votes applied via delegation",
+                delegated
+            );
+        }
     }
 
     /// Revoke a delegation
