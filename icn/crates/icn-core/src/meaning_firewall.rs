@@ -251,13 +251,18 @@ mod tests {
     /// - icn-gossip: CLEAN ✅
     /// - icn-ledger: CLEAN ✅
     /// - icn-gateway: 10 (governance_dashboard, flow_c, steward extracted; commons/treasury/entity residue)
+    ///
+    /// Current state (2026-03-30, governance legitimacy stack):
+    /// - server.rs: +1 scoped `use icn_governance::` inside DeployCharter tokio::spawn handler
+    ///   (Charter creation wiring — required until commons accepts primitive args; see #1456)
+    /// - icn-gateway: 11
     #[test]
     fn strict_governance_import_violations() {
         let expected: &[(&str, usize)] = &[
             ("icn-net", 0),      // CLEAN ✅
             ("icn-gossip", 0),   // CLEAN ✅
             ("icn-ledger", 0),   // CLEAN ✅
-            ("icn-gateway", 10), // Sprint 14 easy sweep: governance_dashboard, flow_c, steward extracted
+            ("icn-gateway", 11), // +1 DeployCharter handler in server.rs (#1456)
         ];
 
         for &(crate_name, expected_count) in expected {
@@ -303,9 +308,14 @@ mod tests {
     /// Current state (2026-03-28, Tranche 4 boundary-semantics):
     /// - constitutional/mod.rs: charter/domain validation refactored ✅ (-2 refs)
     /// - Hard residue: 14 (commons_mgr, commons_store, treasury, entity, receipts, constitutional)
+    ///
+    /// Current state (2026-03-30, governance legitimacy stack):
+    /// - server.rs: +1 `use icn_governance::` inside DeployCharter tokio::spawn handler (#1456)
+    ///   Charter creation wiring — pending extraction to commons primitive API
+    /// - Hard residue: 15
     #[test]
     fn strict_gateway_governance_total_refs() {
-        let expected: usize = 14; // Tranche 4 boundary-semantics: -2 refs from 16
+        let expected: usize = 15; // +1 DeployCharter wiring in server.rs (#1456)
         let actual = count_imports_in_crate("icn-gateway", "icn_governance::");
 
         assert!(
