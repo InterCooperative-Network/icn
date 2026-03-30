@@ -72,6 +72,7 @@ async fn test_governance_proposal_full_lifecycle_with_real_auth() {
         emitter: NoopEventEmitter,
         on_charter_accepted: None,
         on_proposal_accepted: None,
+        member_checker: None,
     };
 
     // Build test app — mirrors the governance-relevant subset of server.rs:
@@ -384,6 +385,7 @@ async fn test_governance_endpoints_require_auth() {
         emitter: NoopEventEmitter,
         on_charter_accepted: None,
         on_proposal_accepted: None,
+        member_checker: None,
     };
 
     let auth_mw = HttpAuthentication::bearer(jwt_auth);

@@ -619,6 +619,20 @@ pub async fn create_proposal<E: GovernanceEventEmitter + Clone + 'static>(
     val::validate_proposal_title(&req.title)?;
     val::validate_proposal_description(&req.description)?;
 
+    // Commons standing gate: if a checker is wired, the proposer must hold active
+    // Member status in the target domain's jurisdiction. This enforces the principle
+    // that institutional authority constrains governance participation — not just
+    // the reverse. The checker is `None` in test setups that don't wire commons.
+    if let Some(ref checker) = ctx.member_checker {
+        if !checker(proposer_did.clone(), req.domain_id.clone()).await {
+            return Err(err_forbidden(format!(
+                "proposer {} does not have active Member standing in domain {}; \
+                 join the jurisdiction before submitting proposals",
+                proposer_did, req.domain_id
+            )));
+        }
+    }
+
     let payload = match &req.payload {
         ProposalPayloadRequest::Text { body } => {
             if body.is_empty() || body.trim().is_empty() {
@@ -2214,6 +2228,7 @@ mod tests {
             emitter: NoopEventEmitter,
             on_charter_accepted: None,
             on_proposal_accepted: Some(hook),
+            member_checker: None,
         };
 
         let app = test_app!(ctx, member_did);
@@ -2289,6 +2304,7 @@ mod tests {
             emitter: NoopEventEmitter,
             on_charter_accepted: None,
             on_proposal_accepted: Some(hook),
+            member_checker: None,
         };
 
         let app = test_app!(ctx, member_did);
