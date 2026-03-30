@@ -124,6 +124,19 @@ pub enum GovernanceEffect {
 /// Errors are non-fatal. Implementations should log internally and not panic.
 pub type ProposalAcceptedHook = Arc<dyn Fn(GovernanceEffect) + Send + Sync>;
 
+/// Async predicate: is `did` an active steward in the commons layer?
+///
+/// Called by SDIS proposal handlers (AppointSteward, RemoveSteward) before
+/// touching the governance manager. Returning `false` causes 403 Forbidden.
+/// Steward standing is a global status — not domain-scoped — so no domain_id
+/// parameter is needed. It represents a strictly higher authority level than
+/// Member standing: all stewards are members, but not all members are stewards.
+///
+/// `None` disables the gate (useful in tests that do not wire commons).
+pub type StewardStandingChecker = Arc<
+    dyn Fn(Did) -> std::pin::Pin<Box<dyn std::future::Future<Output = bool> + Send>> + Send + Sync,
+>;
+
 /// Async predicate: does `did` hold active Member standing in `domain_id`?
 ///
 /// Called by `create_proposal` before touching the governance manager. Returning
@@ -158,6 +171,10 @@ pub struct GovernanceContext<E> {
     /// submission. Returns `true` if the caller has active Member standing in the
     /// target domain; `false` → 403 Forbidden.
     pub member_checker: Option<MemberStandingChecker>,
+    /// Optional gate for SDIS proposal types (AppointSteward, RemoveSteward).
+    /// Returns `true` if the caller is an active steward; `false` → 403 Forbidden.
+    /// Steward standing is a strictly higher bar than Member standing.
+    pub steward_checker: Option<StewardStandingChecker>,
 }
 
 /// Register all governance routes on `cfg`.
@@ -297,5 +314,14 @@ where
         .service(
             web::resource("/proposals/federation/policy")
                 .route(web::post().to(handlers::create_update_federation_policy_proposal::<E>)),
+        )
+        // ── SDIS proposal endpoints ──────────────────────────────────────
+        .service(
+            web::resource("/proposals/sdis/appoint-steward")
+                .route(web::post().to(handlers::create_appoint_steward_proposal::<E>)),
+        )
+        .service(
+            web::resource("/proposals/sdis/remove-steward")
+                .route(web::post().to(handlers::create_remove_steward_proposal::<E>)),
         );
 }

@@ -1212,12 +1212,23 @@ impl GatewayServer {
                 })
             });
 
+        // Steward standing gate: SDIS proposal types (AppointSteward, RemoveSteward)
+        // may only be submitted by active stewards. Wired here so commons remains
+        // the sole source of truth for institutional authority.
+        let commons_mgr_for_steward = commons_manager.clone();
+        let steward_checker: icn_governance_actor::http::configure::StewardStandingChecker =
+            std::sync::Arc::new(move |did| {
+                let commons = commons_mgr_for_steward.clone();
+                Box::pin(async move { commons.is_active_steward(&did).await.unwrap_or(false) })
+            });
+
         let gov_ctx = GovernanceContext {
             manager: governance_manager.clone(),
             emitter: GatewayEventAdapter::new(event_broadcaster.clone()),
             on_charter_accepted: self.charter_accepted_hook,
             on_proposal_accepted: Some(on_proposal_accepted),
             member_checker: Some(member_checker),
+            steward_checker: Some(steward_checker),
         };
 
         // Create rate limiter with configured or default config
