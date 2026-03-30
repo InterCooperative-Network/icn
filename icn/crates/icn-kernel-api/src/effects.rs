@@ -915,5 +915,24 @@ mod tests {
             op.memo.contains("did:icn:alice"),
             "recipient_did should appear in memo for audit provenance"
         );
+        assert_eq!(
+            op.decision_hash,
+            Some("hash-q1-alloc".to_string()),
+            "non-empty decision_hash must propagate to TreasuryOperation.decision_hash as Some(...)"
+        );
+        // Verify empty decision_hash maps to None (preserves Deferred for legacy effects)
+        let legacy_effect = TreasuryEffect::Allocate {
+            treasury_did: "did:icn:treasury".into(),
+            budget_id: "budget-q1".into(),
+            recipient_did: String::new(),
+            amount: 100,
+            currency: "HOURS".into(),
+            decision_hash: String::new(),
+        };
+        let legacy_op = treasury_effect_to_operation(&legacy_effect);
+        assert_eq!(
+            legacy_op.decision_hash, None,
+            "empty decision_hash must map to None to preserve Deferred behavior for legacy effects"
+        );
     }
 }
