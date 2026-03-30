@@ -124,6 +124,21 @@ pub enum GovernanceEffect {
 /// Errors are non-fatal. Implementations should log internally and not panic.
 pub type ProposalAcceptedHook = Arc<dyn Fn(GovernanceEffect) + Send + Sync>;
 
+/// Async predicate: does `did` hold active Member standing in `domain_id`?
+///
+/// Called by `create_proposal` before touching the governance manager. Returning
+/// `false` causes the handler to return `403 Forbidden`. `None` disables the
+/// gate (useful in tests that do not wire commons).
+///
+/// The gateway wires this to `CommonsManager::list_affiliations()` filtered by
+/// the proposal's target domain. The governance app never imports commons types —
+/// the closure is the only crossing point.
+pub type MemberStandingChecker = Arc<
+    dyn Fn(Did, String) -> std::pin::Pin<Box<dyn std::future::Future<Output = bool> + Send>>
+        + Send
+        + Sync,
+>;
+
 /// Shared application context for governance HTTP handlers.
 ///
 /// Stored as `web::Data<GovernanceContext<E>>`. Using a single struct keeps
@@ -139,6 +154,10 @@ pub struct GovernanceContext<E> {
     /// Receives the translated [`GovernanceEffect`] for the accepted proposal,
     /// allowing gateway dispatch without importing governance domain types.
     pub on_proposal_accepted: Option<ProposalAcceptedHook>,
+    /// Optional gate: if set, `create_proposal` calls this before accepting the
+    /// submission. Returns `true` if the caller has active Member standing in the
+    /// target domain; `false` → 403 Forbidden.
+    pub member_checker: Option<MemberStandingChecker>,
 }
 
 /// Register all governance routes on `cfg`.

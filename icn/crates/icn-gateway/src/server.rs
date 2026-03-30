@@ -1188,11 +1188,36 @@ impl GatewayServer {
                 }
             });
 
+        // Member-standing gate: proposer must hold active Member affiliation in the
+        // target domain's jurisdiction. Wired here so the commons source of truth
+        // is always consulted at submission time without the governance app importing
+        // any commons types.
+        let commons_mgr_for_checker = commons_manager.clone();
+        let member_checker: icn_governance_actor::http::configure::MemberStandingChecker =
+            std::sync::Arc::new(move |did, domain_id| {
+                use icn_identity::{JurisdictionId, MembershipStatus};
+                let commons = commons_mgr_for_checker.clone();
+                Box::pin(async move {
+                    let Ok(Some(holder)) = commons.get_holder_by_did(&did).await else {
+                        return false;
+                    };
+                    let holder_id = hex::encode(holder.id());
+                    let Ok(affiliations) = commons.list_affiliations(&holder_id).await else {
+                        return false;
+                    };
+                    affiliations.iter().any(|a| {
+                        a.jurisdiction_id == JurisdictionId::new(&domain_id)
+                            && a.membership_status == MembershipStatus::Member
+                    })
+                })
+            });
+
         let gov_ctx = GovernanceContext {
             manager: governance_manager.clone(),
             emitter: GatewayEventAdapter::new(event_broadcaster.clone()),
             on_charter_accepted: self.charter_accepted_hook,
             on_proposal_accepted: Some(on_proposal_accepted),
+            member_checker: Some(member_checker),
         };
 
         // Create rate limiter with configured or default config
