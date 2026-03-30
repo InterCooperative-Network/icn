@@ -648,6 +648,16 @@ pub struct TreasuryEntryRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expected_nonce: Option<u64>,
 
+    /// Per-recipient distribution amounts for `DistributeSurplus` operations.
+    ///
+    /// Each entry is `(member_did, amount)`. All amounts are debited from the treasury
+    /// and credited to the respective member DIDs in a single journal entry.
+    /// Ignored for all other operation types.
+    ///
+    /// Default is empty (backward-compatible with existing requests).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub distributions: Vec<(String, i64)>,
+
     // Provenance fields (pilot-critical)
     /// Decision receipt ID that authorized this entry (node-local reference)
     pub decision_receipt_id: String,
@@ -727,6 +737,7 @@ impl TreasuryEntryRequest {
             recipient: Some(intent.to.clone()),
             memo: intent.memo.clone().unwrap_or_default(),
             expected_nonce: None,
+            distributions: Vec::new(),
             decision_receipt_id: intent.decision_receipt_id.clone(),
             decision_hash: decision_hash_hex,
         })
