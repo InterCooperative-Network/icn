@@ -2123,6 +2123,164 @@ pub async fn create_update_federation_policy_proposal<
 }
 
 // ============================================================================
+// SDIS proposal endpoints
+// ============================================================================
+
+/// POST /gov/proposals/sdis/appoint-steward — Propose to appoint a new steward.
+///
+/// Requires the proposer to be an active steward (checked via
+/// `GovernanceContext::steward_checker`). Only existing stewards may nominate
+/// new stewards — this separates generic governance participation (Member) from
+/// steward-office governance (active steward required).
+pub async fn create_appoint_steward_proposal<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    req: web::Json<AppointStewardProposalRequest>,
+) -> Result<HttpResponse, ApiError> {
+    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let proposer_did = parse_did(&claims.sub, "Invalid DID in token")?;
+
+    val::validate_domain_id(&req.domain_id)?;
+    val::validate_proposal_title(&req.title)?;
+    val::validate_proposal_description(&req.description)?;
+
+    // Steward standing gate: only active stewards may propose steward appointments.
+    if let Some(ref checker) = ctx.steward_checker {
+        if !checker(proposer_did.clone()).await {
+            return Err(err_forbidden(format!(
+                "proposer {} is not an active steward; only stewards may propose \
+                 steward appointments",
+                proposer_did
+            )));
+        }
+    }
+
+    let candidate = parse_did(&req.candidate, "Invalid candidate DID")?;
+    let sponsors = req
+        .sponsors
+        .iter()
+        .map(|s| parse_did(s, "Invalid sponsor DID"))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let payload = ProposalPayload::Sdis {
+        proposal: icn_governance::sdis::SdisProposal::AppointSteward {
+            candidate,
+            sponsors,
+            region: req.region.clone(),
+            bond_amount: req.bond_amount,
+            term_length: req.term_length_seconds,
+        },
+    };
+
+    let domain_id = GovernanceDomainId(req.domain_id.clone());
+    let suggested_id = ProposalId(format!("prop-{}", uuid::Uuid::new_v4()));
+
+    let proposal_id = ctx
+        .manager
+        .create_proposal(
+            suggested_id,
+            domain_id,
+            proposer_did.clone(),
+            req.title.clone(),
+            req.description.clone(),
+            payload,
+            ProposalScope::Local,
+        )
+        .await
+        .map_err(anyhow_to_api)?;
+
+    ctx.emitter.emit_proposal_created(
+        &proposal_id.0,
+        &req.domain_id,
+        &proposer_did.to_string(),
+        &req.title,
+        "sdis_appoint_steward",
+    );
+
+    let proposal = ctx
+        .manager
+        .get_proposal(&proposal_id)
+        .await
+        .map_err(anyhow_to_api)?
+        .ok_or_else(|| err_internal("Proposal creation succeeded but proposal not found"))?;
+
+    Ok(HttpResponse::Created().json(proposal))
+}
+
+/// POST /gov/proposals/sdis/remove-steward — Propose to remove an existing steward.
+///
+/// Requires the proposer to be an active steward (checked via
+/// `GovernanceContext::steward_checker`). Steward removal is a steward-office
+/// action, not a general membership action.
+pub async fn create_remove_steward_proposal<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    req: web::Json<RemoveStewardProposalRequest>,
+) -> Result<HttpResponse, ApiError> {
+    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let proposer_did = parse_did(&claims.sub, "Invalid DID in token")?;
+
+    val::validate_domain_id(&req.domain_id)?;
+    val::validate_proposal_title(&req.title)?;
+    val::validate_proposal_description(&req.description)?;
+
+    // Steward standing gate: only active stewards may propose steward removals.
+    if let Some(ref checker) = ctx.steward_checker {
+        if !checker(proposer_did.clone()).await {
+            return Err(err_forbidden(format!(
+                "proposer {} is not an active steward; only stewards may propose \
+                 steward removals",
+                proposer_did
+            )));
+        }
+    }
+
+    let steward_did = parse_did(&req.steward, "Invalid steward DID")?;
+
+    let payload = ProposalPayload::Sdis {
+        proposal: icn_governance::sdis::SdisProposal::RemoveSteward {
+            steward: steward_did,
+            reason: req.reason.clone(),
+            return_bond: req.return_bond,
+        },
+    };
+
+    let domain_id = GovernanceDomainId(req.domain_id.clone());
+    let suggested_id = ProposalId(format!("prop-{}", uuid::Uuid::new_v4()));
+
+    let proposal_id = ctx
+        .manager
+        .create_proposal(
+            suggested_id,
+            domain_id,
+            proposer_did.clone(),
+            req.title.clone(),
+            req.description.clone(),
+            payload,
+            ProposalScope::Local,
+        )
+        .await
+        .map_err(anyhow_to_api)?;
+
+    ctx.emitter.emit_proposal_created(
+        &proposal_id.0,
+        &req.domain_id,
+        &proposer_did.to_string(),
+        &req.title,
+        "sdis_remove_steward",
+    );
+
+    let proposal = ctx
+        .manager
+        .get_proposal(&proposal_id)
+        .await
+        .map_err(anyhow_to_api)?
+        .ok_or_else(|| err_internal("Proposal creation succeeded but proposal not found"))?;
+
+    Ok(HttpResponse::Created().json(proposal))
+}
+
+// ============================================================================
 // Tests — governance → execution bridge
 // ============================================================================
 
@@ -2253,6 +2411,7 @@ mod tests {
             on_charter_accepted: None,
             on_proposal_accepted: Some(hook),
             member_checker: None,
+            steward_checker: None,
         };
 
         let app = test_app!(ctx, member_did);
@@ -2329,6 +2488,7 @@ mod tests {
             on_charter_accepted: None,
             on_proposal_accepted: Some(hook),
             member_checker: None,
+            steward_checker: None,
         };
 
         let app = test_app!(ctx, member_did);

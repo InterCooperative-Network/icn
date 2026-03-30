@@ -94,6 +94,44 @@ pub enum ProposalPayloadRequest {
     },
 }
 
+/// Request body for `POST /proposals/sdis/appoint-steward`.
+///
+/// Proposer must be an active steward (checked via `GovernanceContext::steward_checker`).
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct AppointStewardProposalRequest {
+    pub domain_id: String,
+    pub title: String,
+    pub description: String,
+    /// DID of the steward candidate.
+    pub candidate: String,
+    /// Geographic or operational region the steward will serve.
+    pub region: String,
+    /// Bond amount (in commons credits) the steward must post.
+    pub bond_amount: i64,
+    /// Proposed term length in seconds.
+    pub term_length_seconds: u64,
+    /// DIDs of stewards sponsoring this candidate. May be empty.
+    #[serde(default)]
+    pub sponsors: Vec<String>,
+}
+
+/// Request body for `POST /proposals/sdis/remove-steward`.
+///
+/// Proposer must be an active steward (checked via `GovernanceContext::steward_checker`).
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct RemoveStewardProposalRequest {
+    pub domain_id: String,
+    pub title: String,
+    pub description: String,
+    /// DID of the steward to remove.
+    pub steward: String,
+    /// Reason for removal.
+    pub reason: String,
+    /// Whether the steward's bond should be returned on removal.
+    #[serde(default)]
+    pub return_bond: bool,
+}
+
 /// Open a proposal for voting
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct OpenProposalRequest {
