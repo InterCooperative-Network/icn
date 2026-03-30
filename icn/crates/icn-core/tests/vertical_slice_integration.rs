@@ -366,6 +366,7 @@ async fn test_tool_library_cooperative_vertical_slice() -> Result<()> {
     gov_handle
         .submit(GovernanceCommand::CloseProposal {
             proposal_id: membership_proposal_id.clone(),
+            eligible_voters: None,
         })
         .await?;
 
@@ -447,6 +448,7 @@ async fn test_tool_library_cooperative_vertical_slice() -> Result<()> {
     gov_handle
         .submit(GovernanceCommand::CloseProposal {
             proposal_id: budget_proposal_id.clone(),
+            eligible_voters: None,
         })
         .await?;
 
