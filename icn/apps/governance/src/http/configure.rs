@@ -49,6 +49,13 @@ pub type CharterAcceptedHook = Arc<dyn Fn(String, String) + Send + Sync>;
 /// When CCL-governed institutional logic is introduced, `GovernanceEffect`
 /// variants will be the translation target from CCL execution results —
 /// keeping the dispatch table here and the wiring in `server.rs` unchanged.
+///
+/// | Proposal payload            | GovernanceEffect      | Ledger          | Commons              |
+/// |-----------------------------|-----------------------|-----------------|----------------------|
+/// | `FreezeMember`              | `FreezeMember`        | freeze          | Suspended            |
+/// | `UnfreezeMember`            | `UnfreezeMember`      | unfreeze        | Member               |
+/// | `Sdis::AppointSteward`      | `AppointSteward`      | —               | register steward     |
+/// | `Sdis::RemoveSteward`       | `RevokeSteward`       | —               | revoke steward       |
 #[derive(Debug, Clone)]
 pub enum GovernanceEffect {
     /// A member should be frozen: block ledger transactions and suspend commons
@@ -66,6 +73,22 @@ pub enum GovernanceEffect {
         proposal_id: String,
         domain_id: String,
         member: Did,
+        reason: String,
+    },
+    /// A candidate should be registered as a steward in commons.
+    ///
+    /// The candidate must already have a Commons Holder record with Strong POP level.
+    AppointSteward {
+        proposal_id: String,
+        candidate: Did,
+        region: String,
+        bond_amount: i64,
+        term_length_seconds: u64,
+    },
+    /// A steward's appointment should be revoked for cause.
+    RevokeSteward {
+        proposal_id: String,
+        steward: Did,
         reason: String,
     },
     /// Accepted but no gateway execution handler is wired for this payload type.

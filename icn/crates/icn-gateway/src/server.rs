@@ -862,6 +862,8 @@ impl GatewayServer {
         // subsystem based on payload type (the GovernanceEffect dispatch table):
         //   FreezeMember    → ledger.freeze_member_with_metadata() + commons Suspended
         //   UnfreezeMember  → ledger.unfreeze_member_with_metadata() + commons Member
+        //   AppointSteward  → commons.register_steward()
+        //   RevokeSteward   → commons.revoke_steward()
         //   (other types)   → no-op until wired
         let ledger_mgr_for_gov = ledger_manager.clone();
         let commons_mgr_for_gov = commons_manager.clone();
@@ -1027,6 +1029,94 @@ impl GatewayServer {
                                         error = %e,
                                         did = %member,
                                         "UnfreezeMember: commons holder lookup failed"
+                                    );
+                                }
+                            }
+                        });
+                    }
+                    GovernanceEffect::AppointSteward {
+                        proposal_id,
+                        candidate,
+                        region: _,
+                        bond_amount,
+                        term_length_seconds,
+                    } => {
+                        // Register the candidate as a steward in commons.
+                        // Requires the candidate to already have a Commons Holder record
+                        // with Strong POP level — if not enrolled, this is a no-op with a warning.
+                        // Jurisdiction is not set here: steward-to-charter binding requires a
+                        // pre-existing charter domain and is handled via separate governance.
+                        let commons_mgr = commons_mgr_for_gov.clone();
+                        tokio::spawn(async move {
+                            let term_days = term_length_seconds / 86_400;
+                            let bond = bond_amount.max(0) as u64;
+                            match commons_mgr
+                                .register_steward(
+                                    &candidate,
+                                    &candidate,
+                                    term_days,
+                                    bond,
+                                    proposal_id,
+                                    None,
+                                    vec![],
+                                )
+                                .await
+                            {
+                                Ok(_) => {
+                                    tracing::info!(
+                                        did = %candidate,
+                                        "AppointSteward: steward registered in commons"
+                                    );
+                                }
+                                Err(e) => {
+                                    tracing::warn!(
+                                        error = %e,
+                                        did = %candidate,
+                                        "AppointSteward: failed to register steward"
+                                    );
+                                }
+                            }
+                        });
+                    }
+                    GovernanceEffect::RevokeSteward {
+                        proposal_id: _,
+                        steward,
+                        reason,
+                    } => {
+                        // Revoke the steward's appointment in commons.
+                        // If no steward record exists for this DID, this is a no-op.
+                        let commons_mgr = commons_mgr_for_gov.clone();
+                        tokio::spawn(async move {
+                            match commons_mgr.get_steward_by_did(&steward).await {
+                                Ok(Some(record)) => {
+                                    let steward_id = record.id().to_hex();
+                                    if let Err(e) = commons_mgr
+                                        .revoke_steward(&steward_id, reason, vec![])
+                                        .await
+                                    {
+                                        tracing::warn!(
+                                            error = %e,
+                                            did = %steward,
+                                            "RevokeSteward: failed to revoke steward"
+                                        );
+                                    } else {
+                                        tracing::info!(
+                                            did = %steward,
+                                            "RevokeSteward: steward revoked in commons"
+                                        );
+                                    }
+                                }
+                                Ok(None) => {
+                                    tracing::debug!(
+                                        did = %steward,
+                                        "RevokeSteward: no steward record found, skipping"
+                                    );
+                                }
+                                Err(e) => {
+                                    tracing::warn!(
+                                        error = %e,
+                                        did = %steward,
+                                        "RevokeSteward: steward lookup failed"
                                     );
                                 }
                             }

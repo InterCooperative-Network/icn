@@ -1049,6 +1049,32 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
                         reason: reason.clone(),
                     }
                 }
+                icn_governance::ProposalPayload::Sdis { proposal: ref sdis } => match sdis {
+                    icn_governance::sdis::SdisProposal::AppointSteward {
+                        candidate,
+                        region,
+                        bond_amount,
+                        term_length,
+                        ..
+                    } => GovernanceEffect::AppointSteward {
+                        proposal_id: proposal.id.0.clone(),
+                        candidate: candidate.clone(),
+                        region: region.clone(),
+                        bond_amount: *bond_amount,
+                        term_length_seconds: *term_length,
+                    },
+                    icn_governance::sdis::SdisProposal::RemoveSteward {
+                        steward, reason, ..
+                    } => GovernanceEffect::RevokeSteward {
+                        proposal_id: proposal.id.0.clone(),
+                        steward: steward.clone(),
+                        reason: reason.clone(),
+                    },
+                    _ => GovernanceEffect::Unhandled {
+                        proposal_id: proposal.id.0.clone(),
+                        payload_type: proposal.payload.type_name().to_owned(),
+                    },
+                },
                 _ => GovernanceEffect::Unhandled {
                     proposal_id: proposal.id.0.clone(),
                     payload_type: proposal.payload.type_name().to_owned(),

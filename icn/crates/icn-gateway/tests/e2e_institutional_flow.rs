@@ -32,8 +32,8 @@ use icn_gateway::{
     rate_limit::IpRateLimiter,
 };
 use icn_governance::{
-    GovernanceDomainId, GovernanceParams, MembershipConfig, MembershipSource, ProposalId,
-    ProposalPayload, ProposalScope,
+    sdis::SdisProposal, GovernanceDomainId, GovernanceParams, MembershipConfig, MembershipSource,
+    ProposalId, ProposalPayload, ProposalScope,
 };
 use icn_governance_actor::{
     events::NoopEventEmitter,
@@ -154,7 +154,10 @@ async fn test_e2e_freeze_member_suspends_commons_affiliation() {
                 }
             });
         }
-        GovernanceEffect::UnfreezeMember { .. } | GovernanceEffect::Unhandled { .. } => {}
+        GovernanceEffect::UnfreezeMember { .. }
+        | GovernanceEffect::AppointSteward { .. }
+        | GovernanceEffect::RevokeSteward { .. }
+        | GovernanceEffect::Unhandled { .. } => {}
     });
 
     // ── Build test app (governance + auth) ───────────────────────────────────
@@ -537,6 +540,217 @@ async fn test_e2e_unfreeze_member_reinstates_commons_affiliation() {
                 "timed out waiting for commons affiliation to become Member \
                  after UnfreezeMember proposal accepted; last seen status: {:?}",
                 aff.membership_status
+            );
+        }
+        tokio::task::yield_now().await;
+    }
+}
+
+/// E2E institutional flow — AppointSteward:
+///   enroll candidate (Strong POP) → AppointSteward proposal accepted →
+///   commons steward record created and active.
+///
+/// Proves that `GovernanceEffect::AppointSteward` → `CommonsManager::register_steward()`
+/// — the first exercise of delegated authority via the institutional-effects boundary.
+/// Unlike FreezeMember/UnfreezeMember (which modify membership status), this mutates
+/// a distinct institutional role: stewardship.
+#[actix_web::test]
+async fn test_e2e_appoint_steward_creates_steward_record() {
+    const DOMAIN_ID: &str = "test-coop-appoint-steward-e2e";
+
+    // ── Commons setup ────────────────────────────────────────────────────────
+    let commons_mgr = Arc::new(CommonsManager::new());
+
+    // Enroll the candidate with a steward vouch to reach Strong POP level,
+    // which register_steward requires.
+    let vouching_steward_kp = KeyPair::generate().expect("steward KeyPair");
+    let vouching_steward_did = vouching_steward_kp.did().clone();
+    let candidate_kp = KeyPair::generate().expect("candidate KeyPair");
+    let candidate_did = candidate_kp.did().clone();
+
+    let anchor = commons_mgr
+        .create_anchor_from_enrollment(&candidate_did, Some(&vouching_steward_did))
+        .await
+        .expect("create_anchor_from_enrollment");
+    let anchor_id = hex::encode(anchor.id());
+
+    commons_mgr
+        .create_holder_from_anchor(&anchor_id, &candidate_did)
+        .await
+        .expect("create_holder_from_anchor");
+
+    // Pre-condition: candidate is not yet a steward.
+    assert!(
+        !commons_mgr
+            .is_active_steward(&candidate_did)
+            .await
+            .expect("is_active_steward pre-check"),
+        "candidate must not be a steward before AppointSteward proposal"
+    );
+
+    // ── Wire the AppointSteward hook (mirrors server.rs AppointSteward path) ─
+    let commons_mgr_for_hook = commons_mgr.clone();
+    let on_proposal_accepted: ProposalAcceptedHook = Arc::new(move |effect| {
+        if let GovernanceEffect::AppointSteward {
+            proposal_id,
+            candidate,
+            bond_amount,
+            term_length_seconds,
+            ..
+        } = effect
+        {
+            let commons = commons_mgr_for_hook.clone();
+            tokio::spawn(async move {
+                let term_days = term_length_seconds / 86_400;
+                let bond = bond_amount.max(0) as u64;
+                let _ = commons
+                    .register_steward(
+                        &candidate,
+                        &candidate,
+                        term_days,
+                        bond,
+                        proposal_id,
+                        None,
+                        vec![],
+                    )
+                    .await;
+            });
+        }
+    });
+
+    // ── Build test app ────────────────────────────────────────────────────────
+    let jwt_secret = b"e2e-appoint-steward-test-secret-32b".to_vec();
+    let auth_manager = Arc::new(AuthManager::new(jwt_secret));
+    let ip_limiter = Arc::new(IpRateLimiter::new_for_auth());
+    let governance_manager = Arc::new(GovernanceManager::new());
+
+    let gov_ctx = GovernanceContext {
+        manager: governance_manager.clone(),
+        emitter: NoopEventEmitter,
+        on_charter_accepted: None,
+        on_proposal_accepted: Some(on_proposal_accepted),
+    };
+
+    let auth_mw = HttpAuthentication::bearer(jwt_auth);
+    let app = test::init_service(
+        App::new()
+            .app_data(web::Data::new(auth_manager.clone()))
+            .app_data(web::Data::new(ip_limiter.clone()))
+            .service(
+                web::scope("/v1")
+                    .service(api::auth::challenge)
+                    .service(api::auth::verify)
+                    .service(
+                        web::scope("/gov")
+                            .configure({
+                                let ctx = gov_ctx.clone();
+                                move |cfg| {
+                                    icn_governance_actor::http::configure::configure(
+                                        cfg,
+                                        ctx.clone(),
+                                    )
+                                }
+                            })
+                            .wrap(auth_mw),
+                    ),
+            ),
+    )
+    .await;
+
+    let actor_bundle = IdentityBundle::generate().expect("IdentityBundle");
+    let actor_did = actor_bundle.did().to_string();
+    let token = get_jwt(&app, &actor_did, &actor_bundle).await;
+
+    // ── Create governance domain + AppointSteward proposal via manager ────────
+    // SdisProposal::AppointSteward is an internal governance primitive not exposed
+    // via the HTTP create-proposal API — use the manager directly and drive
+    // open/vote/close through the live HTTP handlers.
+    let actor_governance_did: icn_identity::Did = actor_did.parse().expect("actor DID parse");
+    let domain_id_gov = GovernanceDomainId(DOMAIN_ID.to_string());
+    governance_manager
+        .create_domain(
+            domain_id_gov.clone(),
+            "E2E Steward Appointment Test Cooperative".to_string(),
+            "cooperative".to_string(),
+            GovernanceParams::new(50, 50, 86_400),
+            MembershipConfig {
+                source: MembershipSource::StaticList(vec![actor_governance_did.clone()]),
+            },
+        )
+        .await
+        .expect("create_domain");
+
+    let proposal_id_val = ProposalId("e2e-appoint-steward-1".to_string());
+    governance_manager
+        .create_proposal(
+            proposal_id_val.clone(),
+            domain_id_gov,
+            actor_governance_did,
+            "Appoint steward candidate".to_string(),
+            "Candidate meets all requirements.".to_string(),
+            ProposalPayload::Sdis {
+                proposal: SdisProposal::AppointSteward {
+                    candidate: candidate_did.clone(),
+                    sponsors: vec![],
+                    region: "northeast".to_string(),
+                    bond_amount: 100,
+                    term_length: 365 * 86_400, // 1 year
+                },
+            },
+            ProposalScope::Local,
+        )
+        .await
+        .expect("create_proposal");
+
+    let proposal_id = proposal_id_val.0.clone();
+
+    // ── Open → Vote → Close ───────────────────────────────────────────────────
+    let open_resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri(&format!("/v1/gov/proposals/{proposal_id}/open"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
+            .set_json(json!({ "voting_period_seconds": 3600 }))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(open_resp.status().as_u16(), 200, "open_proposal");
+
+    let vote_resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri(&format!("/v1/gov/proposals/{proposal_id}/vote"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
+            .set_json(json!({ "choice": "for" }))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(vote_resp.status().as_u16(), 200, "cast_vote");
+
+    let close_resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri(&format!("/v1/gov/proposals/{proposal_id}/close"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(close_resp.status().as_u16(), 200, "close_proposal");
+
+    // ── Poll until the steward record is created ──────────────────────────────
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
+    loop {
+        if commons_mgr
+            .is_active_steward(&candidate_did)
+            .await
+            .expect("is_active_steward poll")
+        {
+            break;
+        }
+        if tokio::time::Instant::now() >= deadline {
+            panic!(
+                "timed out waiting for steward record to be created \
+                 after AppointSteward proposal accepted"
             );
         }
         tokio::task::yield_now().await;
