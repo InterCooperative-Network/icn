@@ -609,7 +609,37 @@ impl GovernanceManager {
         if let Some(ref handle) = self.governance_handle {
             return handle.close_proposal(proposal_id).await;
         }
+        self.close_proposal_inner(proposal_id, None)
+    }
 
+    /// Close a proposal counting only votes from currently-eligible members.
+    ///
+    /// Called by the HTTP handler after revalidating voter commons standing at
+    /// close time. Votes from members who lost standing (Suspended/Candidate)
+    /// after casting are excluded from the effective tally. This ensures
+    /// institutional legitimacy holds across the full proposal lifecycle —
+    /// standing must be valid at resolution, not just at vote-cast time.
+    ///
+    /// Only valid when the in-memory store is active (`governance_handle` must
+    /// be `None`). The handle-backed path computes its own tally internally.
+    pub async fn close_proposal_filtered(
+        &self,
+        proposal_id: ProposalId,
+        eligible_voters: &HashSet<Did>,
+    ) -> Result<()> {
+        anyhow::ensure!(
+            self.governance_handle.is_none(),
+            "close_proposal_filtered is not supported with GovernanceHandle backend; \
+             perform standing revalidation at the application layer before delegating"
+        );
+        self.close_proposal_inner(proposal_id, Some(eligible_voters))
+    }
+
+    fn close_proposal_inner(
+        &self,
+        proposal_id: ProposalId,
+        eligible_voters: Option<&HashSet<Did>>,
+    ) -> Result<()> {
         let mut proposals = self.proposals.write().map_err(|e| {
             anyhow::anyhow!("Proposals storage lock poisoned (concurrent panic?): {e}")
         })?;
@@ -639,7 +669,16 @@ impl GovernanceManager {
                 )
             })?;
 
-            let proposal_votes = votes.get(&proposal_id).cloned().unwrap_or_default();
+            let raw_votes = votes.get(&proposal_id).cloned().unwrap_or_default();
+            // If an eligibility filter was provided (close-time standing revalidation),
+            // exclude votes from members who no longer hold active commons standing.
+            let proposal_votes: Vec<_> = match eligible_voters {
+                Some(eligible) => raw_votes
+                    .into_iter()
+                    .filter(|v| eligible.contains(&v.voter))
+                    .collect(),
+                None => raw_votes,
+            };
             let tally = VoteTally::from(proposal_votes.clone());
 
             let total_members = match &domain.config.membership.source {
