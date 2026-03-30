@@ -1009,10 +1009,43 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
         )));
     }
 
-    ctx.manager
-        .close_proposal(proposal_id.clone())
-        .await
-        .map_err(anyhow_to_api)?;
+    // Close-time standing revalidation: if a member_checker is configured,
+    // revalidate each voter's current commons standing before tallying.
+    // Votes from members who lost standing (Suspended/Candidate) after casting
+    // are excluded from the effective tally — standing must hold at resolution,
+    // not just at vote-cast time. This converts entry-only gating to lifecycle
+    // legitimacy: the constitutional guarantee holds across the full decision arc.
+    let eligible_voters: Option<std::collections::HashSet<Did>> =
+        if let Some(ref checker) = ctx.member_checker {
+            let voter_dids = ctx
+                .manager
+                .get_voter_dids(&proposal_id)
+                .await
+                .map_err(anyhow_to_api)?;
+            let domain_id = proposal.domain_id.0.clone();
+            let mut eligible = std::collections::HashSet::new();
+            for did in voter_dids {
+                if checker(did.clone(), domain_id.clone()).await {
+                    eligible.insert(did);
+                }
+            }
+            Some(eligible)
+        } else {
+            None
+        };
+
+    match eligible_voters {
+        Some(ref eligible) => ctx
+            .manager
+            .close_proposal_filtered(proposal_id.clone(), eligible)
+            .await
+            .map_err(anyhow_to_api)?,
+        None => ctx
+            .manager
+            .close_proposal(proposal_id.clone())
+            .await
+            .map_err(anyhow_to_api)?,
+    }
 
     let proposal = ctx
         .manager
