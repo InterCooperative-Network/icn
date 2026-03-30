@@ -1041,6 +1041,14 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
                     reason: reason.clone(),
                     duration_seconds: *duration_seconds,
                 },
+                icn_governance::ProposalPayload::UnfreezeMember { member, reason } => {
+                    GovernanceEffect::UnfreezeMember {
+                        proposal_id: proposal.id.0.clone(),
+                        domain_id: proposal.domain_id.0.clone(),
+                        member: member.clone(),
+                        reason: reason.clone(),
+                    }
+                }
                 _ => GovernanceEffect::Unhandled {
                     proposal_id: proposal.id.0.clone(),
                     payload_type: proposal.payload.type_name().to_owned(),

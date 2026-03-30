@@ -154,7 +154,7 @@ async fn test_e2e_freeze_member_suspends_commons_affiliation() {
                 }
             });
         }
-        GovernanceEffect::Unhandled { .. } => {}
+        GovernanceEffect::UnfreezeMember { .. } | GovernanceEffect::Unhandled { .. } => {}
     });
 
     // ── Build test app (governance + auth) ───────────────────────────────────
@@ -314,6 +314,228 @@ async fn test_e2e_freeze_member_suspends_commons_affiliation() {
             panic!(
                 "timed out waiting for commons affiliation to become Suspended \
                  after FreezeMember proposal accepted; last seen status: {:?}",
+                aff.membership_status
+            );
+        }
+        tokio::task::yield_now().await;
+    }
+}
+
+/// E2E institutional flow — UnfreezeMember:
+///   member suspended in commons → UnfreezeMember proposal accepted →
+///   commons affiliation reinstated to Member.
+///
+/// Proves the symmetric restorative path: `GovernanceEffect::UnfreezeMember`
+/// → `CommonsManager::update_affiliation_status(..., Member)`.
+#[actix_web::test]
+async fn test_e2e_unfreeze_member_reinstates_commons_affiliation() {
+    const DOMAIN_ID: &str = "test-coop-unfreeze-e2e";
+
+    // ── Commons setup ────────────────────────────────────────────────────────
+    let commons_mgr = Arc::new(CommonsManager::new());
+
+    let steward_kp = KeyPair::generate().expect("steward KeyPair");
+    let steward_did = steward_kp.did().clone();
+    let target_kp = KeyPair::generate().expect("target KeyPair");
+    let target_did = target_kp.did().clone();
+
+    let anchor = commons_mgr
+        .create_anchor_from_enrollment(&target_did, Some(&steward_did))
+        .await
+        .expect("create_anchor_from_enrollment");
+    let anchor_id = hex::encode(anchor.id());
+
+    let holder = commons_mgr
+        .create_holder_from_anchor(&anchor_id, &target_did)
+        .await
+        .expect("create_holder_from_anchor");
+    let holder_id = hex::encode(holder.id());
+
+    commons_mgr
+        .join_jurisdiction(
+            &holder_id,
+            JurisdictionId::new(DOMAIN_ID),
+            vec![MembershipCapability::Vote],
+        )
+        .await
+        .expect("join_jurisdiction");
+
+    // Pre-condition: manually set affiliation to Suspended (simulates a prior FreezeMember).
+    commons_mgr
+        .update_affiliation_status(
+            &holder_id,
+            &JurisdictionId::new(DOMAIN_ID),
+            MembershipStatus::Suspended,
+        )
+        .await
+        .expect("pre-condition: suspend affiliation");
+
+    {
+        let affiliations = commons_mgr
+            .list_affiliations(&holder_id)
+            .await
+            .expect("list");
+        let aff = affiliations
+            .iter()
+            .find(|a| a.jurisdiction_id == JurisdictionId::new(DOMAIN_ID))
+            .expect("affiliation exists");
+        assert_eq!(
+            aff.membership_status,
+            MembershipStatus::Suspended,
+            "pre-condition: affiliation must be Suspended before UnfreezeMember"
+        );
+    }
+
+    // ── Wire commons-only hook ────────────────────────────────────────────────
+    let commons_mgr_for_hook = commons_mgr.clone();
+    let on_proposal_accepted: ProposalAcceptedHook = Arc::new(move |effect| {
+        if let GovernanceEffect::UnfreezeMember {
+            domain_id, member, ..
+        } = effect
+        {
+            let commons = commons_mgr_for_hook.clone();
+            tokio::spawn(async move {
+                let jurisdiction = JurisdictionId::new(&domain_id);
+                if let Ok(Some(h)) = commons.get_holder_by_did(&member).await {
+                    let hid = hex::encode(h.id());
+                    let _ = commons
+                        .update_affiliation_status(&hid, &jurisdiction, MembershipStatus::Member)
+                        .await;
+                }
+            });
+        }
+    });
+
+    // ── Build test app ────────────────────────────────────────────────────────
+    let jwt_secret = b"e2e-unfreeze-flow-test-secret-min32".to_vec();
+    let auth_manager = Arc::new(AuthManager::new(jwt_secret));
+    let ip_limiter = Arc::new(IpRateLimiter::new_for_auth());
+    let governance_manager = Arc::new(GovernanceManager::new());
+
+    let gov_ctx = GovernanceContext {
+        manager: governance_manager.clone(),
+        emitter: NoopEventEmitter,
+        on_charter_accepted: None,
+        on_proposal_accepted: Some(on_proposal_accepted),
+    };
+
+    let auth_mw = HttpAuthentication::bearer(jwt_auth);
+    let app = test::init_service(
+        App::new()
+            .app_data(web::Data::new(auth_manager.clone()))
+            .app_data(web::Data::new(ip_limiter.clone()))
+            .service(
+                web::scope("/v1")
+                    .service(api::auth::challenge)
+                    .service(api::auth::verify)
+                    .service(
+                        web::scope("/gov")
+                            .configure({
+                                let ctx = gov_ctx.clone();
+                                move |cfg| {
+                                    icn_governance_actor::http::configure::configure(
+                                        cfg,
+                                        ctx.clone(),
+                                    )
+                                }
+                            })
+                            .wrap(auth_mw),
+                    ),
+            ),
+    )
+    .await;
+
+    let actor_bundle = IdentityBundle::generate().expect("IdentityBundle");
+    let actor_did = actor_bundle.did().to_string();
+    let token = get_jwt(&app, &actor_did, &actor_bundle).await;
+
+    // ── Create governance domain + UnfreezeMember proposal via manager ────────
+    let actor_governance_did: icn_identity::Did = actor_did.parse().expect("actor DID parse");
+    let domain_id_gov = GovernanceDomainId(DOMAIN_ID.to_string());
+    governance_manager
+        .create_domain(
+            domain_id_gov.clone(),
+            "E2E Unfreeze Test Cooperative".to_string(),
+            "cooperative".to_string(),
+            GovernanceParams::new(50, 50, 86_400),
+            MembershipConfig {
+                source: MembershipSource::StaticList(vec![actor_governance_did.clone()]),
+            },
+        )
+        .await
+        .expect("create_domain");
+
+    let proposal_id_val = ProposalId("e2e-unfreeze-1".to_string());
+    governance_manager
+        .create_proposal(
+            proposal_id_val.clone(),
+            domain_id_gov,
+            actor_governance_did,
+            "Reinstate suspended member".to_string(),
+            "Investigation complete; member cleared.".to_string(),
+            ProposalPayload::UnfreezeMember {
+                member: target_did.clone(),
+                reason: "Investigation complete, no wrongdoing found".to_string(),
+            },
+            ProposalScope::Local,
+        )
+        .await
+        .expect("create_proposal");
+
+    let proposal_id = proposal_id_val.0.clone();
+
+    // ── Open → Vote → Close ───────────────────────────────────────────────────
+    let open_resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri(&format!("/v1/gov/proposals/{proposal_id}/open"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
+            .set_json(json!({ "voting_period_seconds": 3600 }))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(open_resp.status().as_u16(), 200, "open_proposal");
+
+    let vote_resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri(&format!("/v1/gov/proposals/{proposal_id}/vote"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
+            .set_json(json!({ "choice": "for" }))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(vote_resp.status().as_u16(), 200, "cast_vote");
+
+    let close_resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri(&format!("/v1/gov/proposals/{proposal_id}/close"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(close_resp.status().as_u16(), 200, "close_proposal");
+
+    // ── Poll until affiliation is reinstated ──────────────────────────────────
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
+    loop {
+        let affiliations = commons_mgr
+            .list_affiliations(&holder_id)
+            .await
+            .expect("list_affiliations after unfreeze");
+        let aff = affiliations
+            .iter()
+            .find(|a| a.jurisdiction_id == JurisdictionId::new(DOMAIN_ID))
+            .expect("affiliation must still exist after UnfreezeMember");
+
+        if aff.membership_status == MembershipStatus::Member {
+            break;
+        }
+        if tokio::time::Instant::now() >= deadline {
+            panic!(
+                "timed out waiting for commons affiliation to become Member \
+                 after UnfreezeMember proposal accepted; last seen status: {:?}",
                 aff.membership_status
             );
         }

@@ -30,20 +30,43 @@ use super::handlers;
 /// should log warnings internally rather than panicking.
 pub type CharterAcceptedHook = Arc<dyn Fn(String, String) + Send + Sync>;
 
-/// A translated governance acceptance ready for kernel dispatch.
+/// A governance acceptance translated into a dispatchable institutional effect.
 ///
-/// Built by the governance app from an accepted `Proposal`. The gateway
-/// receives this type without importing any `icn_governance` domain types,
-/// satisfying the meaning-firewall boundary.
+/// ## Role in the architecture
+///
+/// `GovernanceEffect` is the **institutional effects boundary** between the
+/// governance app and gateway-layer subsystems (ledger, commons, etc.). The
+/// governance app translates an accepted `Proposal`'s domain `ProposalPayload`
+/// into a `GovernanceEffect` before invoking `ProposalAcceptedHook`. The
+/// gateway therefore never needs to import `icn_governance` domain types —
+/// satisfying the meaning-firewall constraint.
+///
+/// Adding a new governance-driven institutional action means:
+/// 1. Add a variant here describing the effect (gateway-level semantics only).
+/// 2. Map the `ProposalPayload` → this variant in `handlers::close_proposal`.
+/// 3. Dispatch it in the `on_proposal_accepted` hook in `server.rs`.
+///
+/// When CCL-governed institutional logic is introduced, `GovernanceEffect`
+/// variants will be the translation target from CCL execution results —
+/// keeping the dispatch table here and the wiring in `server.rs` unchanged.
 #[derive(Debug, Clone)]
 pub enum GovernanceEffect {
-    /// A member should be frozen in the cooperative's ledger.
+    /// A member should be frozen: block ledger transactions and suspend commons
+    /// affiliation in the proposal's jurisdiction.
     FreezeMember {
         proposal_id: String,
         domain_id: String,
         member: Did,
         reason: String,
         duration_seconds: Option<u64>,
+    },
+    /// A previously frozen member should be unfrozen: unblock ledger and
+    /// reinstate commons affiliation to `Member` standing.
+    UnfreezeMember {
+        proposal_id: String,
+        domain_id: String,
+        member: Did,
+        reason: String,
     },
     /// Accepted but no gateway execution handler is wired for this payload type.
     Unhandled {
