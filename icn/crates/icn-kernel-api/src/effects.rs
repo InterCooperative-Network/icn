@@ -97,6 +97,9 @@ pub enum TreasuryEffect {
     Allocate {
         treasury_did: String,
         budget_id: String,
+        /// DID of the member or entity receiving this allocation.
+        /// Empty string indicates a general budget reservation without a specific recipient.
+        recipient_did: String,
         amount: i64,
         currency: String,
     },
@@ -743,6 +746,7 @@ mod tests {
             TreasuryEffect::Allocate {
                 treasury_did: "did:icn:t1".into(),
                 budget_id: "b1".into(),
+                recipient_did: "did:icn:member1".into(),
                 amount: 500,
                 currency: "USD".into(),
             },

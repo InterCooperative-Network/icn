@@ -333,6 +333,7 @@ pub fn treasury_effect_to_operation(effect: &TreasuryEffect) -> TreasuryOperatio
         TreasuryEffect::Allocate {
             treasury_did,
             budget_id,
+            recipient_did,
             amount,
             currency,
         } => TreasuryOperation {
@@ -340,8 +341,13 @@ pub fn treasury_effect_to_operation(effect: &TreasuryEffect) -> TreasuryOperatio
             operation_type: TreasuryOperationType::Allocate,
             amount: *amount,
             currency: currency.clone(),
-            recipient: Some(budget_id.clone()),
-            memo: "Budget allocation".to_string(),
+            // Use recipient_did if present; fall back to budget_id for general reservations.
+            recipient: if recipient_did.is_empty() {
+                Some(budget_id.clone())
+            } else {
+                Some(recipient_did.clone())
+            },
+            memo: format!("Budget allocation from {budget_id}"),
             expected_nonce: None,
             decision_hash: None,
         },
