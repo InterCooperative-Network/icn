@@ -104,6 +104,11 @@ pub enum TreasuryEffect {
         recipient_did: String,
         amount: i64,
         currency: String,
+        /// Governance decision hash used as idempotency key by the treasury executor.
+        /// Empty string (default) causes the executor to defer this effect until a
+        /// decision hash is available — preserving backward compat with older serialized effects.
+        #[serde(default)]
+        decision_hash: String,
     },
     /// Transfer between accounts
     Transfer {
@@ -751,6 +756,7 @@ mod tests {
                 recipient_did: "did:icn:member1".into(),
                 amount: 500,
                 currency: "USD".into(),
+                decision_hash: "h-alloc-1".into(),
             },
             TreasuryEffect::Transfer {
                 from_did: "did:icn:a".into(),
@@ -891,6 +897,7 @@ mod tests {
             recipient_did: "did:icn:alice".into(),
             amount: 100,
             currency: "HOURS".into(),
+            decision_hash: "hash-q1-alloc".into(),
         };
         let op = treasury_effect_to_operation(&effect);
         assert_eq!(

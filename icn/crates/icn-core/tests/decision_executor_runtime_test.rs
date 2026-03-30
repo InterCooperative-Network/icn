@@ -594,6 +594,140 @@ async fn test_recovery_does_not_re_execute_confirmed() {
     assert_eq!(after.ledger_entry_ids, vec!["entry-1"]);
 }
 
+/// Test: TreasuryEffect::Allocate with a populated decision_hash executes and produces a
+/// real ledger entry (debit treasury → credit budget liability account).
+///
+/// This test proves "governance allocation → actual economic state change":
+/// - `decision_hash` on the effect flows through `treasury_effect_to_operation`
+/// - `execute_treasury_operation` does NOT hit the Deferred path
+/// - A ledger entry is committed with Governance provenance
+/// - The execution record reaches `Confirmed`
+#[tokio::test(flavor = "multi_thread")]
+async fn test_allocate_with_decision_hash_executes_and_produces_ledger_entry() {
+    use icn_core::supervisor::decision_executor::DecisionExecutor;
+    use icn_core::supervisor::effect_dispatcher::EffectDispatcher;
+    use icn_core::supervisor::governance_executor::KernelGovernanceExecutor;
+
+    let tmp = TempDir::new().unwrap();
+    let ledger_store_path = tmp.path().join("ledger");
+    let exec_store_path = tmp.path().join("execution");
+    std::fs::create_dir_all(&ledger_store_path).unwrap();
+    std::fs::create_dir_all(&exec_store_path).unwrap();
+
+    let decision_hash = "hash-allocate-executes-1";
+    let decision_receipt_id = "receipt-allocate-executes-1";
+    let treasury_did = RT_TEST_TREASURY;
+    let budget_id = "alloc-member-services-receipt-allocate-executes-1";
+    let recipient_did = "did:icn:zGyGKxMyg1p9SsHfm15MkNUu1u9TN2JtTspcdmrtGUdse";
+
+    let ledger_store = Arc::new(SledStore::open(&ledger_store_path).unwrap());
+    let ledger = Arc::new(TokioRwLock::new(
+        icn_ledger::Ledger::new(ledger_store).unwrap(),
+    ));
+
+    let ledger_service = Arc::new(LedgerServiceImpl::new(
+        ledger.clone(),
+        Arc::new(AllowAllOracle::wildcard()),
+        treasury_did.parse().unwrap(),
+    ));
+    let kernel_executor =
+        KernelGovernanceExecutor::new(Arc::new(StubParamStore)).with_ledger_service(ledger_service);
+
+    let dispatcher = Arc::new(EffectDispatcher::new(Arc::new(kernel_executor)));
+    let exec_backend = Arc::new(SledStore::open(&exec_store_path).unwrap());
+    let exec_store = Arc::new(SledExecutionStore::new(exec_backend));
+    let executor = DecisionExecutor::new(dispatcher, exec_store.clone());
+
+    let effects = vec![KernelEffect::Treasury(TreasuryEffect::Allocate {
+        treasury_did: treasury_did.to_string(),
+        budget_id: budget_id.to_string(),
+        recipient_did: recipient_did.to_string(),
+        amount: 1_000,
+        currency: "HOURS".to_string(),
+        decision_hash: decision_hash.to_string(),
+    })];
+
+    let results = executor
+        .execute(
+            effects,
+            decision_receipt_id,
+            decision_hash,
+            "proposal-alloc-1",
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(results.len(), 1, "expected one EffectResult");
+    assert!(
+        results[0].success,
+        "Allocate with decision_hash must succeed (not deferred), got: {:?}",
+        results[0].message
+    );
+    assert!(
+        !results[0].not_executed,
+        "Allocate must not be marked not_executed when decision_hash is present"
+    );
+    assert!(
+        !results[0].message.contains("Deferred"),
+        "expected no Deferred message, got: {:?}",
+        results[0].message
+    );
+
+    let record = exec_store.get(decision_hash).unwrap().unwrap();
+    assert_eq!(
+        record.status,
+        ExecutionStatus::Confirmed,
+        "execution record must be Confirmed after successful Allocate"
+    );
+    assert_eq!(
+        record.ledger_entry_ids.len(),
+        1,
+        "exactly one ledger entry expected for Allocate"
+    );
+
+    let entry_hash = content_hash_from_hex(&record.ledger_entry_ids[0]).unwrap();
+    let ledger_guard = ledger.read().await;
+    let entry = ledger_guard.get_entry(&entry_hash).unwrap().unwrap();
+    assert!(
+        matches!(
+            &entry.provenance,
+            ProvenanceRef::Governance { receipt_id, decision_hash: dh }
+                if receipt_id == decision_receipt_id && dh == decision_hash
+        ),
+        "ledger entry provenance must carry governance receipt_id and decision_hash"
+    );
+    // Verify account deltas: treasury debit + budget liability credit
+    assert_eq!(
+        entry.accounts.len(),
+        2,
+        "Allocate must produce exactly 2 account deltas"
+    );
+    let debit = entry
+        .accounts
+        .iter()
+        .find(|a| a.debit.is_some())
+        .expect("must have a debit delta");
+    let credit = entry
+        .accounts
+        .iter()
+        .find(|a| a.credit.is_some())
+        .expect("must have a credit delta");
+    assert_eq!(
+        debit.account_id.as_str(),
+        treasury_did,
+        "debit must be from treasury"
+    );
+    assert_eq!(debit.debit, Some(1_000));
+    assert_eq!(credit.credit, Some(1_000));
+    // Budget liability DID is a synthetic hash-derived DID — verify it's NOT the recipient_did
+    // (which would be wrong: recipient_did is audit metadata, not the ledger routing key)
+    assert_ne!(
+        credit.account_id.as_str(),
+        recipient_did,
+        "credit must go to budget liability account (budget_id), not directly to recipient_did"
+    );
+}
+
 /// Test 10: Treasury execution appends a real ledger entry with governance provenance,
 /// and the entry + execution record survive restart.
 #[tokio::test(flavor = "multi_thread")]
@@ -966,6 +1100,9 @@ async fn test_deferred_outcome_sled_persists_not_executed() {
         recipient_did: "did:icn:member-test".to_string(),
         amount: 50,
         currency: "HOURS".to_string(),
+        // Deliberately empty: empty decision_hash → None in TreasuryOperation → Deferred path.
+        // Tests backward compat for effects persisted before decision_hash was added to Allocate.
+        decision_hash: String::new(),
     })];
 
     {

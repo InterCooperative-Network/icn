@@ -336,6 +336,7 @@ pub fn treasury_effect_to_operation(effect: &TreasuryEffect) -> TreasuryOperatio
             recipient_did,
             amount,
             currency,
+            decision_hash,
         } => TreasuryOperation {
             treasury_id: treasury_did.clone(),
             operation_type: TreasuryOperationType::Allocate,
@@ -352,7 +353,11 @@ pub fn treasury_effect_to_operation(effect: &TreasuryEffect) -> TreasuryOperatio
                 format!("Budget allocation from {budget_id} → {recipient_did}")
             },
             expected_nonce: None,
-            decision_hash: None,
+            decision_hash: if decision_hash.is_empty() {
+                None
+            } else {
+                Some(decision_hash.clone())
+            },
         },
         TreasuryEffect::Transfer {
             from_did,
