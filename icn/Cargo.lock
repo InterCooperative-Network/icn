@@ -2869,6 +2869,7 @@ dependencies = [
  "icn-governance",
  "icn-identity",
  "icn-obs",
+ "icn-testkit",
  "icn-time",
  "lru",
  "rand 0.8.5",

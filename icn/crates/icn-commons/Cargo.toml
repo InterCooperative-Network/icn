@@ -30,3 +30,8 @@ tempfile = "3"
 tokio = { version = "1", features = ["full"] }
 hex = "0.4"
 ed25519-dalek.workspace = true
+icn-testkit.workspace = true
+
+[[bin]]
+name = "commons_restart_helper"
+path = "src/bin/commons_restart_helper.rs"
