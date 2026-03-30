@@ -136,7 +136,6 @@ async fn run_proposal(
     actor
         .submit(GovernanceCommand::CloseProposal {
             proposal_id: proposal_id.clone(),
-            eligible_voters: None,
         })
         .await?;
 
