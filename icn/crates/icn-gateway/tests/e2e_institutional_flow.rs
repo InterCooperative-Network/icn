@@ -81,6 +81,64 @@ async fn get_jwt(
     token_resp["token"].as_str().expect("token").to_string()
 }
 
+/// Drive the open → vote → close lifecycle for an already-created proposal.
+///
+/// This is purely structural boilerplate shared across all three E2E tests:
+/// the HTTP calls are identical regardless of proposal payload type.
+async fn run_proposal_lifecycle(
+    app: &impl actix_web::dev::Service<
+        actix_http::Request,
+        Response = actix_web::dev::ServiceResponse,
+        Error = actix_web::Error,
+    >,
+    proposal_id: &str,
+    token: &str,
+) {
+    let open_resp = test::call_service(
+        app,
+        test::TestRequest::post()
+            .uri(&format!("/v1/gov/proposals/{proposal_id}/open"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
+            .set_json(json!({ "voting_period_seconds": 3600 }))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(
+        open_resp.status().as_u16(),
+        200,
+        "open_proposal {proposal_id} must return 200"
+    );
+
+    let vote_resp = test::call_service(
+        app,
+        test::TestRequest::post()
+            .uri(&format!("/v1/gov/proposals/{proposal_id}/vote"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
+            .set_json(json!({ "choice": "for" }))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(
+        vote_resp.status().as_u16(),
+        200,
+        "cast_vote {proposal_id} must return 200"
+    );
+
+    let close_resp = test::call_service(
+        app,
+        test::TestRequest::post()
+            .uri(&format!("/v1/gov/proposals/{proposal_id}/close"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(
+        close_resp.status().as_u16(),
+        200,
+        "close_proposal {proposal_id} must return 200"
+    );
+}
+
 /// E2E institutional flow:
 ///   enroll target → join jurisdiction → FreezeMember proposal accepted →
 ///   commons affiliation becomes Suspended.
@@ -155,6 +213,7 @@ async fn test_e2e_freeze_member_suspends_commons_affiliation() {
             });
         }
         GovernanceEffect::UnfreezeMember { .. }
+        | GovernanceEffect::DeployCharter { .. }
         | GovernanceEffect::AppointSteward { .. }
         | GovernanceEffect::RevokeSteward { .. }
         | GovernanceEffect::Unhandled { .. } => {}
@@ -546,17 +605,21 @@ async fn test_e2e_unfreeze_member_reinstates_commons_affiliation() {
     }
 }
 
-/// E2E institutional flow — AppointSteward:
-///   enroll candidate (Strong POP) → AppointSteward proposal accepted →
-///   commons steward record created and active.
+/// E2E institutional flow — AppointSteward scoped to chartered domain:
+///   charter proposal accepted → DeployCharter registers domain in commons →
+///   AppointSteward proposal accepted → steward created with jurisdiction = domain_id.
 ///
-/// Proves that `GovernanceEffect::AppointSteward` → `CommonsManager::register_steward()`
-/// — the first exercise of delegated authority via the institutional-effects boundary.
-/// Unlike FreezeMember/UnfreezeMember (which modify membership status), this mutates
-/// a distinct institutional role: stewardship.
+/// Proves the scoped steward appointment path:
+/// 1. `GovernanceEffect::DeployCharter` → `CommonsManager::store_charter()` (minimal stub)
+/// 2. `GovernanceEffect::AppointSteward { domain_id }` → `CommonsManager::register_steward(..., Some(domain_id))`
+/// 3. Resulting steward record has `jurisdiction == Some(domain_id)`
+///
+/// Before this, AppointSteward passed `None` for jurisdiction because commons validates
+/// jurisdiction strings against its charter store, which was never populated by
+/// governance acceptance.  The Charter proposal now emits `DeployCharter`, closing the gap.
 #[actix_web::test]
-async fn test_e2e_appoint_steward_creates_steward_record() {
-    const DOMAIN_ID: &str = "test-coop-appoint-steward-e2e";
+async fn test_e2e_appoint_steward_scoped_to_chartered_domain() {
+    const DOMAIN_ID: &str = "test-coop-scoped-steward-e2e";
 
     // ── Commons setup ────────────────────────────────────────────────────────
     let commons_mgr = Arc::new(CommonsManager::new());
@@ -579,7 +642,15 @@ async fn test_e2e_appoint_steward_creates_steward_record() {
         .await
         .expect("create_holder_from_anchor");
 
-    // Pre-condition: candidate is not yet a steward.
+    // Pre-condition: no charter for this domain yet, candidate is not a steward.
+    assert!(
+        commons_mgr
+            .get_charter_by_domain(DOMAIN_ID)
+            .await
+            .expect("pre-check charter")
+            .is_none(),
+        "charter must not exist before Charter proposal"
+    );
     assert!(
         !commons_mgr
             .is_active_steward(&candidate_did)
@@ -588,38 +659,57 @@ async fn test_e2e_appoint_steward_creates_steward_record() {
         "candidate must not be a steward before AppointSteward proposal"
     );
 
-    // ── Wire the AppointSteward hook (mirrors server.rs AppointSteward path) ─
+    // ── Wire the hook: DeployCharter + AppointSteward (mirrors server.rs paths) ─
     let commons_mgr_for_hook = commons_mgr.clone();
     let on_proposal_accepted: ProposalAcceptedHook = Arc::new(move |effect| {
-        if let GovernanceEffect::AppointSteward {
-            proposal_id,
-            candidate,
-            bond_amount,
-            term_length_seconds,
-            ..
-        } = effect
-        {
-            let commons = commons_mgr_for_hook.clone();
-            tokio::spawn(async move {
-                let term_days = term_length_seconds / 86_400;
-                let bond = bond_amount.max(0) as u64;
-                let _ = commons
-                    .register_steward(
-                        &candidate,
-                        &candidate,
-                        term_days,
-                        bond,
-                        proposal_id,
-                        None,
-                        vec![],
-                    )
-                    .await;
-            });
+        let commons = commons_mgr_for_hook.clone();
+        match effect {
+            GovernanceEffect::DeployCharter { charter_id, .. } => {
+                tokio::spawn(async move {
+                    use icn_governance::{
+                        Charter, DisputePolicy, GovernanceConfig, MembershipPolicy, OrgType,
+                    };
+                    let charter = Charter::new(
+                        OrgType::Cooperative,
+                        charter_id.clone(),
+                        charter_id.clone(),
+                        GovernanceConfig::cooperative_default(),
+                        MembershipPolicy::default(),
+                        DisputePolicy::default(),
+                    );
+                    let _ = commons.store_charter(charter).await;
+                });
+            }
+            GovernanceEffect::AppointSteward {
+                proposal_id,
+                domain_id,
+                candidate,
+                bond_amount,
+                term_length_seconds,
+                ..
+            } => {
+                tokio::spawn(async move {
+                    let term_days = term_length_seconds / 86_400;
+                    let bond = bond_amount.max(0) as u64;
+                    let _ = commons
+                        .register_steward(
+                            &candidate,
+                            &candidate,
+                            term_days,
+                            bond,
+                            proposal_id,
+                            Some(domain_id),
+                            vec![],
+                        )
+                        .await;
+                });
+            }
+            _ => {}
         }
     });
 
     // ── Build test app ────────────────────────────────────────────────────────
-    let jwt_secret = b"e2e-appoint-steward-test-secret-32b".to_vec();
+    let jwt_secret = b"e2e-scoped-steward-test-secret-32bc".to_vec();
     let auth_manager = Arc::new(AuthManager::new(jwt_secret));
     let ip_limiter = Arc::new(IpRateLimiter::new_for_auth());
     let governance_manager = Arc::new(GovernanceManager::new());
@@ -661,16 +751,12 @@ async fn test_e2e_appoint_steward_creates_steward_record() {
     let actor_did = actor_bundle.did().to_string();
     let token = get_jwt(&app, &actor_did, &actor_bundle).await;
 
-    // ── Create governance domain + AppointSteward proposal via manager ────────
-    // SdisProposal::AppointSteward is an internal governance primitive not exposed
-    // via the HTTP create-proposal API — use the manager directly and drive
-    // open/vote/close through the live HTTP handlers.
     let actor_governance_did: icn_identity::Did = actor_did.parse().expect("actor DID parse");
     let domain_id_gov = GovernanceDomainId(DOMAIN_ID.to_string());
     governance_manager
         .create_domain(
             domain_id_gov.clone(),
-            "E2E Steward Appointment Test Cooperative".to_string(),
+            "E2E Scoped Steward Test Cooperative".to_string(),
             "cooperative".to_string(),
             GovernanceParams::new(50, 50, 86_400),
             MembershipConfig {
@@ -680,13 +766,52 @@ async fn test_e2e_appoint_steward_creates_steward_record() {
         .await
         .expect("create_domain");
 
-    let proposal_id_val = ProposalId("e2e-appoint-steward-1".to_string());
+    // ── Step 1: Charter proposal → DeployCharter → commons charter registered ─
+    // charter_id equals domain_id by governance convention.
+    let charter_proposal_id = ProposalId("e2e-charter-1".to_string());
     governance_manager
         .create_proposal(
-            proposal_id_val.clone(),
+            charter_proposal_id.clone(),
+            domain_id_gov.clone(),
+            actor_governance_did.clone(),
+            "Ratify cooperative charter".to_string(),
+            "Adopts the founding charter for this domain.".to_string(),
+            ProposalPayload::Charter {
+                charter_id: DOMAIN_ID.to_string(),
+                charter_yaml: "schema_version: v0\ntype: cooperative\n".to_string(),
+            },
+            ProposalScope::Local,
+        )
+        .await
+        .expect("create charter proposal");
+
+    run_proposal_lifecycle(&app, &charter_proposal_id.0, &token).await;
+
+    // Poll until the charter is registered in commons (DeployCharter hook fires async).
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
+    loop {
+        if commons_mgr
+            .get_charter_by_domain(DOMAIN_ID)
+            .await
+            .expect("charter poll")
+            .is_some()
+        {
+            break;
+        }
+        if tokio::time::Instant::now() >= deadline {
+            panic!("timed out waiting for DeployCharter to register commons charter");
+        }
+        tokio::task::yield_now().await;
+    }
+
+    // ── Step 2: AppointSteward proposal → steward registered with jurisdiction ─
+    let appoint_proposal_id = ProposalId("e2e-appoint-scoped-1".to_string());
+    governance_manager
+        .create_proposal(
+            appoint_proposal_id.clone(),
             domain_id_gov,
             actor_governance_did,
-            "Appoint steward candidate".to_string(),
+            "Appoint scoped steward".to_string(),
             "Candidate meets all requirements.".to_string(),
             ProposalPayload::Sdis {
                 proposal: SdisProposal::AppointSteward {
@@ -700,44 +825,11 @@ async fn test_e2e_appoint_steward_creates_steward_record() {
             ProposalScope::Local,
         )
         .await
-        .expect("create_proposal");
+        .expect("create appoint proposal");
 
-    let proposal_id = proposal_id_val.0.clone();
+    run_proposal_lifecycle(&app, &appoint_proposal_id.0, &token).await;
 
-    // ── Open → Vote → Close ───────────────────────────────────────────────────
-    let open_resp = test::call_service(
-        &app,
-        test::TestRequest::post()
-            .uri(&format!("/v1/gov/proposals/{proposal_id}/open"))
-            .insert_header(("Authorization", format!("Bearer {token}")))
-            .set_json(json!({ "voting_period_seconds": 3600 }))
-            .to_request(),
-    )
-    .await;
-    assert_eq!(open_resp.status().as_u16(), 200, "open_proposal");
-
-    let vote_resp = test::call_service(
-        &app,
-        test::TestRequest::post()
-            .uri(&format!("/v1/gov/proposals/{proposal_id}/vote"))
-            .insert_header(("Authorization", format!("Bearer {token}")))
-            .set_json(json!({ "choice": "for" }))
-            .to_request(),
-    )
-    .await;
-    assert_eq!(vote_resp.status().as_u16(), 200, "cast_vote");
-
-    let close_resp = test::call_service(
-        &app,
-        test::TestRequest::post()
-            .uri(&format!("/v1/gov/proposals/{proposal_id}/close"))
-            .insert_header(("Authorization", format!("Bearer {token}")))
-            .to_request(),
-    )
-    .await;
-    assert_eq!(close_resp.status().as_u16(), 200, "close_proposal");
-
-    // ── Poll until the steward record is created ──────────────────────────────
+    // Poll until steward record is created.
     let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
     loop {
         if commons_mgr
@@ -755,4 +847,17 @@ async fn test_e2e_appoint_steward_creates_steward_record() {
         }
         tokio::task::yield_now().await;
     }
+
+    // ── Assert: steward record is scoped to the governance domain ─────────────
+    let record = commons_mgr
+        .get_steward_by_did(&candidate_did)
+        .await
+        .expect("get_steward_by_did")
+        .expect("steward record must exist");
+    assert_eq!(
+        record.jurisdiction,
+        Some(DOMAIN_ID.to_string()),
+        "steward must be scoped to the chartered domain, got: {:?}",
+        record.jurisdiction
+    );
 }

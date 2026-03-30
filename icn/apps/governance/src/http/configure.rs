@@ -50,12 +50,13 @@ pub type CharterAcceptedHook = Arc<dyn Fn(String, String) + Send + Sync>;
 /// variants will be the translation target from CCL execution results —
 /// keeping the dispatch table here and the wiring in `server.rs` unchanged.
 ///
-/// | Proposal payload            | GovernanceEffect      | Ledger          | Commons              |
-/// |-----------------------------|-----------------------|-----------------|----------------------|
-/// | `FreezeMember`              | `FreezeMember`        | freeze          | Suspended            |
-/// | `UnfreezeMember`            | `UnfreezeMember`      | unfreeze        | Member               |
-/// | `Sdis::AppointSteward`      | `AppointSteward`      | —               | register steward     |
-/// | `Sdis::RemoveSteward`       | `RevokeSteward`       | —               | revoke steward       |
+/// | Proposal payload            | GovernanceEffect      | Ledger          | Commons                    |
+/// |-----------------------------|-----------------------|-----------------|----------------------------|
+/// | `FreezeMember`              | `FreezeMember`        | freeze          | Suspended                  |
+/// | `UnfreezeMember`            | `UnfreezeMember`      | unfreeze        | Member                     |
+/// | `Charter`                   | `DeployCharter`       | —               | store_charter (stub)       |
+/// | `Sdis::AppointSteward`      | `AppointSteward`      | —               | register_steward (scoped)  |
+/// | `Sdis::RemoveSteward`       | `RevokeSteward`       | —               | revoke_steward             |
 #[derive(Debug, Clone)]
 pub enum GovernanceEffect {
     /// A member should be frozen: block ledger transactions and suspend commons
@@ -75,11 +76,27 @@ pub enum GovernanceEffect {
         member: Did,
         reason: String,
     },
-    /// A candidate should be registered as a steward in commons.
+    /// A governance-ratified charter should be registered in the commons charter store.
+    ///
+    /// This creates a minimal `Charter` record keyed by `domain_id`, making the
+    /// domain known to the commons layer. Required before steward appointment can
+    /// bind to this domain as a jurisdiction.
+    ///
+    /// `domain_id` equals `charter_id` per governance convention (the charter ID
+    /// is the stable domain identifier, e.g. the cooperative's name or DID).
+    DeployCharter {
+        proposal_id: String,
+        /// Governance `charter_id` — used as both the charter identifier and domain key.
+        charter_id: String,
+    },
+    /// A candidate should be registered as a steward in commons, scoped to a
+    /// governance domain that must already have a ratified charter.
     ///
     /// The candidate must already have a Commons Holder record with Strong POP level.
     AppointSteward {
         proposal_id: String,
+        /// Governance domain the appointment was approved in; used as jurisdiction.
+        domain_id: String,
         candidate: Did,
         region: String,
         bond_amount: i64,
