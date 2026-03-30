@@ -153,7 +153,6 @@ async fn test_allocation_receipt_chain_end_to_end() -> Result<()> {
     actor
         .submit(GovernanceCommand::CloseProposal {
             proposal_id: proposal_id.clone(),
-            eligible_voters: None,
         })
         .await?;
 
