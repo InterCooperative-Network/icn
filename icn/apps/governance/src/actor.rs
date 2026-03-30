@@ -1677,7 +1677,10 @@ impl GovernanceActor {
                     tally.add_vote(v);
                 }
 
-                // Resolve eligible membership (list needed for delegation resolution)
+                // Resolve eligible membership (list needed for delegation resolution).
+                // eligible_count uses the FULL member list as the quorum denominator —
+                // standing revalidation filters whose votes count but does not shrink
+                // the community for quorum purposes.
                 let eligible_members = self.resolver.resolve_members(&domain)?;
                 let eligible_count = eligible_members.len();
 
@@ -1691,12 +1694,26 @@ impl GovernanceActor {
                 }
 
                 // Close-time liquid democracy: expand delegated votes for non-voters.
-                // For each eligible member who did NOT vote directly, resolve their
-                // delegation chain. If the terminal delegate voted, attribute their
-                // choice to the absent member. Direct votes always take precedence.
+                //
+                // Delegation scope: when standing revalidation is active (`eligible_voters`
+                // is Some), only members with CURRENT standing can have delegation applied.
+                // A member who lost standing cannot have their absent weight flow through
+                // their delegation record — their absence must contribute to quorum failure,
+                // not be silently covered by a pre-existing delegation.
+                //
+                // Without a standing filter (eligible_voters=None), the full member list
+                // is used and any active delegation is honoured.
+                let delegation_scope: Vec<Did> = match &eligible_voters {
+                    Some(filter) => eligible_members
+                        .iter()
+                        .filter(|m| filter.contains(m))
+                        .cloned()
+                        .collect(),
+                    None => eligible_members.clone(),
+                };
                 self.apply_delegation_to_tally(
                     &votes,
-                    &eligible_members,
+                    &delegation_scope,
                     &proposal.domain_id,
                     &proposal_id,
                     &mut tally,
