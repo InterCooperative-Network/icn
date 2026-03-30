@@ -178,6 +178,12 @@ pub enum GovernanceCommand {
     CloseProposal {
         /// Proposal to close
         proposal_id: ProposalId,
+        /// Optional set of eligible voter DIDs for close-time standing revalidation.
+        ///
+        /// When `Some`, only votes from DIDs in this set are counted in the tally.
+        /// Votes from members who lost commons standing after casting are excluded.
+        /// When `None`, all cast votes are counted (no eligibility filter applied).
+        eligible_voters: Option<std::collections::HashSet<Did>>,
     },
     /// Emergency veto - marks a proposal as vetoed
     VetoProposal {
@@ -961,8 +967,23 @@ impl icn_governance::GovernanceOps for GovernanceHandle {
     }
 
     async fn close_proposal(&self, proposal_id: ProposalId) -> Result<()> {
-        self.submit(GovernanceCommand::CloseProposal { proposal_id })
-            .await
+        self.submit(GovernanceCommand::CloseProposal {
+            proposal_id,
+            eligible_voters: None,
+        })
+        .await
+    }
+
+    async fn close_proposal_filtered(
+        &self,
+        proposal_id: ProposalId,
+        eligible_voters: &std::collections::HashSet<Did>,
+    ) -> Result<()> {
+        self.submit(GovernanceCommand::CloseProposal {
+            proposal_id,
+            eligible_voters: Some(eligible_voters.clone()),
+        })
+        .await
     }
 
     async fn update_domain_membership(
@@ -1189,6 +1210,7 @@ impl GovernanceActor {
                                     info!("Auto-closing expired proposal: {}", proposal_id.0);
                                     if let Err(e) = handle_clone.submit(GovernanceCommand::CloseProposal {
                                         proposal_id: proposal_id.clone(),
+                                        eligible_voters: None,
                                     }).await {
                                         // May fail if proposal was manually closed (race condition - expected)
                                         warn!("Scheduled close for proposal {} skipped: {}", proposal_id.0, e);
@@ -1619,7 +1641,10 @@ impl GovernanceActor {
                 info!("✓ Vote cast: {:?}", choice);
             }
 
-            GovernanceCommand::CloseProposal { proposal_id } => {
+            GovernanceCommand::CloseProposal {
+                proposal_id,
+                eligible_voters,
+            } => {
                 info!("Closing proposal: {}", proposal_id.0);
 
                 // Notify scheduler to cancel any pending events (if scheduled)
@@ -1635,8 +1660,18 @@ impl GovernanceActor {
                     .load_domain(&proposal.domain_id)?
                     .ok_or_else(|| anyhow::anyhow!("Domain not found: {}", proposal.domain_id.0))?;
 
-                // Load and tally votes (keep votes for proof generation)
-                let votes = self.load_votes(&proposal_id)?;
+                // Load all cast votes, then apply close-time eligibility filter if provided.
+                // When `eligible_voters` is Some (from handler-level standing revalidation),
+                // votes from members who lost commons standing after casting are excluded.
+                // The proof records only the votes that counted in the final decision.
+                let all_votes = self.load_votes(&proposal_id)?;
+                let votes: Vec<Vote> = match &eligible_voters {
+                    Some(filter) => all_votes
+                        .into_iter()
+                        .filter(|v| filter.contains(&v.voter))
+                        .collect(),
+                    None => all_votes,
+                };
                 let mut tally = VoteTally::empty();
                 for v in &votes {
                     tally.add_vote(v);
