@@ -140,6 +140,7 @@ async fn lifecycle_proposal(
     actor
         .submit(GovernanceCommand::CloseProposal {
             proposal_id: proposal_id.clone(),
+            eligible_voters: None,
         })
         .await?;
 
@@ -264,6 +265,97 @@ async fn test_direct_vote_overrides_delegation() -> Result<()> {
         accepted_count(&captured),
         1,
         "Bob's direct For vote should not be replaced by Carol's Against via delegation"
+    );
+
+    Ok(())
+}
+
+/// --- Test 4: Standing revalidation blocks delegation for ineligible members ---
+///
+/// A member who LOST standing AND delegated their vote should NOT have their
+/// absent weight flow through delegation when standing revalidation is active.
+///
+/// This tests the interaction between PR #1461 (standing revalidation) and
+/// PR #1462 (delegation resolution).
+///
+/// Setup: 3 members, quorum=67%, approval=50%
+///   Bob loses standing before close (simulated via eligible_voters filter)
+///   Bob delegated to Alice (who votes For)
+///   Only Alice votes directly
+///
+/// With correct interaction:
+///   eligible_voters = {Alice, Carol} (Bob excluded — lost standing)
+///   delegation_scope = intersection of eligible_members ∩ eligible_voters = {Alice, Carol}
+///   Bob is NOT in delegation_scope → delegation NOT applied for Bob
+///   effective votes = 1 (Alice direct For only)
+///   quorum_required = (3*67)/100 = 2; 1 < 2 → NoQuorum → no ProposalAccepted
+///
+/// Without the fix (buggy):
+///   delegation_scope = all eligible_members including Bob
+///   Bob's delegation to Alice fires → For=2 (Alice direct + Bob delegated)
+///   2 >= 2 quorum → Accepted (wrong!)
+#[tokio::test]
+async fn test_lost_standing_member_delegation_blocked() -> Result<()> {
+    let (actor, captured, _sub, alice_did, bob_did, carol_did, domain_id) =
+        make_three_member_actor(67, 50).await?;
+
+    // Bob delegates to Alice before losing standing
+    let delegation = Delegation::new(bob_did.clone(), alice_did.clone(), DelegationScope::Blanket);
+    actor
+        .submit(GovernanceCommand::CreateDelegation { delegation })
+        .await?;
+
+    // Create and open proposal
+    let proposal_id = ProposalId::generate();
+    actor
+        .submit(GovernanceCommand::CreateProposal {
+            proposal_id: proposal_id.clone(),
+            domain_id: domain_id.clone(),
+            title: "Standing-delegation interaction test".to_string(),
+            description: "Bob lost standing; should not delegate".to_string(),
+            payload: ProposalPayload::Text {
+                body: "Test motion".to_string(),
+            },
+            scope: ProposalScope::Local,
+        })
+        .await?;
+    actor
+        .submit(GovernanceCommand::OpenProposal {
+            proposal_id: proposal_id.clone(),
+            voting_period_seconds: 3600,
+        })
+        .await?;
+
+    // Only Alice votes
+    actor
+        .submit(GovernanceCommand::CastVote {
+            proposal_id: proposal_id.clone(),
+            choice: VoteChoice::For,
+            voter: alice_did.clone(),
+            comment: None,
+        })
+        .await?;
+
+    // Simulate standing revalidation: Bob lost standing before close.
+    // Only Alice and Carol are currently eligible (Bob excluded).
+    let mut eligible = std::collections::HashSet::new();
+    eligible.insert(alice_did.clone());
+    eligible.insert(carol_did.clone());
+
+    actor
+        .submit(GovernanceCommand::CloseProposal {
+            proposal_id: proposal_id.clone(),
+            eligible_voters: Some(eligible),
+        })
+        .await?;
+
+    // With correct behavior: Bob's delegation is blocked (he lost standing).
+    // Only Alice's direct For vote counts. 1 < quorum_required(2) → NoQuorum.
+    assert_eq!(
+        accepted_count(&captured),
+        0,
+        "Member who lost standing must not have delegation applied — their absence \
+         should contribute to quorum failure, not be covered by a pre-existing delegation"
     );
 
     Ok(())
