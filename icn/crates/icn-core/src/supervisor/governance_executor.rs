@@ -1086,10 +1086,36 @@ impl FederationExecutor for KernelFederationExecutor {
                     }
                 }
                 FederationOperationType::EstablishClearing => {
+                    let coop_b_did = match operation.target_id.as_deref().filter(|s| !s.is_empty())
+                    {
+                        Some(did) => did.to_string(),
+                        None => {
+                            return Ok(ExecutionOutcome::Failed {
+                                receipt_id: receipt_id.clone(),
+                                reason:
+                                    "EstablishClearing: missing or empty target_id (coop_b_did)"
+                                        .to_string(),
+                            });
+                        }
+                    };
+                    let agreement_id = match operation
+                        .agreement_hash
+                        .as_deref()
+                        .filter(|s| !s.is_empty())
+                    {
+                        Some(id) => id.to_string(),
+                        None => {
+                            return Ok(ExecutionOutcome::Failed {
+                                receipt_id: receipt_id.clone(),
+                                reason: "EstablishClearing: missing or empty agreement_hash (agreement_id)".to_string(),
+                            });
+                        }
+                    };
+                    let log_coop_b = coop_b_did.clone();
                     let request = icn_kernel_api::FederationClearingRequest {
                         coop_a_did: operation.coop_did.clone(),
-                        coop_b_did: operation.target_id.clone().unwrap_or_default(),
-                        agreement_id: operation.agreement_hash.clone().unwrap_or_default(),
+                        coop_b_did,
+                        agreement_id,
                         decision_receipt_id: receipt_id.to_string(),
                         decision_hash: operation.decision_hash.clone().unwrap_or_default(),
                     };
@@ -1105,9 +1131,7 @@ impl FederationExecutor for KernelFederationExecutor {
                             receipt_id: receipt_id.clone(),
                             effects: vec![format!(
                                 "Clearing established: {} <-> {} -> state_hash={}",
-                                operation.coop_did,
-                                operation.target_id.unwrap_or_default(),
-                                result.state_change_hash
+                                operation.coop_did, log_coop_b, result.state_change_hash
                             )],
                         })
                     } else {

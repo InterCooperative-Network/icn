@@ -257,14 +257,26 @@ impl FederationService for FederationServiceImpl {
             "Establishing bilateral clearing agreement"
         );
 
-        let coop_a_did_parsed = Did::from_str(&request.coop_a_did).unwrap_or_else(|_| {
-            let signing_key = ed25519_dalek::SigningKey::from_bytes(&[2u8; 32]);
-            Did::from_public_key(&signing_key.verifying_key())
-        });
-        let coop_b_did_parsed = Did::from_str(&request.coop_b_did).unwrap_or_else(|_| {
-            let signing_key = ed25519_dalek::SigningKey::from_bytes(&[3u8; 32]);
-            Did::from_public_key(&signing_key.verifying_key())
-        });
+        let coop_a_did_parsed = match Did::from_str(&request.coop_a_did) {
+            Ok(did) => did,
+            Err(e) => {
+                return Ok(FederationClearingResult {
+                    success: false,
+                    state_change_hash: String::new(),
+                    error: Some(format!("Invalid coop_a_did '{}': {e}", request.coop_a_did)),
+                });
+            }
+        };
+        let coop_b_did_parsed = match Did::from_str(&request.coop_b_did) {
+            Ok(did) => did,
+            Err(e) => {
+                return Ok(FederationClearingResult {
+                    success: false,
+                    state_change_hash: String::new(),
+                    error: Some(format!("Invalid coop_b_did '{}': {e}", request.coop_b_did)),
+                });
+            }
+        };
 
         let agreement = BilateralClearingAgreement::new(
             request.agreement_id.clone(),
@@ -330,6 +342,13 @@ mod tests {
         let signing_key = SigningKey::from_bytes(&[0u8; 32]);
         let verifying_key = signing_key.verifying_key();
         Did::from_public_key(&verifying_key)
+    }
+
+    /// Generate a valid DID string from a seed byte.
+    fn make_test_did_str(seed: u8) -> String {
+        let signing_key = SigningKey::from_bytes(&[seed; 32]);
+        let verifying_key = signing_key.verifying_key();
+        Did::from_public_key(&verifying_key).to_string()
     }
 
     fn make_own_info() -> CooperativeInfo {
@@ -615,8 +634,8 @@ mod tests {
         let service = FederationServiceImpl::new(registry).with_clearing_manager(clearing.clone());
 
         let request = FederationClearingRequest {
-            coop_a_did: "did:icn:zCoopAlpha12345678901234567890123".to_string(),
-            coop_b_did: "did:icn:zCoopBeta1234567890123456789012345".to_string(),
+            coop_a_did: make_test_did_str(2),
+            coop_b_did: make_test_did_str(3),
             agreement_id: "sha256:clearing-agreement-governance-hash".to_string(),
             decision_receipt_id: "gov:proposal:clearing:receipt:test-001".to_string(),
             decision_hash: "sha256:clearing-decision-hash".to_string(),
@@ -668,6 +687,61 @@ mod tests {
         assert!(
             result.error.is_some(),
             "Should report an error explaining why"
+        );
+    }
+
+    #[test]
+    fn test_establish_clearing_fails_on_invalid_did() {
+        let (registry, _reg_temp) = make_test_registry();
+        let clearing_temp = tempfile::tempdir().expect("Failed to create clearing temp dir");
+        let clearing_store =
+            Arc::new(SledStore::open(clearing_temp.path()).expect("Failed to open clearing store"));
+        let clearing = Arc::new(
+            ClearingManager::new(clearing_store, "coop-alpha".to_string())
+                .expect("Failed to create clearing manager"),
+        );
+        let service = FederationServiceImpl::new(registry).with_clearing_manager(clearing.clone());
+
+        // Invalid coop_a_did
+        let result_a = service
+            .establish_clearing(FederationClearingRequest {
+                coop_a_did: "not-a-did".to_string(),
+                coop_b_did: make_test_did_str(3),
+                agreement_id: "sha256:invalid-a".to_string(),
+                decision_receipt_id: "gov:test".to_string(),
+                decision_hash: "sha256:test".to_string(),
+            })
+            .unwrap();
+        assert!(!result_a.success, "Invalid coop_a_did should fail");
+        assert!(
+            result_a
+                .error
+                .as_deref()
+                .unwrap_or("")
+                .contains("coop_a_did"),
+            "Error should mention coop_a_did: {:?}",
+            result_a.error
+        );
+
+        // Invalid coop_b_did
+        let result_b = service
+            .establish_clearing(FederationClearingRequest {
+                coop_a_did: make_test_did_str(2),
+                coop_b_did: "also-not-a-did".to_string(),
+                agreement_id: "sha256:invalid-b".to_string(),
+                decision_receipt_id: "gov:test".to_string(),
+                decision_hash: "sha256:test".to_string(),
+            })
+            .unwrap();
+        assert!(!result_b.success, "Invalid coop_b_did should fail");
+        assert!(
+            result_b
+                .error
+                .as_deref()
+                .unwrap_or("")
+                .contains("coop_b_did"),
+            "Error should mention coop_b_did: {:?}",
+            result_b.error
         );
     }
 }
