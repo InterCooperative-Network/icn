@@ -225,10 +225,10 @@ impl EffectExecutor for DefaultEffectExecutor {
             KernelEffect::Treasury(TreasuryEffect::DistributeSurplus { .. }) => Ok(EffectResult {
                 effect_id: decision_receipt_id.to_string(),
                 success: false,
-                message: "DistributeSurplus: multi-recipient surplus distribution is not implemented in DefaultEffectExecutor (no balances changed)".to_string(),
+                message: "DistributeSurplus: not implemented in DefaultEffectExecutor; wire a KernelGovernanceExecutor for surplus distribution (no balances changed)".to_string(),
                 state_change_hash: None,
                 ledger_entry_id: None,
-                not_executed: true,
+                not_executed: false,
             }),
             KernelEffect::Treasury(treasury_effect) => {
                 // Convert TreasuryEffect to TreasuryOperation
