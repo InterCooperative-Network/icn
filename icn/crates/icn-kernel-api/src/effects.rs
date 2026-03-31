@@ -112,6 +112,11 @@ pub enum TreasuryEffect {
         amount: i64,
         currency: String,
         memo: String,
+        /// Governance decision hash used as idempotency key by the treasury executor.
+        /// Empty string (default) causes the executor to defer this effect until a
+        /// decision hash is available — preserving backward compat with older serialized effects.
+        #[serde(default)]
+        decision_hash: String,
     },
     /// Surplus distribution to members
     DistributeSurplus {
@@ -758,6 +763,7 @@ mod tests {
                 amount: 200,
                 currency: "USD".into(),
                 memo: "xfer".into(),
+                decision_hash: String::new(),
             },
             TreasuryEffect::DistributeSurplus {
                 treasury_did: "did:icn:t1".into(),

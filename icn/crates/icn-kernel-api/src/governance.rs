@@ -360,6 +360,7 @@ pub fn treasury_effect_to_operation(effect: &TreasuryEffect) -> TreasuryOperatio
             amount,
             currency,
             memo,
+            decision_hash,
         } => TreasuryOperation {
             treasury_id: from_did.clone(),
             operation_type: TreasuryOperationType::Spend,
@@ -368,7 +369,11 @@ pub fn treasury_effect_to_operation(effect: &TreasuryEffect) -> TreasuryOperatio
             recipient: Some(to_did.clone()),
             memo: memo.clone(),
             expected_nonce: None,
-            decision_hash: None,
+            decision_hash: if decision_hash.is_empty() {
+                None
+            } else {
+                Some(decision_hash.clone())
+            },
         },
         TreasuryEffect::ReleaseEscrow {
             treasury_did,

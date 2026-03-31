@@ -318,6 +318,34 @@ impl KernelGovernanceExecutor {
                 })
             }
 
+            // RedeemShares and IssueBond: not yet implemented in this executor.
+            // Return an honest non-deferred failure rather than falling through to
+            // `treasury_effect_to_operation`'s `_ =>` placeholder which produces
+            // zeroed-out operation data and a misleading "missing provenance" Deferred.
+            TreasuryEffect::RedeemShares { .. } => {
+                warn!("RedeemShares received: not yet implemented in the kernel treasury executor");
+                Ok(EffectResult {
+                    effect_id: decision_receipt_id.to_string(),
+                    success: false,
+                    message: "RedeemShares: not yet implemented in the kernel treasury executor (no balances changed)".to_string(),
+                    state_change_hash: None,
+                    ledger_entry_id: None,
+                    not_executed: false,
+                })
+            }
+
+            TreasuryEffect::IssueBond { .. } => {
+                warn!("IssueBond received: not yet implemented in the kernel treasury executor");
+                Ok(EffectResult {
+                    effect_id: decision_receipt_id.to_string(),
+                    success: false,
+                    message: "IssueBond: not yet implemented in the kernel treasury executor (no balances changed)".to_string(),
+                    state_change_hash: None,
+                    ledger_entry_id: None,
+                    not_executed: false,
+                })
+            }
+
             // Path 3: All other treasury effects → direct delegation
             _ => {
                 let operation = treasury_effect_to_operation(&treasury_effect);
