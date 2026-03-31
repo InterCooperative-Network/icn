@@ -339,4 +339,60 @@ mod tests {
         let result = manager.list_cooperatives().await;
         assert!(result.is_err());
     }
+
+    /// Gateway API federation state must survive across restarts when using persistent storage.
+    ///
+    /// Architectural invariant (ADR 0011 / Option B): the gateway's own FederationManager
+    /// serves as the truth for API-originated federation state (agreements created via direct
+    /// API, not governance effects). This state must be durable — ephemeral temp store was the
+    /// root cause of the state-loss gap identified in the audit.
+    ///
+    /// This test proves that `new_with_storage()` gives independent manager instances access
+    /// to the same persisted cooperative registry data — simulating a restart scenario.
+    #[tokio::test]
+    async fn test_persistent_storage_survives_manager_reconstruction() {
+        let data_dir = tempfile::tempdir().expect("tempdir");
+        let path = data_dir.path().to_path_buf();
+
+        // First instance: create and initialize
+        {
+            let mgr = FederationManager::new_with_storage(path.clone())
+                .expect("new_with_storage");
+            let own_info = CooperativeInfo::new(
+                "alpha-coop".to_string(),
+                "Alpha Cooperative".to_string(),
+                test_did(),
+                FederationPolicy::default(),
+            );
+            mgr.init_registry(own_info).await.unwrap();
+            let peer = CooperativeInfo::new(
+                "beta-coop".to_string(),
+                "Beta Cooperative".to_string(),
+                test_did(),
+                FederationPolicy::default(),
+            );
+            mgr.register_cooperative(peer).await.unwrap();
+        }
+
+        // Second instance at the same path — simulates daemon restart
+        {
+            let mgr2 = FederationManager::new_with_storage(path.clone())
+                .expect("new_with_storage after restart");
+            // The registry is lazily loaded — re-init from the same store
+            let own_info = CooperativeInfo::new(
+                "alpha-coop".to_string(),
+                "Alpha Cooperative".to_string(),
+                test_did(),
+                FederationPolicy::default(),
+            );
+            mgr2.init_registry(own_info).await.unwrap();
+
+            let coops = mgr2.list_cooperatives().await.unwrap();
+            let found_beta = coops.iter().any(|c| c.coop_id == "beta-coop");
+            assert!(
+                found_beta,
+                "beta-coop registered in first instance must be visible after restart"
+            );
+        }
+    }
 }

@@ -725,13 +725,32 @@ impl GatewayServer {
         let _service_expiry_handle =
             crate::service_discovery_mgr::start_expiry_task(service_discovery_manager.clone(), 300);
 
-        // FederationManager always uses a TEMPORARY sled store (standalone/testing path).
-        // In daemon mode, clearing state is populated by the compute layer's clearing callbacks
-        // (via supervisor's ClearingManager) — not by gateway API writes. API federation
-        // creation endpoints are demo/testing paths until the full agreement lifecycle is wired.
-        // All READ paths for supervisor-owned federation state (e.g. clearing positions) prefer
-        // the federation_service_for_routes below.  See ADR 0011.
-        let federation_manager = Arc::new(FederationManager::new());
+        // FederationManager: uses persistent sled storage when data_dir is available, temp
+        // store otherwise (tests / no-data-dir deployments).
+        //
+        // ARCHITECTURE NOTE (ADR 0011):
+        // This store holds federation state that originates from gateway API calls
+        // (POST /clearing, POST /coops, POST /attestations, etc.).  It is intentionally
+        // SEPARATE from the supervisor-owned FederationService stores (populated by
+        // governance effects and compute-layer clearing callbacks).
+        //
+        // Production deployments should create agreements through governance (which writes
+        // to the supervisor's ClearingManager).  Gateway API federation endpoints are the
+        // standalone / direct-management path and serve as the truth for that origin path.
+        //
+        // Read paths for supervisor-owned state (e.g. clearing positions) prefer
+        // federation_service_for_routes below; see get_position() handler.
+        let federation_manager = if let Some(ref data_dir) = self.data_dir {
+            let mgr = FederationManager::new_with_storage(data_dir.clone())?;
+            info!(
+                "FederationManager: using persistent sled store at {:?}",
+                data_dir.join("federation_store")
+            );
+            Arc::new(mgr)
+        } else {
+            info!("FederationManager: using temporary in-memory store (no data_dir)");
+            Arc::new(FederationManager::new())
+        };
         // Wrap the optional FederationService handle so route handlers can get it from app_data.
         // When Some, route handlers MUST prefer this over federation_manager for reads.
         let federation_service_for_routes: Arc<

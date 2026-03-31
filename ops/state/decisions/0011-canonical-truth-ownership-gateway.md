@@ -104,24 +104,39 @@ supervisor/fallback relationship — they are parallel accounting systems. This 
 Future work should define where and how these planes are reconciled (e.g., inter-cooperative settlement
 reflecting back to member ledgers).
 
-### The Federation Manager Gap
+### The Federation Manager Write-Path Architecture
 
-`FederationManager` in the gateway **always** uses a temporary sled store (`FederationManager::new()`),
-regardless of whether a `FederationService` is present. This means:
+`FederationManager` is the gateway's own federation state layer for **API-originated** federation
+operations. It wraps `CooperativeRegistry`, `AttestationStore`, and `ClearingManager` from
+`icn-federation`, all sharing a single sled store.
 
-- **Writes through the gateway API** (agreements, vouches, attestations) are ephemeral — lost on restart.
-- **The supervisor's clearing state** is populated by compute-layer clearing callbacks, not gateway API writes.
-- `POST /clearing` → gateway's temp FederationManager → ephemeral
-- `GET /clearing/{id}/position` → supervisor's FederationService → persistent ✅ (post-fix)
+**Two origin paths for federation state (intentionally separate):**
 
-This is the intended architecture for the current phase: federation agreements originate in the compute
-layer (when tasks are executed and clearing callbacks fire), not from direct API creation. The gateway
-federation creation API endpoints are **testing/demo paths** until the full agreement lifecycle is
-implemented.
+| Origin | Path | Store | Owner |
+|--------|------|-------|-------|
+| Governance effects (CCL execution) | `establish_clearing`, `join_federation`, `vouch_for_cooperative` via `FederationServiceImpl` | `store_path/{federation,clearing,attestations,agreements}` | Supervisor |
+| Direct API (gateway endpoints) | `POST /clearing`, `POST /coops`, `POST /attestations`, etc. | `data_dir/federation_store` | Gateway |
+| Compute receipts | clearing callbacks via `AgreementManagerHandle` | `store_path/clearing` | Supervisor |
 
-`FederationManager::new_with_storage()` exists but is not called from `GatewayServer::setup()`. This is
-dead code / future intent. If federation agreement lifecycle management becomes a production concern,
-these writes should route through `FederationService`, not `FederationManager`.
+Both supervisor stores are populated at runtime; both persist across restarts. The gateway's store
+was originally ephemeral (temp sled) — **this was fixed**: `GatewayServer::setup()` now calls
+`FederationManager::new_with_storage(data_dir)` when `data_dir` is available.
+
+**The remaining separation**: the gateway's FederationManager and the supervisor's FederationService
+are separate stores. They share domain types but not state. A clearing agreement created via
+`POST /clearing` lives only in the gateway's store; `GET /clearing/{id}/position` reads from the
+supervisor's service (ADR 0011), and will return 404 for gateway-API-created agreements when
+the daemon is connected.
+
+This is acceptable for the current phase: production clearing agreements should originate from
+governance execution (which writes to the supervisor's stores). The gateway direct-write API is
+the standalone / direct-management path. Users calling `POST /clearing` in daemon mode should
+be aware this creates an agreement that the supervisor's scheduler does not manage.
+
+**Future unification path** (not yet implemented): The FederationService trait would need to grow
+`get_agreement(id)`, `list_agreements()`, `list_coops()`, `get_vouches()` read methods before write
+unification can make the gateway API into a full proxy for the supervisor's state. Alternatively,
+the gateway could gossip-sync its store with the supervisor's store at startup.
 
 ## Consequences
 
@@ -139,7 +154,8 @@ these writes should route through `FederationService`, not `FederationManager`.
 
 4. **The two-ledger architecture is intentional** and not a bug. Document it; do not conflate the planes.
 
-5. **`FederationManager::new_with_storage()`** should either be wired or removed. It is currently dead code.
+5. **`FederationManager::new_with_storage()`** is now wired in `GatewayServer::setup()`. Gateway API
+   federation state persists across restarts when `data_dir` is provided.
 
 ### Future Signals
 
@@ -152,8 +168,9 @@ If a future PR adds a supervisor service for a domain that the gateway previousl
 
 - PR #1474: `feat(federation): settlement execution + correctness fixes`
 - PR #1476: `feat(compute): receipt pipe to clearing (federated task accounting)`
-- PR #1477: `feat(federation): expose clearing position via service-owned state at gateway layer`
+- PR #1477: `feat(federation): expose clearing position via service-owned state at gateway layer` (also contains ADR + persistence fix)
 - `crates/icn-gateway/src/server.rs` — GatewayServer setup, all manager initialization
+- `crates/icn-gateway/src/federation_mgr.rs` — FederationManager (gateway's federation state layer)
 - `crates/icn-core/src/supervisor/actors.rs` — GatewayActorHandles (add new fields here)
 - `crates/icn-core/src/supervisor/init_gateway.rs` — GatewayHandles (mirrors GatewayActorHandles)
 - `crates/icn-core/src/supervisor/lifecycle.rs` — wiring logic for all supervisor→gateway bridges
