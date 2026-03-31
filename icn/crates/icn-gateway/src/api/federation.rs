@@ -158,27 +158,61 @@ pub async fn init_federation(
 // ============================================================================
 
 /// GET /federation/coops - List known cooperatives
+///
+/// When the daemon's FederationService is available, returns cooperatives registered via
+/// governance execution (`join_federation` effects). These carry full provenance.
+/// In standalone mode, falls back to the gateway's direct-management registry.
+///
+/// Note: the two paths are separate stores (ADR 0012). This endpoint always reflects
+/// exactly one path — it does not merge both.
 #[get("/coops")]
 pub async fn list_coops(
     http_req: HttpRequest,
     fed_mgr: web::Data<Arc<FederationManager>>,
+    federation_service: web::Data<Arc<Option<Arc<dyn FederationService>>>>,
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "federation:read")?;
 
+    // Prefer supervisor-owned service (governance-registered coops).
+    if let Some(ref service) = ***federation_service {
+        let coops = service
+            .list_cooperatives()
+            .map_err(|e| GatewayError::InternalError(e.to_string()))?;
+        return Ok(HttpResponse::Ok().json(coops));
+    }
+
+    // Standalone fallback: gateway-local FederationManager.
     let coops = fed_mgr.list_cooperatives().await?;
     Ok(HttpResponse::Ok().json(coops))
 }
 
 /// GET /federation/coops/{coop_id} - Get a specific cooperative
+///
+/// Prefers the supervisor-owned registry in daemon mode. Falls back to
+/// the gateway's direct-management registry in standalone mode.
 #[get("/coops/{coop_id}")]
 pub async fn get_coop(
     http_req: HttpRequest,
     fed_mgr: web::Data<Arc<FederationManager>>,
+    federation_service: web::Data<Arc<Option<Arc<dyn FederationService>>>>,
     path: web::Path<String>,
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "federation:read")?;
 
     let coop_id = path.into_inner();
+
+    if let Some(ref service) = ***federation_service {
+        return match service
+            .get_cooperative(&coop_id)
+            .map_err(|e| GatewayError::InternalError(e.to_string()))?
+        {
+            Some(coop) => Ok(HttpResponse::Ok().json(coop)),
+            None => Err(GatewayError::NotFound(format!(
+                "Cooperative not found: {coop_id}"
+            ))),
+        };
+    }
+
     match fed_mgr.get_cooperative(&coop_id).await? {
         Some(coop) => Ok(HttpResponse::Ok().json(coop)),
         None => Err(GatewayError::NotFound(format!(
@@ -229,17 +263,31 @@ pub async fn register_coop(
 // ============================================================================
 
 /// GET /federation/coops/{coop_id}/vouches - Get vouches for a cooperative
+///
+/// Prefers governance-originated vouch records from the supervisor's registry.
+/// Falls back to the gateway-local registry in standalone mode.
 #[get("/coops/{coop_id}/vouches")]
 pub async fn get_vouches(
     http_req: HttpRequest,
     fed_mgr: web::Data<Arc<FederationManager>>,
+    federation_service: web::Data<Arc<Option<Arc<dyn FederationService>>>>,
     path: web::Path<String>,
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "federation:read")?;
 
     let coop_id = path.into_inner();
-    let vouches = fed_mgr.get_vouches(&coop_id).await?;
 
+    if let Some(ref service) = ***federation_service {
+        let vouches = service
+            .get_vouches_for(&coop_id)
+            .map_err(|e| GatewayError::InternalError(e.to_string()))?;
+        return Ok(HttpResponse::Ok().json(serde_json::json!({
+            "coop_id": coop_id,
+            "vouches": vouches
+        })));
+    }
+
+    let vouches = fed_mgr.get_vouches(&coop_id).await?;
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "coop_id": coop_id,
         "vouches": vouches
@@ -733,6 +781,7 @@ pub async fn federation_connect(
 mod tests {
     use super::*;
     use actix_web::{test, App};
+    use icn_kernel_api::CooperativeView;
 
     #[actix_web::test]
     async fn test_federation_status_route_matches() {
@@ -825,6 +874,33 @@ mod tests {
             fn get_registration_provenance(&self, _coop_did: &str) -> Option<(String, String)> {
                 None
             }
+            fn list_cooperatives(&self) -> anyhow::Result<Vec<CooperativeView>> {
+                Ok(vec![CooperativeView {
+                    coop_id: "stub-coop".to_string(),
+                    name: "Stub Cooperative".to_string(),
+                    public_did: "did:icn:stub".to_string(),
+                    gateway_endpoints: vec![],
+                    capabilities: vec![],
+                    last_seen: 0,
+                }])
+            }
+            fn get_cooperative(&self, coop_id: &str) -> anyhow::Result<Option<CooperativeView>> {
+                if coop_id == "stub-coop" {
+                    Ok(Some(CooperativeView {
+                        coop_id: "stub-coop".to_string(),
+                        name: "Stub Cooperative".to_string(),
+                        public_did: "did:icn:stub".to_string(),
+                        gateway_endpoints: vec![],
+                        capabilities: vec![],
+                        last_seen: 0,
+                    }))
+                } else {
+                    Ok(None)
+                }
+            }
+            fn get_vouches_for(&self, _coop_id: &str) -> anyhow::Result<Vec<String>> {
+                Ok(vec!["did:icn:voucher-stub".to_string()])
+            }
         }
 
         let fed_mgr = Arc::new(FederationManager::new());
@@ -867,6 +943,246 @@ mod tests {
             "Response must come from StubFederationService, not local FederationManager"
         );
         assert_eq!(body["net_position"], 100);
+    }
+
+    /// Helper: build a service_for_routes (the double-wrapped Arc the gateway expects).
+    fn stub_service_data() -> Arc<Option<Arc<dyn FederationService>>> {
+        use icn_kernel_api::{
+            FederationClearingRequest, FederationClearingResult, FederationClearingSettleRequest,
+            FederationClearingSettleResult, FederationJoinRequest, FederationJoinResult,
+            FederationVouchRequest, FederationVouchResult,
+        };
+        struct Stub;
+        impl FederationService for Stub {
+            fn join_federation(
+                &self,
+                _: FederationJoinRequest,
+            ) -> anyhow::Result<FederationJoinResult> {
+                unimplemented!()
+            }
+            fn vouch_for_cooperative(
+                &self,
+                _: FederationVouchRequest,
+            ) -> anyhow::Result<FederationVouchResult> {
+                unimplemented!()
+            }
+            fn establish_clearing(
+                &self,
+                _: FederationClearingRequest,
+            ) -> anyhow::Result<FederationClearingResult> {
+                unimplemented!()
+            }
+            fn settle_clearing(
+                &self,
+                _: FederationClearingSettleRequest,
+            ) -> anyhow::Result<FederationClearingSettleResult> {
+                unimplemented!()
+            }
+            fn get_clearing_position(&self, _: &str) -> anyhow::Result<ClearingPositionView> {
+                unimplemented!()
+            }
+            fn is_registered(&self, _: &str) -> bool {
+                false
+            }
+            fn get_registration_provenance(&self, _: &str) -> Option<(String, String)> {
+                None
+            }
+            fn list_cooperatives(&self) -> anyhow::Result<Vec<CooperativeView>> {
+                Ok(vec![CooperativeView {
+                    coop_id: "governance-coop".to_string(),
+                    name: "Governance Cooperative".to_string(),
+                    public_did: "did:icn:gov".to_string(),
+                    gateway_endpoints: vec!["http://gov.local:8080".to_string()],
+                    capabilities: vec!["clearing".to_string()],
+                    last_seen: 1_000_000,
+                }])
+            }
+            fn get_cooperative(&self, coop_id: &str) -> anyhow::Result<Option<CooperativeView>> {
+                if coop_id == "governance-coop" {
+                    Ok(Some(CooperativeView {
+                        coop_id: "governance-coop".to_string(),
+                        name: "Governance Cooperative".to_string(),
+                        public_did: "did:icn:gov".to_string(),
+                        gateway_endpoints: vec![],
+                        capabilities: vec![],
+                        last_seen: 1_000_000,
+                    }))
+                } else {
+                    Ok(None)
+                }
+            }
+            fn get_vouches_for(&self, _: &str) -> anyhow::Result<Vec<String>> {
+                Ok(vec!["did:icn:voucher-gov".to_string()])
+            }
+        }
+        Arc::new(Some(Arc::new(Stub) as Arc<dyn FederationService>))
+    }
+
+    /// Verify that list_coops prefers FederationService over local FederationManager.
+    ///
+    /// Architectural invariant (ADR 0012 Step 1): when the supervisor's FederationService
+    /// is available, GET /federation/coops must return governance-registered coops, not
+    /// the gateway-local direct-management state.
+    #[actix_web::test]
+    async fn test_list_coops_prefers_federation_service() {
+        use actix_web::HttpMessage;
+
+        let fed_mgr = Arc::new(FederationManager::new());
+        let service_data = stub_service_data();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(fed_mgr.clone()))
+                .app_data(web::Data::new(service_data))
+                .service(web::scope("/v1/federation").service(list_coops)),
+        )
+        .await;
+
+        let claims = crate::auth::TokenClaims {
+            sub: "did:icn:test".to_string(),
+            iat: 1_000_000_000,
+            coop_id: "test-coop".to_string(),
+            scopes: vec!["federation:read".to_string()],
+            exp: 9_999_999_999,
+        };
+        let req = test::TestRequest::get()
+            .uri("/v1/federation/coops")
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        let coops = body.as_array().expect("expected array");
+        assert_eq!(
+            coops.len(),
+            1,
+            "should return exactly the stub-service coop"
+        );
+        assert_eq!(
+            coops[0]["coop_id"], "governance-coop",
+            "must come from FederationService (governance path), not FederationManager"
+        );
+    }
+
+    /// Verify that list_coops falls back to FederationManager when no service is present.
+    #[actix_web::test]
+    async fn test_list_coops_falls_back_to_fed_mgr_when_no_service() {
+        use actix_web::HttpMessage;
+
+        let fed_mgr = Arc::new(FederationManager::new());
+        // No service injected — None variant
+        let no_service: Arc<Option<Arc<dyn FederationService>>> = Arc::new(None);
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(fed_mgr.clone()))
+                .app_data(web::Data::new(no_service))
+                .service(web::scope("/v1/federation").service(list_coops)),
+        )
+        .await;
+
+        let claims = crate::auth::TokenClaims {
+            sub: "did:icn:test".to_string(),
+            iat: 1_000_000_000,
+            coop_id: "test-coop".to_string(),
+            scopes: vec!["federation:read".to_string()],
+            exp: 9_999_999_999,
+        };
+        let req = test::TestRequest::get()
+            .uri("/v1/federation/coops")
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        // FederationManager not initialized → returns error (no registry), but route matched
+        // (NOT 404). The exact error is an app concern; we just verify the fallback path fires.
+        assert_ne!(
+            resp.status().as_u16(),
+            404,
+            "route must match even without FederationService (fell through to fed_mgr path)"
+        );
+    }
+
+    /// Verify that get_coop returns from FederationService and 404s for unknown coops.
+    #[actix_web::test]
+    async fn test_get_coop_prefers_federation_service() {
+        use actix_web::HttpMessage;
+
+        let fed_mgr = Arc::new(FederationManager::new());
+        let service_data = stub_service_data();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(fed_mgr.clone()))
+                .app_data(web::Data::new(service_data))
+                .service(web::scope("/v1/federation").service(get_coop)),
+        )
+        .await;
+
+        let make_claims = || crate::auth::TokenClaims {
+            sub: "did:icn:test".to_string(),
+            iat: 1_000_000_000,
+            coop_id: "test-coop".to_string(),
+            scopes: vec!["federation:read".to_string()],
+            exp: 9_999_999_999,
+        };
+
+        // Known coop → 200
+        let req = test::TestRequest::get()
+            .uri("/v1/federation/coops/governance-coop")
+            .to_request();
+        req.extensions_mut().insert(make_claims());
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status().as_u16(), 200);
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["coop_id"], "governance-coop");
+
+        // Unknown coop → 404 (service returns None)
+        let req2 = test::TestRequest::get()
+            .uri("/v1/federation/coops/nonexistent-coop")
+            .to_request();
+        req2.extensions_mut().insert(make_claims());
+        let resp2 = test::call_service(&app, req2).await;
+        assert_eq!(resp2.status().as_u16(), 404);
+    }
+
+    /// Verify that get_vouches prefers FederationService over local manager.
+    #[actix_web::test]
+    async fn test_get_vouches_prefers_federation_service() {
+        use actix_web::HttpMessage;
+
+        let fed_mgr = Arc::new(FederationManager::new());
+        let service_data = stub_service_data();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(fed_mgr.clone()))
+                .app_data(web::Data::new(service_data))
+                .service(web::scope("/v1/federation").service(get_vouches)),
+        )
+        .await;
+
+        let claims = crate::auth::TokenClaims {
+            sub: "did:icn:test".to_string(),
+            iat: 1_000_000_000,
+            coop_id: "test-coop".to_string(),
+            scopes: vec!["federation:read".to_string()],
+            exp: 9_999_999_999,
+        };
+        let req = test::TestRequest::get()
+            .uri("/v1/federation/coops/any-coop/vouches")
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status().as_u16(), 200);
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(
+            body["vouches"][0], "did:icn:voucher-gov",
+            "must come from FederationService (governance path)"
+        );
     }
 
     /// Verify that empty scopes placed AFTER named scopes don't steal routes.

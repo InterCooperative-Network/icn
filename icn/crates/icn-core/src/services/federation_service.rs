@@ -602,6 +602,41 @@ impl FederationService for FederationServiceImpl {
         prov.get(coop_did)
             .map(|p| (p.decision_receipt_id.clone(), p.decision_hash.clone()))
     }
+
+    fn list_cooperatives(&self) -> Result<Vec<icn_kernel_api::CooperativeView>> {
+        let coops = self.registry.list()?;
+        Ok(coops
+            .into_iter()
+            .map(|c| icn_kernel_api::CooperativeView {
+                coop_id: c.coop_id,
+                name: c.name,
+                public_did: c.public_did.to_string(),
+                gateway_endpoints: c.gateway_endpoints,
+                capabilities: c.capabilities,
+                last_seen: c.last_seen,
+            })
+            .collect())
+    }
+
+    fn get_cooperative(&self, coop_id: &str) -> Result<Option<icn_kernel_api::CooperativeView>> {
+        Ok(self
+            .registry
+            .get(coop_id)?
+            .map(|c| icn_kernel_api::CooperativeView {
+                coop_id: c.coop_id,
+                name: c.name,
+                public_did: c.public_did.to_string(),
+                gateway_endpoints: c.gateway_endpoints,
+                capabilities: c.capabilities,
+                last_seen: c.last_seen,
+            }))
+    }
+
+    fn get_vouches_for(&self, coop_id: &str) -> Result<Vec<String>> {
+        self.registry
+            .get_vouches(coop_id)
+            .map_err(|e| anyhow::anyhow!("{}", e))
+    }
 }
 
 #[cfg(test)]

@@ -988,6 +988,30 @@ pub trait FederationService: Send + Sync {
     ///
     /// Returns (decision_receipt_id, decision_hash) if available.
     fn get_registration_provenance(&self, coop_did: &str) -> Option<(String, String)>;
+
+    // ── Read surface (ADR 0012 Step 1) ─────────────────────────────────────
+
+    /// List all cooperatives registered in the supervisor's federation registry.
+    ///
+    /// Returns only governance-originated state (cooperatives registered via
+    /// `join_federation` governance effects). Gateway-API-registered cooperatives
+    /// live in a separate store and are NOT included here (ADR 0012 / Model C).
+    ///
+    /// Returns an empty vec if the registry has no cooperatives yet.
+    fn list_cooperatives(&self) -> Result<Vec<CooperativeView>, anyhow::Error>;
+
+    /// Get a specific cooperative from the supervisor's federation registry.
+    ///
+    /// Returns `None` if the cooperative is not registered in the supervisor's
+    /// store. Gateway-API-registered cooperatives are not visible here.
+    fn get_cooperative(&self, coop_id: &str) -> Result<Option<CooperativeView>, anyhow::Error>;
+
+    /// Get vouches recorded for a cooperative in the supervisor's registry.
+    ///
+    /// Returns voucher DID strings from governance-originated vouch records
+    /// (`vouch_for_cooperative` effects). Does not include vouches created via
+    /// the gateway API path.
+    fn get_vouches_for(&self, coop_id: &str) -> Result<Vec<String>, anyhow::Error>;
 }
 
 // ============================================================================
@@ -1017,6 +1041,41 @@ pub struct ClearingPositionView {
     pub pending_count: usize,
     /// Unix timestamp of the last settlement that cleared this position.
     pub last_settlement_ts: u64,
+}
+
+// ============================================================================
+// Cooperative View (ADR 0012 Step 1 read DTO)
+// ============================================================================
+
+/// Kernel-API view of a registered cooperative.
+///
+/// A pruned, boundary-clean representation of a cooperative registration that
+/// does not expose federation-internal types (`FederationPolicy`, `CurrencyInfo`,
+/// `Did`, `Vouch`) across the service boundary.
+///
+/// Contains only the fields a gateway or consuming service needs for routing,
+/// display, and capability discovery. The `CooperativeInfo` storage type in
+/// `icn-federation` is richer but must not cross this boundary.
+///
+/// # Origin note
+///
+/// Values returned via `FederationService::list_cooperatives()` originate from
+/// governance execution (ADR 0012 / Model C). They represent the supervisor's
+/// canonical registry, not the gateway's direct-management state.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct CooperativeView {
+    /// Unique identifier for the cooperative.
+    pub coop_id: String,
+    /// Human-readable name.
+    pub name: String,
+    /// The cooperative's institutional DID (string form, not the icn-identity Did type).
+    pub public_did: String,
+    /// Known gateway API endpoints for this cooperative.
+    pub gateway_endpoints: Vec<String>,
+    /// Capability flags (e.g. "clearing", "attestations", "compute").
+    pub capabilities: Vec<String>,
+    /// Unix timestamp of the last observed announcement.
+    pub last_seen: u64,
 }
 
 // ============================================================================
