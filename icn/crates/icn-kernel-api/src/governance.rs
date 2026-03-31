@@ -333,6 +333,7 @@ pub fn treasury_effect_to_operation(effect: &TreasuryEffect) -> TreasuryOperatio
         TreasuryEffect::Allocate {
             treasury_did,
             budget_id,
+            recipient_did,
             amount,
             currency,
         } => TreasuryOperation {
@@ -340,8 +341,16 @@ pub fn treasury_effect_to_operation(effect: &TreasuryEffect) -> TreasuryOperatio
             operation_type: TreasuryOperationType::Allocate,
             amount: *amount,
             currency: currency.clone(),
+            // LedgerServiceImpl::submit_treasury_entry for Allocate uses `recipient` as the
+            // budget liability account key (via budget_liability_did). Always use budget_id
+            // here to preserve the CreateBudget → Allocate ledger linkage.
+            // recipient_did is carried in the memo for audit provenance only.
             recipient: Some(budget_id.clone()),
-            memo: "Budget allocation".to_string(),
+            memo: if recipient_did.is_empty() {
+                format!("Budget allocation from {budget_id}")
+            } else {
+                format!("Budget allocation from {budget_id} → {recipient_did}")
+            },
             expected_nonce: None,
             decision_hash: None,
         },

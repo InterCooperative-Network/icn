@@ -271,10 +271,8 @@ pub fn translate_payload_to_effects(
         // The budget_id includes the decision_receipt_id to prevent collision across
         // allocation rounds with the same purpose string.
         //
-        // NOTE: treasury_did is String::new() — filled by caller context, same pattern
-        // as Budget and other treasury translations. recipient attribution (from
-        // AllocationOption::recipient) is not yet expressible in TreasuryEffect::Allocate;
-        // it will be carried once the kernel type is extended.
+        // NOTE: treasury_did is wired from domain_id (caller context), same pattern
+        // as Budget and other treasury translations.
         ProposalPayload::Allocation {
             pool_amount,
             unit,
@@ -297,6 +295,7 @@ pub fn translate_payload_to_effects(
                 effects.push(KernelEffect::Treasury(TreasuryEffect::Allocate {
                     treasury_did: domain_id.to_string(),
                     budget_id: budget_id.clone(),
+                    recipient_did: opt.recipient.to_string(),
                     amount: opt.requested_amount,
                     currency: unit.clone(),
                 }));

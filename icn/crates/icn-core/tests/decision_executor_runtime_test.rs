@@ -963,6 +963,7 @@ async fn test_deferred_outcome_sled_persists_not_executed() {
     let effects = vec![KernelEffect::Treasury(TreasuryEffect::Allocate {
         treasury_did: RT_TEST_TREASURY.to_string(),
         budget_id: "budget-sled-defer".to_string(),
+        recipient_did: "did:icn:member-test".to_string(),
         amount: 50,
         currency: "HOURS".to_string(),
     })];

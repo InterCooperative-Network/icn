@@ -1372,6 +1372,7 @@ mod tests {
         let effects = vec![KernelEffect::Treasury(TreasuryEffect::Allocate {
             treasury_did: "did:icn:treasury".to_string(),
             budget_id: "budget-defer-proof".to_string(),
+            recipient_did: "did:icn:member-test".to_string(),
             amount: 100,
             currency: "HOURS".to_string(),
         })];
