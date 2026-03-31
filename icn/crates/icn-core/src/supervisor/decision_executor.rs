@@ -1375,6 +1375,9 @@ mod tests {
             recipient_did: "did:icn:member-test".to_string(),
             amount: 100,
             currency: "HOURS".to_string(),
+            // Empty decision_hash → None in TreasuryOperation → Deferred path.
+            // This test verifies that effects without provenance defer correctly.
+            decision_hash: String::new(),
         })];
 
         let results = executor

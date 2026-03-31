@@ -300,6 +300,7 @@ pub fn translate_payload_to_effects(
                     recipient_did: opt.recipient.to_string(),
                     amount: opt.requested_amount,
                     currency: unit.clone(),
+                    decision_hash: decision_hash.to_string(),
                 }));
             }
             Ok(effects)
@@ -684,11 +685,16 @@ mod tests {
                 budget_id,
                 amount,
                 currency,
+                decision_hash,
                 ..
             }) => {
                 assert_eq!(budget_id, "alloc-q1-budget-receipt-alloc-1");
                 assert_eq!(*amount, 6_000);
                 assert_eq!(currency, "compute-hours");
+                assert_eq!(
+                    decision_hash, "decision-hash-alloc-1",
+                    "Allocate must carry decision_hash from proposal context (empty → Deferred)"
+                );
             }
             other => panic!("expected Allocate for Infrastructure, got {other:?}"),
         }
@@ -699,11 +705,16 @@ mod tests {
                 budget_id,
                 amount,
                 currency,
+                decision_hash,
                 ..
             }) => {
                 assert_eq!(budget_id, "alloc-q1-budget-receipt-alloc-1");
                 assert_eq!(*amount, 4_000);
                 assert_eq!(currency, "compute-hours");
+                assert_eq!(
+                    decision_hash, "decision-hash-alloc-1",
+                    "Allocate must carry decision_hash from proposal context (empty → Deferred)"
+                );
             }
             other => panic!("expected Allocate for Education, got {other:?}"),
         }
