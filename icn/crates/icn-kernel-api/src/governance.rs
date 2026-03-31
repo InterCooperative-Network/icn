@@ -598,8 +598,8 @@ mod tests {
     /// correct behavior for an unimplemented effect that requires operator attention.
     #[tokio::test]
     async fn test_default_executor_distribute_surplus_is_hard_failure() {
-        use std::sync::Arc;
         use crate::effects::{KernelEffect, TreasuryEffect};
+        use std::sync::Arc;
 
         // Minimal stub executors required by DefaultEffectExecutor::new
         struct StubTreasury;
@@ -645,8 +645,7 @@ mod tests {
             }
         }
 
-        let executor =
-            DefaultEffectExecutor::new(Arc::new(StubTreasury), Arc::new(StubProtocol));
+        let executor = DefaultEffectExecutor::new(Arc::new(StubTreasury), Arc::new(StubProtocol));
         let effect = KernelEffect::Treasury(TreasuryEffect::DistributeSurplus {
             treasury_did: "did:icn:test".to_string(),
             total_amount: 1000,
@@ -659,8 +658,14 @@ mod tests {
             decision_hash: "sha256:test".to_string(),
         });
 
-        let result = executor.execute_effect(effect, "receipt-001").await.unwrap();
-        assert!(!result.success, "DistributeSurplus must fail in DefaultEffectExecutor");
+        let result = executor
+            .execute_effect(effect, "receipt-001")
+            .await
+            .unwrap();
+        assert!(
+            !result.success,
+            "DistributeSurplus must fail in DefaultEffectExecutor"
+        );
         assert!(
             !result.not_executed,
             "not_executed must be false (hard failure, not deferred)"
