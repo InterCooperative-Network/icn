@@ -1085,19 +1085,44 @@ impl FederationExecutor for KernelFederationExecutor {
                         })
                     }
                 }
-                // LeaveFederation and EstablishClearing not yet wired to service
+                FederationOperationType::EstablishClearing => {
+                    let request = icn_kernel_api::FederationClearingRequest {
+                        coop_a_did: operation.coop_did.clone(),
+                        coop_b_did: operation.target_id.clone().unwrap_or_default(),
+                        agreement_id: operation.agreement_hash.clone().unwrap_or_default(),
+                        decision_receipt_id: receipt_id.to_string(),
+                        decision_hash: operation.decision_hash.clone().unwrap_or_default(),
+                    };
+
+                    let result = service.establish_clearing(request)?;
+
+                    if result.success {
+                        tracing::info!(
+                            state_change_hash = %result.state_change_hash,
+                            "Bilateral clearing agreement established with durable state"
+                        );
+                        Ok(ExecutionOutcome::Success {
+                            receipt_id: receipt_id.clone(),
+                            effects: vec![format!(
+                                "Clearing established: {} <-> {} -> state_hash={}",
+                                operation.coop_did,
+                                operation.target_id.unwrap_or_default(),
+                                result.state_change_hash
+                            )],
+                        })
+                    } else {
+                        Ok(ExecutionOutcome::Failed {
+                            receipt_id: receipt_id.clone(),
+                            reason: result.error.unwrap_or_else(|| "Unknown error".to_string()),
+                        })
+                    }
+                }
+                // LeaveFederation not yet wired to service
                 FederationOperationType::LeaveFederation => {
                     tracing::warn!("LeaveFederation not yet implemented with durable state");
                     Ok(ExecutionOutcome::Failed {
                         receipt_id: receipt_id.clone(),
                         reason: "LeaveFederation not yet implemented".to_string(),
-                    })
-                }
-                FederationOperationType::EstablishClearing => {
-                    tracing::warn!("EstablishClearing not yet implemented with durable state");
-                    Ok(ExecutionOutcome::Failed {
-                        receipt_id: receipt_id.clone(),
-                        reason: "EstablishClearing not yet implemented".to_string(),
                     })
                 }
             }

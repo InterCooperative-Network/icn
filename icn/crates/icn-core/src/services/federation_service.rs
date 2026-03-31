@@ -9,11 +9,11 @@ use std::sync::{Arc, RwLock};
 
 use anyhow::Result;
 use icn_federation::types::{CooperativeInfo, FederationPolicy, Vouch};
-use icn_federation::CooperativeRegistry;
+use icn_federation::{BilateralClearingAgreement, ClearingManager, CooperativeRegistry};
 use icn_identity::Did;
 use icn_kernel_api::{
-    FederationJoinRequest, FederationJoinResult, FederationService, FederationVouchRequest,
-    FederationVouchResult,
+    FederationClearingRequest, FederationClearingResult, FederationJoinRequest,
+    FederationJoinResult, FederationService, FederationVouchRequest, FederationVouchResult,
 };
 use sha2::{Digest, Sha256};
 use tracing::info;
@@ -25,10 +25,14 @@ struct FederationProvenance {
     decision_hash: String,
 }
 
-/// Adapter implementing `FederationService` using `CooperativeRegistry`.
+/// Adapter implementing `FederationService` using `CooperativeRegistry` and `ClearingManager`.
 pub struct FederationServiceImpl {
     /// The underlying federation registry
     registry: Arc<CooperativeRegistry>,
+
+    /// Clearing manager for bilateral clearing agreements (optional — only present when
+    /// federation clearing is configured in the supervisor)
+    clearing: Option<Arc<ClearingManager>>,
 
     /// Provenance tracking for registered cooperatives
     /// Maps coop_did -> (decision_receipt_id, decision_hash)
@@ -40,8 +44,15 @@ impl FederationServiceImpl {
     pub fn new(registry: Arc<CooperativeRegistry>) -> Self {
         Self {
             registry,
+            clearing: None,
             provenance: RwLock::new(HashMap::new()),
         }
+    }
+
+    /// Attach a clearing manager, enabling governance-driven clearing establishment.
+    pub fn with_clearing_manager(mut self, clearing: Arc<ClearingManager>) -> Self {
+        self.clearing = Some(clearing);
+        self
     }
 
     /// Compute a state change hash for a join operation.
@@ -63,6 +74,20 @@ impl FederationServiceImpl {
         hasher.update(request.voucher_did.as_bytes());
         hasher.update(b"->");
         hasher.update(request.vouchee_did.as_bytes());
+        hasher.update(b":");
+        hasher.update(request.decision_receipt_id.as_bytes());
+        format!("{:x}", hasher.finalize())
+    }
+
+    /// Compute a state change hash for a clearing establishment.
+    fn compute_clearing_hash(request: &FederationClearingRequest) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(b"federation:clearing:");
+        hasher.update(request.coop_a_did.as_bytes());
+        hasher.update(b"<->");
+        hasher.update(request.coop_b_did.as_bytes());
+        hasher.update(b":");
+        hasher.update(request.agreement_id.as_bytes());
         hasher.update(b":");
         hasher.update(request.decision_receipt_id.as_bytes());
         format!("{:x}", hasher.finalize())
@@ -198,6 +223,80 @@ impl FederationService for FederationServiceImpl {
                     "Failed to record vouch"
                 );
                 Ok(FederationVouchResult {
+                    success: false,
+                    state_change_hash: String::new(),
+                    error: Some(e.to_string()),
+                })
+            }
+        }
+    }
+
+    fn establish_clearing(
+        &self,
+        request: FederationClearingRequest,
+    ) -> Result<FederationClearingResult> {
+        let clearing = match &self.clearing {
+            Some(c) => c,
+            None => {
+                return Ok(FederationClearingResult {
+                    success: false,
+                    state_change_hash: String::new(),
+                    error: Some(
+                        "Clearing manager not configured — wire FederationServiceImpl::with_clearing_manager in supervisor"
+                            .to_string(),
+                    ),
+                });
+            }
+        };
+
+        info!(
+            coop_a_did = %request.coop_a_did,
+            coop_b_did = %request.coop_b_did,
+            agreement_id = %request.agreement_id,
+            decision_receipt_id = %request.decision_receipt_id,
+            "Establishing bilateral clearing agreement"
+        );
+
+        let coop_a_did_parsed = Did::from_str(&request.coop_a_did).unwrap_or_else(|_| {
+            let signing_key = ed25519_dalek::SigningKey::from_bytes(&[2u8; 32]);
+            Did::from_public_key(&signing_key.verifying_key())
+        });
+        let coop_b_did_parsed = Did::from_str(&request.coop_b_did).unwrap_or_else(|_| {
+            let signing_key = ed25519_dalek::SigningKey::from_bytes(&[3u8; 32]);
+            Did::from_public_key(&signing_key.verifying_key())
+        });
+
+        let agreement = BilateralClearingAgreement::new(
+            request.agreement_id.clone(),
+            request.coop_a_did.clone(),
+            coop_a_did_parsed,
+            request.coop_b_did.clone(),
+            coop_b_did_parsed,
+        );
+
+        match clearing.create_agreement(agreement) {
+            Ok(agreement_id) => {
+                let state_change_hash = Self::compute_clearing_hash(&request);
+                info!(
+                    agreement_id = %agreement_id,
+                    state_change_hash = %state_change_hash,
+                    decision_receipt_id = %request.decision_receipt_id,
+                    "Bilateral clearing agreement established"
+                );
+                Ok(FederationClearingResult {
+                    success: true,
+                    state_change_hash,
+                    error: None,
+                })
+            }
+            Err(e) => {
+                tracing::warn!(
+                    coop_a_did = %request.coop_a_did,
+                    coop_b_did = %request.coop_b_did,
+                    error = %e,
+                    "Failed to establish clearing agreement"
+                );
+                Ok(FederationClearingResult {
                     success: false,
                     state_change_hash: String::new(),
                     error: Some(e.to_string()),
@@ -498,5 +597,77 @@ mod tests {
         // Verify vouch is stored
         let vouches = registry.get_vouches("vouchee-coop").unwrap();
         assert!(!vouches.is_empty(), "Vouch should be stored");
+    }
+
+    #[test]
+    fn test_establish_clearing_creates_durable_agreement() {
+        let (registry, _reg_temp) = make_test_registry();
+
+        // Create a separate store for the clearing manager
+        let clearing_temp = tempfile::tempdir().expect("Failed to create clearing temp dir");
+        let clearing_store =
+            Arc::new(SledStore::open(clearing_temp.path()).expect("Failed to open clearing store"));
+        let clearing = Arc::new(
+            ClearingManager::new(clearing_store, "coop-alpha".to_string())
+                .expect("Failed to create clearing manager"),
+        );
+
+        let service = FederationServiceImpl::new(registry).with_clearing_manager(clearing.clone());
+
+        let request = FederationClearingRequest {
+            coop_a_did: "did:icn:zCoopAlpha12345678901234567890123".to_string(),
+            coop_b_did: "did:icn:zCoopBeta1234567890123456789012345".to_string(),
+            agreement_id: "sha256:clearing-agreement-governance-hash".to_string(),
+            decision_receipt_id: "gov:proposal:clearing:receipt:test-001".to_string(),
+            decision_hash: "sha256:clearing-decision-hash".to_string(),
+        };
+
+        let result = service.establish_clearing(request.clone()).unwrap();
+
+        assert!(result.success, "Clearing establishment should succeed");
+        assert!(
+            !result.state_change_hash.is_empty(),
+            "Should have state change hash"
+        );
+        assert!(result.error.is_none(), "Should have no error");
+
+        // Verify the agreement is persisted in the clearing manager
+        let stored = clearing
+            .get_agreement(&request.agreement_id)
+            .expect("get_agreement failed");
+        assert!(
+            stored.is_some(),
+            "Agreement should be stored in clearing manager"
+        );
+        let agreement = stored.unwrap();
+        assert_eq!(agreement.agreement_id, request.agreement_id);
+        assert_eq!(agreement.coop_a, request.coop_a_did);
+        assert_eq!(agreement.coop_b, request.coop_b_did);
+    }
+
+    #[test]
+    fn test_establish_clearing_without_manager_returns_failure() {
+        let (registry, _temp) = make_test_registry();
+        // Deliberately do NOT attach a clearing manager
+        let service = FederationServiceImpl::new(registry);
+
+        let request = FederationClearingRequest {
+            coop_a_did: "did:icn:zCoopA12345678901234567890".to_string(),
+            coop_b_did: "did:icn:zCoopB12345678901234567890".to_string(),
+            agreement_id: "sha256:no-manager-test".to_string(),
+            decision_receipt_id: "gov:proposal:clearing:no-manager".to_string(),
+            decision_hash: "sha256:no-manager".to_string(),
+        };
+
+        let result = service.establish_clearing(request).unwrap();
+
+        assert!(
+            !result.success,
+            "Should fail without a clearing manager configured"
+        );
+        assert!(
+            result.error.is_some(),
+            "Should report an error explaining why"
+        );
     }
 }

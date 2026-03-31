@@ -535,7 +535,7 @@ async fn spawn_actors_with_identity(
 
     let (
         federation_registry_for_rpc,
-        _clearing_manager_for_governance,
+        clearing_manager_for_governance,
         _attestation_store_for_governance,
         federation_handler_for_notifications,
     ) = if let Some(ref services) = federation_services {
@@ -715,9 +715,12 @@ async fn spawn_actors_with_identity(
 
         // Wire federation service adapter if available
         if let Some(registry) = federation_registry_for_rpc.clone() {
-            let federation_service =
-                Arc::new(crate::services::FederationServiceImpl::new(registry));
-            kernel_executor = kernel_executor.with_federation_service(federation_service);
+            let mut federation_service = crate::services::FederationServiceImpl::new(registry);
+            if let Some(clearing) = clearing_manager_for_governance.clone() {
+                federation_service = federation_service.with_clearing_manager(clearing);
+                info!("✓ Federation clearing manager wired to federation service");
+            }
+            kernel_executor = kernel_executor.with_federation_service(Arc::new(federation_service));
             info!("✓ Federation service wired to governance executor");
         }
 
