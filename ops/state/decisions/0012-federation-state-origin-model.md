@@ -233,39 +233,78 @@ The two paths serve different institutional roles:
    - CCL governance execution → institutional (full provenance)
    These are not interchangeable.
 
-4. **Read APIs reflect their write path**. `GET /federation/coops` returns gateway-local state.
-   This is correct behavior, not a bug. The limitation must be documented.
+4. **Read APIs reflect their write path**. `GET /federation/coops` returns gateway-local state
+   in standalone mode, governance-registered coops in daemon mode (Step 1 implemented below).
 
-5. **Position reads are already unified** (ADR 0011). This is the one crossing point.
+5. **Position reads are already unified** (ADR 0011). This is the original crossing point.
 
 ---
 
 ## Phase 4: Precise Design Artifact — What Full Unification Requires
 
-Full unification is **not yet implementable** without the following components:
+## Phase 4a: Read Unification — Step 1 Implementation (2026-03-31)
 
-### Prerequisite A: FederationService Read API Expansion
+### Implemented: Cooperative Registry Read Surface
 
-`FederationService` (icn-kernel-api) currently exposes only:
-- `join_federation`, `vouch_for_cooperative`, `establish_clearing`, `settle_clearing` (writes)
-- `get_clearing_position` (one read, added in ADR 0011)
-- `is_registered`, `get_registration_provenance` (existence checks)
+Added the following to `FederationService` (icn-kernel-api) and implemented in
+`FederationServiceImpl` (icn-core):
 
-To unify read paths, the following methods are required:
 ```rust
-fn list_cooperatives(&self) -> Result<Vec<CooperativeInfo>>;
-fn get_cooperative(&self, coop_id: &str) -> Result<Option<CooperativeInfo>>;
-fn list_agreements(&self) -> Result<Vec<BilateralClearingAgreement>>;
-fn get_agreement(&self, agreement_id: &str) -> Result<Option<BilateralClearingAgreement>>;
-fn get_vouches(&self, coop_id: &str) -> Result<Vec<String>>;
+fn list_cooperatives(&self) -> Result<Vec<CooperativeView>>;
+fn get_cooperative(&self, coop_id: &str) -> Result<Option<CooperativeView>>;
+fn get_vouches_for(&self, coop_id: &str) -> Result<Vec<String>>;
 ```
 
-Once these exist, the gateway route handlers can be updated to prefer the service (same pattern
-as `get_clearing_position` in ADR 0011).
+New view DTO in `icn-kernel-api`:
+```rust
+pub struct CooperativeView {
+    pub coop_id: String,
+    pub name: String,
+    pub public_did: String,    // DID as string — no icn-identity dep in kernel-api
+    pub gateway_endpoints: Vec<String>,
+    pub capabilities: Vec<String>,
+    pub last_seen: u64,
+}
+```
+
+Gateway handlers updated to prefer service in daemon mode:
+- `GET /federation/coops` — prefers `FederationService::list_cooperatives()`
+- `GET /federation/coops/{coop_id}` — prefers `FederationService::get_cooperative()`
+- `GET /federation/coops/{coop_id}/vouches` — prefers `FederationService::get_vouches_for()`
+
+In standalone mode (no service injected), all three fall back to `FederationManager`.
+
+**Response shape note**: In daemon mode, these endpoints return `CooperativeView` (pruned DTO)
+not `CooperativeInfo` (internal type). Fields omitted from the view: `FederationPolicy`,
+`CurrencyInfo`, `signature`. These are federation-internal and should not cross the boundary.
+
+**Tests added** (4 new in `api/federation.rs`):
+- `test_list_coops_prefers_federation_service` — proves service path taken over mgr
+- `test_list_coops_falls_back_to_fed_mgr_when_no_service` — proves fallback path
+- `test_get_coop_prefers_federation_service` — proves get + 404 behavior
+- `test_get_vouches_prefers_federation_service` — proves vouch path
+
+---
+
+## Phase 4b: Remaining Read Unification — What Full Unification Requires
+
+The cooperative registry reads are now unified. The following remain gateway-only reads:
+
+```
+GET /federation/clearing          → FederationManager only (no service equivalent)
+GET /federation/clearing/{id}     → FederationManager only
+```
+
+### Prerequisite: ClearingAgreementView DTO
 
 **Blocking issue**: `BilateralClearingAgreement` is in `icn-federation` (not `icn-kernel-api`).
-The trait would need to either re-export this type from kernel-api or introduce a
-`ClearingAgreementView` DTO similar to `ClearingPositionView`.
+The trait needs a `ClearingAgreementView` DTO similar to `ClearingPositionView`.
+
+Required new service methods:
+```rust
+fn list_agreements(&self) -> Result<Vec<ClearingAgreementView>>;
+fn get_agreement(&self, agreement_id: &str) -> Result<Option<ClearingAgreementView>>;
+```
 
 ### Prerequisite B: Origin Labeling
 
@@ -299,16 +338,19 @@ This is a long-term path, not a current requirement.
 
 ### Sequencing Plan
 
-| Step | Prerequisite | Risk | Scope |
-|------|-------------|------|-------|
-| 1. Add `FederationService` read methods | None | Low | `icn-kernel-api` + `icn-core` |
-| 2. Add `ClearingAgreementView` DTO | Step 1 | Low | `icn-kernel-api` |
-| 3. Update gateway route handlers to prefer service for list/get | Step 1+2 | Low | `icn-gateway` |
-| 4. Add origin labeling to DTOs | Step 1-3 | Medium | Cross-crate |
-| 5. Implement CCL adoption contract | Steps 1-4 + CCL work | High | `icn-ccl`, `icn-governance` |
+| Step | Prerequisite | Risk | Scope | Status |
+|------|-------------|------|-------|--------|
+| 1a. `list/get_cooperative`, `get_vouches_for`, `CooperativeView` DTO | None | Low | `icn-kernel-api` + `icn-core` + `icn-gateway` | ✅ Done (2026-03-31) |
+| 1b. `list/get_agreement`, `ClearingAgreementView` DTO | None | Low | `icn-kernel-api` + `icn-core` + `icn-gateway` | ⏳ Next |
+| 2. Wire gateway clearing GET routes to prefer service | Step 1b | Low | `icn-gateway` | ⏳ After 1b |
+| 3. Add origin labeling to response DTOs | Steps 1a+1b | Medium | Cross-crate | ⏳ Future |
+| 4. Implement CCL adoption contract | Step 3 + CCL work | High | `icn-ccl`, `icn-governance` | ⏳ Future |
 
-Steps 1-3 are the read unification path (no semantic risk, no write path changes).
-Steps 4-5 are the full lifecycle unification (future work).
+Step 1b is the next minimal slice: design `ClearingAgreementView`, add two trait methods, implement them, wire `GET /federation/clearing` and `GET /federation/clearing/{id}` to prefer service.
+
+Step 3 is the origin labeling pass — adds `origin: "governance" | "direct-management"` to responses. This is optional/future; the handler comments + ADR documentation serve this purpose for now.
+
+Step 4 is full lifecycle unification (future work).
 
 ---
 
