@@ -838,11 +838,38 @@ pub struct FederationVouchResult {
     pub error: Option<String>,
 }
 
+/// Request to establish a bilateral clearing agreement between two cooperatives.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FederationClearingRequest {
+    /// DID of the first cooperative (initiating side)
+    pub coop_a_did: String,
+    /// DID of the second cooperative (counterparty)
+    pub coop_b_did: String,
+    /// Stable identifier for this agreement (typically the governance proposal hash)
+    pub agreement_id: String,
+    /// Decision receipt ID that authorized this clearing establishment
+    pub decision_receipt_id: String,
+    /// Hash of the decision that authorized this clearing establishment
+    pub decision_hash: String,
+}
+
+/// Result of establishing a bilateral clearing agreement.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FederationClearingResult {
+    /// Whether the operation succeeded
+    pub success: bool,
+    /// State change hash (for verification)
+    pub state_change_hash: String,
+    /// Error message if failed
+    pub error: Option<String>,
+}
+
 /// Abstract federation management service.
 ///
-/// The kernel uses this to register cooperatives and vouches without
-/// knowing the underlying federation semantics. Apps implement this
-/// trait to provide actual federation registry operations.
+/// The kernel uses this to register cooperatives, record vouches, and
+/// establish clearing agreements without knowing the underlying federation
+/// semantics. Apps implement this trait to provide actual federation
+/// registry and clearing operations.
 ///
 /// # Provenance Tracking
 ///
@@ -866,6 +893,16 @@ pub trait FederationService: Send + Sync {
         &self,
         request: FederationVouchRequest,
     ) -> Result<FederationVouchResult, anyhow::Error>;
+
+    /// Establish a bilateral clearing agreement between two cooperatives.
+    ///
+    /// Creates a durable `BilateralClearingAgreement` that the clearing
+    /// infrastructure can use to net and settle cross-coop transfers.
+    /// Returns state_change_hash for verification.
+    fn establish_clearing(
+        &self,
+        request: FederationClearingRequest,
+    ) -> Result<FederationClearingResult, anyhow::Error>;
 
     /// Check if a cooperative is registered in the federation.
     fn is_registered(&self, coop_did: &str) -> bool;
