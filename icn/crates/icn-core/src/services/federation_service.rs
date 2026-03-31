@@ -12,8 +12,9 @@ use icn_federation::types::{CooperativeInfo, FederationPolicy, Vouch};
 use icn_federation::{BilateralClearingAgreement, ClearingManager, CooperativeRegistry};
 use icn_identity::Did;
 use icn_kernel_api::{
-    FederationClearingRequest, FederationClearingResult, FederationJoinRequest,
-    FederationJoinResult, FederationService, FederationVouchRequest, FederationVouchResult,
+    FederationClearingRequest, FederationClearingResult, FederationClearingSettleRequest,
+    FederationClearingSettleResult, FederationJoinRequest, FederationJoinResult, FederationService,
+    FederationVouchRequest, FederationVouchResult,
 };
 use sha2::{Digest, Sha256};
 use tracing::info;
@@ -310,6 +311,107 @@ impl FederationService for FederationServiceImpl {
                 );
                 Ok(FederationClearingResult {
                     success: false,
+                    state_change_hash: String::new(),
+                    error: Some(e.to_string()),
+                })
+            }
+        }
+    }
+
+    fn settle_clearing(
+        &self,
+        request: FederationClearingSettleRequest,
+    ) -> Result<FederationClearingSettleResult> {
+        let clearing = match &self.clearing {
+            Some(c) => c,
+            None => {
+                return Ok(FederationClearingSettleResult {
+                    success: false,
+                    net_settlement: 0,
+                    coop_a: String::new(),
+                    coop_b: String::new(),
+                    transfers_settled: 0,
+                    state_change_hash: String::new(),
+                    error: Some(
+                        "Clearing manager not configured — wire FederationServiceImpl::with_clearing_manager in supervisor"
+                            .to_string(),
+                    ),
+                });
+            }
+        };
+
+        // Look up the agreement to get coop identifiers for the ledger transfer
+        let agreement = match clearing.get_agreement(&request.agreement_id)? {
+            Some(a) => a,
+            None => {
+                return Ok(FederationClearingSettleResult {
+                    success: false,
+                    net_settlement: 0,
+                    coop_a: String::new(),
+                    coop_b: String::new(),
+                    transfers_settled: 0,
+                    state_change_hash: String::new(),
+                    error: Some(format!(
+                        "Clearing agreement '{}' not found",
+                        request.agreement_id
+                    )),
+                });
+            }
+        };
+
+        let coop_a = agreement.coop_a.clone();
+        let coop_b = agreement.coop_b.clone();
+
+        info!(
+            agreement_id = %request.agreement_id,
+            currency = %request.currency,
+            coop_a = %coop_a,
+            coop_b = %coop_b,
+            decision_receipt_id = %request.decision_receipt_id,
+            "Triggering clearing settlement"
+        );
+
+        match clearing.trigger_settlement(&request.agreement_id) {
+            Ok(report) => {
+                let mut hasher = Sha256::new();
+                hasher.update(b"federation:settle:");
+                hasher.update(request.agreement_id.as_bytes());
+                hasher.update(b":");
+                hasher.update(request.decision_receipt_id.as_bytes());
+                hasher.update(b":");
+                hasher.update(report.net_settlement.to_le_bytes());
+                let state_change_hash = format!("{:x}", hasher.finalize());
+
+                info!(
+                    agreement_id = %report.agreement_id,
+                    net_settlement = %report.net_settlement,
+                    transfers_settled = %report.transfers_settled,
+                    state_change_hash = %state_change_hash,
+                    "Clearing settlement completed"
+                );
+
+                Ok(FederationClearingSettleResult {
+                    success: true,
+                    net_settlement: report.net_settlement,
+                    coop_a,
+                    coop_b,
+                    transfers_settled: report.transfers_settled,
+                    state_change_hash,
+                    error: None,
+                })
+            }
+            Err(e) => {
+                tracing::warn!(
+                    agreement_id = %request.agreement_id,
+                    error = %e,
+                    "Clearing settlement failed"
+                );
+                Ok(FederationClearingSettleResult {
+                    success: false,
+                    net_settlement: 0,
+                    coop_a,
+                    coop_b,
+                    transfers_settled: 0,
                     state_change_hash: String::new(),
                     error: Some(e.to_string()),
                 })
@@ -742,6 +844,144 @@ mod tests {
                 .contains("coop_b_did"),
             "Error should mention coop_b_did: {:?}",
             result_b.error
+        );
+    }
+
+    #[test]
+    fn test_settle_clearing_zero_net_position() {
+        let (registry, _reg_temp) = make_test_registry();
+        let clearing_temp = tempfile::tempdir().unwrap();
+        let clearing_store = Arc::new(SledStore::open(clearing_temp.path()).unwrap());
+        let clearing =
+            Arc::new(ClearingManager::new(clearing_store, "coop-a".to_string()).unwrap());
+
+        // First establish the agreement
+        let service = FederationServiceImpl::new(registry).with_clearing_manager(clearing.clone());
+        let establish = service
+            .establish_clearing(FederationClearingRequest {
+                coop_a_did: make_test_did_str(2),
+                coop_b_did: make_test_did_str(3),
+                agreement_id: "agreement-settle-zero".to_string(),
+                decision_receipt_id: "gov:establish-clearing".to_string(),
+                decision_hash: "sha256:establish".to_string(),
+            })
+            .unwrap();
+        assert!(establish.success, "EstablishClearing should succeed");
+
+        // Settle with no transfers — net position is zero
+        let result = service
+            .settle_clearing(FederationClearingSettleRequest {
+                agreement_id: "agreement-settle-zero".to_string(),
+                currency: "HOURS".to_string(),
+                decision_receipt_id: "gov:settle-clearing".to_string(),
+                decision_hash: "sha256:settle".to_string(),
+            })
+            .unwrap();
+
+        assert!(
+            result.success,
+            "Settlement should succeed: {:?}",
+            result.error
+        );
+        assert_eq!(result.net_settlement, 0, "No transfers → zero net position");
+        assert_eq!(result.transfers_settled, 0);
+        assert!(!result.state_change_hash.is_empty());
+    }
+
+    #[test]
+    fn test_settle_clearing_nonzero_net_position() {
+        use icn_federation::clearing::CrossCoopTransfer;
+
+        let (registry, _reg_temp) = make_test_registry();
+        let clearing_temp = tempfile::tempdir().unwrap();
+        let clearing_store = Arc::new(SledStore::open(clearing_temp.path()).unwrap());
+        let clearing =
+            Arc::new(ClearingManager::new(clearing_store, "coop-a".to_string()).unwrap());
+
+        let coop_a_did = Did::from_public_key(
+            &ed25519_dalek::SigningKey::from_bytes(&[2u8; 32]).verifying_key(),
+        );
+        let coop_b_did = Did::from_public_key(
+            &ed25519_dalek::SigningKey::from_bytes(&[3u8; 32]).verifying_key(),
+        );
+        let agreement_id = "agreement-settle-nonzero".to_string();
+
+        // Establish the agreement with an HOURS→HOURS exchange rate
+        clearing
+            .create_agreement(
+                BilateralClearingAgreement::new(
+                    agreement_id.clone(),
+                    "coop-a".to_string(),
+                    coop_a_did.clone(),
+                    "coop-b".to_string(),
+                    coop_b_did.clone(),
+                )
+                .with_rate("HOURS", "HOURS", 1.0),
+            )
+            .unwrap();
+
+        // Propose and confirm a transfer: coop-a sends 100 HOURS to coop-b
+        let transfer = CrossCoopTransfer::new(
+            "transfer-001".to_string(),
+            "coop-a".to_string(),
+            coop_a_did.clone(),
+            "coop-b".to_string(),
+            coop_b_did.clone(),
+            100,
+            "HOURS".to_string(),
+            100,
+            "HOURS".to_string(),
+        );
+        let transfer_id = clearing.propose_transfer(transfer).unwrap();
+        clearing.confirm_transfer(&transfer_id).unwrap();
+
+        let service = FederationServiceImpl::new(registry).with_clearing_manager(clearing.clone());
+
+        let result = service
+            .settle_clearing(FederationClearingSettleRequest {
+                agreement_id: agreement_id.clone(),
+                currency: "HOURS".to_string(),
+                decision_receipt_id: "gov:settle-nonzero".to_string(),
+                decision_hash: "sha256:settle-nonzero".to_string(),
+            })
+            .unwrap();
+
+        assert!(
+            result.success,
+            "Settlement should succeed: {:?}",
+            result.error
+        );
+        // coop-a owes coop-b 100 HOURS → net_settlement = +100 (positive: a owes b)
+        assert_eq!(result.net_settlement, 100, "net_settlement should be 100");
+        assert_eq!(result.coop_a, "coop-a");
+        assert_eq!(result.coop_b, "coop-b");
+        assert_eq!(result.transfers_settled, 1);
+        assert!(!result.state_change_hash.is_empty());
+    }
+
+    #[test]
+    fn test_settle_clearing_agreement_not_found() {
+        let (registry, _reg_temp) = make_test_registry();
+        let clearing_temp = tempfile::tempdir().unwrap();
+        let clearing_store = Arc::new(SledStore::open(clearing_temp.path()).unwrap());
+        let clearing =
+            Arc::new(ClearingManager::new(clearing_store, "coop-a".to_string()).unwrap());
+        let service = FederationServiceImpl::new(registry).with_clearing_manager(clearing);
+
+        let result = service
+            .settle_clearing(FederationClearingSettleRequest {
+                agreement_id: "no-such-agreement".to_string(),
+                currency: "HOURS".to_string(),
+                decision_receipt_id: "gov:settle-missing".to_string(),
+                decision_hash: "sha256:missing".to_string(),
+            })
+            .unwrap();
+
+        assert!(!result.success, "Should fail for unknown agreement");
+        assert!(
+            result.error.as_deref().unwrap_or("").contains("not found"),
+            "Error should mention not found: {:?}",
+            result.error
         );
     }
 }
