@@ -1266,8 +1266,16 @@ async fn test_distribute_surplus_executes_single_entry_with_n_deltas() {
         "DistributeSurplus with 2 recipients must produce 4 account deltas (debit+credit per member)"
     );
 
-    let debits: Vec<_> = entry.accounts.iter().filter(|a| a.debit.is_some()).collect();
-    let credits: Vec<_> = entry.accounts.iter().filter(|a| a.credit.is_some()).collect();
+    let debits: Vec<_> = entry
+        .accounts
+        .iter()
+        .filter(|a| a.debit.is_some())
+        .collect();
+    let credits: Vec<_> = entry
+        .accounts
+        .iter()
+        .filter(|a| a.credit.is_some())
+        .collect();
     assert_eq!(debits.len(), 2, "must have 2 treasury debits");
     assert_eq!(credits.len(), 2, "must have 2 member credits");
 

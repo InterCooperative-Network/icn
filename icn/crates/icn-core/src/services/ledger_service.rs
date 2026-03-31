@@ -200,8 +200,26 @@ impl LedgerServiceImpl {
                             .to_string(),
                     );
                 }
+
+                // Validate: sum of individual amounts must equal req.amount to prevent
+                // the logged total from diverging from actual ledger mutations.
+                let distribution_sum: i64 = req.distributions.iter().map(|(_, amt)| amt).sum();
+                if distribution_sum != req.amount {
+                    return Err(format!(
+                        "DistributeSurplus: distribution sum ({distribution_sum}) \
+                         does not equal total amount ({})",
+                        req.amount
+                    ));
+                }
+
+                // Sort by recipient DID string to canonicalize delta ordering.
+                // The ledger entry hash covers the AccountDelta sequence, so ordering
+                // must be deterministic across all nodes processing the same decision.
+                let mut sorted: Vec<&(String, i64)> = req.distributions.iter().collect();
+                sorted.sort_by(|(a, _), (b, _)| a.cmp(b));
+
                 let mut deltas = Vec::with_capacity(req.distributions.len() * 2);
-                for (member_did_str, amount) in &req.distributions {
+                for (member_did_str, amount) in sorted {
                     let member_did: icn_identity::Did = member_did_str
                         .parse()
                         .map_err(|e| format!("Invalid member DID in distribution: {e}"))?;

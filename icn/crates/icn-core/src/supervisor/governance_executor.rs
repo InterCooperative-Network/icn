@@ -2521,11 +2521,12 @@ mod tests {
         );
         assert!(
             effect_result.not_executed,
-            "DistributeSurplus should be structurally not executed until ledger support exists"
+            "DistributeSurplus without ledger service must defer (not_executed=true): {}",
+            effect_result.message
         );
         assert!(
-            effect_result.message.contains("DistributeSurplus"),
-            "message should name the effect: {}",
+            effect_result.message.starts_with("Deferred:"),
+            "message must be a Deferred reason when ledger service is not configured: {}",
             effect_result.message
         );
     }
