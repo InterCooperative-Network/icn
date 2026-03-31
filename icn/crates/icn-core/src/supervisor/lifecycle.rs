@@ -726,16 +726,80 @@ async fn spawn_actors_with_identity(
                 federation_service = federation_service.with_clearing_manager(clearing);
                 info!("✓ Federation clearing manager wired to federation service");
             }
-            kernel_executor = kernel_executor.with_federation_service(Arc::new(federation_service));
+            // Wire ledger so settle_clearing() can emit transfer entries for non-zero net positions.
+            if let Some(ref ledger) = gateway_handles.ledger_service {
+                federation_service = federation_service.with_ledger(ledger.clone());
+                info!("✓ Settlement ledger wired to federation service");
+            }
+            let federation_service = Arc::new(federation_service);
+            kernel_executor = kernel_executor.with_federation_service(federation_service.clone());
             info!("✓ Federation service wired to governance executor");
-        }
 
-        // Wire settlement ledger so SettleClearing effects can produce ledger entries.
-        // Reuses the same LedgerService Arc already wired to the treasury executor;
-        // the service is stateless (no mutable fields), so sharing is safe.
-        if let Some(settlement_ledger) = gateway_handles.ledger_service.clone() {
-            kernel_executor = kernel_executor.with_settlement_ledger(settlement_ledger);
-            info!("✓ Settlement ledger wired to federation executor");
+            // Spawn the operational clearing settlement scheduler.
+            // This is the PRIMARY settlement path: agreements settle on their own terms
+            // without requiring governance proposals. Governance SettleClearing effects
+            // serve as an escape hatch for force-settle scenarios only.
+            if let Some(clearing) = clearing_manager_for_governance.clone() {
+                let sched_svc: Arc<dyn icn_kernel_api::FederationService> =
+                    federation_service.clone();
+                let mut sched_shutdown = shutdown_tx.subscribe();
+                // Default 60-second interval; TODO: expose via FederationConfig::settlement_interval_secs
+                let sched_interval = std::time::Duration::from_secs(60);
+                background_tasks.spawn(async move {
+                    let mut interval = tokio::time::interval(sched_interval);
+                    loop {
+                        tokio::select! {
+                            _ = interval.tick() => {
+                                let due = clearing.get_due_settlements();
+                                for agreement_id in due {
+                                    // Default to HOURS; exchange_rates keys are "from:to" pairs
+                                    // TODO: derive currency from agreement exchange_rates when multi-currency support needed
+                                    let currency = "HOURS".to_string();
+                                    let req = icn_kernel_api::FederationClearingSettleRequest {
+                                        agreement_id: agreement_id.clone(),
+                                        currency,
+                                        decision_receipt_id: "scheduler:auto".to_string(),
+                                        decision_hash: String::new(),
+                                    };
+                                    match sched_svc.settle_clearing(req) {
+                                        Ok(result) if result.success => {
+                                            tracing::info!(
+                                                agreement_id = %agreement_id,
+                                                transfers_settled = result.transfers_settled,
+                                                net_settlement = result.net_settlement,
+                                                ledger_entry = ?result.ledger_entry_hash,
+                                                "Scheduled clearing settlement completed"
+                                            );
+                                        }
+                                        Ok(result) => {
+                                            tracing::warn!(
+                                                agreement_id = %agreement_id,
+                                                error = ?result.error,
+                                                "Scheduled clearing settlement failed"
+                                            );
+                                        }
+                                        Err(e) => {
+                                            tracing::warn!(
+                                                agreement_id = %agreement_id,
+                                                error = %e,
+                                                "Clearing settlement scheduler error"
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+                            _ = sched_shutdown.recv() => {
+                                tracing::debug!("Clearing settlement scheduler shutting down");
+                                break;
+                            }
+                        }
+                    }
+                });
+                info!(
+                    "✓ Clearing settlement scheduler started (interval: {}s)",
+                    sched_interval.as_secs()
+                );
+            }
         }
 
         // Wire control service adapter

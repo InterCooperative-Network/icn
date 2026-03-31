@@ -895,6 +895,8 @@ pub struct FederationClearingSettleResult {
     pub transfers_settled: usize,
     /// State change hash for verification
     pub state_change_hash: String,
+    /// Ledger entry hash if a transfer entry was emitted (non-zero net settlement with ledger configured)
+    pub ledger_entry_hash: Option<String>,
     /// Error message if failed
     pub error: Option<String>,
 }
