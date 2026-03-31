@@ -539,6 +539,8 @@ async fn spawn_actors_with_identity(
         _attestation_store_for_governance,
         federation_handler_for_notifications,
         federation_clearing_handle_for_compute,
+        federation_clearing_handle_for_flush,
+        federation_clearing_manager_for_flush,
     ) = if let Some(ref services) = federation_services {
         gateway_handles.agreement_manager = Some(services.agreement_manager.clone());
         (
@@ -547,10 +549,12 @@ async fn spawn_actors_with_identity(
             Some(services.attestation_store.clone()),
             Some(services.federation_handler.clone()),
             Some(services.receipt_clearing_handle.clone()),
+            Some(services.receipt_clearing_handle.clone()),
+            Some(services.clearing_manager.clone()),
         )
     } else {
         gateway_handles.agreement_manager = None;
-        (None, None, None, None, None)
+        (None, None, None, None, None, None, None)
     };
 
     // Initialize send callback with E2E encryption support
@@ -923,6 +927,20 @@ async fn spawn_actors_with_identity(
         background_tasks,
     )
     .await;
+
+    // Spawn clearing receipt flush task if federation is enabled.
+    // Uses the same ReceiptClearingManager instance that the compute clearing callback fills.
+    if let (Some(rcm_handle), Some(clearing_mgr)) = (
+        federation_clearing_handle_for_flush,
+        federation_clearing_manager_for_flush,
+    ) {
+        super::init_federation::spawn_clearing_flush_task(
+            rcm_handle,
+            clearing_mgr,
+            shutdown_tx.subscribe(),
+            background_tasks,
+        );
+    }
 
     // Spawn steward actor if enabled
     let steward_services = super::init_steward::init_steward_services(

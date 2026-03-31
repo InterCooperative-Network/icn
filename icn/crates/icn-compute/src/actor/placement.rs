@@ -1202,3 +1202,178 @@ impl ComputeActor {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::actor::types::FederationClearingNotification;
+    use crate::types::{ComputeResult, ComputeTask, ExecutionOutcome, FuelLimit, TaskCode};
+    use std::sync::{Arc, Mutex};
+
+    /// Generate a real keypair and return (did_string, ed25519_signing_key).
+    fn make_keypair() -> (String, ed25519_dalek::SigningKey) {
+        let kp = icn_identity::KeyPair::generate().expect("keypair generation failed");
+        let did = kp.did().to_string();
+        let sk_bytes = kp.to_signing_key_bytes();
+        let signing_key = ed25519_dalek::SigningKey::from_bytes(&sk_bytes);
+        (did, signing_key)
+    }
+
+    fn make_actor_with_coop(own_did: &str, coop_id: &str) -> ComputeActor {
+        let trust_cb: crate::actor::types::TrustCallback = Arc::new(|_did: &str| 1.0_f64);
+        let mut actor = ComputeActor::new(own_did.to_string(), trust_cb);
+        actor.set_cooperative_id(coop_id.to_string());
+        actor
+    }
+
+    fn make_task(submitter_did: &str, payment_rate: u64) -> ComputeTask {
+        ComputeTask {
+            id: "test-task-001".to_string(),
+            submitter: submitter_did.to_string(),
+            coop_id: Some("alpha-coop".to_string()),
+            code: TaskCode::Ccl("rule test {}".to_string()),
+            inputs: vec![],
+            fuel_limit: FuelLimit(10_000),
+            required_capabilities: vec![],
+            priority: crate::types::TaskPriority::Normal,
+            created_at: 0,
+            deadline: None,
+            payment_rate: Some(payment_rate),
+            payment_currency: Some("credits".to_string()),
+            resource_profile: None,
+            actor_mode: None,
+            placement_constraints: None,
+            federation_constraints: None,
+            estimated_value: None,
+            verification: None,
+            inputs_hash: None,
+            policy_hash: None,
+            determinism_class: crate::types::DeterminismClass::default(),
+            privacy_class: crate::types::PrivacyClass::default(),
+            storage_class: None,
+            data_locality: None,
+            scope: icn_kernel_api::ScopeLevel::default(),
+        }
+    }
+
+    fn make_signed_result(
+        task_hash: crate::types::TaskHash,
+        task_id: &str,
+        executor_did: &str,
+        signing_key: &ed25519_dalek::SigningKey,
+        outcome: ExecutionOutcome,
+        fuel_used: u64,
+    ) -> ComputeResult {
+        let mut result = ComputeResult {
+            task_hash,
+            task_id: task_id.to_string(),
+            executor: executor_did.to_string(),
+            outcome,
+            fuel_used,
+            duration_ms: 50,
+            completed_at: 0,
+            signature: vec![],
+        };
+        result.sign(signing_key);
+        result
+    }
+
+    /// Verify that `on_federated_task_result` fires the `federation_clearing_callback`
+    /// when the task succeeds and has non-zero payment terms.
+    ///
+    /// This is the "federated task completion → clearing obligation" boundary test:
+    /// it proves the notification carries the right entity IDs and amount before
+    /// any adapter layer converts it into a `ClearingReceipt`.
+    #[tokio::test]
+    async fn test_federated_task_result_fires_clearing_callback() {
+        let (own_did, _) = make_keypair();
+        let (executor_did, executor_sk) = make_keypair();
+        let (submitter_did, _) = make_keypair();
+
+        let mut actor = make_actor_with_coop(&own_did, "alpha-coop");
+
+        // Capture the notification in a shared cell
+        let captured: Arc<Mutex<Option<FederationClearingNotification>>> =
+            Arc::new(Mutex::new(None));
+        let captured_clone = captured.clone();
+        let cb: crate::actor::types::FederationClearingCallback = Arc::new(move |notification| {
+            *captured_clone.lock().unwrap() = Some(notification);
+        });
+        actor.set_federation_clearing_callback(cb);
+
+        // Register the task in the task manager (10 credits per 1000 fuel)
+        let task = make_task(&submitter_did, 10);
+        let task_hash = {
+            let mut mgr = actor.task_manager.lock().await;
+            mgr.submit(task).expect("task submit failed")
+        };
+
+        // Signed successful result consuming 100 fuel → amount = 10 * 100 = 1000
+        let result = make_signed_result(
+            task_hash,
+            "test-task-001",
+            &executor_did,
+            &executor_sk,
+            ExecutionOutcome::Success(vec![]),
+            100,
+        );
+
+        actor
+            .on_federated_task_result(result, "beta-coop".to_string(), [0u8; 32])
+            .await
+            .expect("on_federated_task_result failed");
+
+        // Verify the callback was fired with correct entity IDs and amount
+        let notification = captured.lock().unwrap().take().expect("callback not fired");
+        assert_eq!(notification.from_entity_id, "alpha-coop");
+        assert_eq!(notification.to_entity_id, "beta-coop");
+        assert_eq!(notification.from_did, submitter_did);
+        assert_eq!(notification.to_did, executor_did);
+        // amount = payment_rate(10) * fuel_used(100) = 1000
+        assert_eq!(notification.amount, 1000);
+        assert_eq!(notification.currency, "credits");
+        assert_eq!(notification.task_id, "test-task-001");
+    }
+
+    /// Verify that the callback is NOT fired when the task fails.
+    #[tokio::test]
+    async fn test_federated_task_result_no_callback_on_failure() {
+        let (own_did, _) = make_keypair();
+        let (executor_did, executor_sk) = make_keypair();
+        let (submitter_did, _) = make_keypair();
+
+        let mut actor = make_actor_with_coop(&own_did, "alpha-coop");
+
+        let fired = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let fired_clone = fired.clone();
+        let cb: crate::actor::types::FederationClearingCallback = Arc::new(move |_| {
+            fired_clone.store(true, std::sync::atomic::Ordering::SeqCst);
+        });
+        actor.set_federation_clearing_callback(cb);
+
+        let task = make_task(&submitter_did, 10);
+        let task_hash = {
+            let mut mgr = actor.task_manager.lock().await;
+            mgr.submit(task).expect("task submit failed")
+        };
+
+        let result = make_signed_result(
+            task_hash,
+            "test-task-001",
+            &executor_did,
+            &executor_sk,
+            ExecutionOutcome::Failed("out of gas".to_string()),
+            100,
+        );
+
+        actor
+            .on_federated_task_result(result, "beta-coop".to_string(), [0u8; 32])
+            .await
+            .expect("on_federated_task_result failed");
+
+        assert!(
+            !fired.load(std::sync::atomic::Ordering::SeqCst),
+            "callback should not fire on failure"
+        );
+    }
+}

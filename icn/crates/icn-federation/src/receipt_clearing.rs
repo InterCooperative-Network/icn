@@ -931,4 +931,72 @@ mod tests {
         let err = mgr.submit_receipt(receipt).unwrap_err();
         assert!(err.to_string().contains("batch full"));
     }
+
+    /// Prove that a receipt constructed by the compute adapter (mapping entity IDs to coop
+    /// fields) survives the full submit → flush → clearing position pipeline.
+    ///
+    /// This test simulates exactly what `init_compute.rs` does when it converts a
+    /// `FederationClearingNotification` with `from_entity_id` / `to_entity_id` into a
+    /// `ClearingReceipt` with `submitter_coop` / `executor_coop`.
+    #[test]
+    fn test_adapter_entity_id_receipt_flushes_to_clearing_position() {
+        use crate::clearing::BilateralClearingAgreement;
+
+        let store = Arc::new(SledStore::temporary().unwrap()) as Arc<dyn Store>;
+        let clearing = ClearingManager::new(store, "alpha-coop".to_string()).unwrap();
+
+        let executor_kp = KeyPair::generate().unwrap();
+        let submitter_kp = KeyPair::generate().unwrap();
+
+        // Simulate entity IDs as they would arrive from FederationClearingNotification
+        let from_entity_id = "alpha-coop"; // submitter (from compute actor own_cooperative_id)
+        let to_entity_id = "beta-coop"; // executor (from on_federated_task_result executor_coop)
+
+        let agreement = BilateralClearingAgreement::new(
+            "alpha-beta-agreement".to_string(),
+            from_entity_id.to_string(),
+            submitter_kp.did().clone(),
+            to_entity_id.to_string(),
+            executor_kp.did().clone(),
+        )
+        .with_rate("credits", "credits", 1.0);
+        clearing.create_agreement(agreement).unwrap();
+
+        // Construct receipt as init_compute.rs adapter does:
+        // from_entity_id → submitter_coop, to_entity_id → executor_coop
+        let attestation_hash = [0xDE; 32];
+        let receipt = ClearingReceipt {
+            receipt_hash: attestation_hash,
+            executor_did: executor_kp.did().to_string(),
+            executor_coop: to_entity_id.to_string(),
+            submitter_did: submitter_kp.did().to_string(),
+            submitter_coop: from_entity_id.to_string(),
+            cost: 1_000,
+            currency: "credits".into(),
+            scope: ScopeLevel::Federation,
+            created_at: current_timestamp(),
+            disputed: false,
+            dispute_reason: None,
+        };
+
+        let mgr = ReceiptClearingManager::new(BatchClearingConfig::default());
+        mgr.submit_receipt(receipt).unwrap();
+
+        let report = mgr.flush_to_clearing(&clearing).unwrap();
+        assert_eq!(report.federation_flushed, 1, "receipt should be flushed");
+        assert_eq!(report.errors.len(), 0, "no flush errors expected");
+        assert_eq!(mgr.pending_count(), 0, "queue should be empty after flush");
+
+        // Verify the clearing position changed
+        let position = clearing.calculate_position("alpha-beta-agreement").unwrap();
+        assert_eq!(
+            position.pending_transfers.len(),
+            1,
+            "one pending transfer should exist"
+        );
+        assert_eq!(
+            position.pending_transfers[0].source_amount, 1_000,
+            "transfer amount should match receipt cost"
+        );
+    }
 }
