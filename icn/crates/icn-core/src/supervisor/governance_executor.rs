@@ -998,7 +998,8 @@ impl ProtocolExecutor for KernelProtocolExecutor {
 /// Executes federation operations (join, leave, vouch, clearing) by
 /// delegating to the FederationService for durable state mutations.
 pub struct KernelFederationExecutor {
-    /// Federation service for durable state operations
+    /// Federation service for durable state operations.
+    /// The service holds all required resources including ledger access for settlements.
     service: Option<Arc<dyn icn_kernel_api::FederationService>>,
 }
 
@@ -1168,6 +1169,91 @@ impl FederationExecutor for KernelFederationExecutor {
                             reason: result.error.unwrap_or_else(|| "Unknown error".to_string()),
                         })
                     }
+                }
+                FederationOperationType::SettleClearing => {
+                    let agreement_id = match operation
+                        .agreement_hash
+                        .as_deref()
+                        .filter(|s| !s.is_empty())
+                    {
+                        Some(id) => id.to_string(),
+                        None => {
+                            return Ok(ExecutionOutcome::Failed {
+                                receipt_id: receipt_id.clone(),
+                                reason: "SettleClearing: missing or empty agreement_hash"
+                                    .to_string(),
+                            });
+                        }
+                    };
+                    let currency = operation
+                        .target_id
+                        .clone()
+                        .filter(|s| !s.is_empty())
+                        .unwrap_or_else(|| "HOURS".to_string());
+
+                    // decision_hash is required: settlement may emit a ledger transfer entry,
+                    // which must carry non-empty decision_hash for provenance.  Reject early
+                    // rather than letting an empty hash propagate to the ledger layer.
+                    let decision_hash = match operation
+                        .decision_hash
+                        .as_deref()
+                        .filter(|s| !s.is_empty())
+                    {
+                        Some(h) => h.to_string(),
+                        None => {
+                            return Ok(ExecutionOutcome::Failed {
+                                receipt_id: receipt_id.clone(),
+                                reason: "SettleClearing: missing or empty decision_hash — required for ledger provenance".to_string(),
+                            });
+                        }
+                    };
+
+                    let settle_req = icn_kernel_api::FederationClearingSettleRequest {
+                        agreement_id: agreement_id.clone(),
+                        currency: currency.clone(),
+                        decision_receipt_id: receipt_id.to_string(),
+                        decision_hash,
+                    };
+
+                    // Delegate fully to the service — ledger emission happens there.
+                    let settle_result = service.settle_clearing(settle_req)?;
+
+                    if !settle_result.success {
+                        return Ok(ExecutionOutcome::Failed {
+                            receipt_id: receipt_id.clone(),
+                            reason: settle_result
+                                .error
+                                .unwrap_or_else(|| "Settlement failed".to_string()),
+                        });
+                    }
+
+                    let effects = if settle_result.net_settlement == 0 {
+                        vec![format!(
+                            "Clearing settled: {} transfers, net=0 (positions cancelled)",
+                            settle_result.transfers_settled
+                        )]
+                    } else if let Some(ref entry_hash) = settle_result.ledger_entry_hash {
+                        vec![format!(
+                            "Clearing settled: {} transfers, net={} {} -> ledger entry {}",
+                            settle_result.transfers_settled,
+                            settle_result.net_settlement,
+                            currency,
+                            entry_hash
+                        )]
+                    } else {
+                        // Non-zero net but no ledger entry — service warned; treat as partial success.
+                        vec![format!(
+                            "Clearing settled: {} transfers, net={} {} (no ledger — wire with_ledger() on FederationServiceImpl)",
+                            settle_result.transfers_settled,
+                            settle_result.net_settlement,
+                            currency
+                        )]
+                    };
+
+                    Ok(ExecutionOutcome::Success {
+                        receipt_id: receipt_id.clone(),
+                        effects,
+                    })
                 }
                 // LeaveFederation not yet wired to service
                 FederationOperationType::LeaveFederation => {

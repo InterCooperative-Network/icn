@@ -864,6 +864,45 @@ pub struct FederationClearingResult {
     pub error: Option<String>,
 }
 
+/// Request to settle net positions for a bilateral clearing agreement.
+///
+/// Causes `ClearingManager::trigger_settlement()` to run, which nets all
+/// confirmed transfers and resets the running position.  The resulting net
+/// amount is returned so the caller can emit a corresponding ledger entry.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FederationClearingSettleRequest {
+    /// ID of the clearing agreement to settle
+    pub agreement_id: String,
+    /// Currency for the net settlement transfer
+    pub currency: String,
+    /// Governance decision receipt for audit linkage
+    pub decision_receipt_id: String,
+    /// Canonical decision hash
+    pub decision_hash: String,
+}
+
+/// Result of a clearing settlement operation.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FederationClearingSettleResult {
+    /// Whether the settlement succeeded
+    pub success: bool,
+    /// Net settlement amount.  Positive: coop_a owes coop_b.  Negative: coop_b owes coop_a.
+    /// Zero: positions cancelled, no transfer needed.
+    pub net_settlement: i64,
+    /// coop_a identifier (from the agreement) — debtor when net_settlement > 0
+    pub coop_a: String,
+    /// coop_b identifier (from the agreement) — debtor when net_settlement < 0
+    pub coop_b: String,
+    /// Number of transfers that were settled
+    pub transfers_settled: usize,
+    /// State change hash for verification
+    pub state_change_hash: String,
+    /// Ledger entry hash if a transfer entry was emitted (non-zero net settlement with ledger configured)
+    pub ledger_entry_hash: Option<String>,
+    /// Error message if failed
+    pub error: Option<String>,
+}
+
 /// Abstract federation management service.
 ///
 /// The kernel uses this to register cooperatives, record vouches, and
@@ -903,6 +942,19 @@ pub trait FederationService: Send + Sync {
         &self,
         request: FederationClearingRequest,
     ) -> Result<FederationClearingResult, anyhow::Error>;
+
+    /// Settle net positions for a bilateral clearing agreement.
+    ///
+    /// Triggers `ClearingManager::trigger_settlement()` which nets all confirmed
+    /// cross-coop transfers and returns the resulting net position.  The caller
+    /// is responsible for submitting a ledger transfer entry for the net amount.
+    ///
+    /// Returns the net position and coop identifiers so the executor can
+    /// produce the correct ledger debit/credit entries.
+    fn settle_clearing(
+        &self,
+        request: FederationClearingSettleRequest,
+    ) -> Result<FederationClearingSettleResult, anyhow::Error>;
 
     /// Check if a cooperative is registered in the federation.
     fn is_registered(&self, coop_did: &str) -> bool;

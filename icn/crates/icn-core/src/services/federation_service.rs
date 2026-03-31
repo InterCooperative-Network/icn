@@ -11,9 +11,11 @@ use anyhow::Result;
 use icn_federation::types::{CooperativeInfo, FederationPolicy, Vouch};
 use icn_federation::{BilateralClearingAgreement, ClearingManager, CooperativeRegistry};
 use icn_identity::Did;
+use icn_kernel_api::services::TreasuryOperationType;
 use icn_kernel_api::{
-    FederationClearingRequest, FederationClearingResult, FederationJoinRequest,
-    FederationJoinResult, FederationService, FederationVouchRequest, FederationVouchResult,
+    FederationClearingRequest, FederationClearingResult, FederationClearingSettleRequest,
+    FederationClearingSettleResult, FederationJoinRequest, FederationJoinResult, FederationService,
+    FederationVouchRequest, FederationVouchResult, LedgerService, TreasuryEntryRequest,
 };
 use sha2::{Digest, Sha256};
 use tracing::info;
@@ -34,6 +36,10 @@ pub struct FederationServiceImpl {
     /// federation clearing is configured in the supervisor)
     clearing: Option<Arc<ClearingManager>>,
 
+    /// Ledger service for emitting settlement transfers (optional — required for non-zero
+    /// net settlement to produce ledger entries)
+    ledger: Option<Arc<dyn LedgerService>>,
+
     /// Provenance tracking for registered cooperatives
     /// Maps coop_did -> (decision_receipt_id, decision_hash)
     provenance: RwLock<HashMap<String, FederationProvenance>>,
@@ -45,6 +51,7 @@ impl FederationServiceImpl {
         Self {
             registry,
             clearing: None,
+            ledger: None,
             provenance: RwLock::new(HashMap::new()),
         }
     }
@@ -52,6 +59,15 @@ impl FederationServiceImpl {
     /// Attach a clearing manager, enabling governance-driven clearing establishment.
     pub fn with_clearing_manager(mut self, clearing: Arc<ClearingManager>) -> Self {
         self.clearing = Some(clearing);
+        self
+    }
+
+    /// Attach a ledger service so that non-zero clearing settlements produce ledger entries.
+    ///
+    /// Required for the operational clearing scheduler and governance force-settle paths
+    /// to write net obligations into the ledger.
+    pub fn with_ledger(mut self, ledger: Arc<dyn LedgerService>) -> Self {
+        self.ledger = Some(ledger);
         self
     }
 
@@ -311,6 +327,232 @@ impl FederationService for FederationServiceImpl {
                 Ok(FederationClearingResult {
                     success: false,
                     state_change_hash: String::new(),
+                    error: Some(e.to_string()),
+                })
+            }
+        }
+    }
+
+    fn settle_clearing(
+        &self,
+        request: FederationClearingSettleRequest,
+    ) -> Result<FederationClearingSettleResult> {
+        let clearing = match &self.clearing {
+            Some(c) => c,
+            None => {
+                return Ok(FederationClearingSettleResult {
+                    success: false,
+                    net_settlement: 0,
+                    coop_a: String::new(),
+                    coop_b: String::new(),
+                    transfers_settled: 0,
+                    state_change_hash: String::new(),
+                    ledger_entry_hash: None,
+                    error: Some(
+                        "Clearing manager not configured — wire FederationServiceImpl::with_clearing_manager in supervisor"
+                            .to_string(),
+                    ),
+                });
+            }
+        };
+
+        // Look up the agreement to get coop identifiers for the ledger transfer
+        let agreement = match clearing.get_agreement(&request.agreement_id)? {
+            Some(a) => a,
+            None => {
+                return Ok(FederationClearingSettleResult {
+                    success: false,
+                    net_settlement: 0,
+                    coop_a: String::new(),
+                    coop_b: String::new(),
+                    transfers_settled: 0,
+                    state_change_hash: String::new(),
+                    ledger_entry_hash: None,
+                    error: Some(format!(
+                        "Clearing agreement '{}' not found",
+                        request.agreement_id
+                    )),
+                });
+            }
+        };
+
+        let coop_a = agreement.coop_a.clone();
+        let coop_b = agreement.coop_b.clone();
+        // Store DIDs as strings for the ledger transfer — the ledger's Transfer path
+        // parses recipient via Did::from_str(), so we must pass the DID, not the coop ID.
+        let coop_a_did_str = agreement.coop_a_did.to_string();
+        let coop_b_did_str = agreement.coop_b_did.to_string();
+
+        // Idempotency guard: if net is non-zero and no ledger is configured, fail BEFORE
+        // mutating clearing positions.  Otherwise trigger_settlement() would clear positions
+        // leaving no accounting trace (partial-settlement state).
+        //
+        // We must propagate position-read errors rather than treating them as zero:
+        // a store error cannot be distinguished from a true zero balance, and silently
+        // allowing settlement would corrupt the audit trail.
+        if self.ledger.is_none() {
+            let preview_net = clearing
+                .calculate_position(&request.agreement_id)
+                .map_err(|e| {
+                    anyhow::anyhow!(
+                        "Cannot read clearing position for '{}': {} — retry after store recovery",
+                        request.agreement_id,
+                        e
+                    )
+                })?
+                .net_position();
+            if preview_net != 0 {
+                return Ok(FederationClearingSettleResult {
+                    success: false,
+                    net_settlement: 0,
+                    coop_a,
+                    coop_b,
+                    transfers_settled: 0,
+                    state_change_hash: String::new(),
+                    ledger_entry_hash: None,
+                    error: Some(format!(
+                        "Cannot settle agreement '{}': net position is {} but no ledger configured — wire with_ledger()",
+                        request.agreement_id,
+                        preview_net
+                    )),
+                });
+            }
+        }
+
+        info!(
+            agreement_id = %request.agreement_id,
+            currency = %request.currency,
+            coop_a = %coop_a,
+            coop_b = %coop_b,
+            decision_receipt_id = %request.decision_receipt_id,
+            "Triggering clearing settlement"
+        );
+
+        match clearing.trigger_settlement(&request.agreement_id) {
+            Ok(report) => {
+                let mut hasher = Sha256::new();
+                hasher.update(b"federation:settle:");
+                hasher.update(request.agreement_id.as_bytes());
+                hasher.update(b":");
+                hasher.update(request.decision_receipt_id.as_bytes());
+                hasher.update(b":");
+                hasher.update(report.net_settlement.to_le_bytes());
+                let state_change_hash = format!("{:x}", hasher.finalize());
+
+                info!(
+                    agreement_id = %report.agreement_id,
+                    net_settlement = %report.net_settlement,
+                    transfers_settled = %report.transfers_settled,
+                    state_change_hash = %state_change_hash,
+                    "Clearing settlement completed"
+                );
+
+                // Emit ledger transfer for non-zero net positions.
+                // net_settlement > 0: coop_a owes coop_b
+                // net_settlement < 0: coop_b owes coop_a
+                // We use DID strings (not coop ID strings) because the ledger's Transfer
+                // path parses treasury_id and recipient via Did::from_str().
+                let ledger_entry_hash = if report.net_settlement != 0 {
+                    if let Some(ledger) = &self.ledger {
+                        let (debtor_did, creditor_did, debtor_label, creditor_label, amount) =
+                            if report.net_settlement > 0 {
+                                (
+                                    coop_a_did_str.clone(),
+                                    coop_b_did_str.clone(),
+                                    coop_a.clone(),
+                                    coop_b.clone(),
+                                    report.net_settlement,
+                                )
+                            } else {
+                                (
+                                    coop_b_did_str.clone(),
+                                    coop_a_did_str.clone(),
+                                    coop_b.clone(),
+                                    coop_a.clone(),
+                                    -report.net_settlement,
+                                )
+                            };
+                        let entry_req = TreasuryEntryRequest {
+                            treasury_id: debtor_did.clone(),
+                            operation_type: TreasuryOperationType::Transfer,
+                            amount,
+                            currency: request.currency.clone(),
+                            recipient: Some(creditor_did.clone()),
+                            memo: format!(
+                                "Clearing settlement for {}: {} -> {}",
+                                request.agreement_id, debtor_label, creditor_label
+                            ),
+                            expected_nonce: None,
+                            decision_receipt_id: request.decision_receipt_id.clone(),
+                            decision_hash: request.decision_hash.clone(),
+                        };
+                        match ledger.submit_treasury_entry(entry_req) {
+                            Ok(entry_result) => {
+                                info!(
+                                    agreement_id = %request.agreement_id,
+                                    net_settlement = report.net_settlement,
+                                    entry_hash = %entry_result.entry_hash,
+                                    "Clearing settlement produced ledger transfer entry"
+                                );
+                                Some(entry_result.entry_hash)
+                            }
+                            Err(e) => {
+                                tracing::warn!(
+                                    agreement_id = %request.agreement_id,
+                                    error = %e,
+                                    "Clearing settlement succeeded but ledger transfer failed"
+                                );
+                                return Ok(FederationClearingSettleResult {
+                                    success: false,
+                                    net_settlement: report.net_settlement,
+                                    coop_a,
+                                    coop_b,
+                                    transfers_settled: report.transfers_settled,
+                                    state_change_hash,
+                                    ledger_entry_hash: None,
+                                    error: Some(format!(
+                                        "Settlement positions cleared but ledger transfer failed: {e}"
+                                    )),
+                                });
+                            }
+                        }
+                    } else {
+                        tracing::warn!(
+                            agreement_id = %request.agreement_id,
+                            net_settlement = report.net_settlement,
+                            "Non-zero net settlement but no ledger configured — wire with_ledger()"
+                        );
+                        None
+                    }
+                } else {
+                    None
+                };
+
+                Ok(FederationClearingSettleResult {
+                    success: true,
+                    net_settlement: report.net_settlement,
+                    coop_a,
+                    coop_b,
+                    transfers_settled: report.transfers_settled,
+                    state_change_hash,
+                    ledger_entry_hash,
+                    error: None,
+                })
+            }
+            Err(e) => {
+                tracing::warn!(
+                    agreement_id = %request.agreement_id,
+                    error = %e,
+                    "Clearing settlement failed"
+                );
+                Ok(FederationClearingSettleResult {
+                    success: false,
+                    net_settlement: 0,
+                    coop_a,
+                    coop_b,
+                    transfers_settled: 0,
+                    state_change_hash: String::new(),
+                    ledger_entry_hash: None,
                     error: Some(e.to_string()),
                 })
             }
@@ -742,6 +984,316 @@ mod tests {
                 .contains("coop_b_did"),
             "Error should mention coop_b_did: {:?}",
             result_b.error
+        );
+    }
+
+    #[test]
+    fn test_settle_clearing_zero_net_position() {
+        let (registry, _reg_temp) = make_test_registry();
+        let clearing_temp = tempfile::tempdir().unwrap();
+        let clearing_store = Arc::new(SledStore::open(clearing_temp.path()).unwrap());
+        let clearing =
+            Arc::new(ClearingManager::new(clearing_store, "coop-a".to_string()).unwrap());
+
+        // First establish the agreement
+        let service = FederationServiceImpl::new(registry).with_clearing_manager(clearing.clone());
+        let establish = service
+            .establish_clearing(FederationClearingRequest {
+                coop_a_did: make_test_did_str(2),
+                coop_b_did: make_test_did_str(3),
+                agreement_id: "agreement-settle-zero".to_string(),
+                decision_receipt_id: "gov:establish-clearing".to_string(),
+                decision_hash: "sha256:establish".to_string(),
+            })
+            .unwrap();
+        assert!(establish.success, "EstablishClearing should succeed");
+
+        // Settle with no transfers — net position is zero
+        let result = service
+            .settle_clearing(FederationClearingSettleRequest {
+                agreement_id: "agreement-settle-zero".to_string(),
+                currency: "HOURS".to_string(),
+                decision_receipt_id: "gov:settle-clearing".to_string(),
+                decision_hash: "sha256:settle".to_string(),
+            })
+            .unwrap();
+
+        assert!(
+            result.success,
+            "Settlement should succeed: {:?}",
+            result.error
+        );
+        assert_eq!(result.net_settlement, 0, "No transfers → zero net position");
+        assert_eq!(result.transfers_settled, 0);
+        assert!(!result.state_change_hash.is_empty());
+    }
+
+    /// Non-zero net settlement without a ledger service must fail BEFORE mutating
+    /// clearing positions (idempotency guard).  The clearing positions should be
+    /// unchanged after the call so a retry with a ledger wired will work correctly.
+    #[test]
+    fn test_settle_clearing_nonzero_net_requires_ledger() {
+        use icn_federation::clearing::CrossCoopTransfer;
+
+        let (registry, _reg_temp) = make_test_registry();
+        let clearing_temp = tempfile::tempdir().unwrap();
+        let clearing_store = Arc::new(SledStore::open(clearing_temp.path()).unwrap());
+        let clearing =
+            Arc::new(ClearingManager::new(clearing_store, "coop-a".to_string()).unwrap());
+
+        let coop_a_did = Did::from_public_key(
+            &ed25519_dalek::SigningKey::from_bytes(&[2u8; 32]).verifying_key(),
+        );
+        let coop_b_did = Did::from_public_key(
+            &ed25519_dalek::SigningKey::from_bytes(&[3u8; 32]).verifying_key(),
+        );
+        let agreement_id = "agreement-settle-nonzero".to_string();
+
+        // Establish the agreement with an HOURS→HOURS exchange rate
+        clearing
+            .create_agreement(
+                BilateralClearingAgreement::new(
+                    agreement_id.clone(),
+                    "coop-a".to_string(),
+                    coop_a_did.clone(),
+                    "coop-b".to_string(),
+                    coop_b_did.clone(),
+                )
+                .with_rate("HOURS", "HOURS", 1.0),
+            )
+            .unwrap();
+
+        // Propose and confirm a transfer: coop-a sends 100 HOURS to coop-b
+        let transfer = CrossCoopTransfer::new(
+            "transfer-001".to_string(),
+            "coop-a".to_string(),
+            coop_a_did.clone(),
+            "coop-b".to_string(),
+            coop_b_did.clone(),
+            100,
+            "HOURS".to_string(),
+            100,
+            "HOURS".to_string(),
+        );
+        let transfer_id = clearing.propose_transfer(transfer).unwrap();
+        clearing.confirm_transfer(&transfer_id).unwrap();
+
+        // Service without ledger — must fail on non-zero net to prevent partial settlement
+        let service = FederationServiceImpl::new(registry).with_clearing_manager(clearing.clone());
+
+        let result = service
+            .settle_clearing(FederationClearingSettleRequest {
+                agreement_id: agreement_id.clone(),
+                currency: "HOURS".to_string(),
+                decision_receipt_id: "gov:settle-nonzero".to_string(),
+                decision_hash: "sha256:settle-nonzero".to_string(),
+            })
+            .unwrap();
+
+        assert!(!result.success, "Non-zero net without ledger must fail");
+        assert!(
+            result
+                .error
+                .as_deref()
+                .unwrap_or("")
+                .contains("no ledger configured"),
+            "Error should mention ledger requirement: {:?}",
+            result.error
+        );
+
+        // Verify positions were NOT mutated (idempotency guard fired before trigger_settlement)
+        let position = clearing.calculate_position(&agreement_id).unwrap();
+        assert_eq!(
+            position.net_position(),
+            100,
+            "Positions must be unchanged after guard fires"
+        );
+    }
+
+    #[test]
+    fn test_settle_clearing_agreement_not_found() {
+        let (registry, _reg_temp) = make_test_registry();
+        let clearing_temp = tempfile::tempdir().unwrap();
+        let clearing_store = Arc::new(SledStore::open(clearing_temp.path()).unwrap());
+        let clearing =
+            Arc::new(ClearingManager::new(clearing_store, "coop-a".to_string()).unwrap());
+        let service = FederationServiceImpl::new(registry).with_clearing_manager(clearing);
+
+        let result = service
+            .settle_clearing(FederationClearingSettleRequest {
+                agreement_id: "no-such-agreement".to_string(),
+                currency: "HOURS".to_string(),
+                decision_receipt_id: "gov:settle-missing".to_string(),
+                decision_hash: "sha256:missing".to_string(),
+            })
+            .unwrap();
+
+        assert!(!result.success, "Should fail for unknown agreement");
+        assert!(
+            result.error.as_deref().unwrap_or("").contains("not found"),
+            "Error should mention not found: {:?}",
+            result.error
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // Stub ledger for settlement tests
+    // -------------------------------------------------------------------------
+
+    use std::sync::Mutex;
+
+    struct StubLedger {
+        captured: Mutex<Vec<TreasuryEntryRequest>>,
+        result: Result<String, String>,
+    }
+
+    impl StubLedger {
+        fn succeeding(entry_hash: &str) -> Arc<Self> {
+            Arc::new(Self {
+                captured: Mutex::new(Vec::new()),
+                result: Ok(entry_hash.to_string()),
+            })
+        }
+
+        fn captured_entries(&self) -> Vec<TreasuryEntryRequest> {
+            self.captured.lock().unwrap().clone()
+        }
+    }
+
+    impl icn_kernel_api::LedgerService for StubLedger {
+        fn oracle(&self) -> Arc<dyn icn_kernel_api::PolicyOracle> {
+            Arc::new(icn_kernel_api::AllowAllOracle::wildcard())
+        }
+
+        fn balance(&self, _account: &String, _currency: &str) -> i64 {
+            0
+        }
+
+        fn credit_limit(&self, _account: &String, _currency: &str) -> i64 {
+            0
+        }
+
+        fn record_event(&self, _event: icn_kernel_api::LedgerEvent) {}
+
+        fn submit_treasury_entry(
+            &self,
+            entry: TreasuryEntryRequest,
+        ) -> Result<icn_kernel_api::TreasuryEntryResult, String> {
+            let decision_hash = entry.decision_hash.clone();
+            let decision_receipt_id = entry.decision_receipt_id.clone();
+            self.captured.lock().unwrap().push(entry);
+            self.result
+                .clone()
+                .map(|h| icn_kernel_api::TreasuryEntryResult {
+                    entry_hash: h,
+                    decision_hash,
+                    decision_receipt_id,
+                })
+        }
+    }
+
+    /// Happy path: non-zero net settlement with a wired ledger.
+    /// Proves that:
+    /// - `settle_clearing` succeeds when ledger is wired and net is non-zero
+    /// - the correct decision_hash flows into the ledger transfer entry
+    /// - debtor/creditor DIDs are set correctly based on net direction
+    /// - transfers_settled > 0 and ledger_entry_hash is Some
+    #[test]
+    fn test_settle_clearing_with_ledger_emits_correct_entry() {
+        use icn_federation::clearing::CrossCoopTransfer;
+
+        let (registry, _reg_temp) = make_test_registry();
+        let clearing_temp = tempfile::tempdir().unwrap();
+        let clearing_store = Arc::new(SledStore::open(clearing_temp.path()).unwrap());
+        let clearing =
+            Arc::new(ClearingManager::new(clearing_store, "coop-a".to_string()).unwrap());
+
+        let coop_a_did = Did::from_public_key(&SigningKey::from_bytes(&[4u8; 32]).verifying_key());
+        let coop_b_did = Did::from_public_key(&SigningKey::from_bytes(&[5u8; 32]).verifying_key());
+        let agreement_id = "agreement-ledger-test".to_string();
+
+        // Establish agreement with HOURS→HOURS rate
+        clearing
+            .create_agreement(
+                BilateralClearingAgreement::new(
+                    agreement_id.clone(),
+                    "coop-a".to_string(),
+                    coop_a_did.clone(),
+                    "coop-b".to_string(),
+                    coop_b_did.clone(),
+                )
+                .with_rate("HOURS", "HOURS", 1.0),
+            )
+            .unwrap();
+
+        // coop-a sends 200 HOURS to coop-b — net: coop-a owes coop-b 200
+        let transfer = CrossCoopTransfer::new(
+            "transfer-ledger-001".to_string(),
+            "coop-a".to_string(),
+            coop_a_did.clone(),
+            "coop-b".to_string(),
+            coop_b_did.clone(),
+            200,
+            "HOURS".to_string(),
+            200,
+            "HOURS".to_string(),
+        );
+        let transfer_id = clearing.propose_transfer(transfer).unwrap();
+        clearing.confirm_transfer(&transfer_id).unwrap();
+
+        let stub = StubLedger::succeeding("sha256:settlement-entry-001");
+        let service = FederationServiceImpl::new(registry)
+            .with_clearing_manager(clearing)
+            .with_ledger(stub.clone() as Arc<dyn icn_kernel_api::LedgerService>);
+
+        let decision_hash = "sha256:governance-settle-decision-abc123".to_string();
+        let result = service
+            .settle_clearing(FederationClearingSettleRequest {
+                agreement_id: agreement_id.clone(),
+                currency: "HOURS".to_string(),
+                decision_receipt_id: "gov:settle-001".to_string(),
+                decision_hash: decision_hash.clone(),
+            })
+            .unwrap();
+
+        assert!(
+            result.success,
+            "Settlement should succeed: {:?}",
+            result.error
+        );
+        assert_eq!(result.net_settlement, 200, "coop-a owes coop-b 200");
+        assert_eq!(result.transfers_settled, 1);
+        assert!(!result.state_change_hash.is_empty());
+        assert_eq!(
+            result.ledger_entry_hash.as_deref(),
+            Some("sha256:settlement-entry-001"),
+            "Ledger entry hash must come from stub"
+        );
+
+        // Verify the entry submitted to the ledger carries correct provenance
+        let entries = stub.captured_entries();
+        assert_eq!(
+            entries.len(),
+            1,
+            "Exactly one ledger entry should be emitted"
+        );
+        let entry = &entries[0];
+        assert_eq!(
+            entry.decision_hash, decision_hash,
+            "decision_hash must flow through to the ledger entry unchanged"
+        );
+        assert_eq!(entry.amount, 200);
+        assert_eq!(entry.currency, "HOURS");
+        // coop-a is the debtor (net_settlement > 0 means coop-a owes coop-b)
+        assert_eq!(
+            entry.treasury_id,
+            coop_a_did.to_string(),
+            "Debtor must be coop-a DID"
+        );
+        assert_eq!(
+            entry.recipient.as_deref(),
+            Some(coop_b_did.to_string().as_str()),
+            "Creditor must be coop-b DID"
         );
     }
 }
