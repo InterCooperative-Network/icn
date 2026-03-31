@@ -90,25 +90,6 @@ impl KernelGovernanceExecutor {
         self
     }
 
-    /// Set the ledger service for clearing settlement entries.
-    ///
-    /// Must be called after `with_federation_service()` to attach the ledger
-    /// service to the federation executor (so SettleClearing can emit transfers).
-    pub fn with_settlement_ledger(
-        mut self,
-        ledger: Arc<dyn icn_kernel_api::LedgerService>,
-    ) -> Self {
-        // Rebuild the federation executor with ledger attached.
-        // Preserve any existing service by extracting it from the current executor.
-        let existing_service = self.federation.service.clone();
-        let mut new_fed = KernelFederationExecutor::new();
-        if let Some(svc) = existing_service {
-            new_fed = KernelFederationExecutor::with_service(svc);
-        }
-        self.federation = Arc::new(new_fed.with_ledger(ledger));
-        self
-    }
-
     /// Set the membership service for membership operations.
     pub fn with_membership_service(
         mut self,
@@ -989,34 +970,22 @@ impl ProtocolExecutor for KernelProtocolExecutor {
 /// Executes federation operations (join, leave, vouch, clearing) by
 /// delegating to the FederationService for durable state mutations.
 pub struct KernelFederationExecutor {
-    /// Federation service for durable state operations
+    /// Federation service for durable state operations.
+    /// The service holds all required resources including ledger access for settlements.
     service: Option<Arc<dyn icn_kernel_api::FederationService>>,
-    /// Ledger service for emitting settlement transfer entries.
-    /// Required only for SettleClearing operations.
-    ledger: Option<Arc<dyn icn_kernel_api::LedgerService>>,
 }
 
 impl KernelFederationExecutor {
     /// Create a new federation executor (placeholder mode - no durable state).
     pub fn new() -> Self {
-        Self {
-            service: None,
-            ledger: None,
-        }
+        Self { service: None }
     }
 
     /// Create a new federation executor with a real service.
     pub fn with_service(service: Arc<dyn icn_kernel_api::FederationService>) -> Self {
         Self {
             service: Some(service),
-            ledger: None,
         }
-    }
-
-    /// Attach a ledger service for settlement transfer entries.
-    pub fn with_ledger(mut self, ledger: Arc<dyn icn_kernel_api::LedgerService>) -> Self {
-        self.ledger = Some(ledger);
-        self
     }
 
     /// Set the federation service after construction.
@@ -1201,6 +1170,7 @@ impl FederationExecutor for KernelFederationExecutor {
                         decision_hash: operation.decision_hash.clone().unwrap_or_default(),
                     };
 
+                    // Delegate fully to the service — ledger emission happens there.
                     let settle_result = service.settle_clearing(settle_req)?;
 
                     if !settle_result.success {
@@ -1212,106 +1182,33 @@ impl FederationExecutor for KernelFederationExecutor {
                         });
                     }
 
-                    // If net position is zero, positions cancelled — no ledger entry needed.
-                    if settle_result.net_settlement == 0 {
-                        tracing::info!(
-                            agreement_id = %agreement_id,
-                            transfers_settled = settle_result.transfers_settled,
-                            "Clearing settlement: zero net position, no transfer needed"
-                        );
-                        return Ok(ExecutionOutcome::Success {
-                            receipt_id: receipt_id.clone(),
-                            effects: vec![format!(
-                                "Clearing settled: {} transfers, net=0 (positions cancelled)",
-                                settle_result.transfers_settled
-                            )],
-                        });
-                    }
-
-                    // Non-zero net: emit a ledger transfer for the net settlement.
-                    // net_settlement > 0: coop_a owes coop_b
-                    // net_settlement < 0: coop_b owes coop_a
-                    let (debtor, creditor, amount) = if settle_result.net_settlement > 0 {
-                        (
-                            settle_result.coop_a.clone(),
-                            settle_result.coop_b.clone(),
+                    let effects = if settle_result.net_settlement == 0 {
+                        vec![format!(
+                            "Clearing settled: {} transfers, net=0 (positions cancelled)",
+                            settle_result.transfers_settled
+                        )]
+                    } else if let Some(ref entry_hash) = settle_result.ledger_entry_hash {
+                        vec![format!(
+                            "Clearing settled: {} transfers, net={} {} -> ledger entry {}",
+                            settle_result.transfers_settled,
                             settle_result.net_settlement,
-                        )
+                            currency,
+                            entry_hash
+                        )]
                     } else {
-                        (
-                            settle_result.coop_b.clone(),
-                            settle_result.coop_a.clone(),
-                            -settle_result.net_settlement,
-                        )
+                        // Non-zero net but no ledger entry — service warned; treat as partial success.
+                        vec![format!(
+                            "Clearing settled: {} transfers, net={} {} (no ledger — wire with_ledger() on FederationServiceImpl)",
+                            settle_result.transfers_settled,
+                            settle_result.net_settlement,
+                            currency
+                        )]
                     };
 
-                    if let Some(ledger) = &self.ledger {
-                        let entry_req = icn_kernel_api::TreasuryEntryRequest {
-                            treasury_id: debtor.clone(),
-                            operation_type:
-                                icn_kernel_api::services::TreasuryOperationType::Transfer,
-                            amount,
-                            currency: currency.clone(),
-                            recipient: Some(creditor.clone()),
-                            memo: format!(
-                                "Clearing settlement for {agreement_id}: {debtor} -> {creditor}"
-                            ),
-                            expected_nonce: None,
-                            decision_receipt_id: receipt_id.to_string(),
-                            decision_hash: operation.decision_hash.clone().unwrap_or_default(),
-                        };
-
-                        match ledger.submit_treasury_entry(entry_req) {
-                            Ok(entry_result) => {
-                                tracing::info!(
-                                    agreement_id = %agreement_id,
-                                    net_settlement = settle_result.net_settlement,
-                                    entry_hash = %entry_result.entry_hash,
-                                    "Clearing settlement produced ledger transfer entry"
-                                );
-                                Ok(ExecutionOutcome::Success {
-                                    receipt_id: receipt_id.clone(),
-                                    effects: vec![format!(
-                                        "Clearing settled: {} {} {} -> {} -> ledger entry {}",
-                                        settle_result.transfers_settled,
-                                        amount,
-                                        currency,
-                                        creditor,
-                                        entry_result.entry_hash
-                                    )],
-                                })
-                            }
-                            Err(e) => {
-                                tracing::warn!(
-                                    agreement_id = %agreement_id,
-                                    error = %e,
-                                    "Clearing settlement succeeded but ledger transfer failed"
-                                );
-                                Ok(ExecutionOutcome::Failed {
-                                    receipt_id: receipt_id.clone(),
-                                    reason: format!(
-                                        "Settlement positions cleared but ledger transfer failed: {e}"
-                                    ),
-                                })
-                            }
-                        }
-                    } else {
-                        // Ledger not configured — report net position but can't produce entry.
-                        tracing::warn!(
-                            agreement_id = %agreement_id,
-                            net_settlement = settle_result.net_settlement,
-                            "SettleClearing: no ledger service configured, settlement positions cleared but no ledger transfer emitted"
-                        );
-                        Ok(ExecutionOutcome::Failed {
-                            receipt_id: receipt_id.clone(),
-                            reason: format!(
-                                "Settlement cleared ({} transfers, net={} {}) but ledger service not configured — wire with_settlement_ledger()",
-                                settle_result.transfers_settled,
-                                settle_result.net_settlement,
-                                currency
-                            ),
-                        })
-                    }
+                    Ok(ExecutionOutcome::Success {
+                        receipt_id: receipt_id.clone(),
+                        effects,
+                    })
                 }
                 // LeaveFederation not yet wired to service
                 FederationOperationType::LeaveFederation => {
