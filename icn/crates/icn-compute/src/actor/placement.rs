@@ -1136,14 +1136,62 @@ impl ComputeActor {
         );
 
         // Process the result through normal channels
-        // The attestation_hash can be used to verify the result came from a trusted source
         self.on_task_result(result.clone()).await?;
 
-        // TODO: Trigger payment settlement via ClearingManager
-        // This would involve:
-        // 1. Verify attestation_hash matches expected value
-        // 2. Look up payment terms from original FederatedTaskRequest
-        // 3. Call ClearingManager::propose_transfer()
+        // Fire cross-entity clearing callback on successful federated completion.
+        // Only fires when:
+        // - the task succeeded
+        // - we have a submitter cooperative ID (own_cooperative_id is the submitter's entity)
+        // - a clearing callback is wired
+        if success {
+            if let Some(ref submitter_entity_id) = self.own_cooperative_id {
+                if let Some(ref cb) = self.federation_clearing_callback {
+                    // Look up the task to get payment terms
+                    let (amount, currency, submitter_did, task_id_str) = {
+                        let mgr = self.task_manager.lock().await;
+                        if let Some(task) = mgr.get(&result.task_hash) {
+                            let amount = task
+                                .payment_rate
+                                .unwrap_or(0)
+                                .saturating_mul(result.fuel_used);
+                            let currency = task.payment_currency.clone().unwrap_or_default();
+                            let submitter_did = task.submitter.clone();
+                            let task_id = task.id.clone();
+                            (amount, currency, submitter_did, task_id)
+                        } else {
+                            tracing::warn!(
+                                task_hash = %task_hash_str,
+                                "federated task not found for clearing; skipping"
+                            );
+                            return Ok(());
+                        }
+                    };
+
+                    // Only record a clearing obligation when there is a non-zero amount.
+                    // Zero-amount tasks are informational and don't create economic obligations.
+                    if amount > 0 {
+                        let notification = crate::actor::types::FederationClearingNotification {
+                            from_entity_id: submitter_entity_id.clone(),
+                            from_did: submitter_did,
+                            to_entity_id: executor_coop.clone(),
+                            to_did: result.executor.clone(),
+                            amount,
+                            currency,
+                            task_id: task_id_str,
+                            attestation_hash,
+                        };
+                        cb(notification);
+                        tracing::debug!(
+                            task_hash = %task_hash_str,
+                            from = %submitter_entity_id,
+                            to = %executor_coop,
+                            amount = amount,
+                            "Fired federation clearing notification"
+                        );
+                    }
+                }
+            }
+        }
 
         tracing::debug!(
             task_hash = %task_hash_str,

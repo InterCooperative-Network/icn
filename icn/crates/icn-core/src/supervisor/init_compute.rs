@@ -42,6 +42,11 @@ pub struct ComputeDeps {
     pub contract_registry: Option<icn_ccl::ContractRegistryHandle>,
     /// Governance policy thresholds for commons pool admission and cost estimation
     pub policy_config: crate::config::ComputePolicyConfig,
+    /// Handle to the receipt clearing queue for cross-entity clearing (optional).
+    /// When set, a `FederationClearingCallback` is wired so that federated task
+    /// completions are queued for periodic batch settlement.
+    pub federation_clearing_handle:
+        Option<std::sync::Arc<tokio::sync::RwLock<Option<icn_federation::ReceiptClearingManager>>>>,
 }
 
 /// Services returned from compute initialization
@@ -479,6 +484,44 @@ pub async fn init_compute_services(deps: ComputeDeps) -> anyhow::Result<ComputeS
                 warn!("WASM execution will not be available");
             }
         }
+    }
+
+    // Wire cross-entity clearing callback (if federation clearing handle is provided)
+    if let Some(rcm_handle) = deps.federation_clearing_handle {
+        let cb = std::sync::Arc::new(
+            move |notification: icn_compute::FederationClearingNotification| {
+                let rcm_handle = rcm_handle.clone();
+                let receipt = icn_federation::ClearingReceipt {
+                    receipt_hash: notification.attestation_hash,
+                    executor_did: notification.to_did.clone(),
+                    executor_coop: notification.to_entity_id.clone(),
+                    submitter_did: notification.from_did.clone(),
+                    submitter_coop: notification.from_entity_id.clone(),
+                    cost: notification.amount,
+                    currency: notification.currency.clone(),
+                    scope: icn_kernel_api::ScopeLevel::Federation,
+                    created_at: std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs(),
+                    disputed: false,
+                    dispute_reason: None,
+                };
+                // Fire-and-forget: best-effort enqueue. If the lock is poisoned or the
+                // manager is uninit'd, we log a warning and continue — clearing is non-critical
+                // for task completion.
+                tokio::spawn(async move {
+                    let guard = rcm_handle.read().await;
+                    if let Some(ref rcm) = *guard {
+                        if let Err(e) = rcm.submit_receipt(receipt) {
+                            warn!("Failed to queue clearing receipt: {e}");
+                        }
+                    }
+                });
+            },
+        );
+        compute_actor.set_federation_clearing_callback(cb);
+        info!("Federation clearing callback wired for cross-entity settlement");
     }
 
     // Spawn the compute actor

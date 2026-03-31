@@ -5,8 +5,9 @@
 #[cfg(test)]
 use icn_federation::FederationPolicy;
 use icn_federation::{
-    AttestationStore, BilateralClearingAgreement, ClearingManager, ClearingPosition,
-    CooperativeInfo, CooperativeRegistry, FederatedTrustAttestation, SettlementReport, Vouch,
+    AttestationStore, BatchClearingConfig, BilateralClearingAgreement, ClearingManager,
+    ClearingPosition, ClearingReceipt, CooperativeInfo, CooperativeRegistry,
+    FederatedTrustAttestation, ReceiptClearingManager, SettlementReport, Vouch,
 };
 use icn_identity::Did;
 use icn_store::SledStore;
@@ -22,6 +23,9 @@ pub struct FederationManager {
     registry: RwLock<Option<CooperativeRegistry>>,
     attestation_store: AttestationStore,
     clearing_manager: RwLock<Option<ClearingManager>>,
+    /// Queue for cross-entity clearing receipts produced by compute task completions.
+    /// Receipts are flushed to `clearing_manager` in periodic batches.
+    receipt_clearing: Arc<RwLock<Option<ReceiptClearingManager>>>,
 }
 
 impl FederationManager {
@@ -37,6 +41,7 @@ impl FederationManager {
             registry: RwLock::new(None),
             attestation_store,
             clearing_manager: RwLock::new(None),
+            receipt_clearing: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -53,6 +58,7 @@ impl FederationManager {
             registry: RwLock::new(None),
             attestation_store,
             clearing_manager: RwLock::new(None),
+            receipt_clearing: Arc::new(RwLock::new(None)),
         })
     }
 
@@ -65,13 +71,56 @@ impl FederationManager {
         let clearing = ClearingManager::new(self.store.clone(), coop_id.clone())
             .map_err(|e| GatewayError::InternalError(format!("Failed to init clearing: {e}")))?;
 
+        let receipt_clearing = ReceiptClearingManager::new(BatchClearingConfig::default());
+
         *self.registry.write().await = Some(registry);
         *self.clearing_manager.write().await = Some(clearing);
+        *self.receipt_clearing.write().await = Some(receipt_clearing);
 
         info!(
             "Federation manager initialized for cooperative: {}",
             coop_id
         );
+        Ok(())
+    }
+
+    // ========================================================================
+    // Receipt Clearing (compute task → clearing obligation)
+    // ========================================================================
+
+    /// Return a cloneable handle to the receipt clearing queue.
+    ///
+    /// Used by lifecycle wiring to produce a `FederationClearingCallback` that
+    /// captures this handle without requiring a full `Arc<FederationManager>` cycle.
+    pub fn receipt_clearing_handle(&self) -> Arc<RwLock<Option<ReceiptClearingManager>>> {
+        self.receipt_clearing.clone()
+    }
+
+    /// Queue a cross-entity clearing receipt produced by a compute task completion.
+    ///
+    /// The receipt is enqueued for batch flushing to the `ClearingManager`.
+    /// Returns `Ok(())` silently if the receipt clearing queue is not yet initialized
+    /// (federation not yet init'd), since clearing is best-effort for local-only nodes.
+    pub async fn queue_clearing_receipt(&self, receipt: ClearingReceipt) -> Result<()> {
+        let mgr = self.receipt_clearing.read().await;
+        if let Some(ref rcm) = *mgr {
+            rcm.submit_receipt(receipt)
+                .map_err(|e| GatewayError::InternalError(e.to_string()))?;
+        }
+        Ok(())
+    }
+
+    /// Flush queued clearing receipts to the bilateral clearing manager.
+    ///
+    /// Should be called periodically (e.g., from a background task or on gateway shutdown).
+    /// No-op if either the receipt queue or the clearing manager is uninitialized.
+    pub async fn flush_clearing_receipts(&self) -> Result<()> {
+        let rcm = self.receipt_clearing.read().await;
+        let cm = self.clearing_manager.read().await;
+        if let (Some(rcm), Some(cm)) = (rcm.as_ref(), cm.as_ref()) {
+            rcm.flush_to_clearing(cm)
+                .map_err(|e| GatewayError::InternalError(e.to_string()))?;
+        }
         Ok(())
     }
 

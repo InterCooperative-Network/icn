@@ -31,6 +31,10 @@ pub struct FederationServices {
     /// The agreement manager for inter-cooperative agreements (persistent storage)
     pub agreement_manager:
         Arc<icn_federation::agreement::AgreementManager<icn_federation::agreement::AgreementStore>>,
+    /// Queue for cross-entity clearing receipts produced by compute completions.
+    /// Shared with compute actor via `FederationClearingCallback`.
+    pub receipt_clearing_handle:
+        std::sync::Arc<tokio::sync::RwLock<Option<icn_federation::ReceiptClearingManager>>>,
 }
 
 /// Dependencies for federation initialization
@@ -315,6 +319,12 @@ pub async fn init_federation_services(
         agreement_store_path.display()
     );
 
+    // Create receipt clearing manager for compute → clearing ingestion
+    let receipt_clearing =
+        icn_federation::ReceiptClearingManager::new(icn_federation::BatchClearingConfig::default());
+    let receipt_clearing_handle =
+        std::sync::Arc::new(tokio::sync::RwLock::new(Some(receipt_clearing)));
+
     info!(
         "✓ Federation enabled: coop_id={}, coop_name={}, store={}",
         coop_id,
@@ -328,6 +338,7 @@ pub async fn init_federation_services(
         clearing_manager,
         attestation_store,
         agreement_manager,
+        receipt_clearing_handle,
     }))
 }
 

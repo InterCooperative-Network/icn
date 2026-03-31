@@ -538,6 +538,7 @@ async fn spawn_actors_with_identity(
         clearing_manager_for_governance,
         _attestation_store_for_governance,
         federation_handler_for_notifications,
+        federation_clearing_handle_for_compute,
     ) = if let Some(ref services) = federation_services {
         gateway_handles.agreement_manager = Some(services.agreement_manager.clone());
         (
@@ -545,10 +546,11 @@ async fn spawn_actors_with_identity(
             Some(services.clearing_manager.clone()),
             Some(services.attestation_store.clone()),
             Some(services.federation_handler.clone()),
+            Some(services.receipt_clearing_handle.clone()),
         )
     } else {
         gateway_handles.agreement_manager = None;
-        (None, None, None, None)
+        (None, None, None, None, None)
     };
 
     // Initialize send callback with E2E encryption support
@@ -873,6 +875,7 @@ async fn spawn_actors_with_identity(
             store_path: config.store_path(),
             contract_registry: Some(contract_registry_handle.clone()),
             policy_config: config.compute.policy.clone(),
+            federation_clearing_handle: federation_clearing_handle_for_compute,
         })
         .await?;
 

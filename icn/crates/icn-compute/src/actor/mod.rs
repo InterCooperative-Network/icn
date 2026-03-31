@@ -16,7 +16,8 @@ pub use handle::ComputeHandle;
 pub use types::{
     BalanceCallback, CommonsPaymentRequest, CommonsReleaseCallback, CommonsReleaseRequest,
     CommonsReserveCallback, CommonsReserveRequest, CommonsSettlementCallback, ComputeEvent,
-    EventCallback, LocalityCallback, PaymentCallback, PaymentRequest, SendCallback, TrustCallback,
+    EventCallback, FederationClearingCallback, FederationClearingNotification, LocalityCallback,
+    PaymentCallback, PaymentRequest, SendCallback, TrustCallback,
 };
 
 // Internal imports from submodules
@@ -136,6 +137,11 @@ pub struct ComputeActor {
     /// cleared on settlement (Success) or release (non-Success / timeout).
     /// Not persisted — consistent with task state loss on process crash (V1 limitation).
     pending_reservations: Arc<Mutex<HashMap<String, i64>>>,
+    /// Callback for recording cross-entity clearing obligations on federated task completion.
+    /// Fires when a federated executor (different entity than submitter) confirms a result.
+    /// The receiving layer converts the notification into a `ClearingReceipt` queued in
+    /// `ReceiptClearingManager`. Not set = clearing obligations are not recorded (local-only mode).
+    federation_clearing_callback: Option<FederationClearingCallback>,
     /// WASM registry for execute-by-hash (Issue #1074)
     wasm_registry: Option<Arc<WasmRegistry>>,
     /// Resource refresh configuration
@@ -189,6 +195,7 @@ impl ComputeActor {
             commons_reserve_callback: None,
             commons_release_callback: None,
             pending_reservations: Arc::new(Mutex::new(HashMap::new())),
+            federation_clearing_callback: None,
             wasm_registry: None,
             resource_refresh_config: crate::scheduler::ResourceRefreshConfig::default(),
             cached_capacity: Arc::new(Mutex::new(None)),
@@ -465,6 +472,15 @@ impl ComputeActor {
     /// Set the callback for settling commons credits on task completion (E7 - #948).
     pub fn set_commons_settlement_callback(&mut self, cb: CommonsSettlementCallback) {
         self.commons_settlement_callback = Some(cb);
+    }
+
+    /// Set the callback for recording cross-entity clearing obligations.
+    ///
+    /// When set, fires on every federated task completion where the executor's entity differs
+    /// from the submitter's entity. The notification carries entity IDs (not coop-specific),
+    /// allowing the receiving layer to route to the appropriate clearing infrastructure.
+    pub fn set_federation_clearing_callback(&mut self, cb: FederationClearingCallback) {
+        self.federation_clearing_callback = Some(cb);
     }
 
     /// Set the callback for broadcasting compute events
