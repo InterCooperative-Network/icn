@@ -116,6 +116,9 @@ pub enum FederationOperationType {
     LeaveFederation,
     EstablishClearing,
     VouchForCoop,
+    /// Settle net positions for a bilateral clearing agreement and emit a
+    /// ledger transfer entry for the net amount.
+    SettleClearing,
 }
 
 /// Federation operation request from governance
@@ -509,6 +512,24 @@ pub fn federation_effect_to_operation(effect: &FederationEffect) -> FederationOp
             target_id: Some(vouchee_did.clone()),
             agreement_hash: Some(attestation_hash.clone()),
             decision_hash: None,
+        },
+        FederationEffect::SettleClearing {
+            agreement_id,
+            currency,
+            decision_receipt_id: _,
+            decision_hash,
+        } => FederationOperation {
+            operation_type: FederationOperationType::SettleClearing,
+            // coop_did is not meaningful for SettleClearing; use agreement_id as key
+            coop_did: agreement_id.clone(),
+            // target_id carries the currency
+            target_id: Some(currency.clone()),
+            agreement_hash: Some(agreement_id.clone()),
+            decision_hash: if decision_hash.is_empty() {
+                None
+            } else {
+                Some(decision_hash.clone())
+            },
         },
     }
 }

@@ -724,6 +724,14 @@ async fn spawn_actors_with_identity(
             info!("✓ Federation service wired to governance executor");
         }
 
+        // Wire settlement ledger so SettleClearing effects can produce ledger entries.
+        // Reuses the same LedgerService Arc already wired to the treasury executor;
+        // the service is stateless (no mutable fields), so sharing is safe.
+        if let Some(settlement_ledger) = gateway_handles.ledger_service.clone() {
+            kernel_executor = kernel_executor.with_settlement_ledger(settlement_ledger);
+            info!("✓ Settlement ledger wired to federation executor");
+        }
+
         // Wire control service adapter
         let control_service = Arc::new(crate::services::ControlServiceImpl::new(
             governance_handle.clone(),

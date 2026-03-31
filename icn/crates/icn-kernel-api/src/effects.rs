@@ -291,6 +291,20 @@ pub enum FederationEffect {
         vouchee_did: String,
         attestation_hash: String,
     },
+    /// Trigger settlement for an established bilateral clearing agreement.
+    /// Nets all confirmed cross-coop transfers and emits a ledger transfer
+    /// entry for the net position.  The agreement_id references an agreement
+    /// previously established via EstablishClearing.
+    SettleClearing {
+        agreement_id: String,
+        currency: String,
+        /// Governance provenance — empty string for legacy/backwards compat.
+        #[serde(default)]
+        decision_receipt_id: String,
+        /// Canonical decision hash for audit trail.
+        #[serde(default)]
+        decision_hash: String,
+    },
 }
 
 // =============================================================================
