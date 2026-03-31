@@ -725,8 +725,15 @@ impl GatewayServer {
         let _service_expiry_handle =
             crate::service_discovery_mgr::start_expiry_task(service_discovery_manager.clone(), 300);
 
+        // FederationManager always uses a TEMPORARY sled store (standalone/testing path).
+        // In daemon mode, clearing state is populated by the compute layer's clearing callbacks
+        // (via supervisor's ClearingManager) — not by gateway API writes. API federation
+        // creation endpoints are demo/testing paths until the full agreement lifecycle is wired.
+        // All READ paths for supervisor-owned federation state (e.g. clearing positions) prefer
+        // the federation_service_for_routes below.  See ADR 0011.
         let federation_manager = Arc::new(FederationManager::new());
         // Wrap the optional FederationService handle so route handlers can get it from app_data.
+        // When Some, route handlers MUST prefer this over federation_manager for reads.
         let federation_service_for_routes: Arc<
             Option<Arc<dyn icn_kernel_api::services::FederationService>>,
         > = Arc::new(self.federation_service_handle.clone());

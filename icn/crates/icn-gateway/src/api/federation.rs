@@ -759,6 +759,116 @@ mod tests {
         );
     }
 
+    /// Verify that the clearing position handler prefers the supervisor-owned FederationService
+    /// over the gateway-local FederationManager when a service is injected.
+    ///
+    /// Architectural invariant (ADR 0011): the gateway must never present state from its own
+    /// divergent local manager when a supervisor-owned service is available. Reads must route
+    /// through the canonical service instance.
+    #[actix_web::test]
+    async fn test_get_position_prefers_federation_service_over_local_manager() {
+        use actix_web::HttpMessage;
+        use icn_kernel_api::{
+            ClearingPositionView, FederationClearingRequest, FederationClearingResult,
+            FederationClearingSettleRequest, FederationClearingSettleResult, FederationJoinRequest,
+            FederationJoinResult, FederationService, FederationVouchRequest, FederationVouchResult,
+        };
+
+        // Stub service that records calls and returns a known ClearingPositionView.
+        // Only get_clearing_position is implemented — all others panic to surface
+        // any accidental routing to the wrong method.
+        struct StubFederationService;
+
+        impl FederationService for StubFederationService {
+            fn join_federation(
+                &self,
+                _req: FederationJoinRequest,
+            ) -> anyhow::Result<FederationJoinResult> {
+                unimplemented!("test stub: join_federation should not be called")
+            }
+            fn vouch_for_cooperative(
+                &self,
+                _req: FederationVouchRequest,
+            ) -> anyhow::Result<FederationVouchResult> {
+                unimplemented!("test stub: vouch_for_cooperative should not be called")
+            }
+            fn establish_clearing(
+                &self,
+                _req: FederationClearingRequest,
+            ) -> anyhow::Result<FederationClearingResult> {
+                unimplemented!("test stub: establish_clearing should not be called")
+            }
+            fn settle_clearing(
+                &self,
+                _req: FederationClearingSettleRequest,
+            ) -> anyhow::Result<FederationClearingSettleResult> {
+                unimplemented!("test stub: settle_clearing should not be called")
+            }
+            fn get_clearing_position(
+                &self,
+                agreement_id: &str,
+            ) -> anyhow::Result<ClearingPositionView> {
+                Ok(ClearingPositionView {
+                    agreement_id: agreement_id.to_string(),
+                    party_a: "coop-alpha".to_string(),
+                    party_b: "coop-beta".to_string(),
+                    party_a_owes: 100,
+                    party_b_owes: 0,
+                    net_position: 100,
+                    pending_count: 1,
+                    last_settlement_ts: 0,
+                })
+            }
+            fn is_registered(&self, _coop_did: &str) -> bool {
+                false
+            }
+            fn get_registration_provenance(&self, _coop_did: &str) -> Option<(String, String)> {
+                None
+            }
+        }
+
+        let fed_mgr = Arc::new(FederationManager::new());
+        let stub_service: Arc<dyn FederationService> = Arc::new(StubFederationService);
+        // Wrap as the gateway expects: Arc<Option<Arc<dyn FederationService>>>
+        let service_for_routes: Arc<Option<Arc<dyn FederationService>>> =
+            Arc::new(Some(stub_service));
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(fed_mgr.clone()))
+                .app_data(web::Data::new(service_for_routes))
+                .service(web::scope("/v1/federation").service(get_position)),
+        )
+        .await;
+
+        // Inject minimal JWT claims so require_scope("federation:read") passes.
+        let claims = crate::auth::TokenClaims {
+            sub: "did:icn:test".to_string(),
+            iat: 1_000_000_000,
+            coop_id: "coop-alpha".to_string(),
+            scopes: vec!["federation:read".to_string()],
+            exp: 9_999_999_999,
+        };
+        let req = test::TestRequest::get()
+            .uri("/v1/federation/clearing/agr-001/position")
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(
+            resp.status().as_u16(),
+            200,
+            "Expected 200 from service-backed path; fallback would 404/500"
+        );
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(
+            body["party_a"], "coop-alpha",
+            "Response must come from StubFederationService, not local FederationManager"
+        );
+        assert_eq!(body["net_position"], 100);
+    }
+
     /// Verify that empty scopes placed AFTER named scopes don't steal routes.
     /// This is a regression test for the bug where web::scope("") before
     /// web::scope("/federation") caused federation routes to 404.
