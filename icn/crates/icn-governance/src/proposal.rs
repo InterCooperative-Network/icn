@@ -1742,8 +1742,9 @@ mod tests {
                 (icn_ledger::ShareId::new("share-001"), 50_000),
                 (icn_ledger::ShareId::new("share-002"), 50_000),
             ],
+            member_payments: vec![], // Not needed for this structural proposal test
             proposal_id: String::new(), // Will be set after proposal creation
-            allocated_at: 0,            // Will be set on execution
+            allocated_at: 0,         // Will be set on execution
             currency: "COOP".to_string(),
         };
 
