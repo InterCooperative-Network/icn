@@ -386,11 +386,21 @@ impl FederationService for FederationServiceImpl {
         // Idempotency guard: if net is non-zero and no ledger is configured, fail BEFORE
         // mutating clearing positions.  Otherwise trigger_settlement() would clear positions
         // leaving no accounting trace (partial-settlement state).
+        //
+        // We must propagate position-read errors rather than treating them as zero:
+        // a store error cannot be distinguished from a true zero balance, and silently
+        // allowing settlement would corrupt the audit trail.
         if self.ledger.is_none() {
             let preview_net = clearing
                 .calculate_position(&request.agreement_id)
-                .map(|p| p.net_position())
-                .unwrap_or(0);
+                .map_err(|e| {
+                    anyhow::anyhow!(
+                        "Cannot read clearing position for '{}': {} — retry after store recovery",
+                        request.agreement_id,
+                        e
+                    )
+                })?
+                .net_position();
             if preview_net != 0 {
                 return Ok(FederationClearingSettleResult {
                     success: false,
@@ -1123,6 +1133,167 @@ mod tests {
             result.error.as_deref().unwrap_or("").contains("not found"),
             "Error should mention not found: {:?}",
             result.error
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // Stub ledger for settlement tests
+    // -------------------------------------------------------------------------
+
+    use std::sync::Mutex;
+
+    struct StubLedger {
+        captured: Mutex<Vec<TreasuryEntryRequest>>,
+        result: Result<String, String>,
+    }
+
+    impl StubLedger {
+        fn succeeding(entry_hash: &str) -> Arc<Self> {
+            Arc::new(Self {
+                captured: Mutex::new(Vec::new()),
+                result: Ok(entry_hash.to_string()),
+            })
+        }
+
+        fn captured_entries(&self) -> Vec<TreasuryEntryRequest> {
+            self.captured.lock().unwrap().clone()
+        }
+    }
+
+    impl icn_kernel_api::LedgerService for StubLedger {
+        fn oracle(&self) -> Arc<dyn icn_kernel_api::PolicyOracle> {
+            Arc::new(icn_kernel_api::AllowAllOracle::wildcard())
+        }
+
+        fn balance(&self, _account: &String, _currency: &str) -> i64 {
+            0
+        }
+
+        fn credit_limit(&self, _account: &String, _currency: &str) -> i64 {
+            0
+        }
+
+        fn record_event(&self, _event: icn_kernel_api::LedgerEvent) {}
+
+        fn submit_treasury_entry(
+            &self,
+            entry: TreasuryEntryRequest,
+        ) -> Result<icn_kernel_api::TreasuryEntryResult, String> {
+            let decision_hash = entry.decision_hash.clone();
+            let decision_receipt_id = entry.decision_receipt_id.clone();
+            self.captured.lock().unwrap().push(entry);
+            self.result
+                .clone()
+                .map(|h| icn_kernel_api::TreasuryEntryResult {
+                    entry_hash: h,
+                    decision_hash,
+                    decision_receipt_id,
+                })
+        }
+    }
+
+    /// Happy path: non-zero net settlement with a wired ledger.
+    /// Proves that:
+    /// - `settle_clearing` succeeds when ledger is wired and net is non-zero
+    /// - the correct decision_hash flows into the ledger transfer entry
+    /// - debtor/creditor DIDs are set correctly based on net direction
+    /// - transfers_settled > 0 and ledger_entry_hash is Some
+    #[test]
+    fn test_settle_clearing_with_ledger_emits_correct_entry() {
+        use icn_federation::clearing::CrossCoopTransfer;
+
+        let (registry, _reg_temp) = make_test_registry();
+        let clearing_temp = tempfile::tempdir().unwrap();
+        let clearing_store = Arc::new(SledStore::open(clearing_temp.path()).unwrap());
+        let clearing =
+            Arc::new(ClearingManager::new(clearing_store, "coop-a".to_string()).unwrap());
+
+        let coop_a_did = Did::from_public_key(&SigningKey::from_bytes(&[4u8; 32]).verifying_key());
+        let coop_b_did = Did::from_public_key(&SigningKey::from_bytes(&[5u8; 32]).verifying_key());
+        let agreement_id = "agreement-ledger-test".to_string();
+
+        // Establish agreement with HOURS→HOURS rate
+        clearing
+            .create_agreement(
+                BilateralClearingAgreement::new(
+                    agreement_id.clone(),
+                    "coop-a".to_string(),
+                    coop_a_did.clone(),
+                    "coop-b".to_string(),
+                    coop_b_did.clone(),
+                )
+                .with_rate("HOURS", "HOURS", 1.0),
+            )
+            .unwrap();
+
+        // coop-a sends 200 HOURS to coop-b — net: coop-a owes coop-b 200
+        let transfer = CrossCoopTransfer::new(
+            "transfer-ledger-001".to_string(),
+            "coop-a".to_string(),
+            coop_a_did.clone(),
+            "coop-b".to_string(),
+            coop_b_did.clone(),
+            200,
+            "HOURS".to_string(),
+            200,
+            "HOURS".to_string(),
+        );
+        let transfer_id = clearing.propose_transfer(transfer).unwrap();
+        clearing.confirm_transfer(&transfer_id).unwrap();
+
+        let stub = StubLedger::succeeding("sha256:settlement-entry-001");
+        let service = FederationServiceImpl::new(registry)
+            .with_clearing_manager(clearing)
+            .with_ledger(stub.clone() as Arc<dyn icn_kernel_api::LedgerService>);
+
+        let decision_hash = "sha256:governance-settle-decision-abc123".to_string();
+        let result = service
+            .settle_clearing(FederationClearingSettleRequest {
+                agreement_id: agreement_id.clone(),
+                currency: "HOURS".to_string(),
+                decision_receipt_id: "gov:settle-001".to_string(),
+                decision_hash: decision_hash.clone(),
+            })
+            .unwrap();
+
+        assert!(
+            result.success,
+            "Settlement should succeed: {:?}",
+            result.error
+        );
+        assert_eq!(result.net_settlement, 200, "coop-a owes coop-b 200");
+        assert_eq!(result.transfers_settled, 1);
+        assert!(!result.state_change_hash.is_empty());
+        assert_eq!(
+            result.ledger_entry_hash.as_deref(),
+            Some("sha256:settlement-entry-001"),
+            "Ledger entry hash must come from stub"
+        );
+
+        // Verify the entry submitted to the ledger carries correct provenance
+        let entries = stub.captured_entries();
+        assert_eq!(
+            entries.len(),
+            1,
+            "Exactly one ledger entry should be emitted"
+        );
+        let entry = &entries[0];
+        assert_eq!(
+            entry.decision_hash, decision_hash,
+            "decision_hash must flow through to the ledger entry unchanged"
+        );
+        assert_eq!(entry.amount, 200);
+        assert_eq!(entry.currency, "HOURS");
+        // coop-a is the debtor (net_settlement > 0 means coop-a owes coop-b)
+        assert_eq!(
+            entry.treasury_id,
+            coop_a_did.to_string(),
+            "Debtor must be coop-a DID"
+        );
+        assert_eq!(
+            entry.recipient.as_deref(),
+            Some(coop_b_did.to_string().as_str()),
+            "Creditor must be coop-b DID"
         );
     }
 }

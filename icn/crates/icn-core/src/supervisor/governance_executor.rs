@@ -1191,11 +1191,28 @@ impl FederationExecutor for KernelFederationExecutor {
                         .filter(|s| !s.is_empty())
                         .unwrap_or_else(|| "HOURS".to_string());
 
+                    // decision_hash is required: settlement may emit a ledger transfer entry,
+                    // which must carry non-empty decision_hash for provenance.  Reject early
+                    // rather than letting an empty hash propagate to the ledger layer.
+                    let decision_hash = match operation
+                        .decision_hash
+                        .as_deref()
+                        .filter(|s| !s.is_empty())
+                    {
+                        Some(h) => h.to_string(),
+                        None => {
+                            return Ok(ExecutionOutcome::Failed {
+                                receipt_id: receipt_id.clone(),
+                                reason: "SettleClearing: missing or empty decision_hash — required for ledger provenance".to_string(),
+                            });
+                        }
+                    };
+
                     let settle_req = icn_kernel_api::FederationClearingSettleRequest {
                         agreement_id: agreement_id.clone(),
                         currency: currency.clone(),
                         decision_receipt_id: receipt_id.to_string(),
-                        decision_hash: operation.decision_hash.clone().unwrap_or_default(),
+                        decision_hash,
                     };
 
                     // Delegate fully to the service — ledger emission happens there.
