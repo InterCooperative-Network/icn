@@ -31,6 +31,10 @@ pub struct FederationServices {
     /// The agreement manager for inter-cooperative agreements (persistent storage)
     pub agreement_manager:
         Arc<icn_federation::agreement::AgreementManager<icn_federation::agreement::AgreementStore>>,
+    /// Queue for cross-entity clearing receipts produced by compute completions.
+    /// Shared with compute actor via `FederationClearingCallback`.
+    pub receipt_clearing_handle:
+        std::sync::Arc<tokio::sync::RwLock<Option<icn_federation::ReceiptClearingManager>>>,
 }
 
 /// Dependencies for federation initialization
@@ -315,6 +319,12 @@ pub async fn init_federation_services(
         agreement_store_path.display()
     );
 
+    // Create receipt clearing manager for compute → clearing ingestion
+    let receipt_clearing =
+        icn_federation::ReceiptClearingManager::new(icn_federation::BatchClearingConfig::default());
+    let receipt_clearing_handle =
+        std::sync::Arc::new(tokio::sync::RwLock::new(Some(receipt_clearing)));
+
     info!(
         "✓ Federation enabled: coop_id={}, coop_name={}, store={}",
         coop_id,
@@ -328,6 +338,7 @@ pub async fn init_federation_services(
         clearing_manager,
         attestation_store,
         agreement_manager,
+        receipt_clearing_handle,
     }))
 }
 
@@ -372,5 +383,80 @@ pub fn spawn_federation_announcement_task(
     info!(
         "Federation announcement task spawned (interval: {:?})",
         icn_federation::defaults::ANNOUNCEMENT_INTERVAL
+    );
+}
+
+/// Spawn the periodic clearing receipt flush task.
+///
+/// Periodically drains queued `ClearingReceipt`s from the `ReceiptClearingManager`
+/// into the `ClearingManager` as proposed `CrossCoopTransfer`s. This closes the
+/// loop from compute task completion → clearing obligation.
+///
+/// Flush interval: 30 seconds. Receipts accumulate between flushes; the flush
+/// is best-effort and logs warnings on errors without crashing.
+pub fn spawn_clearing_flush_task(
+    rcm_handle: std::sync::Arc<tokio::sync::RwLock<Option<icn_federation::ReceiptClearingManager>>>,
+    clearing_manager: std::sync::Arc<icn_federation::ClearingManager>,
+    mut shutdown_rx: tokio::sync::broadcast::Receiver<()>,
+    background_tasks: &mut tokio::task::JoinSet<()>,
+) {
+    const FLUSH_INTERVAL_SECS: u64 = 30;
+
+    background_tasks.spawn(async move {
+        let mut interval =
+            tokio::time::interval(std::time::Duration::from_secs(FLUSH_INTERVAL_SECS));
+        interval.tick().await; // skip first immediate tick
+
+        loop {
+            tokio::select! {
+                _ = interval.tick() => {
+                    let rcm = rcm_handle.read().await;
+                    if let Some(ref rcm) = *rcm {
+                        // Skip flush if queue is empty to avoid log noise
+                        if rcm.pending_count() == 0 {
+                            continue;
+                        }
+                        match rcm.flush_to_clearing(&clearing_manager) {
+                            Ok(report) => {
+                                tracing::info!(
+                                    total = report.total,
+                                    federation_flushed = report.federation_flushed,
+                                    commons_deferred = report.commons_deferred,
+                                    disputed_skipped = report.disputed_skipped,
+                                    errors = report.errors.len(),
+                                    "Clearing receipt flush complete"
+                                );
+                                for err in &report.errors {
+                                    tracing::warn!("Clearing flush error: {err}");
+                                }
+                            }
+                            Err(e) => {
+                                tracing::warn!("Clearing flush failed: {e}");
+                            }
+                        }
+                    }
+                }
+                _ = shutdown_rx.recv() => {
+                    // Final drain on shutdown: flush any remaining receipts
+                    let rcm = rcm_handle.read().await;
+                    if let Some(ref rcm) = *rcm {
+                        if rcm.pending_count() > 0 {
+                            if let Err(e) = rcm.flush_to_clearing(&clearing_manager) {
+                                tracing::warn!("Final clearing flush on shutdown failed: {e}");
+                            } else {
+                                tracing::info!("Final clearing flush on shutdown complete");
+                            }
+                        }
+                    }
+                    info!("Clearing flush task shutting down");
+                    break;
+                }
+            }
+        }
+    });
+
+    info!(
+        "Clearing flush task spawned (interval: {}s)",
+        FLUSH_INTERVAL_SECS
     );
 }

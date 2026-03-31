@@ -85,6 +85,44 @@ pub struct PaymentRequest {
 /// Callback for settling payments via ledger
 pub type PaymentCallback = Arc<dyn Fn(PaymentRequest) + Send + Sync>;
 
+/// Notification emitted when a federated task result is confirmed and
+/// a cross-entity clearing obligation should be recorded.
+///
+/// The compute layer fires this callback after a federated executor reports
+/// task completion. The receiving layer (gateway/lifecycle) converts it into
+/// a `ClearingReceipt` and queues it into `ReceiptClearingManager`.
+///
+/// Keeping this separate from `PaymentRequest` preserves the semantic
+/// distinction between local settlement (ledger debit/credit) and
+/// cross-entity clearing (netting → scheduled settlement).
+///
+/// Note: fields use `entity_id` (not `coop_id`) because the ICN substrate
+/// supports multiple organizational kinds (cooperatives, communities,
+/// federations). The downstream clearing infrastructure maps entity IDs to
+/// the appropriate clearing agreement.
+#[derive(Debug, Clone)]
+pub struct FederationClearingNotification {
+    /// Entity ID of the submitter (task buyer — cooperative, community, or federation)
+    pub from_entity_id: String,
+    /// DID of the submitter node
+    pub from_did: String,
+    /// Entity ID of the executor (task seller — cooperative, community, or federation)
+    pub to_entity_id: String,
+    /// DID of the executor node
+    pub to_did: String,
+    /// Settlement amount (in smallest currency unit)
+    pub amount: u64,
+    /// Currency for the transfer
+    pub currency: String,
+    /// Task identifier for memo/audit trail
+    pub task_id: String,
+    /// Attestation hash — used as the clearing receipt's dedup key
+    pub attestation_hash: [u8; 32],
+}
+
+/// Callback for recording cross-cooperative clearing obligations.
+pub type FederationClearingCallback = Arc<dyn Fn(FederationClearingNotification) + Send + Sync>;
+
 /// Compute event for external notification
 #[derive(Debug, Clone)]
 pub enum ComputeEvent {

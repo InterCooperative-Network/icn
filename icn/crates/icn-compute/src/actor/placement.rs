@@ -1136,14 +1136,89 @@ impl ComputeActor {
         );
 
         // Process the result through normal channels
-        // The attestation_hash can be used to verify the result came from a trusted source
         self.on_task_result(result.clone()).await?;
 
-        // TODO: Trigger payment settlement via ClearingManager
-        // This would involve:
-        // 1. Verify attestation_hash matches expected value
-        // 2. Look up payment terms from original FederatedTaskRequest
-        // 3. Call ClearingManager::propose_transfer()
+        // Fire cross-entity clearing callback on successful federated completion.
+        // Only fires when:
+        // - the task succeeded
+        // - the task carries a submitter cooperative/entity ID (task.coop_id)
+        // - a clearing callback is wired
+        //
+        // Note: We derive the submitter entity from task.coop_id rather than
+        // self.own_cooperative_id because:
+        // 1. task.coop_id is always set at submission time (authoritative source)
+        // 2. own_cooperative_id describes this *executor* node's coop, not the submitter's
+        if success {
+            if let Some(ref cb) = self.federation_clearing_callback {
+                // Look up the task to get payment terms and submitter entity ID
+                let task_fields = {
+                    let mgr = self.task_manager.lock().await;
+                    if let Some(task) = mgr.get(&result.task_hash) {
+                        let Some(submitter_entity_id) = task.coop_id.clone() else {
+                            tracing::warn!(
+                                task_hash = %task_hash_str,
+                                "federated task has no coop_id; skipping clearing notification"
+                            );
+                            return Ok(());
+                        };
+                        // payment_rate is credits per 1_000 fuel units (same divisor as
+                        // DEFAULT_FUEL_COST_DIVISOR in cost.rs). Divide after multiply to
+                        // preserve precision on small fuel values.
+                        let amount = task
+                            .payment_rate
+                            .unwrap_or(0)
+                            .saturating_mul(result.fuel_used)
+                            .saturating_div(1_000);
+                        let currency = task
+                            .payment_currency
+                            .clone()
+                            .unwrap_or_else(|| "credits".to_string());
+                        let submitter_did = task.submitter.clone();
+                        let task_id = task.id.clone();
+                        Some((
+                            amount,
+                            currency,
+                            submitter_did,
+                            task_id,
+                            submitter_entity_id,
+                        ))
+                    } else {
+                        tracing::warn!(
+                            task_hash = %task_hash_str,
+                            "federated task not found for clearing; skipping"
+                        );
+                        return Ok(());
+                    }
+                };
+
+                if let Some((amount, currency, submitter_did, task_id_str, submitter_entity_id)) =
+                    task_fields
+                {
+                    // Only record a clearing obligation when there is a non-zero amount.
+                    // Zero-amount tasks are informational and don't create economic obligations.
+                    if amount > 0 {
+                        let notification = crate::actor::types::FederationClearingNotification {
+                            from_entity_id: submitter_entity_id.clone(),
+                            from_did: submitter_did,
+                            to_entity_id: executor_coop.clone(),
+                            to_did: result.executor.clone(),
+                            amount,
+                            currency,
+                            task_id: task_id_str,
+                            attestation_hash,
+                        };
+                        cb(notification);
+                        tracing::debug!(
+                            task_hash = %task_hash_str,
+                            from = %submitter_entity_id,
+                            to = %executor_coop,
+                            amount = amount,
+                            "Fired federation clearing notification"
+                        );
+                    }
+                }
+            }
+        }
 
         tracing::debug!(
             task_hash = %task_hash_str,
@@ -1152,5 +1227,180 @@ impl ComputeActor {
         );
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::actor::types::FederationClearingNotification;
+    use crate::types::{ComputeResult, ComputeTask, ExecutionOutcome, FuelLimit, TaskCode};
+    use std::sync::{Arc, Mutex};
+
+    /// Generate a real keypair and return (did_string, ed25519_signing_key).
+    fn make_keypair() -> (String, ed25519_dalek::SigningKey) {
+        let kp = icn_identity::KeyPair::generate().expect("keypair generation failed");
+        let did = kp.did().to_string();
+        let sk_bytes = kp.to_signing_key_bytes();
+        let signing_key = ed25519_dalek::SigningKey::from_bytes(&sk_bytes);
+        (did, signing_key)
+    }
+
+    fn make_actor(own_did: &str) -> ComputeActor {
+        let trust_cb: crate::actor::types::TrustCallback = Arc::new(|_did: &str| 1.0_f64);
+        ComputeActor::new(own_did.to_string(), trust_cb)
+    }
+
+    fn make_task(submitter_did: &str, payment_rate: u64) -> ComputeTask {
+        ComputeTask {
+            id: "test-task-001".to_string(),
+            submitter: submitter_did.to_string(),
+            coop_id: Some("alpha-coop".to_string()),
+            code: TaskCode::Ccl("rule test {}".to_string()),
+            inputs: vec![],
+            fuel_limit: FuelLimit(10_000),
+            required_capabilities: vec![],
+            priority: crate::types::TaskPriority::Normal,
+            created_at: 0,
+            deadline: None,
+            payment_rate: Some(payment_rate),
+            payment_currency: Some("credits".to_string()),
+            resource_profile: None,
+            actor_mode: None,
+            placement_constraints: None,
+            federation_constraints: None,
+            estimated_value: None,
+            verification: None,
+            inputs_hash: None,
+            policy_hash: None,
+            determinism_class: crate::types::DeterminismClass::default(),
+            privacy_class: crate::types::PrivacyClass::default(),
+            storage_class: None,
+            data_locality: None,
+            scope: icn_kernel_api::ScopeLevel::default(),
+        }
+    }
+
+    fn make_signed_result(
+        task_hash: crate::types::TaskHash,
+        task_id: &str,
+        executor_did: &str,
+        signing_key: &ed25519_dalek::SigningKey,
+        outcome: ExecutionOutcome,
+        fuel_used: u64,
+    ) -> ComputeResult {
+        let mut result = ComputeResult {
+            task_hash,
+            task_id: task_id.to_string(),
+            executor: executor_did.to_string(),
+            outcome,
+            fuel_used,
+            duration_ms: 50,
+            completed_at: 0,
+            signature: vec![],
+        };
+        result.sign(signing_key);
+        result
+    }
+
+    /// Verify that `on_federated_task_result` fires the `federation_clearing_callback`
+    /// when the task succeeds and has non-zero payment terms.
+    ///
+    /// Specifically proves:
+    /// - submitter entity ID comes from `task.coop_id` (not actor.own_cooperative_id)
+    /// - amount is `payment_rate * fuel_used / 1000` (credits per 1000 fuel)
+    /// - entity IDs (from/to) are correct
+    #[tokio::test]
+    async fn test_federated_task_result_fires_clearing_callback() {
+        let (own_did, _) = make_keypair();
+        let (executor_did, executor_sk) = make_keypair();
+        let (submitter_did, _) = make_keypair();
+
+        // No set_cooperative_id needed — entity ID comes from task.coop_id
+        let mut actor = make_actor(&own_did);
+
+        // Capture the notification in a shared cell
+        let captured: Arc<Mutex<Option<FederationClearingNotification>>> =
+            Arc::new(Mutex::new(None));
+        let captured_clone = captured.clone();
+        let cb: crate::actor::types::FederationClearingCallback = Arc::new(move |notification| {
+            *captured_clone.lock().unwrap() = Some(notification);
+        });
+        actor.set_federation_clearing_callback(cb);
+
+        // payment_rate=100 credits per 1000 fuel, fuel_used=5000 → amount = 100*5000/1000 = 500
+        let task = make_task(&submitter_did, 100);
+        let task_hash = {
+            let mut mgr = actor.task_manager.lock().await;
+            mgr.submit(task).expect("task submit failed")
+        };
+
+        let result = make_signed_result(
+            task_hash,
+            "test-task-001",
+            &executor_did,
+            &executor_sk,
+            ExecutionOutcome::Success(vec![]),
+            5_000,
+        );
+
+        actor
+            .on_federated_task_result(result, "beta-coop".to_string(), [0u8; 32])
+            .await
+            .expect("on_federated_task_result failed");
+
+        // Verify the callback was fired with correct entity IDs and amount
+        let notification = captured.lock().unwrap().take().expect("callback not fired");
+        // from_entity_id comes from task.coop_id, not actor.own_cooperative_id
+        assert_eq!(notification.from_entity_id, "alpha-coop");
+        assert_eq!(notification.to_entity_id, "beta-coop");
+        assert_eq!(notification.from_did, submitter_did);
+        assert_eq!(notification.to_did, executor_did);
+        // amount = payment_rate(100) * fuel_used(5000) / 1000 = 500
+        assert_eq!(notification.amount, 500);
+        assert_eq!(notification.currency, "credits");
+        assert_eq!(notification.task_id, "test-task-001");
+    }
+
+    /// Verify that the callback is NOT fired when the task fails.
+    #[tokio::test]
+    async fn test_federated_task_result_no_callback_on_failure() {
+        let (own_did, _) = make_keypair();
+        let (executor_did, executor_sk) = make_keypair();
+        let (submitter_did, _) = make_keypair();
+
+        let mut actor = make_actor(&own_did);
+
+        let fired = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let fired_clone = fired.clone();
+        let cb: crate::actor::types::FederationClearingCallback = Arc::new(move |_| {
+            fired_clone.store(true, std::sync::atomic::Ordering::SeqCst);
+        });
+        actor.set_federation_clearing_callback(cb);
+
+        let task = make_task(&submitter_did, 10);
+        let task_hash = {
+            let mut mgr = actor.task_manager.lock().await;
+            mgr.submit(task).expect("task submit failed")
+        };
+
+        let result = make_signed_result(
+            task_hash,
+            "test-task-001",
+            &executor_did,
+            &executor_sk,
+            ExecutionOutcome::Failed("out of gas".to_string()),
+            100,
+        );
+
+        actor
+            .on_federated_task_result(result, "beta-coop".to_string(), [0u8; 32])
+            .await
+            .expect("on_federated_task_result failed");
+
+        assert!(
+            !fired.load(std::sync::atomic::Ordering::SeqCst),
+            "callback should not fire on failure"
+        );
     }
 }
