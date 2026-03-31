@@ -574,7 +574,18 @@ pub struct SurplusAllocation {
     pub total_labor_days: u64,
 
     /// Individual allocations: (share_id, amount)
+    /// Used by the treasury's internal accounting to update `LaborShare.accumulated_surplus`.
     pub allocations: Vec<(ShareId, i64)>,
+
+    /// Member DID → amount pairs derived from `allocations` at construction time.
+    /// Populated by `SurplusAllocation::new` from each share's `holder` field.
+    /// Used by the governance execution path to build `TreasuryEffect::DistributeSurplus.distributions`.
+    ///
+    /// `#[serde(default)]` preserves backward compat: records persisted before this field was
+    /// added deserialize with an empty Vec, which the execution path treats as a not-yet-resolved
+    /// allocation (and declines to execute rather than silently using wrong IDs).
+    #[serde(default)]
+    pub member_payments: Vec<(Did, i64)>,
 
     /// Governance proposal that approved this allocation
     pub proposal_id: String,
@@ -685,6 +696,25 @@ impl SurplusAllocation {
                 .collect()
         };
 
+        // Build member_payments from share holder DIDs.
+        // Keyed by the same ShareId values in `allocations` so the two lists stay in sync.
+        let holder_map: std::collections::HashMap<&ShareId, &Did> =
+            active_shares.iter().map(|s| (&s.id, &s.holder)).collect();
+        let member_payments: Vec<(Did, i64)> = allocations
+            .iter()
+            .map(|(share_id, amount)| {
+                holder_map
+                    .get(share_id)
+                    .map(|holder| ((*holder).clone(), *amount))
+                    .ok_or_else(|| {
+                        format!(
+                            "allocation share_id {} not found in active_shares",
+                            share_id
+                        )
+                    })
+            })
+            .collect::<Result<_, _>>()?;
+
         Ok(SurplusAllocation {
             id,
             cooperative_id,
@@ -693,6 +723,7 @@ impl SurplusAllocation {
             share_unit_value,
             total_labor_days,
             allocations,
+            member_payments,
             proposal_id,
             allocated_at,
             currency,

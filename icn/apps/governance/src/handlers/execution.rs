@@ -76,10 +76,12 @@ pub fn translate_payload_to_effects(
         })]),
 
         ProposalPayload::SurplusAllocation { allocation } => {
+            // Use member_payments (resolved holder DIDs) not allocations (ShareId keys).
+            // ShareId strings are not valid DIDs; the ledger executor parses distributions as DIDs.
             let distributions = allocation
-                .allocations
+                .member_payments
                 .iter()
-                .map(|(share_id, amount)| (share_id.0.clone(), *amount))
+                .map(|(did, amount)| (did.to_string(), *amount))
                 .collect();
             Ok(vec![KernelEffect::Treasury(
                 TreasuryEffect::DistributeSurplus {
@@ -718,6 +720,14 @@ mod tests {
 
     #[test]
     fn test_translate_surplus_allocation_carries_decision_provenance() {
+        let member_a_did: icn_identity::Did =
+            "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9"
+                .parse()
+                .unwrap();
+        let member_b_did: icn_identity::Did =
+            "did:icn:zGyGKxMyg1p9SsHfm15MkNUu1u9TN2JtTspcdmrtGUdse"
+                .parse()
+                .unwrap();
         let allocation = icn_ledger::SurplusAllocation {
             id: "alloc-q1".to_string(),
             cooperative_id: "coop-x".to_string(),
@@ -729,6 +739,8 @@ mod tests {
                 (icn_ledger::ShareId::new("share-a"), 300),
                 (icn_ledger::ShareId::new("share-b"), 200),
             ],
+            // member_payments carries the resolved holder DIDs used by the execution path.
+            member_payments: vec![(member_a_did.clone(), 300), (member_b_did.clone(), 200)],
             proposal_id: "prop-1".to_string(),
             allocated_at: 0,
             currency: "HOURS".to_string(),
@@ -754,9 +766,13 @@ mod tests {
                 assert_eq!(treasury_did, "domain-coop-x");
                 assert_eq!(*total_amount, 500);
                 assert_eq!(currency, "HOURS");
+                // distributions must carry member DIDs (not ShareId strings).
                 assert_eq!(
                     distributions,
-                    &vec![("share-a".to_string(), 300), ("share-b".to_string(), 200)]
+                    &vec![
+                        (member_a_did.to_string(), 300),
+                        (member_b_did.to_string(), 200)
+                    ]
                 );
                 assert_eq!(decision_receipt_id, "receipt-surplus-1");
                 assert_eq!(decision_hash, "hash-surplus-1");
