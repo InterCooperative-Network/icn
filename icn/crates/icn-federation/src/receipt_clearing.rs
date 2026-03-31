@@ -999,4 +999,116 @@ mod tests {
             "transfer amount should match receipt cost"
         );
     }
+
+    /// Prove the **full federation economic loop**:
+    ///
+    /// federated task completion (simulated as ClearingReceipt)
+    ///   → ReceiptClearingManager::submit_receipt
+    ///   → flush_to_clearing (propose)
+    ///   → ClearingManager::confirm_transfer
+    ///   → ClearingManager::trigger_settlement
+    ///   → position reset + SettlementReport carries correct counts
+    ///
+    /// Settlement is the last observable layer before ledger emission (which is a
+    /// separate architectural step not yet implemented in trigger_settlement). This
+    /// test proves everything up to and including the clearing-layer close.
+    #[test]
+    fn test_full_federation_economic_loop() {
+        use crate::clearing::BilateralClearingAgreement;
+
+        // ---- Setup ----
+        let store = Arc::new(SledStore::temporary().unwrap()) as Arc<dyn Store>;
+        // clearing manager owns "food-coop" perspective
+        let clearing = ClearingManager::new(store, "food-coop".to_string()).unwrap();
+
+        let executor_kp = KeyPair::generate().unwrap();
+        let submitter_kp = KeyPair::generate().unwrap();
+
+        let agreement = BilateralClearingAgreement::new(
+            "food-tech-agreement".to_string(),
+            "food-coop".to_string(),
+            submitter_kp.did().clone(),
+            "tech-coop".to_string(),
+            executor_kp.did().clone(),
+        )
+        .with_rate("credits", "credits", 1.0);
+        clearing.create_agreement(agreement).unwrap();
+
+        // ---- Step 1: Task completion produces a clearing receipt ----
+        // This simulates what the init_compute adapter does when it receives a
+        // FederationClearingNotification (amount = payment_rate * fuel_used / 1000).
+        // payment_rate=100, fuel_used=5000 → 100*5000/1000 = 500 credits
+        let receipt = ClearingReceipt {
+            receipt_hash: [0xF1; 32],
+            executor_did: executor_kp.did().to_string(),
+            executor_coop: "tech-coop".to_string(),
+            submitter_did: submitter_kp.did().to_string(),
+            submitter_coop: "food-coop".to_string(),
+            cost: 500,
+            currency: "credits".to_string(),
+            scope: ScopeLevel::Federation,
+            created_at: current_timestamp(),
+            disputed: false,
+            dispute_reason: None,
+        };
+
+        let rcm = ReceiptClearingManager::new(BatchClearingConfig::default());
+        rcm.submit_receipt(receipt).unwrap();
+        assert_eq!(rcm.pending_count(), 1, "receipt should be queued");
+
+        // ---- Step 2: Periodic flush moves receipt into clearing layer ----
+        let flush_report = rcm.flush_to_clearing(&clearing).unwrap();
+        assert_eq!(flush_report.federation_flushed, 1);
+        assert_eq!(flush_report.errors.len(), 0);
+        assert_eq!(rcm.pending_count(), 0, "queue drained after flush");
+
+        // Transfer is now Pending in the clearing position
+        let position = clearing.calculate_position("food-tech-agreement").unwrap();
+        assert_eq!(position.pending_transfers.len(), 1);
+        let transfer_id = position.pending_transfers[0].id.clone();
+        assert_eq!(position.pending_transfers[0].source_amount, 500);
+        // Owes amounts are not yet updated (transfer is Pending, not Confirmed)
+        assert_eq!(position.coop_a_owes_b, 0);
+        assert_eq!(position.coop_b_owes_a, 0);
+
+        // ---- Step 3: Confirm the transfer (bilateral acknowledgement) ----
+        // In production this would come from the remote cooperative confirming receipt.
+        clearing.confirm_transfer(&transfer_id).unwrap();
+
+        let position = clearing.calculate_position("food-tech-agreement").unwrap();
+        // After confirm: food-coop owes tech-coop 500 credits
+        // food-coop is coop_a (own_coop_id), from_coop = food-coop → coop_a_owes_b
+        assert!(
+            position.coop_a_owes_b > 0 || position.coop_b_owes_a > 0,
+            "confirming a transfer must update the owes amounts"
+        );
+
+        // ---- Step 4: Settle — the economic loop closes ----
+        let settlement = clearing.trigger_settlement("food-tech-agreement").unwrap();
+        assert_eq!(
+            settlement.transfers_settled, 1,
+            "one confirmed transfer should be settled"
+        );
+
+        // After settlement: position is fully reset
+        let position = clearing.calculate_position("food-tech-agreement").unwrap();
+        assert_eq!(
+            position.pending_transfers.len(),
+            0,
+            "settled transfers should be removed"
+        );
+        assert_eq!(
+            position.coop_a_owes_b, 0,
+            "owes amount reset after settlement"
+        );
+        assert_eq!(
+            position.coop_b_owes_a, 0,
+            "owes amount reset after settlement"
+        );
+        // The settlement report carries the pre-settlement balances for audit/ledger emission
+        assert!(
+            settlement.coop_a_owed > 0 || settlement.coop_b_owed > 0,
+            "settlement report should carry pre-settlement balance for ledger emission"
+        );
+    }
 }
