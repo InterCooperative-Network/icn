@@ -34,6 +34,10 @@ pub struct GatewayActorHandles {
     /// Hook invoked when a Charter proposal is accepted.
     /// Type-erased so `icn-core` stays domain-agnostic.
     pub charter_accepted_hook: Option<Arc<dyn Fn(String, String) + Send + Sync>>,
+    /// Federation service for clearing position queries and settlement.
+    /// When provided, the gateway uses this service-owned clearing state rather
+    /// than its own divergent ClearingManager instance.
+    pub federation_service: Option<Arc<dyn icn_kernel_api::services::FederationService>>,
 }
 
 /// Core actor handles returned from initialization

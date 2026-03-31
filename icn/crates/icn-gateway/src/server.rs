@@ -93,6 +93,10 @@ pub struct GatewayServer {
     trust_service_handle: Option<Arc<dyn icn_kernel_api::services::TrustService>>,
     /// Optional LedgerService for treasury nonce queries
     ledger_service_handle: Option<Arc<dyn icn_kernel_api::services::LedgerService>>,
+    /// Optional FederationService for clearing position queries.
+    /// When provided, position queries use the supervisor-owned clearing state rather
+    /// than the gateway's own divergent ClearingManager instance.
+    federation_service_handle: Option<Arc<dyn icn_kernel_api::services::FederationService>>,
     /// Optional handle to daemon's GovernanceActor (for actor-backed mode)
     governance_handle: Option<GovernanceHandle>,
     /// Optional handle to daemon's ContractRegistryActor (for contract management)
@@ -143,6 +147,7 @@ impl GatewayServer {
             coop_handle: None,
             trust_service_handle: None,
             ledger_service_handle: None,
+            federation_service_handle: None,
             governance_handle: None,
             contract_registry_handle: None,
             treasury_handle: None,
@@ -187,6 +192,7 @@ impl GatewayServer {
             coop_handle: None,
             trust_service_handle: None,
             ledger_service_handle: None,
+            federation_service_handle: None,
             governance_handle: None,
             contract_registry_handle: None,
             treasury_handle: None,
@@ -232,6 +238,7 @@ impl GatewayServer {
             coop_handle: None,
             trust_service_handle: None,
             ledger_service_handle: None,
+            federation_service_handle: None,
             governance_handle: None,
             contract_registry_handle: None,
             treasury_handle: None,
@@ -333,6 +340,18 @@ impl GatewayServer {
         service: Arc<dyn icn_kernel_api::services::LedgerService>,
     ) -> Self {
         self.ledger_service_handle = Some(service);
+        self
+    }
+
+    /// Set federation service for clearing position queries.
+    ///
+    /// When set, the `GET /v1/federation/clearing/{id}/position` endpoint queries the
+    /// supervisor-owned clearing state rather than the gateway's own divergent instance.
+    pub fn with_federation_service(
+        mut self,
+        service: Arc<dyn icn_kernel_api::services::FederationService>,
+    ) -> Self {
+        self.federation_service_handle = Some(service);
         self
     }
 
@@ -707,6 +726,10 @@ impl GatewayServer {
             crate::service_discovery_mgr::start_expiry_task(service_discovery_manager.clone(), 300);
 
         let federation_manager = Arc::new(FederationManager::new());
+        // Wrap the optional FederationService handle so route handlers can get it from app_data.
+        let federation_service_for_routes: Arc<
+            Option<Arc<dyn icn_kernel_api::services::FederationService>>,
+        > = Arc::new(self.federation_service_handle.clone());
         let commons_manager: Arc<CommonsManager> = if let Some(handle) = self.commons_handle {
             // Canonical path: daemon injected a shared CommonsHandle.
             // CommonsManager is a thin facade over this handle — no second sled store opened.
@@ -1487,6 +1510,7 @@ impl GatewayServer {
                 .app_data(web::Data::new(trust_manager.as_oracle()))
                 .app_data(web::Data::new(compute_manager.clone()))
                 .app_data(web::Data::new(federation_manager.clone()))
+                .app_data(web::Data::new(federation_service_for_routes.clone()))
                 .app_data(web::Data::new(commons_manager.clone()))
                 .app_data(web::Data::new(entity_manager.clone()))
                 .app_data(web::Data::new(entity_audit_manager.clone()))

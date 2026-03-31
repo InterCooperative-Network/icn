@@ -967,6 +967,20 @@ pub trait FederationService: Send + Sync {
         request: FederationClearingSettleRequest,
     ) -> Result<FederationClearingSettleResult, anyhow::Error>;
 
+    /// Query the current clearing position for a bilateral agreement.
+    ///
+    /// Returns a party-level view of the inter-entity clearing state: what
+    /// each party owes the other, the net position, and pending transfer count.
+    /// Uses party/entity vocabulary — coop-specific internals are adapted at
+    /// the service boundary and do not leak into this response.
+    ///
+    /// Returns `Err` if the agreement does not exist or the clearing manager
+    /// is not configured on this node.
+    fn get_clearing_position(
+        &self,
+        agreement_id: &str,
+    ) -> Result<ClearingPositionView, anyhow::Error>;
+
     /// Check if a cooperative is registered in the federation.
     fn is_registered(&self, coop_did: &str) -> bool;
 
@@ -974,6 +988,35 @@ pub trait FederationService: Send + Sync {
     ///
     /// Returns (decision_receipt_id, decision_hash) if available.
     fn get_registration_provenance(&self, coop_did: &str) -> Option<(String, String)>;
+}
+
+// ============================================================================
+// Clearing Position View
+// ============================================================================
+
+/// Party-level view of a bilateral inter-entity clearing position.
+///
+/// Uses `party_a`/`party_b` vocabulary to remain entity-type-agnostic.
+/// The underlying clearing internals may use cooperative-specific naming,
+/// but that is adapted at the service boundary and never appears here.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ClearingPositionView {
+    /// The agreement this position belongs to.
+    pub agreement_id: String,
+    /// Identifier of the first party (entity ID / org ID, not a DID).
+    pub party_a: String,
+    /// Identifier of the second party.
+    pub party_b: String,
+    /// Amount party_a currently owes party_b (confirmed, unsettled).
+    pub party_a_owes: i64,
+    /// Amount party_b currently owes party_a (confirmed, unsettled).
+    pub party_b_owes: i64,
+    /// Net position: positive means party_a is net debtor; negative means party_b is net debtor.
+    pub net_position: i64,
+    /// Number of transfers proposed but not yet confirmed.
+    pub pending_count: usize,
+    /// Unix timestamp of the last settlement that cleared this position.
+    pub last_settlement_ts: u64,
 }
 
 // ============================================================================

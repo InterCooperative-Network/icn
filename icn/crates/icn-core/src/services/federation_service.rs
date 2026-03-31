@@ -559,6 +559,39 @@ impl FederationService for FederationServiceImpl {
         }
     }
 
+    fn get_clearing_position(
+        &self,
+        agreement_id: &str,
+    ) -> Result<icn_kernel_api::ClearingPositionView> {
+        let clearing = self.clearing.as_ref().ok_or_else(|| {
+            anyhow::anyhow!(
+                "Clearing manager not configured on this node — federation clearing is disabled"
+            )
+        })?;
+
+        // Fetch the agreement to get the party identifiers (coop IDs — adapted here at boundary).
+        let agreement = clearing
+            .get_agreement(agreement_id)
+            .map_err(|e| anyhow::anyhow!("Failed to read agreement '{}': {}", agreement_id, e))?
+            .ok_or_else(|| anyhow::anyhow!("Agreement '{}' not found", agreement_id))?;
+
+        let position = clearing.calculate_position(agreement_id).map_err(|e| {
+            anyhow::anyhow!("Failed to read position for '{}': {}", agreement_id, e)
+        })?;
+
+        Ok(icn_kernel_api::ClearingPositionView {
+            agreement_id: agreement_id.to_string(),
+            // Adapt from coop-specific internal naming to party-level external vocabulary.
+            party_a: agreement.coop_a.clone(),
+            party_b: agreement.coop_b.clone(),
+            party_a_owes: position.coop_a_owes_b,
+            party_b_owes: position.coop_b_owes_a,
+            net_position: position.net_position(),
+            pending_count: position.pending_transfers.len(),
+            last_settlement_ts: position.last_settlement,
+        })
+    }
+
     fn is_registered(&self, coop_did: &str) -> bool {
         // Check if the DID (as coop_id) is in the registry
         self.registry.get(coop_did).ok().flatten().is_some()

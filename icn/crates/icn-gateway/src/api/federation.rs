@@ -15,6 +15,7 @@ use icn_federation::{
     SettlementInterval, SettlementReport, TrustContext, Vouch,
 };
 use icn_identity::Did;
+use icn_kernel_api::{ClearingPositionView, FederationService};
 
 // ============================================================================
 // Request/Response Models
@@ -462,19 +463,54 @@ pub async fn create_agreement(
     })))
 }
 
-/// GET /federation/clearing/{agreement_id}/position - Get clearing position
+/// GET /federation/clearing/{agreement_id}/position - Get current inter-party clearing position
+///
+/// Returns the accumulated clearing obligations between the two parties in the agreement:
+/// how much each party owes the other (confirmed, unsettled), the net position, and
+/// the count of pending (unconfirmed) transfers.
+///
+/// When the daemon's FederationService is available (normal runtime), this queries the
+/// supervisor-owned clearing state — the same state that the settlement scheduler uses.
+/// In standalone mode (no daemon), this falls back to the gateway's own clearing manager.
 #[get("/clearing/{agreement_id}/position")]
 pub async fn get_position(
     http_req: HttpRequest,
     fed_mgr: web::Data<Arc<FederationManager>>,
+    federation_service: web::Data<Arc<Option<Arc<dyn FederationService>>>>,
     path: web::Path<String>,
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "federation:read")?;
 
     let agreement_id = path.into_inner();
-    let position = fed_mgr.get_position(&agreement_id).await?;
 
-    Ok(HttpResponse::Ok().json(position))
+    // Prefer the supervisor-owned FederationService: it reads from the correct clearing
+    // store that governance-triggered agreements and compute-receipt accumulations write to.
+    // Fall back to the gateway's own clearing manager only in standalone mode.
+    if let Some(ref service) = ***federation_service {
+        let view = service
+            .get_clearing_position(&agreement_id)
+            .map_err(|e| GatewayError::NotFound(e.to_string()))?;
+        return Ok(HttpResponse::Ok().json(view));
+    }
+
+    // Standalone fallback: gateway's own ClearingManager (may not reflect daemon state).
+    let position = fed_mgr.get_position(&agreement_id).await?;
+    // Adapt internal ClearingPosition to the party-level response vocabulary.
+    let agreement = fed_mgr
+        .get_agreement(&agreement_id)
+        .await?
+        .ok_or_else(|| GatewayError::NotFound(format!("Agreement not found: {agreement_id}")))?;
+    let view = ClearingPositionView {
+        agreement_id: agreement_id.clone(),
+        party_a: agreement.coop_a.clone(),
+        party_b: agreement.coop_b.clone(),
+        party_a_owes: position.coop_a_owes_b,
+        party_b_owes: position.coop_b_owes_a,
+        net_position: position.net_position(),
+        pending_count: position.pending_transfers.len(),
+        last_settlement_ts: position.last_settlement,
+    };
+    Ok(HttpResponse::Ok().json(view))
 }
 
 /// POST /federation/clearing/{agreement_id}/settle - Trigger settlement
