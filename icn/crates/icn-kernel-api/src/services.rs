@@ -869,6 +869,7 @@ pub struct FederationClearingResult {
 /// Causes `ClearingManager::trigger_settlement()` to run, which nets all
 /// confirmed transfers and resets the running position.  The resulting net
 /// amount is returned so the caller can emit a corresponding ledger entry.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct FederationClearingSettleRequest {
     /// ID of the clearing agreement to settle
     pub agreement_id: String,
@@ -881,6 +882,7 @@ pub struct FederationClearingSettleRequest {
 }
 
 /// Result of a clearing settlement operation.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct FederationClearingSettleResult {
     /// Whether the settlement succeeded
     pub success: bool,

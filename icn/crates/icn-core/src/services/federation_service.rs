@@ -378,6 +378,36 @@ impl FederationService for FederationServiceImpl {
 
         let coop_a = agreement.coop_a.clone();
         let coop_b = agreement.coop_b.clone();
+        // Store DIDs as strings for the ledger transfer — the ledger's Transfer path
+        // parses recipient via Did::from_str(), so we must pass the DID, not the coop ID.
+        let coop_a_did_str = agreement.coop_a_did.to_string();
+        let coop_b_did_str = agreement.coop_b_did.to_string();
+
+        // Idempotency guard: if net is non-zero and no ledger is configured, fail BEFORE
+        // mutating clearing positions.  Otherwise trigger_settlement() would clear positions
+        // leaving no accounting trace (partial-settlement state).
+        if self.ledger.is_none() {
+            let preview_net = clearing
+                .calculate_position(&request.agreement_id)
+                .map(|p| p.net_position())
+                .unwrap_or(0);
+            if preview_net != 0 {
+                return Ok(FederationClearingSettleResult {
+                    success: false,
+                    net_settlement: 0,
+                    coop_a,
+                    coop_b,
+                    transfers_settled: 0,
+                    state_change_hash: String::new(),
+                    ledger_entry_hash: None,
+                    error: Some(format!(
+                        "Cannot settle agreement '{}': net position is {} but no ledger configured — wire with_ledger()",
+                        request.agreement_id,
+                        preview_net
+                    )),
+                });
+            }
+        }
 
         info!(
             agreement_id = %request.agreement_id,
@@ -410,22 +440,37 @@ impl FederationService for FederationServiceImpl {
                 // Emit ledger transfer for non-zero net positions.
                 // net_settlement > 0: coop_a owes coop_b
                 // net_settlement < 0: coop_b owes coop_a
+                // We use DID strings (not coop ID strings) because the ledger's Transfer
+                // path parses treasury_id and recipient via Did::from_str().
                 let ledger_entry_hash = if report.net_settlement != 0 {
                     if let Some(ledger) = &self.ledger {
-                        let (debtor, creditor, amount) = if report.net_settlement > 0 {
-                            (coop_a.clone(), coop_b.clone(), report.net_settlement)
-                        } else {
-                            (coop_b.clone(), coop_a.clone(), -report.net_settlement)
-                        };
+                        let (debtor_did, creditor_did, debtor_label, creditor_label, amount) =
+                            if report.net_settlement > 0 {
+                                (
+                                    coop_a_did_str.clone(),
+                                    coop_b_did_str.clone(),
+                                    coop_a.clone(),
+                                    coop_b.clone(),
+                                    report.net_settlement,
+                                )
+                            } else {
+                                (
+                                    coop_b_did_str.clone(),
+                                    coop_a_did_str.clone(),
+                                    coop_b.clone(),
+                                    coop_a.clone(),
+                                    -report.net_settlement,
+                                )
+                            };
                         let entry_req = TreasuryEntryRequest {
-                            treasury_id: debtor.clone(),
+                            treasury_id: debtor_did.clone(),
                             operation_type: TreasuryOperationType::Transfer,
                             amount,
                             currency: request.currency.clone(),
-                            recipient: Some(creditor.clone()),
+                            recipient: Some(creditor_did.clone()),
                             memo: format!(
                                 "Clearing settlement for {}: {} -> {}",
-                                request.agreement_id, debtor, creditor
+                                request.agreement_id, debtor_label, creditor_label
                             ),
                             expected_nonce: None,
                             decision_receipt_id: request.decision_receipt_id.clone(),
@@ -973,8 +1018,11 @@ mod tests {
         assert!(!result.state_change_hash.is_empty());
     }
 
+    /// Non-zero net settlement without a ledger service must fail BEFORE mutating
+    /// clearing positions (idempotency guard).  The clearing positions should be
+    /// unchanged after the call so a retry with a ledger wired will work correctly.
     #[test]
-    fn test_settle_clearing_nonzero_net_position() {
+    fn test_settle_clearing_nonzero_net_requires_ledger() {
         use icn_federation::clearing::CrossCoopTransfer;
 
         let (registry, _reg_temp) = make_test_registry();
@@ -1020,6 +1068,7 @@ mod tests {
         let transfer_id = clearing.propose_transfer(transfer).unwrap();
         clearing.confirm_transfer(&transfer_id).unwrap();
 
+        // Service without ledger — must fail on non-zero net to prevent partial settlement
         let service = FederationServiceImpl::new(registry).with_clearing_manager(clearing.clone());
 
         let result = service
@@ -1031,17 +1080,24 @@ mod tests {
             })
             .unwrap();
 
+        assert!(!result.success, "Non-zero net without ledger must fail");
         assert!(
-            result.success,
-            "Settlement should succeed: {:?}",
+            result
+                .error
+                .as_deref()
+                .unwrap_or("")
+                .contains("no ledger configured"),
+            "Error should mention ledger requirement: {:?}",
             result.error
         );
-        // coop-a owes coop-b 100 HOURS → net_settlement = +100 (positive: a owes b)
-        assert_eq!(result.net_settlement, 100, "net_settlement should be 100");
-        assert_eq!(result.coop_a, "coop-a");
-        assert_eq!(result.coop_b, "coop-b");
-        assert_eq!(result.transfers_settled, 1);
-        assert!(!result.state_change_hash.is_empty());
+
+        // Verify positions were NOT mutated (idempotency guard fired before trigger_settlement)
+        let position = clearing.calculate_position(&agreement_id).unwrap();
+        assert_eq!(
+            position.net_position(),
+            100,
+            "Positions must be unchanged after guard fires"
+        );
     }
 
     #[test]
