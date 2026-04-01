@@ -431,6 +431,9 @@ async fn test_two_node_federation_join_determinism() -> Result<()> {
         target_id: Some("federation-regional-pilot".to_string()),
         agreement_hash: None,
         decision_hash: Some(decision_hash.clone()),
+        settlement_interval: None,
+        max_imbalance: None,
+        source_agreement_id: None,
     };
 
     // Execute on Node A
@@ -476,6 +479,9 @@ async fn test_two_node_federation_join_determinism() -> Result<()> {
         target_id: Some("federation-regional-pilot".to_string()),
         agreement_hash: None,
         decision_hash: Some(decision_hash.clone()),
+        settlement_interval: None,
+        max_imbalance: None,
+        source_agreement_id: None,
     };
 
     // Execute on Node B

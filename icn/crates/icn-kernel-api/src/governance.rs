@@ -139,6 +139,18 @@ pub struct FederationOperation {
     pub target_id: Option<String>, // federation_id or target coop
     pub agreement_hash: Option<String>,
     pub decision_hash: Option<String>,
+    /// Settlement interval for EstablishClearing (ADR 0013 Step 3a).
+    /// Absent for all other operation types.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub settlement_interval: Option<String>,
+    /// Max imbalance for EstablishClearing (ADR 0013 Step 3a).
+    /// Absent for all other operation types.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_imbalance: Option<i64>,
+    /// Source direct-management agreement ID for adopted governance agreements
+    /// (ADR 0013 Step 3b). Absent for ordinary clearing establishments.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_agreement_id: Option<String>,
 }
 
 /// Trait for executing federation operations from governance decisions
@@ -530,6 +542,9 @@ pub fn federation_effect_to_operation(effect: &FederationEffect) -> FederationOp
             target_id: Some(federation_id.clone()),
             agreement_hash: None,
             decision_hash: None,
+            settlement_interval: None,
+            max_imbalance: None,
+            source_agreement_id: None,
         },
         FederationEffect::LeaveFederation {
             coop_did,
@@ -540,17 +555,26 @@ pub fn federation_effect_to_operation(effect: &FederationEffect) -> FederationOp
             target_id: Some(federation_id.clone()),
             agreement_hash: None,
             decision_hash: None,
+            settlement_interval: None,
+            max_imbalance: None,
+            source_agreement_id: None,
         },
         FederationEffect::EstablishClearing {
             coop_a_did,
             coop_b_did,
             agreement_hash,
+            settlement_interval,
+            max_imbalance,
+            source_agreement_id,
         } => FederationOperation {
             operation_type: FederationOperationType::EstablishClearing,
             coop_did: coop_a_did.clone(),
             target_id: Some(coop_b_did.clone()),
             agreement_hash: Some(agreement_hash.clone()),
             decision_hash: None,
+            settlement_interval: settlement_interval.clone(),
+            max_imbalance: *max_imbalance,
+            source_agreement_id: source_agreement_id.clone(),
         },
         FederationEffect::VouchForCoop {
             voucher_did,
@@ -562,6 +586,9 @@ pub fn federation_effect_to_operation(effect: &FederationEffect) -> FederationOp
             target_id: Some(vouchee_did.clone()),
             agreement_hash: Some(attestation_hash.clone()),
             decision_hash: None,
+            settlement_interval: None,
+            max_imbalance: None,
+            source_agreement_id: None,
         },
         FederationEffect::SettleClearing {
             agreement_id,
@@ -580,6 +607,9 @@ pub fn federation_effect_to_operation(effect: &FederationEffect) -> FederationOp
             } else {
                 Some(decision_hash.clone())
             },
+            settlement_interval: None,
+            max_imbalance: None,
+            source_agreement_id: None,
         },
     }
 }

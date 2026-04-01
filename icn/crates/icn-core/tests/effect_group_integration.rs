@@ -571,6 +571,9 @@ async fn test_federation_join_provenance_chain() -> Result<()> {
         target_id: Some("alpine-federation".to_string()),
         agreement_hash: None,
         decision_hash: Some(decision_hash.clone()),
+        settlement_interval: None,
+        max_imbalance: None,
+        source_agreement_id: None,
     };
 
     // Execute
@@ -661,6 +664,9 @@ async fn test_federation_vouch_executor_path() -> Result<()> {
         target_id: Some("did:icn:target-coop".to_string()),
         agreement_hash: None,
         decision_hash: Some(decision_hash.clone()),
+        settlement_interval: None,
+        max_imbalance: None,
+        source_agreement_id: None,
     };
 
     let outcome = executor

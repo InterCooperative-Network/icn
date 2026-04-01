@@ -451,6 +451,9 @@ fn translate_federation_proposal(
                 coop_a_did: String::new(),
                 coop_b_did: partner_coop_did.to_string(),
                 agreement_hash: String::new(),
+                settlement_interval: None,
+                max_imbalance: None,
+                source_agreement_id: None,
             },
         )]),
         FederationProposal::VouchForCooperative {

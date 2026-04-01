@@ -299,6 +299,21 @@ pub enum FederationEffect {
         coop_a_did: String,
         coop_b_did: String,
         agreement_hash: String,
+        /// Settlement interval: "daily", "weekly", "monthly", or "manual".
+        /// When absent, the executor uses its default (weekly).
+        /// ADR 0013 Step 3a: terms propagation.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        settlement_interval: Option<String>,
+        /// Maximum allowed imbalance before forced settlement.
+        /// When absent, the executor uses its default (10000).
+        /// ADR 0013 Step 3a: terms propagation.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        max_imbalance: Option<i64>,
+        /// Reference to the direct-management agreement this governance agreement
+        /// is derived from. Present only when this is a ratified re-instantiation
+        /// of an existing direct-management agreement (ADR 0013 Model B).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        source_agreement_id: Option<String>,
     },
     /// Vouch for another cooperative
     VouchForCoop {

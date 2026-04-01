@@ -9,7 +9,9 @@ use std::sync::{Arc, RwLock};
 
 use anyhow::Result;
 use icn_federation::types::{CooperativeInfo, FederationPolicy, Vouch};
-use icn_federation::{BilateralClearingAgreement, ClearingManager, CooperativeRegistry};
+use icn_federation::{
+    BilateralClearingAgreement, ClearingManager, CooperativeRegistry, SettlementInterval,
+};
 use icn_identity::Did;
 use icn_kernel_api::services::TreasuryOperationType;
 use icn_kernel_api::{
@@ -294,13 +296,28 @@ impl FederationService for FederationServiceImpl {
             }
         };
 
-        let agreement = BilateralClearingAgreement::new(
+        let mut agreement = BilateralClearingAgreement::new(
             request.agreement_id.clone(),
             request.coop_a_did.clone(),
             coop_a_did_parsed,
             request.coop_b_did.clone(),
             coop_b_did_parsed,
         );
+
+        // Step 3a: Apply provided terms instead of hardcoded defaults (ADR 0013).
+        if let Some(interval) = &request.settlement_interval {
+            agreement.settlement_interval = match interval.as_str() {
+                "daily" => SettlementInterval::Daily,
+                "monthly" => SettlementInterval::Monthly,
+                "manual" => SettlementInterval::Manual,
+                _ => SettlementInterval::Weekly,
+            };
+        }
+        if let Some(max) = request.max_imbalance {
+            agreement.max_imbalance = max;
+        }
+        // Step 3b: Record the source direct-management agreement reference (ADR 0013).
+        agreement.source_agreement_id = request.source_agreement_id.clone();
 
         match clearing.create_agreement(agreement) {
             Ok(agreement_id) => {
@@ -658,10 +675,10 @@ impl FederationService for FederationServiceImpl {
                 coop_b: a.coop_b,
                 coop_b_did: a.coop_b_did.to_string(),
                 settlement_interval: match a.settlement_interval {
-                    icn_federation::SettlementInterval::Daily => "daily",
-                    icn_federation::SettlementInterval::Weekly => "weekly",
-                    icn_federation::SettlementInterval::Monthly => "monthly",
-                    icn_federation::SettlementInterval::Manual => "manual",
+                    SettlementInterval::Daily => "daily",
+                    SettlementInterval::Weekly => "weekly",
+                    SettlementInterval::Monthly => "monthly",
+                    SettlementInterval::Manual => "manual",
                 }
                 .to_string(),
                 max_imbalance: a.max_imbalance,
@@ -669,6 +686,8 @@ impl FederationService for FederationServiceImpl {
                 exchange_rates: a.exchange_rates,
                 // This record came from governance execution (establish_clearing effect).
                 origin: "governance".to_string(),
+                // Step 3c: Expose source reference for adopted agreements (ADR 0013).
+                source_agreement_id: a.source_agreement_id,
             })
             .collect())
     }
@@ -690,10 +709,10 @@ impl FederationService for FederationServiceImpl {
                 coop_b: a.coop_b,
                 coop_b_did: a.coop_b_did.to_string(),
                 settlement_interval: match a.settlement_interval {
-                    icn_federation::SettlementInterval::Daily => "daily",
-                    icn_federation::SettlementInterval::Weekly => "weekly",
-                    icn_federation::SettlementInterval::Monthly => "monthly",
-                    icn_federation::SettlementInterval::Manual => "manual",
+                    SettlementInterval::Daily => "daily",
+                    SettlementInterval::Weekly => "weekly",
+                    SettlementInterval::Monthly => "monthly",
+                    SettlementInterval::Manual => "manual",
                 }
                 .to_string(),
                 max_imbalance: a.max_imbalance,
@@ -701,6 +720,8 @@ impl FederationService for FederationServiceImpl {
                 exchange_rates: a.exchange_rates,
                 // This record came from governance execution (establish_clearing effect).
                 origin: "governance".to_string(),
+                // Step 3c: Expose source reference for adopted agreements (ADR 0013).
+                source_agreement_id: a.source_agreement_id,
             }))
     }
 }
@@ -1015,6 +1036,9 @@ mod tests {
             agreement_id: "sha256:clearing-agreement-governance-hash".to_string(),
             decision_receipt_id: "gov:proposal:clearing:receipt:test-001".to_string(),
             decision_hash: "sha256:clearing-decision-hash".to_string(),
+            settlement_interval: None,
+            max_imbalance: None,
+            source_agreement_id: None,
         };
 
         let result = service.establish_clearing(request.clone()).unwrap();
@@ -1052,6 +1076,9 @@ mod tests {
             agreement_id: "sha256:no-manager-test".to_string(),
             decision_receipt_id: "gov:proposal:clearing:no-manager".to_string(),
             decision_hash: "sha256:no-manager".to_string(),
+            settlement_interval: None,
+            max_imbalance: None,
+            source_agreement_id: None,
         };
 
         let result = service.establish_clearing(request).unwrap();
@@ -1086,6 +1113,9 @@ mod tests {
                 agreement_id: "sha256:invalid-a".to_string(),
                 decision_receipt_id: "gov:test".to_string(),
                 decision_hash: "sha256:test".to_string(),
+                settlement_interval: None,
+                max_imbalance: None,
+                source_agreement_id: None,
             })
             .unwrap();
         assert!(!result_a.success, "Invalid coop_a_did should fail");
@@ -1107,6 +1137,9 @@ mod tests {
                 agreement_id: "sha256:invalid-b".to_string(),
                 decision_receipt_id: "gov:test".to_string(),
                 decision_hash: "sha256:test".to_string(),
+                settlement_interval: None,
+                max_imbalance: None,
+                source_agreement_id: None,
             })
             .unwrap();
         assert!(!result_b.success, "Invalid coop_b_did should fail");
@@ -1138,6 +1171,9 @@ mod tests {
                 agreement_id: "agreement-settle-zero".to_string(),
                 decision_receipt_id: "gov:establish-clearing".to_string(),
                 decision_hash: "sha256:establish".to_string(),
+                settlement_interval: None,
+                max_imbalance: None,
+                source_agreement_id: None,
             })
             .unwrap();
         assert!(establish.success, "EstablishClearing should succeed");
@@ -1428,6 +1464,295 @@ mod tests {
             entry.recipient.as_deref(),
             Some(coop_b_did.to_string().as_str()),
             "Creditor must be coop-b DID"
+        );
+    }
+
+    // =========================================================================
+    // ADR 0013 Step 3a–3c implementation tests
+    // =========================================================================
+
+    /// Step 3a: establish_clearing uses provided terms, not hardcoded defaults.
+    ///
+    /// This directly tests the correctness gap identified in ADR 0013: before
+    /// Step 3a, governance-established agreements silently used Weekly/10000 regardless
+    /// of what the governance proposal specified.
+    #[test]
+    fn test_establish_clearing_uses_provided_terms_not_defaults() {
+        let (registry, _reg_temp) = make_test_registry();
+        let clearing_temp = tempfile::tempdir().expect("Failed to create clearing temp dir");
+        let clearing_store = Arc::new(SledStore::open(clearing_temp.path()).unwrap());
+        let clearing =
+            Arc::new(ClearingManager::new(clearing_store, "coop-alpha".to_string()).unwrap());
+        let service = FederationServiceImpl::new(registry).with_clearing_manager(clearing.clone());
+
+        let result = service
+            .establish_clearing(FederationClearingRequest {
+                coop_a_did: make_test_did_str(10),
+                coop_b_did: make_test_did_str(11),
+                agreement_id: "agr-terms-test".to_string(),
+                decision_receipt_id: "gov:terms-test".to_string(),
+                decision_hash: "sha256:terms-test".to_string(),
+                settlement_interval: Some("daily".to_string()),
+                max_imbalance: Some(50000),
+                source_agreement_id: None,
+            })
+            .unwrap();
+
+        assert!(
+            result.success,
+            "EstablishClearing should succeed: {:?}",
+            result.error
+        );
+
+        // Read back the stored agreement and verify provided terms were applied.
+        let stored = clearing
+            .get_agreement("agr-terms-test")
+            .expect("get_agreement failed")
+            .expect("agreement should be stored");
+
+        assert_eq!(
+            stored.settlement_interval,
+            SettlementInterval::Daily,
+            "settlement_interval must be Daily, not the Weekly default"
+        );
+        assert_eq!(
+            stored.max_imbalance, 50000,
+            "max_imbalance must be 50000, not the 10000 default"
+        );
+    }
+
+    /// Step 3a backward compat: omitting the new terms fields falls back to defaults.
+    ///
+    /// Callers that pre-date the terms extension (or that explicitly pass None) must
+    /// continue to succeed. The executor must not reject absent fields.
+    #[test]
+    fn test_establish_clearing_compat_with_missing_terms() {
+        let (registry, _reg_temp) = make_test_registry();
+        let clearing_temp = tempfile::tempdir().unwrap();
+        let clearing_store = Arc::new(SledStore::open(clearing_temp.path()).unwrap());
+        let clearing =
+            Arc::new(ClearingManager::new(clearing_store, "coop-alpha".to_string()).unwrap());
+        let service = FederationServiceImpl::new(registry).with_clearing_manager(clearing.clone());
+
+        // All three new fields absent (None).
+        let result = service
+            .establish_clearing(FederationClearingRequest {
+                coop_a_did: make_test_did_str(12),
+                coop_b_did: make_test_did_str(13),
+                agreement_id: "agr-compat-test".to_string(),
+                decision_receipt_id: "gov:compat-test".to_string(),
+                decision_hash: "sha256:compat-test".to_string(),
+                settlement_interval: None,
+                max_imbalance: None,
+                source_agreement_id: None,
+            })
+            .unwrap();
+
+        assert!(
+            result.success,
+            "Compat call should succeed: {:?}",
+            result.error
+        );
+
+        let stored = clearing
+            .get_agreement("agr-compat-test")
+            .expect("get_agreement failed")
+            .expect("agreement should be stored");
+
+        // When None, defaults must apply: Weekly + 10000.
+        assert_eq!(
+            stored.settlement_interval,
+            SettlementInterval::Weekly,
+            "Missing settlement_interval must fall back to Weekly"
+        );
+        assert_eq!(
+            stored.max_imbalance, 10000,
+            "Missing max_imbalance must fall back to 10000"
+        );
+        assert!(
+            stored.source_agreement_id.is_none(),
+            "source_agreement_id must be None when not provided"
+        );
+    }
+
+    /// Step 3b: source_agreement_id is persisted to Sled and survives a process restart.
+    ///
+    /// This proves that the adoption provenance is durable, not merely in-memory.
+    #[test]
+    fn test_establish_clearing_with_source_agreement_id_stores_provenance() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let clearing_path = temp_dir.path().join("clearing");
+        let registry_path = temp_dir.path().join("registry");
+
+        // Phase A: write.
+        {
+            let registry = make_registry_at_path(&registry_path);
+            let clearing_store =
+                Arc::new(SledStore::open(&clearing_path).expect("Failed to open clearing store"));
+            let clearing =
+                Arc::new(ClearingManager::new(clearing_store, "coop-alpha".to_string()).unwrap());
+            let service =
+                FederationServiceImpl::new(registry).with_clearing_manager(clearing.clone());
+
+            let result = service
+                .establish_clearing(FederationClearingRequest {
+                    coop_a_did: make_test_did_str(20),
+                    coop_b_did: make_test_did_str(21),
+                    agreement_id: "agr-adopted-001".to_string(),
+                    decision_receipt_id: "gov:adopt-test".to_string(),
+                    decision_hash: "sha256:adopt-test".to_string(),
+                    settlement_interval: Some("manual".to_string()),
+                    max_imbalance: Some(25000),
+                    source_agreement_id: Some("agr-direct-mgmt-001".to_string()),
+                })
+                .unwrap();
+
+            assert!(
+                result.success,
+                "Adoption should succeed: {:?}",
+                result.error
+            );
+        } // ClearingManager drops here, simulating process boundary.
+
+        // Phase B: reload and verify provenance survived.
+        {
+            let clearing_store =
+                Arc::new(SledStore::open(&clearing_path).expect("Failed to reopen clearing store"));
+            let clearing =
+                Arc::new(ClearingManager::new(clearing_store, "coop-alpha".to_string()).unwrap());
+
+            let stored = clearing
+                .get_agreement("agr-adopted-001")
+                .expect("get_agreement failed")
+                .expect("agreement must survive reload");
+
+            assert_eq!(
+                stored.source_agreement_id.as_deref(),
+                Some("agr-direct-mgmt-001"),
+                "source_agreement_id must survive Sled reload"
+            );
+            assert_eq!(stored.settlement_interval, SettlementInterval::Manual);
+            assert_eq!(stored.max_imbalance, 25000);
+        }
+    }
+
+    /// Step 3b/3c: adopted governance agreement positions start fresh.
+    ///
+    /// The governance agreement is a new canonical record; it must NOT inherit
+    /// positions from the direct-management source agreement (which lives in a
+    /// separate store). This test verifies zero starting position.
+    #[test]
+    fn test_adopted_agreement_position_starts_fresh() {
+        let (registry, _reg_temp) = make_test_registry();
+        let clearing_temp = tempfile::tempdir().unwrap();
+        let clearing_store = Arc::new(SledStore::open(clearing_temp.path()).unwrap());
+        let clearing =
+            Arc::new(ClearingManager::new(clearing_store, "coop-alpha".to_string()).unwrap());
+        let service = FederationServiceImpl::new(registry).with_clearing_manager(clearing.clone());
+
+        // Establish an adopted agreement (with source reference).
+        let result = service
+            .establish_clearing(FederationClearingRequest {
+                coop_a_did: make_test_did_str(30),
+                coop_b_did: make_test_did_str(31),
+                agreement_id: "agr-fresh-position".to_string(),
+                decision_receipt_id: "gov:fresh-pos-test".to_string(),
+                decision_hash: "sha256:fresh-pos".to_string(),
+                settlement_interval: Some("weekly".to_string()),
+                max_imbalance: Some(10000),
+                source_agreement_id: Some("agr-existing-direct-mgmt".to_string()),
+            })
+            .unwrap();
+
+        assert!(result.success, "Adopted agreement creation should succeed");
+
+        // The new governance agreement must start at zero, regardless of what
+        // the direct-management source agreement's position might be.
+        let position = clearing
+            .calculate_position("agr-fresh-position")
+            .expect("calculate_position failed");
+        assert_eq!(
+            position.net_position(),
+            0,
+            "Adopted agreement must start with zero net position"
+        );
+    }
+
+    /// Step 3c: list_agreements and get_agreement expose source_agreement_id.
+    ///
+    /// Clients must be able to see origin = "governance" + source_agreement_id
+    /// for adopted agreements, and source_agreement_id = None for ordinary ones.
+    #[test]
+    fn test_read_surface_shows_source_reference_for_adopted_agreement() {
+        let (registry, _reg_temp) = make_test_registry();
+        let clearing_temp = tempfile::tempdir().unwrap();
+        let clearing_store = Arc::new(SledStore::open(clearing_temp.path()).unwrap());
+        let clearing =
+            Arc::new(ClearingManager::new(clearing_store, "coop-alpha".to_string()).unwrap());
+        let service = FederationServiceImpl::new(registry).with_clearing_manager(clearing.clone());
+
+        // Create one adopted agreement (with source) and one ordinary agreement (without).
+        service
+            .establish_clearing(FederationClearingRequest {
+                coop_a_did: make_test_did_str(40),
+                coop_b_did: make_test_did_str(41),
+                agreement_id: "agr-adopted".to_string(),
+                decision_receipt_id: "gov:adopted-read-test".to_string(),
+                decision_hash: "sha256:adopted-read".to_string(),
+                settlement_interval: None,
+                max_imbalance: None,
+                source_agreement_id: Some("agr-dm-source".to_string()),
+            })
+            .unwrap();
+
+        service
+            .establish_clearing(FederationClearingRequest {
+                coop_a_did: make_test_did_str(42),
+                coop_b_did: make_test_did_str(43),
+                agreement_id: "agr-ordinary".to_string(),
+                decision_receipt_id: "gov:ordinary-read-test".to_string(),
+                decision_hash: "sha256:ordinary-read".to_string(),
+                settlement_interval: None,
+                max_imbalance: None,
+                source_agreement_id: None,
+            })
+            .unwrap();
+
+        // Verify via list_agreements.
+        let views = service
+            .list_agreements()
+            .expect("list_agreements should succeed");
+        assert_eq!(views.len(), 2, "Expected 2 agreements");
+
+        let adopted_view = views
+            .iter()
+            .find(|v| v.agreement_id == "agr-adopted")
+            .expect("adopted agreement must appear in list");
+        assert_eq!(
+            adopted_view.source_agreement_id.as_deref(),
+            Some("agr-dm-source"),
+            "Adopted agreement must expose source_agreement_id in list view"
+        );
+        assert_eq!(adopted_view.origin, "governance");
+
+        let ordinary_view = views
+            .iter()
+            .find(|v| v.agreement_id == "agr-ordinary")
+            .expect("ordinary agreement must appear in list");
+        assert!(
+            ordinary_view.source_agreement_id.is_none(),
+            "Ordinary governance agreement must have source_agreement_id = None"
+        );
+
+        // Verify via get_agreement.
+        let adopted_single = service
+            .get_agreement("agr-adopted")
+            .expect("get_agreement failed")
+            .expect("adopted agreement must be findable");
+        assert_eq!(
+            adopted_single.source_agreement_id.as_deref(),
+            Some("agr-dm-source"),
+            "get_agreement must expose source_agreement_id for adopted agreement"
         );
     }
 }

@@ -42,6 +42,13 @@ pub struct BilateralClearingAgreement {
 
     /// Signatures from both cooperatives: (DID, signature bytes)
     pub signatures: Vec<(Did, Vec<u8>)>,
+
+    /// The direct-management agreement this governance agreement was adopted from.
+    /// Present only for ratified re-instantiation agreements (ADR 0013 Model B).
+    /// None for ordinary direct-management or governance-originated agreements
+    /// that are not adoptions.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_agreement_id: Option<String>,
 }
 
 impl BilateralClearingAgreement {
@@ -64,6 +71,7 @@ impl BilateralClearingAgreement {
             max_imbalance: 10000,
             created_at: current_timestamp(),
             signatures: Vec::new(),
+            source_agreement_id: None,
         }
     }
 
