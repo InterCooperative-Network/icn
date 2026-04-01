@@ -53,7 +53,7 @@ artifact that the next implementation pass can execute from.
 | Canonical owner | `FederationServiceImpl` (supervisor-owned) |
 | Persistence | `store_path/clearing` — Sled, supervisor-controlled |
 | Object created | `BilateralClearingAgreement` with **HARDCODED DEFAULTS** (see critical gap below) |
-| Provenance | `decision_receipt_id` + `decision_hash` — stored in `FederationProvenance` in-memory map |
+| Provenance | `decision_receipt_id` + `decision_hash` — carried on `FederationClearingRequest` but **not yet persisted** to `BilateralClearingAgreement`; `FederationProvenance` in-memory map tracks cooperative registration (join/registration) only, not clearing agreement establishment |
 | Read surface | `GET /v1/federation/clearing`, `/clearing/{id}` — preferred path (origin = "governance") |
 | Position read | `GET /v1/federation/clearing/{id}/position` — supervisor-owned, works correctly |
 | Settlement | `FederationEffect::SettleClearing` — governance execution path |
@@ -289,7 +289,7 @@ the governance voting flow.
 **Candidate endpoint**: `POST /v1/federation/clearing/{id}/propose-adoption`
 
 Request (minimal):
-```json
+```jsonc
 {
   "proposed_canonical_id": "agr-gov-001",   // governance ID for the new canonical record
   "rationale": "Formalizing bilateral clearing agreement for institutional use"
