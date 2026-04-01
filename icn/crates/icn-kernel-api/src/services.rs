@@ -862,6 +862,20 @@ pub struct FederationClearingRequest {
     pub decision_receipt_id: String,
     /// Hash of the decision that authorized this clearing establishment
     pub decision_hash: String,
+    /// Settlement interval: "daily", "weekly", "monthly", or "manual".
+    /// When absent, the executor uses its default (weekly).
+    /// ADR 0013 Step 3a: terms propagation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub settlement_interval: Option<String>,
+    /// Maximum allowed imbalance before forced settlement.
+    /// When absent, the executor uses its default (10000).
+    /// ADR 0013 Step 3a: terms propagation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_imbalance: Option<i64>,
+    /// Reference to the direct-management agreement this governance agreement is derived from.
+    /// Present only for ratified re-instantiation (ADR 0013 Model B).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_agreement_id: Option<String>,
 }
 
 /// Result of establishing a bilateral clearing agreement.
@@ -1143,6 +1157,12 @@ pub struct ClearingAgreementView {
     /// by governance execution) or `"direct-management"` (from the gateway's own clearing store,
     /// written via the direct-management API path). ADR 0012 / Model C.
     pub origin: String,
+    /// The direct-management agreement this governance agreement was adopted from.
+    /// Present only when this record is a ratified re-instantiation of a direct-management
+    /// source (ADR 0013 Model B). Clients can use this to trace the adoption lineage.
+    /// Absent for ordinary governance clearing agreements and all direct-management records.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_agreement_id: Option<String>,
 }
 
 // ============================================================================

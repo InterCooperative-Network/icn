@@ -515,6 +515,8 @@ pub async fn list_agreements(
             created_at: a.created_at,
             exchange_rates: a.exchange_rates,
             origin: "direct-management".to_string(),
+            // Direct-management agreements are never adopted governance records.
+            source_agreement_id: None,
         })
         .collect();
     Ok(HttpResponse::Ok().json(views))
@@ -567,6 +569,8 @@ pub async fn get_agreement(
             created_at: a.created_at,
             exchange_rates: a.exchange_rates,
             origin: "direct-management".to_string(),
+            // Direct-management agreements are never adopted governance records.
+            source_agreement_id: None,
         })),
         None => Err(GatewayError::NotFound(format!(
             "Agreement not found: {agreement_id}"
@@ -1196,6 +1200,7 @@ mod tests {
                     created_at: 1_000_000,
                     exchange_rates: std::collections::HashMap::new(),
                     origin: "governance".to_string(),
+                    source_agreement_id: None,
                 }])
             }
             fn get_agreement(
@@ -1214,6 +1219,7 @@ mod tests {
                         created_at: 1_000_000,
                         exchange_rates: std::collections::HashMap::new(),
                         origin: "governance".to_string(),
+                        source_agreement_id: None,
                     }))
                 } else {
                     Ok(None)

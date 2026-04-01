@@ -346,9 +346,9 @@ This is a long-term path, not a current requirement.
 | 1a. `list/get_cooperative`, `get_vouches_for`, `CooperativeView` DTO | None | Low | `icn-kernel-api` + `icn-core` + `icn-gateway` | ✅ Done (2026-03-31) |
 | 1b. `list/get_agreement`, `ClearingAgreementView` DTO | None | Low | `icn-kernel-api` + `icn-core` + `icn-gateway` | ✅ Done (2026-04-01) |
 | 2. Add origin labeling to response DTOs | Steps 1a+1b | Medium | Cross-crate | ✅ Done (2026-04-01) |
-| 3a. Terms propagation fix + source reference fields | Steps 1-2 + store-isolation tests | Low | `icn-kernel-api` + `icn-core` | ⏳ Designed (ADR 0013) |
-| 3b. Adoption provenance persistence (Sled) | Step 3a | Low | `icn-core` | ⏳ Designed (ADR 0013) |
-| 3c. `source_agreement_id` in ClearingAgreementView | Step 3b | Low | `icn-kernel-api` + `icn-gateway` | ⏳ Designed (ADR 0013) |
+| 3a. Terms propagation fix + source reference fields | Steps 1-2 + store-isolation tests | Low | `icn-kernel-api` + `icn-core` | ✅ Done (2026-04-01) |
+| 3b. Adoption provenance persistence (Sled) | Step 3a | Low | `icn-core` | ✅ Done (2026-04-01) |
+| 3c. `source_agreement_id` in ClearingAgreementView | Step 3b | Low | `icn-kernel-api` + `icn-gateway` | ✅ Done (2026-04-01) |
 | 3d. Adoption proposal endpoint | Steps 3a-3c + governance plumbing | High | `icn-gateway` + governance | ⏳ Future (ADR 0013) |
 
 Step 2 is the origin labeling pass — adds `origin: "governance" | "direct-management"` to view DTOs and gateway fallback paths. See Phase 4d below.
@@ -474,15 +474,87 @@ Fallback path (direct-management) origin is covered implicitly by the existing f
 
 ### What the next slice should be
 
-Step 3 (CCL adoption contract) is the next major item in the sequencing table. It is high
-complexity and requires `icn-ccl` / `icn-governance` work. The minimal prerequisite design:
-a CCL contract type that accepts a `BilateralClearingAgreement` payload and on approval executes
-`FederationEffect::EstablishClearing` with the same terms + provenance from the vote decision.
+Steps 3a/3b/3c (terms propagation, adoption provenance persistence, read surface exposure) are
+complete as of 2026-04-01. See Phase 4e below for details.
 
-Before Step 3: consider whether origin labeling should be extended to include
+Step 3d (CCL adoption proposal endpoint: `POST /v1/federation/clearing/{id}/propose-adoption`) is
+the remaining item for the Step 3 adoption contract sequence. It requires wiring the gateway
+endpoint that accepts a direct-management agreement ID and emits an `EstablishClearing` effect with
+the stored terms and `source_agreement_id` set. The governance execution path (Step 3b) is already
+wired to carry these fields through to `BilateralClearingAgreement`.
+
+Before Step 3d: consider whether origin labeling should be extended to include
 `decision_receipt_id` and `decision_hash` on `"governance"` records — currently these fields are
 available in `FederationProvenance` (stored in `FederationServiceImpl`) but not exposed in the
 view DTOs. Exposing them would allow clients to verify governance provenance directly from the API.
+
+---
+
+## Phase 4e: Adoption Contract Foundation — Steps 3a/3b/3c (2026-04-01)
+
+### What was implemented
+
+Steps 3a, 3b, and 3c close the terms-carry-through gap and establish adoption provenance
+persistence across the governance execution path.
+
+**Step 3a — Terms propagation fix**
+
+Extended the full effect chain to carry agreement terms from proposal through to the stored
+`BilateralClearingAgreement`. Four types updated:
+
+- `FederationEffect::EstablishClearing` (in `icn-kernel-api::effects`): added
+  `settlement_interval: Option<String>`, `max_imbalance: Option<i64>`,
+  `source_agreement_id: Option<String>` — all with `#[serde(default)]` for backward compat
+- `FederationOperation` (in `icn-kernel-api::governance`): same three fields added with
+  `#[serde(default, skip_serializing_if = "Option::is_none")]`
+- `federation_effect_to_operation()`: `EstablishClearing` arm updated to carry all three fields
+- `FederationClearingRequest` (in `icn-kernel-api::services`): same three fields added
+
+`establish_clearing()` in `icn-core::services::federation_service` updated to apply the provided
+`settlement_interval` and `max_imbalance` instead of relying on `BilateralClearingAgreement::new()`
+defaults (which were hardcoded to `Weekly` / `10000`).
+
+**Step 3b — Adoption provenance persistence**
+
+`BilateralClearingAgreement` (in `icn-federation::clearing`) extended with
+`source_agreement_id: Option<String>` using `#[serde(default, skip_serializing_if = "Option::is_none")]`
+for Sled backward compat. The field is populated in `establish_clearing()` from
+`request.source_agreement_id` before `ClearingManager::create_agreement()` persists it.
+
+`governance_executor.rs` updated to forward `operation.source_agreement_id` into the
+`FederationClearingRequest` it constructs, completing the governance → persistence chain.
+
+**Step 3c — Read surface exposure**
+
+`ClearingAgreementView` (in `icn-kernel-api::services`) extended with
+`source_agreement_id: Option<String>`. Both `list_agreements()` and `get_agreement()` in
+`federation_service.rs` now populate this field from the stored `BilateralClearingAgreement`.
+
+Gateway direct-management handlers in `icn-gateway::api::federation` set `source_agreement_id: None`
+(direct-management agreements are not adopted from anywhere).
+
+### Deviation from ADR 0013 design
+
+ADR 0013 specified `exchange_rates: HashMap<String, f64>` as a term to carry through the effect
+chain. This field was **deferred**: `FederationEffect` derives `PartialEq + Eq`, and `HashMap<String,
+f64>` cannot satisfy `Eq` because `f64` does not implement `Eq`. Only `settlement_interval`,
+`max_imbalance`, and `source_agreement_id` were added.
+
+Resolution path when needed: wrap exchange rates in a newtype that implements `Eq` by approximate
+comparison, or relax the `Eq` derive on `FederationEffect` variants that don't need it.
+
+### Tests added (5 new in `icn-core`)
+
+- `test_establish_clearing_terms_propagate` — verifies `settlement_interval` and `max_imbalance`
+  from `FederationClearingRequest` are applied to the stored `BilateralClearingAgreement`
+- `test_establish_clearing_backward_compat_no_terms` — verifies a request without terms fields
+  creates an agreement with default `Weekly` / `10000` (backward compat)
+- `test_source_agreement_id_persisted_via_clearing_manager` — verifies `source_agreement_id` round-
+  trips through `ClearingManager::create_agreement()` and is returned by `get_agreement()`
+- `test_establish_clearing_creates_fresh_positions` — verifies governance-path agreement starts
+  with zero credit balances regardless of source provenance
+- `test_list_agreements_returns_source_agreement_id` — verifies `list_agreements()` exposes
+  `source_agreement_id` in the returned `ClearingAgreementView`
 
 ---
 
@@ -497,15 +569,13 @@ The following invariants are already tested or should be added:
   preference is enforced for position queries
 - `test_persistent_storage_survives_manager_reconstruction` — proves gateway-API state is durable
 
-**Required** (not yet added):
-- **`test_gateway_clearing_and_governance_clearing_do_not_share_positions`**: create an agreement
-  via gateway API path, create a different agreement via `FederationServiceImpl::establish_clearing`,
-  assert `get_clearing_position` returns the governance-path agreement and 404s on the gateway-path
-  agreement — proving the stores are isolated as intended.
-- **`test_gateway_coop_list_reflects_only_gateway_registered_coops`**: register a coop via
-  `FederationManager`, register a different coop via `FederationServiceImpl::join_federation`,
-  assert `list_cooperatives` on `FederationManager` returns only the first — proving read API
-  accurately reflects its write path, not governance state.
+**Required** (now confirmed present in `icn-gateway/src/federation_mgr.rs`):
+- **`test_gateway_clearing_and_governance_clearing_do_not_share_positions`**: exists and passes.
+  Proves gateway and supervisor Sled stores are isolated — creating an agreement via one path does
+  not appear in the other's position reads.
+- **`test_gateway_coop_list_reflects_only_gateway_registered_coops`**: exists and passes. Proves
+  `FederationManager::list_cooperatives` reflects only direct-management registrations, not
+  governance-ratified ones.
 
 ### Documentation Updates
 
@@ -533,14 +603,21 @@ This ADR serves as the design artifact. Gateway API documentation should note:
 
 ### What This ADR Leaves Open
 
-1. CCL adoption contract for promotion path (Step 3 in sequencing table) — future work, high complexity.
+1. Step 3d: `POST /v1/federation/clearing/{id}/propose-adoption` endpoint — emits `EstablishClearing`
+   effect with stored terms + `source_agreement_id` from an existing direct-management agreement.
+   The governance execution and Sled persistence are already wired (Steps 3a/3b/3c); only the
+   gateway intake endpoint remains.
 2. Provenance field exposure on governance-origin reads: `decision_receipt_id` / `decision_hash` are
    stored in `FederationProvenance` but not yet exposed in view DTOs. Clients cannot verify
    governance origin directly from the API without this. Low-complexity follow-up.
-3. Integration tests verifying store isolation between paths (see Phase 5 — Required tests).
+3. `exchange_rates: HashMap<String, f64>` carry-through: deferred because `FederationEffect` derives
+   `Eq` and `f64` does not implement `Eq`. Exchange rate terms do not flow through the effect chain
+   today. When needed: either wrap in a newtype that implements `Eq`, or relax the `Eq` derive on
+   `FederationEffect`.
 
-Steps 1a, 1b (FederationService read expansion), and Step 2 (origin labeling) are complete as of
-2026-04-01. See Phase 4a, 4c, 4d above for details.
+Steps 1a, 1b (FederationService read expansion), Step 2 (origin labeling), and Steps 3a/3b/3c
+(terms propagation, adoption provenance persistence, read surface exposure) are complete as of
+2026-04-01. See Phase 4a, 4c, 4d, 4e below for details.
 
 ---
 

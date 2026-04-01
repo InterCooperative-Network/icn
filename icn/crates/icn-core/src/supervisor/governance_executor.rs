@@ -1149,6 +1149,10 @@ impl FederationExecutor for KernelFederationExecutor {
                         agreement_id,
                         decision_receipt_id: receipt_id.to_string(),
                         decision_hash: operation.decision_hash.clone().unwrap_or_default(),
+                        // Step 3a: Forward terms from the FederationOperation (ADR 0013).
+                        settlement_interval: operation.settlement_interval.clone(),
+                        max_imbalance: operation.max_imbalance,
+                        source_agreement_id: operation.source_agreement_id.clone(),
                     };
 
                     let result = service.establish_clearing(request)?;
