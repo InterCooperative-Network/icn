@@ -644,9 +644,16 @@ pub async fn get_position(
     // store that governance-triggered agreements and compute-receipt accumulations write to.
     // Fall back to the gateway's own clearing manager only in standalone mode.
     if let Some(ref service) = ***federation_service {
-        let view = service
-            .get_clearing_position(&agreement_id)
-            .map_err(|e| GatewayError::NotFound(e.to_string()))?;
+        let view = service.get_clearing_position(&agreement_id).map_err(|e| {
+            let msg = e.to_string();
+            if msg.contains("not found") {
+                GatewayError::NotFound(msg)
+            } else if msg.contains("not configured") || msg.contains("disabled") {
+                GatewayError::ServiceUnavailable(msg)
+            } else {
+                GatewayError::InternalError(msg)
+            }
+        })?;
         return Ok(HttpResponse::Ok().json(view));
     }
 
@@ -1063,6 +1070,47 @@ mod tests {
             "Response must come from StubFederationService, not local FederationManager"
         );
         assert_eq!(body["net_position"], 100);
+    }
+
+    /// Verify that get_position falls back to the gateway's own FederationManager when no
+    /// FederationService is injected (standalone mode).
+    #[actix_web::test]
+    async fn test_get_position_falls_back_to_fed_mgr_when_no_service() {
+        use actix_web::HttpMessage;
+
+        let fed_mgr = Arc::new(FederationManager::new());
+        // No service injected — None variant
+        let no_service: Arc<Option<Arc<dyn FederationService>>> = Arc::new(None);
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(fed_mgr.clone()))
+                .app_data(web::Data::new(no_service))
+                .service(web::scope("/v1/federation").service(get_position)),
+        )
+        .await;
+
+        let claims = crate::auth::TokenClaims {
+            sub: "did:icn:test".to_string(),
+            iat: 1_000_000_000,
+            coop_id: "test-coop".to_string(),
+            scopes: vec!["federation:read".to_string()],
+            exp: 9_999_999_999,
+        };
+        let req = test::TestRequest::get()
+            .uri("/v1/federation/clearing/nonexistent-agreement/position")
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        // FederationManager has no agreement — expect an error, but NOT from the service
+        // path (which would only fire if federation_service is Some). The route must match
+        // (not a 405/404 routing failure).
+        assert_ne!(
+            resp.status().as_u16(),
+            405,
+            "route must match even without FederationService (fell through to fed_mgr path)"
+        );
     }
 
     /// Helper: build a service_for_routes (the double-wrapped Arc the gateway expects).

@@ -528,9 +528,14 @@ This ADR serves as the design artifact. Gateway API documentation should note:
 
 ### What This ADR Leaves Open
 
-1. FederationService read method expansion (Step 1-3 above) — future PR, low risk.
-2. Origin labeling for mixed-origin reads (Step 4) — future design.
-3. CCL adoption contract for promotion path (Step 5) — future work, high complexity.
+1. CCL adoption contract for promotion path (Step 3 in sequencing table) — future work, high complexity.
+2. Provenance field exposure on governance-origin reads: `decision_receipt_id` / `decision_hash` are
+   stored in `FederationProvenance` but not yet exposed in view DTOs. Clients cannot verify
+   governance origin directly from the API without this. Low-complexity follow-up.
+3. Integration tests verifying store isolation between paths (see Phase 5 — Required tests).
+
+Steps 1a, 1b (FederationService read expansion), and Step 2 (origin labeling) are complete as of
+2026-04-01. See Phase 4a, 4c, 4d above for details.
 
 ---
 
