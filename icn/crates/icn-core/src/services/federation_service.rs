@@ -485,6 +485,7 @@ impl FederationService for FederationServiceImpl {
                             expected_nonce: None,
                             decision_receipt_id: request.decision_receipt_id.clone(),
                             decision_hash: request.decision_hash.clone(),
+                            distributions: Vec::new(),
                         };
                         match ledger.submit_treasury_entry(entry_req) {
                             Ok(entry_result) => {
