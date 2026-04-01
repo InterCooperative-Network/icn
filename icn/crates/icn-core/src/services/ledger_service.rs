@@ -201,9 +201,33 @@ impl LedgerServiceImpl {
                     );
                 }
 
+                // Validate individual amounts are positive (zero/negative inverts
+                // debit/credit semantics and violates AccountDelta type contract).
+                if req.amount <= 0 {
+                    return Err(format!(
+                        "DistributeSurplus: total amount must be positive, got {}",
+                        req.amount
+                    ));
+                }
+                for (did, amount) in &req.distributions {
+                    if *amount <= 0 {
+                        return Err(format!(
+                            "DistributeSurplus: distribution amount for '{did}' must be \
+                             positive, got {amount}"
+                        ));
+                    }
+                }
+
                 // Validate: sum of individual amounts must equal req.amount to prevent
                 // the logged total from diverging from actual ledger mutations.
-                let distribution_sum: i64 = req.distributions.iter().map(|(_, amt)| amt).sum();
+                // Use checked arithmetic to surface overflow before it corrupts ledger state.
+                let distribution_sum: i64 = req
+                    .distributions
+                    .iter()
+                    .try_fold(0i64, |acc, (_, amt)| acc.checked_add(*amt))
+                    .ok_or_else(|| {
+                        "DistributeSurplus: distribution amounts overflow i64".to_string()
+                    })?;
                 if distribution_sum != req.amount {
                     return Err(format!(
                         "DistributeSurplus: distribution sum ({distribution_sum}) \
