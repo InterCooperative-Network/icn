@@ -106,8 +106,8 @@ pub use receipts::{
 };
 pub use scope::{CellId, MockCellService, ScopeLevel};
 pub use services::{
-    AddMemberRequest, AddMemberResult, CellService, ClearingPositionView, ControlService,
-    CooperativeView, FederationClearingRequest, FederationClearingResult,
+    AddMemberRequest, AddMemberResult, CellService, ClearingAgreementView, ClearingPositionView,
+    ControlService, CooperativeView, FederationClearingRequest, FederationClearingResult,
     FederationClearingSettleRequest, FederationClearingSettleResult, FederationJoinRequest,
     FederationJoinResult, FederationService, FederationVouchRequest, FederationVouchResult,
     ForceCloseProposalRequest, ForceCloseProposalResult, FreezeMemberRequest, FreezeMemberResult,

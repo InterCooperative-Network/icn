@@ -637,6 +637,63 @@ impl FederationService for FederationServiceImpl {
             .get_vouches(coop_id)
             .map_err(|e| anyhow::anyhow!("{}", e))
     }
+
+    fn list_agreements(&self) -> Result<Vec<icn_kernel_api::ClearingAgreementView>> {
+        let clearing = match self.clearing.as_ref() {
+            Some(c) => c,
+            None => return Ok(vec![]),
+        };
+        Ok(clearing
+            .list_agreements()
+            .into_iter()
+            .map(|a| icn_kernel_api::ClearingAgreementView {
+                agreement_id: a.agreement_id,
+                coop_a: a.coop_a,
+                coop_a_did: a.coop_a_did.to_string(),
+                coop_b: a.coop_b,
+                coop_b_did: a.coop_b_did.to_string(),
+                settlement_interval: match a.settlement_interval {
+                    icn_federation::SettlementInterval::Daily => "daily",
+                    icn_federation::SettlementInterval::Weekly => "weekly",
+                    icn_federation::SettlementInterval::Monthly => "monthly",
+                    icn_federation::SettlementInterval::Manual => "manual",
+                }
+                .to_string(),
+                max_imbalance: a.max_imbalance,
+                created_at: a.created_at,
+                exchange_rates: a.exchange_rates,
+            })
+            .collect())
+    }
+
+    fn get_agreement(
+        &self,
+        agreement_id: &str,
+    ) -> Result<Option<icn_kernel_api::ClearingAgreementView>> {
+        let clearing = match self.clearing.as_ref() {
+            Some(c) => c,
+            None => return Ok(None),
+        };
+        Ok(clearing
+            .get_agreement(agreement_id)?
+            .map(|a| icn_kernel_api::ClearingAgreementView {
+                agreement_id: a.agreement_id,
+                coop_a: a.coop_a,
+                coop_a_did: a.coop_a_did.to_string(),
+                coop_b: a.coop_b,
+                coop_b_did: a.coop_b_did.to_string(),
+                settlement_interval: match a.settlement_interval {
+                    icn_federation::SettlementInterval::Daily => "daily",
+                    icn_federation::SettlementInterval::Weekly => "weekly",
+                    icn_federation::SettlementInterval::Monthly => "monthly",
+                    icn_federation::SettlementInterval::Manual => "manual",
+                }
+                .to_string(),
+                max_imbalance: a.max_imbalance,
+                created_at: a.created_at,
+                exchange_rates: a.exchange_rates,
+            }))
+    }
 }
 
 #[cfg(test)]

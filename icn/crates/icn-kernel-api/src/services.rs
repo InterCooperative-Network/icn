@@ -1012,6 +1012,24 @@ pub trait FederationService: Send + Sync {
     /// (`vouch_for_cooperative` effects). Does not include vouches created via
     /// the gateway API path.
     fn get_vouches_for(&self, coop_id: &str) -> Result<Vec<String>, anyhow::Error>;
+
+    /// List all clearing agreements in the supervisor's clearing store.
+    ///
+    /// Returns only governance-originated agreements (created via `establish_clearing`
+    /// governance effects). Gateway-API-created agreements live in a separate store and
+    /// are NOT included (ADR 0012 / Model C).
+    ///
+    /// Returns an empty vec if the clearing manager is not configured or has no agreements.
+    fn list_agreements(&self) -> Result<Vec<ClearingAgreementView>, anyhow::Error>;
+
+    /// Get a specific clearing agreement from the supervisor's clearing store.
+    ///
+    /// Returns `None` if the agreement does not exist in the supervisor's store.
+    /// Gateway-API-created agreements are not visible here.
+    fn get_agreement(
+        &self,
+        agreement_id: &str,
+    ) -> Result<Option<ClearingAgreementView>, anyhow::Error>;
 }
 
 // ============================================================================
@@ -1076,6 +1094,47 @@ pub struct CooperativeView {
     pub capabilities: Vec<String>,
     /// Unix timestamp of the last observed announcement.
     pub last_seen: u64,
+}
+
+// ============================================================================
+// Clearing Agreement View (ADR 0012 Step 1b read DTO)
+// ============================================================================
+
+/// Kernel-API view of a bilateral clearing agreement.
+///
+/// A boundary-clean representation that does not expose `icn-federation` internal
+/// types (`Did`, `SettlementInterval`, raw signature bytes) across the service
+/// boundary. Uses string representations for enum and identity fields.
+///
+/// Fields intentionally omitted:
+/// - `signatures` — raw cryptographic material, not useful to API consumers
+///
+/// # Origin note
+///
+/// Values returned via `FederationService::list_agreements()` originate from
+/// governance execution (`establish_clearing` effects). They represent the
+/// supervisor's canonical clearing store, not the gateway's direct-management state
+/// (ADR 0012 / Model C).
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ClearingAgreementView {
+    /// Unique identifier for the agreement.
+    pub agreement_id: String,
+    /// Identifier of the first cooperative.
+    pub coop_a: String,
+    /// DID of the first cooperative (string form).
+    pub coop_a_did: String,
+    /// Identifier of the second cooperative.
+    pub coop_b: String,
+    /// DID of the second cooperative (string form).
+    pub coop_b_did: String,
+    /// Settlement schedule: "daily", "weekly", "monthly", or "manual".
+    pub settlement_interval: String,
+    /// Maximum allowed imbalance before forced settlement.
+    pub max_imbalance: i64,
+    /// Unix timestamp when the agreement was created.
+    pub created_at: u64,
+    /// Exchange rates between currencies: "from:to" -> rate.
+    pub exchange_rates: std::collections::HashMap<String, f64>,
 }
 
 // ============================================================================

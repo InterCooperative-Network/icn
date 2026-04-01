@@ -49,9 +49,10 @@ phase with a precise roadmap for unification.
 | `POST /federation/clearing/netting/{unit}/apply` | Position adjustments | `ClearingManager` |
 
 **Visibility through gateway reads**:
-- `GET /federation/coops*` → reads from `FederationManager` — shows only gateway-API-registered coops
-- `GET /federation/clearing*` → reads from `FederationManager` — shows only gateway-API-created agreements
-- `GET /federation/clearing/{id}/position` → reads from `FederationService` (ADR 0011) — shows supervisor state
+- `GET /federation/coops*` → prefers `FederationService` (Step 1a); falls back to `FederationManager`
+- `GET /federation/clearing` → prefers `FederationService` (Step 1b); falls back to `FederationManager`
+- `GET /federation/clearing/{id}` → prefers `FederationService` (Step 1b); falls back to `FederationManager`
+- `GET /federation/clearing/{id}/position` → `FederationService` only (ADR 0011) — shows supervisor state
 
 ### Supervisor/Governance-Originated State
 
@@ -144,7 +145,8 @@ phase.
 | Store | `data_dir/federation_store` | `store_path/clearing` |
 | Provenance | None | `decision_receipt_id`, `decision_hash` |
 | Position query | 404 in daemon mode (ADR 0011) | ✅ via `FederationService::get_clearing_position` |
-| Read list | `GET /federation/clearing` (gateway-only) | Not exposed |
+| Read list | `GET /federation/clearing` (fallback only) | ✅ via `FederationService::list_agreements` (Step 1b) |
+| Read by ID | `GET /federation/clearing/{id}` (fallback only) | ✅ via `FederationService::get_agreement` (Step 1b) |
 | Relationship | **Transitional** | **Canonical** |
 
 **Gap (documented, acceptable)**: A clearing agreement created via `POST /federation/clearing` in
@@ -341,16 +343,60 @@ This is a long-term path, not a current requirement.
 | Step | Prerequisite | Risk | Scope | Status |
 |------|-------------|------|-------|--------|
 | 1a. `list/get_cooperative`, `get_vouches_for`, `CooperativeView` DTO | None | Low | `icn-kernel-api` + `icn-core` + `icn-gateway` | ✅ Done (2026-03-31) |
-| 1b. `list/get_agreement`, `ClearingAgreementView` DTO | None | Low | `icn-kernel-api` + `icn-core` + `icn-gateway` | ⏳ Next |
-| 2. Wire gateway clearing GET routes to prefer service | Step 1b | Low | `icn-gateway` | ⏳ After 1b |
-| 3. Add origin labeling to response DTOs | Steps 1a+1b | Medium | Cross-crate | ⏳ Future |
-| 4. Implement CCL adoption contract | Step 3 + CCL work | High | `icn-ccl`, `icn-governance` | ⏳ Future |
+| 1b. `list/get_agreement`, `ClearingAgreementView` DTO | None | Low | `icn-kernel-api` + `icn-core` + `icn-gateway` | ✅ Done (2026-04-01) |
+| 2. Add origin labeling to response DTOs | Steps 1a+1b | Medium | Cross-crate | ⏳ Future |
+| 3. Implement CCL adoption contract | Step 2 + CCL work | High | `icn-ccl`, `icn-governance` | ⏳ Future |
 
-Step 1b is the next minimal slice: design `ClearingAgreementView`, add two trait methods, implement them, wire `GET /federation/clearing` and `GET /federation/clearing/{id}` to prefer service.
+Step 2 is the origin labeling pass — adds `origin: "governance" | "direct-management"` to responses. This is optional/future; the handler comments + ADR documentation serve this purpose for now.
 
-Step 3 is the origin labeling pass — adds `origin: "governance" | "direct-management"` to responses. This is optional/future; the handler comments + ADR documentation serve this purpose for now.
+Step 3 is full lifecycle unification (future work).
 
-Step 4 is full lifecycle unification (future work).
+---
+
+## Phase 4c: Read Unification — Step 1b Implementation (2026-04-01)
+
+### Implemented: Clearing Agreement Read Surface
+
+Added the following to `FederationService` (icn-kernel-api) and implemented in
+`FederationServiceImpl` (icn-core):
+
+```rust
+fn list_agreements(&self) -> Result<Vec<ClearingAgreementView>>;
+fn get_agreement(&self, agreement_id: &str) -> Result<Option<ClearingAgreementView>>;
+```
+
+New view DTO in `icn-kernel-api`:
+```rust
+pub struct ClearingAgreementView {
+    pub agreement_id: String,
+    pub coop_a: String,
+    pub coop_a_did: String,   // Did as string — no icn-identity dep in kernel-api
+    pub coop_b: String,
+    pub coop_b_did: String,
+    pub settlement_interval: String, // "daily" | "weekly" | "monthly" | "manual"
+    pub max_imbalance: i64,
+    pub created_at: u64,
+    pub exchange_rates: std::collections::HashMap<String, f64>,
+}
+```
+
+**Boundary notes**:
+- `Did` mapped to `String` — `icn-kernel-api` has no `icn-identity` dependency
+- `SettlementInterval` mapped to string — avoids cross-crate enum duplication, safe for future variants
+- `signatures` field omitted — raw cryptographic bytes have no API utility and must not cross boundary
+- `exchange_rates: HashMap<String, f64>` crosses freely (std primitives)
+- `None` clearing manager: `list_agreements` returns empty vec, `get_agreement` returns `Ok(None)`
+
+Gateway handlers updated to prefer service in daemon mode:
+- `GET /federation/clearing` — prefers `FederationService::list_agreements()`
+- `GET /federation/clearing/{id}` — prefers `FederationService::get_agreement()`
+
+In standalone mode (no service injected), both fall back to `FederationManager`.
+
+**Tests added** (3 new in `api/federation.rs`):
+- `test_list_agreements_prefers_federation_service` — proves service path taken over mgr, correct shape
+- `test_get_agreement_prefers_federation_service` — proves get + 404 behavior
+- `test_list_agreements_falls_back_to_fed_mgr_when_no_service` — proves fallback path fires
 
 ---
 

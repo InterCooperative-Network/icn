@@ -436,27 +436,61 @@ pub async fn issue_attestation(
 // ============================================================================
 
 /// GET /federation/clearing - List clearing agreements
+///
+/// When the daemon's FederationService is available, returns agreements registered via
+/// governance execution (`establish_clearing` effects). These carry full provenance.
+/// In standalone mode, falls back to the gateway's direct-management registry.
+///
+/// Note: the two paths are separate stores (ADR 0012). This endpoint always reflects
+/// exactly one path — it does not merge both.
 #[get("/clearing")]
 pub async fn list_agreements(
     http_req: HttpRequest,
     fed_mgr: web::Data<Arc<FederationManager>>,
+    federation_service: web::Data<Arc<Option<Arc<dyn FederationService>>>>,
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "federation:read")?;
 
+    // Prefer supervisor-owned service (governance-registered agreements).
+    if let Some(ref service) = ***federation_service {
+        let agreements = service
+            .list_agreements()
+            .map_err(|e| GatewayError::InternalError(e.to_string()))?;
+        return Ok(HttpResponse::Ok().json(agreements));
+    }
+
+    // Standalone fallback: gateway-local FederationManager.
     let agreements = fed_mgr.list_agreements().await?;
     Ok(HttpResponse::Ok().json(agreements))
 }
 
 /// GET /federation/clearing/{agreement_id} - Get a clearing agreement
+///
+/// Prefers the supervisor-owned registry in daemon mode. Falls back to
+/// the gateway's direct-management registry in standalone mode.
 #[get("/clearing/{agreement_id}")]
 pub async fn get_agreement(
     http_req: HttpRequest,
     fed_mgr: web::Data<Arc<FederationManager>>,
+    federation_service: web::Data<Arc<Option<Arc<dyn FederationService>>>>,
     path: web::Path<String>,
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "federation:read")?;
 
     let agreement_id = path.into_inner();
+
+    if let Some(ref service) = ***federation_service {
+        return match service
+            .get_agreement(&agreement_id)
+            .map_err(|e| GatewayError::InternalError(e.to_string()))?
+        {
+            Some(agreement) => Ok(HttpResponse::Ok().json(agreement)),
+            None => Err(GatewayError::NotFound(format!(
+                "Agreement not found: {agreement_id}"
+            ))),
+        };
+    }
+
     match fed_mgr.get_agreement(&agreement_id).await? {
         Some(agreement) => Ok(HttpResponse::Ok().json(agreement)),
         None => Err(GatewayError::NotFound(format!(
@@ -781,7 +815,7 @@ pub async fn federation_connect(
 mod tests {
     use super::*;
     use actix_web::{test, App};
-    use icn_kernel_api::CooperativeView;
+    use icn_kernel_api::{ClearingAgreementView, CooperativeView};
 
     #[actix_web::test]
     async fn test_federation_status_route_matches() {
@@ -901,6 +935,15 @@ mod tests {
             fn get_vouches_for(&self, _coop_id: &str) -> anyhow::Result<Vec<String>> {
                 Ok(vec!["did:icn:voucher-stub".to_string()])
             }
+            fn list_agreements(&self) -> anyhow::Result<Vec<ClearingAgreementView>> {
+                Ok(vec![])
+            }
+            fn get_agreement(
+                &self,
+                _agreement_id: &str,
+            ) -> anyhow::Result<Option<ClearingAgreementView>> {
+                Ok(None)
+            }
         }
 
         let fed_mgr = Arc::new(FederationManager::new());
@@ -1013,6 +1056,39 @@ mod tests {
             }
             fn get_vouches_for(&self, _: &str) -> anyhow::Result<Vec<String>> {
                 Ok(vec!["did:icn:voucher-gov".to_string()])
+            }
+            fn list_agreements(&self) -> anyhow::Result<Vec<ClearingAgreementView>> {
+                Ok(vec![ClearingAgreementView {
+                    agreement_id: "agr-gov-001".to_string(),
+                    coop_a: "coop-alpha".to_string(),
+                    coop_a_did: "did:icn:alpha".to_string(),
+                    coop_b: "coop-beta".to_string(),
+                    coop_b_did: "did:icn:beta".to_string(),
+                    settlement_interval: "weekly".to_string(),
+                    max_imbalance: 5000,
+                    created_at: 1_000_000,
+                    exchange_rates: std::collections::HashMap::new(),
+                }])
+            }
+            fn get_agreement(
+                &self,
+                agreement_id: &str,
+            ) -> anyhow::Result<Option<ClearingAgreementView>> {
+                if agreement_id == "agr-gov-001" {
+                    Ok(Some(ClearingAgreementView {
+                        agreement_id: "agr-gov-001".to_string(),
+                        coop_a: "coop-alpha".to_string(),
+                        coop_a_did: "did:icn:alpha".to_string(),
+                        coop_b: "coop-beta".to_string(),
+                        coop_b_did: "did:icn:beta".to_string(),
+                        settlement_interval: "weekly".to_string(),
+                        max_imbalance: 5000,
+                        created_at: 1_000_000,
+                        exchange_rates: std::collections::HashMap::new(),
+                    }))
+                } else {
+                    Ok(None)
+                }
             }
         }
         Arc::new(Some(Arc::new(Stub) as Arc<dyn FederationService>))
@@ -1182,6 +1258,141 @@ mod tests {
         assert_eq!(
             body["vouches"][0], "did:icn:voucher-gov",
             "must come from FederationService (governance path)"
+        );
+    }
+
+    /// Verify that list_agreements prefers FederationService over local FederationManager.
+    ///
+    /// Architectural invariant (ADR 0012 Step 1b): when the supervisor's FederationService
+    /// is available, GET /federation/clearing must return governance-established agreements,
+    /// not the gateway-local direct-management state.
+    #[actix_web::test]
+    async fn test_list_agreements_prefers_federation_service() {
+        use actix_web::HttpMessage;
+
+        let fed_mgr = Arc::new(FederationManager::new());
+        let service_data = stub_service_data();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(fed_mgr.clone()))
+                .app_data(web::Data::new(service_data))
+                .service(web::scope("/v1/federation").service(list_agreements)),
+        )
+        .await;
+
+        let claims = crate::auth::TokenClaims {
+            sub: "did:icn:test".to_string(),
+            iat: 1_000_000_000,
+            coop_id: "test-coop".to_string(),
+            scopes: vec!["federation:read".to_string()],
+            exp: 9_999_999_999,
+        };
+        let req = test::TestRequest::get()
+            .uri("/v1/federation/clearing")
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        let agreements = body.as_array().expect("expected array");
+        assert_eq!(
+            agreements.len(),
+            1,
+            "should return exactly the stub agreement"
+        );
+        assert_eq!(
+            agreements[0]["agreement_id"], "agr-gov-001",
+            "must come from FederationService (governance path), not FederationManager"
+        );
+        assert_eq!(agreements[0]["coop_a"], "coop-alpha");
+        assert_eq!(agreements[0]["settlement_interval"], "weekly");
+    }
+
+    /// Verify that get_agreement returns from FederationService and 404s for unknown agreements.
+    ///
+    /// Architectural invariant (ADR 0012 Step 1b): the gateway must never present state from
+    /// its own local manager when the supervisor-owned service is available.
+    #[actix_web::test]
+    async fn test_get_agreement_prefers_federation_service() {
+        use actix_web::HttpMessage;
+
+        let fed_mgr = Arc::new(FederationManager::new());
+        let service_data = stub_service_data();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(fed_mgr.clone()))
+                .app_data(web::Data::new(service_data))
+                .service(web::scope("/v1/federation").service(get_agreement)),
+        )
+        .await;
+
+        let make_claims = || crate::auth::TokenClaims {
+            sub: "did:icn:test".to_string(),
+            iat: 1_000_000_000,
+            coop_id: "test-coop".to_string(),
+            scopes: vec!["federation:read".to_string()],
+            exp: 9_999_999_999,
+        };
+
+        // Known agreement → 200 with correct shape
+        let req = test::TestRequest::get()
+            .uri("/v1/federation/clearing/agr-gov-001")
+            .to_request();
+        req.extensions_mut().insert(make_claims());
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status().as_u16(), 200);
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["agreement_id"], "agr-gov-001");
+        assert_eq!(body["coop_a"], "coop-alpha");
+        assert_eq!(body["max_imbalance"], 5000);
+
+        // Unknown agreement → 404 (service returns None)
+        let req2 = test::TestRequest::get()
+            .uri("/v1/federation/clearing/nonexistent")
+            .to_request();
+        req2.extensions_mut().insert(make_claims());
+        let resp2 = test::call_service(&app, req2).await;
+        assert_eq!(resp2.status().as_u16(), 404);
+    }
+
+    /// Verify that list_agreements falls back to FederationManager when no service is present.
+    #[actix_web::test]
+    async fn test_list_agreements_falls_back_to_fed_mgr_when_no_service() {
+        use actix_web::HttpMessage;
+
+        let fed_mgr = Arc::new(FederationManager::new());
+        let no_service: Arc<Option<Arc<dyn FederationService>>> = Arc::new(None);
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(fed_mgr.clone()))
+                .app_data(web::Data::new(no_service))
+                .service(web::scope("/v1/federation").service(list_agreements)),
+        )
+        .await;
+
+        let claims = crate::auth::TokenClaims {
+            sub: "did:icn:test".to_string(),
+            iat: 1_000_000_000,
+            coop_id: "test-coop".to_string(),
+            scopes: vec!["federation:read".to_string()],
+            exp: 9_999_999_999,
+        };
+        let req = test::TestRequest::get()
+            .uri("/v1/federation/clearing")
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        // FederationManager not initialized → may error, but route matched (NOT 404).
+        assert_ne!(
+            resp.status().as_u16(),
+            404,
+            "route must match even without FederationService (fell through to fed_mgr path)"
         );
     }
 
