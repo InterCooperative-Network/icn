@@ -1068,6 +1068,11 @@ pub enum FederationProposal {
         settlement_interval: SettlementInterval,
         /// Currency for the clearing arrangement
         currency: String,
+        /// If this proposal was created by the `propose-adoption` path (ADR 0013 Model B),
+        /// this carries the ID of the originating direct-management agreement.
+        /// `None` for ordinary governance-originated proposals.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        source_agreement_id: Option<String>,
     },
 
     /// Terminate an existing clearing agreement
@@ -1902,6 +1907,7 @@ mod tests {
                 max_imbalance: 50_000,
                 settlement_interval: SettlementInterval::Weekly,
                 currency: "HOURS".to_string(),
+                source_agreement_id: None,
             }),
         );
 
@@ -2003,6 +2009,7 @@ mod tests {
                 max_imbalance: 1000,
                 settlement_interval: SettlementInterval::Daily,
                 currency: "HOURS".to_string(),
+                source_agreement_id: None,
             }
             .action_name(),
             "establish_clearing"
@@ -2173,6 +2180,7 @@ mod tests {
             max_imbalance: 0,
             settlement_interval: SettlementInterval::Weekly,
             currency: "HOURS".to_string(),
+            source_agreement_id: None,
         };
         assert!(zero_imbalance.validate().is_err());
         assert!(zero_imbalance
@@ -2336,6 +2344,7 @@ mod tests {
                 max_imbalance: 50000,
                 settlement_interval: SettlementInterval::Weekly,
                 currency: "HOURS".to_string(),
+                source_agreement_id: None,
             },
             FederationProposal::VouchForCooperative {
                 target_coop_id: "target".to_string(),

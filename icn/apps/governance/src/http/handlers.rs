@@ -2012,6 +2012,7 @@ pub async fn create_establish_clearing_proposal<E: GovernanceEventEmitter + Clon
         max_imbalance: req.max_imbalance,
         settlement_interval,
         currency: req.currency.clone(),
+        source_agreement_id: None,
     };
 
     create_federation_proposal_impl(

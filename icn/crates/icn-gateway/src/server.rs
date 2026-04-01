@@ -1817,6 +1817,7 @@ impl GatewayServer {
                                 .service(api::federation::list_agreements)
                                 .service(api::federation::get_agreement)
                                 .service(api::federation::create_agreement)
+                                .service(api::federation::propose_clearing_adoption)
                                 .service(api::federation::get_position)
                                 .service(api::federation::trigger_settlement)
                                 .service(api::federation::process_scheduled_settlements)

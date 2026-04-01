@@ -445,15 +445,27 @@ fn translate_federation_proposal(
             )])
         }
         FederationProposal::EstablishClearing {
-            partner_coop_did, ..
+            partner_coop_did,
+            settlement_interval,
+            max_imbalance,
+            source_agreement_id,
+            ..
         } => Ok(vec![KernelEffect::Federation(
             FederationEffect::EstablishClearing {
                 coop_a_did: String::new(),
                 coop_b_did: partner_coop_did.to_string(),
                 agreement_hash: String::new(),
-                settlement_interval: None,
-                max_imbalance: None,
-                source_agreement_id: None,
+                settlement_interval: Some(
+                    match settlement_interval {
+                        icn_federation::SettlementInterval::Daily => "daily",
+                        icn_federation::SettlementInterval::Weekly => "weekly",
+                        icn_federation::SettlementInterval::Monthly => "monthly",
+                        icn_federation::SettlementInterval::Manual => "manual",
+                    }
+                    .to_string(),
+                ),
+                max_imbalance: Some(*max_imbalance),
+                source_agreement_id: source_agreement_id.clone(),
             },
         )]),
         FederationProposal::VouchForCooperative {
