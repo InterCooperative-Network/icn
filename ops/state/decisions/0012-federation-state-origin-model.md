@@ -346,9 +346,9 @@ This is a long-term path, not a current requirement.
 | 1a. `list/get_cooperative`, `get_vouches_for`, `CooperativeView` DTO | None | Low | `icn-kernel-api` + `icn-core` + `icn-gateway` | ✅ Done (2026-03-31) |
 | 1b. `list/get_agreement`, `ClearingAgreementView` DTO | None | Low | `icn-kernel-api` + `icn-core` + `icn-gateway` | ✅ Done (2026-04-01) |
 | 2. Add origin labeling to response DTOs | Steps 1a+1b | Medium | Cross-crate | ✅ Done (2026-04-01) |
-| 3a. Terms propagation fix + source reference fields | Steps 1-2 + store-isolation tests | Low | `icn-kernel-api` + `icn-core` | ⏳ Designed (ADR 0013) |
-| 3b. Adoption provenance persistence (Sled) | Step 3a | Low | `icn-core` | ⏳ Designed (ADR 0013) |
-| 3c. `source_agreement_id` in ClearingAgreementView | Step 3b | Low | `icn-kernel-api` + `icn-gateway` | ⏳ Designed (ADR 0013) |
+| 3a. Terms propagation fix + source reference fields | Steps 1-2 + store-isolation tests | Low | `icn-kernel-api` + `icn-core` | ✅ Done (2026-04-01) |
+| 3b. Adoption provenance persistence (Sled) | Step 3a | Low | `icn-core` | ✅ Done (2026-04-01) |
+| 3c. `source_agreement_id` in ClearingAgreementView | Step 3b | Low | `icn-kernel-api` + `icn-gateway` | ✅ Done (2026-04-01) |
 | 3d. Adoption proposal endpoint | Steps 3a-3c + governance plumbing | High | `icn-gateway` + governance | ⏳ Future (ADR 0013) |
 
 Step 2 is the origin labeling pass — adds `origin: "governance" | "direct-management"` to view DTOs and gateway fallback paths. See Phase 4d below.
