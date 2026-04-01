@@ -266,6 +266,7 @@ pub struct CooperativeView {
     pub gateway_endpoints: Vec<String>,
     pub capabilities: Vec<String>,
     pub last_seen: u64,
+    pub origin: String,        // "governance" | "direct-management" (added Step 2)
 }
 ```
 
@@ -344,10 +345,10 @@ This is a long-term path, not a current requirement.
 |------|-------------|------|-------|--------|
 | 1a. `list/get_cooperative`, `get_vouches_for`, `CooperativeView` DTO | None | Low | `icn-kernel-api` + `icn-core` + `icn-gateway` | ✅ Done (2026-03-31) |
 | 1b. `list/get_agreement`, `ClearingAgreementView` DTO | None | Low | `icn-kernel-api` + `icn-core` + `icn-gateway` | ✅ Done (2026-04-01) |
-| 2. Add origin labeling to response DTOs | Steps 1a+1b | Medium | Cross-crate | ⏳ Future |
+| 2. Add origin labeling to response DTOs | Steps 1a+1b | Medium | Cross-crate | ✅ Done (2026-04-01) |
 | 3. Implement CCL adoption contract | Step 2 + CCL work | High | `icn-ccl`, `icn-governance` | ⏳ Future |
 
-Step 2 is the origin labeling pass — adds `origin: "governance" | "direct-management"` to responses. This is optional/future; the handler comments + ADR documentation serve this purpose for now.
+Step 2 is the origin labeling pass — adds `origin: "governance" | "direct-management"` to view DTOs and gateway fallback paths. See Phase 4d below.
 
 Step 3 is full lifecycle unification (future work).
 
@@ -377,6 +378,7 @@ pub struct ClearingAgreementView {
     pub max_imbalance: i64,
     pub created_at: u64,
     pub exchange_rates: std::collections::HashMap<String, f64>,
+    pub origin: String,       // "governance" | "direct-management" (added Step 2)
 }
 ```
 
@@ -397,6 +399,85 @@ In standalone mode (no service injected), both fall back to `FederationManager`.
 - `test_list_agreements_prefers_federation_service` — proves service path taken over mgr, correct shape
 - `test_get_agreement_prefers_federation_service` — proves get + 404 behavior
 - `test_list_agreements_falls_back_to_fed_mgr_when_no_service` — proves fallback path fires
+
+---
+
+## Phase 4d: Origin Labeling — Step 2 Implementation (2026-04-01)
+
+### Why origin labeling was needed after Step 1a/1b
+
+After Steps 1a and 1b, the 5 federation GET endpoints all have two possible code paths:
+- **Service path** — reads from the supervisor's store (governance-originated state)
+- **Fallback path** — reads from `FederationManager` (direct-management state)
+
+Before this step:
+1. The `origin` was entirely implicit — clients had no in-band signal indicating which path was taken
+2. The fallback paths serialized raw `icn-federation` domain types (`CooperativeInfo`,
+   `BilateralClearingAgreement`) with different JSON shapes than the service-path view DTOs —
+   creating an undocumented shape inconsistency between daemon mode and standalone mode
+
+### Labeling model chosen: Option A (add `origin` field to view DTOs)
+
+Considered:
+- **Option B (envelope `{ origin, data }`)**: body-breaking change, requires unwrap by clients
+- **Option C (response header)**: silently ignorable, not reflected in OpenAPI
+- **Option A (field on DTOs)**: consistent with existing DTO pattern, visible in body, type-safe
+
+Chose Option A. The `origin` field is a stable string at the `CooperativeView` and
+`ClearingAgreementView` boundaries. It is not a full provenance record — that requires
+`decision_receipt_id` / `decision_hash`, which belong in a future promotion-path design.
+
+### DTOs changed
+
+`CooperativeView` in `icn-kernel-api`:
+- Added `pub origin: String` — `"governance"` or `"direct-management"`
+
+`ClearingAgreementView` in `icn-kernel-api`:
+- Added `pub origin: String` — `"governance"` or `"direct-management"`
+
+`GET /federation/coops/{id}/vouches` response (raw JSON object):
+- Added `"origin"` key directly — not a typed DTO
+
+### Handler changes
+
+**Service path** (daemon mode): `origin = "governance"` — set in `FederationServiceImpl` mappers
+in `icn-core`
+
+**Fallback path** (standalone mode): `origin = "direct-management"` — set in gateway handler
+adapters. **Important**: the fallback paths now also adapt the raw `icn-federation` types
+(`CooperativeInfo`, `BilateralClearingAgreement`) to the view DTOs. This:
+- Unifies the response shape regardless of which path was taken
+- Eliminates the hidden shape inconsistency between daemon and standalone mode
+- Ensures `signatures`, `FederationPolicy`, `CurrencyInfo` fields never reach API consumers
+
+`ClearingPositionView` was NOT labeled — this endpoint only has one meaningful path
+(`FederationService`) and the fallback already builds the same DTO from gateway state.
+The handler comments explain the distinction.
+
+### Tests added (5 new)
+
+- `test_list_coops_origin_governance_when_service_present`
+- `test_get_coop_origin_governance_when_service_present`
+- `test_get_vouches_origin_governance_when_service_present`
+- `test_list_agreements_origin_governance_when_service_present`
+- `test_get_agreement_origin_governance_when_service_present`
+
+Each asserts `body["origin"] == "governance"` when the stub service is injected.
+Fallback path (direct-management) origin is covered implicitly by the existing fallback tests
+(`test_list_coops_falls_back_to_fed_mgr_when_no_service`, etc.) which now produce labeled
+`ClearingAgreementView` / `CooperativeView` responses.
+
+### What the next slice should be
+
+Step 3 (CCL adoption contract) is the next major item in the sequencing table. It is high
+complexity and requires `icn-ccl` / `icn-governance` work. The minimal prerequisite design:
+a CCL contract type that accepts a `BilateralClearingAgreement` payload and on approval executes
+`FederationEffect::EstablishClearing` with the same terms + provenance from the vote decision.
+
+Before Step 3: consider whether origin labeling should be extended to include
+`decision_receipt_id` and `decision_hash` on `"governance"` records — currently these fields are
+available in `FederationProvenance` (stored in `FederationServiceImpl`) but not exposed in the
+view DTOs. Exposing them would allow clients to verify governance provenance directly from the API.
 
 ---
 

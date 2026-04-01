@@ -15,7 +15,9 @@ use icn_federation::{
     SettlementInterval, SettlementReport, TrustContext, Vouch,
 };
 use icn_identity::Did;
-use icn_kernel_api::{ClearingPositionView, FederationService};
+use icn_kernel_api::{
+    ClearingAgreementView, ClearingPositionView, CooperativeView, FederationService,
+};
 
 // ============================================================================
 // Request/Response Models
@@ -182,8 +184,23 @@ pub async fn list_coops(
     }
 
     // Standalone fallback: gateway-local FederationManager.
+    // Adapt to CooperativeView so the response shape is identical to the service path.
+    // origin = "direct-management" because these records come from the gateway API
+    // write path, not from governance execution (ADR 0012 / Model C).
     let coops = fed_mgr.list_cooperatives().await?;
-    Ok(HttpResponse::Ok().json(coops))
+    let views: Vec<CooperativeView> = coops
+        .into_iter()
+        .map(|c| CooperativeView {
+            coop_id: c.coop_id,
+            name: c.name,
+            public_did: c.public_did.to_string(),
+            gateway_endpoints: c.gateway_endpoints,
+            capabilities: c.capabilities,
+            last_seen: c.last_seen,
+            origin: "direct-management".to_string(),
+        })
+        .collect();
+    Ok(HttpResponse::Ok().json(views))
 }
 
 /// GET /federation/coops/{coop_id} - Get a specific cooperative
@@ -213,8 +230,18 @@ pub async fn get_coop(
         };
     }
 
+    // Adapt to CooperativeView so the response shape matches the service path.
+    // origin = "direct-management": written via the gateway API, not governance execution.
     match fed_mgr.get_cooperative(&coop_id).await? {
-        Some(coop) => Ok(HttpResponse::Ok().json(coop)),
+        Some(c) => Ok(HttpResponse::Ok().json(CooperativeView {
+            coop_id: c.coop_id,
+            name: c.name,
+            public_did: c.public_did.to_string(),
+            gateway_endpoints: c.gateway_endpoints,
+            capabilities: c.capabilities,
+            last_seen: c.last_seen,
+            origin: "direct-management".to_string(),
+        })),
         None => Err(GatewayError::NotFound(format!(
             "Cooperative not found: {coop_id}"
         ))),
@@ -281,15 +308,20 @@ pub async fn get_vouches(
         let vouches = service
             .get_vouches_for(&coop_id)
             .map_err(|e| GatewayError::InternalError(e.to_string()))?;
+        // origin = "governance": vouch records written by governance execution
+        // (vouch_for_cooperative effects), not the direct-management API.
         return Ok(HttpResponse::Ok().json(serde_json::json!({
             "coop_id": coop_id,
+            "origin": "governance",
             "vouches": vouches
         })));
     }
 
     let vouches = fed_mgr.get_vouches(&coop_id).await?;
+    // origin = "direct-management": vouch records written via the gateway API path.
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "coop_id": coop_id,
+        "origin": "direct-management",
         "vouches": vouches
     })))
 }
@@ -460,8 +492,32 @@ pub async fn list_agreements(
     }
 
     // Standalone fallback: gateway-local FederationManager.
+    // Adapt to ClearingAgreementView so the response shape matches the service path.
+    // origin = "direct-management": these agreements were created via the gateway API,
+    // not through governance execution (ADR 0012 / Model C).
     let agreements = fed_mgr.list_agreements().await?;
-    Ok(HttpResponse::Ok().json(agreements))
+    let views: Vec<ClearingAgreementView> = agreements
+        .into_iter()
+        .map(|a| ClearingAgreementView {
+            agreement_id: a.agreement_id,
+            coop_a: a.coop_a,
+            coop_a_did: a.coop_a_did.to_string(),
+            coop_b: a.coop_b,
+            coop_b_did: a.coop_b_did.to_string(),
+            settlement_interval: match a.settlement_interval {
+                SettlementInterval::Daily => "daily",
+                SettlementInterval::Weekly => "weekly",
+                SettlementInterval::Monthly => "monthly",
+                SettlementInterval::Manual => "manual",
+            }
+            .to_string(),
+            max_imbalance: a.max_imbalance,
+            created_at: a.created_at,
+            exchange_rates: a.exchange_rates,
+            origin: "direct-management".to_string(),
+        })
+        .collect();
+    Ok(HttpResponse::Ok().json(views))
 }
 
 /// GET /federation/clearing/{agreement_id} - Get a clearing agreement
@@ -491,8 +547,27 @@ pub async fn get_agreement(
         };
     }
 
+    // Adapt to ClearingAgreementView so the response shape matches the service path.
+    // origin = "direct-management": written via the gateway API, not governance execution.
     match fed_mgr.get_agreement(&agreement_id).await? {
-        Some(agreement) => Ok(HttpResponse::Ok().json(agreement)),
+        Some(a) => Ok(HttpResponse::Ok().json(ClearingAgreementView {
+            agreement_id: a.agreement_id,
+            coop_a: a.coop_a,
+            coop_a_did: a.coop_a_did.to_string(),
+            coop_b: a.coop_b,
+            coop_b_did: a.coop_b_did.to_string(),
+            settlement_interval: match a.settlement_interval {
+                SettlementInterval::Daily => "daily",
+                SettlementInterval::Weekly => "weekly",
+                SettlementInterval::Monthly => "monthly",
+                SettlementInterval::Manual => "manual",
+            }
+            .to_string(),
+            max_imbalance: a.max_imbalance,
+            created_at: a.created_at,
+            exchange_rates: a.exchange_rates,
+            origin: "direct-management".to_string(),
+        })),
         None => Err(GatewayError::NotFound(format!(
             "Agreement not found: {agreement_id}"
         ))),
@@ -916,6 +991,7 @@ mod tests {
                     gateway_endpoints: vec![],
                     capabilities: vec![],
                     last_seen: 0,
+                    origin: "governance".to_string(),
                 }])
             }
             fn get_cooperative(&self, coop_id: &str) -> anyhow::Result<Option<CooperativeView>> {
@@ -927,6 +1003,7 @@ mod tests {
                         gateway_endpoints: vec![],
                         capabilities: vec![],
                         last_seen: 0,
+                        origin: "governance".to_string(),
                     }))
                 } else {
                     Ok(None)
@@ -1038,6 +1115,7 @@ mod tests {
                     gateway_endpoints: vec!["http://gov.local:8080".to_string()],
                     capabilities: vec!["clearing".to_string()],
                     last_seen: 1_000_000,
+                    origin: "governance".to_string(),
                 }])
             }
             fn get_cooperative(&self, coop_id: &str) -> anyhow::Result<Option<CooperativeView>> {
@@ -1049,6 +1127,7 @@ mod tests {
                         gateway_endpoints: vec![],
                         capabilities: vec![],
                         last_seen: 1_000_000,
+                        origin: "governance".to_string(),
                     }))
                 } else {
                     Ok(None)
@@ -1068,6 +1147,7 @@ mod tests {
                     max_imbalance: 5000,
                     created_at: 1_000_000,
                     exchange_rates: std::collections::HashMap::new(),
+                    origin: "governance".to_string(),
                 }])
             }
             fn get_agreement(
@@ -1085,6 +1165,7 @@ mod tests {
                         max_imbalance: 5000,
                         created_at: 1_000_000,
                         exchange_rates: std::collections::HashMap::new(),
+                        origin: "governance".to_string(),
                     }))
                 } else {
                     Ok(None)
@@ -1393,6 +1474,195 @@ mod tests {
             resp.status().as_u16(),
             404,
             "route must match even without FederationService (fell through to fed_mgr path)"
+        );
+    }
+
+    // ── Origin labeling tests (ADR 0012 Step 2) ────────────────────────────────
+
+    /// Service-backed coop list carries origin = "governance".
+    #[actix_web::test]
+    async fn test_list_coops_origin_governance_when_service_present() {
+        use actix_web::HttpMessage;
+
+        let fed_mgr = Arc::new(FederationManager::new());
+        let service_data = stub_service_data();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(fed_mgr.clone()))
+                .app_data(web::Data::new(service_data))
+                .service(web::scope("/v1/federation").service(list_coops)),
+        )
+        .await;
+
+        let claims = crate::auth::TokenClaims {
+            sub: "did:icn:test".to_string(),
+            iat: 1_000_000_000,
+            coop_id: "test-coop".to_string(),
+            scopes: vec!["federation:read".to_string()],
+            exp: 9_999_999_999,
+        };
+        let req = test::TestRequest::get()
+            .uri("/v1/federation/coops")
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status().as_u16(), 200);
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        let coops = body.as_array().expect("expected array");
+        assert_eq!(
+            coops[0]["origin"], "governance",
+            "service-backed coop list must carry origin = governance"
+        );
+    }
+
+    /// Service-backed get_coop carries origin = "governance".
+    #[actix_web::test]
+    async fn test_get_coop_origin_governance_when_service_present() {
+        use actix_web::HttpMessage;
+
+        let fed_mgr = Arc::new(FederationManager::new());
+        let service_data = stub_service_data();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(fed_mgr.clone()))
+                .app_data(web::Data::new(service_data))
+                .service(web::scope("/v1/federation").service(get_coop)),
+        )
+        .await;
+
+        let claims = crate::auth::TokenClaims {
+            sub: "did:icn:test".to_string(),
+            iat: 1_000_000_000,
+            coop_id: "test-coop".to_string(),
+            scopes: vec!["federation:read".to_string()],
+            exp: 9_999_999_999,
+        };
+        let req = test::TestRequest::get()
+            .uri("/v1/federation/coops/governance-coop")
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status().as_u16(), 200);
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(
+            body["origin"], "governance",
+            "service-backed coop must carry origin = governance"
+        );
+    }
+
+    /// Service-backed vouches carry origin = "governance".
+    #[actix_web::test]
+    async fn test_get_vouches_origin_governance_when_service_present() {
+        use actix_web::HttpMessage;
+
+        let fed_mgr = Arc::new(FederationManager::new());
+        let service_data = stub_service_data();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(fed_mgr.clone()))
+                .app_data(web::Data::new(service_data))
+                .service(web::scope("/v1/federation").service(get_vouches)),
+        )
+        .await;
+
+        let claims = crate::auth::TokenClaims {
+            sub: "did:icn:test".to_string(),
+            iat: 1_000_000_000,
+            coop_id: "test-coop".to_string(),
+            scopes: vec!["federation:read".to_string()],
+            exp: 9_999_999_999,
+        };
+        let req = test::TestRequest::get()
+            .uri("/v1/federation/coops/any-coop/vouches")
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status().as_u16(), 200);
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(
+            body["origin"], "governance",
+            "service-backed vouches must carry origin = governance"
+        );
+    }
+
+    /// Service-backed agreement list carries origin = "governance".
+    #[actix_web::test]
+    async fn test_list_agreements_origin_governance_when_service_present() {
+        use actix_web::HttpMessage;
+
+        let fed_mgr = Arc::new(FederationManager::new());
+        let service_data = stub_service_data();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(fed_mgr.clone()))
+                .app_data(web::Data::new(service_data))
+                .service(web::scope("/v1/federation").service(list_agreements)),
+        )
+        .await;
+
+        let claims = crate::auth::TokenClaims {
+            sub: "did:icn:test".to_string(),
+            iat: 1_000_000_000,
+            coop_id: "test-coop".to_string(),
+            scopes: vec!["federation:read".to_string()],
+            exp: 9_999_999_999,
+        };
+        let req = test::TestRequest::get()
+            .uri("/v1/federation/clearing")
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status().as_u16(), 200);
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        let agreements = body.as_array().expect("expected array");
+        assert_eq!(
+            agreements[0]["origin"], "governance",
+            "service-backed clearing list must carry origin = governance"
+        );
+    }
+
+    /// Service-backed get_agreement carries origin = "governance".
+    #[actix_web::test]
+    async fn test_get_agreement_origin_governance_when_service_present() {
+        use actix_web::HttpMessage;
+
+        let fed_mgr = Arc::new(FederationManager::new());
+        let service_data = stub_service_data();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(fed_mgr.clone()))
+                .app_data(web::Data::new(service_data))
+                .service(web::scope("/v1/federation").service(get_agreement)),
+        )
+        .await;
+
+        let claims = crate::auth::TokenClaims {
+            sub: "did:icn:test".to_string(),
+            iat: 1_000_000_000,
+            coop_id: "test-coop".to_string(),
+            scopes: vec!["federation:read".to_string()],
+            exp: 9_999_999_999,
+        };
+        let req = test::TestRequest::get()
+            .uri("/v1/federation/clearing/agr-gov-001")
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status().as_u16(), 200);
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(
+            body["origin"], "governance",
+            "service-backed agreement must carry origin = governance"
         );
     }
 

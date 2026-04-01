@@ -614,6 +614,8 @@ impl FederationService for FederationServiceImpl {
                 gateway_endpoints: c.gateway_endpoints,
                 capabilities: c.capabilities,
                 last_seen: c.last_seen,
+                // This record came from governance execution (join_federation effect).
+                origin: "governance".to_string(),
             })
             .collect())
     }
@@ -629,6 +631,8 @@ impl FederationService for FederationServiceImpl {
                 gateway_endpoints: c.gateway_endpoints,
                 capabilities: c.capabilities,
                 last_seen: c.last_seen,
+                // This record came from governance execution (join_federation effect).
+                origin: "governance".to_string(),
             }))
     }
 
@@ -662,6 +666,8 @@ impl FederationService for FederationServiceImpl {
                 max_imbalance: a.max_imbalance,
                 created_at: a.created_at,
                 exchange_rates: a.exchange_rates,
+                // This record came from governance execution (establish_clearing effect).
+                origin: "governance".to_string(),
             })
             .collect())
     }
@@ -692,6 +698,8 @@ impl FederationService for FederationServiceImpl {
                 max_imbalance: a.max_imbalance,
                 created_at: a.created_at,
                 exchange_rates: a.exchange_rates,
+                // This record came from governance execution (establish_clearing effect).
+                origin: "governance".to_string(),
             }))
     }
 }

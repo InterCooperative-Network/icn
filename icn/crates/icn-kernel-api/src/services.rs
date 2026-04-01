@@ -1094,6 +1094,10 @@ pub struct CooperativeView {
     pub capabilities: Vec<String>,
     /// Unix timestamp of the last observed announcement.
     pub last_seen: u64,
+    /// Origin of this record: `"governance"` (from supervisor-owned FederationService, written
+    /// by governance execution) or `"direct-management"` (from the gateway's own registry,
+    /// written via the direct-management API path). ADR 0012 / Model C.
+    pub origin: String,
 }
 
 // ============================================================================
@@ -1135,6 +1139,10 @@ pub struct ClearingAgreementView {
     pub created_at: u64,
     /// Exchange rates between currencies: "from:to" -> rate.
     pub exchange_rates: std::collections::HashMap<String, f64>,
+    /// Origin of this record: `"governance"` (from supervisor-owned FederationService, written
+    /// by governance execution) or `"direct-management"` (from the gateway's own clearing store,
+    /// written via the direct-management API path). ADR 0012 / Model C.
+    pub origin: String,
 }
 
 // ============================================================================
