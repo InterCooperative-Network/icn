@@ -228,7 +228,9 @@ impl EffectExecutor for DefaultEffectExecutor {
             KernelEffect::Treasury(TreasuryEffect::DistributeSurplus { .. }) => Ok(EffectResult {
                 effect_id: decision_receipt_id.to_string(),
                 success: false,
-                message: "DistributeSurplus: not implemented in DefaultEffectExecutor; wire a KernelGovernanceExecutor for surplus distribution (no balances changed)".to_string(),
+                message: "DistributeSurplus: not implemented in DefaultEffectExecutor; \
+                          use an executor that supports DistributeSurplus (no balances changed)"
+                    .to_string(),
                 state_change_hash: None,
                 ledger_entry_id: None,
                 not_executed: false,
@@ -590,5 +592,86 @@ mod tests {
         };
         let json = serde_json::to_string(&outcome).unwrap();
         assert!(json.contains("Success"));
+    }
+
+    /// DistributeSurplus in DefaultEffectExecutor is a hard failure (not_executed: false).
+    /// This verifies that the classification is correct — hard failures bump retries
+    /// and will eventually drive the decision to PermanentlyFailed, which is the
+    /// correct behavior for an unimplemented effect that requires operator attention.
+    #[tokio::test]
+    async fn test_default_executor_distribute_surplus_is_hard_failure() {
+        use crate::effects::{KernelEffect, TreasuryEffect};
+        use std::sync::Arc;
+
+        // Minimal stub executors required by DefaultEffectExecutor::new
+        struct StubTreasury;
+        struct StubProtocol;
+
+        #[async_trait::async_trait]
+        impl TreasuryExecutor for StubTreasury {
+            async fn execute_treasury_operation(
+                &self,
+                _receipt_id: &DecisionReceiptId,
+                _op: TreasuryOperation,
+            ) -> anyhow::Result<ExecutionOutcome> {
+                Ok(ExecutionOutcome::Failed {
+                    receipt_id: DecisionReceiptId::new("stub"),
+                    reason: "stub".to_string(),
+                })
+            }
+
+            async fn get_treasury_balance(
+                &self,
+                _treasury_id: &str,
+                _currency: &str,
+            ) -> anyhow::Result<i64> {
+                Ok(0)
+            }
+        }
+
+        #[async_trait::async_trait]
+        impl ProtocolExecutor for StubProtocol {
+            async fn apply_protocol_change(
+                &self,
+                _receipt_id: &DecisionReceiptId,
+                _change: ProtocolChange,
+            ) -> anyhow::Result<ExecutionOutcome> {
+                Ok(ExecutionOutcome::Failed {
+                    receipt_id: DecisionReceiptId::new("stub"),
+                    reason: "stub".to_string(),
+                })
+            }
+
+            async fn get_parameter(&self, _name: &str) -> anyhow::Result<Option<String>> {
+                Ok(None)
+            }
+        }
+
+        let executor = DefaultEffectExecutor::new(Arc::new(StubTreasury), Arc::new(StubProtocol));
+        let effect = KernelEffect::Treasury(TreasuryEffect::DistributeSurplus {
+            treasury_did: "did:icn:test".to_string(),
+            total_amount: 1000,
+            currency: "HOURS".to_string(),
+            distributions: vec![
+                ("did:icn:member1".to_string(), 500),
+                ("did:icn:member2".to_string(), 500),
+            ],
+            decision_receipt_id: "receipt-001".to_string(),
+            decision_hash: "sha256:test".to_string(),
+        });
+
+        let result = executor
+            .execute_effect(effect, "receipt-001")
+            .await
+            .unwrap();
+        assert!(
+            !result.success,
+            "DistributeSurplus must fail in DefaultEffectExecutor"
+        );
+        assert!(
+            !result.not_executed,
+            "not_executed must be false (hard failure, not deferred)"
+        );
+        assert!(result.message.contains("DistributeSurplus"));
     }
 }
